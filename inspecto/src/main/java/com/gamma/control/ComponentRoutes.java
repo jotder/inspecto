@@ -542,7 +542,7 @@ final class ComponentRoutes implements RouteModule {
             // D7 (c): a widget's `tags` array is a projection of the assignment store, so it is derived
             // here rather than taken from the body — adopted on create, overwritten on update.
             WidgetTags.project(api, type, id, content, !componentExists(store, type, id),
-                    name -> TagRoutes.ensureTag(api, name));
+                    name -> api.service().objects().ifPresent(o -> o.ensureTag(name)));
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));

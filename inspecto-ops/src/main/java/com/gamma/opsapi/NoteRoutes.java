@@ -1,4 +1,11 @@
-package com.gamma.control;
+package com.gamma.opsapi;
+
+import com.gamma.control.AnnotationTargets;
+import com.gamma.control.RouteErrors;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.RouteModule;
 
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.NoteService;
@@ -34,7 +41,7 @@ import java.util.Map;
  * {@link NoteService.TargetResolver}, so existence and authorization cannot diverge between the read and
  * the write path. That gate is shared with the D7 tag-assignment routes; see {@link AnnotationTargets}.
  */
-final class NoteRoutes implements RouteModule {
+public final class NoteRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
@@ -82,7 +89,7 @@ final class NoteRoutes implements RouteModule {
 
     /** A request-scoped {@link NoteService} over the engine's note store, gated by {@link AnnotationTargets#gate}. */
     private NoteService notes(ApiContext api, HttpExchange ex) {
-        return new NoteService(api.service().objects().noteStore(),
+        return new NoteService(OpsEngine.of(api).noteStore(),
                 (kind, id) -> AnnotationTargets.gate(api, ex, kind, id));
     }
 }

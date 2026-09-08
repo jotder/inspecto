@@ -243,9 +243,11 @@ public final class JobService implements AutoCloseable {
     /** This space's event ledger — the on-signal Trigger source (P1c). Set by the host ({@code CollectorService});
      *  {@code null} (e.g. the bare-{@code JobService} test constructors) disables on-signal dispatch. */
     private volatile EventLog eventLog;
-    /** This space's Object Engine, wired post-construction ({@link #objects(com.gamma.ops.ObjectService)}) so
-     *  the {@code recon.run} built-in can promote a breach to an Incident; {@code null} until wired. */
-    private volatile com.gamma.ops.ObjectService objects;
+    /** This space's operational-object seam, wired post-construction ({@link #objects(ObjectAccess)}) so
+     *  the {@code recon.run} built-in can promote a breach to an Incident; {@code null} until wired.
+     *  ⚠ Typed as the seam, not the domain service: {@code com.gamma.ops} is an optional edition module
+     *  (EDG-01 cell 7) and this class is in the mandatory engine. */
+    private volatile com.gamma.objects.ObjectAccess objects;
     /** One coalescer per on-signal Job, so a burst of matching signals folds into one follow-up Run (§8.4). */
     private final Map<String, TriggerCoalescer> signalCoalescers = new ConcurrentHashMap<>();
 
@@ -432,28 +434,11 @@ public final class JobService implements AutoCloseable {
                 List.of(ParameterDecl.required("reconciliation", ParamType.STRING, "Saved reconciliation component id")),
                 List.of("recon.run.completed"), List.of()),
                 c -> new ReconRunJob(c, dataDir, () -> this.objects)));
-        // caserule.evaluate (C5 Ops): schedule the auto-grouping tail of the Alert → Incident → Case chain —
-        // evaluates a saved Case Rule, grouping matching in-window Incidents under a Case, and emits
-        // caserule.evaluate.completed. Idempotent (dedupe via attributes.raisedByRule), so a cron re-fire only
-        // attaches new matches. Requires the space Object Engine (wired via objects()); fails closed otherwise.
-        registry.register(JobTypeProvider.of(new JobTypeDescriptor("caserule.evaluate", "Case Rule Evaluation",
-                "Evaluates a saved Case Rule, grouping matching Incidents into a Case; emits a completion signal.",
-                List.of(ParameterDecl.required("rule", ParamType.STRING, "Saved case rule name")),
-                List.of("caserule.evaluate.completed"), List.of()),
-                c -> new CaseRuleEvalJob(c, () -> this.objects)));
-        // objects.analytics: materialize the Alert/Incident/Case/Task rollups as tall Parquet samples under
-        // <dataDir>/ops_analytics/ + result-stamp the ops_analytics Dataset, so Studio/BI can bind them (there
-        // is no view surface over the live inspecto_ops_objects table, and a 2nd connection to it is not
-        // allowed — so the analytics are computed in-process via objects()). Append-per-run, because the time
-        // dimension is the whole point over GET /objects/analytics. Requires the Object Engine; fails closed.
-        registry.register(JobTypeProvider.of(new JobTypeDescriptor("objects.analytics", "Object Analytics Sample",
-                "Samples Alert/Incident/Case/Task analytics into the ops_analytics Dataset for Studio/BI.",
-                List.of(ParameterDecl.optional("types", ParamType.STRING, null,
-                                "CSV of ALERT | INCIDENT | CASE | TASK (default: all four)"),
-                        ParameterDecl.optional("retention_days", ParamType.INTEGER, "0",
-                                "Forget samples older than N days (0 = keep forever)")),
-                List.of("objects.analytics.completed"), List.of()),
-                c -> new ObjectsAnalyticsJob(c, dataDir, () -> this.objects)));
+        // ⛔ caserule.evaluate and objects.analytics are NOT registered here any more (EDG-01 cell 7).
+        // Both call ObjectService.evaluateCaseRule / the analytics rollups, which the ObjectAccess seam
+        // deliberately does not expose — they are whole operational-object features, not narrow consumers,
+        // so they moved into the optional inspecto-ops module and register through the ServiceLoader
+        // JobTypeProvider loop below. On a Personal build they are simply unknown Job Types.
         // sample.hello — the inert reference Job (see SampleHelloJob). Its declaration is deliberately a
         // tour of the parameter contract (job-parameter-contract §7.2): every tier, a group, options, a
         // multi list, bounds, a secret, and a deduced date. Authors read this to learn the form.
@@ -613,7 +598,7 @@ public final class JobService implements AutoCloseable {
 
     /** Bind this service to its space's Object Engine so {@code recon.run} can promote a breach to an Incident.
      *  Optional; read live by the built-in through a supplier, so ordering vs construction doesn't matter. */
-    public void objects(com.gamma.ops.ObjectService objects) {
+    public void objects(com.gamma.objects.ObjectAccess objects) {
         this.objects = objects;
     }
 
@@ -622,12 +607,12 @@ public final class JobService implements AutoCloseable {
      * Read at run time by the {@code incident_purge} maintenance task (MNT-14).
      *
      * <p>⚠ <b>One hook, not four.</b> The retention sweep needs the object, note, link and tag-assignment
-     * stores together, and {@link com.gamma.ops.ObjectService} already holds all four as non-null final
+     * stores together, and {@code ObjectService} already holds all four as non-null final
      * fields — so there is no such thing as a partially-attached cascade to fail closed on. Do not add
      * per-store hooks alongside this one; four independently-nullable fields would reintroduce exactly the
      * half-cascade hazard this shape rules out.
      */
-    public Optional<com.gamma.ops.ObjectService> objects() {
+    public Optional<com.gamma.objects.ObjectAccess> objects() {
         return Optional.ofNullable(objects);
     }
 

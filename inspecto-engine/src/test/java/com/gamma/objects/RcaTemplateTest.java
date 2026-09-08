@@ -1,4 +1,4 @@
-package com.gamma.ops.rca;
+package com.gamma.objects;
 
 import com.gamma.objects.RcaTemplate;
 

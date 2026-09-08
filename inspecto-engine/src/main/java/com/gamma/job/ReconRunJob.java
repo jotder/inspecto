@@ -1,6 +1,6 @@
 package com.gamma.job;
 
-import com.gamma.ops.ObjectService;
+import com.gamma.objects.ObjectAccess;
 import com.gamma.objects.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -26,7 +26,7 @@ import java.util.function.Supplier;
  * future Alert Rule can watch. A breach ({@code breaks > 0}) also opens a managed {@link ObjectType#INCIDENT}
  * (deduped to one open Incident per reconciliation), the same signal→Incident wiring the alert path does, so
  * a scheduled reconciliation's breaks enter the triage workflow rather than only the signal ledger. The
- * {@link ObjectService} is resolved through a supplier (it is wired onto the {@code JobService} after this
+ * the seam is resolved through a supplier (it is wired onto the {@code JobService} after this
  * built-in is constructed); a {@code null} supplier value leaves the Job signal-only.
  *
  * <p>Follows the built-in convention of constructor-injected {@code dataDir} plus reading the component
@@ -39,11 +39,11 @@ final class ReconRunJob implements Job {
 
     private final JobConfig cfg;
     private final String dataDir;
-    /** Live view of this space's {@link ObjectService} (wired post-construction on the JobService); its value
+    /** Live view of this space's {@link ObjectAccess} (wired post-construction on the JobService); its value
      *  is {@code null} until wired and on the bare-JobService test constructors — then the Job stays signal-only. */
-    private final Supplier<ObjectService> objects;
+    private final Supplier<ObjectAccess> objects;
 
-    ReconRunJob(JobConfig cfg, String dataDir, Supplier<ObjectService> objects) {
+    ReconRunJob(JobConfig cfg, String dataDir, Supplier<ObjectAccess> objects) {
         this.cfg = cfg;
         this.dataDir = dataDir;
         this.objects = objects;
@@ -108,15 +108,15 @@ final class ReconRunJob implements Job {
     /**
      * Open a managed {@link ObjectType#INCIDENT} for a reconciliation breach, deduped to one open Incident
      * per reconciliation (correlationId = the reconciliation id) so a nightly schedule doesn't hand the
-     * operator a clone every run. No-op when no {@link ObjectService} is wired. Best-effort: a failure here
+     * operator a clone every run. No-op when no seam is wired (a Personal build has none). Best-effort: a failure here
      * is logged to the run and never fails the run itself (the signal is already the durable ledger fact).
      */
     private void openIncident(JobContext ctx, String reconId, long missingLeft, long missingRight,
                               long valueBreak, long breaks) {
-        ObjectService svc = objects == null ? null : objects.get();
+        ObjectAccess svc = objects == null ? null : objects.get();
         if (svc == null) return;
         try {
-            if (!svc.active(ObjectType.INCIDENT, reconId).isEmpty()) return;   // one open Incident per reconciliation
+            if (svc.hasActive(ObjectType.INCIDENT, reconId)) return;   // one open Incident per reconciliation
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put("reconciliation", reconId);
             attrs.put("breaks", String.valueOf(breaks));

@@ -51,7 +51,7 @@ import java.time.Instant;
  *       (D5/MNT-14). Optional {@code max_count} (default 1000) bounds one run. Legal-held Incidents are
  *       never purged and are counted separately. ⚠ The <b>only</b> destructive task over operator business
  *       records — hence {@code purge}, not {@code prune}. The append-only event trail survives a purge.
- *       See {@link IncidentPurgeTask}.</li>
+ *       Supplied by the optional {@code inspecto-ops} module since EDG-01 cell 7.</li>
  *   <li>{@code storage_report} — read-only per-axis storage usage + largest consumers over {@code dir},
  *       recorded as Run Artifacts and — on a real run with a data/write root configured — appended as one
  *       row per axis to the queryable {@code maintenance_storage} catalog Dataset (the sample series
@@ -156,7 +156,11 @@ final class MaintenanceJob implements Job {
             case "event_prune"        -> EventPruneTask.run(cfg, host, dryRun);
             case "partition_prune"    -> PartitionPruneTask.run(cfg, dryRun);
             case "receipt_prune"      -> ReceiptPruneTask.run(cfg, host, dryRun);
-            case "incident_purge"     -> IncidentPurgeTask.run(cfg, host, dryRun);
+            // ⛔ incident_purge is NOT a case here any more (EDG-01 cell 7). It is Incident retention
+            // with legal-hold rules — operational-object domain — so it moved to the optional
+            // inspecto-ops module and arrives through MaintenanceTaskProvider via the default arm.
+            // ⚠ It had to be REMOVED, not merely also provided: a named case always beats a
+            // contributed provider, so leaving it would silently keep the built-in on every edition.
             // Read-only observers: a dry run and a real run observe the same thing. (storage_report
             // additionally persists its sample to the maintenance_storage catalog — real runs only.)
             case "storage_report"     -> StorageReportTask.run(cfg, dataDir, ctx);

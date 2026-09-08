@@ -72,23 +72,13 @@ final class ServiceBootstrap {
             svc.registerRcaTemplate(t);
         for (com.gamma.acquire.ConnectionProfile c : loadConnections(resolveBySuffix(paths, "_connection.toon")))
             svc.registerConnection(c);
-        // INC-4: work queues + the SLA escalation policy. Queues route incident assignment; the escalation
-        // policy (at most one — the incident SLA response) is applied by the sweep. Both optional.
-        for (com.gamma.ops.queue.Queue q : loadQueues(resolveBySuffix(paths, "_queue.toon")))
-            svc.objects().registerQueue(q);
-        loadEscalation(resolveBySuffix(paths, "_escalation.toon")).ifPresent(svc.objects()::escalationPolicy);
-        // Tags + Tag Rules (GLOSSARY §9): authored as *_tag.toon / *_tagrule.toon, or written by the
-        // /tags routes at runtime — this rescan is what makes runtime-created tags survive a restart.
-        for (com.gamma.ops.tag.Tag t : loadTags(resolveBySuffix(paths, "_tag.toon")))
-            svc.objects().registerTag(t);
-        for (com.gamma.ops.tag.TagRule r : loadTagRules(resolveBySuffix(paths, "_tagrule.toon")))
-            svc.objects().registerTagRule(r);
-        for (com.gamma.ops.tag.CaseRule r : loadCaseRules(resolveBySuffix(paths, "_caserule.toon")))
-            svc.objects().registerCaseRule(r);
-        // Workflow overrides (case-management-design §Workflow): a *_workflow.toon replaces the built-in
-        // Workflow.defaultFor(type) state machine that GET /workflows/{type} serves. Last file wins per type.
-        for (com.gamma.ops.workflow.Workflow w : loadWorkflows(resolveBySuffix(paths, "_workflow.toon")))
-            svc.objects().registerWorkflow(w);
+        // The six operational-object config kinds — *_queue, *_escalation, *_tag, *_tagrule,
+        // *_caserule, *_workflow — are registered by the optional inspecto-ops module now (EDG-01 cell 7):
+        // every one of them parsed into a com.gamma.ops type, so the loaders could not stay in mandatory
+        // core. ⚠ *_rca is NOT one of them and is still loaded above: RcaTemplate is core vocabulary.
+        // On a Personal build no engine is present and these documents are simply not read.
+        List<Path> opsConfigs = resolveBySuffix(paths, ".toon");   // resolved OUTSIDE the lambda: it throws IOException
+        svc.objectEngine().ifPresent(engine -> engine.loadConfigs(opsConfigs));
         return svc;
     }
 
@@ -184,97 +174,11 @@ final class ServiceBootstrap {
         return out;
     }
 
-    /** Load each {@code *_queue.toon} (INC-4); a bad one is warned and skipped (others still register). */
-    static List<com.gamma.ops.queue.Queue> loadQueues(List<Path> paths) {
-        List<com.gamma.ops.queue.Queue> out = new ArrayList<>();
-        for (Path p : paths) {
-            try {
-                com.gamma.ops.queue.Queue q = com.gamma.ops.queue.Queue.load(p);
-                out.add(q);
-                log.info("Loaded queue '{}' ({} member(s), {} routing) from {}",
-                        q.id(), q.members().size(), q.routing(), p);
-            } catch (Exception e) {
-                log.warn("Could not load queue {}: {}", p, e.getMessage());
-            }
-        }
-        return out;
-    }
 
-    /** Load each {@code *_tag.toon} (GLOSSARY §9); a bad one is warned and skipped (others still register). */
-    static List<com.gamma.ops.tag.Tag> loadTags(List<Path> paths) {
-        List<com.gamma.ops.tag.Tag> out = new ArrayList<>();
-        for (Path p : paths) {
-            try {
-                com.gamma.ops.tag.Tag t = com.gamma.ops.tag.Tag.load(p);
-                out.add(t);
-                log.info("Loaded tag '{}' from {}", t.name(), p);
-            } catch (Exception e) {
-                log.warn("Could not load tag {}: {}", p, e.getMessage());
-            }
-        }
-        return out;
-    }
 
-    /** Load each {@code *_tagrule.toon} (GLOSSARY §9); a bad one is warned and skipped (others still register). */
-    static List<com.gamma.ops.tag.TagRule> loadTagRules(List<Path> paths) {
-        List<com.gamma.ops.tag.TagRule> out = new ArrayList<>();
-        for (Path p : paths) {
-            try {
-                com.gamma.ops.tag.TagRule r = com.gamma.ops.tag.TagRule.load(p);
-                out.add(r);
-                log.info("Loaded tag rule '{}' (tags \"{}\") from {}", r.name(), r.tag(), p);
-            } catch (Exception e) {
-                log.warn("Could not load tag rule {}: {}", p, e.getMessage());
-            }
-        }
-        return out;
-    }
 
-    /** Load each {@code *_caserule.toon} (GLOSSARY §9, C5); a bad one is warned and skipped (others still register). */
-    static List<com.gamma.ops.tag.CaseRule> loadCaseRules(List<Path> paths) {
-        List<com.gamma.ops.tag.CaseRule> out = new ArrayList<>();
-        for (Path p : paths) {
-            try {
-                com.gamma.ops.tag.CaseRule r = com.gamma.ops.tag.CaseRule.load(p);
-                out.add(r);
-                log.info("Loaded case rule '{}' (raises \"{}\") from {}", r.name(), r.title(), p);
-            } catch (Exception e) {
-                log.warn("Could not load case rule {}: {}", p, e.getMessage());
-            }
-        }
-        return out;
-    }
 
-    /** Load each {@code *_workflow.toon} override; a bad one is warned and skipped (others still register). */
-    static List<com.gamma.ops.workflow.Workflow> loadWorkflows(List<Path> paths) {
-        List<com.gamma.ops.workflow.Workflow> out = new ArrayList<>();
-        for (Path p : paths) {
-            try {
-                com.gamma.ops.workflow.Workflow w = com.gamma.ops.workflow.Workflow.load(p);
-                out.add(w);
-                log.info("Loaded workflow override for {} (initial={}, {} transition(s)) from {}",
-                        w.objectType(), w.initialState(), w.transitions().size(), p);
-            } catch (Exception e) {
-                log.warn("Could not load workflow {}: {}", p, e.getMessage());
-            }
-        }
-        return out;
-    }
 
-    /** Load the SLA {@code *_escalation.toon} policy (INC-4) — the first valid one wins; a bad one is skipped. */
-    static java.util.Optional<com.gamma.ops.EscalationPolicy> loadEscalation(List<Path> paths) {
-        for (Path p : paths) {
-            try {
-                com.gamma.ops.EscalationPolicy pol = com.gamma.ops.EscalationPolicy.load(p);
-                log.info("Loaded SLA escalation policy from {} (severity={}, reassignQueue={}, renotify={})",
-                        p, pol.severity(), pol.reassignQueue(), pol.renotify());
-                return java.util.Optional.of(pol);
-            } catch (Exception e) {
-                log.warn("Could not load escalation policy {}: {}", p, e.getMessage());
-            }
-        }
-        return java.util.Optional.empty();
-    }
 
     /** Load each {@code *_connection.toon} (Data Acquisition); a bad one is warned and skipped. */
     static List<com.gamma.acquire.ConnectionProfile> loadConnections(List<Path> paths) {

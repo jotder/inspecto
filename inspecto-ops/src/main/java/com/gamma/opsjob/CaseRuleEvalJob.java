@@ -1,4 +1,10 @@
-package com.gamma.job;
+package com.gamma.opsjob;
+
+import com.gamma.job.Job;
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobContext;
+import com.gamma.job.JobResult;
+import com.gamma.job.JobService;
 
 import com.gamma.ops.ObjectService;
 import com.gamma.signal.Severity;
@@ -48,9 +54,14 @@ final class CaseRuleEvalJob implements Job {
     public JobResult run(JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
         String ruleName = cfg.require("rule");
+        // ⚠ Resolved at RUN time since EDG-01 cell 7: this Job Type is contributed by ServiceLoader now,
+        // and a JobTypeProvider is constructed with no arguments — it cannot know the Space. A running job
+        // can: JobContext.services() carries the ObjectAccess seam core registered for this Space. The
+        // supplier is still honoured first, so the direct-construction tests are unchanged.
         ObjectService svc = objects == null ? null : objects.get();
+        if (svc == null) svc = OpsJobTypes.engineFor(ctx);
         if (svc == null)
-            throw new IllegalStateException("caserule.evaluate needs the space Object Engine (JobService.objects not wired)");
+            throw new IllegalStateException("caserule.evaluate needs the space Object Engine (the inspecto-ops module's ObjectEngineProvider is not installed)");
 
         ObjectService.CaseRuleEvaluation e = svc.evaluateCaseRule(ruleName);   // throws if the rule is unknown
 

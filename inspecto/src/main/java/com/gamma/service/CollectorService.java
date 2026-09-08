@@ -114,22 +114,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** Operator-saved event views (Phase 1, v4.2.0) — backs {@code /events/views}. File-backed when
      *  {@code -Devents.views.file} is set, otherwise in-memory only. */
     private final SavedViewStore savedViews;
-    /** Mutable operational-object store (Phase 2, v4.3.0) — the Layer-2 Alert Center backing the
-     *  {@code /objects} API. Built from {@code -Dobjects.backend} (memory|db); closed in {@link #close()}. */
-    private final com.gamma.ops.ObjectStore objectStore;
-    /** Append-only correlation-link store (Phase 4, v4.5.0) — the OBJECT_LINK graph behind the
-     *  {@code /objects/{id}/links} + {@code /graph} API. Same {@code -Dobjects.backend} toggle; closed in {@link #close()}. */
-    private final com.gamma.ops.link.LinkStore linkStore;
-    /** Append-only evidence/notes store (Phase 4 follow-up, v4.6.0) — comments + attachment refs behind
-     *  {@code /objects/{id}/comments|attachments}. Same {@code -Dobjects.backend} toggle; closed in {@link #close()}. */
-    private final com.gamma.ops.note.NoteStore noteStore;
-    /** Cross-entity tag assignments (BACKLOG D7) — the {@code (tag, targetKind, targetId)} graph behind
-     *  {@code /tags/assignments/…}. Deliberately NOT inside {@code ObjectService}: a tag spans Datasets,
-     *  Widgets and Expectations as readily as Incidents, so hanging it off the object engine would scope it
-     *  to one family. Same {@code -Dobjects.backend} toggle; closed in {@link #close()}. */
-    private final com.gamma.ops.tag.TagAssignmentStore tagAssignmentStore;
-    /** Object Engine + Workflow Engine over {@link #objectStore} + {@link #linkStore} + {@link #noteStore}. */
-    private final com.gamma.ops.ObjectService objects;
+    /**
+     * This Space's operational-object engine, or empty when the optional {@code inspecto-ops} module is
+     * not bundled (EDITIONS {@code CP-11}; EDG-01 cell 7).
+     *
+     * <p>⚠ Replaces five fields that were each a {@code com.gamma.ops} type: the object, link, note and
+     * tag-assignment stores plus the {@code ObjectService} over them. Core cannot name any of those now,
+     * and it no longer needs to — the engine owns opening them (each its own DuckDB file, since a
+     * file-based DuckDB holds a single-writer lock) and closing them.
+     */
+    private final java.util.Optional<ObjectEngineProvider.ObjectEngine> objectEngine;
+
     /** Loaded {@code *_rca.toon} templates by name (Phase 4) — backs {@code GET /rca/templates} and
      *  {@code POST /objects/{id}/rca {template:<name>}}. Extracted registry (M2); populated by
      *  {@link #fromArgs} or {@link #registerRcaTemplate}; empty otherwise. */
@@ -423,7 +418,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // ⚠ Supplies the ObjectAccess SEAM, not the ObjectService (EDG-01 cell 7): com.gamma.ops becomes
         // an optional edition module, so this mandatory boot path must not name a type that leaves with it.
         platformServices.register("incidents", com.gamma.objects.IncidentAccess.class,
-                com.gamma.objects.IncidentAccess.over(() -> objects().access()));
+                com.gamma.objects.IncidentAccess.over(() -> objects().orElse(null)));
+        // ⚠ The seam is also a Platform Service (EDG-01 cell 7) — that is how a Job Type contributed by
+        // the optional inspecto-ops module reaches it: a ServiceLoader-discovered JobTypeProvider gets
+        // only a JobConfig, but a RUNNING job has JobContext.services(). Registered whatever the edition:
+        // on Personal the supplier yields null and a consumer finds nothing, which is the honest answer.
+        platformServices.register("objects", com.gamma.objects.ObjectAccess.class,
+                objects().orElse(null));
         platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,
                 com.gamma.pipeline.SchemaAccess.over(this::componentRegistry));
         platformServices.register("consignment-status",
@@ -463,33 +464,33 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             public List<SemanticModel> semantics() { return CollectorService.this.semanticModels; }
         };
         this.configSource = configSource;
-        // Object Engine (Phase 2, v4.3.0): the mutable Layer-2 store for managed objects (alerts now;
-        // incidents/cases later). Built from -Dobjects.backend (memory|db); always present so /objects
-        // works even with no alert rules. Fired alerts are promoted into it by the AlertService below.
-        this.objectStore = ServiceStores.openObjectStore(root);
-        this.linkStore = ServiceStores.openLinkStore(root);
-        this.noteStore = ServiceStores.openNoteStore(root);
-        this.tagAssignmentStore = ServiceStores.openTagAssignmentStore(root);
-        this.objects = new com.gamma.ops.ObjectService(objectStore, java.util.Map.of(), linkStore, noteStore,
-                tagAssignmentStore);
+        // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module
+        // contributes an ObjectEngineProvider; absent it this is empty and every operational-object
+        // surface answers 503, while events are still recorded and the audit trail is untouched.
+        this.objectEngine = java.util.ServiceLoader.load(ObjectEngineProvider.class).findFirst()
+                .map(provider -> provider.open(root, System.getProperty("data.dir", root.dataDir())));
         // D7 phase 2: adopt tags that exist only in the legacy attributes CSV into the assignment store, so
         // the two cannot disagree. Idempotent, and a no-op on a fresh Space; logged only when it does work.
-        int adopted = this.objects.backfillTagAssignments();
+        int adopted = this.objectEngine.map(ObjectEngineProvider.ObjectEngine::adoptedTagAssignments).orElse(0);
         if (adopted > 0) log.info("Adopted {} legacy tag assignment(s) from object attributes (D7)", adopted);
-        // Give the Job engine this space's Object Engine so the recon.run built-in can promote a breach to
-        // an Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
-        if (this.jobs != null) this.jobs.objects(this.objects);
+        // Give the Job engine this space's seam so the recon.run built-in can promote a breach to an
+        // Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
+        if (this.jobs != null) this.jobs.objects(this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
         // Phase D2: promote selected domain events to managed objects (SEQUENCE_GAP → ALERT) via an EventLog
-        // subscriber. Registered unconditionally (independent of *_alert.toon rules — a gap is not a batch
-        // metric) and de-registered in close() so repeated service instances don't accumulate listeners.
-        this.eventObjectBridge = new com.gamma.ops.EventObjectBridge(this.objects)::onEvent;
-        this.eventLog.addSubscriber(this.eventObjectBridge);
+        // subscriber. ⚠ Now ASKED FOR rather than constructed: core used to do
+        // `new com.gamma.ops.EventObjectBridge(objects)::onEvent` by fully-qualified name with no import —
+        // a coupling an import census cannot see. De-registered in close() so repeated service instances
+        // don't accumulate listeners. ⛔ Absent the module there is no promotion, which is exactly the
+        // amended EDITIONS SP-CTL-02 contract: a gap still raises the EVENT on Personal.
+        this.eventObjectBridge = this.objectEngine.flatMap(e -> e.access().eventSubscriber()).orElse(null);
+        if (this.eventObjectBridge != null) this.eventLog.addSubscriber(this.eventObjectBridge);
         // Alert engine (v4.1, B5): deterministic, lean-core, event-driven. Always present (like the
         // object store above) so the authoring routes (POST/PUT/DELETE /alerts/rules) can arm rules at
         // runtime even when no *_alert.toon was loaded at boot — empty until a rule is added. Subscribed
         // here (before start()) so it sees the first terminal batch. Phase 2: also persists each fired
         // alert as a managed ALERT object via the Object Engine above.
-        this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status, this.objects);
+        this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status,
+                this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
         // BI-5: measure rules evaluate a Dataset measure via the headless BI evaluator. Both roots
         // resolve lazily — the write root is a -D property, the data root is this space's data dir.
         alerting.measureProbe(new com.gamma.query.DatasetMeasureProbe(
@@ -756,17 +757,20 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return deliveryReceipts;
     }
 
-    /** The Object Engine (Phase 2, v4.3.0) — managed operational objects + their workflows; backs the
-     *  {@code /objects} API and is where fired alerts are persisted as ALERT objects. */
-    public com.gamma.ops.ObjectService objects() {
-        return objects;
+    /**
+     * This Space's operational-object seam, or empty when the {@code inspecto-ops} module is absent.
+     *
+     * <p>⚠ Returns the {@link com.gamma.objects.ObjectAccess} seam, never a domain service — callers that
+     * need the full engine live in the module. A caller that finds this empty must answer <b>503 naming
+     * the module</b>, never 404 and never a silent empty result.
+     */
+    public java.util.Optional<com.gamma.objects.ObjectAccess> objects() {
+        return objectEngine.map(ObjectEngineProvider.ObjectEngine::access);
     }
 
-    /** This Space's cross-entity tag-assignment graph (BACKLOG D7). Never static — see {@link #tagAssignmentStore}.
-     *  For {@code object} targets prefer {@link com.gamma.ops.ObjectService#applyTag} over writing here
-     *  directly: it also re-projects the object's {@code tags} attribute, which the Incidents UI reads. */
-    public com.gamma.ops.tag.TagAssignmentStore tagAssignments() {
-        return tagAssignmentStore;
+    /** The engine itself, for the two things the seam deliberately does not cover (config loading, close). */
+    java.util.Optional<ObjectEngineProvider.ObjectEngine> objectEngine() {
+        return objectEngine;
     }
 
     /** Register an RCA template (Phase 4), keyed by {@link com.gamma.objects.RcaTemplate#name()}; {@code null} ignored. */
@@ -1014,7 +1018,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         long slaSweepSeconds = Long.getLong("objects.sla.sweep.seconds", 60L);
         if (slaSweepSeconds > 0)
             scheduler.everySeconds("sla-sweep", slaSweepSeconds, slaSweepSeconds,
-                    () -> underSpace(() -> objects.sweepIncidentSla(System.currentTimeMillis())));
+                    () -> underSpace(() -> objectEngine.ifPresent(
+                            e -> e.sweepIncidentSla(System.currentTimeMillis()))));
         log.info("CollectorService started: {} pipeline(s), poll every {}s, up to {} concurrent run(s)",
                 registry.size(), pollSeconds, maxConcurrentRuns);
         this.eventLog.emit(Event.builder(EventType.SERVICE_STARTED)
@@ -1261,8 +1266,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      */
     public List<com.gamma.util.BrowsableStore> browsableStores() {
         List<com.gamma.util.BrowsableStore> out = new ArrayList<>();
-        for (Object s : new Object[]{objectStore, linkStore, noteStore, tagAssignmentStore, status})
-            if (s instanceof com.gamma.util.BrowsableStore b) out.add(b);
+        // ⚠ The four operational-object stores come from the engine now (EDG-01 cell 7) — core does not
+        // hold them. A Personal build contributes none, so the browser simply lists fewer stores.
+        objectEngine.ifPresent(e -> out.addAll(e.browsableStores()));
+        if (status instanceof com.gamma.util.BrowsableStore b) out.add(b);
         jobService().ifPresent(js -> {
             js.runStore().ifPresent(out::add);
             js.provenanceStore().ifPresent(out::add);
@@ -1313,7 +1320,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             created.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.eventStore(events);                            // event_prune maintenance task (COMPLY-3)
-            created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
+            created.objects(this.objects().orElse(null));           // recon.run promotion (seam; empty on Personal)
             created.start();
             jobs = created;
         }
@@ -1688,10 +1695,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (status instanceof AutoCloseable c) {       // close a DB-backed store's connection
             try { c.close(); } catch (Exception e) { log.warn("Error closing status store: {}", e.getMessage()); }
         }
-        try { objectStore.close(); } catch (Exception e) { log.warn("Error closing object store: {}", e.getMessage()); }
-        try { linkStore.close(); } catch (Exception e) { log.warn("Error closing link store: {}", e.getMessage()); }
-        try { noteStore.close(); } catch (Exception e) { log.warn("Error closing note store: {}", e.getMessage()); }
-        try { tagAssignmentStore.close(); } catch (Exception e) { log.warn("Error closing tag store: {}", e.getMessage()); }
+        // The four operational-object stores are the engine's to close now (EDG-01 cell 7) — it owns
+        // opening them, so it owns the connections. A no-op when the module is absent.
+        objectEngine.ifPresent(e -> {
+            try { e.close(); } catch (Exception ex) { log.warn("Error closing object engine: {}", ex.getMessage()); }
+        });
         log.info("CollectorService stopped");
         // Close last so the "stopped" log line above is itself captured, then flushed to disk.
         try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }

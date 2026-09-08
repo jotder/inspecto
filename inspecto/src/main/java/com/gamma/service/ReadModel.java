@@ -8,7 +8,6 @@ import com.gamma.etl.StatusStore;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventStore;
 import com.gamma.job.JobService;
-import com.gamma.ops.ObjectService;
 import com.gamma.report.ReportService;
 import com.gamma.util.BrowsableStore;
 
@@ -104,7 +103,8 @@ public interface ReadModel {
     ConfigSource configSource();
 
     /** The operational-object service (Incidents/Cases read surface). */
-    ObjectService objects();
+    /** The operational-object seam, or empty when the optional inspecto-ops module is absent. */
+    java.util.Optional<com.gamma.objects.ObjectAccess> objects();
 
     /** The job service, or empty when this deployment runs no jobs. */
     Optional<JobService> jobService();

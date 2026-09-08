@@ -7,10 +7,8 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
-import com.gamma.ops.ObjectService;
+import com.gamma.objects.ObjectAccess;
 import com.gamma.objects.ObjectType;
-import com.gamma.ops.OperationalObject;
-import com.gamma.ops.link.LinkRelationship;
 import com.gamma.etl.StatusStore;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
@@ -62,7 +60,10 @@ public final class AlertService {
     private final ConfigSource configs;
     private final StatusStore status;
     /** Object store for persisting fired alerts as managed objects (Phase 2); {@code null} = events-only. */
-    private final ObjectService objects;
+    /** The {@code LinkRelationship} name for an escalation edge — the enum itself lives in the module. */
+    private static final String ESCALATED_FROM = "ESCALATED_FROM";
+
+    private final ObjectAccess objects;
     /** The {@code incidents} Platform Service view over {@link #objects} (S1-4) — high-severity
      *  promotion opens through the same interface a granted Run uses; {@code null} = events-only. */
     private final com.gamma.objects.IncidentAccess incidents;
@@ -73,16 +74,16 @@ public final class AlertService {
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalDouble> measureProbe;
 
     public AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status) {
-        this(rules, configs, status, (ObjectService) null);
+        this(rules, configs, status, (ObjectAccess) null);
     }
 
     /**
      * Phase 2: also persist each fired alert as an {@link ObjectType#ALERT}
-     * {@link com.gamma.ops.OperationalObject} through {@code objects}. A {@code null} {@code objects}
+     * a managed ALERT object through the {@link ObjectAccess} seam. A {@code null} {@code objects}
      * keeps the prior events-only behaviour (the lean path and unit tests).
      */
     public AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
-                        ObjectService objects) {
+                        ObjectAccess objects) {
         this(rules, configs, status, objects, DEFAULT_CAPACITY);
     }
 
@@ -91,12 +92,12 @@ public final class AlertService {
     }
 
     AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status,
-                 ObjectService objects, int capacity) {
+                 ObjectAccess objects, int capacity) {
         this.rules = List.copyOf(rules);
         this.configs = configs;
         this.status = status;
         this.objects = objects;
-        this.incidents = objects == null ? null : com.gamma.objects.IncidentAccess.over(objects::access);
+        this.incidents = objects == null ? null : com.gamma.objects.IncidentAccess.over(() -> objects);
         this.capacity = Math.max(1, capacity);
     }
 
@@ -267,7 +268,7 @@ public final class AlertService {
 
     /**
      * Phase 2: promote a fired alert to a managed {@link ObjectType#ALERT}
-     * {@link com.gamma.ops.OperationalObject}, linked to the firing event via the {@code causedByEvent}
+     * a managed ALERT object, linked to the firing event via the {@code causedByEvent}
      * attribute. No-op when no object store is wired (events-only). A still-active (non-terminal) object
      * for the same rule+pipeline suppresses a duplicate — the cooldown throttles re-fires within a
      * window; this guards across windows so an operator handling one breach isn't handed a clone.
@@ -277,9 +278,10 @@ public final class AlertService {
                                     String eventId) {
         if (objects == null) return;
         try {
-            boolean active = objects.active(ObjectType.ALERT, pipeline).stream()
-                    .anyMatch(o -> rule.name().equals(o.attributes().get("rule")));
-            if (active) return;
+            // ⚠ The seam's compound-key form (EDG-01 cell 7). This used to filter active() by the
+            // "rule" attribute in-process; hasActiveMatching does the same match on the module's side,
+            // which is what lets core stop naming OperationalObject.
+            if (objects.hasActiveMatching(ObjectType.ALERT, pipeline, Map.of("rule", rule.name()))) return;
             Map<String, String> attrs = new LinkedHashMap<>();
             attrs.put("rule", rule.name());
             if (rule.metric() != null) attrs.put("metric", rule.metric());
@@ -290,9 +292,9 @@ public final class AlertService {
             if (rule.window() != null) attrs.put("window", rule.window());
             attrs.put("value", String.valueOf(value));
             if (eventId != null) attrs.put("causedByEvent", eventId);
-            OperationalObject alertObject = objects.open(ObjectType.ALERT,
+            String alertObjectId = objects.open(ObjectType.ALERT,
                     rule.name() + " on " + pipeline, alert.message(), rule.severity(), pipeline, attrs);
-            promoteToIncident(rule, alert, pipeline, attrs, alertObject.id());
+            promoteToIncident(rule, alert, pipeline, attrs, alertObjectId);
         } catch (RuntimeException e) {
             log.warn("could not persist alert object for rule {}: {}", rule.name(), e.getMessage());
         }
@@ -307,7 +309,7 @@ public final class AlertService {
      * try — a promotion failure never disturbs evaluation.
      *
      * <p>The opened Incident is correlated to the ALERT that raised it with an
-     * {@link LinkRelationship#ESCALATED_FROM} edge ({@code Incident ESCALATED_FROM Alert}), so the
+     * {@code ESCALATED_FROM} edge ({@code Incident ESCALATED_FROM Alert}), so the
      * correlation is traversable in the object graph rather than only implied by matching attributes —
      * matching what the operator-facing {@code POST /objects} create path has always required. ⚠ No edge
      * is added when the promotion is <em>suppressed</em> as a duplicate: a re-fire whose earlier ALERT was
@@ -326,8 +328,10 @@ public final class AlertService {
                 // Machine actor, mirroring the Case Rules auto-linker's `case-rule:<name>` convention.
                 // ⚠ `incidentId` is the id itself since EDG-01 cell 7 — this was the only reader of the
                 // opened object, and it only ever wanted .id().
+                // ⚠ "ESCALATED_FROM" as a String: LinkRelationship is domain vocabulary and stays in the
+                // optional module, so the seam names the relationship rather than importing the enum.
                 .ifPresent(incidentId -> objects.link(incidentId, alertObjectId,
-                        LinkRelationship.ESCALATED_FROM, "alert-rule:" + rule.name()));
+                        ESCALATED_FROM, "alert-rule:" + rule.name()));
     }
 
     /** Whether a rule severity warrants an Incident (critical / error) rather than staying an alert. */

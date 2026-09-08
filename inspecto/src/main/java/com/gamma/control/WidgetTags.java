@@ -30,14 +30,18 @@ import java.util.function.Consumer;
  * the widget lives in the Space's {@link ComponentStore}, which the engine deliberately knows nothing
  * about. {@code ObjectService.renameTag}/{@code deleteTag} therefore still move only the object CSVs, and
  * {@link TagRoutes} composes the component half around them.
+ * <p>⚠ <b>Public since EDG-01 cell 7</b> (2026-09-08), for the same reason the route SPI went public in
+ * cell 3a: the {@code /objects}, {@code /notes} and {@code /tags} route families moved into the optional
+ * {@code inspecto-ops} module and still need this core helper. Widening the visibility was the honest
+ * option — copying it into the module would have left two implementations of one contract to drift.
  */
-final class WidgetTags {
+public final class WidgetTags {
 
     private static final Logger log = LoggerFactory.getLogger(WidgetTags.class);
 
     /** The one kind whose tags are config-embedded, so the one kind needing a projection. The
      *  {@link AnnotationKinds} target kind and the {@link ComponentStore} type are the same string. */
-    static final String KIND = "widget";
+    public static final String KIND = "widget";
 
     /** The content key holding the projection. */
     private static final String TAGS = "tags";
@@ -57,16 +61,21 @@ final class WidgetTags {
      * deliberate: a stale client (or a re-save from a form that still remembers the old chips) must not be
      * able to resurrect a tag the operator removed through the dialog. Removing a tag is the dialog's job.
      */
-    static void project(ApiContext api, String type, String id, Map<String, Object> content,
+    public static void project(ApiContext api, String type, String id, Map<String, Object> content,
                         boolean create, Consumer<String> ensureTag) {
         if (!KIND.equals(type)) return;
+        // ⚠ Through the seam since EDG-01 cell 7, and absent on a bundle without inspecto-ops. Tag
+        // assignments are operational-object domain, so on Personal a widget simply carries no managed
+        // tags — the persisted TOON keeps whatever it was authored with rather than being rewritten.
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        if (objects == null) return;
         if (create) {
             for (String tag : names(content.get(TAGS))) {
                 ensureTag.accept(tag);
-                api.service().tagAssignments().add(TagAssignment.of(tag, KIND, id, "migration"));
+                objects.addTag(tag, KIND, id, "migration");
             }
         }
-        List<String> edges = api.service().tagAssignments().tagsOf(KIND, id);
+        List<String> edges = objects.tagsOf(KIND, id);
         if (edges.isEmpty()) content.remove(TAGS);   // an empty array is noise in the persisted TOON
         else content.put(TAGS, edges);
     }
@@ -83,8 +92,11 @@ final class WidgetTags {
      *
      * @return how many widget components were actually rewritten
      */
-    static int reproject(ApiContext api, Collection<String> widgetIds) {
+    public static int reproject(ApiContext api, Collection<String> widgetIds) {
         if (widgetIds.isEmpty() || api.writeRoot() == null) return 0;
+        // Nothing to re-project without the operational-object module (EDG-01 cell 7).
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        if (objects == null) return 0;
         ComponentStore store = new ComponentStore(api.writeRoot().resolve("registry"));
         int done = 0;
         for (String id : widgetIds) {
@@ -95,7 +107,7 @@ final class WidgetTags {
                 continue;
             }
             if (c == null) continue;
-            List<String> edges = api.service().tagAssignments().tagsOf(KIND, id);
+            List<String> edges = objects.tagsOf(KIND, id);
             if (edges.equals(names(c.content().get(TAGS)))) continue;   // no version for a no-op
             Map<String, Object> content = new LinkedHashMap<>(c.content());
             if (edges.isEmpty()) content.remove(TAGS);
@@ -114,12 +126,10 @@ final class WidgetTags {
     }
 
     /** The widget ids currently carrying {@code tag} — the component half of a vocabulary change. */
-    static List<String> targetsOf(ApiContext api, String tag) {
-        return api.service().tagAssignments().forTag(tag).stream()
-                .filter(a -> KIND.equals(a.targetKind()))
-                .map(TagAssignment::targetId)
-                .distinct()
-                .toList();
+    public static List<String> targetsOf(ApiContext api, String tag) {
+        return api.service().objects()
+                .map(o -> o.targetIdsForTag(tag, KIND).stream().distinct().toList())
+                .orElseGet(List::of);
     }
 
     /**
@@ -136,7 +146,7 @@ final class WidgetTags {
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     /** Run {@link #backfill} once per hosted Space, on the first tag read or write it sees. */
-    static void backfillOnce(ApiContext api, Consumer<String> ensureTag) {
+    public static void backfillOnce(ApiContext api, Consumer<String> ensureTag) {
         Object space;
         try {
             space = api.service();
@@ -162,7 +172,7 @@ final class WidgetTags {
      *
      * @return how many assignments were created
      */
-    static int backfill(ApiContext api, Consumer<String> ensureTag) {
+    public static int backfill(ApiContext api, Consumer<String> ensureTag) {
         if (api.writeRoot() == null) return 0;
         List<ComponentRegistry.Component> widgets;
         try {
@@ -171,16 +181,19 @@ final class WidgetTags {
             log.warn("Widget tag backfill skipped — widgets are not readable: {}", unreadable.getMessage());
             return 0;
         }
+        // Nothing to adopt without the operational-object module (EDG-01 cell 7).
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        if (objects == null) return 0;
         List<String> touched = new ArrayList<>();
         int created = 0;
         for (ComponentRegistry.Component w : widgets) {
             List<String> configured = names(w.content().get(TAGS));
             if (configured.isEmpty()) continue;
-            List<String> known = api.service().tagAssignments().tagsOf(KIND, w.name());
+            List<String> known = objects.tagsOf(KIND, w.name());
             for (String tag : configured) {
                 if (known.contains(tag)) continue;
                 ensureTag.accept(tag);
-                api.service().tagAssignments().add(TagAssignment.of(tag, KIND, w.name(), "migration"));
+                objects.addTag(tag, KIND, w.name(), "migration");
                 created++;
             }
             touched.add(w.name());

@@ -303,7 +303,7 @@ final class BundleRoutes implements RouteModule {
                         // record, not an accident. Adopt-then-reproject, exactly as a create does.
                         if (WidgetTags.KIND.equals(kind)) {
                             WidgetTags.project(api, kind, id, new LinkedHashMap<>(content), true,
-                                    name -> TagRoutes.ensureTag(api, name));
+                                    name -> api.service().objects().ifPresent(o -> o.ensureTag(name)));
                             WidgetTags.reproject(api, List.of(id));
                         }
                         status = exists ? "overwritten" : "imported";

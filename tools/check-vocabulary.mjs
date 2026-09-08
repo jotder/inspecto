@@ -436,7 +436,7 @@ function isSentence(fragment) {
 const SOURCE_ALLOW = {
     'inspecto-event/src/main/java/com/gamma/event/EventType.java::flow-identifier':
         'Deliberate Tier-2 read-alias: FLOW_CONSERVATION_IMBALANCE_LEGACY must keep the pre-rename spelling — it exists to match events already persisted under the old type. Renaming it would defeat its purpose.',
-    'inspecto-engine/src/main/java/com/gamma/ops/EventObjectBridge.java::flow-identifier':
+    'inspecto-ops/src/main/java/com/gamma/ops/EventObjectBridge.java::flow-identifier':
         'Reads the Tier-2 legacy alias above so pre-rename events still promote — the whole point of the alias.',
 
     // ── the sanctioned lowercase "flow of value" sense: NOT the Pipeline entity ────────────────────

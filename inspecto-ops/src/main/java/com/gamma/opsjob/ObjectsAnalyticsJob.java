@@ -1,4 +1,10 @@
-package com.gamma.job;
+package com.gamma.opsjob;
+
+import com.gamma.job.Job;
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobContext;
+import com.gamma.job.JobResult;
+import com.gamma.job.JobService;
 
 import com.gamma.ops.ObjectService;
 import com.gamma.objects.ObjectType;
@@ -77,11 +83,18 @@ final class ObjectsAnalyticsJob implements Job {
     @Override
     public JobResult run(JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
+        // ⚠ Both resolved at RUN time since EDG-01 cell 7 — a ServiceLoader-contributed JobTypeProvider is
+        // constructed with no arguments and cannot know the Space. The engine comes from
+        // JobContext.services() and the data root from this module's per-Space registry; the constructor
+        // values are still honoured first, so the direct-construction tests are unchanged.
         ObjectService svc = objects == null ? null : objects.get();
+        if (svc == null) svc = OpsJobTypes.engineFor(ctx);
         if (svc == null)
-            throw new IllegalStateException("objects.analytics needs the space Object Engine (JobService.objects not wired)");
+            throw new IllegalStateException("objects.analytics needs the space Object Engine (the inspecto-ops module's ObjectEngineProvider is not installed)");
         String writeRoot = System.getProperty("assist.write.root");
-        if (dataDir == null || dataDir.isBlank())
+        String root = dataDir == null || dataDir.isBlank()
+                ? com.gamma.ops.OpsEngineProvider.dataDirFor(ctx.spaceId()) : dataDir;
+        if (root == null || root.isBlank())
             throw new IllegalStateException("objects.analytics needs a space data directory");
         if (writeRoot == null || writeRoot.isBlank())
             throw new IllegalStateException("objects.analytics needs -Dassist.write.root (the component registry root)");
@@ -100,7 +113,7 @@ final class ObjectsAnalyticsJob implements Job {
         Path parquet;
         int purged;
         try {
-            Path storeDir = Path.of(dataDir).resolve(CATALOG);
+            Path storeDir = Path.of(root).resolve(CATALOG);
             Files.createDirectories(storeDir);
             parquet = storeDir.resolve("analytics_" + now.toEpochMilli() + "_out.parquet");
             writeParquet(parquet, now, rows);

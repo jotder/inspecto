@@ -161,8 +161,12 @@ final class ExpectationRoutes implements RouteModule {
     private void raiseIncident(ApiContext api, Expectation exp, long violations) {
         String correlationId = "expectation:" + exp.name();
         try {
-            boolean open = !api.service().objects().active(ObjectType.INCIDENT, correlationId).isEmpty();
-            if (open) return;   // one Incident already tracks this expectation's breach
+            // ⚠ Through the seam since EDG-01 cell 7. Absent inspecto-ops there is nothing to raise an
+            // Incident on, so the breach is still EVENTED below but not promoted — the same posture the
+            // amended EDITIONS SP-CTL-02 takes for a sequence gap.
+            com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+            if (objects == null) return;
+            if (objects.hasActive(ObjectType.INCIDENT, correlationId)) return;   // one Incident already tracks it
 
             String title = "Expectation failed: " + exp.name();
             String description = exp.kind() + " check on " + exp.targetType() + " \"" + exp.target() + "\""
@@ -174,8 +178,7 @@ final class ExpectationRoutes implements RouteModule {
             attrs.put("target", exp.target());
             if (exp.column() != null) attrs.put("column", exp.column());
             attrs.put("violations", String.valueOf(violations));
-            api.service().objects().open(ObjectType.INCIDENT, title, description, exp.severity(),
-                    correlationId, attrs);
+            objects.open(ObjectType.INCIDENT, title, description, exp.severity(), correlationId, attrs);
 
             EventLog.current().emit(Event.builder(EventType.EXPECTATION_FAILED)
                     .level("CRITICAL".equals(exp.severity()) ? EventLevel.ERROR : EventLevel.WARN)

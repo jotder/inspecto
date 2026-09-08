@@ -5,7 +5,6 @@ import com.gamma.alert.AlertAccess;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.objects.IncidentAccess;
-import com.gamma.ops.OperationalObject;
 import com.gamma.util.RunLog;
 
 import java.util.List;

@@ -1,4 +1,8 @@
-package com.gamma.job;
+package com.gamma.opsjob;
+
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobResult;
+import com.gamma.job.JobService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,11 +53,16 @@ final class IncidentPurgeTask {
         long t0 = System.nanoTime();
         // Fail-open on no Object Engine, like every sibling task. There is no partial-attachment case to
         // guard: ObjectService holds all four stores it cascades over, so it is present or absent whole.
-        var engine = host == null
-                ? java.util.Optional.<com.gamma.ops.ObjectService>empty() : host.objects();
-        if (engine.isEmpty())
+        // ⚠ host.objects() hands back the core ObjectAccess seam since EDG-01 cell 7, so this task takes
+        // it down to the concrete engine it belongs to — purgeEligible and the legal-hold rule are
+        // domain operations the seam deliberately does not expose.
+        com.gamma.ops.ObjectService objects = host == null ? null
+                : host.objects()
+                        .filter(com.gamma.ops.ObjectServiceAccess.class::isInstance)
+                        .map(a -> ((com.gamma.ops.ObjectServiceAccess) a).service())
+                        .orElse(null);
+        if (objects == null)
             return JobResult.ok("incident_purge: no object engine attached — nothing to purge", 0L);
-        com.gamma.ops.ObjectService objects = engine.get();
 
         long cutoff = System.currentTimeMillis() - Duration.ofDays(days).toMillis();
         List<com.gamma.ops.OperationalObject> candidates =

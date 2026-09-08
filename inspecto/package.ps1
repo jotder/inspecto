@@ -236,6 +236,7 @@ $geoLinkJarSrc  = $null
 $exchangeJarSrc = $null
 $metricsJarSrc  = $null
 $eventsJarSrc   = $null
+$opsJarSrc      = $null
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
@@ -246,7 +247,8 @@ if ($Edition -ne 'Personal') {
     # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Standard and above.
     # EDG-01 cell 5: inspecto-metrics (CP-13, the /metrics exposition), Standard and above.
     # EDG-01 cell 6: inspecto-events (CP-13's other half, the /events* feed), Standard and above.
-    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events' }
+    # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Standard and above.
+    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -315,6 +317,14 @@ if ($Edition -ne 'Personal') {
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $eventsJarSrc -or -not (Test-Path $eventsJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $eventsTargetDir\inspecto-events-*.jar."
+    }
+    # The operational-objects module (EDG-01 cell 7). NOT thin: the whole com.gamma.ops domain.
+    $opsTargetDir = Join-Path $sandboxRoot 'inspecto-ops\target'
+    $opsJarSrc = Get-ChildItem -Path $opsTargetDir -Filter 'inspecto-ops-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $opsJarSrc -or -not (Test-Path $opsJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $opsTargetDir\inspecto-ops-*.jar."
     }
     if ($Edition -eq 'Enterprise') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
@@ -461,6 +471,22 @@ if ($eventsJarSrc) {
         if (-not $spiEntry) { throw "inspecto-events.jar has no META-INF/services/com.gamma.control.RouteModule - every /events* path would 503 on a bundle supposed to serve the feed." }
         Write-Host "  verified: RouteModule registration present in the events module" -ForegroundColor DarkGray
     } finally { $evZip.Dispose() }
+}
+if ($opsJarSrc) {
+    Copy-Item $opsJarSrc "$bundleDir\inspecto-ops.jar"
+    Write-Host "Bundled Standard-edition operational-objects module -> inspecto-ops.jar" -ForegroundColor Green
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $opZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-ops.jar")
+    try {
+        # TWO seams must be declared, not one: the routes AND the engine provider core resolves
+        # ObjectAccess through. A jar with routes but no provider would 503 every path while claiming
+        # the feature is installed.
+        $routeSpi = $opZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.control.RouteModule' }
+        if (-not $routeSpi) { throw "inspecto-ops.jar has no META-INF/services/com.gamma.control.RouteModule - every /objects* path would 503 on a bundle supposed to serve them." }
+        $engineSpi = $opZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.service.ObjectEngineProvider' }
+        if (-not $engineSpi) { throw "inspecto-ops.jar has no META-INF/services/com.gamma.service.ObjectEngineProvider - the routes would load but resolve no ObjectAccess." }
+        Write-Host "  verified: RouteModule + ObjectEngineProvider registrations present in the ops module" -ForegroundColor DarkGray
+    } finally { $opZip.Dispose() }
 }
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
@@ -677,6 +703,7 @@ CP="inspecto.jar"
 # Prometheus scrape endpoint (EDG-01 cell 5): Standard/Enterprise only.
 [ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
 [ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
+[ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
 [ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
@@ -756,6 +783,7 @@ if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
 rem Prometheus scrape endpoint (EDG-01 cell 5) - Standard/Enterprise only.
 if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
 if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
+if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
@@ -894,6 +922,7 @@ fi
 # Prometheus scrape endpoint (EDG-01 cell 5): Standard/Enterprise only.
 [ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
 [ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
+[ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -982,6 +1011,7 @@ if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
 rem Prometheus scrape endpoint (EDG-01 cell 5) - Standard/Enterprise only.
 if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
 if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
+if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
@@ -1154,7 +1184,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)

@@ -25,12 +25,24 @@ import java.util.function.Consumer;
  * <p>⚠ This class travels with {@code com.gamma.ops} into the optional {@code inspecto-ops} module. Core
  * never names it — it obtains an {@link ObjectAccess} and knows nothing more.
  */
-final class ObjectServiceAccess implements ObjectAccess {
+public final class ObjectServiceAccess implements ObjectAccess {
 
     private final ObjectService service;
 
     ObjectServiceAccess(ObjectService service) {
         this.service = service;
+    }
+
+    /**
+     * The concrete engine behind this seam — for <b>module-internal</b> callers only.
+     *
+     * <p>⚠ This is how {@code com.gamma.opsapi}'s routes get the full {@code ObjectService} they need:
+     * core hands out only {@link ObjectAccess}, so the module downcasts its own implementation back. That
+     * keeps the lookup per-Space (it comes off that Space's {@code CollectorService}) with no global
+     * state, and a foreign {@code ObjectAccess} simply fails the cast rather than being mis-used.
+     */
+    public ObjectService service() {
+        return service;
     }
 
     @Override
@@ -71,6 +83,13 @@ final class ObjectServiceAccess implements ObjectAccess {
         service.tagAssignments().add(TagAssignment.of(tag, targetKind, targetId, actor));
     }
 
+    /** ⚠ Uses the module's own {@code Tag} record — the vocabulary type never crosses into core. */
+    @Override
+    public void ensureTag(String name) {
+        if (service.tag(name).isPresent()) return;
+        service.registerTag(new com.gamma.ops.tag.Tag(name, System.currentTimeMillis()));
+    }
+
     @Override
     public List<String> tagsOf(String targetKind, String targetId) {
         return service.tagAssignments().tagsOf(targetKind, targetId);
@@ -87,15 +106,25 @@ final class ObjectServiceAccess implements ObjectAccess {
     /** The flat projection core's SEC-7d gate reads — deliberately not the whole record. */
     @Override
     public Optional<Map<String, Object>> summary(String objectId) {
-        return service.get(objectId).map(o -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", o.id());
-            m.put("correlationId", o.correlationId());
-            m.put("owner", o.owner());
-            m.put("assignee", o.assignee());
-            m.put("attributes", o.attributes());
-            return m;
-        });
+        return service.get(objectId).map(ObjectServiceAccess::flatten);
+    }
+
+    /** ONE projection behind both {@link #summary} and {@link #findByStatus}, so the two cannot drift. */
+    private static Map<String, Object> flatten(OperationalObject o) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", o.objectType().name().toLowerCase(java.util.Locale.ROOT));
+        m.put("id", o.id());
+        m.put("correlationId", o.correlationId());
+        m.put("owner", o.owner());
+        m.put("assignee", o.assignee());
+        m.put("attributes", o.attributes());
+        return m;
+    }
+
+    @Override
+    public List<Map<String, Object>> findByStatus(ObjectType kind, String status) {
+        return service.query(ObjectQuery.builder().objectType(kind).status(status).build())
+                .stream().map(ObjectServiceAccess::flatten).toList();
     }
 
     /**

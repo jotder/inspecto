@@ -74,6 +74,15 @@ public interface ObjectAccess {
     /** Assign a tag to any taggable target ({@link AnnotationKinds}), cross-entity. */
     void addTag(String tag, String targetKind, String targetId, String actor);
 
+    /**
+     * Register {@code name} in the tag vocabulary if it is not there already; a no-op when it is.
+     *
+     * <p>⚠ On the seam because TWO core route families need it — component writes and bundle imports both
+     * adopt a widget's inline tags and must not author a dangling assignment. It used to be
+     * {@code TagRoutes.ensureTag}, a static in a route class that has now moved to the module.
+     */
+    void ensureTag(String name);
+
     /** The tag names assigned to one target, or empty when none. */
     List<String> tagsOf(String targetKind, String targetId);
 
@@ -81,10 +90,24 @@ public interface ObjectAccess {
     List<String> targetIdsForTag(String tag, String targetKind);
 
     /**
-     * A flat view of one object for core's visibility gate: {@code id}, {@code correlationId},
-     * {@code owner}, {@code assignee} and {@code attributes}. Empty when no such object exists.
+     * A flat view of one object for core's visibility gate: {@code kind} (the lower-cased object type),
+     * {@code id}, {@code correlationId}, {@code owner}, {@code assignee} and {@code attributes}. Empty
+     * when no such object exists.
+     *
+     * <p>⚠ {@code kind} is in here because the SEC-7d row-scope check needs the object's type, and core
+     * performs that check itself — see this interface's note on why the decision does not cross the
+     * boundary.
      */
     Optional<Map<String, Object>> summary(String objectId);
+
+    /**
+     * Every object of {@code kind} in {@code status}, as the same flat maps {@link #summary} returns.
+     *
+     * <p>⚠ Narrow on purpose: the one consumer is the intelligence agent's remediable-state scan, which
+     * reads {@code id}, {@code correlationId} and {@code attributes.rule} and nothing else. A general
+     * query surface would have meant putting {@code ObjectQuery} — module vocabulary — in this signature.
+     */
+    List<Map<String, Object>> findByStatus(ObjectType kind, String status);
 
     /**
      * The module's {@code EventLog} subscriber, which promotes qualifying events (a sequence gap, a

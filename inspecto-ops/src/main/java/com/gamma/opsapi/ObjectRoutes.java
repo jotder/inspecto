@@ -1,4 +1,15 @@
-package com.gamma.control;
+package com.gamma.opsapi;
+
+import com.gamma.control.RouteErrors;
+import com.gamma.control.RowScope;
+import com.gamma.control.Subject;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.Cursor;
+import com.gamma.control.Handler;
+import com.gamma.control.RouteModule;
+import com.gamma.control.WriteGates;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.ops.ObjectQuery;
@@ -32,7 +43,7 @@ import java.util.NoSuchElementException;
  * Phase 2-4): create, lifecycle transitions, correlation links + graph, comments, attachments and
  * RCA seeding. Extracted verbatim from {@link ControlApi}: identical routes, order and HTTP statuses.
  */
-final class ObjectRoutes implements RouteModule {
+public final class ObjectRoutes implements RouteModule {
 
     private static final Logger log = LoggerFactory.getLogger(ObjectRoutes.class);
 
@@ -40,7 +51,7 @@ final class ObjectRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/objects", (e, m) -> objectsList(api, e));
         // Registered before the /objects/{id} catch-all so "analytics" is not read as an id (C4).
-        api.get("/objects/analytics", (e, m) -> api.service().objects().analytics(parseObjectType(ApiContext.query(e, "type"))));
+        api.get("/objects/analytics", (e, m) -> OpsEngine.of(api).analytics(parseObjectType(ApiContext.query(e, "type"))));
         api.post("/objects", (e, m) -> createObject(api, e, api.body(e)));
         // Every by-id route runs behind the SEC-7d data-scope guard: an object whose caseType is outside
         // the caller's dataScopes answers 404, indistinguishable from absence (existence-hiding).
@@ -52,15 +63,15 @@ final class ObjectRoutes implements RouteModule {
         api.post("/objects/([^/]+)/unwatch", scoped(api, (e, m) -> setWatch(api, ApiContext.name(m), api.body(e), false)));
         api.get("/objects/([^/]+)/watchers", scoped(api, (e, m) -> watchersOf(api, ApiContext.name(m))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/links", scoped(api, (e, m) -> toLinkMaps(api.service().objects().linksOf(ApiContext.name(m)))));
+        api.get("/objects/([^/]+)/links", scoped(api, (e, m) -> toLinkMaps(OpsEngine.of(api).linksOf(ApiContext.name(m)))));
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/merge", scoped(api, (e, m) -> mergeCases(api, e, ApiContext.name(m), api.body(e))));
         api.post("/objects/([^/]+)/split", scoped(api, (e, m) -> splitCase(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(api.service().objects().notesOf(ApiContext.name(m), NoteKind.COMMENT))));
+        api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT))));
         api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
-        api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(api.service().objects().notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
+        api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
         api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, ApiContext.name(m), api.body(e))));
         api.patch("/objects/([^/]+)", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
@@ -74,7 +85,7 @@ final class ObjectRoutes implements RouteModule {
         api.get("/findings/([^/]+)", (e, m) -> findingsSpecOf(api, ApiContext.name(m)));
         // Rule-raised cases (C5): auto-group Incidents into a Case. CRUD is capability-gated (config);
         // evaluate mutates objects (an operational action, like transition), so it is ungated.
-        api.get("/cases/rules", (e, m) -> api.service().objects().caseRules().stream().map(CaseRule::toMap).toList());
+        api.get("/cases/rules", (e, m) -> OpsEngine.of(api).caseRules().stream().map(CaseRule::toMap).toList());
         api.post("/cases/rules", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> saveCaseRule(api, api.body(e))));
         api.delete("/cases/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteCaseRule(api, ApiContext.name(m))));
         api.post("/cases/rules/([^/]+)/evaluate", (e, m) -> evaluateCaseRule(api, ApiContext.name(m)));
@@ -98,16 +109,16 @@ final class ObjectRoutes implements RouteModule {
         Path file = caseRuleFile(api, rule.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("case_rule", rule.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(file, bytes, ".caserule-");
-        return api.service().objects().registerCaseRule(rule).toMap();
+        return OpsEngine.of(api).registerCaseRule(rule).toMap();
     }
 
     /** {@code DELETE /cases/rules/{name}} — remove a rule (registry + persisted file); 404 if unknown. */
     private Object deleteCaseRule(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "case rule write");
-        if (api.service().objects().caseRule(name).isEmpty())
+        if (OpsEngine.of(api).caseRule(name).isEmpty())
             throw new ApiException(404, "no case rule named '" + name + "'");
         boolean fileRemoved = Files.deleteIfExists(caseRuleFile(api, name));
-        api.service().objects().removeCaseRule(name);
+        OpsEngine.of(api).removeCaseRule(name);
         return Map.of("deleted", name, "fileRemoved", fileRemoved);
     }
 
@@ -117,7 +128,7 @@ final class ObjectRoutes implements RouteModule {
      */
     private Object evaluateCaseRule(ApiContext api, String name) {
         try {
-            ObjectService.CaseRuleEvaluation r = api.service().objects().evaluateCaseRule(name);
+            ObjectService.CaseRuleEvaluation r = OpsEngine.of(api).evaluateCaseRule(name);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("matched", r.matched());
             out.put("grouped", r.grouped());
@@ -138,7 +149,7 @@ final class ObjectRoutes implements RouteModule {
 
     /** {@code GET /workflows/{type}} — the effective workflow definition; unknown type → 400. */
     private Object workflowOf(ApiContext api, String type) {
-        return api.service().objects().workflow(parseObjectType(type)).toMap();
+        return OpsEngine.of(api).workflow(parseObjectType(type)).toMap();
     }
 
     /**
@@ -218,7 +229,7 @@ final class ObjectRoutes implements RouteModule {
      * subsumes the plain existence checks these routes already made.
      */
     private static void requireVisible(ApiContext api, HttpExchange ex, String id) {
-        OperationalObject o = api.service().objects().get(id).orElse(null);
+        OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null || !visibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
     }
 
@@ -226,7 +237,7 @@ final class ObjectRoutes implements RouteModule {
     private Handler scoped(ApiContext api, Handler h) {
         return (e, m) -> {
             String id = ApiContext.name(m);
-            OperationalObject o = api.service().objects().get(id).orElse(null);
+            OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
             if (o != null && !visibleTo(e, o))
                 throw new ApiException(404, "no object with id '" + id + "'");
             return h.handle(e, m);   // absent ids keep their existing 404/behaviour
@@ -240,7 +251,7 @@ final class ObjectRoutes implements RouteModule {
      * absent — out-of-scope throws the same 404 an absent id does (existence-hiding).
      */
     static String visibleObjectCorrelationId(ApiContext api, HttpExchange ex, String id) {
-        OperationalObject o = api.service().objects().get(id).orElse(null);
+        OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null) return null;
         if (!visibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
         return o.correlationId() == null ? "" : o.correlationId();
@@ -263,7 +274,7 @@ final class ObjectRoutes implements RouteModule {
      */
     private Object objectsList(ApiContext api, HttpExchange e) {
         if (!ApiContext.v1(e))
-            return toObjectMaps(visibleOnly(api.service().objects().query(objectQuery(e)), e));
+            return toObjectMaps(visibleOnly(OpsEngine.of(api).query(objectQuery(e)), e));
         return objectsPage(api, e);
     }
 
@@ -283,7 +294,7 @@ final class ObjectRoutes implements RouteModule {
         Long afterCreatedAt = key.size() == 2 ? parseLongOr(key.get(0), Long.MIN_VALUE) : null;
         String afterId = key.size() == 2 ? key.get(1) : null;
 
-        List<OperationalObject> visible = visibleOnly(api.service().objects().query(q.unbounded()), e)
+        List<OperationalObject> visible = visibleOnly(OpsEngine.of(api).query(q.unbounded()), e)
                 .stream().sorted(KEYSET_ORDER).toList();
         long total = visible.size();
         List<OperationalObject> after = visible.stream()
@@ -327,7 +338,7 @@ final class ObjectRoutes implements RouteModule {
 
     /** {@code GET /objects/{id}} — the object, or 404. */
     private Object objectById(ApiContext api, String id) {
-        return api.service().objects().get(id).map(OperationalObject::toMap)
+        return OpsEngine.of(api).get(id).map(OperationalObject::toMap)
                 .orElseThrow(() -> new ApiException(404, "no object with id '" + id + "'"));
     }
 
@@ -365,12 +376,12 @@ final class ObjectRoutes implements RouteModule {
         Long dueAt = parseDueAt(body);
         if (dueAt != null) attrs.put(ObjectService.ATTR_DUE_AT, Long.toString(dueAt));
 
-        OperationalObject created = api.service().objects().open(type, title, ApiContext.str(body, "description"),
+        OperationalObject created = OpsEngine.of(api).open(type, title, ApiContext.str(body, "description"),
                 ApiContext.str(body, "severity"), ApiContext.str(body, "priority"), ApiContext.str(body, "owner"),
                 ApiContext.str(body, "assignee"), ApiContext.str(body, "correlationId"), attrs);
         String actor = ApiContext.str(body, "actor");
         for (LinkSpec l : links)
-            api.service().objects().link(created.id(), l.to(), l.relationship(), actor);
+            OpsEngine.of(api).link(created.id(), l.to(), l.relationship(), actor);
         return created.toMap();
     }
 
@@ -434,7 +445,7 @@ final class ObjectRoutes implements RouteModule {
         if (to == null) throw new ApiException(400, "body must include 'to'");
         requireVisible(api, ex, to);
         try {
-            return api.service().objects().link(fromId, to, ApiContext.str(body, "relationship"), ApiContext.str(body, "actor")).toMap();
+            return OpsEngine.of(api).link(fromId, to, ApiContext.str(body, "relationship"), ApiContext.str(body, "actor")).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
         }
@@ -455,7 +466,7 @@ final class ObjectRoutes implements RouteModule {
         if (to == null || to.isBlank()) throw new ApiException(400, "query must include 'to'");
         requireVisible(api, ex, to);
         try {
-            if (!api.service().objects().unlink(fromId, to, relationship, ApiContext.query(ex, "actor")))
+            if (!OpsEngine.of(api).unlink(fromId, to, relationship, ApiContext.query(ex, "actor")))
                 throw new ApiException(404, "no such link " + fromId + " -> " + to);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
@@ -474,7 +485,7 @@ final class ObjectRoutes implements RouteModule {
         if (sources.isEmpty()) throw new ApiException(400, "body must include non-empty 'sources'");
         for (String source : sources) requireVisible(api, ex, source);
         return RouteErrors.mapCaseErrors(() -> {
-            var result = api.service().objects().mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
+            var result = OpsEngine.of(api).mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("survivor", result.survivor().toMap());
             out.put("merged", result.merged());
@@ -496,7 +507,7 @@ final class ObjectRoutes implements RouteModule {
         if (members.isEmpty()) throw new ApiException(400, "body must include non-empty 'members'");
         for (String member : members) requireVisible(api, ex, member);
         return RouteErrors.mapCaseErrors(() -> {
-            var result = api.service().objects().splitCase(caseId, title, members,
+            var result = OpsEngine.of(api).splitCase(caseId, title, members,
                     ApiContext.str(body, "assignee"), ApiContext.str(body, "queue"), ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("case", result.part().toMap());
@@ -528,7 +539,7 @@ final class ObjectRoutes implements RouteModule {
         int depth = Math.min(5, Math.max(1, ApiContext.parseIntOr(ApiContext.query(ex, "depth"), 2)));
         Map<String, Object> g;
         try {
-            g = api.service().objects().graph(id, depth);
+            g = OpsEngine.of(api).graph(id, depth);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
         }
@@ -536,7 +547,7 @@ final class ObjectRoutes implements RouteModule {
         java.util.Set<String> visible = new java.util.HashSet<>();
         List<Map<String, Object>> keptNodes = nodes.stream().filter(n -> {
             String nid = String.valueOf(n.get("id"));
-            boolean ok = api.service().objects().get(nid).map(o -> visibleTo(ex, o)).orElse(false);
+            boolean ok = OpsEngine.of(api).get(nid).map(o -> visibleTo(ex, o)).orElse(false);
             if (ok) visible.add(nid);
             return ok;
         }).toList();
@@ -553,7 +564,7 @@ final class ObjectRoutes implements RouteModule {
         String text = ApiContext.str(body, "body");
         if (text == null) throw new ApiException(400, "body must include 'body'");
         try {
-            return api.service().objects().comment(id, ApiContext.str(body, "author"), text).toMap();
+            return OpsEngine.of(api).comment(id, ApiContext.str(body, "author"), text).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
         }
@@ -568,7 +579,7 @@ final class ObjectRoutes implements RouteModule {
         String uri = ApiContext.str(body, "uri");
         if (name == null || uri == null) throw new ApiException(400, "body must include 'name' and 'uri'");
         try {
-            return api.service().objects().attach(id, ApiContext.str(body, "author"), name, ApiContext.str(body, "contentType"),
+            return OpsEngine.of(api).attach(id, ApiContext.str(body, "author"), name, ApiContext.str(body, "contentType"),
                     uri, ApiContext.str(body, "caption")).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
@@ -601,7 +612,7 @@ final class ObjectRoutes implements RouteModule {
             }
         }
         try {
-            return toNoteMaps(api.service().objects().applyRca(id, template, ApiContext.str(body, "actor")));
+            return toNoteMaps(OpsEngine.of(api).applyRca(id, template, ApiContext.str(body, "actor")));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
         }
@@ -624,7 +635,7 @@ final class ObjectRoutes implements RouteModule {
         if (assignee == null && queue == null)
             throw new ApiException(400, "body must include 'assignee' or 'queue'");
         return RouteErrors.mapCaseErrors(
-                () -> api.service().objects().assign(id, assignee, queue, ApiContext.str(body, "actor")).toMap());
+                () -> OpsEngine.of(api).assign(id, assignee, queue, ApiContext.str(body, "actor")).toMap());
     }
 
     /**
@@ -648,7 +659,7 @@ final class ObjectRoutes implements RouteModule {
             throw new ApiException(400, "body must include at least one of 'priority', 'severity', 'assignee', 'attributes'");
         if (attrs != null) validateFindings(api, id, attrs);
         try {
-            return api.service().objects().patch(id, priority, severity, assignee, attrs).toMap();
+            return OpsEngine.of(api).patch(id, priority, severity, assignee, attrs).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
         }
@@ -664,7 +675,7 @@ final class ObjectRoutes implements RouteModule {
      * left to the patch itself to 404.
      */
     private static void validateFindings(ApiContext api, String id, Map<String, String> attrs) {
-        OperationalObject o = api.service().objects().get(id).orElse(null);
+        OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null) return;
         Map<String, String> merged = new LinkedHashMap<>(o.attributes());
         merged.putAll(attrs);
@@ -680,8 +691,8 @@ final class ObjectRoutes implements RouteModule {
         String user = ApiContext.str(body, "user");
         if (user == null) throw new ApiException(400, "body must include 'user'");
         try {
-            return (add ? api.service().objects().watch(id, user)
-                        : api.service().objects().unwatch(id, user)).toMap();
+            return (add ? OpsEngine.of(api).watch(id, user)
+                        : OpsEngine.of(api).unwatch(id, user)).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
         }
@@ -689,7 +700,7 @@ final class ObjectRoutes implements RouteModule {
 
     /** {@code GET /objects/{id}/watchers} (INC-4) — the object's watcher list. */
     private Object watchersOf(ApiContext api, String id) {
-        return api.service().objects().get(id).map(OperationalObject::watchers)
+        return OpsEngine.of(api).get(id).map(OperationalObject::watchers)
                 .orElseThrow(() -> new ApiException(404, "no object with id '" + id + "'"));
     }
 
@@ -712,8 +723,8 @@ final class ObjectRoutes implements RouteModule {
     private Object doTransition(ApiContext api, String id, String action, String target, String actor) {
         try {
             OperationalObject updated = (action != null)
-                    ? api.service().objects().transition(id, action, actor)
-                    : api.service().objects().transitionTo(id, target, actor);
+                    ? OpsEngine.of(api).transition(id, action, actor)
+                    : OpsEngine.of(api).transitionTo(id, target, actor);
             return updated.toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());

@@ -229,100 +229,19 @@ final class ServiceStores {
         }
     }
 
-    /**
-     * Select the Phase-2 object-store backend (v4.3.0): {@code -Dobjects.backend=memory} (default — an
-     * in-memory map; the lean fat-JAR keeps no extra files and tests stay light) or
-     * {@code -Dobjects.backend=db} (durable JDBC, engine chosen by {@code -Dobjects.db.url}, default
-     * {@link SpaceRoot#objectsDbUrl()} — the bundled DuckDB; point at {@code jdbc:postgresql://…} with
-     * the PG driver on the classpath for a distributed deployment). A DB backend that fails to open is
-     * logged and degrades to in-memory — the Alert Center must never block service startup.
-     */
-    static com.gamma.ops.ObjectStore openObjectStore(SpaceRoot root) {
-        String backend = System.getProperty("objects.backend", "memory");
-        if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.InMemoryObjectStore();
-        String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root.objectsDbUrl());
-        try {
-            com.gamma.ops.ObjectStore db = com.gamma.ops.DbObjectStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.OBJECTS), OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
-            log.info("Object backend: database ({})", url);
-            return db;
-        } catch (Exception e) {
-            log.warn("Could not open object DB at {} — falling back to in-memory: {}", url, e.getMessage());
-            return new com.gamma.ops.InMemoryObjectStore();
-        }
-    }
-
-    /**
-     * Select the Phase-4 link-store backend, mirroring {@link #openObjectStore(SpaceRoot)}: in-memory by
-     * default, or durable JDBC under {@code -Dobjects.backend=db}. The link URL is its own
-     * {@code -Dobjects.links.db.url} (default {@link SpaceRoot#linksDbUrl()}) — a <em>separate</em> DuckDB
-     * file, because a file-based DuckDB holds a single-writer lock and the object store already owns
-     * {@code inspecto-ops.db}; point both at one {@code jdbc:postgresql://…} for a distributed deployment.
-     * A DB open that fails degrades to in-memory — the graph must never block service startup.
-     */
-    static com.gamma.ops.link.LinkStore openLinkStore(SpaceRoot root) {
-        String backend = System.getProperty("objects.backend", "memory");
-        if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.link.InMemoryLinkStore();
-        String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root.linksDbUrl());
-        try {
-            com.gamma.ops.link.LinkStore db = com.gamma.ops.link.DbLinkStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.LINKS), OperationalDb.passwordFor(OperationalDb.Family.LINKS));
-            log.info("Link backend: database ({})", url);
-            return db;
-        } catch (Exception e) {
-            log.warn("Could not open link DB at {} — falling back to in-memory: {}", url, e.getMessage());
-            return new com.gamma.ops.link.InMemoryLinkStore();
-        }
-    }
-
-    /**
-     * Select the Phase-4-follow-up note-store backend, mirroring {@link #openLinkStore(SpaceRoot)}: in-memory by
-     * default, or durable JDBC under {@code -Dobjects.backend=db} in its own DuckDB file
-     * ({@code -Dobjects.notes.db.url}, default {@link SpaceRoot#notesDbUrl()}) — a separate file for the
-     * same single-writer-lock reason as the link store; point all three at one Postgres for a distributed
-     * deployment. A DB open that fails degrades to in-memory.
-     */
-    static com.gamma.ops.note.NoteStore openNoteStore(SpaceRoot root) {
-        String backend = System.getProperty("objects.backend", "memory");
-        if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.note.InMemoryNoteStore();
-        String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root.notesDbUrl());
-        try {
-            com.gamma.ops.note.NoteStore db = com.gamma.ops.note.DbNoteStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.NOTES), OperationalDb.passwordFor(OperationalDb.Family.NOTES));
-            log.info("Note backend: database ({})", url);
-            return db;
-        } catch (Exception e) {
-            log.warn("Could not open note DB at {} — falling back to in-memory: {}", url, e.getMessage());
-            return new com.gamma.ops.note.InMemoryNoteStore();
-        }
-    }
-
-    /**
-     * Select the cross-entity tag-assignment backend (BACKLOG D7), mirroring {@link #openNoteStore(SpaceRoot)}:
-     * in-memory by default, or durable JDBC under {@code -Dobjects.backend=db} in its own DuckDB file
-     * ({@code -Dobjects.tags.db.url}, default {@link SpaceRoot#tagAssignmentsDbUrl()}) — a separate file for
-     * the same single-writer-lock reason as the note and link stores. A DB open that fails degrades to
-     * in-memory rather than blocking startup: losing durable tags is bad, refusing to boot over labels is worse.
-     */
-    static com.gamma.ops.tag.TagAssignmentStore openTagAssignmentStore(SpaceRoot root) {
-        String backend = System.getProperty("objects.backend", "memory");
-        if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.tag.InMemoryTagAssignmentStore();
-        String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root.tagAssignmentsDbUrl());
-        try {
-            com.gamma.ops.tag.TagAssignmentStore db = com.gamma.ops.tag.DbTagAssignmentStore.open(url,
-                    OperationalDb.userFor(OperationalDb.Family.TAGS), OperationalDb.passwordFor(OperationalDb.Family.TAGS));
-            log.info("Tag assignment backend: database ({})", url);
-            return db;
-        } catch (Exception e) {
-            log.warn("Could not open tag DB at {} — falling back to in-memory: {}", url, e.getMessage());
-            return new com.gamma.ops.tag.InMemoryTagAssignmentStore();
-        }
-    }
+    // ⛔ The four operational-object store openers are GONE from core (EDG-01 cell 7, 2026-09-08):
+    // openObjectStore / openLinkStore / openNoteStore / openTagAssignmentStore. They named
+    // com.gamma.ops types, which is now an optional edition module, so opening them moved behind
+    // com.gamma.service.ObjectEngineProvider and lives in inspecto-ops.
+    //
+    // ⚠ Two behaviours travelled with them and must not be lost there: each store is its OWN DuckDB
+    // file (a file-based DuckDB holds a single-writer lock, so one file cannot serve four), and a DB
+    // that fails to open degrades to in-memory rather than blocking startup.
 
     /**
      * The in-app notification feed (Phase B2) for the single {@code appUser}. The feed is low-volume, so
      * the lean {@link com.gamma.notify.InMemoryNotificationStore} is the default and currently the only
-     * backend; a durable DuckDB backend would mirror {@link #openObjectStore(SpaceRoot)} when needed.
+     * backend; a durable DuckDB backend would mirror the status store below when needed.
      */
     static com.gamma.notify.NotificationStore openNotificationStore(SpaceRoot root) {
         return new com.gamma.notify.InMemoryNotificationStore();

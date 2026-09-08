@@ -440,7 +440,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
                 new RunRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineRelatedRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
-                new ObjectRoutes(), new NoteRoutes(), new QueueRoutes(), new TagRoutes(), new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes moved to inspecto-events (EDG-01 cell 6)
+                new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-events (cell 6); Object/Note/Queue/TagRoutes -> inspecto-ops (cell 7)
                 new QueryRoutes(), new BiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(),

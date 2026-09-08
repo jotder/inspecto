@@ -1,4 +1,8 @@
-package com.gamma.control;
+package com.gamma.opsapi;
+
+import com.gamma.control.ApiContext;
+import com.gamma.control.ApiException;
+import com.gamma.control.RouteModule;
 
 import com.gamma.ops.queue.Queue;
 
@@ -11,18 +15,18 @@ import java.util.Map;
  * (operational visibility); create/update authors config, so it requires {@code canAuthorWorkbench}
  * (a no-op on Personal). Members + routing strategy come from the body, mirroring {@code *_queue.toon}.
  */
-final class QueueRoutes implements RouteModule {
+public final class QueueRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/queues", (e, m) -> api.service().objects().queues().stream().map(Queue::toMap).toList());
+        api.get("/queues", (e, m) -> OpsEngine.of(api).queues().stream().map(Queue::toMap).toList());
         api.get("/queues/([^/]+)", (e, m) -> queueById(api, ApiContext.name(m)));
         api.post("/queues", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createQueue(api, api.body(e))));
     }
 
     /** {@code GET /queues/{id}} — the queue, or 404. */
     private Object queueById(ApiContext api, String id) {
-        return api.service().objects().queue(id).map(Queue::toMap)
+        return OpsEngine.of(api).queue(id).map(Queue::toMap)
                 .orElseThrow(() -> new ApiException(404, "no queue with id '" + id + "'"));
     }
 
@@ -37,7 +41,7 @@ final class QueueRoutes implements RouteModule {
         // Normalize members to a list of strings for Queue.fromMap (tolerate a single string).
         if (body.get("members") instanceof String one) block.put("members", List.of(one));
         try {
-            return api.service().objects().registerQueue(Queue.fromMap(block)).toMap();
+            return OpsEngine.of(api).registerQueue(Queue.fromMap(block)).toMap();
         } catch (IllegalArgumentException bad) {
             throw new ApiException(400, bad.getMessage());
         }

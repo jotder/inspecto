@@ -41,8 +41,12 @@ import java.util.function.Function;
  * {@code ${KEYSTORE:opsdb}}, {@code ${FILE:/run/secrets/pg}} or a literal, expanded at use — the
  * exact {@code auth.oidc.clientSecret} precedent, so the value need not sit on the process command
  * line and {@code secrets.keystore.*} is supported without a new mechanism.
+ * <p>⚠ <b>Public since EDG-01 cell 7</b> (2026-09-08): the four operational-object stores are opened by the
+ * optional {@code inspecto-ops} module now, and they resolve their URLs, users and passwords through the
+ * same {@link Family} entries as before. Widening the visibility keeps ONE place that decides how an
+ * operational DB is addressed — a module-local copy would drift from the family roster this class pins.
  */
-final class OperationalDb {
+public final class OperationalDb {
 
     /** The PostgreSQL JDBC driver class, probed by name — never linked against. */
     private static final String PG_DRIVER = "org.postgresql.Driver";
@@ -70,7 +74,7 @@ final class OperationalDb {
      *       {@code *.db.url} but share one {@code objects.db.user}/{@code .password}.</li>
      * </ul>
      */
-    enum Family {
+    public enum Family {
         JOB_RUNS("Job runs", "jobs.backend", "none", Mode.URL_OR_ENGINE,
                 "jobs.db.url", null, null, SpaceRoot::jobRunDbUrl),
         PROVENANCE("Provenance", "provenance.backend", "none", Mode.URL_OR_ENGINE,
@@ -194,7 +198,7 @@ final class OperationalDb {
      * A family's effective configuration — the same three-way the store openers perform, in one place so
      * a diagnostic read cannot report a URL the store is not actually using.
      */
-    static Resolved resolve(Family f, SpaceRoot root) {
+    public static Resolved resolve(Family f, SpaceRoot root) {
         String backend = System.getProperty(f.backendProperty, f.backendDefault).trim();
         if (f.mode == Family.Mode.URL_OR_ENGINE) {
             String lower = backend.toLowerCase();
@@ -231,7 +235,7 @@ final class OperationalDb {
     }
 
     /** True when the operational stores should speak PostgreSQL rather than embedded DuckDB. */
-    static boolean postgres() {
+    public static boolean postgres() {
         String v = System.getProperty("inspecto.db", "duckdb").trim().toLowerCase();
         return "postgres".equals(v) || "postgresql".equals(v);
     }
@@ -240,16 +244,16 @@ final class OperationalDb {
      * The shared connection URL, or {@code null} when this is a DuckDB (Personal) deployment or no
      * shared URL was given — callers then fall back to their per-space DuckDB file as before.
      */
-    static String url() {
+    public static String url() {
         if (!postgres()) return null;
         String url = System.getProperty("inspecto.db.url");
         return url == null || url.isBlank() ? null : url.trim();
     }
 
-    static String user()     { return System.getProperty("inspecto.db.user"); }
+    public static String user()     { return System.getProperty("inspecto.db.user"); }
 
     /** The shared password, with a {@code ${…}} reference expanded at use; a literal passes through. */
-    static String password() { return SecretResolver.resolve(System.getProperty("inspecto.db.password")); }
+    public static String password() { return SecretResolver.resolve(System.getProperty("inspecto.db.password")); }
 
     /**
      * Fail closed at boot if {@code postgres} was selected but cannot be honoured — a missing driver or
@@ -259,7 +263,7 @@ final class OperationalDb {
      * @throws IllegalStateException naming the property at fault and what to do about it
      */
     /** Whether the PostgreSQL driver is on the classpath — the sidecar question, asked without throwing. */
-    static boolean driverAvailable() {
+    public static boolean driverAvailable() {
         try {
             Class.forName(PG_DRIVER);
             return true;
@@ -268,7 +272,7 @@ final class OperationalDb {
         }
     }
 
-    static void verifySelectable() {
+    public static void verifySelectable() {
         if (!postgres()) return;
         if (url() == null)
             throw new IllegalStateException(
@@ -293,7 +297,7 @@ final class OperationalDb {
      * The caller still supplies the space default because several openers reach it by a path this class
      * should not know (a legacy root, a {@code jdbc:} backend value that already decided).
      */
-    static String urlFor(Family family, String spaceDefault) {
+    public static String urlFor(Family family, String spaceDefault) {
         String explicit = System.getProperty(family.urlProperty);
         if (explicit != null && !explicit.isBlank()) return explicit.trim();
         String shared = url();
@@ -301,14 +305,14 @@ final class OperationalDb {
     }
 
     /** As {@link #urlFor}, for the credential half — a per-family value first, then the shared one. */
-    static String userFor(Family family) {
+    public static String userFor(Family family) {
         if (family.userProperty == null) return user();
         String explicit = System.getProperty(family.userProperty);
         return explicit != null ? explicit : user();
     }
 
     /** As {@link #userFor}, for the password — a per-family value may also be a {@code ${…}} reference. */
-    static String passwordFor(Family family) {
+    public static String passwordFor(Family family) {
         if (family.passwordProperty == null) return password();
         String explicit = System.getProperty(family.passwordProperty);
         return explicit != null ? SecretResolver.resolve(explicit) : password();

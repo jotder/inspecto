@@ -1,4 +1,4 @@
-package com.gamma.ops.findings;
+package com.gamma.objects;
 
 import com.gamma.objects.FindingsSpec;
 

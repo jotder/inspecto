@@ -186,8 +186,11 @@ final class DecisionRoutes implements RouteModule {
                 // (+ the authored rule, when authored) only.
                 String corr = "decision-rule:" + ruleName;
                 String incidentDetail = null;
-                if (isHighSeverity(severity) && api.service().objects().active(ObjectType.INCIDENT, corr).isEmpty()) {
-                    api.service().objects().open(ObjectType.INCIDENT, "Decision Rule " + alertName,
+                // ⚠ Through the seam since EDG-01 cell 7, and empty on a bundle without inspecto-ops —
+                // in which case no Incident is raised and the decision still executes and audits.
+                com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+                if (isHighSeverity(severity) && objects != null && !objects.hasActive(ObjectType.INCIDENT, corr)) {
+                    objects.open(ObjectType.INCIDENT, "Decision Rule " + alertName,
                             "Raised by Decision Rule '" + ruleName + "'", severity, corr,
                             Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
                     incidentDetail = "opened Incident for '" + alertName + "' (" + severity + ")";
@@ -229,8 +232,9 @@ final class DecisionRoutes implements RouteModule {
                 String title = paramStr(c, "title", "Decision Rule " + ruleName);
                 String severity = paramStr(c, "severity", "error");
                 status = "executed";
-                if (api.service().objects().active(ObjectType.INCIDENT, corr).isEmpty()) {
-                    api.service().objects().open(ObjectType.INCIDENT, title,
+                com.gamma.objects.ObjectAccess objs = api.service().objects().orElse(null);
+                if (objs != null && !objs.hasActive(ObjectType.INCIDENT, corr)) {
+                    objs.open(ObjectType.INCIDENT, title,
                             "Raised by Decision Rule '" + ruleName + "'", severity, corr,
                             Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
                     detail = "opened Incident '" + title + "' (" + severity + ")";

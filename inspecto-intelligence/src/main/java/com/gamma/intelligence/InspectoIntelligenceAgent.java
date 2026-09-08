@@ -572,14 +572,21 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         if (service == null) return List.of();
         List<OpsMonitor.Finding> findings = new java.util.ArrayList<>();
         try {
-            var query = com.gamma.ops.ObjectQuery.builder()
-                    .objectType(com.gamma.objects.ObjectType.ALERT).status("OPEN").build();
-            for (var obj : service.objects().query(query)) {
+            // ⚠ Through the ObjectAccess seam since EDG-01 cell 7 — operational objects are the optional
+            // inspecto-ops module, so on a bundle without it this scan yields nothing and the agent's
+            // other monitors are unaffected. ⛔ Not an error: an absent optional module is a deployment
+            // state, and reporting "scan failed" would teach an operator something is broken.
+            var objects = service.objects().orElse(null);
+            if (objects == null) return List.of();
+            for (Map<String, Object> obj : objects.findByStatus(com.gamma.objects.ObjectType.ALERT, "OPEN")) {
                 Map<String, Object> subject = new HashMap<>();
-                subject.put("alertId", obj.id());
-                subject.put("pipeline", obj.correlationId());
-                if (obj.attributes() != null) subject.put("rule", obj.attributes().get("rule"));
-                findings.add(new OpsMonitor.Finding(OpsMonitor.ACTION_ALERT_TRIAGE, obj.id(), subject));
+                String alertId = String.valueOf(obj.get("id"));
+                subject.put("alertId", alertId);
+                subject.put("pipeline", obj.get("correlationId"));
+                @SuppressWarnings("unchecked")
+                Map<String, String> attrs = (Map<String, String>) obj.get("attributes");
+                if (attrs != null) subject.put("rule", attrs.get("rule"));
+                findings.add(new OpsMonitor.Finding(OpsMonitor.ACTION_ALERT_TRIAGE, alertId, subject));
             }
         } catch (RuntimeException e) {
             log.warn("ops_monitor state-watch scan failed: {}", e.getMessage());
