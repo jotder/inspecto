@@ -54,4 +54,43 @@
             </plugins>
         </pluginManagement>
     </build>
+
+    <!-- Coverage reporting, mirroring the inspecto root POM's `coverage` profile (GUARD-SWEEP-1g,
+         2026-09-08).
+
+         🔴 It has to be DUPLICATED here, not inherited. This POM is a separate root
+         (com.gamma.asn:asn-decoders) that the inspecto reactor merely AGGREGATES as a module — and a
+         Maven profile is inherited through <parent>, never through aggregation. So the root's profile
+         could not reach these nine modules, and `mvn -Pcoverage` produced reports for 21 modules while
+         silently measuring nothing here: ~13 300 lines across 91 files, about a tenth of the codebase,
+         absent from a number presented as repo-wide. That is exactly the "scope exemptions are silent by
+         default" failure guard-coverage.md documents.
+
+         ⚠ REPORTING only — prepare-agent + report, no `check` goal and no threshold, so it cannot fail a
+         build. Keep it in step with the root profile if that one changes. -->
+    <profiles>
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>0.8.13</version>
+                        <executions>
+                            <execution>
+                                <id>prepare-agent</id>
+                                <goals><goal>prepare-agent</goal></goals>
+                            </execution>
+                            <execution>
+                                <id>report</id>
+                                <phase>test</phase>
+                                <goals><goal>report</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

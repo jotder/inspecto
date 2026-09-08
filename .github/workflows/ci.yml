@@ -117,10 +117,45 @@ jobs:
       # resolution — the security-critical surface. `release.yml` does build Enterprise, but with
       # -DskipTests, so a compile break was caught at tag time and a test regression never was.
       # Enterprise is the superset, so this one flag covers Standard too, in the same reactor pass.
-      - name: Run tests (all editions) and install, so the dependency guard below can resolve the reactor
+      #
+      # `-Pcoverage` (GUARD-SWEEP-1g, 2026-09-08): jacoco had been configured for months behind this
+      # profile and NO workflow activated it, so the repo had no coverage number at all — the "no coverage
+      # gate anywhere" gap. It is REPORTING only: the profile binds prepare-agent + report and no `check`
+      # goal, so this cannot fail a build. ⛔ A threshold is deliberately NOT set here — choosing what
+      # number blocks whom is a policy decision, and the point of this step is to produce the data that
+      # decision needs. Measured baseline 2026-09-08: instructions 81.01%, branches 67.19%, lines 80.88%
+      # across 26 reporting modules (239572/295731 instructions).
+      # ⚠ That is the HONEST figure. The first measurement said 82.92% across 21 modules, because the
+      # asn-parser tree was never instrumented — a separate root POM, and a Maven profile is inherited
+      # through <parent>, never through aggregation. Adding the profile there pulled the number DOWN by
+      # ~1.9 points, mostly from asn-golden (4.4%) and asn-plugin-vendors (12.2%), whose tests are
+      # environment-gated. ⚠ A module with ZERO tests writes no jacoco.exec and so vanishes from the
+      # denominator rather than dragging it down — immaterial here (~800 lines across 4 modules) but the
+      # reason the percentage is not a measure of "code with tests". See
+      # okf/backend/build-run/guard-coverage.md.
+      - name: Run tests (all editions) with coverage, and install so the dependency guard can resolve the reactor
         run: >-
-          mvn --batch-mode --no-transfer-progress install -Pedition-enterprise
+          mvn --batch-mode --no-transfer-progress install -Pedition-enterprise -Pcoverage
           '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'
+
+      # Keep the reports so a trend is visible run-to-run — without this the number exists only in the
+      # log and nobody can say whether it moved.
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: '**/target/site/jacoco/'
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Repo-WIDE floors (operator decision 2026-09-08), summed across the per-module CSVs.
+      # ⚠ Not `jacoco:check`: that goal binds per module, so it would gate every module on its own
+      # number — inspecto-util (49.6%) and asn-golden (4.4%) would fail while the codebase as a whole
+      # sits well above the floor. Summing is the only way to enforce ONE number.
+      # ⚠ Absent reports FAIL rather than pass, so a build that lost `-Pcoverage` cannot slip through.
+      - name: Coverage floors
+        run: node tools/check-coverage.mjs --backend
 
       # Boundary law (U1): the lean ETL core never gains a kernel dependency. Kernel types live
       # ONLY in the optional inspecto-agent module, behind the AssistAgent SPI. This guard

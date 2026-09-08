@@ -77,6 +77,14 @@ that proves an optional module is **self-contained**. `inspecto-ops` ships in St
 direction still PASSED locally off a stale `~/.m2`. A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
 do not read that as the total, and do not conclude a module "failed" when the build never reached it.
 
+🔴 **Check for a live build BEFORE every `mvn`, not just when you remember.** ⚠ Recorded twice on
+2026-09-08 because writing it down once did not prevent the second occurrence: a targeted
+`mvn -pl asn-parser/asn-decoders/asn-core test` was fired while a full-reactor coverage run was in
+flight, so both wrote `asn-core/target/` at once and that module's numbers had to be treated as
+suspect. A `-pl` run feels harmless precisely because it is small — but it shares `target/` with
+whatever the reactor is doing to the same module. `ps -W | grep -iE 'java\.exe|mvn'` costs nothing;
+run it as a reflex, not as a recovery step.
+
 🔴 **Never edit the tree while a verification is running, and do not trust a process check to tell you it
 finished.** A verify pass runs several builds in sequence, so an empty `ps -W | grep java` between them
 looks identical to "done". Editing into that gap produces two distinct false failures: a *transient*

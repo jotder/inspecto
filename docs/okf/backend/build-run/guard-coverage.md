@@ -105,6 +105,20 @@ under review — was the only one the lock never saw, while `compliance/controls
 CLOSED. It now resolves `-Pedition-enterprise` (25 modules, not 23). Audit a guard's scope apart from its
 rules: the scope is where the silent exemptions live.
 
+✅ **A third instance, 2026-09-08 — and a MEASUREMENT is the same shape as a guard.** The first
+code-coverage baseline reported "repo-wide 82.92%" across 21 modules — the true figure is **81.01%**. Nine more code modules produced no
+report at all — not because coverage was low, but because they were **never instrumented**:
+`asn-parser/asn-decoders/pom.xml` is a separate root (`com.gamma.asn`) that the inspecto reactor only
+**aggregates**, and a Maven profile is inherited through `<parent>`, never through aggregation. So ~13 300
+lines across 91 files — about a tenth of the codebase — sat outside a number presented as repo-wide, and
+`mvn -Pcoverage` exited 0 the whole time. 🔴 **A reported number tells you nothing about what it declined
+to look at.** Had a threshold been set from that figure it would have been a gate that could not fail for
+a tenth of the code. Fixed by duplicating the profile into the asn root, with a comment saying why it
+cannot be inherited. ⚠ And a second, smaller exemption of the same family: a module with **zero tests**
+writes no `jacoco.exec` at all, so it disappears from the denominator instead of dragging the percentage
+down. Four modules do that here (~800 lines, immaterial) — but it is why a coverage percentage is never a
+measure of *"how much code has tests"*, only of *"how much measured code was executed"*.
+
 ## A third shape: the guard whose subject is a NUMBER a human wrote
 
 The two shapes above are about a guard that cannot fail. This one is about work that **has no guard at all

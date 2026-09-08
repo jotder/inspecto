@@ -5,7 +5,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -65,6 +65,11 @@ async function create() {
         ],
     });
     await TestBed.compileComponents(); // data-table @defer block
+    // EDG-01 cell 7: opsEnabled defaults FALSE, where this pane renders only the explained alert.
+    // ⚠ Armed here because the coverage baseline caught what no assertion did — the spec still
+    // PASSED while the template it exists to exercise fell to 2.2%: it asserts on component
+    // state, not on rendered output, so the gated branch was invisible to it.
+    TestBed.inject(SessionService).opsEnabled.set(true);
     const fixture = TestBed.createComponent(ObjectMailComponent);
     fixture.detectChanges(); // ngOnInit → reload()
     return { fixture, c: fixture.componentInstance, api };

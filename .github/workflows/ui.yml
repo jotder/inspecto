@@ -63,8 +63,32 @@ jobs:
       - name: Typecheck (all three tsconfigs)
         run: npm run typecheck
 
-      - name: Unit tests
-        run: npm run test:ci
+      # `test:coverage`, not `test:ci` (GUARD-SWEEP-1g, 2026-09-08): the UI had NO coverage
+      # configuration at all, so the repo had no UI number. Coverage is REPORTING only — no
+      # `coverageThresholds` is set, so this cannot fail the job. ⛔ Choosing a threshold is a policy
+      # decision; this step exists to produce the data it needs. Measured baseline 2026-09-08:
+      # statements 73.82%, branches 70.04%, functions 62.41%, lines 77.77%.
+      # ⚠ Scope mirrors what the design-token guard and prettier already treat as OURS — src/app/inspecto
+      # and src/app/modules/admin — with the vendored @gamma/** and modules/auth/** excluded. Measuring
+      # vendored template code would make the percentage meaningless.
+      - name: Unit tests (with coverage)
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-coverage
+          path: inspecto-ui/coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+      # The same repo-wide guard, run from the repo root so it finds inspecto-ui/coverage/. ⚠ It reports
+      # the backend as skipped here (no jacoco.csv in this job — the UI workflow never builds Java), and
+      # says so rather than presenting half the picture as all of it.
+      - name: Coverage floors (UI)
+        working-directory: .
+        run: node tools/check-coverage.mjs --ui
 
       # Production build is the green gate (AOT type-check + bundle + budgets).
       # No dev-only fileReplacements, so one configuration covers both.
