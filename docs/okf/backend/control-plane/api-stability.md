@@ -94,8 +94,9 @@ above the generated commit list.
 - Run artifacts carry `event_time_min` / `event_time_max` instead of `timeRange`.
 - `mail.send` with no recipients logs "SUCCESS, nothing sent" rather than failing the job.
 - The token picker's preview is the server's evaluation, not a client-side guess.
-- New default-on caps: DuckDB `memory_limit=2GB` and `-Djobs.maxConcurrentRuns=4` (D11), both editable
-  under Settings ▸ Scheduler ▸ Resource caps.
+- New default-on cap: `-Djobs.maxConcurrentRuns=4` (D11), editable under Settings ▸ Scheduler ▸ Resource caps, where
+  DuckDB `memory_limit` is also served (`2GB` is the measured recommendation, **not a shipped default** — GAP-4;
+  this line said "default-on caps … `memory_limit=2GB`" until 2026-09-08).
 - The event store prunes by whole day partitions once an `event_prune` maintenance job exists (COMPLY-3);
   releases are SBOM'd and signed in CI only (COMPLY-1/2).
 

@@ -34,6 +34,12 @@ renderings (Widgets, Dashboards, exports). Vocabulary: [`GLOSSARY.md`](../../../
   a server-side structured compiler would duplicate that logic for no functional gain; the server
   therefore returns `422` for a non-SQL body **deliberately** (an explicit contract, never silent).
   Revisit only if an external `/api/v1` consumer must submit structured (non-SQL) bodies directly.
+  ⚠ **Two facts this page omitted until 2026-09-08:** (1) `POST /bi/query` *is* a server-side structured
+  evaluator for the widget *spec* grammar (`MeasureCompiler`), failing honestly on what it cannot map — the
+  422 here and the compiler there are two routes over one boundary; (2) **the SPA never calls
+  `POST /queries/{id}/run`** — the Query Library resolves `$`-parameters client-side (`inspecto/query/parameters.ts`)
+  and previews through `/db/query`, so server-side `$current_user`/`$role` resolution has no product caller.
+  Requirement of record: [DAT capability spec](../../capabilities/data-plane/data-plane.md).
   (Widgets don't execute *any* bound query server-side yet — a separate, pre-existing follow-on.)
   Pagination is offset-based in this slice. `graph`/`spatial`/`search`/`api` query types are
   deliberately not built (geo/link views keep their own query shapes).

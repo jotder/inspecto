@@ -281,8 +281,8 @@ a test that post-dates it. What is left is one release-gated wire change.)*
   session" for two months over a pane that shipped 2026-07-07). An authority note now says `EDITIONS.md`'s matrix
   wins for the Edition column. Still open, same root cause — the column predates the 2026-09-02 "not for Personal"
   decisions: ~~SEC-8~~ (reconciled 2026-09-08 — `okf/capabilities/security/security.md` §2 owns the row),
-  **OPS-2**, **INV-2** (both say `All`; EDITIONS gates them Standard+; ~~INC-2/3/4~~ reconciled 2026-09-08 — `okf/capabilities/incidents/incidents.md` §2 owns those rows), and **DAT-6** wants a caveat that
-  the multi-user half is unbuilt. ⚠ ACQ-4's *other* half is unresolved and needs grounding, not a doc edit:
+  **OPS-2**, **INV-2** (both say `All`; EDITIONS gates them Standard+; ~~INC-2/3/4~~ reconciled 2026-09-08 — `okf/capabilities/incidents/incidents.md` §2 owns those rows), and ~~**DAT-6** wants a caveat that
+  the multi-user half is unbuilt~~ (the caveat is in the REQUIREMENTS cell; retired 2026-09-08). ⚠ ACQ-4's *other* half is unresolved and needs grounding, not a doc edit:
   EDITIONS' generated board marks `SP-ACQ-06`/`SP-ACQ-08` (S3/GCS) planned while the **connectors** ship with tests
   — check whether the *Step processor* exists before flipping `ProcessorCatalog`, because a connector is not a Step.
   → `REQUIREMENTS.md` · `EDITIONS.md`
@@ -408,7 +408,7 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 | Completeness KPI hold (§2) | Completeness KPI K2/K4/K5 (§3) · `superpower/completeness-kpi-plan.md` |
 | Compliance program NFR-7 (§2) | SOC 2 Type II window (§2) — the same observation window, twice in one table |
 | Deployment topology live validation (§2) | Deployment topology gaps (§3) · §6 "D1–D8 signed as recommended" — the §3 row's gate is already discharged |
-| Postgres multi-user — §6 PARKED | §3 Postgres multi-user row, which contradicts §6; its plan pointer is dead (the file is in `plans-archive/`) |
+| Postgres multi-user — §6 PARKED | §3 Postgres multi-user row — now says PARKED and points at `plans-archive/` (this row's "contradicts §6 / dead pointer" note was stale by 2026-09-08); `EDITIONS.md` OPS-03 |
 
 **Deleted 2026-09-07:** *Three disagreeing name rules* — resolved **2026-08-17**
 (`okf/backend/control-plane/pipeline-identity.md`), not on 2026-09-06, and all three of its aliases were dead or

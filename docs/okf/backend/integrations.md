@@ -64,6 +64,12 @@ LIMIT 100;
 
 ## Warehouse Query Layer — DBeaver via pg_duckdb
 
+> ⚠ **Operator runbook, not a product feature** (banner added 2026-09-08). Everything below runs on a *customer's*
+> PostgreSQL: install `pg_duckdb`, run the bundled `warehouse_setup.sql` (repo root, outside the Maven build), create
+> roles and views by hand. **No `pg_duckdb` code exists in this repo and nothing tests this layer.** The DuckLake
+> registrar above registers already-written local Parquet paths — bytes never move. Requirement of record:
+> [DAT capability spec](../capabilities/data-plane/data-plane.md) §3.10.
+
 Parquet output can be queried directly from DBeaver (or any PostgreSQL client) without loading data into PostgreSQL. The `pg_duckdb` extension embeds DuckDB inside PostgreSQL as a transparent execution engine — users connect with a standard PostgreSQL driver and DuckDB is invisible to them.
 
 ```

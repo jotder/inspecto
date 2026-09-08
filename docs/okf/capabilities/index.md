@@ -29,7 +29,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `ING` | Ingestion & parsing | `ingestion/` | planned |
 | `PIP` | Pipeline authoring | `pipeline-authoring/` | planned — the first `PIP` spec |
 | `PIP` | Pipeline execution | `pipeline-execution/` | planned — the second `PIP` spec; near-certain §3 split (440 KB of as-built truth) |
-| `DAT` | Data plane | `data-plane/` | planned |
+| `DAT` | [Data plane](data-plane/data-plane.md) | `data-plane/` | ✅ **area #7 — 2026-09-08** |
 | `BI` · `INV` | Studio | `studio/` | planned — one spec for both ID ranges |
 | `OPS` | Observability & maintenance | `observability/` | planned |
 | `INC` | [Alerts & Incidents](incidents/incidents.md) | `incidents/` | ✅ **area #3 — 2026-09-08** (🔴 the backend objects domain still has no concept file — §7 gap row) |

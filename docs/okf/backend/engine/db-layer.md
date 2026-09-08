@@ -80,7 +80,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | `memory` |
 | Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | `memory` |
 | Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* | `events.backend=memory\|parquet` | `memory` |
-| Ingest status / audit projection | `etl/StatusStore` | [`DbStatusStore`](../../../../inspecto/src/main/java/com/gamma/service/DbStatusStore.java) | `status.backend=file\|db` | `file` |
+| Ingest status / audit projection | `etl/StatusStore` | [`DbStatusStore`](../../../../inspecto/src/main/java/com/gamma/service/DbStatusStore.java) | `status.backend=file\|db` | **`db`** (flipped 2026-08-31; this row said `file` until 2026-09-08) |
 | Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
 | Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
 | Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
@@ -97,7 +97,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
 warning rather than blocking startup.
 
-> **Why exactly one store defaults on** *(2026-08-10, addressing D1)*. `consignment_outputs` is the only
+> **Why `consignment_outputs` defaults on** *(2026-08-10, addressing D1 — at the time the only one; since then the dedup ledger (D-9, 2026-09-01) and `status` (2026-08-31) default on too — `okf/capabilities/data-plane/data-plane.md` §3.8)*. `consignment_outputs` was the only
 > row above that opens without being asked, and the reason is a bug, not the addressing feature it was
 > built for. [`ReprocessCommand`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java)
 > refuses to reprocess a Consignment whose output a compaction merged away — re-ingesting rows that still
@@ -494,7 +494,7 @@ the ledger armed against the real `DbDedupLedger` while writing nothing. It is s
 value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class source that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all eleven families (it fails that test). Tests needing durable dedup
+`OperationalDbTest` pins across all twelve families (it fails that test). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
@@ -596,8 +596,9 @@ The layer was **designed** for this: stores are JDBC-pluggable by URL scheme, th
 portable (`VARCHAR`/`BIGINT`, composite PKs, no auto-increment, no upserts — explicit DELETE-then-INSERT),
 and there is a **real embedded-Postgres round-trip test**
 ([`PostgresStateStoreTest`](../../../../inspecto-ops/src/test/java/com/gamma/service/PostgresStateStoreTest.java))
-covering 6 of the 9 DB-backed stores — **`consignment_outputs` and `file_stages` are two of the three it does
-not cover.** Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
+covering **9 of the 12 families** (note, tag assignment, job run, file stage, consignment output, status, provenance,
+object, link) — **the dedup ledger, the acquisition ledger and delivery receipts are the three it does not cover**
+(measured 2026-09-08; this sentence said "6 of the 9" and named two covered stores as uncovered). Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
 is reasoned, not proved.
 
 ### 5.0 One selection: `-Dinspecto.db` (2026-08-14)
@@ -650,7 +651,7 @@ without a restart — and persisting from the UI would create a **second declara
 beside `-D`, the split-brain the enrichment companion already refused (D7). Decided 2026-08-15: the
 operator applies flags through their own deployment tooling; this screen tells them what is in force.
 
-- **`OperationalDb.Family` is now the roster** — the ten families' property names live there and nowhere
+- **`OperationalDb.Family` is now the roster** — the **twelve** families' property names live there and nowhere
   else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
 - ⚠ **Three irregularities the report models rather than flattens:** three different "is it on" spellings
@@ -719,11 +720,11 @@ supplies them all; the per-family flags remain as overrides and for back-compat.
    (`BackupTask` is a filesystem zip, not a DB-row mover). Either write a one-off per-table
    `SELECT → INSERT` script, or accept a clean cutover with empty Postgres tables that the writers
    repopulate going forward.
-4. Before relying on it: confirm the `CHECKPOINT` no-op is fine. (All seven JDBC stores now have a
-   Postgres round-trip in `PostgresStateStoreTest`, including `DbAcquisitionLedger`.)
+4. Before relying on it: confirm the `CHECKPOINT` no-op is fine. (Nine store classes have a Postgres round-trip in `PostgresStateStoreTest`; `DbAcquisitionLedger`, `DbDedupLedger`
+   and `DbDeliveryReceiptStore` do **not** — this parenthesis said "all seven … including `DbAcquisitionLedger`" until 2026-09-08.)
 5. Events cannot move — `ParquetEventStore` has no DB sibling; moving events off Parquet needs new code.
 
-For the 7 covered stores this is essentially a **configuration change** — flags + URLs + driver + a
+For the 9 covered stores this is essentially a **configuration change** — flags + URLs + driver + a
 Postgres instance — not a code change.
 
 ---
@@ -758,7 +759,7 @@ evaluations can therefore open duplicates. Treat the dedup as best-effort and do
 
 ## Proving the JDBC stores on real PostgreSQL (DAT-6)
 
-`PostgresStateStoreTest` opens all ten JDBC-backed stores against a real server and round-trips each one.
+`PostgresStateStoreTest` opens **nine** JDBC-backed store classes against a real server and round-trips each one (not "all ten" — the roster is twelve families, three are uncovered; corrected 2026-09-08).
 Its load-bearing case is `DbJobRunStore.metrics`: p50/p95 are the one piece of non-portable SQL — DuckDB's
 `quantile_cont` versus Postgres's `percentile_cont(..) WITHIN GROUP` — so only a real engine pins the
 dialect fix.

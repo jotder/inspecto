@@ -470,8 +470,10 @@ compaction) remain the Phase-2 backlog.
 
 **Matrix** — The **intended user-facing name** for a summary / cube / roll-up data asset. It **is a Derived
 Table** (so it lives inside the **Dataset** umbrella) — "Matrix" is the label the Catalog and Studio are meant
-to show for it, not a new model type. **Not yet surfaced in the UI as of 2026-07-20** (no `Matrix` label found
-in the Angular source) — this is the intended vocabulary for when it lands, not a description of a shipped
+to show for it, not a new model type. **Surfaced 2026-08-04**: the Catalog labels `DERIVED_TABLE` **Matrix** (`nodeKindLabel()`, §13); the
+materialization itself is `task: materialize` (DAT-4, 2026-07-08) — ⚠ no UI action triggers it and no committed job
+schedules one (`okf/capabilities/data-plane/data-plane.md` §5). *(This entry said "not yet surfaced as of 2026-07-20"
+until 2026-09-08.)* Not a description of a shipped
 screen. ⛔ "Cube" stays a *verb* (the Transform action that produces it), never the asset's noun.
 
 **View** — A virtual (logical) query over a Table, Derived Table, or View. No storage of its own.
