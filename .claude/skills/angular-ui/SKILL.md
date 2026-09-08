@@ -13,7 +13,7 @@ description: >
 
 > Durable inspecto-ui conventions & gotchas (mode-toggle lens, lint:tokens guard, ag-Grid refresh/theme/
 > virtualization, NG8011, auth-free client, CSV-blob download, live-tail, connectivity banner, optimistic
-> mutate, G6 reuse): [docs/PROJECT_NOTES.md](../../docs/PROJECT_NOTES.md) §6.
+> mutate, G6 reuse): [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md) §6.
 
 You are acting as a **Senior Frontend Architect**. The goal is not merely to make things work, but a
 frontend that stays **maintainable, scalable, testable, and consistent** over years. Assume this app

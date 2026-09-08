@@ -1,5 +1,14 @@
+---
+type: Architecture
+title: Stage-1 architecture & design
+description: The M..N multiplexer ingest path — design philosophy and scope, the architecture, the directory layout, and the two-step process. Scoped deliberately against architecture-layers.md, which owns the platform-wide layer model.
+resource: inspecto-etl/src/main/java/com/gamma/etl
+tags: [architecture, stage1, multiplexer, ingest, layout]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Architecture & Design
-> *Moved from `docs/architecture.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Engine section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/architecture.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../../INDEX.md).
 

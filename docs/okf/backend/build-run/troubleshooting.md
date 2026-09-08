@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Troubleshooting
+description: Symptom-first fixes for operational failures — pg_duckdb view errors, and the other recurring diagnoses that are faster to look up than to re-derive.
+resource: inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java
+tags: [troubleshooting, diagnostics, duckdb, operations]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Troubleshooting
-> *Moved from `docs/troubleshooting.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Build & run section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/troubleshooting.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 

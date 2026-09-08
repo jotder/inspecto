@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Integrations — remote sources, DuckLake & the warehouse query layer
+description: Pulling input from remote SFTP/FTP/FTPS instead of a local `dirs.poll` tree, the DuckLake integration, and the warehouse query layer that exposes output to DBeaver through pg_duckdb.
+resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
+tags: [integrations, sftp, ducklake, warehouse, pg-duckdb]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Integrations: Remote Sources, DuckLake & Warehouse Query Layer
-> *Moved from `docs/integrations.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Backend section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/integrations.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../inspecto/README.md) documentation. See the [docs index](../INDEX.md).
 
@@ -9,13 +18,16 @@ Inspecto can pull input files from remote SFTP/FTP/FTPS servers instead of a loc
 connectors live in the **optional `inspecto-connectors` module** (artifact `inspecto-connectors`) so their
 network dependencies — sshj (+BouncyCastle) for SFTP, Apache commons-net for FTP/FTPS — never bloat the lean core
 JAR. Put that JAR on the classpath and the connectors are discovered automatically via `ServiceLoader`; without
-it, only the built-in `local` connector exists. New protocols (S3/GCS/Azure, NFS/SMB) are future connectors that
-plug into the same SPI without touching the core engine.
+it, only the built-in `local` connector exists. Eight schemes ship in that module today — `sftp`, `ftp`, `ftps`, `db`, `s3`, `kafka`, `azure`, `gcs`
+(`META-INF/services/com.gamma.acquire.CollectorConnectorFactory`). NFS/SMB is a **declined** design, not
+a pending one: there is deliberately no in-process client and the path jail rejects UNC paths — mount the
+share at the OS level and point the built-in `local` connector at it. Further protocols plug into the
+same SPI without touching the core engine.
 
 ### 1. Define a connection profile (`<name>_connection.toon`)
 
 Reachability and credentials live in a reusable profile, referenced by one or more pipelines. **Secrets are
-references, never literals** — `${ENV:VAR}` reads an environment variable, `${SYS:prop}` a JVM system property.
+references, never literals** — `SecretResolver` expands five forms at connect time: `${ENV:VAR}` (environment variable), `${SYS:prop}` (JVM system property), `${FILE:/path}` (a mounted secret file), `${KEYSTORE:alias}` (a `SecretKeyEntry` from the store named by `-Dsecrets.keystore.path`/`.type`/`.password`), and bare `${NAME}` (environment first, then system property). ⚠ **SEC-07: `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only** — they are served by the `inspecto-security` module's `SecretsProvider`, so a Personal bundle refuses the scheme by name and a connection test surfaces it as the failure.
 
 ```yaml
 connection:
@@ -215,13 +227,13 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
        table: <data_source>_data
    ```
 
-3. **Run the ETL.** After each file is written, CollectorProcessor will:
+3. **Run the ETL.** After each file is written, `DuckLakeRegistrar.register` (called from `ConsignmentIngestor`) will:
    - `INSTALL ducklake FROM core` (downloads on first run; cached thereafter)
    - `ATTACH` the PostgreSQL catalog
    - Create the schema and table if they do not exist
    - `INSERT INTO` the DuckLake table by reading the just-written Parquet files
 
-   DuckLake registration is **non-fatal** — if it fails (e.g. PostgreSQL unreachable), the file is still marked processed and the failure is logged to stderr. The Parquet output on disk is unaffected.
+   DuckLake registration is **non-fatal** — if it fails (e.g. PostgreSQL unreachable), the file is still marked processed and the failure is logged at WARN. The Parquet output on disk is unaffected.
 
 ### Remote access via DBeaver
 

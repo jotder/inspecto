@@ -1,3 +1,12 @@
+---
+type: Concept
+title: Pipeline closure — what belongs to a pipeline
+description: The closure query and why reference direction is irreducibly inconsistent by design — what it returns, how it is built by joining two existing halves, and two rules that look like details and are not.
+resource: inspecto/src/main/java/com/gamma/control
+tags: [pipeline, closure, references, catalog, related]
+timestamp: 2026-08-18T00:00:00Z
+---
+
 # Pipeline closure — what belongs to a pipeline
 
 **Route:** `PipelineRelatedRoutes` — `GET /pipelines/{name}/related`.

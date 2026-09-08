@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Parsing options reference
+description: The parser frontend/DuckDB backend model, what the engine exposes today versus raw DuckDB, and a corrected + extended `read_csv` option reference grounded in this engine's actual config and SPI.
+resource: inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
+tags: [parsing, duckdb, read-csv, frontend, options, spi]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Parsing Options Reference
-> *Moved from `docs/parsing-options-reference.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Parsing Grammar](../engine/parsing-grammar.md) for the summary; this page is the long form it points to. *(Moved from `docs/parsing-options-reference.md` (docs consolidation, 2026-07-16).)*
 
 > Companion to `docs/Parsing Options Reference.pdf`. The PDF is an excellent **generic DuckDB
 > `read_csv` cheat-sheet**; this document (1) **validates and corrects** that material against
@@ -203,9 +212,20 @@ With `read_text` + `string_split(content,'\n')` + `UNNEST` you get one row per p
 A single top-level `parsing:` block per pipeline selects a **frontend** and its options. It
 generalizes today's `csv_settings` (which remains the `delimited` frontend — `parsing.delimited`
 and `processing.csv_settings` are aliases, `parsing:` keys win) and reuses the existing
-`raw.fields[]` / `mapping.rules[]` / `partitions[]` backend verbatim. `parsing.plugin` likewise
-aliases `processing.ingester`/`segments`/`ingester_config`. A config with no `parsing:` block
+`raw.fields[]` / `mapping.rules[]` / `partitions[]` backend verbatim. A config with no `parsing:` block
 parses exactly as before. An unknown `parsing.frontend` is rejected at load.
+
+⚠ **The plugin ingester has a THREE-tier config home, not two** (`PipelineConfigParser.parsePlugin`,
+`:1078-1105`). One block is chosen **whole**, then each key falls back to the legacy triple:
+1. inline `parsing.plugin.{ingester,ingester_config,segments}`;
+2. else the referenced Grammar component's own top-level `plugin:` map — reachable only when that
+   grammar file is *block-shaped* (`isParsingBlock`, `:1923-1926`: it carries a `delimited:` or a
+   `plugin:` map), because a Grammar component is just an extracted `parsing:` block;
+3. else the legacy `processing.ingester` / `processing.ingester_config` / `processing.segments` triple.
+Tiers 1 and 2 are never merged. A fourth spelling, `frontend: asn1`, **synthesizes** the block from the
+`asn1:` map and **refuses** a co-present `parsing.plugin` / `processing.ingester` (`:1091-1094`).
+A plugin ingester with no `segments` is refused at config load (`:1106-1109`), and `frontend: plugin`
+with no `ingester` anywhere is refused (`:1129-1131`).
 
 ```yaml
 parsing:

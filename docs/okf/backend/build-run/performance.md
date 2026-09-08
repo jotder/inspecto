@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Performance assessment & bottleneck analysis
+description: Measured stage-isolated benchmark results (JDK 26 / DuckDB 1.5.2 via PipelineBenchmark) — why ingest is the bottleneck, how its cost scales with total cells, the root causes, the concurrency model and the native-path resolution.
+resource: inspecto-etl/src/test/java/com/gamma/etl/PipelineBenchmark.java
+tags: [performance, benchmark, duckdb, ingest, concurrency, bottleneck]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Performance Assessment & Bottleneck Analysis
-> *Moved from `docs/performance.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Build & run section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/performance.md` (docs consolidation, 2026-07-16).)*
 
 Measured on JDK 26 / DuckDB 1.5.2 via `PipelineBenchmark` (a stage-isolating
 benchmark in the test tree). Reproduce with:

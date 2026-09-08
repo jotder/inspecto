@@ -2,7 +2,7 @@
 type: Feature
 title: Schema, Mapping & Transformation Authoring
 description: End-user authoring path for a dataset's schema (the redesigned Parse pane), the SQL-first transform.sql pane, the legacy transform.map rule grid, and transform.join lookup config — with the 2026-09-03 gap list annotated by what the redesign closed, absorbed or dropped.
-resource: inspecto-ui/src/app/modules/admin/pipelines/pipeline-load-definition.component.ts
+resource: inspecto-ui/src/app/modules/admin/pipelines/pipeline-transform-sql-definition.component.ts
 tags: [feature, pipelines, authoring, schema, mapping, transform, gap-analysis]
 timestamp: 2026-09-04T00:00:00Z
 ---
@@ -22,8 +22,9 @@ timestamp: 2026-09-04T00:00:00Z
 > [`sql-transform-v1-plan.md`](../../../archived-documents/plans-archive/sql-transform-v1-plan.md)
 > (`98ffc90b` engine + `7e13dd82` pane; as-built in §0 below and
 > [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md)). §1–§5 describe the surfaces
-> that still exist — `SchemaEditorDialog`, the `transform.map` rule grid and the `transform.join` form
-> were NOT removed; `transform.map` is now the legacy mapping path beside `transform.sql`. §6's gap list
+> that still exist — `SchemaEditorDialog` and the `transform.join` form were NOT removed. ⅋ The
+> `transform.map` rule grid WAS: `transform.map` and its Load pane were **deleted 2026-09-05** (§2). A
+> stored `mapping.rules[]` still LOADS, converted to `fields[]`. §6's gap list
 > is annotated with what the redesign closed, absorbed, or dropped as premature.
 
 ## 0. The Transform Step pane — `transform.sql` (as built; a fields grid over a function catalog)
@@ -237,13 +238,14 @@ catalog and by persisting `fields[]`.
 
 ## 3. Expression building
 
-- **No dedicated expression-builder UI exists anywhere** — no function picker, no column-picker-into-EXPR,
-  no live-preview-as-you-type editor. Confirmed by a codebase-wide search for `monaco`/`codemirror`/
-  `ace-builds`/`ace-editor`.
-- **CodeMirror is present** (`@codemirror/*` in `package.json`) but wired only to two unrelated surfaces:
-  the SQL query workbench (`inspecto/data-table/sql/sql-codemirror.component.ts`) and the enrichment editor
-  (`inspecto/enrichment/enrichment-editor.component.ts`) — never to the mapping `EXPR` field. Monaco/ace are
-  absent entirely (no package, no references).
+> ⚠ **Superseded 2026-09-04/05 by §0 — the three bullets below described the pre-redesign state.**
+
+- **An expression-building surface DOES exist** — the Transform pane's function picker per row over
+  `SQL_FUNCTIONS` (24 functions in 7 categories), with a form control per declared parameter and
+  "Try it on the sample" (§0).
+- **CodeMirror has THREE hosts**, not two: the SQL query workbench (`inspecto/data-table/sql/`), the
+  enrichment editor (`inspecto/enrichment/enrichment-editor.component.ts`) and **the Transform pane's SQL
+  view** (`pipeline-transform-sql-definition.component.ts`). Monaco/ace are still absent entirely.
 - No SQL function catalog is surfaced to end users on the mapping or join authoring surfaces — only free
   hints in tooltips/captions.
 
@@ -383,8 +385,10 @@ wrongly — the schema describes the **file**, the SELECT describes the **output
 
 ### D9 — Both field tables are built for a wide feed
 
-Search over name and synonym; view-only filter chips **with counts**; a page-size choice that reaches
-down to 10. ⚠ The two grids deliberately **do not** share a default: Transform pages at 10 because its
+Search over name and synonym (Parse also matches the selector); a page-size choice that reaches down to
+10. ⚠ The **filter idiom differs by grid**: Transform has view-only filter chips **with counts**
+(All · Changed · Calculated · Needs attention), Parse has a **type dropdown with no counts** — a type
+sweep is the question a wide schema asks. ⚠ The two grids deliberately **do not** share a default: Transform pages at 10 because its
 rows are tall (a function select plus per-parameter controls), Parse at 50 because its rows are dense
 one-liners and a type sweep wants many at once. Symmetry here would cost more than it buys. 🔴 **`#`
 is the position in the FULL list, never the row's index in the current view** — on Parse it is the

@@ -11,7 +11,7 @@ description: >
 
 # Release & Branch Workflow (binding)
 
-Canonical policy: [docs/BRANCHING.md](../../docs/BRANCHING.md). This skill is the operational
+Canonical policy: [docs/BRANCHING.md](../../../docs/BRANCHING.md). This skill is the operational
 checklist. Enforced by three layers: a Claude Code hook (agent reminder), `.githooks/pre-push`
 (local block — **also runs the committed-secret guard**, above the release override, because CI
 catches a leaked secret only after it is already public, **and the canonical-vocabulary guard**,

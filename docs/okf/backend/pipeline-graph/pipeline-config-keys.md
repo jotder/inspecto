@@ -40,12 +40,14 @@ There is also a **third, utility-only reader family** outside both authorities: 
 
 | Scope | Blocks the parser reads | Declared in `ConfigSpecs.pipeline()` | Parser-only (ratchet list) |
 |---|---|---|---|
-| Top-level | 18 | 11 | 7 |
+| Top-level | 18 | 12 | 6 |
 | `processing.*` | 24 | 14 | 10 |
-| **Total** | **42** | **25** | **17** |
+| **Total** | **42** | **26** | **16** |
 
 History: 18 parser-only when the ratchet landed (2026-08-31); 17 after `output_store` was declared the
-same day (gap 8). The 17 current entries are exactly `UNDECLARED_BLOCKS`.
+same day (gap 8); **16** after CONSIGNMENT-HOME-1 declared `collector.consignment.max_files`
+(2026-09-02), which took `collector` off the list. The 16 current entries are exactly
+`UNDECLARED_BLOCKS`.
 
 ⚠ **Granularity is the block, deliberately.** Leaf drift *inside* a declared block is not covered —
 the known case: `dirs` is declared (poll, database, backup, temp, status_dir have `FieldSpec`s) while
@@ -69,7 +71,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `reference` | spec (`load`/`key`/`refresh_seconds`) | `BatchIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
 | `stream` | spec | `MetadataGraphBuilder` Stream grouping | hand-authored (default = pipeline name) |
 | `dirs` | spec block (5 of 9 leaves — see census caveat) | `CollectorProcessor`; `dirs.backup` doubles as the park home (`StepDisableArming`) | create scaffold derives the convention set; hand after |
-| `collector` | parser-only | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
+| `collector` | spec block (1 leaf only — `collector.consignment.max_files`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
 | `parsing` | spec, partially (`parsing.grammar` is the canonical grammar ref; `source_timezone` / `delimited.*` are rule-only) | `mergeParsing` / `resolveGrammarRef` → format frontends | Parse drawer; New-pipeline writes `parsing.frontend` (D3) |
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
@@ -155,6 +157,6 @@ top-level and `processing.*` read and compares against `ConfigSpecs.pipeline()`:
 
 - a **new undeclared block fails the build** immediately;
 - a **newly declared block must leave** `UNDECLARED_BLOCKS` or the stale-entry test fails;
-- the list **only ever shrinks** — its size (17) is the remaining gap-10 debt;
+- the list **only ever shrinks** — its size (16) is the remaining gap-10 debt;
 - the scan is **self-falsifying**: pinned certainly-read blocks, a minimum count (≥ 35), and a pinned
   count of the two `raw`-shadowing locals guard against the scan silently matching nothing.

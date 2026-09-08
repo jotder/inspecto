@@ -246,7 +246,7 @@ A layer that turns raw signal into managed, assignable work:
 
 ### 6.6 Operator web console
 
-A single-page Angular application served from the engine process, with operational panes for: dashboard (recent activity + acquisition summary), **Flows** (graph visualization, combined cross-flow view, and a visual flow editor with provenance overlay), **Sources/Acquisition** (metrics + connections CRUD), **Events/Activity** (grid, filters, live tail, export, saved views), **Jobs & Schedules** (schedule management + run reporting), and **Cases/Issues** (list, detail, lifecycle, links, RCA, correlated events). The console is built on a shared design system with accessibility remediation and a no-hardcoded-color guard.
+A single-page Angular application served from the engine process, with operational panes for: dashboard (recent activity + acquisition summary), **Pipelines** (graph visualization, combined cross-pipeline view, and a visual Pipeline editor with provenance overlay), **Collectors/Acquisition** (metrics + connections CRUD), **Events/Activity** (grid, filters, live tail, export, saved views), **Jobs & Schedules** (schedule management + run reporting), and **Cases/Incidents** (list, detail, lifecycle, links, RCA, correlated events). The console is built on a shared design system with accessibility remediation and a no-hardcoded-color guard.
 
 ### 6.7 How the layers reinforce each other
 
@@ -339,7 +339,7 @@ The architecture choices translate directly into cost-of-ownership advantages th
 | Operational Intelligence (events/alerts/cases) | **Shipped** | Managed objects, links, RCA, correlation |
 | AI Assist agent (7 skills) | **Shipped** | Draft-only; local + hosted model routing |
 | Operator web console | **Shipped** | All operational panes live |
-| Flow-graph platform (authoring + execution) | **In mainline** | NiFi-style flows run as first-class jobs; visual editor shipped |
+| Pipeline-graph platform (authoring + execution) | **In mainline** | NiFi-style Pipelines run as first-class jobs; visual editor shipped |
 | Data-plane provenance / lineage | **In mainline** | Per-edge counts, conservation checks, Sankey overlay (off by default) |
 | Auth-free common core (edition realignment) | **In mainline** | Core is auth-free; security becomes an edition module |
 | Standard edition security (`inspecto-security`) | **Planned** | OIDC resource-server + RBAC/ABAC behind an SPI |
@@ -365,7 +365,7 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 
 ### 10.2 Now (in mainline, hardening toward the next release)
 
-- **Flow-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental flows, materialized views, and a visual editor. *Status: built; final hardening and live end-to-end verification with real job configs.*
+- **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-Collector merge, incremental Pipelines, materialized views, and a visual editor. *Status: built; final hardening and live end-to-end verification with real job configs.*
 - **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, and the Sankey overlay. *Status: built and tested; off by default.*
 - **Edition realignment** — the auth-free common core that makes the three-edition model real. *Status: in mainline; commit/release gated on stakeholder go-ahead.*
 - **The `sink.view` consumer** — query a flow's logical views over REST. *Status: shipped in mainline.*
@@ -375,7 +375,7 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 - **`inspecto-security` module (Standard edition)** — an `Authenticator` SPI plus OIDC resource-server validation, RBAC/ABAC from token claims, HTTPS, and actor-attributed audit. This is the single highest-leverage item for commercialization. *Incremental hardening on the framework-free core — explicitly not a Spring/Quarkus migration.*
 - **Object-storage & network-share connectors** — S3 / GCS / Azure Blob / MinIO and NFS/SMB on the existing connector SPI; the analytical engine already speaks object storage natively.
 - **Unified `parsing:` grammar** — promote today's frontends under one `parsing:` block and add **JSON** and **text/regex** frontends, each a thin frontend producing rows for the shared backend (existing configs keep working via aliases).
-- **Flow authoring polish** — round out the visual editor and add a dedicated run endpoint for authored flows; adapter stream-consumer runtime for streaming sources.
+- **Pipeline authoring polish** — round out the visual editor and add a dedicated run endpoint for authored Pipelines; adapter stream-consumer runtime for streaming Collectors.
 - **Etag/version fingerprint dimensions** — richer dedup for object-store connectors (depends on those connectors landing).
 
 ### 10.4 Later (future / vision)
@@ -403,7 +403,7 @@ The recommended order is **(1) edition security → (2) object-storage connector
 |---|---|---|
 | **Single-node ceiling** | The lean, single-JVM design has a throughput ceiling per node. | It is a deliberate trade for operational simplicity and already covers a wide band; the Enterprise distributed tier is the escape hatch when a real workload exceeds it. Keep the seams open (done). |
 | **Edition security scope** | Standard-edition auth is the gating item for commercialization; scope creep here delays revenue. | Deliver the minimum sellable security (external-IAM delegation + RBAC/ABAC) first; do *not* build user management into the core — that is the IAM's job. |
-| **Flow-graph go-live** | Powerful new surface area; needs live end-to-end verification with real job configs (current verification used synthetic data on a config-less dev backend). | Stand up a representative `type: flow` job with seeded data and verify the full run + provenance path before release. |
+| **Pipeline-graph go-live** | Powerful new surface area; needs live end-to-end verification with real job configs (current verification used synthetic data on a config-less dev backend). | Stand up a representative `type: pipeline` job with seeded data and verify the full run + provenance path before release. |
 | **Connector breadth vs. core leanness** | Each new connector adds dependencies. | Keep all network deps in `inspecto-connectors` (done) so the core fat JAR stays lean and air-gap friendly. |
 | **Naming consistency** | Product is "Inspecto"; some shipped docs/UI still say "Inspector" for the console. | Finalize the console name and reconcile in one pass. |
 | **AI on air-gapped nodes** | The richest assist UX benefits from a GPU. | Local-model routing (Ollama) already works; treat GPU-class inline UX as a parallel, opt-in track. |
@@ -415,7 +415,7 @@ The recommended order is **(1) edition security → (2) object-storage connector
 ### 12.1 Glossary
 
 - **M..N multiplexer** — the Stage-1 property that the number of output partitions is decoupled from the number of input files.
-- **Flow / flow-graph** — an authored pipeline expressed as a directed graph of nodes (source/parse/transform/sink).
+- **Pipeline** — an authored data path expressed as a directed graph of nodes (collect/parse/transform/sink). *(Superseded spelling: "Flow / flow-graph" — renamed per `GLOSSARY.md` §5; the `flow:` config key is unchanged and rides the next major.)* <!-- vocab-allow: records the superseded spelling this entry retires -->
 - **Provenance / conservation** — per-edge record counting for a flow run, and the invariant that records-in equals records-out at non-amplifying nodes.
 - **Connection profile** — reusable, named connection + credentials referenced by many feeds.
 - **Fingerprint ledger** — the record of seen files used for deduplication (path/metadata/checksum).
@@ -430,9 +430,9 @@ Files discovered / downloaded / downloads-failed; bytes transferred; fetch durat
 
 ### 12.3 Representative API surface (illustrative)
 
-Pipelines & config authoring · Jobs & schedules (+ run reporting) · Sources & acquisition metrics · Connections CRUD · Flows (catalog, graph, combined, authored CRUD, dry-run, raw, views) · Provenance (per-run edge counts, run list) · Events (search, views, export) · Alerts · Objects (cases/issues, links, graph, comments, attachments, RCA) · Metrics · AI assist.
+Pipelines & config authoring · Jobs & schedules (+ run reporting) · Collectors & acquisition metrics · Connections CRUD · Pipelines (catalog, graph, combined, authored CRUD, dry-run, raw, views) · Provenance (per-run edge counts, run list) · Events (search, views, export) · Alerts · Objects (cases/incidents, links, graph, comments, attachments, RCA) · Metrics · AI assist.
 
-### 12.4 Source documents
+### 12.4 Reference documents
 
 This overview synthesizes: the consolidated reference set (`docs/consolidated/`), the editions model (`docs/EDITIONS.md`), the branching/release policy (`docs/BRANCHING.md`), the flow-graph design (`docs/okf/backend/pipeline-graph/pipeline-graph-design.md`), the data-acquisition framework notes, and the operations source-of-truth (`docs/ADVANCED_GUIDE.md`).
 

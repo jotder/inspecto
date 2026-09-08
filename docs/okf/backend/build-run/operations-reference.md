@@ -1,5 +1,34 @@
+---
+type: Reference
+title: Operations reference — utilities, batching, output, deployment
+description: The long-form operations manual — the pre-ETL `ura` utility suite, output structure, the status log and auditing, batch processing, remote-server deployment, and onboarding a new Collector. The largest reference in the bundle.
+resource: inspecto/package.ps1
+tags: [operations, utilities, deployment, batching, output, onboarding]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Operations: Utilities, Batching, Output & Deployment
-> *Moved from `docs/operations.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Operations](operations.md) for the summary; this page is the long form it points to.
+
+> 🔴 **NOT the authority on `-D` flags, auth headers, launchers, or the Java floor.** This page is 66 KB
+> moved wholesale from `docs/operations.md` on 2026-07-16 and its long tail is still sound — the `ura`
+> utility suite, output structure, the status log, batch processing, deployment and Collector onboarding.
+> Its *cross-cutting* material has drifted, and a 2026-09-08 sweep verified four defects against source:
+>
+> - ⛔ **`-Dcontrol.token` is a DEAD flag** — **zero** Java readers in the tree. It survives here in 3
+>   launch examples, plus 27 `Authorization: Bearer secret` curls and 6 `CONTROL_TOKEN` uses, none of
+>   which authenticates anything. `package.ps1`, `serve.sh` and `serve.bat` still emit it inertly. For
+>   real auth read [auth & security](../editions/auth-security.md).
+> - ⛔ **`-Dui.static.log=DEBUG` does not exist** — no such key in any Java source, so the two places
+>   that tell you to turn it on to make an abort visible cannot work.
+> - ⚠ **`java -jar` and `mvn clean package`** are both wrong for this repo: the launcher uses `-cp`
+>   (RUNSH-CP-1) and packaging is `-pl inspecto,inspecto-connectors -am -DskipTests -q`. See
+>   [build & test](build-test.md).
+> - ⚠ The **`Issue Tracker`** section heading (§ below) predates the shipped Issue → **Incident** rename;
+>   the same file already says Incident elsewhere.
+>
+> For the curated flag table read [Operations](operations.md); for build, reactor and `package.ps1` read
+> [Build & Test](build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from `docs/operations.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
@@ -617,14 +646,16 @@ preview and the run still wins.
 Nothing schedules `incident_purge` for you. Standing up the job is an operator act, exactly like
 `receipt_prune` — shipping a default that deletes business records would be indefensible.
 
-### Status backend — file (default) or database (`DbStatusStore`)
+### Status backend — database (default) or file (`FileStatusStore`)
 
 The audit queries above (`commits`/`batches`/`files`/`lineage`/`quarantine`) and the
-observability gauges read through a pluggable **`StatusStore`**. By default it reads the
-on-disk audit artifacts directly (`FileStatusStore`). Set `-Dstatus.backend=db` to make the
-service project that audit into a database and serve queries from it instead — durable and
-SQL-queryable, while ingest keeps writing the file audit unchanged (it stays the write-time
-source of truth and survives a DB outage).
+observability gauges read through a pluggable **`StatusStore`**. ⚠ **The default is `db`, not
+`file`** — it flipped on 2026-08-31 (`OperationalDb.java:132` declares `STATUS("Status",
+"status.backend", "db", …)`); this section previously said the opposite. The service projects the
+audit into a database and serves queries from it — durable and SQL-queryable — while ingest keeps
+writing the file audit unchanged (it stays the write-time source of truth and survives a DB
+outage). Set `-Dstatus.backend=file` to read the on-disk audit artifacts directly
+(`FileStatusStore`) instead.
 
 The DB engine is **DuckDB by default** — already bundled for ingest/enrichment, so the DB
 backend adds **no new dependency** and the same engine serves tests and production. With no
@@ -1051,7 +1082,7 @@ java --enable-native-access=ALL-UNNAMED \
      config/<data_source>/<data_source>_pipeline.toon
 ```
 
-**Java requirement:** Java 25 or later. No other runtime dependencies.
+**Java requirement:** **Java 24** or later (`pom.xml` `maven.compiler.release` = 24; the shipped container is `temurin:24-jre`). No other runtime dependencies. ⚠ Three distinct floors exist — 24 for the product, 25+ for the agent modules, 26 for the build toolchain.
 
 ### Performance reference (single-node, HDD, 4 threads)
 
@@ -1066,7 +1097,7 @@ Note: the 20200117 <data_source> file is ~4.3 GB uncompressed (~2.97 M rows) due
 
 - [ ] Delete `inbox/<data_source>/20200101/vou_DATE_20200101.csv/` — this is an 8 GB uncompressed directory (duplicate of the `.gz`); the glob pattern would pick up the file inside it and double-process the day
 - [ ] Run from the bundle root (or sandbox root locally) so relative paths resolve correctly
-- [ ] Verify Java 25 is on `PATH`: `java -version`
+- [ ] Verify Java 24+ is on `PATH`: `java -version`
 
 ---
 

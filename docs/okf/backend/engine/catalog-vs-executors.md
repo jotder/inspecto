@@ -9,7 +9,7 @@ timestamp: 2026-09-04T00:00:00Z
 
 # Step Processor catalog vs. real node executors
 
-The [Step Processor catalog](../../frontend/features/pipeline-editor.md) (121 entries, 8 families,
+The [Step Processor catalog](../../frontend/features/pipeline-editor.md) (119 entries, 8 families,
 `ProcessorCatalog.java`) is a **taxonomy/palette layer**, not a 1:1 map to engine code. Five catalog entries
 that read like a "Mapping and Transformer" family — spanning the `DQ` and `XFM` families — all resolve to
 three [node types](node-types.md): `transform.map` (2), `transform.sql` (2 — repointed 2026-09-04 when the
@@ -49,7 +49,7 @@ and *Field type cast & renamer matrix* were three labels for three columns of th
 |---|---|---|---|---|
 | **`transform.record`** — *Record Transformer* | XFM | DELIVERED | `transform.sql` | One Step that shapes a record: sanitize · cast · rename · computed columns, one row per output field over the function catalog, generating the SELECT it saves. **Folded from `transform.expression` + `transform.cast` + `quality.cleanse.trim`.** |
 | `quality.schema.validator` — *Schema registry & structural rejects* | DQ | DELIVERED | `parser` (⇒ `addable: false`) | The half that could NOT fold — see below. |
-| `transform.lookup` | XFM | PARTIAL | `transform.join` | "a reference join covers it; no inline static map" (untouched) |
+| `transform.lookup` | XFM | **DELIVERED (2026-09-06)** | `transform.lookup` | Its own node type and executor — an inline `key=value` map over one column, compiled to a `CASE`. A *versioned* reference is `transform.join`. |
 
 🔴 **Only HALF of "Schema validator & type coercion" folded, and the half that stayed is the load-bearing
 one.** Type coercion as an *authoring act* is now a Record Transformer row (`convert.type` → `TRY_CAST`).
@@ -156,7 +156,7 @@ As built:
 | Whitespace & string sanitizer | `TRIM(x)` in the SQL — the Simple mode's "Remove extra spaces" verb |
 | Expression builder & computed columns | **is** `transform.sql` |
 | Field type cast & renamer matrix | splits: cast → Layer 1; rename → the editable Name (alias) in the Simple grid |
-| Lookup & static map | `transform.join` stays for Reference datasets (v2 may allow `JOIN` inside the SQL) |
+| Lookup & static map | **split, and both halves now exist:** the inline static map is `transform.lookup` (delivered 2026-09-06); `transform.join` keeps the *versioned* Reference-dataset half |
 | Summarizer | same shape — `transform.sql` with `GROUP BY`; `transform.summarize` keeps its `measures`/`group_by` validators for the structured form, not deleted |
 
 **Parked with a recorded decision (BACKLOG AUTHORING-REDESIGN-1, not this file):** v2 smart table over the
@@ -196,8 +196,10 @@ registry that do not exist. Dynamic/environment values — none in v1; when need
 
 ## `transform.join` (the 5th — "Lookup & Static Map Transcoder")
 
-* Only the **reference-join half is real**; there is no inline literal key→value static map anywhere in
-  the engine — confirmed by the catalog's own `PARTIAL` status and note.
+* 🔴 **The inline-static-map half is no longer missing.** It shipped 2026-09-06 as its own node type,
+  `transform.lookup` (`BuiltinNodeType.java:109-111`, `RowShaper.lookup`), which compiles an author
+  `key=value` list to a `CASE` — no join, no stored relation. Pick `lookup` for a fixed code table,
+  `join` for a Reference dataset that changes over time.
 * **Config schema exists and is real** (unlike the map group):
   `NodeAttributes.TRANSFORM_JOIN` (`NodeAttributes.java:361-366`) — `reference` (autocomplete, required,
   points at a registered `reference/<id>` component) and `on` (list, required, join key columns).

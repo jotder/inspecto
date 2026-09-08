@@ -9,8 +9,13 @@ timestamp: 2026-07-30T00:00:00Z
 
 # Parser plugins — the self-describing Parser framework
 
-> The runtime parse model (three frontends / one DuckDB backend) is
+> The runtime parse model (three byte→row *mechanisms* over one DuckDB backend) is
 > [parsing-grammar.md](parsing-grammar.md); the ingest SPI itself is [plugins.md](plugins.md).
+> ⚠ **"Frontend" names two different things.** As a *mechanism* there are three (DuckDB-native read,
+> DuckDB-native + SQL regex, Java `StreamingFileIngester`). As a **legal `parsing.frontend` config
+> value** there are ten tokens / eight distinct formats (`PipelineConfigParser.FRONTENDS:1590-1591`).
+> As a **registered `ParserPlugin` id** there are six built-ins (`BuiltinParsers.IDS:29`) plus any
+> `ServiceLoader` providers. Read "exactly three" as a mechanism claim, never as a config constraint.
 > THIS concept is the self-description layer over both: discovery, served grammar schemas, preview.
 
 The E of ELT: any file loads into one or more **Tables** (the segment → partitioned CSV/Parquet
@@ -40,9 +45,10 @@ otherwise a regression in the flag would go unseen precisely because every real 
 
 ## Registry (`com.gamma.parse.Parsers`) + discovery
 
-Built once at class-load: the four built-in adapters (`BuiltinParsers` — delimited / fixedwidth /
-json / text_regex, whose `preview` delegates to `ComponentPreview.parsing`, i.e. the exact DuckDB
-read specs `DuckDbCsvIngester` runs at ingest) merged with
+Built once at class-load: the **six** built-in adapters (`BuiltinParsers.IDS:29` — delimited /
+fixedwidth / json / text_regex / xlsx / parquet, whose `preview` delegates to
+`ComponentPreview.parsing`, i.e. the exact DuckDB read specs `DuckDbCsvIngester` runs at ingest) merged
+with
 `ServiceLoader.load(ParserPlugin.class)` (`META-INF/services/com.gamma.parse.ParserPlugin`).
 ⚠ **Duplicate ids fail startup loudly** — deliberately unlike `PipelineNodeTypes`' override-a-
 builtin rule: the built-ins' preview IS the engine that ingests, so an override would let a
@@ -140,8 +146,9 @@ them.
 
 **Served as of 2026-07-31** via `Asn1ParserPlugin` (above) — it appears in the Onboarding Parsing
 stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. The plugin
-sits on the new `asn-facade` API and serves grammar + framing; it is preview-only (no
-`ingesterClass()`).
+sits on the new `asn-facade` API and serves grammar + framing. ⚠ It was preview-only until
+2026-07-31; it now names `com.gamma.ingester.Asn1RecordIngester` via `ingesterClass()`, so
+`Parsers.ingestable()` (`Parsers.java:66-68`) is **true** — see "Loading to Tables" below.
 
 ### The tree→segments bridge — `XmlRecordIngester` (2026-08-30)
 
@@ -187,8 +194,12 @@ tries to reach it through `PipelineConfig.load` is testing the parser, not the i
 
 ASN.1 loads through the **existing `parsing.plugin` machinery**, not a new path: `frontend: plugin`
 + `plugin.ingester` + `plugin.segments` + `plugin.ingester_config`. ⚠ `asn1` is a *catalog id for
-preview/authoring*, *never* a `parsing.frontend` value — `PipelineConfigParser`'s `FRONTENDS` set is
-`{delimited, fixedwidth, fixed_width, json, text_regex, plugin}` and always will be.
+preview/authoring*, **and also a first-class `parsing.frontend` value**: `PipelineConfigParser`'s
+`FRONTENDS` set (`:1590-1591`) has ten tokens —
+`{delimited, fixedwidth, fixed_width, json, text_regex, xlsx, excel, parquet, asn1, plugin}` — and
+`frontend: asn1` synthesizes this exact plugin wiring (`parsePlugin:1090-1095`), refusing a co-present
+`parsing.plugin` / `processing.ingester`. Writing the wiring out by hand under `frontend: plugin`
+remains equivalent.
 
 `com.gamma.ingester.Asn1RecordIngester` (engine, alongside `TypedRecordIngester`):
 

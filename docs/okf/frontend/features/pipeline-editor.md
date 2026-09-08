@@ -311,8 +311,10 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
 [Grammar configuration](grammar-config.md)'s. What is the editor's:
 
 - **Custody split**: a per-format parse Step (`PARSE_NODE_FRONTENDS`) defines in the right-dock
-  Parse drawer; `GrammarEditorDialog` (`grammar-editor.dialog.ts`) survives ONLY for a dangling
-  `use: grammar/<id>`, binary fixed-width, and a config-less generic `parser` — deliberate keeps.
+  Parse drawer; `GrammarEditorDialog` (`grammar-editor.dialog.ts`) survives ONLY for **two** shapes —
+  binary fixed-width, and a generic `parser` whose config maps to no frontend (`isDrawerParse`). ⚠ Since
+  2026-09-06 (PARSE-HOME-1) a **dangling** `use: grammar/<id>` opens the DRAWER, with the Grammar section
+  flagged "template missing" — the decision note at the end of this file is the current list.
   **A parser is always format-specific — never author the generic type** (operator directive
   2026-08-21). A generic `parser` whose config maps to a built-in frontend migrates on edit:
   `definitionDraft` presents it re-typed with `csv_settings` folded in under the engine's own merge
@@ -335,7 +337,9 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   editor's `previewFn` — a function because `previewed` fires on SUCCESS only, and a failing
   re-parse must not leave a stale "parsed · N cols" chip standing. Only a **table** result feeds
   the thread (parsed = "rows a downstream step can cast"); a record tree leaves it untouched.
-  `Parse sample` lives in the sample strip; the FIRST derivation steers to the Types & columns tab;
+  `Parse sample` lives in the sample strip; the FIRST derivation **expands the `types` section** —
+  labelled *"How values are understood"*, a `mat-expansion-panel`, not a tab — via `showTab('types')`,
+  which since the sectioned redesign means "expand";
   **Re-derive from this sample** confirms destructively naming the loss and is implemented as
   "clear `schemaHydrated` and re-run the parse" so one derivation path exists.
 - **Write-ordering guards** (both falsified by deleting them and watching their tests fail):
@@ -365,7 +369,8 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   write precedent canvas rename set). New pipelines seed `output.filename_column: file_name` in
   `pipelineScaffold()` — the one choke point both create surfaces use; a scaffold fact, never an
   engine default (which would silently grow every existing store). The lineage column is shown
-  read-only in the Types tab and Column metadata list (it IS an output column, stamped at write
+  read-only in the `types` section's columns table — ⅋ never a "Column metadata list", which left Parse
+entirely with the metadata grid (D2) — (it IS an output column, stamped at write
   time) — never as a fake `schemaSeed` row, which risks being written back as authored.
 - **Partitioning** (`<inspecto-schema-partitions-editor>`, `inspecto/schema/`; **rendered on the Sink
   pane since 2026-09-04**, which reads/writes the SAME companion schema toon's `partitions[]` key directly;
@@ -396,17 +401,27 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   were DELETED 2026-09-05 (the projection slot is a `transform.sql`, so it opens this pane); every other
   `transform.*` kind stays on the generic `pipeline-config-definition` schema-form. A node TYPE routes to
   its own pane — the rule that already held for map/parse/sink.
-- **The pane (SQL-first, operator instruction 2026-09-04 — supersedes D5/D6):** one SQL `<textarea>`
+- **The pane (bespoke — ⅋ NOT the shared fields editor):** `PipelineTransformSqlDefinitionComponent` does
+  not import `<inspecto-schema-fields-editor>`. Its **Fields** view is its own grid
+  (`# · Field name · From · What to do · Comes out as · Sample · ×`) over the `SQL_FUNCTIONS` catalog — 24
+  functions in 7 categories — with a control per declared parameter; its **SQL** view is an *editable*
+  `<inspecto-sql-codemirror>`, never a `<textarea>` and no longer a refusal. The old wording follows, kept
+  for the record: one SQL `<textarea>`
   seeded for a new Step with an explicit column list over the upstream sample columns (else `SELECT *
   FROM input`), "Columns that come out" in the same `<inspecto-schema-fields-editor>` the Parse pane
   uses (fed from the test run's DESCRIBE `columnTypes`, read-only types), and Test this Step over
   `ComponentsService.previewTransform` (the existing path — `transform.sql` qualifies by prefix). The
-  persisted config is **`{ sql }` only**; a legacy `fields[]` from the retired Simple grid is dropped on
-  the next Apply. Full as-built, what the grid did and why it went:
+  persisted config is **`{ sql, fields }`** — `submit()` writes both on every Apply and `seedFrom`
+  rehydrates the grid from `fields`. 🔴 It is NOT `{ sql }` only, and a stored `fields[]` is NOT
+  dropped. Full as-built, what the grid did and why it went:
   [schema-mapping-authoring.md](schema-mapping-authoring.md) §0; engine half:
   [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md).
-- ⚠ `sql` is the single `NodeAttributes` entry; the engine reads nothing else. Do not add an authoring
-  artifact beside it — the retired `fields[]` is exactly that, and its presence no longer means anything.
+- ⚠ `sql` is the single `NodeAttributes` entry — but that is the DECLARED attribute schema, **not** the
+  set of keys the engine reads. 🔴 `fields` is a live executable contract: `RowShaper`'s
+  `MAP_NODE_CONFIG_KEYS` includes it and runs it as the mapping, and `PipelineEditable.MAP_AUTHORED`
+  allow-lists it precisely so `lower` cannot drop it — *"a key that becomes executable without joining this
+  allow-list is silently dropped on save"*. ⅋ Do not "clean up" `fields` off a `transform.sql` node:
+  that deletes the author's grid and, on the projection slot, its mapping.
 - **Parse pane companions (`d012f721`, same shift):** the Parse drawer is sectioned (not tabbed), flat
   compact rows, one "Columns that come out" table; **partitioning moved from Parse to the Sink pane** and
   the Collection pointer is read-only on Parse — see [grammar-config.md](grammar-config.md). The
@@ -492,9 +507,10 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   drawer already parsed — the rules being EDITED, not the node's. The result is written back as
   the thread's cast hop; an edited rule clears the grid (a result may never outlive the config it
   came from). Reachable only where the parse Step is per-format (the dialog has no thread).
-- The Load pane authors all four `TransformCompiler` types; a transform type it has never heard of
-  (a hand-authored `LOOKUP`) is preserved and shown — *not offering* must never become
-  *destroying*. The two specialised types pack parameters into `sourceExpression` as `|`-delimited
+- 🔴 **Read path only since 2026-09-05** (the Load pane is deleted; nothing AUTHORS these any more)
+  — but every constraint below is still armed on a stored `mapping.rules[]`, which
+  `RecordTransform.fromMappingRules` converts to `fields[]`. A transform type nothing has heard of (a
+  hand-authored `LOOKUP`) is preserved, never dropped — *not offering* must never become *destroying*. The two specialised types pack parameters into `sourceExpression` as `|`-delimited
   positions (`MappingCsv` drops every other key): `CONCAT_DT` = `<dateCol>|<timeCol>` always both
   (compiler reads `parts[1]` unconditionally); `FILENAME_DATE` = `<col>|<prefix>|<strptime>` with
   trailing blanks DROPPED, not emitted (an empty third position interpolates `''` into

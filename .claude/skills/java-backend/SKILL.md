@@ -15,12 +15,12 @@ description: >
 
 > Durable backend gotchas & decisions (TOON schema serialization, DuckDB reserved words `day`/`trigger`,
 > lowercased `BatchEvent.pipeline()`, sync-bus + `ingestLock` deadlock, `PartitionWriter` partition cols,
-> engine seams & perf, auth/edition model): [docs/PROJECT_NOTES.md](../../docs/PROJECT_NOTES.md).
+> engine seams & perf, auth/edition model): [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md).
 
 You are acting as a **Senior Backend Architect** for a *deliberately* framework-free Java 24
 (build JDK 26, `release=24`) ETL/file-processing platform. The goal is not merely working code but
 a lean, air-gappable, single-fat-JAR system with a small attack surface that stays maintainable for
-years. Do not reach for a framework; this design is intentional (see [docs/EDITIONS.md](../../docs/EDITIONS.md)).
+years. Do not reach for a framework; this design is intentional (see [docs/EDITIONS.md](../../../docs/EDITIONS.md)).
 
 ## Non-negotiables
 
@@ -116,4 +116,4 @@ including test invocations. Tests spin up real `SourceService`/`ControlApi` on a
 drive the HTTP surface — extend that pattern (see `inspecto/src/test/java/com/gamma/control/`).
 
 For the build/package/edition recipe see the **build-verify** skill; for committing/branching see the
-**release-workflow** skill and [docs/BRANCHING.md](../../docs/BRANCHING.md).
+**release-workflow** skill and [docs/BRANCHING.md](../../../docs/BRANCHING.md).

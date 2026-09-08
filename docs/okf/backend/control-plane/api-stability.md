@@ -1,5 +1,14 @@
+---
+type: Reference
+title: API stability policy
+description: What the `@PublicApi` marker means and does not mean, the release baseline (nothing after 3.x has shipped), and the running draft of release notes for the pending MAJOR.
+resource: inspecto-api/src/main/java/com/gamma/api/PublicApi.java
+tags: [api, stability, publicapi, semver, release]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # API Stability Policy
-> *Moved from `docs/api-stability.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Control-plane section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/api-stability.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation.
 

@@ -1,3 +1,12 @@
+---
+type: Concept
+title: Pipeline identity — rename & save-as-template
+description: The identity model and its four operations — `label` display-only rename, `save-as-template` non-runnable sibling, `rename` full identity migration, and `resume` for an interrupted one.
+resource: inspecto/src/main/java/com/gamma/control
+tags: [pipeline, identity, rename, template, migration]
+timestamp: 2026-08-17T00:00:00Z
+---
+
 # Pipeline identity: rename & Save-as-template
 
 **Routes:** `PipelineSettingsRoutes` — `POST /pipelines/{name}/label`, `POST /pipelines/{name}/save-as-template`;

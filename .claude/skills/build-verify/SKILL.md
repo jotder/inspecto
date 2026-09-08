@@ -16,7 +16,7 @@ Inspecto — Java 26 build (`release=24`), Maven reactor `inspecto-parent`. UI i
 `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Always build offline (`-o`).**
 
 > Durable project knowledge (module map, gotchas, engine seams & perf, decisions):
-> [docs/PROJECT_NOTES.md](../../docs/PROJECT_NOTES.md).
+> [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md).
 
 ## Verify (authoritative — the source of truth)
 
@@ -179,7 +179,7 @@ pwsh -File inspecto\package.ps1 -NoUi           # skip Angular UI
 pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must provide Java 24+)
 ```
 Editions are build flavors (Personal HTTP/no-auth · Standard HTTPS/OIDC · Enterprise = Standard + ABAC
-policy) — see [docs/EDITIONS.md](../../docs/EDITIONS.md). All three flavors exist today:
+policy) — see [docs/EDITIONS.md](../../../docs/EDITIONS.md). All three flavors exist today:
 
 ```powershell
 pwsh -File inspecto\package.ps1 -Edition Standard    # + inspecto-security.jar (OIDC)

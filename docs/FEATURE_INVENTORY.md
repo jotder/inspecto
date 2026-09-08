@@ -144,7 +144,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 |---|---|---|
 | SFTP (key auth + bastion tunnel) | `connection: { id, connector: sftp, host, username, password: "${ENV:…}", tunnel: { host, username } }` | connections/cdr_sftp |
 | FTPS (TLS) | `options: { tls: explicit }` | `okf/backend/acquisition/data-acquisition-framework.md` |
-| SSH host-key pinning | `options: { host_key: "ssh-rsa AAAA…" }` or `{ known_hosts: … }` | `okf/backend/acquisition/data-acquisition-framework.md` |
+| SSH host-key pinning | `options: { host_key: "SHA256:<base64>" }` — a **fingerprint** (SHA256/SHA1 base64, or MD5 colon-hex); a raw `ssh-rsa AAAA…` key line is REJECTED. Use `{ known_hosts: … }` to pin from an OpenSSH file. | `okf/backend/acquisition/data-acquisition-framework.md` |
 | FTP passive port range (NAT) | `options: { passive_ports: "10000-10100" }` | `okf/backend/acquisition/data-acquisition-framework.md` |
 | DB-export source (JDBC + watermark) | `connection: { connector: db, options: { watermark_column: updated_at } }` | `okf/backend/acquisition/data-acquisition-framework.md` |
 | Secret via env / sys property | `password: "${ENV:MY_SECRET}"` / `"${SYS:my.prop}"` | `configuration.md` · `SecretResolver` |

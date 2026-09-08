@@ -45,7 +45,7 @@ deferred knob (`acquire.maxFilesPerCycle`, BACKLOG §6).
   `CollectorConnector.discover(ctx)` lists candidates (never dedups — that's an engine concern).
 * **B — Stability gate.** `StabilityGate` (`com/gamma/acquire/StabilityGate.java`) holds back half-written
   files: it first asks `connector.readiness()`; if `UNKNOWN`, applies size/mtime quiescence (unchanged for
-  `stability.window` across `stability.sizeChecks` cycles). One shared instance per [space](../control-plane/multi-space.md).
+  `stability.window` across `stability.size_checks` cycles). One shared instance per [space](../control-plane/multi-space.md).
 * **C — Deduplication + watermark.** `AcquisitionLedger` (`com/gamma/acquire/AcquisitionLedger.java`) is the
   fingerprint SPI: `find`/`record` per `(sourceId, relativePath)`, `highWatermark(sourceId)` for incremental
   discovery, `dbWatermark` for row-level DB export. Implementations: `InMemoryAcquisitionLedger` (default,

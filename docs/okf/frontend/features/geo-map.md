@@ -61,7 +61,7 @@ Geocoder — never "marker/pin" in model names).
 
 Plan + gotchas (rAF hidden-page stall, absolute style URLs, seed-once localStorage) — archived:
 [`geo-map-analysis-plan.md`](../../../archived-documents/plans-archive/geo-map-analysis-plan.md) ·
-case-study pack: [`geo-map-case-studies.md`](../../../superpower/geo-map-case-studies.md).
+case-study pack: [`geo-map-case-studies.md`](../../../archived-documents/plans-archive/geo-map-case-studies.md).
 
 ## Case studies (CS1–CS5)
 

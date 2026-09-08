@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Database / persistence layer
+description: How state is stored on disk — the three data classes, the operational store inventory and relational schemas, the per-space file topology, and how to run operational data on Postgres.
+resource: inspecto-ops/src/main/java/com/gamma/ops
+tags: [persistence, duckdb, postgres, schema, topology, stores]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Database / Persistence Layer
-> *Moved from `docs/DB_LAYER.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Engine section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/DB_LAYER.md` (docs consolidation, 2026-07-16).)*
 
 > **Scope:** how Inspecto stores state on disk — the three data classes, the operational
 > (relational) table schemas, the per-space file topology, and how to run operational data on
@@ -67,9 +76,9 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 
 | Domain | Interface | DB impl | Backend toggle (`-D…`) | Default |
 |---|---|---|---|---|
-| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../inspecto-engine/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=memory\|db` | `memory` |
-| Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-engine/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | `memory` |
-| Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-engine/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | `memory` |
+| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=memory\|db` | `memory` |
+| Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | `memory` |
+| Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | `memory` |
 | Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* | `events.backend=memory\|parquet` | `memory` |
 | Ingest status / audit projection | `etl/StatusStore` | [`DbStatusStore`](../../../../inspecto/src/main/java/com/gamma/service/DbStatusStore.java) | `status.backend=file\|db` | `file` |
 | Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
@@ -83,7 +92,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 
 > **`ALERT`s are not their own table.** Alerts, incidents, cases and tasks are all rows in
 > `inspecto_ops_objects`, discriminated by the `object_type` column
-> ([`ObjectType`](../../../../inspecto-engine/src/main/java/com/gamma/ops/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
+> ([`ObjectType`](../../../../inspecto-engine/src/main/java/com/gamma/objects/ObjectType.java): `ALERT, INCIDENT, CASE, TASK`).
 
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
 warning rather than blocking startup.
@@ -586,7 +595,7 @@ dirs, so without the mkdir every DB-backed store silently degraded to in-memory 
 The layer was **designed** for this: stores are JDBC-pluggable by URL scheme, the DDL is deliberately
 portable (`VARCHAR`/`BIGINT`, composite PKs, no auto-increment, no upserts — explicit DELETE-then-INSERT),
 and there is a **real embedded-Postgres round-trip test**
-([`PostgresStateStoreTest`](../../../../inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java))
+([`PostgresStateStoreTest`](../../../../inspecto-ops/src/test/java/com/gamma/service/PostgresStateStoreTest.java))
 covering 6 of the 9 DB-backed stores — **`consignment_outputs` and `file_stages` are two of the three it does
 not cover.** Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
 is reasoned, not proved.

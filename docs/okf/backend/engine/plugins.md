@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Plugin ingester
+description: When to reach for the plugin ingester, the `StreamingFileIngester` SPI contract (columns, emit, quarantine, segment keys), and the union/generation execution modes the framework picks by file size.
+resource: inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
+tags: [plugins, spi, ingester, streaming, segments, quarantine]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Plugin Ingester
-> *Moved from `docs/plugins.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Parser Plugins](parser-plugins.md) for the summary; this page is the long form it points to. *(Moved from `docs/plugins.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
@@ -58,7 +67,7 @@ public class MyCdrIngester implements StreamingFileIngester {
 
 ### Execution modes — the framework picks by file size
 
-The same ingester serves both ingestion shapes; the [`StreamingPluginBatchStrategy`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/StreamingPluginBatchStrategy.java) chooses one **per batch** with zero extra I/O (member sizes are already known):
+The same ingester serves both ingestion shapes; the [`StreamingPluginIngestStrategy`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/StreamingPluginIngestStrategy.java) chooses one **per batch** with zero extra I/O (member sizes are already known):
 
 | Mode | When | What it does | Output |
 |---|---|---|---|
@@ -154,8 +163,9 @@ processing:
   streaming:                # optional — mode selection + generation budget
     large_file_bytes: 268435456   # ≥ this (per member) → generation mode; else union mode
     flush_records: 5000000        # rows per generation flush
-  batch:
-    max_files: 1000         # pack many small files per union batch (raise for the many-small case)
+collector:
+  consignment:
+    max_files: 1000         # pack many small files per union consignment (raise for the many-small case)
   csv_settings:
     delimiter: ","
     skip_header_lines: 0

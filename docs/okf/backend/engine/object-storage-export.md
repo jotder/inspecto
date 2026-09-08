@@ -1,3 +1,12 @@
+---
+type: Reference
+title: Object-storage export (S3 / HDFS) — posture and options
+description: The grounded facts about exporting output to object storage, the options by ambition, and the recommendation of record. ⚠ Intent, not as-built — the schedulable row is EXPORT-1 in BACKLOG.md.
+resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
+tags: [export, object-storage, s3, hdfs, options, intent]
+timestamp: 2026-08-28T00:00:00Z
+---
+
 # Object-storage export (S3 / HDFS) — posture and options
 
 **Status:** DISCUSSED 2026-08-28, not scheduled — the operator asked for the analysis to be kept

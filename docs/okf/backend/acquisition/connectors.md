@@ -90,7 +90,7 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
   SA's `token_uri` for a bearer token, and caches that token until ~60s before expiry (one mint per scan cycle).
   Listings come from Objects:list (paginated via `nextPageToken`), the object `generation` → `RemoteFile.version`,
   and TAG maps to GCS custom object metadata (a metadata PATCH), the native equivalent of S3 object tags. JSON is
-  parsed with gson (parent-managed; already transitively on the classpath — no new fat-JAR jar). The
+  parsed with gson — a **declared compile dependency** of this module (version parent-managed). It was already on the classpath transitively, so declaring it adds no new fat-JAR jar. The
   **"offline-blocked (no SDK jars)" label ACQ-4 carried for GCS-native was stale**: OAuth2 JWT signing is the
   same category of hand-rollable JDK crypto as SigV4/SharedKey, needs no SDK.
 

@@ -28,7 +28,7 @@ parallel truth; it distills into these concepts as its waves drain.
 * [Multi-location ingest](multi-location-ingest.md) — N collector pipelines → one merge flow job +
   the `on_pipeline` all-gate; `collector()` stays singular permanently.
 * [Step catalog — every Step kind, delivered and pending](step-catalog.md) — the one reference for
-  all 15 delivered Step kinds (function · behaviour · configuration keys · refusals · runnable example)
+  all 16 delivered Step kinds (function · behaviour · configuration keys · refusals · runnable example)
   and the 119-entry Step Processor catalog split into delivered / partial / planned, with what exists
   today for each pending entry.
 * [Per-Step enabled — park and drain](step-park-drain.md) — switching off a route-branch sink PARKS

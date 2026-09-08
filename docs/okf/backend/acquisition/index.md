@@ -1,7 +1,7 @@
 # Acquisition
 
 The data-acquisition engine that feeds the [engine](../engine) — discover, gate, dedup, retrieve, finalize —
-plus the remote [connectors](../modules/connectors.md). All six roadmap phases (A–F) ship on `4.x`.
+plus the remote [connectors](../modules/connectors.md). All six roadmap phases (A–F) have shipped.
 
 # Concepts
 

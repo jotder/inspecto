@@ -1,7 +1,16 @@
-# Data Acquisition & File Collection Requirements
-> *Moved from `docs/data_acquisition_framework.md` (docs consolidation, 2026-07-16).*
+---
+type: Reference
+title: Data acquisition — the original requirement
+description: The requirement-of-record for remote file collection — connectivity, discovery, stability detection, duplicate prevention, change detection and collection guarantees, as 14 numbered requirement areas. Phases A-F shipped; this states what was asked for, not the as-built.
+resource: inspecto-acquire/src/main/java/com/gamma/acquire
+tags: [acquisition, requirements, discovery, stability, dedup, watermark, guarantees]
+timestamp: 2026-07-16T00:00:00Z
+---
 
-> **Status (2026-06-15): the framework is built — Phases A–F shipped on `4.x`.** This document is the original
+# Data Acquisition & File Collection Requirements
+> **Deep reference — the detail tier.** Start at [Data Acquisition Framework](framework.md) for the summary; this page is the long form it points to. *(Moved from `docs/data_acquisition_framework.md` (docs consolidation, 2026-07-16).)*
+
+> **Status (2026-06-15): the framework is built — Phases A–F have all shipped on `master`.** *(⚠ do not restore a `4.x` attribution: that branch and its `v4.0.0`/`v4.0.0-RC1` tags were deleted 2026-08-17 — `docs/BRANCHING.md` §0-A.)* This document is the original
 > *requirement*; the as-built design + phase log live in
 > [`docs/archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md`](../../../archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md),
 > and the operator-facing config/runbook are in
@@ -33,9 +42,9 @@
 > unchanged objects **before** downloading; listed objects are atomic ⇒ readiness is always READY (no
 > stabilization pass). MOVE/RENAME = CopyObject+DeleteObject; TAG = PutObjectTagging.
 > **NFS/SMB/CIFS = OS-mounted shares** (see §1 note below) — no in-process protocol client, by design.
-> **Also shipped 2026-07-08 (ACQ-6):** push/event-driven discovery — **`POST /sources/{id}/notify`**
+> **Also shipped 2026-07-08 (ACQ-6):** push/event-driven discovery — **`POST /collectors/{id}/notify`**
 > (an S3 event notification, upload script, or upstream job triggers an immediate scan; v1 answers
-> `202 {runId}` + poll `Location`, gated on `canOperateRuns`, audited as `source.notified`; a spurious
+> `202 {runId}` + poll `Location`, gated on `canOperateRuns`, audited as `collector.notified`; a spurious
 > notify is harmless — the cycle's dedup/stability decide what ingests) and **`source.discovery: watch`**
 > (JDK `WatchService` on a local/mounted poll root; debounced ~1s via `-Dservice.watch.quiet.millis`;
 > the interval poll loop stays on as the backstop — watch narrows latency, it never carries correctness).
@@ -81,7 +90,7 @@ The system shall support collecting files from multiple source types through a p
   * FTP
   * SFTP
   * SSH/SCP
-  * SSH Tunneling and Proxy (future)
+  * SSH Tunneling and Proxy — **shipped**: `SshTunnel` for `sftp`/`ftp`/`ftps`/`db`, plus SOCKS5 and HTTP `CONNECT` proxy dial-through, extended to the PostgreSQL JDBC driver
   * SMB/CIFS — via an **OS-mounted share** (see note)
   * NFS — via an **OS-mounted share** (see note)
 * **Database export file**
@@ -118,7 +127,7 @@ The system shall identify candidate files available for processing.
 
 **Capabilities**
 * **New File Detection:** Detect newly arrived files.
-  * Methods: directory listing, timestamp comparison, object version comparison, event notification (future).
+  * Methods: directory listing, timestamp comparison, object version comparison, event notification (**shipped** — `POST /collectors/{id}/notify`, ACQ-6).
 * **Incremental Discovery:** Collect only files newer than the previous successful scan.
   * Maintain: `last_scan_timestamp`, `last_processed_marker`, `high_watermark`.
 * **Pattern Filtering:** Support `*.csv`, `*.gz`, `CDR_*.dat`, regex patterns, and exclude patterns.

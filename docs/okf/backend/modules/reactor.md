@@ -1,4 +1,28 @@
+---
+type: Architecture
+title: Maven reactor & modularization (as-built)
+description: How the reactor is shaped and why, the shared-helper homes in inspecto-util, version management, and the rules for extracting a further module.
+resource: pom.xml
+tags: [reactor, maven, modules, extraction, layering]
+timestamp: 2026-07-22T00:00:00Z
+---
+
 # Maven reactor & modularization (as-built)
+
+> 🔴 **THE MODULE LIST BELOW IS STALE — do not read it as the current reactor.** §1 is headed *"Reactor
+> shape (2026-07-22 …)"* and mentions `inspecto-ops`, `inspecto-events`, `inspecto-metrics`,
+> `inspecto-exchange`, `inspecto-geo-link`, `inspecto-backup`, `inspecto-notify-channels`,
+> `inspecto-policy` and `inspecto-intelligence` **zero times** — nine modules, all created after it was
+> written (the EDG-01 edition extractions, through 2026-09-08).
+>
+> **The reactor is 23 modules today: 14 default + 9 profile-scoped.** `pom.xml` is the only current
+> source — rebuild the list from it, never from this page. ⚠ `backend/architecture.md` used to call this
+> page "the authoritative map"; that deference has been corrected.
+>
+> **Still sound and unique to this page:** the *reasoning* behind the split, the shared-helper homes in
+> `inspecto-util` (as-built 2026-08-27), version management (M1), and the rules for extracting a further
+> module. Read it for why, not for what. *(Assessed 2026-09-08 —
+> `docs/superpower/docs-consolidation-plan.md` §5.8.1 group 7, row 7.3.)*
 
 How the reactor is shaped, why, and the rules for extracting further modules. Distilled from
 `modularization-optimization-plan.md` (completed 2026-07-21, archived in

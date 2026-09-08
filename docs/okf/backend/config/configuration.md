@@ -1,5 +1,14 @@
+---
+type: Reference
+title: Configuration reference
+description: The full config surface — the three `.toon` file types (only the generation config is hand-authored), the Spaces multi-project layout, the type-mapping reference, and the optional Postgres state store.
+resource: inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java
+tags: [config, toon, spaces, type-mapping, postgres]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Configuration Reference
-> *Moved from `docs/configuration.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [TOON Configuration](toon-config.md) for the summary; this page is the long form it points to. *(Moved from `docs/configuration.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
@@ -33,11 +42,15 @@ Each space is fully isolated: its own service, scheduler, event log, stores, con
 `space` label. Store **backends** (`status.backend`, `objects.backend`, `events.backend`, …) stay process-global
 `-D` flags; only their location defaults move under the space root.
 
-- **API:** every route is addressable under `/spaces/{id}/…` (e.g. `GET /spaces/acme/pipelines`); an unknown id
-  is a `404`. `/health`, `/ready`, `/metrics` stay un-prefixed and server-global. An un-prefixed API path resolves
-  the `default` (or sole) space.
-- **Space CRUD** (server-global): `GET /spaces` (list), `POST /spaces` `{id,display_name?,description?}` (create +
-  boot, no restart), `DELETE /spaces/{id}` (deregister + stop; add `?purge=true` to also delete its files).
+- **API:** the space segment sits **inside** `/api/v1` — `GET /api/v1/spaces/acme/pipelines`, never
+  `GET /spaces/acme/pipelines` (dispatch strips `/api/v1` first, then matches `/spaces/{id}/…`; the v1
+  gate re-reads the *raw* URI, so a space-outside path is never an API path at all). An unknown id is a
+  `404`; `/health`, `/ready`, `/metrics` stay un-prefixed and server-global; an un-prefixed API path
+  resolves the `default` (or sole) space. The wire protocol lives in
+  [multi-space](../control-plane/multi-space.md) — do not restate routes here.
+- **Space CRUD** is server-global and lives on the wire-protocol page — the seven routes are documented
+  in [multi-space](../control-plane/multi-space.md); this file covers on-disk layout and `SpaceMigrator`
+  only.
 - **Single-tenant mode** (no `-Dspaces.root`, a config/dir passed on the CLI) hosts one `default` space and is
   byte-identical to the pre-spaces behaviour; CRUD returns `409`.
 
@@ -250,7 +263,7 @@ config SPI), reached only when config genuinely can't express the need:
 | Level | Reach for it when | Where / how |
 |---|---|---|
 | **1 — Record Transformer field** *(config, no code)* | rename/select (`keep`), cast a type (`convert.type`), compose a timestamp (`date.concat_parts`), derive a date from the filename (`date.from_filename`), **or any per-row DuckDB scalar expression (`custom`)** — a legacy `mapping.rules[]` row is read as one of these | a row in `mapping.fields[]` |
-| **2 — New named `transformType`** *(engine code)* | you want a **reusable, named** verb across many schemas (e.g. a domain checksum) rather than repeating the same `EXPR` everywhere | add a `ColumnRule` to the `DATA_RULES` registry in `etl/TransformCompiler` — a one-line addition returning a DuckDB **scalar** expression (one row in → one row out) |
+| **2 — New named `transformType`** *(engine code)* | you want a **reusable, named** verb across many schemas (e.g. a domain checksum) rather than repeating the same `EXPR` everywhere | add the verb to the **`RecordTransform`** catalog (`inspecto-etl/src/main/java/com/gamma/etl/RecordTransform.java`) — a one-line addition returning a DuckDB **scalar** expression (one row in → one row out). 🔴 It must not drift from `inspecto-ui/src/app/modules/admin/pipelines/sql-functions.ts`; `RecordTransformContractTest` pins the pair by writing `sql-functions.contract.json` from the catalog. *(Corrected 2026-09-08: this cell used to name a `ColumnRule` in a `DATA_RULES` registry in `etl/TransformCompiler`. `DATA_RULES` does not exist anywhere in the tree — the Record Transformer replaced that lane.)* |
 | **3 — Plugin ingester** *(engine code)* | the **input format** isn't delimited text — binary, fixed-width, ASN.1 — or one file splits into several event-type tables | implement [`StreamingFileIngester`](../engine/plugins.md#plugin-ingester): you parse and `emit` records; the framework still applies the same `mapping.rules[]` / `partitions[]` to them |
 
 Anything that needs **more than one row** — a join to a reference table, a `GROUP BY`, a running

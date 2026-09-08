@@ -1,3 +1,12 @@
+---
+type: Concept
+title: Pipeline test run (run-to-here)
+description: The Test step of the Build/Test/Run journey — two independent structural containments, the `files` jail, the two grains in the response, and the `to=` cutoff.
+resource: inspecto/src/main/java/com/gamma/control
+tags: [test-run, run-to-here, containment, jail, authoring]
+timestamp: 2026-08-14T00:00:00Z
+---
+
 # Pipeline test run (run-to-here)
 
 **What it is:** a bounded, scratch-only run of an authored Pipeline over the user's **real** inbox

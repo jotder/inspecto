@@ -19,12 +19,15 @@ One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.
 and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
 that mention the stage describe history, not a live host.
 
-> ⚠ **Amended 2026-09-04 by D8–D10 (decided, NOT built)** — see
+> ⚠ **Amended 2026-09-04 by D8–D10 — decided and BUILT the same day** (`4e64fe4a`, `c769719d`;
+> `AUTHORING-WIDE-1` is CLOSED) — see
 > [schema-mapping-authoring.md §7](schema-mapping-authoring.md). In short: **Parse does not drop
 > columns** (it settles existence/name/type/synonym; exclusion is `transform.sql`'s job only, because
 > excluding here edits the schema and `SchemaCompatibility` gates that BACKWARD), and the columns table
-> must carry the wide-feed treatment (search · filter chips with counts · 10/20/100 paging · `#` = the
-> position in the FULL file, never the filtered row index). Tracked as BACKLOG `AUTHORING-WIDE-1`.
+> carries the wide-feed treatment: a search box over name · selector · synonym, a **type dropdown**
+> (`mat-select`, no counts — counted filter chips are the *Transform* grid's idiom, not Parse's), a
+> paginator of **`[10, 25, 50, 100]` defaulting to 50** (Transform's is `[10, 20, 100]` defaulting to 10 —
+> deliberately different), and `#` = the position in the FULL file, never the filtered row index.
 
 ## The sectioned Parse pane (parse-pane-redesign plan, SHIPPED `d012f721` 2026-09-04)
 
@@ -77,8 +80,10 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   one textarea (typing clears captured bytes — the xlsx `sample.b64` rule kept); Import/Export (the Grammar
   CSV round-trip, unchanged) sit beside it; the parsed rows get a 10 · 25 · 50 · 100 page size (default
   10). Safe from R9 because neither tab hosts a form.
-- **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): Use · `#` ·
-  Name · Type · **Sample value** (first parsed row) · Also known as (the synonym), a search box; Selector
+- **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): `#` ·
+  Name · Type · **Sample value** (first parsed row) · Also known as (the synonym), a search box; ⅋ **no
+  Use/include column** — D8 removed include-control, so every row the grid holds is emitted
+  (`SchemaFieldRow.include` survives only so a Grammar CSV carrying the column still round-trips); Selector
   only for name-based frontends (`#` IS the selector for positional ones); Source zone only when a <!-- vocab-allow: quotes the UI column label "Source zone" (the data-origin zone sense, not the acquisition entity) -->
   `TIMESTAMP(TZ)` row exists. "Add a column with the source file name" appends a read-only **`file_name`**
   row that is never saved into `raw.fields[]` — the real mechanism is the SINK's `output.filename_column`
@@ -116,8 +121,10 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   (never `applyNodePatch`, so a rename never invalidates a green test outcome). A second identity editor
   inside the pane would have conflicted with it.
 - **Dialog custody unchanged** (R7): `openNodeConfig` (`pipeline-editor.component.ts:2126-2154`) already
-  sends every drawer-capable delimited node to the drawer; `GrammarEditorDialog` remains ONLY for a
-  grammar-bound (`use: grammar/x`) node, a dangling binding, or binary fixed-width. Removing it is a
+  sends every drawer-capable delimited node to the drawer. ⚠ **Superseded since:** `GrammarEditorDialog`
+  now remains ONLY for **binary fixed-width** and a **generic `parser` that maps to no frontend**
+  (`isDrawerParse`). A grammar-**bound** per-format node opens the drawer as an inline COPY (D4), and a
+  **dangling** binding does too since 2026-09-06 (PARSE-HOME-1). Removing it is a
   Components-registry decision — BACKLOG, not made here.
 - Fixed in passing: `schema-form.validate()` treated a `dependsOn`-disabled sole control as invalid
   (`form.valid || form.disabled`).

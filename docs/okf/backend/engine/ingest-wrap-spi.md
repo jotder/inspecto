@@ -1,3 +1,12 @@
+---
+type: Seam
+title: The ingest wrap-SPI — non-DuckDB formats into the DuckDB core
+description: How formats DuckDB cannot read natively wrap the execution core by parsing records in Java and feeding them in — the SPI pair, the one sink implementation, the two deliberate partition-declaration contracts, and the contract test.
+resource: inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java
+tags: [spi, ingester, duckdb, seam, partitions, contract-test]
+timestamp: 2026-08-10T00:00:00Z
+---
+
 # The ingest wrap-SPI — feeding non-DuckDB formats into the DuckDB execution core
 
 **Status:** as-built (canonized 2026-08-19, E3 of the delimited-grammar-properties plan Part II).

@@ -1,3 +1,12 @@
+---
+type: Concept
+title: Tags — the cross-entity label graph
+description: One label graph over five entity kinds — `(targetKind, targetId)` addressing shared with notes, a central assignment store rather than per-entity fields, authorization, the HTTP surface and the Tags pane.
+resource: inspecto-ops/src/main/java/com/gamma/ops/tag
+tags: [tags, labels, cross-entity, assignment, authorization]
+timestamp: 2026-07-12T00:00:00Z
+---
+
 # Tags — the cross-entity label graph
 
 **Concept home for BACKLOG D7.** Status: **complete end-to-end 2026-07-26** — the central store, the

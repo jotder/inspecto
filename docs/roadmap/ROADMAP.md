@@ -1,6 +1,6 @@
 # Inspecto — Forward Roadmap
 
-**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../GLOSSARY.md). The **§1 theme horizons and the §2 NOW horizon still read as of 2026-06-19** and need their own status pass (see §9). · **Companion:** [STAKEHOLDER_OVERVIEW.md](STAKEHOLDER_OVERVIEW.md) · **Engineering detail:** [../okf/backend/pipeline-graph/pipeline-graph-design.md](../okf/backend/pipeline-graph/pipeline-graph-design.md)
+**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon still read as of 2026-06-19** and need their own status pass (see §9). · **Companion:** [STAKEHOLDER_OVERVIEW.md](STAKEHOLDER_OVERVIEW.md) · **Engineering detail:** [../okf/backend/pipeline-graph/pipeline-graph-design.md](../okf/backend/pipeline-graph/pipeline-graph-design.md)
 
 > **Timeline convention.** This roadmap sequences work into **Now / Next / Later** horizons and gives **relative effort** sizing (S/M/L). It deliberately does **not** assign calendar dates — the cadence is one minor release per milestone on the active line, and dates are set per planning cycle, not here. Where an item gates revenue or another item, that dependency is called out explicitly.
 
@@ -172,7 +172,7 @@ N4 Edition realignment          [NFS/SMB-CIFS still open]                complet
 
 ## 9. Known-stale sections (pending their own status pass)
 
-The 2026-07-25 pass reconciled §3, §6 and the *Flow → Pipeline* vocabulary only. Deliberately **not**
+The 2026-07-25 pass reconciled §3, §6 and the *Flow → Pipeline* vocabulary only. Deliberately **not** <!-- vocab-allow: names the rename itself -->
 restated, because each needs a status call rather than a doc edit:
 
 - **§1 theme horizons** — T1 and T2 still read *Primary horizon: Next*, though their gating items (§3.1,
@@ -183,10 +183,17 @@ restated, because each needs a status call rather than a doc edit:
   `examples/06-serve/pipeline-job`), and N4's edition model shipped as real Maven build flavors
   (`-Pedition-standard` / `-Pedition-enterprise`). N2 provenance is genuinely still open — it needs a live
   feed (**OPS-5** in [`../BACKLOG.md`](../BACKLOG.md) §2).
-- **Residual banned vocabulary** — the acquisition-entity sense of *Source* (⛔ → **Collector**) still
-  appears in §3.2, §3.4, §4 L4 and §7; and [STAKEHOLDER_OVERVIEW.md](STAKEHOLDER_OVERVIEW.md) still uses
-  *Flow* throughout (§5.3, §7, §10, the glossary entry, the architecture diagram). Both are larger passes
-  than this one.
+- **Residual banned vocabulary** — *(re-grounded 2026-09-08, when `docs/roadmap/` finally entered the
+  vocabulary guard's scope — it had been outside every pass since the guard was written.)* Both halves of
+  what this bullet used to claim were stale. The acquisition-entity residue it named in §3.2, §3.4, §4 L4
+  and §7 is **gone**: the guard finds none in this file. In
+  [STAKEHOLDER_OVERVIEW.md](STAKEHOLDER_OVERVIEW.md) every guard-visible hit was drained the same day — the
+  §4 pane inventory, the §10 tables, the §11 risk row (whose remediation told the reader to stand up a
+  `type: flow` job, which is not a real job type — the engine accepts `enrich | report | maintenance |
+  pipeline`), and the §12 glossary entry. <!-- vocab-allow: cites the retired job-type spelling being corrected -->
+  What remains there is ~26 **lowercase** prose uses — "how data flows through" (§5), the "flow-graph"
+  compound (§4, §5.3), "authored flows" (§5.3) — which `bare-flow` does not flag. That is a prose pass,
+  still larger than this one. <!-- vocab-allow: names the residue that remains -->
 
 ---
 

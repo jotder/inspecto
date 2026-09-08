@@ -1,5 +1,28 @@
+---
+type: Architecture
+title: Architecture layers — platform-wide design map
+description: The whole-platform layer model — package inventory, composition and lifecycle, the SPI extension surface, the two distinct event buses, and configuration flow. Scoped deliberately against stage1-architecture.md, which owns the M..N ingest path.
+resource: pom.xml
+tags: [architecture, layers, packages, spi, events, lifecycle]
+timestamp: 2026-07-16T00:00:00Z
+---
+
 # Architecture Layers — Platform-Wide Design Map
-> *Moved from `docs/architecture-layers.md` (docs consolidation, 2026-07-16).*
+> **Deep reference — the detail tier.** Start at [Backend section index](index.md) for the summary; this page is the long form it points to.
+
+> 🔴 **ITS PREMISE IS PRE-REACTOR-SPLIT — do not trust the structural half.** §1 calls the backend "a
+> **layered monolith** with satellite plug-in modules" (`:27`). That system no longer exists: the WS-D
+> split extracted the engine, and the tree is now **23 Maven modules** (14 default + 9 profile-scoped).
+> Every L0/L1/L2 package in its §2 inventory has since been extracted, so its §1 diagram, §2 package
+> table and §2 "extraction blockers" describe a shape that is gone. Its SPI count ("eight ServiceLoader
+> SPIs", `:123`) is also wrong — **22** ship in `src/main` — and two of its stated SPI *gaps* are refuted
+> by the code (`PipelineNodeType` has implementors; `RouteModule` is wired as a registry).
+>
+> For current structure read [architecture](architecture.md); for the reasoning behind the split read
+> [reactor.md](modules/reactor.md) (whose own module list is also stale — see architecture.md).
+> **Still sound and unique to this page:** §5's two-event-buses distinction and §7's DuckDB
+> open-per-use / `SqlSandbox` boundary. *(Assessed 2026-09-08; this page is a retirement candidate —
+> `docs/superpower/docs-consolidation-plan.md` §5.8.1 group 7.)* *(Moved from `docs/architecture-layers.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 >
@@ -82,9 +105,10 @@ Direct files / lines, role, and outbound `com.gamma` dependencies (import counts
 
 - **`service` ↔ `job` ↔ `pipeline.exec`** (3-way): `CollectorService` → `JobService`; `job` →
   `service.BatchEventBus` and → `pipeline.exec.PipelineJobRunner`; `pipeline.exec` → `job.Job*`
-  types and → `service.BatchEventBus`. Break by moving `BatchEventBus` down a layer and extracting
-  job contract types. **Partially done (WS-D §1.7):** `CronExpression` moved `service` → `util`;
-  `BatchEventBus` → `etl` still pending.
+  types and → the consignment-commit bus. Break by extracting job contract types.
+  **DONE (WS-D §1.7 + `ff33246a`):** `CronExpression` moved `service` → `util`, and the bus was both
+  renamed and relocated — it is `com.gamma.etl.ConsignmentEventBus` in `inspecto-etl` today, so this
+  row's `service` attribution is historical.
 - ~~**`service` ↔ `catalog`**~~ **RESOLVED (WS-D §1.7):** `StatusStore` (interface) moved
   `service` → `etl` — it was `CatalogOverlay`'s only `service` edge, so this cycle is now broken.
 - **`ops` ↔ `ops.link` / `ops` ↔ `ops.workflow`**, **`catalog` ↔ `catalog.spi`**: parent↔child

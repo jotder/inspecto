@@ -1,3 +1,12 @@
+---
+type: Feature
+title: Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)
+description: The one shared inline authoring surface — a pane names a non-mutating agent tool and passes its own context; the three invariants it preserves, the four result shapes adaptToolResult normalizes, and the adopted panes.
+resource: inspecto-ui/src/app/inspecto/ai-assist
+tags: [ai, authoring, assist, agent, panes, agt-6a]
+timestamp: 2026-07-27T00:00:00Z
+---
+
 # Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)
 
 The one shared inline authoring surface: a pane names a **non-mutating** agent tool, passes its own

@@ -13,6 +13,10 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
 
 * **`ConfigCodec`** (`inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java`) — thin JToon wrapper:
   `toMap` (lenient, tolerates `#` comments), `toMapStrict` (canonical assertion), `toToon` (canonical encode).
+  🔴 **"Tolerates" means "does not throw", NOT "reads correctly."** A `#` line above a block makes the
+  lenient decode **truncate the file there**, and the load accepts the truncated map with no error and no
+  warning — every key after the comment is silently gone. Never author `#` comments in a live config; if
+  you inherit one, decode the file and compare its top-level key list.
   **Gotcha**: `toToon` does **not** emit tabular-array format — a Java-constructed schema whose `fields`/
   `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
   declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
@@ -35,7 +39,10 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `orders_schema.toon` beside its pipeline is portable (the space tree can be moved, renamed, or imported
   under a new name with no edits), while every legacy `spaces/<id>/config/...` value keeps loading unchanged.
   `fromMap(map)` has no directory, so it takes the CWD branch only.
-  ⚠ `grammar` and `dirs.*` are **still CWD-only** — they were not part of W1b.
+  ⚠ **`dirs.*` is still CWD-only** — it was not part of W1b. *(Corrected 2026-09-08: this line used to say
+  `grammar` was CWD-only too. It is not — `resolveGrammarRef` delegates to `resolveSchemaRef(ref, configDir,
+  "grammar")` (`PipelineConfigParser.java:1181-1185`), so a `grammar` ref takes the same config-relative-first
+  branch as `schema_file`, including the `grammar:<id>` registry form.)*
   ⚠ The config-relative branch is contained (a `../` escape is skipped, not resolved); the CWD branch is
   **not** jailed and is explicitly not a security boundary (see [gotchas](../gotchas/cross-cutting.md) and
   `BACKLOG.md` §6).
@@ -46,7 +53,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
 |---|---|
 | `<src>_gen.toon` | `csv_settings` (delimiter, engine, skip_* lines), `type_patterns` (dates/timestamps) |
 | `<src>_schema.toon` | `raw.fields[]` (name/selector/type), `mapping.fields[]` (name/from/fn/args — Record Transformer rows; a legacy `mapping.rules[]` is still read and converted), `partitions[]` |
-| `<src>_pipeline.toon` | `name`, `active`, `dirs.*`, `output.format/compression`, `processing.*` (threads, batch, csv_settings, schema_file, streaming, ingester/segments), `source:` acquisition block |
+| `<src>_pipeline.toon` | `name`, `active`, `dirs.*`, `output.format/compression`, `processing.*` (threads, batch, csv_settings, schema_file, streaming, ingester/segments), `collector:` acquisition block |
 
 No `#` comments are allowed in files the strict parser handles. Writes go through
 [`ConfigSafetyValidator`](config-safety.md).
