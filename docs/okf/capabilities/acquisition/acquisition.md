@@ -100,7 +100,7 @@ the bytes are already local (`CollectorConnectors.java:47-60`).
 
 The authored config block is **`collector:`**. ⛔ There is no `source:` block and no alias: the parser reads
 `collector` only (`PipelineConfigParser.java:218`, `:376`), and zero committed `*_pipeline.toon` carries a
-top-level `source:`. ⚠ `data-acquisition-framework.md` (§13 and passim) and `integrations.md:59` still spell
+top-level `source:`. ⚠ `data-acquisition-framework.md` (§13 and passim) still spells
 it `source.*`; both are stale, and the reason they are stale is that **`inspecto-acquire`'s own javadocs
 still say `source.*`** (`CollectorConnectors.java:11`, `RateLimiter.java:3`, `CircuitBreaker.java:12`,
 `AcquisitionLedger.java:16`, `StabilityGate` and others) — the prose inherited the drift from the code
@@ -394,7 +394,7 @@ Eight schemes are registered by `inspecto-connectors`
 | `GcsConnector` + `GcpServiceAccountToken` | `gcs` | **SDK-free** (gson for JSON) |
 | `KafkaConnector` | `kafka` | kafka-clients |
 
-⚠ Two precisions the sources get wrong in opposite directions. (a) `integrations.md:12` and
+⚠ Two precisions the sources get wrong in opposite directions. (a) `connectors-runbook.md` (its opening paragraph) and
 `modules/connectors.md:16` once called S3/GCS/Azure "future"; they ship — the current text of both files is
 now correct, and **NFS/SMB is a *declined* design, not a pending one** (no in-process client by intent; the
 config safety validator rejects UNC paths at the path jail — that is the security boundary). (b) "Eight
@@ -467,7 +467,7 @@ the `SecretsProvider` SPI in the core, whose implementation is `inspecto-securit
 (`inspecto-security/src/main/resources/META-INF/services/com.gamma.acquire.SecretsProvider`). A bundle
 without that module — Personal — **refuses the scheme with an `IllegalStateException` naming the edition,
 never a silent `null`**; a connection test surfaces that refusal as its failure. A Vault/KMS scope is the
-Enterprise follow-on. ⚠ `integrations.md:18` once listed only 2 of the 5 forms and omitted this gate; its
+Enterprise follow-on. ⚠ `connectors-runbook.md` (formerly `integrations.md`) once listed only 2 of the 5 forms and omitted this gate; its
 current text is correct — prefer it over any older account.
 
 `ConnectionRegistry` bridges the service layer (which owns the toon files) to the static poll-cycle path,
@@ -482,7 +482,7 @@ legacy accept-on-connect behaviour is unchanged (and logged at debug, `:79`):
 
 | Option | Effect |
 |---|---|
-| `host_key` | 🔴 a key **FINGERPRINT** — `SHA256:<base64>` or OpenSSH MD5 colon-hex. The field is literally named `fingerprint` (`:35`) and is handed to sshj's `client.addHostKeyVerifier(fingerprint)` (`:70-71`), so a **raw `ssh-rsa AAAA…` key line cannot work**. `integrations.md:91` is right and any doc showing a raw key line is wrong — `docs/FEATURE_INVENTORY.md:147` is one such. |
+| `host_key` | 🔴 a key **FINGERPRINT** — `SHA256:<base64>` or OpenSSH MD5 colon-hex. The field is literally named `fingerprint` (`:35`) and is handed to sshj's `client.addHostKeyVerifier(fingerprint)` (`:70-71`), so a **raw `ssh-rsa AAAA…` key line cannot work**. `connectors-runbook.md`'s host-key table is right and any doc showing a raw key line is wrong — `docs/FEATURE_INVENTORY.md:147` is one such. |
 | `known_hosts` | path to an OpenSSH `known_hosts` file; the host must have an entry. Works across hops. |
 | `strict_host_key: true` | when set and neither of the above is configured, **refuse to connect** (`:75`) rather than silently accept any key. |
 
@@ -804,7 +804,7 @@ pair is not "reconciled" by flattening one of them.
 | Poll cycle, phases A–F, back-pressure | `docs/okf/backend/acquisition/framework.md` (`Concept`) | `inspecto-acquire/src/main/java/com/gamma/acquire` | the two-timer / two-guard split, the manual-run overlap gotcha, B4 vs `IntakeGovernor` |
 | Connector SPI, 8 schemes, profiles, secrets, workbench, proxy chain | `docs/okf/backend/acquisition/connectors.md` (`Concept`) | `inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | stage-then-land, SDK-free auth per store, the four dial-through ships, workbench disciplines |
 | The 14 numbered requirement areas | `docs/okf/backend/acquisition/data-acquisition-framework.md` (`Reference`) | `inspecto-acquire/src/main/java/com/gamma/acquire` | requirement-of-record wording + the mounted-share security note |
-| Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | `docs/okf/backend/integrations.md` §"Remote source connectors" (`Reference`) | `inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | the copy-pasteable profile shapes and the `curl` verification sequence |
+| Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | `docs/okf/backend/acquisition/connectors-runbook.md` (`Reference`) | `inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | the copy-pasteable profile shapes and the `curl` verification sequence |
 | Module boundary + dependency confinement | `docs/okf/backend/modules/connectors.md` (`Module`) | `inspecto-connectors/` | why the jar is optional and what `ServiceLoader` gives you |
 | Section map | `docs/okf/backend/acquisition/index.md` | *(none — index, exempt by charter)* | navigation only |
 
@@ -931,7 +931,7 @@ control-plane port, not a working SFTP endpoint) · `spaces/demo/config/connecti
 (`local`, the only one that resolves offline) · `spaces/demo/config/connections/warehouse_sftp_connection.toon`
 (`sftp`, `${ENV:WAREHOUSE_SFTP_PASSWORD}`; `spaces/demo/config/README.md:52` labels it "reference shape").
 **No committed `.toon` anywhere contains a `tunnel:` or `proxy:` block** — those shapes live only in
-`integrations.md`, `ConnectionProfileTest`'s inline TOON, and the UI's `connection-form.dialog.ts`.
+`connectors-runbook.md`, `ConnectionProfileTest`'s inline TOON, and the UI's `connection-form.dialog.ts`.
 
 ### 8.6 Guards
 
@@ -940,11 +940,13 @@ control-plane port, not a working SFTP endpoint) · `spaces/demo/config/connecti
   because tree-scan alone hands out a false green when a secret is committed and moved one commit later;
   `.githooks/pre-push` runs both. Wired into `ci.yml`.
 - `tools/check-vocabulary.mjs` — rule `source-acquisition-entity` (`:228`) enforces Collector over Source. <!-- vocab-allow: names the guard rule by id -->
-  🔴 **Merge hazard for this capability doc:** `DOC_ALLOW` holds a *path-keyed* waiver
-  `docs/okf/backend/integrations.md::source-acquisition-entity` (`:169`), and the guard's own
-  self-retirement rule **fails the build** when a keyed path leaves scope. Retiring or moving that section
-  must re-key the waiver in the same change. The guard's comment at `:176-177` records the identical error
-  class already fixed once — a documented `GET /sources` that is really `GET /collectors`.
+  ✅ **The merge hazard this note used to describe is discharged (2026-09-08).** `DOC_ALLOW` held a
+  *path-keyed* waiver for `integrations.md` whose only suppressed hit was that file's H1 ("Remote Sources"); <!-- vocab-allow: quotes the retired heading the waiver covered -->
+  the connector runbook was split out to `acquisition/connectors-runbook.md`, the H1 went with the retitle,
+  and the waiver was **deleted** in the same commit — the guard's self-retirement rule would otherwise have
+  failed the build. The moved text needed no waiver of its own: every remaining banned-sense use is fenced
+  or backticked. The guard's comments still record the identical error class fixed once before — a
+  documented `GET /sources` that is really `GET /collectors`.
 - `tools/check-doc-links.mjs` — new 2026-09-08, wired into `.githooks/pre-push` + `ci.yml`; any ACQ file
   move must keep its 1,378-link baseline at zero dangling.
 - `tools/check-coverage.mjs` — ⚠ the floors are **repo-wide, not per-module** (`:2-6`), so there is no

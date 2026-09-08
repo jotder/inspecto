@@ -1,0 +1,206 @@
+---
+type: Reference
+title: Remote connectors — operator runbook
+description: Copy-pasteable connection profiles and the verification sequence for SFTP/FTP/FTPS, DB export, and the bastion/host-key options — the how-to tier under the Connectors concept.
+resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
+tags: [acquisition, connectors, sftp, ftps, bastion, host-key, db-export, runbook]
+timestamp: 2026-09-08T00:00:00Z
+---
+
+# Remote connectors — operator runbook
+> **Deep reference — the detail tier.** Start at [Connectors](connectors.md) for the summary (the SPI, the
+> schemes, profiles and secrets); this page is the copy-pasteable long form it points to. For what was
+> *required*, *left* and *refused*, read the capability spec
+> [Acquisition & connectivity (`ACQ`)](../../capabilities/acquisition/acquisition.md).
+> *(Split out of `integrations.md` 2026-09-08 — that file is now the DuckLake / warehouse doc. The
+> `source.*` spellings the text carried were corrected to `collector.*` in the move: the parser reads only
+> the `collector:` block.)*
+
+## Remote connectors (SFTP / FTP / FTPS)
+
+Inspecto can pull input files from remote SFTP/FTP/FTPS servers instead of a local `dirs.poll` tree. The
+connectors live in the **optional `inspecto-connectors` module** (artifact `inspecto-connectors`) so their
+network dependencies — sshj (+BouncyCastle) for SFTP, Apache commons-net for FTP/FTPS — never bloat the lean core
+JAR. Put that JAR on the classpath and the connectors are discovered automatically via `ServiceLoader`; without
+it, only the built-in `local` connector exists. Eight schemes ship in that module today — `sftp`, `ftp`, `ftps`, `db`, `s3`, `kafka`, `azure`, `gcs`
+(`META-INF/services/com.gamma.acquire.CollectorConnectorFactory`). NFS/SMB is a **declined** design, not
+a pending one: there is deliberately no in-process client and the path jail rejects UNC paths — mount the
+share at the OS level and point the built-in `local` connector at it. Further protocols plug into the
+same SPI without touching the core engine.
+
+### 1. Define a connection profile (`<name>_connection.toon`)
+
+Reachability and credentials live in a reusable profile, referenced by one or more pipelines. **Secrets are
+references, never literals** — `SecretResolver` expands five forms at connect time: `${ENV:VAR}` (environment variable), `${SYS:prop}` (JVM system property), `${FILE:/path}` (a mounted secret file), `${KEYSTORE:alias}` (a `SecretKeyEntry` from the store named by `-Dsecrets.keystore.path`/`.type`/`.password`), and bare `${NAME}` (environment first, then system property). ⚠ **SEC-07: `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only** — they are served by the `inspecto-security` module's `SecretsProvider`, so a Personal bundle refuses the scheme by name and a connection test surfaces it as the failure.
+
+```yaml
+connection:
+  id: prod_sftp
+  connector: sftp                 # sftp | ftp | ftps
+  host: sftp.partner.example.com
+  port: 22
+  base_path: /outbound/cdr        # listing root
+  username: inspecto
+  password: ${ENV:SFTP_PASSWORD}  # reference; resolved at connect, masked in API output
+  options:
+    private_key: /etc/inspecto/id_ed25519   # SFTP: switches to public-key auth
+    host_key: "SHA256:abc…"                  # SFTP: pin the server key (fingerprint) — reject anything else
+    # known_hosts: /etc/inspecto/known_hosts  strict_host_key: true   # alternatives (see below)
+    # tls: explicit   tls_trust: all          # FTPS knobs (see below); explicit|implicit
+    # active: false   binary: true            # FTP-only knobs (passive + binary default)
+  tunnel:                          # optional SSH bastion (SFTP); omit for a direct connection
+    host: bastion.example.com
+    port: 22
+    username: jump
+    password: ${ENV:BASTION_PASSWORD}
+```
+
+> **No `#` comment lines** in `*_connection.toon` (or any `ConfigCodec` file) — JToon rejects them.
+
+### 2. Bind a pipeline to it
+
+```yaml
+collector:
+  connector: sftp
+  connection: prod_sftp
+  stability: { ready_marker: "{name}.done" }   # only fetch files the sender has finished writing
+  duplicate: { mode: METADATA }                 # don't re-fetch unchanged files
+  fetch:     { parallel_fetch: 4, rate_limit: 50MBps }
+  retry:     { count: 5, backoff: EXPONENTIAL }
+  post_action: { on_success: MOVE, archive_path: archive/yyyy/MM/dd }
+```
+
+The full set of `source:` knobs (stability, dedup, integrity, retry, circuit breaker, post-actions, parallel
+fetch, rate limit) is documented in [configuration.md](../config/configuration.md#data-acquisition--the-collector-block).
+Remote files are fetched into the local staging tree and then flow through the *exact same* batch/dedup/backup
+engine as local files — nothing downstream special-cases them.
+
+### 3. Verify reachability before a run
+
+```bash
+curl -s localhost:8080/connections                  # list loaded profiles (secrets masked)
+curl -s localhost:8080/connections/prod_sftp         # one profile
+curl -s -X POST localhost:8080/connections/prod_sftp/test   # TCP reachability + latency + secret resolution
+```
+
+The Connections pane in the UI lists profiles with a per-row **Test** action over the same endpoints.
+
+### SSH host-key pinning (SFTP)
+
+By default the SFTP client accepts whatever host key the server presents on first connect (convenient, but no
+defence against a man-in-the-middle or a silently changed host). Pin it via the profile `options`:
+
+| Option | Effect |
+|---|---|
+| `host_key` | A key fingerprint (`SHA256:<base64>` or OpenSSH MD5 colon-hex). The presented key must match exactly — best for a single direct host. |
+| `known_hosts` | Path to an OpenSSH `known_hosts` file; the host must have an entry. Works across hops (a bastion **and** a target). |
+| `strict_host_key: true` | When set and neither of the above is configured, **refuse to connect** rather than silently accept any key. |
+
+Over an SSH tunnel, a single `host_key` fingerprint pins the **target** SFTP server (a fingerprint matches one
+host); use `known_hosts` to verify the bastion as well. For a `db`-export or `ftp`/`ftps` profile reached through
+a tunnel, `host_key`/`known_hosts` pin the **bastion** (its only SSH hop). With none of these set, the legacy
+accept-on-connect behaviour is unchanged — pinning is purely additive.
+
+### FTPS (FTP over TLS)
+
+Set `connector: ftps` (defaults to explicit/`AUTH TLS`), or keep `connector: ftp` and add `options.tls`:
+
+| Option | Values | Effect |
+|---|---|---|
+| `tls` | `explicit` (FTPES, port 21) · `implicit` (TLS-first, port 990) · `none` | Enables TLS; the control **and** data channels are encrypted (`PBSZ 0` + `PROT P`). |
+| `tls_trust` | `all` · *(unset)* | `all` accepts any server certificate (self-signed / internal CA — still encrypted, **not** authenticated). Unset validates against the JVM trust store (the secure default; works for publicly-signed certs out of the box). |
+
+```yaml
+connection:
+  id: partner_ftps
+  connector: ftps                 # explicit AUTH TLS by default
+  host: ftps.partner.example.com
+  username: inspecto
+  password: ${ENV:FTPS_PASSWORD}
+  options: { tls_trust: all }     # for a self-signed / internal-CA server
+```
+
+### FTP / FTPS through an SSH bastion
+
+`sftp`, `db`, **and now `ftp`/`ftps`** honour the profile `tunnel:` block. FTP is the special case: it opens a
+**control** connection *and* separate **passive data** connections, so the bastion must carry both. Set
+`options.passive_ports` to the range the FTP server is configured to advertise (its `PassivePorts`) — each port
+is forwarded loopback→server over the bastion, and the client is told to dial the loopback (a passive
+NAT-workaround) instead of the server's advertised, unreachable address. Active mode can't traverse a tunnel, so
+a tunnelled FTP connection is always passive.
+
+```yaml
+connection:
+  id: partner_ftps_via_bastion
+  connector: ftps
+  host: ftps.internal.example.com     # only reachable from the bastion
+  username: inspecto
+  password: ${ENV:FTPS_PASSWORD}
+  options:
+    tls_trust: all
+    passive_ports: "30000-30009"      # MUST match the server's configured passive range
+  tunnel:
+    host: bastion.example.com
+    username: jump
+    password: ${ENV:BASTION_PASSWORD}
+    # known_hosts: /etc/inspecto/known_hosts   strict_host_key: true   # pin the bastion
+```
+
+> If you tunnel FTP **without** `passive_ports`, only the control channel is forwarded — data transfers will fail
+> unless the server's passive ports happen to be independently reachable from the Inspecto host (the connector
+> logs a warning). For a bastion-only server, always set `passive_ports`.
+
+### DB-export source (SQL → CSV)
+
+A `connector: db` profile turns a **database query** into an acquired file: the connector runs `options.query`
+against a JDBC database and materialises the result set as CSV, which then flows through the normal batch path.
+The PostgreSQL driver ships in the connectors module (default target), but the connector is JDBC-generic — any
+driver on the classpath works.
+
+```yaml
+connection:
+  id: cdr_export
+  connector: db
+  options:
+    jdbc_url: jdbc:postgresql://db.example.com:5432/warehouse   # or omit + set host/port/database
+    query: "SELECT * FROM cdr WHERE event_date = '{yyyy-MM-dd}'"  # {…} = a date pattern, resolved per run
+    export_name: "cdr_{yyyyMMdd}.csv"                              # stable per-slice name ⇒ dedup re-exports once
+    # driver: org.postgresql.Driver        # optional explicit driver class
+  username: warehouse_ro
+  password: ${ENV:WAREHOUSE_PW}
+  tunnel: { host: bastion.example.com, username: jump, password: ${ENV:BASTION_PW} }   # optional SSH tunnel to the DB
+```
+
+The date-templated `query`/`export_name` give idempotent **per-slice** export (each cycle exports a fresh slice;
+the marker/ledger dedup re-runs the same slice only once). It is a `STREAM`-only source — there's no source-side
+file to move/delete, so leave `collector.post_action` unset.
+
+#### Row-level incremental export (watermark)
+
+For a continuously-changing table, date-slicing is clumsy — you want "export only rows that changed since the last
+run." Set `watermark_column` and reference a `:watermark` placeholder in the query; the connector binds the stored
+watermark, exports only newer rows, and advances the watermark **after the batch commits** (so a crash mid-ingest
+re-exports the slice rather than skipping it — at-least-once / resumable):
+
+```yaml
+connection:
+  id: cdr_export
+  connector: db
+  options:
+    jdbc_url: jdbc:postgresql://db.example.com:5432/warehouse
+    query: "SELECT * FROM cdr WHERE updated_at > :watermark ORDER BY updated_at"  # :watermark = the bind placeholder
+    export_name: "cdr_{yyyyMMdd_HHmmss}.csv"     # keep a unique name per cycle (the rows differ each run)
+    watermark_column: updated_at                 # the result column whose max is tracked + bound; enables this mode
+    watermark_type: timestamp                    # string (default) | long | timestamp — bind precision + ordering
+    # watermark_initial: "1970-01-01 00:00:00"   # optional first-run lower bound (else a type floor ⇒ export all)
+```
+
+- The watermark is bound as a JDBC parameter (`:watermark` → `?`), so it is **SQL-injection-safe**; it composes with
+  the `{…}` date tokens (date tokens are literal substitution applied first, the watermark is a bind).
+- The new max is persisted per **connection-profile id** in the acquisition ledger DB
+  (`-Dacquire.ledger.backend=db`; the in-memory default is lost on restart). An empty result leaves the frontier
+  untouched.
+- **Gap-free only over an append-only / monotonic column** (the compare is strictly `>`). Prefer an ingestion
+  timestamp or sequence over an event-time column — a late, back-dated row whose timestamp is below the frontier
+  would be missed. This is orthogonal to the file-level `collector.incremental.watermark` (which can't help DB export,
+  since the export file's mtime is always "now") and needs no `collector.duplicate` mode.

@@ -10,70 +10,20 @@ timestamp: 2026-07-16T00:00:00Z
 # Data Acquisition & File Collection Requirements
 > **Deep reference — the detail tier.** Start at [Data Acquisition Framework](framework.md) for the summary; this page is the long form it points to. *(Moved from `docs/data_acquisition_framework.md` (docs consolidation, 2026-07-16).)*
 
-> **Status (2026-06-15): the framework is built — Phases A–F have all shipped on `master`.** *(⚠ do not restore a `4.x` attribution: that branch and its `v4.0.0`/`v4.0.0-RC1` tags were deleted 2026-08-17 — `docs/BRANCHING.md` §0-A.)* This document is the original
-> *requirement*; the as-built design + phase log live in
-> [`docs/archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md`](../../../archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md),
-> and the operator-facing config/runbook are in
+> **Status: the framework is built — Phases A–F have all shipped on `master`.** *(⚠ do not restore a `4.x`
+> attribution: that branch and its `v4.0.0`/`v4.0.0-RC1` tags were deleted 2026-08-17 — `docs/BRANCHING.md`
+> §0-A.)* This document is the original *requirement*, kept for the wording of its 14 numbered areas.
+> **What is built, what is left and what was refused is owned by the capability spec**
+> [Acquisition & connectivity (`ACQ`)](../../capabilities/acquisition/acquisition.md) — §2 for the
+> requirement-of-record table, §3 for the specification (connectors, schemes, watermarks, push discovery,
+> the `s3`/`azure`/`gcs`/`kafka`/`db` connectors), §5 for the unbuilt tail, §6 for the refusals (the
+> in-process NFS/SMB client is a **declined** design, not a pending one — mount the share and use `local`).
+> The per-phase delivery log this banner used to carry (2026-06-15 → 2026-07-22) collapsed into that spec on
+> 2026-09-08; the original phase roadmap is archived at
+> [`2026-06-14-data-acquisition-framework-roadmap.md`](../../../archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md),
+> and the operator-facing config/runbook are
 > [`configuration.md`](../config/configuration.md#data-acquisition--the-collector-block) and
-> [`integrations.md`](../integrations.md#remote-source-connectors-sftp--ftp--ftps).
-> **Delivered:** the `CollectorConnector` SPI (`com.gamma.acquire`) + local parity (A); readiness/stability gate (B);
-> fingerprint ledger + content dedup (C); collection-guarantee knob + sequence-gap→alert (D); **SFTP + FTP**
-> connectors in the optional `inspecto-connectors` module + connection profiles + integrity + `.bz2`/`.zip` (E);
-> retry/circuit-breaker/dead-letter + source-side post-actions + parallel fetch + rate limit (F).
-> **Plus (post-roadmap, 2026-06-15):** the **DB-export source** (`DbExportConnector`, scheme `db`) — runs a SQL
-> query against a JDBC database (Postgres driver bundled; JDBC-generic) and materialises the result as CSV, with
-> date-templated query/name and an optional SSH tunnel; and the **C4 incremental high-watermark**
-> (`source.incremental.watermark: last_modified`) — each scan skips files modified before the source's
-> high-watermark (max `last_modified` recorded in the fingerprint ledger), so remote sources spend no fetch
-> bandwidth re-collecting history; the **DB-export row-level watermark** (`options.watermark_column` +
-> a `:watermark` bind in the query) — resumable incremental export of only rows newer than the last *committed*
-> run (advances post-commit ⇒ at-least-once on crash), which the file-level C4 watermark can't do for DB sources;
-> and **connector hardening** — **FTPS** (`connector: ftps`, or
-> `options.tls: explicit|implicit`; encrypts control + data channels), **strict SSH host-key pinning**
-> (`options.host_key`/`known_hosts`/`strict_host_key`), and **FTP/FTPS through an SSH bastion**
-> (`tunnel:` + `options.passive_ports` for the passive data range) — so all of SFTP/FTP/FTPS/DB-export can
-> traverse a bastion.
-> **Shipped 2026-07-08 (ACQ-4/ACQ-7):** the **`s3` connector** — the S3 REST API spoken directly over the JDK
-> `HttpClient` with in-tree SigV4 signing (**no AWS SDK**; air-gap + SBOM preserved). One connector covers
-> AWS S3, MinIO, and any S3-compatible store (GCS interoperability mode included); path-style addressing.
-> Profile: `host`/`port` = endpoint, `username`/`password` = access/secret key (SecretResolver reference),
-> `base_path: bucket[/prefix]`, `options.region` (default `us-east-1`), `options.protocol: https|http`.
-> Listings carry each object's **ETag onto `RemoteFile.etag`**, so `source.duplicate.mode: etag` skips
-> unchanged objects **before** downloading; listed objects are atomic ⇒ readiness is always READY (no
-> stabilization pass). MOVE/RENAME = CopyObject+DeleteObject; TAG = PutObjectTagging.
-> **NFS/SMB/CIFS = OS-mounted shares** (see §1 note below) — no in-process protocol client, by design.
-> **Also shipped 2026-07-08 (ACQ-6):** push/event-driven discovery — **`POST /collectors/{id}/notify`**
-> (an S3 event notification, upload script, or upstream job triggers an immediate scan; v1 answers
-> `202 {runId}` + poll `Location`, gated on `canOperateRuns`, audited as `collector.notified`; a spurious
-> notify is harmless — the cycle's dedup/stability decide what ingests) and **`source.discovery: watch`**
-> (JDK `WatchService` on a local/mounted poll root; debounced ~1s via `-Dservice.watch.quiet.millis`;
-> the interval poll loop stays on as the backstop — watch narrows latency, it never carries correctness).
-> **Also shipped 2026-07-08 (ACQ-5):** the **`kafka` connector** — a Kafka topic consumed by a Collector. Each
-> scan cycle drains a partition's unconsumed backlog into a **virtual slice file**
-> (`<topic>-p<partition>-<from>-<to>.<ext>`) that flows through the normal batch path — the DB-export
-> virtual-file idiom applied to a stream, so **no core-engine change**. Offsets are **not** a broker consumer
-> group: the connector `assign()`+`seek()`s and the consumed frontier rides the **ledger watermark** (the
-> DB-export machinery), persisted only **after the batch commits** — a crash mid-ingest re-drains the slice
-> rather than skips it (at-least-once). Profile: `host`/`port` (or `options.bootstrap_servers`),
-> `options.topic` (required), optional `username`/`password` for SASL PLAIN
-> (`options.security_protocol`/`sasl_mechanism`), `options.start: earliest|latest` first-run position,
-> `options.max_records` per-partition cap, `options.payload: envelope|raw` (envelope = one JSON object per
-> record; raw = the value verbatim, for CSV-over-Kafka), `options.export_ext`, and `kafka.*` client
-> passthrough. `kafka-clients` (3.9.x, broker-compatible back to 2.1) is confined to `inspecto-connectors`;
-> the tests drive the in-jar `MockConsumer`, so the suite needs no broker.
-> **Also shipped 2026-07-08 (ACQ-4, second half):** the **`azure` connector** — Azure Blob Storage spoken
-> directly over the JDK `HttpClient` with in-tree **SharedKey** signing (**no Azure SDK**; the same
-> discipline as the s3 connector). Profile: `host`/`port` = the blob endpoint, `username` = storage
-> account, `password` = account key (SecretResolver reference), `base_path: container[/prefix]`,
-> `options.protocol: https|http` (http for a LAN Azurite). List Blobs pagination via `NextMarker`;
-> listing **Etags feed `RemoteFile.etag`** (ACQ-7 pre-fetch skip); blobs are atomic ⇒ readiness READY;
-> Range-resume fetch; MOVE/RENAME = Copy Blob + Delete guarded on `x-ms-copy-status: success` (a pending
-> copy never deletes the source); TAG = Set Blob Tags.
-> **GCS native** — `connector: gcs` (SDK-free, shipped 2026-07-22): the GCS JSON API + service-account
-> OAuth2 (RS256 JWT→bearer on JDK crypto, token cached per scan); Objects:list pagination, `generation` →
-> `RemoteFile.version`, TAG = custom object metadata PATCH. Distinct from the S3-interop path above (which
-> reaches GCS via HMAC keys). See `connectors.md`.
-> **Still future** (this SPI makes each non-disruptive): a presigned-URL / STS credential mode for s3.
+> [`connectors-runbook.md`](connectors-runbook.md#remote-connectors-sftp--ftp--ftps).
 
 **GOAL:**
 * **The system guarantees that every eligible data source file is collected exactly once (or according to policy), safely, efficiently, and recoverable regardless of where the file resides**

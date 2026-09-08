@@ -38,4 +38,4 @@ Start with the [Overview](overview.md) and [Architecture](architecture.md), then
   transport) and hosted model providers.
 * [Build & run](build-run/) - the verify loop, the DuckDB native-access flag, packaging, launch flags.
 * [Gotchas](gotchas/) - the expensive-to-rediscover cross-cutting pitfalls.
-* [Integrations](integrations.md) - acquisition connectors + DuckLake/warehouse touchpoints (moved from `docs/integrations.md`).
+* [DuckLake & warehouse](integrations.md) - registering output in a DuckLake catalog; the pg_duckdb warehouse query layer for DBeaver. (The remote-connector runbook that used to share this file is [acquisition/connectors-runbook.md](acquisition/connectors-runbook.md).)

@@ -166,8 +166,6 @@ const DOC_ALLOW = {
     // is headed **Selector** now — exactly the `raw.fields[].selector` it renders — so the doc describing it
     // no longer uses a reserved word and needs no allowance. Preferred outcome: an exemption records that a
     // banned word is tolerated somewhere, and every one of them is a small ongoing cost.
-    'docs/okf/backend/integrations.md::source-acquisition-entity':
-        'Sanctioned sense: "Remote Sources" are data origins (Stream/Reference axis, GLOSSARY §3), not collection tasks.',
     'docs/okf/backend/log.md::bare-flow':
         'Historical changelog: the entry records the `flow-graph`→`pipeline-graph` directory rename itself.',
 

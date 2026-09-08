@@ -10,4 +10,5 @@ plus the remote [connectors](../modules/connectors.md). All six roadmap phases (
 
 * [Framework](framework.md) - the poll cycle and phases A–F: discovery, stability gate, dedup/watermark ledgers, gap detection, retry + circuit breaker.
 * [Connectors](connectors.md) - the `CollectorConnector` SPI and its **eight** registered schemes (`sftp`, `ftp`, `ftps`, `db`, `s3`, `kafka`, `azure`, `gcs`), SSH tunnelling and proxy dial-through, connection profiles, secret resolution.
+* [Remote connectors — operator runbook](connectors-runbook.md) - copy-pasteable profiles, host-key pinning, FTPS, the bastion tunnel, DB export + watermark, and the `curl` verification sequence (split out of `integrations.md` 2026-09-08).
 * [Data-acquisition framework (full design)](data-acquisition-framework.md) - the complete framework doc (moved from `docs/data_acquisition_framework.md`).

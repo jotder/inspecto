@@ -390,7 +390,7 @@ interpretation (chosen join keys, KPI definition, sample rows) before applying. 
 
 **Output** lands as Hive-partitioned Parquet/CSV under `database/<source>/` (e.g.
 `.../year=2020/month=04/day=03/<table>_out.parquet`). Optionally registered into a DuckLake
-catalog — see [Integrations](../docs/integrations.md).
+catalog — see [Integrations](../docs/okf/backend/integrations.md).
 
 **Audit** is three-layered: a per-file status CSV (`status/<source>/`), a per-batch summary, and an
 input→output **lineage matrix** — all also queryable via the Control API (`/pipelines/{name}/files`,
@@ -432,7 +432,7 @@ This README is the overview + user guide. Detailed topics live under [`../docs/`
 | [Plugin Ingester](../docs/plugins.md) | The `StreamingFileIngester` interface, segment schemas, the `TypedRecordIngester` reference plugin |
 | [Operations](../docs/operations.md) | Pre-ETL utilities, batch processing & concurrency, multi-source orchestration, output structure, audit logs, deployment |
 | [Operator Console (Inspector)](../docs/operator-console.md) | The web UI: connecting with tokens, every screen, common operator tasks, dev vs. prod serving, troubleshooting |
-| [Integrations](../docs/integrations.md) | DuckLake registration and the pg_duckdb warehouse query layer |
+| [Integrations](../docs/okf/backend/integrations.md) | DuckLake registration and the pg_duckdb warehouse query layer |
 | [Troubleshooting](../docs/troubleshooting.md) | Common failures and fixes |
 | [v3 Architecture & Redesign](../docs/v3-architecture.md) | The 3.x assessment, gaps (G1–G10), and the Smart Config / agent / UI-ready redesign |
 | [v3 Agent MVP](../docs/v3-agent-mvp.md) | The assist-agent design: skills, model tiering, oracles, security guardrails, hardware profiles |
