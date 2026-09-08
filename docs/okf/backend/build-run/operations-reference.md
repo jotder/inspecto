@@ -402,6 +402,8 @@ and unversioned.
 | Method & path | Purpose |
 |---|---|
 | `GET /health`, `GET /ready` | liveness / readiness (open) |
+| `GET /health/details` | per-subsystem UP/DOWN/NOT_CONFIGURED (MNT-15) — **auth-gated**, not a public path (row added 2026-09-08) |
+| `GET /audit/search`, `GET /audit/export?format=csv` | the who-did-what trail, core in every edition since EDG-01 cell 6 (row added 2026-09-08; `okf/capabilities/observability/observability.md` §3.3) |
 | `GET /pipelines` | list pipelines + paused state + commit count |
 | `POST /pipelines` | body `{"configPath":"…"}` — register a new pipeline live from a config under `-Dassist.write.root`, no restart (v4.1) |
 | `POST /pipelines/{name}/trigger` | run one pipeline once |

@@ -152,14 +152,16 @@ AI-driven autonomy without redesign.
 | INV-3 | **Cases** grouping Incidents; RCA templates; correlation ids end-to-end | Must | SHIPPED | All |
 | INV-4 | Cross-studio bridges (e.g. geo co-location → graph dialog) | Could | SHIPPED | All |
 
-### 3.7 Observability & operations (OPS) — backend + UI Ops
+### 3.7 Observability & maintenance (OPS) — backend + the Ops Lens's data contracts
+
+> ⚠ **These rows now have an owner:** [`okf/capabilities/observability/observability.md`](okf/capabilities/observability/observability.md) §2 is the requirement-of-record for `OPS`, and it CORRECTS this table (`OPS-2`'s exposition has been gated since 2026-09-07; `OPS-3`'s log is append-only, not tamper-evident, and does not audit sign-ins; `OPS-4`'s "off by default" is true of the job-run projection only; `OPS-1`'s live tail is polling). Renamed from "Observability & operations" per `GLOSSARY.md` §14 — *Ops* is the Lens, `OPS` the capability. Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| OPS-1 | One **Signal** ledger; **Events**, Alerts, Notifications as *views* over it; live tail, saved views, CSV export | Must | SHIPPED (R4) | All |
-| OPS-2 | **Metrics** (Prometheus-compatible) — throughput, error rate, lag, run durations | Must | SHIPPED (`GET /metrics`, `MetricRegistry.scrape()`; deliberately an unauthenticated infra route) | S/E (decided 2026-09-02, EDITIONS CP-13 — ⚠ the code is core and **ungated in every bundle**; the gating is EDG-01 debt, so this is a stated product decision the code does not yet apply) |
-| OPS-3 | Three-layer audit: file/batch audit, provenance rows, immutable who-did-what **Audit Log** | Must | SHIPPED (actor attribution hardening on Standard — see SEC-7) | All |
-| OPS-4 | Durable Run reporting (success rate, p50/p95) | Should | SHIPPED (off by default) | All |
+| OPS-1 | One **Signal** ledger; **Events**, Alerts, Notifications as *views* over it; live tail, saved views, CSV export | Must | SHIPPED (R4) — ⚠ live tail is client **polling**; the SSE `GET /signals/stream` has no client (corrected 2026-09-08) | Recording **All**; the `/events*` feed **S/E** (`inspecto-events`, EDG-01 cell 6) |
+| OPS-2 | **Metrics** (Prometheus-compatible) — throughput, error rate, lag, run durations | Must | SHIPPED (`GET /metrics`, `MetricRegistry.scrape()`; deliberately an unauthenticated infra route — `PUBLIC_PATHS`) | S/E — ✅ **GATED since 2026-09-07** (EDG-01 cell 5: the exposition is `inspecto-metrics`, Personal answers `503`; `MetricRegistry` stays core). ~~the code is core and ungated in every bundle; the gating is EDG-01 debt~~ (stale until 2026-09-08). `GET /metrics/acquisition` (JSON, authenticated) stays core, All |
+| OPS-3 | Three-layer audit: file/batch audit, provenance rows, **append-only** who-did-what **Audit Log** | Must | SHIPPED (actor attribution hardening on Standard — see SEC-7). ⚠ Corrected 2026-09-08: append-only by construction, **not tamper-evident** (`compliance/controls-matrix.md` AU-9); **sign-ins are not audited** (mutations, exports and access-denied are); the CSV export is core `GET /audit/export` | All |
+| OPS-4 | Durable Run reporting (success rate, p50/p95) | Should | SHIPPED — ⚠ "off by default" is true of the **job-run DB projection only** (`-Djobs.backend` default `none`); the batch-audit report (`/status`, `/report`, p50/p95/p99) is always on over the `db` status store (corrected 2026-09-08) | All |
 | OPS-5 | Per-edge **Provenance** + conservation invariant → Alerts + Sankey overlay | Should | PARTIAL (built/tested; off by default; verified vs synthetic data only. Executable verification protocol signed 2026-07-08: `docs/ops/provenance-conservation-verification.md` — enable on a real feed, soak through natural variation, cross-check invariants against ground truth, log the outcome. Cannot close offline; needs the first live deployment to run it) | All |
 | OPS-6 | Record-level lineage & replay (per-record ancestry) | **Won't (now)** | — (per-batch ancestry is the accepted grain) | — |
 

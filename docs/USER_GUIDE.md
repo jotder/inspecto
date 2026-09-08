@@ -201,8 +201,9 @@ minimum severity, event type, Pipeline, and free text, cap the result count, and
 matching rows to CSV and save common filter combinations as reusable views. Click a row to see the
 full Signal (correlation id, type, severity, payload).
 
-**Audit log** — The immutable **who-did-what** trail: sign-ins, configuration changes, permission
-grants, exports. It answers accountability questions and is deliberately separate from **Events**:
+**Audit log** — The append-only **who-did-what** trail: configuration changes, permission
+grants, exports and refused attempts (sign-ins are *not* recorded — the trail covers what you *did*, not
+that you arrived; corrected 2026-09-08). It answers accountability questions and is deliberately separate from **Events**:
 Events records *system activity* (Signals), Audit records *human and access actions*. Entries can't
 be edited or deleted.
 

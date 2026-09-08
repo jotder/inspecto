@@ -63,8 +63,9 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   a recursive `children[]`; roots and children read oldest-first, orphans (cause outside the set) are
   surfaced as roots, cycles are broken (never loops). `correlationId` is **required** (400 otherwise —
   a tree without an anchor is an unbounded forest). Pure logic in `Signals.assembleTree` (engine);
-  the route just projects `SignalNode` → nested map. ⚠ No producer threads `causationId` yet, so trees
-  are flat (all roots) today — this is the HTTP peer of `signal_timeline` below, which does the same
+  the route just projects `SignalNode` → nested map. `JobService.emitSignal` threads `causationId` (the Signal
+  that triggered a Run; a mirror's root is deliberately `null`) — *(this said "no producer threads `causationId`
+  yet, so trees are flat" until 2026-09-08)*. This is the HTTP peer of `signal_timeline` below, which does the same
   causation assembly as a flat list. **Both share one engine primitive**: `signal_timeline` calls
   `Signals.causationOrder`, a depth-first (pre-order) flatten of the same `assembleTree` forest (dedup
   done 2026-07-22, `BACKLOG.md` §5).

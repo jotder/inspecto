@@ -566,7 +566,7 @@ C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 ## 8. Observability
 
 **Signal** — A lightweight **emitted fact** — it *announces, never decides* (the Signal network,
-okf/living-operational-system, The thesis). One envelope `{ signalId, type, at, source, correlationId, severity?, payload }`
+okf/living-operational-system, The thesis). One envelope — as built, the 13-field `Signal` record `{ signalId, type, at, severity, source, subject, correlationId, causationId, space, actor, message, payload, schemaVersion }` (`okf/capabilities/observability/observability.md` §3.1; this entry showed the seven-field design sketch until 2026-09-08)
 where `source` is a metadata **Ref** (`rel:'emits'`) to the producer. Every run, job, Alert Rule firing, failed
 Expectation, Decision Consequence and operator action emits one, to a single **signal ledger**. **Event, Alert and
 Notification are *views* over this one ledger, not parallel stores** (unified in R4). ⚠️ §6-proposed → **binding**.
@@ -651,7 +651,7 @@ Tag Rule / Case Rule).
 **Diagnosis** — An AI-assisted root-cause analysis of a failing Run or Collector that produces an **Incident** with
 a suggested fix.
 
-**Audit Log** — The immutable *who-did-what* trail (logins, config changes, permission grants, data exports).
+**Audit Log** — The append-only *who-did-what* trail (config changes, permission grants, data exports, refused attempts — *not* logins, and not tamper-evident; `okf/capabilities/observability/observability.md` §3.3).
 **Distinct** from the operational Event stream.
 
 ---

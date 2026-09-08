@@ -2,7 +2,8 @@
 
 **Scope:** per-space config (and optionally DuckDB) backup, verification, and restore — including
 restore-into-a-new-space. Everything here runs through the `maintenance` Job Type; no shell scripts.
-Plan of record: `docs/superpower/system-maintenance-plan.md`.
+Plan of record (archived): `docs/archived-documents/plans-archive/system-maintenance-plan.md`; requirement of record:
+`docs/okf/capabilities/observability/observability.md` §3.6.
 
 ## ⚠ Edition — Standard and above only (since 2026-09-07)
 
