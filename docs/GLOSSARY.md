@@ -80,7 +80,7 @@ are granted within them) but are enforced server-side, unlike Lenses. **Data-def
 (2026-07-23):** the role → Capability/data-scope table is a per-space `roles.toon` settings doc
 (`GET/PUT /access/roles`) overlaying a shipped seed — role *assignment* stays in the IdP (claims);
 only the *definitions* are authorable. Enforcement stays out of the auth-free core.
-*(Added 2026-07-03; design: `superpower/rbac-groundwork.md`.)*
+*(Added 2026-07-03; provenance: `archived-documents/plans-archive/rbac-groundwork.md`; decisions of record: `okf/capabilities/security/security.md` §4.)*
 
 **Capability** — One named authorization question the UI gates on (e.g. `canAuthorWorkbench`,
 `canOperateRuns`, `canTriageRequirements` — `LensService`). The **seam between Lens and Role**: in the
@@ -90,8 +90,8 @@ never on Lens identity. *(Added 2026-07-03.)*
 
 **Access Catalog** — The canonical tree of gateable surface: menu groups → panes → functionalities
 (action nodes, each bound to exactly one Capability). Derived from the navigation config + the Capability
-seam; persisted per Space (`access-catalog` component kind). *(Added 2026-07-14; design:
-`superpower/lens-access-config-design.md`.)*
+seam; persisted per Space (`access-catalog` component kind). *(Added 2026-07-14; provenance:
+`archived-documents/plans-archive/lens-access-config-design.md`; as-built: `okf/capabilities/security/security.md` §3.7.)*
 
 **Access Profile** — One subject's sparse **Grant** map over the Access Catalog; `subjectType` is `lens`
 today (Builder/Ops/Business visibility shaping) and `role` under RBAC — same document, same editor, only

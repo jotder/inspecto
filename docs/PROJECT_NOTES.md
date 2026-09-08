@@ -98,7 +98,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 - **All auth removed from `master`/common core (2026-06-16).** Personal is genuinely auth-free (every
   ControlApi route open; SPA boots to `/dashboard`; no token paste/guards). Standard re-adds auth out-of-band
   via the **`inspecto-security` module (BUILT, W6 2026-07-06** — `OidcAuthenticator` Nimbus+JWKS, `RoleMapper`,
-  `KeycloakTokenRelay`; reactor-gated behind the `edition-standard` profile) behind the
+  `OidcTokenRelay` (renamed from `KeycloakTokenRelay` 2026-07-25, D15); reactor-gated behind the `edition-standard` profile) behind the
   `Authenticator`/`Subject`/`TokenRelay` SPIs (`com.gamma.control`), plus HTTPS (`HttpsServer`) and the BFF
   `/auth/exchange|refresh|logout` routes; Angular uses OIDC Auth-Code+PKCE driven by `bootstrap.features.authMode`
   (no-op on Personal). **The `-Dassist.write.root` 503 write-gate is SEPARATE from auth and stays.**

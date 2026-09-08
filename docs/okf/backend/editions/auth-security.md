@@ -16,8 +16,8 @@ is no token paste / guard / interceptor. The removed hand-rolled bearer-token pl
 
 **Standard re-adds auth via SPIs + the shipped `inspecto-security` module.** The core defines three SPIs in
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
-`id` + capabilities), and **`TokenRelay`**. `inspecto-security/` (artifactId `inspecto-security`, 41
-tests) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
+`id` + capabilities), and **`TokenRelay`**. `inspecto-security/` (artifactId `inspecto-security`, **34**
+tests — measured 2026-09-08: 24 + 7 + 3; an earlier "41" was never true of the tree) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
 `OidcTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
 build never compiles it (verify with `-Pedition-standard`); because it's a
 [build flavor](editions-model.md), the core still carries zero auth code.
@@ -269,7 +269,7 @@ Three things a future change must not undo:
 Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): a policy-**authoring** UX beyond
 TOON+validation (a matrix/create editor — the read-only visibility + explain above shipped, authoring did
 not); X-Actor is already rejected on Standard (the SEC-7a spoof guard), so only its full removal remains,
-client-migration-gated with the API-v1 legacy sunset.
+gated on **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset apparatus this used to cite was deleted 2026-07-25). The capability spec [`okf/capabilities/security/security.md`](../../capabilities/security/security.md) is the front door for what was required, left and refused; this page stays the mechanism.
 
 `package.ps1 -Edition Enterprise` **shipped 2026-07-25** — a superset of Standard (both the `security` and
 `policy` jars are bundled), with `serve.sh`/`serve.bat` deriving the edition from bundle contents. No

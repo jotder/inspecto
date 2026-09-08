@@ -36,7 +36,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `SPC` | Spaces & tenancy | `spaces/` | planned |
 | `MET` | Component metamodel & Catalog | `metamodel/` | planned |
 | `API` | Control API | `control-api/` | planned |
-| `SEC` | Security | `security/` | planned |
+| `SEC` | [Security](security/security.md) | `security/` | ✅ **area #2 — 2026-09-08** |
 | `AGT` · `EOI` | Assistant | `assistant/` | planned — one spec for both ID ranges |
 | `UI` | Surfaces & Lenses | `surfaces/` | planned |
 | `PKG` | Editions & packaging | `editions/` | planned — ⚠ must absorb the design in `superpower/deployment-topology-plan.md` before that plan can move (plan §5.10) |

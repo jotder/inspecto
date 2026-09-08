@@ -42,7 +42,7 @@ now headed by what was actually delivered. **§3.4–§3.5 remain the live NEXT 
 ### 3.1 `inspecto-security` module — Standard edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**
 
 > **Delivered.** `inspecto-security/` implements the core `Authenticator` / `Subject` / `TokenRelay` SPIs —
-> `OidcAuthenticator` (Nimbus JOSE+JWT, JWKS-validated), `RoleMapper`, `KeycloakTokenRelay` — joining the
+> `OidcAuthenticator` (Nimbus JOSE+JWT, JWKS-validated), `RoleMapper`, `OidcTokenRelay` (renamed 2026-07-25, D15: no vendor of record) — joining the
 > reactor only under the `edition-standard` Maven profile. The browser never holds tokens (BFF exchange +
 > httpOnly `inspecto_rt` cookie with an `Origin` CSRF check); HTTPS is served by the pure-JDK `HttpsServer`.
 > **RBAC/ABAC completed 2026-07-24:** data-driven roles + a capability manifest, Access-Profile enforcement,
