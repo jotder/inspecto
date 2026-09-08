@@ -65,7 +65,9 @@ paid for violating them.
     pilot), [`SEC`](okf/capabilities/security/security.md), [`INC`](okf/capabilities/incidents/incidents.md) and
     [`API`](okf/capabilities/control-api/control-api.md), [`SPC`](okf/capabilities/spaces/spaces.md),
     [`MET`](okf/capabilities/metamodel/metamodel.md), [`DAT`](okf/capabilities/data-plane/data-plane.md),
-    [`ING`](okf/capabilities/ingestion/ingestion.md), [`OPS`](okf/capabilities/observability/observability.md); the other eight slots are named in
+    [`ING`](okf/capabilities/ingestion/ingestion.md), [`OPS`](okf/capabilities/observability/observability.md),
+    [`Studio`](okf/capabilities/studio/studio.md) (`BI`+`INV`),
+    [`Assistant`](okf/capabilities/assistant/assistant.md) (`AGT`+`EOI`); the other six slots are named in
     `GLOSSARY.md` §14 and sized in [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.

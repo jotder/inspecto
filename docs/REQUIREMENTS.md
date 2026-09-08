@@ -235,19 +235,25 @@ AI-driven autonomy without redesign.
 | SEC-8 | Secrets: env/file/keystore; Vault option future | Should | 🟡 PARTIAL by design — the Vault half is unbuilt (built half 2026-09-06, EDITIONS SEC-07: `SecretsProvider` SPI in the core `inspecto-acquire`; `${ENV}`/`${SYS}` resolve in **every** edition, `${FILE}`/`${KEYSTORE:alias}` (JCEKS) arrive by ServiceLoader from `inspecto-security`, which only `package.ps1 -Edition Standard\|Enterprise` bundles; a Personal bundle **refuses** those two schemes with an edition-naming message, never a silent null. Vault/cloud-KMS unbuilt — Enterprise-only, gated on a client policy (D4)) | All (`${ENV}`/`${SYS}`) · S/E (`${FILE}`/`${KEYSTORE}`) · E (Vault/KMS, unbuilt) |
 | SEC-9 | Write-root gate (`-Dassist.write.root` → 503 fail-closed) — separate from auth, always on | Must | SHIPPED | All |
 
-### 3.13 Assistant & embedded intelligence (AGT)
+### 3.13 Assistant (AGT)
+
+> ⚠ **These rows now have an owner:** [`okf/capabilities/assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §2 is the requirement-of-record for `AGT`+`EOI` (ONE capability — `GLOSSARY.md` §14), and it CORRECTS this table.
+>
+> 🔴 **Read its §3.10 before reading any Edition cell below as a promise.** `inspecto-agent`, `inspecto-agent-hosted` and `inspecto-intelligence` are **never bundled** (`EDITIONS.md` `CP-14`; `okf/backend/build-run/build-test.md`), so `/assist/*` and `/agent/*` answer **503 in every artifact `package.ps1` produces**. SHIPPED here means *built and tested in the reactor*, not reachable by an operator — and that is the intended default (`BACKLOG.md` `PKG-5`).
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| AGT-1 | **Assistant** skills (7, read-only/draft-only, abstain-only escalation): diagnose, explain, KPI→SQL, NL→schedule, report narrative/SQL, suggest config | Must | SHIPPED | All |
-| AGT-2 | Pluggable model transport: **eoiagent** gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | SHIPPED | All |
-| AGT-3 | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds (`EgressGuardTest` invariant) | Must | SHIPPED | All |
-| AGT-4 | Model Settings pane + per-tier connectivity probes | Should | SHIPPED | All |
-| AGT-5 | **Embedded intelligence** (`inspecto-intelligence` module): ContextBroker grounding, tool belt L0–L3, autonomy ladder (Explain → Draft → Act-with-approval → bounded autonomy) | Should | SHIPPED — P0 2026-07-07 (sign-off given), **P1–P5 COMPLETE 2026-07-21** (+ polish); as-built in `okf/backend/agent/embedded-intelligence.md`, follow-ons in `BACKLOG.md` §2 | All (L3 = S+, opt-in) |
-| AGT-6a | **AI behind every screen** — inline natural-language authoring on every console pane, reusing the shipped L1 draft tools (no new backend capability) | Should | PLANNED — **scoped 2026-07-25** (`superpower/agt-6-plan.md` §3); ready to schedule pending D1–D4 | All |
+| AGT-1 | **Assistant** skills (7, read-only/draft-only, abstain-only escalation): diagnose, explain, KPI→SQL, NL→schedule, report narrative/SQL, suggest config | Must | SHIPPED — built and tested; ⚠ **not bundled** | 🔴 **none** — `CP-14`; the `All` here was wrong (corrected 2026-09-08) |
+| AGT-2 | Pluggable model transport: **eoiagent** gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | SHIPPED — built and tested | 🔴 **none** — `CP-14` (corrected 2026-09-08) |
+| AGT-3 | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds (`EgressGuardTest` invariant) | Must | SHIPPED | All — ⚠ vacuously: the guarantee is that code is ABSENT, and in a stock bundle the whole layer is absent (`CP-14`) |
+| AGT-4 | Model Settings pane + per-tier connectivity probes | Should | SHIPPED — the pane ships in the SPA; what it configures does not | 🔴 **none** — `CP-14` (corrected 2026-09-08) |
+| AGT-5 | **Embedded intelligence** (`inspecto-intelligence` module): ContextBroker grounding, tool belt L0–L3, autonomy ladder (Explain → Draft → Act-with-approval → bounded autonomy) | Should | SHIPPED — P0 2026-07-07 (sign-off given), **P1–P5 COMPLETE 2026-07-21** (+ polish); as-built in `okf/backend/agent/embedded-intelligence.md`, follow-ons in `BACKLOG.md` §2 | 🔴 **none** — `CP-14` (corrected 2026-09-08). ⚠ "L3 = S+" is a paper designation: L3 is a `-D` switch (`-Dintelligence.opsmonitor.enabled`, default off), the very mechanism EDG-01 rejected for edition boundaries; nothing in code edition-gates it |
+| AGT-6a | **AI behind every screen** — inline natural-language authoring on every console pane, reusing the shipped L1 draft tools (no new backend capability) | Should | PLANNED — **scoped 2026-07-25** (`superpower/agt-6-plan.md` §3); ~~ready to schedule pending D1–D4~~ — ⚠ **corrected 2026-09-08: `superpower/agt-6-plan.md` records D1–D4 + D8–D11 ANSWERED and phases A1–A5 SHIPPED** (six draft tools live on five panes, the glossary component on twelve); the plan stays open only for the `kpi_report_builder` host | All |
 | AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) beyond the code-defined seeded runbooks | Could | PLANNED — demand-gated (`superpower/agt-6-plan.md` §4); upstream prerequisite = the eoiagent per-tool `DryRunProvider` seam | All (L3 = S+, opt-in) |
 
-### 3.14 Agentic framework as a product (EOI) — eoiagent, separate repo
+### 3.14 Assistant: the agent runtime (EOI) — upstream repo `jotder/inspect-agent`, product name *eoiagent*
+
+> ⚠ **Owned by [`okf/capabilities/assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §2** — `EOI` is not a separate area; its rows are the Assistant's runtime (`GLOSSARY.md` §14). ⚠ The upstream **repository** is `jotder/inspect-agent`; *eoiagent* is the product name and Maven groupId. `okf/agentic/` still points at a local sandbox path that does not exist.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
@@ -257,7 +263,7 @@ AI-driven autonomy without redesign.
 | EOI-4 | Audit trail + observability of agent decisions | Must | SHIPPED | — |
 | EOI-5 | Core vs **application-pack** split (host apps ship packs; core stays generic) | Must | SHIPPED | — |
 | EOI-6 | Eval harness for skill/orchestration regression | Should | SHIPPED | — |
-| EOI-7 | Cut a **0.1.0 release** + publish artifacts (today: `0.1.0-SNAPSHOT`, local-`.m2`/source-build only; Inspecto CI builds it from source) | **Must** | PARTIAL (2026-07-08: **(a) cut + pinned** — `v0.1.0` tagged on eoiagent `main`, trunk bumped to `0.2.0-SNAPSHOT`, released jars in local `.m2`; both Inspecto agent poms pin `eoiagent.version 0.1.0` (no SNAPSHOT anywhere), reactor green; reproduce with `git checkout v0.1.0 && mvn -o clean install`. Remaining: **(b) publish** — the registry decision (Nexus? GitHub Packages?), infra/product call) | — |
+| EOI-7 | Cut a **0.1.0 release** + publish artifacts (today: `0.1.0-SNAPSHOT`, local-`.m2`/source-build only; Inspecto CI builds it from source) | **Must** | PARTIAL (2026-07-08: **(a) cut + pinned** — `v0.1.0` tagged on eoiagent `main`, trunk bumped to `0.2.0-SNAPSHOT`, released jars in local `.m2`; both Inspecto agent poms pin `eoiagent.version 0.1.0` (~~no SNAPSHOT anywhere~~ — 🔴 **FALSE as of 2026-09-08: the reactor's PARENT pom pins `<eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>`** (not the two agent poms), and CI clones `jotder/inspect-agent` and rebuilds it from the branch head on every run, so the build is not reproducible from published artifacts — which is exactly what (b) was for), reactor green; reproduce with `git checkout v0.1.0 && mvn -o clean install`. Remaining: **(b) publish** — the registry decision (Nexus? GitHub Packages?), infra/product call) | — |
 
 ### 3.15 Operator console UX (UI)
 

@@ -10,5 +10,5 @@ timestamp: 2026-06-28T00:00:00Z
 # Model Settings
 
 Route `/model-settings` (Settings nav group). Configures the AI model / provider used by the
-[assistant](assist.md) and AI-backed features. Backed by `ConfigService`. When AI is disabled the backend
+[assistant](assist.md) and AI-backed features. Backed by `AssistService` (⚠ this said `ConfigService` until 2026-09-08; no such wiring exists). When AI is disabled the backend
 returns a per-screen `503` (not backend-down) — see [errors & connectivity](../conventions/errors-and-connectivity.md).

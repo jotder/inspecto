@@ -11,6 +11,12 @@ timestamp: 2026-06-28T00:00:00Z
 
 The assist surface is an SPI in the core, implemented by the optional [agent module](../modules/agent.md).
 
+> 🔴 **No bundle ships that implementor.** `inspecto-agent` is a plain reactor module that
+> `package.ps1` never copies, so `/assist/*` answers **503 in every artifact** — the intended default
+> (`EDITIONS.md` `CP-14`, [`build-test.md`](../build-run/build-test.md), `BACKLOG.md` `PKG-5`). Using the
+> Assistant means building and placing the jar by hand. Requirement-of-record:
+> [Assistant capability spec](../../capabilities/assistant/assistant.md) §3.10.
+
 * **SPI** — `AssistAgent` (`inspecto/src/main/java/com/gamma/assist/spi/AssistAgent.java`), discovered via
   `ServiceLoader`. When no provider is present the assist routes degrade gracefully.
 * **Implementation** — `UccAssistAgent` (`inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`)
