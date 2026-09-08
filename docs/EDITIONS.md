@@ -153,9 +153,9 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | SCH-03 | Field classification metadata (PII / INTERNAL) | ✅ | ✅ | ✅ | metadata only — no edition enforces masking on it (see SEC-08) |
 | XFM-04 | Decision Rules (space-registry, rule-routed outputs) | ✅ | ✅ | ✅ | keep a pipeline on the flat lane when they route rows |
 | OUT-04 | Auto-chunking of huge files, DuckDB scratch/memory tuning | ✅ | ✅ | ✅ | |
-| JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `recon.run`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F |
+| JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `recon.run`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F. ⚠ **`caserule.evaluate` and `objects.analytics` are `inspecto-ops` Job Types (EDG-01 cell 7) — unknown on Personal**; the framework cell stays ✅ (corrected 2026-09-08, `okf/capabilities/incidents/incidents.md` §2) |
 | JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | ✅ | ✅ | ✅ | |
-| JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | ✅ | ✅ | ✅ | `event_prune` added 2026-09-02 (COMPLY-3) |
+| JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | ✅ | ✅ | ✅ | `event_prune` added 2026-09-02 (COMPLY-3). ⚠ **`incident_purge` is an `inspecto-ops` task (EDG-01 cell 7) — unknown on Personal**; backup/restore/verify are `inspecto-backup` (cell 2), also not Personal (corrected 2026-09-08) |
 | JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | |
 
 ### Step Processors (one row per processor; the board's authoring surface)

@@ -733,28 +733,32 @@ richer lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` (ac
 `/objects/{id}/transition` route:
 
 ```bash
-# create an issue with a 2-hour SLA (dueInMinutes; or pass an absolute dueAt in epoch millis)
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects \
-  -d '{"title":"reconcile mismatch on pipeX","severity":"HIGH","assignee":"alice","priority":"P1","dueInMinutes":120}'
-# walk the lifecycle
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"assign","actor":"alice"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"start"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"resolve"}'
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects?type=ISSUE&status=IN_PROGRESS"
+# create an Incident with a 2-hour SLA (dueInMinutes; or pass an absolute dueAt in epoch millis).
+# Standard/Enterprise only — the object routes are the inspecto-ops module and 503 on Personal.
+# title + at least one link are mandatory (create contract, 2026-07-22).
+curl -s -X POST localhost:8080/api/v1/objects \
+  -d '{"type":"INCIDENT","title":"reconcile mismatch on pipeX","priority":"MAJOR","assignee":"alice","dueInMinutes":120,"links":[{"to":"<alert-or-run-id>","relationship":"RELATED_TO"}]}'
+# walk the lifecycle: IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED (assign never moves status)
+curl -s -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"accept"}'
+curl -s -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"resolve"}'   # 422 until the postmortem has timeline + cause analysis + corrective action and dueAt (I1)
+curl -s "localhost:8080/api/v1/objects?type=INCIDENT&status=DIAGNOSING"
 ```
 
-**SLA tracking** is opt-in per issue: set `dueAt` (epoch millis) or `dueInMinutes` at creation. A
-scheduled sweep then breaches any issue that passes its deadline while still being worked (i.e. not
-yet `RESOLVED`/`CLOSED`); each breach stamps a `slaBreachedAt` marker on the object (so it fires once)
+*(Rewritten 2026-09-08: the block used the retired words `issue`/`ISSUE`, the retired `assign` → `start`
+transitions, and `Authorization: Bearer secret` — the token plane was removed 2026-06-16; under Standard the
+header is a real OIDC bearer.)*
+
+**SLA tracking** is opt-in per Incident: set `dueAt` (epoch millis) or `dueInMinutes` at creation. A
+scheduled sweep then breaches any Incident that passes its deadline while still being worked (i.e. not
+yet `RESOLVED`/`ARCHIVED`); each breach stamps a `slaBreachedAt` marker on the object (so it fires once)
 and emits an **`OBJECT_SLA_BREACH`** event into the event log, where it surfaces in `/events`
-alongside the issue's activity. The cadence is `-Dobjects.sla.sweep.seconds` (default `60`; set `0`
+alongside the Incident's activity; an `*_escalation.toon` policy, if present, is applied on breach. The cadence is `-Dobjects.sla.sweep.seconds` (default `60`; set `0`
 to disable):
 
 ```bash
-java -cp inspecto.jar com.gamma.control.ControlApi \
-     -Dcontrol.token=secret -Dobjects.sla.sweep.seconds=30 config/
+java -cp inspecto.jar com.gamma.control.ControlApi -Dobjects.sla.sweep.seconds=30 config/
 # find breached incidents via the event feed (Standard and above: optional inspecto-events module)
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_SLA_BREACH"
+curl -s "localhost:8080/api/v1/events/search?type=OBJECT_SLA_BREACH"
 ```
 
 ### Case Management (Phase 4) — correlation links & graph

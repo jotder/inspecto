@@ -32,7 +32,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `DAT` | Data plane | `data-plane/` | planned |
 | `BI` · `INV` | Studio | `studio/` | planned — one spec for both ID ranges |
 | `OPS` | Observability & maintenance | `observability/` | planned |
-| `INC` | Alerts & Incidents | `incidents/` | planned — 🔴 no dedicated backend concept file exists today |
+| `INC` | [Alerts & Incidents](incidents/incidents.md) | `incidents/` | ✅ **area #3 — 2026-09-08** (🔴 the backend objects domain still has no concept file — §7 gap row) |
 | `SPC` | Spaces & tenancy | `spaces/` | planned |
 | `MET` | Component metamodel & Catalog | `metamodel/` | planned |
 | `API` | Control API | `control-api/` | planned |

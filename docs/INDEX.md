@@ -62,7 +62,7 @@ paid for violating them.
     built · what is left · what was refused*. The four parts below answer only the second of those,
     and answer it by CODE LAYER — which is why "consignment" could appear in 48 current-tier docs
     with none of them being its entry point. Built: [`ACQ`](okf/capabilities/acquisition/acquisition.md) (the
-    pilot) and [`SEC`](okf/capabilities/security/security.md); the other fifteen slots are named in
+    pilot), [`SEC`](okf/capabilities/security/security.md) and [`INC`](okf/capabilities/incidents/incidents.md); the other fourteen slots are named in
     `GLOSSARY.md` §14 and sized in [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.

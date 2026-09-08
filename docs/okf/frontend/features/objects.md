@@ -23,7 +23,8 @@ the real ControlApi.
   ladder Critical · Major · Minor · Low. The UI reads **`GET /workflows/{type}`** (BFS-ordered states)
   instead of hardcoding transitions, so TOON-overridden workflows drive the same panes. Resolve requires
   a resolution comment; a soft resolution-readiness warn checks timeline/cause-analysis/corrective
-  actions (backend workflow guard is a documented follow-up).
+  actions — a *mirror* of the **server-side hard gate** (I1, 2026-07-24: `ObjectService.commit` rejects
+  `INCIDENT → RESOLVED` with the same four checks; this line called it "a documented follow-up" until 2026-09-08).
 * **Create contract (product sign-off + enforced 2026-07-22)** — assignment is **direct**: an `assignee`,
   optional at creation, settable at triage; queue-based routing is deferred (no multi-analyst consumer yet).
   Mandatory at creation: **title** (400) **+ at least one linked entity** (a case/incident with nothing
@@ -97,7 +98,7 @@ the real ControlApi.
     lossy for zero reuse.
   * ⚠ **That canonical-frontend-shape choice is paid for by a hand-kept backend mirror, so it is pinned by
     a cross-language contract test** (2026-08-15, the `MeasureCompiler.AGGS` idiom). One committed
-    artifact, `inspecto/contracts/attribute-spec.contract.json`, is compared by `FindingsSpecContractTest`
+    artifact, `inspecto-ui/src/app/inspecto/contracts/attribute-spec.contract.json`, is compared by `FindingsSpecContractTest`
     (Java) and `attribute-spec.contract.spec.ts` (TS), so neither side moves alone. Drift used to be
     silent in the worse direction: a type added only in TypeScript makes the server **422 a section the
     renderer could have drawn**, with an error naming a control the author's own form offers. The unions

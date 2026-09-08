@@ -219,14 +219,14 @@ rule (metric, comparator, threshold, window, severity, optional Pipeline scope),
 it, and **Evaluate now** to sweep the armed rules on demand. Alerts are a common trigger for
 raising an **Incident**.
 
-**Incidents** — Tracked operational problems with a lifecycle: **open → in-progress → resolved**.
+**Incidents** — Tracked operational problems with a lifecycle: **Identified → Diagnosing → Resolved → Archived** (reopen returns a Resolved/Archived Incident to Diagnosing). Standard and Enterprise editions; a Personal build hides the Incidents and Case Manager screens.
 An Incident can be raised automatically by an Alert or a Diagnosis, or created by hand. Open one to
 update its status, add notes, and record the resolution. Incidents are the unit of "something is
 wrong and we're on it."
 
 **Cases** — A **Case** groups related Incidents into one larger investigation with a shared
 narrative and resolution — useful when several Incidents turn out to be facets of the same
-underlying problem. Cases and Incidents share the same working surface (the same list-and-detail
+underlying problem. Cases and Incidents share the same working surface (the same mail-like three-pane
 pattern), just at different granularity.
 
 ---

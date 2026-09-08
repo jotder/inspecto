@@ -281,7 +281,7 @@ a test that post-dates it. What is left is one release-gated wire change.)*
   session" for two months over a pane that shipped 2026-07-07). An authority note now says `EDITIONS.md`'s matrix
   wins for the Edition column. Still open, same root cause — the column predates the 2026-09-02 "not for Personal"
   decisions: ~~SEC-8~~ (reconciled 2026-09-08 — `okf/capabilities/security/security.md` §2 owns the row),
-  **OPS-2**, **INC-3**, **INV-2** (all say `All`; EDITIONS gates them Standard+), and **DAT-6** wants a caveat that
+  **OPS-2**, **INV-2** (both say `All`; EDITIONS gates them Standard+; ~~INC-2/3/4~~ reconciled 2026-09-08 — `okf/capabilities/incidents/incidents.md` §2 owns those rows), and **DAT-6** wants a caveat that
   the multi-user half is unbuilt. ⚠ ACQ-4's *other* half is unresolved and needs grounding, not a doc edit:
   EDITIONS' generated board marks `SP-ACQ-06`/`SP-ACQ-08` (S3/GCS) planned while the **connectors** ship with tests
   — check whether the *Step processor* exists before flipping `ProcessorCatalog`, because a connector is not a Step.

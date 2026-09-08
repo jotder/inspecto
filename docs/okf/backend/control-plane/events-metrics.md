@@ -52,8 +52,9 @@ timestamp: 2026-07-16T00:00:00Z
   `deliver(n)` for impls that resolve their destination from `notify.*` flags instead). A `kind` with no
   matching transport, or a disabled destination, delivers nothing. **Still open**: `ChannelConfig` has
   no `template` field, so a persisted channel can't override the rule-level `NotificationTemplate` — that
-  rides the notification-templating slice of the in-flight Signal Backbone plan
-  (`docs/superpower/event-signal-backbone-plan.md` S2), not this seam.
+  was scoped as the notification-templating slice (S2) of the Signal Backbone plan, now archived
+  (`docs/archived-documents/plans-archive/event-signal-backbone-plan.md`) with that slice unbuilt and no board row —
+  recorded as `UNTRACKED` in `okf/capabilities/incidents/incidents.md` §5 (2026-09-08).
 * **`AuditTrail`** — a central interceptor in `ControlApi.dispatch` records every successful
   state-changing request plus non-GET forbidden-route attempts (actor/action/target, secret
   scrubbing, immutable store). One seam covers all routes; 405 immutability is inherent to dispatch.
