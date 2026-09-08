@@ -198,6 +198,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   never through aggregation, and `asn-parser/asn-decoders/pom.xml` is a separate root the reactor merely
   aggregates. A tenth of the codebase sat outside a "repo-wide" number while `mvn -Pcoverage` exited 0.
 
+  ⚠ **`node tools/check-sbom-modules.mjs` joined 2026-09-09** (`f2eaeec8`), bringing `ci.yml` to **six**
+  pure-Node guards that run before the JDK is even set up, plus the two Maven-dependent ones above. It
+  holds the shipped bill of materials' first-party module set against `inspecto/package.ps1` — which
+  enumerates the staged jars **three** times (`$modules`, the `Copy-Item` staging steps, the boot-smoke
+  classpath) — and fails if any two disagree. It exists because the generator's table said four artifacts
+  while the bundle carried ten or eleven, for a document that ships **inside** the signed, checksummed
+  archive. ⛔ There is **no `node --test` anywhere in this repo**: a tooling check is a `tools/check-*.mjs`
+  script that exits non-zero and is wired as a `ci.yml` step. Anything else runs nowhere.
+
 - **A guard, hook or reminder that never reaches anyone looks identical to one with nothing to say.**
   Three instances, all 2026-08-26: the committed-secret guard ran only in CI, i.e. only *after* a push
   had already made the secret public; the `PreCompact` hook emitted an invalid shape

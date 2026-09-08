@@ -554,8 +554,9 @@ citations elsewhere in this spec still resolve.
    generator**. Closed by moving the set into `tools/bundle-modules.mjs` and adding the CI guard
    `tools/check-sbom-modules.mjs`, which holds it against the packaging script's three enumerations; a
    duplicate driver component, invalid under both schemas, was fixed in the same pass.
-   🔴 **What remains, and is not the same defect:** generating the document at all requires the reactor to
-   be **installed** in the local repository, because the build tool will not resolve a sibling module from a
+   🔴 **What remains, and is not the same defect — now tracked as `SBOM-RESOLVE-1` (`BACKLOG.md` §4, P1),
+   so this item is no longer `UNTRACKED`:** generating the document at all requires the reactor to be
+   **installed** in the local repository, because the build tool will not resolve a sibling module from a
    jar built in an earlier invocation. The release pipeline installs only the agent dependency. Enterprise
    fails first — the policy module's cell-7 test-scoped edge to the operational-objects module must resolve
    even though the document lists runtime scope only — and on a clean runner every edition would. Either the
