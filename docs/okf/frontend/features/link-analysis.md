@@ -36,6 +36,10 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   * *Algorithm library* — `pageRank`, closeness/eigenvector/katz centrality, `hits`, `kCore`,
     `triangleCount`, `cliques` (Bron–Kerbosch), `maxFlow`+min-cut (Edmonds–Karp),
     `maximumSpanningForest`, `jaccardSimilarity`, `linkPrediction`.
+  * *Communities* — `detectCommunities` with a `communityMethod` toggle of label propagation or
+    **`louvainCommunities`** (`link-analysis-toolbox.component`). *(Added to this inventory 2026-09-08: the
+    tool shipped and both `REQUIREMENTS` `INV-1` and the user guide promised Louvain, but this list — the
+    mechanism's source of truth — omitted it.)*
   * *Suspicion scoring* — `suspicionScore`, an explainable 0–100 composite (degree/betweenness/
     PageRank/k-core/triangles) with a per-node factor breakdown; the toolbox highlights the top decile.
   * *Pattern packs* — a picker (`pattern-packs.ts`) that pre-fills the motif builder from parameterized

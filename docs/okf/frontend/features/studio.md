@@ -13,40 +13,46 @@ The Builder surface for BI authoring under `/studio`. Vocabulary is Type→Insta
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Visualization Type** is the template; a **Widget** is the
 configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout of Widgets.
 
-* **Panes** — **Datasets** (define Tables/Derived Tables/Views the BI layer binds to), the
-  **Query Library** (`/studio/queries` — author SQL + `$`-Parameters, preview the Result Set offline),
+* **Panes** — the **Query Library** (`/studio/queries` — author SQL + `$`-Parameters, preview the Result Set offline),
   the **Viz Library** (searchable Widget gallery) with the **Widget Builder**, and the
   **Dashboard Builder** (quick-filter bar, drill-through drawer, time grain, PNG export). The
   investigation studios live alongside: [Geo Map Analysis](geo-map.md) and [Link Analysis](link-analysis.md).
+  ⚠ **Datasets is NOT a Studio pane** (corrected 2026-09-08): `/studio/datasets` — and the Studio root —
+  redirect to `/catalog/datasets`, because a Dataset became a Catalog asset in Phase B.2.
 * **Visualization Types** come from the `VizPlugin` registry (`src/app/inspecto/viz/`) — charts, tables,
   scatter, funnel, …; **Measures** (never "metrics" in the BI sense) drive aggregations in Explore.
 * **Persistence is real** — datasets/widgets/dashboards/queries are writable component kinds since W3/W4
   (`/components` + ETag/If-Match; [backend registry](../../backend/components/component-registry.md));
-  query execution runs on DuckDB via [`POST /queries/{id}/run`](../../backend/control-plane/queries.md).
+  a Widget's result runs on DuckDB via [`POST /bi/query`](../../backend/control-plane/queries.md) and the
+  Query Library previews through `DatasetRowsService` (`/db/table`, `/db/query`). ⚠ *(This line named
+  `POST /queries/{id}/run` until 2026-09-08; that route has **no client caller at all** — see the
+  [`DAT`](../../capabilities/data-plane/data-plane.md) and [`Studio`](../../capabilities/studio/studio.md) specs.)*
 * **Curated starter templates** — `GET /bi/templates` lists the seed pack (`BiTemplates`): `kpi-overview`,
   `quality-monitor` and, since 2026-09-02, the temporal `trend-monitor` (two `line` widgets over
   `event_date` at `month` grain + a KPI); `POST /bi/templates/{id}/apply` writes them as ordinary
   components bound to the caller's Dataset (409 on an id collision, `prefix` to disambiguate). Enrichment
   is the continuous BACKLOG §7 C7 item.
 * **Widgets are library citizens** — identity + tags, the browsable Viz Library gallery, a standalone
-  `WidgetHost` render path, and one shared `DatasetResultService` result layer: live it runs
-  `POST /bi/query` (DuckDB), offline the same specs run byte-identically on AlaSQL; unmappable specs
-  (named-Measure SQL, OR filters) fail honestly. Sharing/RBAC stays gated on the security module.
+  `WidgetHost` render path, and one shared `DatasetResultService` result layer: it runs
+  `POST /bi/query` (DuckDB) and unmappable specs (named-Measure SQL, OR filters) fail honestly.
+  ⚠ *(Until 2026-09-08 this said "offline the same specs run byte-identically on AlaSQL" — that arm went
+  with the mock backend; AlaSQL survives only as the data-table Pro editor's own client-side SQL.)* Sharing/RBAC stays gated on the security module.
 * **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
-  resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): live it reads the
+  resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): it reads the
   real store over `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by
-  `compileSql`; offline it serves the store's entry in `inspecto/mock/sample-sources.ts`, filtered by
-  `evaluateRows`. `sql()` runs authored SQL the same way (server-guarded live, AlaSQL offline) and
+  `compileSql`. ⚠ *(Until 2026-09-08 this named an offline arm serving `inspecto/mock/sample-sources.ts`,
+  a path that no longer exists, and an AlaSQL arm for `sql()`.)* `sql()` runs authored SQL server-guarded and
   `columns()` answers the declared columns, else a 1-row probe. It is the layer UNDER
   `DatasetResultService`: that one runs a `QuerySpec`, this one supplies rows a screen reads directly.
   ⚠ **Every result is a PAGE** — it carries `truncated` and an `error` string, and a consumer that
   counts or lists must say so (the drill-through drawer and the Queries preview both do). Before this,
   every consumer did a synchronous `SAMPLE_SOURCES[name]` lookup, so a live deployment showed sample data
   or nothing.
-* ⛔ **Three sample-row folds are CORRECT and must stay** — `EntityProjectionGraphSource`,
-  Geo's point/route sources and `ReconExecService` each already pair a server call with a sample fold as
-  its **offline arm**; routing those through the seam adds a second round-trip behind a path that already
-  has one. They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
+* ⛔ **The sample-row folds must stay — but not for the reason this bullet used to give.** Since the mock
+  backend was deleted they are **not** offline arms: a backend failure surfaces. They are retained under
+  decision `MOCK-DEAD-COMPUTE-1` (2026-08-31) as the **reference folds** the live paths are asserted to
+  agree with, and as the vehicle the example graph and geo case studies are pinned through — delete them
+  and the guards go with them (corrected 2026-09-08). They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
   dropped column metadata and so compared numbers and dates as strings).
 * **A widget's time grain travels on the wire (2026-08-14).** `QuerySpec.grains` (group-by column →
   `day|week|month`) is the ONE source of truth: each plugin's `buildQuery` fills it from the channel

@@ -21,9 +21,11 @@ The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation
 [`GLOSSARY.md`](../../../GLOSSARY.md) §11-Geo (GeoSource, GeoQuery, GeoPoint/GeoRoute, Geo View, Layer,
 Geocoder — never "marker/pin" in model names).
 
-* **Fully offline** — MapLibre GL host (`src/app/inspecto/geo/`) over a bundled PMTiles basemap
-  (`assets/basemap/`, ~2.7 MB); the offline place-table **Geocoder** resolves name→point behind a
-  pluggable seam.
+* **Fully offline** — MapLibre GL host (`src/app/inspecto/geo/`) over a bundled basemap
+  (`assets/basemap/`, ~2.7 MB). ⚠ **It is NOT PMTiles** (corrected 2026-09-08): a planet extract at z0–6
+  would have been ~100 MB, so D2 took **four slimmed Natural Earth GeoJSON layers + glyph fonts**; the
+  `pmtiles://` protocol was to stay registered for a customer archive and **no code references it today**.
+  The offline place-table **Geocoder** resolves name→point behind a pluggable seam.
 * **Data plane** — a **GeoSource** projects Dataset rows to GeoPoints (lat/lon column mapping) or
   weighted great-circle **od-routes**; display modes include heatmap, a time slider + timeline playback,
   and filter-to-view.
@@ -51,10 +53,11 @@ Geocoder — never "marker/pin" in model names).
   — `DatasetGeoSource`/`RouteProjectionGeoSource` (`geo-projection.ts`) are now **backend-first**,
   mirroring `EntityProjectionGraphSource`/`InvService`: each calls the new `GeoService`
   (`inspecto/api/geo.service.ts`, `POST /geo/projection`|`/geo/routes`) first, folding the server's
-  aggregated rows into the identical `GeoPoint`/`GeoRoute` shapes; on any failure (offline demo — the
-  mock `geo.handler.ts` answers 501, or a pre-Phase-4 backend) it falls back to the original
-  client-side sample fold, byte-identical to the prior behaviour. No point-count threshold — same
-  simple try/backend-then/catch-fallback shape as the Link Analysis precedent, not a size-gated switch.
+  aggregated rows into the identical `GeoPoint`/`GeoRoute` shapes. ⚠ **A backend failure now SURFACES**
+  — *(until 2026-09-08 this said it "falls back to the original client-side sample fold"; that arm went with
+  the mock backend's deletion, and `projectPoints`/`projectRoutes` are retained as reference folds only,
+  decision `MOCK-DEAD-COMPUTE-1`)*. No point-count threshold — the same backend-first shape as the Link
+  Analysis precedent, not a size-gated switch.
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a point resolving an `objectRef` offers
   "View in graph" (pivots to Link Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.
