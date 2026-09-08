@@ -25,10 +25,12 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 > target never existed. §3.9–§3.13 are that design, distilled. **The plan stays in `superpower/`** — its
 > Phases 0–5 are unbuilt, so it is still in flight; what moves here is the part that is settled.
 >
-> 🔴 **The loudest finding in this area is not about editions at all.** The bill of materials that ships
-> inside every signed bundle **declares the wrong module set** — four first-party jars where the bundle
-> carries eleven or twelve (§3.7). It is a compliance artifact that is wrong on the wire, and nothing in
-> the repository can catch it.
+> ✅ **The loudest finding in this area was not about editions at all — and is now fixed (2026-09-09).**
+> The bill of materials that ships inside every signed bundle **declared the wrong module set** — four
+> first-party jars where a Standard bundle carries ten and an Enterprise one eleven (§3.7). It was a
+> compliance artifact wrong on the wire, and nothing in the repository could catch it. The set now lives
+> once in `tools/bundle-modules.mjs`, and `tools/check-sbom-modules.mjs` fails CI when it drifts from what
+> the packaging script stages.
 
 ## 1. Purpose & scope
 
@@ -77,7 +79,7 @@ files. The corrections below are the requirement of record.
 | Row | Register says | Correction of record |
 |---|---|---|
 | **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🔴 **Two-thirds shipped.** The fat JAR ships. The per-edition bundles are **two of three** — no Standard artifact is ever produced by any automated path (§3.7). And **no released artifact contains the trimmed runtime**: the release pipeline passes the skip-runtime switch for every bundle, because the runner has no module cache. The runtime is real, buildable, and shipped in nothing. |
-| **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | 🔴 **The generator declares the wrong module set** — four first-party jars against the eleven a Standard bundle carries (§3.7). The isolation half also no longer holds as written: the connector sidecar ships in **every** edition by a 2026-09-07 decision, and the mail dependency **left** it for `inspecto-notify-channels` in gating cell 1 — so that dependency now appears in **no** bill of materials, while the generator's own comment still credits the sidecar with bringing it. "Lean" was measured and belongs to the *bundle*, not the reactor (§3.7). |
+| **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | ✅ **Corrected 2026-09-09.** The generator had declared **four** first-party jars against the **ten** a Standard bundle carries and the eleven an Enterprise one does, knowing none of the seven gating modules; the mail dependency consequently appeared in **no** bill of materials (§3.7). The set now lives once in `tools/bundle-modules.mjs` and a CI guard holds it against the staging script. The isolation half still does not hold as written: the connector sidecar ships in **every** edition by a 2026-09-07 decision, and the mail dependency **left** it for `inspecto-notify-channels` in gating cell 1. "Lean" was measured and belongs to the *bundle*, not the reactor (§3.7). |
 | **PKG-3** | Runnable, self-contained example suite — `SHIPPED` (should), all editions | 🟡 **Shipped and largely unexercised.** Thirty examples in seven categories are tracked and staged into every bundle. **One** of the thirty runs in any pipeline, and only on a tag. "Runnable" is proven for one example and asserted for twenty-nine. |
 | **PKG-4** | Verify the Standard bundle's runtime module set against the token library — `SHIPPED` (must, Standard), verified 2026-07-07 | ⚠ **The evidence covers five of the twelve modules.** The recorded verification names the four the token library needs plus the elliptic-curve provider; the remaining seven in the image are unattributed by it. The status is then stated three ways: the register says resolved, the backlog says not re-verified, and the build concept page says the runtime step is unproven. All three are moot for shipped artifacts, which contain no runtime at all. |
 | **OPS-07** (`EDITIONS.md`) | Embedded trimmed JVM runtime in the bundle — ✅ in all three editions | 🔴 **No shipped artifact contains it.** Same root cause as PKG-1. The row describes a capability of the script, not a property of the bundle a customer receives. |
@@ -291,22 +293,40 @@ the archive and is covered by the checksum and the signature. A non-zero exit th
 its bill of materials or not at all. Generating it per bundle rather than per reactor was itself a decision,
 and a good one — the reactor attests a set no customer installs.
 
-🔴 **And the generator declares the wrong set.** Its first-party table holds **four** artifacts: the
-processor, the connectors, the authentication module for non-Personal, and the policy engine for
-Enterprise. It knows **none** of the seven gating modules. So:
+✅ **The generator declared the wrong set — fixed 2026-09-09.** Its first-party table held **four**
+artifacts: the processor, the connectors, the authentication module for non-Personal, and the policy engine
+for Enterprise. It knew **none** of the seven gating modules. So, until the fix:
 
-* Every Standard bill of materials declares 4 first-party jars where the bundle carries **11**; every
-  Enterprise one declares 4 where the bundle carries **12**.
-* The **mail dependency appears in no bill of materials at all**. It left the connector sidecar for the
-  channels module in gating cell 1, and the generator's own comment still credits the sidecar with bringing
-  it.
-* The comment above that table claims it is "the SAME table the packaging script stages from". It is not,
-  and saying so is what made it invisible.
+* Every Standard bill of materials declared 4 first-party jars where the bundle carries **10** (11 staged
+  jars, counting the driver sidecar); every Enterprise one declared 4 where the bundle carries **11** (12).
+* The **mail dependency appeared in no bill of materials at all**. It left the connector sidecar for the
+  channels module in gating cell 1, and the generator's own comment still credited the sidecar with
+  bringing it.
+* The comment above that table claimed it was "the SAME table the packaging script stages from". It was
+  not, and saying so is what made it invisible.
 
-Nothing can catch this. There is no test over the generator, and the release pipeline merely copies its
-output. This is the same failure shape the control-API area found in a served contract file: **a generated
-artifact that is authoritative to its consumer and unverified by its producer.** Filed in §5 as the highest
-item in this area.
+Nothing could catch it: there was no test over the generator, and the release pipeline merely copies its
+output. This was the same failure shape the control-API area found in a served contract file: **a generated
+artifact that is authoritative to its consumer and unverified by its producer.**
+
+**What closed it.** The module set now lives once, in `tools/bundle-modules.mjs`, read by both the
+generator and a new CI guard, `tools/check-sbom-modules.mjs`. The guard parses the packaging script's
+**three independent enumerations** — the module list, the staging steps, and the boot-smoke classpath —
+requires them to agree with each other and with that file, and checks each module's declared artifact
+identifier, because a wrong directory-to-identifier pair contributes **zero** components for that module
+without saying so. It was falsified in both directions before being wired in, including against the
+original four-module table. Measured after the fix: Personal 2 first-party, Standard 10, Enterprise 11,
+with the mail dependency present in the latter two and absent from Personal, where no channels module
+ships. A second defect surfaced in the same pass and was fixed with it: the driver sidecar was appended
+unconditionally although the connector module already resolves it at compile scope, so every
+Standard and Enterprise document carried a **duplicate** component identifier — invalid under both
+schemas, in a document whose purpose is to be machine-validated.
+
+⚠ **One thing the fix does not close.** The generator resolves through the build tool, which cannot see a
+sibling module's previously-built jar across separate invocations — so it needs the reactor **installed**,
+and the release pipeline installs only the agent dependency, never this reactor. Enterprise is the first
+edition to expose it, because the policy module gained a test-scoped edge to the operational-objects module
+in gating cell 7 and resolution covers every scope. Tracked in §5.3.
 
 🔴 **No Standard artifact exists, and four documents disagree about it.** The release pipeline packages
 **Personal and Enterprise**, both with the runtime skipped and both signed. There is no Standard step and
@@ -525,13 +545,21 @@ Nothing a shift can close from this checkout.
 
 ### 5.3 `UNTRACKED` — found writing this spec, no board row exists
 
-Ranked. The first four change what a customer receives.
+Ranked. Items 2–4 change what a customer receives; item 1 is closed, and the numbering is kept so the
+citations elsewhere in this spec still resolve.
 
-1. 🔴 **The bill of materials declares the wrong module set** (§3.7) — four first-party jars against
-   eleven or twelve, the mail dependency in none of them, and a comment asserting it matches the staging
-   table. It ships inside a signed, checksummed archive and **no test covers the generator**. Same shape
-   as the served contract file the control-API area found: authoritative to its consumer, unverified by its
-   producer. Fix the table, and add a test comparing it to what the script stages.
+1. ✅ **RESOLVED 2026-09-09 — the bill of materials declared the wrong module set** (§3.7): four
+   first-party jars against ten or eleven, the mail dependency in none of them, and a comment asserting it
+   matched the staging table. It shipped inside a signed, checksummed archive with **no test over the
+   generator**. Closed by moving the set into `tools/bundle-modules.mjs` and adding the CI guard
+   `tools/check-sbom-modules.mjs`, which holds it against the packaging script's three enumerations; a
+   duplicate driver component, invalid under both schemas, was fixed in the same pass.
+   🔴 **What remains, and is not the same defect:** generating the document at all requires the reactor to
+   be **installed** in the local repository, because the build tool will not resolve a sibling module from a
+   jar built in an earlier invocation. The release pipeline installs only the agent dependency. Enterprise
+   fails first — the policy module's cell-7 test-scoped edge to the operational-objects module must resolve
+   even though the document lists runtime scope only — and on a clean runner every edition would. Either the
+   pipeline installs the reactor before packaging, or the generator resolves within a build phase.
 2. 🔴 **No Standard artifact is built, checksummed, signed, given a bill of materials, or published**
    (§3.7). Either the release pipeline gains the step, or both supply-chain rows lose their Standard
    column. Four documents currently describe an artifact that does not exist.
@@ -628,7 +656,8 @@ this area has three sites whose line citations drifted (§3.2).
 |---|---|---|
 | The edition switch and staging | `inspecto/package.ps1` — the edition guard, the module list, and the per-jar shape assertions | ⚠ Its header names three of twelve staged jars |
 | The profiles | `pom.xml` — two profile identifiers, module lists only | — |
-| The bill of materials | `tools/sbom.mjs` | 🔴 Declares four first-party jars of eleven or twelve; no test (§3.7) |
+| The bill of materials | `tools/sbom.mjs`, over the set in `tools/bundle-modules.mjs` | ⚠ Needs the reactor installed to resolve (§5.3 item 1) |
+| Its drift guard | `tools/check-sbom-modules.mjs`, wired into `ci.yml` | — |
 | The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ 95 across 25 modules against four prose sites saying 94 |
 | The release pipeline | `.github/workflows/release.yml` | 🔴 No Standard step; every bundle skips the runtime |
 | The test pipeline | `.github/workflows/ci.yml` | ⚠ One profile pass; no Personal-with-tests, no Standard |
@@ -659,8 +688,9 @@ this area has three sites whose line citations drifted (§3.2).
   plane on a free port, polls health, and **throws** on failure. It is the only check that proves a bundle
   can start.
 * **Fail-closed signing** — a missing binary, a missing key, or a non-zero exit all throw.
-* **A bill of materials that must generate** or the bundle does not ship. ⚠ It must generate; it need not
-  be *correct* (§3.7).
+* **A bill of materials that must generate** or the bundle does not ship — and, since 2026-09-09, one whose
+  module set is **held against the packaging script in CI** by `tools/check-sbom-modules.mjs`, over the
+  script's three independent enumerations (§3.7).
 * **Six falsification tests** proving the gated features are absent from the default build, plus two
   module-side halves proving they are present with the module.
 * **A dependency lock diffed on every run**, distinguishing drift from could-not-run.
@@ -668,7 +698,8 @@ this area has three sites whose line citations drifted (§3.2).
 **Falsify, don't read — five probes worth running**
 
 1. **Unzip a Standard bundle's bill of materials and count its first-party entries.** Four means the defect
-   is live. Eleven means it was fixed.
+   is live; **ten** means it was fixed (eleven for Enterprise). Counting *staged jars* instead gives 11 and
+   12 — the driver sidecar is third-party, and conflating the two is what made the original counts confusing.
 2. **Grep a released Enterprise bundle's launcher for the policy jar**, then start it and read the reported
    edition. It will say `standard` while enabling Enterprise policy.
 3. **Ask a Personal build for a gated path** — an object route, say. A 503 naming the module is correct; a

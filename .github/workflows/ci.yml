@@ -87,6 +87,22 @@ jobs:
       - name: Guard — every relative doc link resolves
         run: node tools/check-doc-links.mjs
 
+      # SBOM module-set guard (2026-09-09). tools/sbom.mjs built its first-party table from FOUR artifacts
+      # under a comment claiming it was "the SAME table package.ps1 stages from". It was not, and had not
+      # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Enterprise, so every shipped
+      # bill of materials under-declared its own bundle (4 first-party where Standard carries 10), and
+      # javax.mail appeared in NO shipped SBOM at all after it moved to inspecto-notify-channels. The
+      # documents ship INSIDE the signed, checksummed archive and the compliance matrix relies on them, yet
+      # nothing could go red: there was no test over the generator and release.yml only copies its output.
+      # This parses package.ps1's three independent enumerations ($modules, the Copy-Item staging steps, the
+      # boot-smoke classpath), requires them to agree with each other and with tools/bundle-modules.mjs, and
+      # checks each module's declared artifactId — a wrong dir→artifactId pair contributes ZERO components
+      # for that module, silently. Pure Node, ~instant. Falsified in both directions before wiring: the
+      # original 4-module table, a phantom module, a wrong artifactId, a newly staged jar, a dropped
+      # boot-classpath entry, a restructured $modules, and a re-indented unconditional copy.
+      - name: Guard — the shipped SBOM declares the jars the bundle stages
+        run: node tools/check-sbom-modules.mjs
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
