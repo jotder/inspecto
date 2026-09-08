@@ -65,6 +65,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 | Topic | Doc |
 |---|---|
+| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | [`okf/capabilities/`](okf/capabilities/index.md) — one doc per area ID. `ACQ` is the pilot; the other 14 areas are sized in [`docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
 | Production investigation (process/events/metrics/state/`-D` flags/Control API/troubleshooting) | [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **living doc** |
 | Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) |
 | Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md) |
@@ -405,7 +406,22 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   survive, which is exactly why the bug hides — six unquoted `-D` JVM properties sat latent in the same
   script's launch step, invisible only because it died earlier. Prove it in one line, don't reason about
   it: `pwsh -NoProfile -Command 'function Show { $args | % { "[$_]" } }; Show -Da.b=c "-Dd.e=f"'`.
-- **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push (a third, `tools/check-dependencies.mjs`, runs AFTER it — see the guards note above):
+- **Pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so any of them can fail a
+  green-code push (`tools/check-dependencies.mjs` runs AFTER it — see the guards note above).
+  ⚠ **`tools/check-doc-links.mjs` joined them 2026-09-08** — the SIXTH repo guard: every relative
+  markdown link in a current doc must resolve (1,415 links, zero dangling). Links inside
+  `docs/archived-documents/**` are ignored (never-maintained tier) but links pointing INTO it are
+  not, and the exemption plus its live count prints on every run. Links inside a ``` or ~~~ fence
+  are skipped: a link in a code fence is quoted text, not a live link.
+  🔴 **The lesson the guard roster keeps re-teaching: read a guard's success line as a CLAIM, not a
+  result.** Three instances inside two days — `check-coverage --ui` could never pass, so `ui.yml`'s
+  step was red from the moment it landed; `check-vocabulary`'s pass 1 announced "9 user-facing
+  doc(s) clean" for 54 days while reading ONE (8 of 9 entries were dead paths and the count came
+  from the LIST, not the read — now a `stale-scope` rule fails the build on a dead entry); and
+  AGT-5's gate ran `gh search code`, which returns zero for EVERY term against that repo, control
+  included. A guard's SCOPE is a silent exemption — audit it apart from its rules, and never trust
+  a zero without a control probe that must succeed.
+  The two that have always run first:
   `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs, **plus banned KEYS in the committed
   TOON config corpus** since 2026-08-04 — it reads `git ls-files`, not the working tree, so local matches
   CI and `spaces/**` runtime state is never scanned; its `CONFIG_ALLOW` doubles as the Flow→Pipeline Tier-3

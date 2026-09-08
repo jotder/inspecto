@@ -56,7 +56,13 @@ one concept per file, cross-linked, indexed by graphify. ⚠ It is a **constrain
 its invariants and traps are rules future work must not break, several recorded because the repo already
 paid for violating them.
 
-- [`okf/`](okf/index.md) — master index. Four parts:
+- [`okf/`](okf/index.md) — master index. **Five** parts since 2026-09-08:
+  - [`okf/capabilities/`](okf/capabilities/index.md) — **the subject tier, new.** One document per
+    capability, keyed to `REQUIREMENTS.md` §3's area IDs, answering *what was required · what is
+    built · what is left · what was refused*. The four parts below answer only the second of those,
+    and answer it by CODE LAYER — which is why "consignment" could appear in 48 current-tier docs
+    with none of them being its entry point. `ACQ` is the pilot; the remaining 14 areas are sized in
+    [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.
   - [`okf/frontend/`](okf/frontend/index.md) — the Angular console: architecture, conventions, the shared
