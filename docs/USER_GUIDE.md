@@ -42,7 +42,7 @@ Inspecto is **ELT**, not ETL: the *load* is a plain write of parsed rows to Parq
 file to a dashboard tile is a chain of the nouns this guide defines:
 
 ```
-  Connection ─▶ Collector ─▶ Run ⊇ Batch ⊇ File ─▶ Pipeline (parse → shape)
+  Connection ─▶ Collector ─▶ Run ⊇ Consignment ⊇ File ─▶ Pipeline (parse → shape)
        │            │                                   │
    how to reach  what/when to                     ┌─────▼─────┐
    the system    collect                          │  Table    │  partitioned Parquet (the "load")
@@ -268,8 +268,9 @@ enrichment, sink, and the control nodes) and connect them. A **Job is not a node
 by pointing it at a `sink.view` store. In the editor, click to select, double-click to configure,
 drag to move, and **Shift-drag** to draw a connection between nodes; each node has a **Test** button
 for validating just that step. Parser nodes open a dedicated configuration dialog with a typed
-property sheet and a grid preview of the parsed output; the dialog offers nine format types, but
-today only the ones matching the engine's `parsing.frontend` set actually run against real data —
+property sheet and a grid preview of the parsed output; the format list is **served by the engine** (`GET /parsers`:
+delimited, fixed-width, JSON, text/regex, XLSX, Parquet, ASN.1, plus custom plugins) — every listed format runs against
+real data —
 **delimited/DSV**, **fixed-width or line-pattern plain text** (regex-matched named groups), **JSON**
 (newline-delimited), and a generic **"other"** (custom Java plugin) for anything else. **ASN.1,
 HTML, Parquet, XLSX, and XML** appear in the dialog as staged scaffolding — selecting one won't yet

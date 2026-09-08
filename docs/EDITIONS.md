@@ -147,7 +147,7 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 |---|---|---|---|---|---|
 | ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | ✅ | ✅ | ✅ | FEATURE_INVENTORY §A |
 | ING-02 | Consignment formation (`collector.consignment: max_files / max_bytes / order`) | ✅ | ✅ | ✅ | moved to the Collector 2026-09-02 (CONSIGNMENT-HOME-1); legacy `processing.batch` dual-read |
-| ING-05 | Unpack stage (zip/tar/gz/bz2/Z, nested archives) | ✅ | ✅ | ✅ | |
+| ING-05 | Unpack stage (zip/tar/gz/bz2/Z) | ✅ | ✅ | ✅ | ⚠ **nested archives are refused by design** (`UnpackLimits.depth` = 1, any other value refused by name) — this row promised them until 2026-09-08; xz/zstd have no codec (BACKLOG §3) |
 | SCH-01 | Schema registry: field types (all DuckDB scalars, fail-closed), rules (`DIRECT`/`EXPR`/`CONCAT_DT`/`FILENAME_DATE`), multi-format dates | ✅ | ✅ | ✅ | fail-closed types = `SchemaFieldTypes` (2026-08-22); the `rules[]` spelling now *loads by conversion* — the engine reads `fields[]` first (`MAPPING-SPELLING-1`, BACKLOG §1). *(This cell pointed at a §C that does not exist until 2026-09-08.)* |
 | SCH-02 | Quarantine / reject routing | ✅ | ✅ | ✅ | |
 | SCH-03 | Field classification metadata (PII / INTERNAL) | ✅ | ✅ | ✅ | metadata only — no edition enforces masking on it (see SEC-08) |

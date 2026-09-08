@@ -209,7 +209,8 @@ Since 2026-07-30 the toggle also appends the **served plugin parsers** (`GET /pa
 ASN.1/vendor formats when their plugins deploy; `okf/backend/engine/parser-plugins.md`): their
 options form renders the served grammar schema (`fieldSpecsToAttributes`), Test parse runs the real
 `POST /parsers/{id}/preview` (table or record tree), and **Save is disabled with an honest note** for a
-preview-only plugin (one that is not `ingestable` or names no `ingesterClass` — XML today), because
+preview-only plugin (one that is not `ingestable` or names no `ingesterClass` — **none shipped today**: XML gained
+`XmlRecordIngester` 2026-08-30; this said "XML today" until 2026-09-08), because
 there is nothing truthful to write. ⚠ The plugin preview is pane-local — the sample thread's parsed hop
 (and thus the Schema stage derivation) is fed only by the four built-ins the draft can actually go live
 with.

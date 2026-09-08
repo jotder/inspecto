@@ -94,14 +94,16 @@ AI-driven autonomy without redesign.
 
 ### 3.2 Ingestion & parsing (ING) — backend
 
+> ⚠ **These rows now have an owner:** [`okf/capabilities/ingestion/ingestion.md`](okf/capabilities/ingestion/ingestion.md) §2 is the requirement-of-record for `ING`, and it CORRECTS this table (`ING-2` understates the build — ten frontend tokens, eight formats, six DuckDB-native built-ins incl. `parquet`; `ING-5`'s LDIF note is stale — blank-line records are live; `ING-6` has no UI and evaluates at rest, not at ingest). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
+
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
 | ING-1 | Stage-1 M..N multiplexer: parse → transform → partition → commit, batch-atomic | Must | SHIPPED | All |
-| ING-2 | Format frontends: delimited grammar, fixed-width (text+binary), plugin `StreamingFileIngester` SPI (binary/multi-segment) | Must | SHIPPED | All |
+| ING-2 | Format frontends: delimited grammar, fixed-width (text+binary), plugin `StreamingFileIngester` SPI (binary/multi-segment) | Must | SHIPPED — ⚠ understated (corrected 2026-09-08): `PipelineConfigParser.FRONTENDS` is ten tokens / eight formats (`delimited`, `fixedwidth`, `json`, `text_regex`, `xlsx`, `parquet`, `asn1`, `plugin`) and `BuiltinParsers.IDS` six built-ins incl. `parquet`, which is on no board | All |
 | ING-3 | Compressed input streaming (gzip/bz2/zip) | Must | SHIPPED | All |
 | ING-4 | Schema casting + reject routing (quarantine semantics: unreadable / mismatch / sink-flush fail) | Must | SHIPPED | All |
-| ING-5 | Unified `parsing:` config block + **JSON/NDJSON** + **text/regex** frontends | **Must** | SHIPPED (2026-07-07; `parsing:` aliases `csv_settings`/`processing.ingester`; LDIF block-records stay PROPOSED) | All |
-| ING-6 | **Expectation** engine: data-quality rules validating records against a Schema (non-null, range, regex, referential) | **Must** | SHIPPED (2026-07-07: `com.gamma.expectation` — authored `expectation` components, request-driven evaluation counts violations in the target's at-rest Parquet via a server-built COUNT in a DuckDB sandbox; a FAILED check opens a deduped `expectation:<name>` Incident + emits `EXPECTATION_FAILED` → notifications; `/expectations*` CRUD+evaluate) | All |
+| ING-5 | Unified `parsing:` config block + **JSON/NDJSON** + **text/regex** frontends | **Must** | SHIPPED (2026-07-07; `parsing:` aliases `csv_settings`/`processing.ingester`; ~~LDIF block-records stay PROPOSED~~ LDIF block records are LIVE via `text_regex.record_split: blank_line` (2026-08-28; corrected 2026-09-08)) | All |
+| ING-6 | **Expectation** engine: data-quality rules validating records against a Schema (non-null, range, regex, referential) | **Must** | ✅ server SHIPPED — ⚠ **no UI** (corrected 2026-09-08: no file under `inspecto-ui/src/app` mentions Expectations; evaluation is an at-rest COUNT, not ingest-time validation). Detail (2026-07-07: `com.gamma.expectation` — authored `expectation` components, request-driven evaluation counts violations in the target's at-rest Parquet via a server-built COUNT in a DuckDB sandbox; a FAILED check opens a deduped `expectation:<name>` Incident + emits `EXPECTATION_FAILED` → notifications; `/expectations*` CRUD+evaluate) | All |
 
 ### 3.3 Pipelines & orchestration (PIP) — backend + UI Workbench
 

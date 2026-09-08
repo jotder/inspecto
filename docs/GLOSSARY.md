@@ -405,7 +405,7 @@ defines *when*, not *what*.
 **Archive** *(added 2026-08-26; as-built in `okf/backend/engine/unpack-stage.md`)* — A **container file** the
 operator drops in the inbox that holds many inner files: `.zip`, `.tar`, `.tar.gz`. Expanded by the **Unpack**
 stage at the Collector *before* Consignments are planned, so its contents become ordinary Files from birth. An
-Archive is **not** a Consignment and can outlive one (500 entries at `batch.max_files: 100` plans five), which
+Archive is **not** a Consignment and can outlive one (500 entries at `collector.consignment.max_files: 100` plans five), which
 is why its verdict is a **Run**-level fact — one row per Archive per Run in the `unpack` ledger — never a
 manifest member row. Its four verdicts are `UNPACKED` / `UNPACKED_PARTIAL` / `UNREADABLE` / `EMPTY`;
 ⛔ `UNPACKED_PARTIAL` is **reporting, never a gate** — the Consignment still commits.

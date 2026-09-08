@@ -26,7 +26,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | ID prefix(es) | Capability | Directory | State |
 |---|---|---|---|
 | `ACQ` | [Acquisition & connectivity](acquisition/acquisition.md) | `acquisition/` | ✅ **pilot — the template's first instance** |
-| `ING` | Ingestion & parsing | `ingestion/` | planned |
+| `ING` | [Ingestion & parsing](ingestion/ingestion.md) | `ingestion/` | ✅ **area #8 — 2026-09-08** |
 | `PIP` | Pipeline authoring | `pipeline-authoring/` | planned — the first `PIP` spec |
 | `PIP` | Pipeline execution | `pipeline-execution/` | planned — the second `PIP` spec; near-certain §3 split (440 KB of as-built truth) |
 | `DAT` | [Data plane](data-plane/data-plane.md) | `data-plane/` | ✅ **area #7 — 2026-09-08** |

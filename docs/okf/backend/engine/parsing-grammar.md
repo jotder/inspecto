@@ -21,6 +21,11 @@ and an `engine` selector (`auto`/`duckdb`/`java`). Files are read all-VARCHAR; t
 time via `TRY_STRPTIME`. The `auto` engine uses native `read_csv` unless `skip_junk_lines`/`skip_tail_lines`/
 `skip_tail_columns` force the Java `CsvIngester` path (messy files). Native is ~4–5× faster.
 
+> ⚠ **The paragraph below is the 4.1 account and is superseded** (flagged 2026-09-08): since 2026-07-07 a Grammar lives
+> **inline** on its parse Step in the unified `parsing:` block; `processing.csv_settings` is a read alias `parsing:` wins
+> over; a reusable Grammar is a **Grammar Template** in the `grammar` component kind — a copy source, never a binding
+> (2026-08-15). Requirement of record: [ING capability spec](../../capabilities/ingestion/ingestion.md) §3.3, §3.9.
+
 **Delimited grammar** (v4.1) — a reusable `*.grammar.toon` externalises per-data-file-type parse settings
 (`delimiter`, `quote`, `escape`, `encoding`, `compression`, `strict_mode`, `null_strings`, boundary pre-scan)
 from the pipeline `.toon`. One grammar serves one data-file type; many event-type schemas can reference it.

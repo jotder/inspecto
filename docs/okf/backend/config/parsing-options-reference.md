@@ -512,7 +512,7 @@ modes") keeps TB-scale binaries within bounded memory.
 | JSON / NDJSON | `json` → `read_json`/`read_ndjson` | yes | `[LIVE]` |
 | Flat XML / key-value | `text_regex` | via read_csv(1-col) | `[LIVE]` |
 | Nested XML | `plugin` (StAX streaming) | no | `[PLUGIN]` |
-| LDIF | `text_regex` (or `plugin` if folded/base64) | via read_csv(1-col) | `[PROPOSED]` (needs `"\n\n"` split) |
+| LDIF | `text_regex` (or `plugin` if folded/base64) | via read_csv(1-col) | `[LIVE via `text_regex` `record_split: blank_line`, 2026-08-28 — this cell said PROPOSED until 2026-09-08]` (needs `"\n\n"` split) |
 | ASN.1 / BER-TLV CDR | `plugin` (your ASN.1 parser) | no | `[PLUGIN]` |
 | Proprietary binary | `plugin` | no | `[PLUGIN]` |
 

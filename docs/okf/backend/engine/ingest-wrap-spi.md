@@ -38,7 +38,8 @@ Two drive modes exist above it:
 - **`GenerationModeIngester`** — huge single files; bounded generation flushes
   (`processing.streaming.flush_records`) cap scratch per generation.
 - **`UnionModeIngester`** — many small files; union them, then one transform/write pass.
-  `processing.streaming.generation_threshold_bytes` picks the mode per batch.
+  `processing.streaming.large_file_bytes` (default 256 MB, keyed on the Consignment's **largest** member) picks the
+  mode per Consignment — *(this line named a `generation_threshold_bytes` key that exists nowhere until 2026-09-08)*.
 
 **Reference implementation:** `Asn1RecordIngester` (`com.gamma.ingester`) — Java decodes BER/DER
 records against an X.680 grammar and emits them per segment; everything downstream is the shared
@@ -65,12 +66,12 @@ the unpartitioned single-file `COPY`, with staging + atomic per-file reveal for 
 
 ## The contract test
 
-`BatchProcessorPluginTest` (`inspecto-engine`) is the end-to-end pin: a toy
+`ConsignmentIngestorPluginTest` (`inspecto-engine`; named `BatchProcessorPluginTest` until the 2026-08-31 rename — this page carried the old name until 2026-09-08) is the end-to-end pin: a toy
 `StreamingFileIngester` drives records through the whole wrap into a **partitioned** store
 (CALL/SMS segments, `event_type/year/month/day`) and — `unkeyedSegmentWritesAFlatStoreWithLineage`
 — into an **unpartitioned flat** store, asserting rows, layout (no sentinel), and the lineage
 ledger. The concurrency claims of the finalization stores are pinned at the ledger by
-`BatchAuditWriterTest.concurrentFlushesKeepEachBatchBlockContiguous` (E4, narrowed — see the plan),
+`ConsignmentAuditWriterTest.concurrentFlushesKeepEachBatchBlockContiguous` (E4, narrowed — see the plan),
 and since 2026-08-19 by **`FinalizeSourceConcurrencyTest`** (the E4 remainder, ex-BACKLOG §4 (b)):
 8 distinct batches finalizing concurrently through the SHARED `DbConsignmentOutputStore` /
 `DbAcquisitionLedger` / `DbFileStageStore` (registry reconciliation, ledger PROCESSED, the full
