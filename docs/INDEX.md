@@ -67,7 +67,8 @@ paid for violating them.
     [`MET`](okf/capabilities/metamodel/metamodel.md), [`DAT`](okf/capabilities/data-plane/data-plane.md),
     [`ING`](okf/capabilities/ingestion/ingestion.md), [`OPS`](okf/capabilities/observability/observability.md),
     [`Studio`](okf/capabilities/studio/studio.md) (`BI`+`INV`),
-    [`Assistant`](okf/capabilities/assistant/assistant.md) (`AGT`+`EOI`); the other six slots are named in
+    [`Assistant`](okf/capabilities/assistant/assistant.md) (`AGT`+`EOI`),
+    [`Surfaces & Lenses`](okf/capabilities/surfaces/surfaces.md) (`UI`); the other five slots are named in
     `GLOSSARY.md` §14 and sized in [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.

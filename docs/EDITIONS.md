@@ -120,7 +120,7 @@ Will need later (don't preclude now): distributed scheduler coordination, all st
 
 **How to read and work this board.** One row per product feature, one cell per edition. A cell is
 addressed as `<row-id>/<P|S|E>` (e.g. `SEC-03/S`) so we can decide, build and deliver **cell-wise**.
-Rows are grouped by the FEATURE_INVENTORY §1 areas plus the control-plane / UI / security / compliance
+Rows are grouped by the FEATURE_INVENTORY §1 areas plus the control-plane / security / compliance — ⚠ **there is deliberately no `UI` row group** (corrected 2026-09-08: this note claimed one). The SPA shell ships in every edition and adapts to what registered; a gated pane rides its module's row (`CP-09`, `CP-11`, `CP-13`). Shell requirement-of-record: [`okf/capabilities/surfaces/surfaces.md`](okf/capabilities/surfaces/surfaces.md). Legacy wording:
 surfaces EDITIONS.md §Matrix already splits. **Editions are build flavors of one codebase** — a core
 feature is in every edition by construction, so most Personal/Standard/Enterprise cells agree; the
 board exists for the cells that *differ* or are *undecided*.

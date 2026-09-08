@@ -48,8 +48,9 @@ seed), and per-capability overrides `searchable`/`exportable`/`queryable`/`savab
   (`?limit=<pageSize>&offset=<rows loaded>`) and appends it — true offset paging (R6, 2026-07-19; no
   refetch from 0). Adopted by object-mail, audit-logs, events — never silently cap a list. Full
   refetches (filter change, refresh, live-tail tick) reset to page 0; `hasMore` re-derives from
-  `page.length >= pageSize`. The mock handlers (`ops.handler.ts` `pageSlice`) mirror the backend's
-  `offset` semantics so offline paging behaves identically.
+  `page.length >= pageSize`. ⚠ *(Until 2026-09-08 this cited mock handlers
+  — `ops.handler.ts` — mirroring the backend's `offset` semantics for offline paging. That file went with
+  the mock backend on 2026-08-31; paging is server-side only now.)*
 * **Keyboard layer** (document-level, review R3): **`/`** opens + focuses the first visible searchable
   table's quick filter; opt-in **`[keyNav]`** gives **j/k** row focus, **Enter** = `(rowClick)` (opens
   the host's detail), **x** = toggle selection — piloted on the incidents/cases mail list. Typed input

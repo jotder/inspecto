@@ -16,7 +16,7 @@ operational event stream (events, alerts, cases/incidents, enrichment, jobs, Run
 
 ## Tech stack
 
-* **Framework**: Angular 21, **standalone components** (no NgModules), new control flow (`@if`/`@for`/`@switch`), `@defer` for lazy chunks.
+* **Framework**: Angular 22 (22.1.1, upgraded 2026-08-13 — this said 21 until 2026-09-08), **standalone components** (no NgModules), new control flow (`@if`/`@for`/`@switch`), `@defer` for lazy chunks.
 * **Language**: TypeScript (strict); explicit return types; `inject()` over constructor params.
 * **State**: Angular **signals** (local + service-held) + **RxJS** for async/streams. No NgRx / global store.
 * **UI**: Angular **Material (M2)** + **Tailwind** on the gamma/Fuse shell; **ag-Grid 35** tables; **Chart.js** charts; **AntV G6** graphs (powers the Link Analysis studio + the shared graph host); **MapLibre GL + PMTiles** (fully-bundled offline basemap) for the Geo Map studio; **CodeMirror 6** for the SQL editor.
@@ -30,8 +30,9 @@ Every API call goes through the versioned **`/api/v1`** surface (`apiUrl()` pref
 `v1Interceptor` unwraps the response envelope). On boot the app reads `GET /bootstrap` →
 `features.authMode`: on **Personal** it is `none` and the OIDC login flow (`auth.interceptor.ts` exists but
 no-ops) does nothing — the app boots straight to `/dashboard` with no token or login. On **Standard** the
-same flow drives OIDC against the backend's `inspecto-security` module. Fully offline, the mock layer
-serves a Personal-mode bootstrap. See [API & data conventions](./conventions/api-and-data.md).
+same flow drives OIDC against the backend's `inspecto-security` module. ⚠ **The offline mock layer was DELETED
+2026-08-31** — the SPA now requires a real control plane (`REQUIREMENTS.md` `UI-4`, superseded). *(This said
+"fully offline, the mock layer serves a Personal-mode bootstrap" until 2026-09-08.)* See [API & data conventions](./conventions/api-and-data.md).
 
 ## Where things live
 

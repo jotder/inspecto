@@ -27,7 +27,7 @@ src/app/
     confirm.service.ts, ...
   modules/admin/<feature>/  # FEATURES: standalone component(s) + .html + <feature>.routes.ts
   layout/                   # app shell (connectivity-banner mounts here)
-  mock-api/common/navigation/data.ts   # nav items
+  core/navigation/navigation-data.ts   # nav items (was mock-api/…, deleted 2026-08-31)
 ```
 
 ## Shared libraries
