@@ -40,7 +40,9 @@
 # The zip is a self-contained deployment unit.  On the target server:
 #   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
 #   2. Create your inbox directories under inspecto-deploy/inbox/<adapter>/
-#   3. java -jar inspecto-deploy/inspecto.jar inspecto-deploy/config/<adapter>/<adapter>_pipeline.toon
+#   3. Use the bundled run.sh / run.bat (RUNSH-CP-1): they cd to the bundle root and launch with
+#      -cp inspecto.jar[:sidecars ...], NEVER java -jar (which ignores -cp and CLASSPATH outright,
+#      making every sidecar unreachable) — see the run.sh emitter at ~line 684 and run.bat at ~771.
 #      (or use the bundled run.bat / run.sh — they cd to the bundle root automatically)
 #
 param(

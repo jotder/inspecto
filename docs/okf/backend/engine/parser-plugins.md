@@ -25,7 +25,7 @@ for the built-ins, custom Java decoders for everything DuckDB can't consume — 
 self-describing SPI so a new format can be *deployed and configured as a plugin* with **zero UI or
 control-plane change**.
 
-## The SPI (`com.gamma.parse.ParserPlugin`, engine, `@PublicApi 5.3.0`)
+## The SPI (`com.gamma.parse.ParserPlugin`, engine, `@PublicApi since = "4.0.0"`)
 
 | Method | The authoring question it answers |
 |---|---|

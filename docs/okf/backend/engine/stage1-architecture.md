@@ -19,7 +19,7 @@ timestamp: 2026-07-16T00:00:00Z
 > accurate below. Around it the platform has since grown, in order: the **Stage-2 enrichment engine**
 > (`com.gamma.enrich`, 2.x) which deliberately *does* the joins/aggregations listed below as Stage-1
 > non-goals; the **service + control plane** (`CollectorService` + `ControlApi` — Jobs, Signals/events,
-> Metrics, audit, and since 4.8 the versioned **`/api/v1`** contract); **authored Pipelines**
+> Metrics, audit, and the versioned **`/api/v1`** contract); **authored Pipelines**
 > (`com.gamma.pipeline` — DAGs of Steps run as `type: pipeline` Jobs); **multi-space tenancy**
 > (`spaces/<id>/…`); the **Component metamodel** + derived registry; **editions** as build flavors
 > (Personal/Standard/Enterprise; `inspecto-security` for Standard); and the optional **assist agent**
@@ -265,7 +265,7 @@ These keep the data path lean while making formats, ingest paths, transforms, an
 
 ## Directory Layout
 
-Since multi-space (4.x), everything an installation owns lives under a **Space** directory
+Since multi-space, everything an installation owns lives under a **Space** directory
 (`-Dspaces.root`, default `./spaces`); single-space installs use the `default` Space. Legacy flat
 layouts are migrated once via `com.gamma.service.SpaceMigrator` — there is no flat fallback.
 
@@ -406,7 +406,7 @@ declares the EL/T split; without it the keys have no execution route and arming 
 neither. ⚠ An absolute refusal was the original design and was **wrong**: it would have meant Stage 1
 could never land the store the chain reads, making the route unreachable.
 
-⛔ **Not covered by this route** (both wait on the branch-aware executor): ingest-side `route:` demux —
+⛔ **Not covered by this route**: ingest-side `route:` demux —
 one `output_store` cannot name N branch destinations, so a `route` step refuses here too — and
 multi-destination `sinks:` arming. ⚠ **Refused at rest as well:** a *legacy* (pre-map) filter, whose
 predicate speaks raw-column vocabulary the landed store no longer has, and any filter carrying pre-parse

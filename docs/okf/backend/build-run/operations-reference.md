@@ -723,7 +723,7 @@ curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/
 > scans them at boot and installs each via `ObjectService.registerWorkflow`, so `GET /workflows/{type}`
 > then serves the authored machine (last file wins per type; a malformed one is warned and skipped).
 
-### Issue Tracker (Phase 3) — operator-created issues + SLA tracking
+### Incident Tracker (Phase 3) — operator-created Incidents + SLA tracking
 
 Issues reuse the **same** `inspecto_ops_objects` table and workflow engine as alerts — only
 `object_type=ISSUE` differs, so there is no new storage or backend to configure. Where an `ALERT` is
@@ -802,7 +802,7 @@ curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<id>/at
 
 ### Observability — metrics & structured events
 
-The Control API host also exposes `GET /metrics` (open — scrapers don't carry tokens) in **Prometheus text format**, served from a zero-dependency in-process registry. No extra agent or sidecar.
+`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-metrics` module** (`pom.xml:93`/`:121`, Standard+Enterprise only): on **Personal the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentMetricsRoutes.java:18-25`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
 
 ```bash
 curl -s localhost:8080/metrics

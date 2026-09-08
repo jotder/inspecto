@@ -24,7 +24,7 @@ partitioned columnar output — all backed by an embedded **DuckDB**. An operato
 
 ## Module map
 
-The directory names were renamed 2026-06-12; the Maven **artifactIds were not** (so dir ≠ artifactId).
+The directory names were renamed 2026-06-12 and the Maven **artifactIds followed**: 22 of the 23 modules have `dir == artifactId`. The **one** exception is `inspecto/` → `inspecto-processor`. ⚠ The table below lists 5 of 23 Maven modules; the full list is the root `pom.xml` (14 default + 9 profile-scoped), mapped in [architecture-layers.md](./architecture-layers.md).
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
@@ -45,4 +45,4 @@ See [Modules](./modules) for each one.
   Maven profiles + `ServiceLoader` + `-D` flags. Standard's OIDC auth now exists as the profile-gated
   `inspecto-security` module — the core itself still carries zero auth code. See
   [Editions](./editions/editions-model.md) and [auth & security](./editions/auth-security.md).
-* **Mainline** `master`; current release line `4.x`. See [branch & release policy](./editions/branching-release.md).
+* **Mainline** `master` — today the **only** line. `4.x` was deleted 2026-08-17 with its `v4.0.0`/`v4.0.0-RC1` tags, and nothing is in production after `3.x` (newest tag `v3.12.0`); the next `N.x` is cut from `master` at release. See [branch & release policy](./editions/branching-release.md) and `docs/BRANCHING.md` §0-A.

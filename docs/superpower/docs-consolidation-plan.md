@@ -647,14 +647,37 @@ working files, not canon: retire them with the plan.
 and `parsing-options-reference.md` rows, group 7's `architecture-layers.md` row, group 8's
 `modules/security.md` row and group 10's `configuration.md` rows are applied.
 
-⚠ **Roughly 20 blocks in `adj-g6789.md` remain un-applied** — the mechanically-appliable remainder of
-groups 7, 8 and 9, chiefly in `overview.md` (the `4.x` release-line claim, which contradicts binding root
-canon — the highest-value one left), `stage1-architecture.md`, `build-run/operations.md` (including the
-missing `-Dcontrol.bind` row, the **unauthenticated-exposure** flag), `operations-reference.md`,
-`build-test.md` and `package.ps1`'s header. They are byte-exact blocks; apply them with the same
-count-must-be-1 discipline and re-run the guards. ⛔ Two carry warnings that must be honoured:
-`stage1-architecture.md`'s `route:` refusal keeps its RULE (only the parenthetical reason goes), and
-`PipelineLift.stageTwo` must not be "fixed" — a prior audit self-corrected on it.
+✅ **ALL 31 blocks in `adj-g6789.md` are now applied (2026-09-08).** 28 fenced + 3 inline, every one
+accounted for. The last pass closed groups 7, 8 and 9 — including the two highest-value ones:
+
+- `overview.md:27` claimed "the Maven **artifactIds were not** [renamed] (so dir ≠ artifactId)". It is
+  **22 of 23 with `dir == artifactId`**, the sole exception being `inspecto/` → `inspecto-processor` —
+  which the file's own table already proved, and which the `java-backend` skill states outright. Its
+  `:48` release-line claim (a live `4.x`) is corrected too: `master` is the only line, `4.x` and its
+  `v4.0.0`/`v4.0.0-RC1` tags were deleted 2026-08-17.
+- `build-run/operations.md` gained the missing **`-Dcontrol.bind`** row — the unauthenticated-exposure
+  flag: unset means EVERY interface, in every edition, and Personal ships no `Authenticator`.
+
+Also: `stage1-architecture.md`'s "Since multi-space (4.x)" and `operations-reference.md`'s ⛔ *Issue*
+Tracker heading (renamed only after confirming **nothing** links `#issue-tracker`; the one live inbound
+anchor is `#batch-processing`, untouched). `inspecto/package.ps1`'s header lost its `java -jar`
+instruction — comment-only, verified parse-clean — because the launcher uses `-cp` (RUNSH-CP-1), and
+`java -jar` ignores `-cp` outright, making every sidecar unreachable.
+
+⛔ **Both do-not-touch warnings were honoured and re-verified:** `stage1-architecture.md`'s at-rest
+`route:` refusal keeps its RULE (only the stale parenthetical reason went — the rule is pinned by
+`PipelineStageTwoLiftTest`), and `PipelineLift.stageTwo` is untouched.
+
+🔴 **A trap worth recording: two of these blocks are INSERTIONS whose `OLD` survives inside their
+`NEW`.** An "already applied?" check that only asks whether `OLD` is absent reports them as pending
+forever, and re-running would have **duplicated** a `-Dcontrol.bind` table row and a two-409s note.
+Verified each inserted item appears exactly once. When re-applying a block set, test whether `NEW` is
+already present — not just whether `OLD` still is.
+
+⚠ One block carried a deliberate distortion for the working file's sake: row 7.6's `NEW` had its
+`./architecture-layers.md` link repointed so `adj-g6789.md` itself would satisfy `check-doc-links.mjs`.
+Applying it verbatim put the wrong depth into `overview.md`; the recorded caveat and the guard both
+caught it, and the sibling form is restored.
 
 **Also applied, in code** (javadoc-only, verified by a full `mvn -o clean test`: 23 modules / 3777 tests /
 0 failures): `Parsers.java` said "the four built-ins" where `BuiltinParsers.IDS` has **six**;

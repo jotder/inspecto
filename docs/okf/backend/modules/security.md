@@ -9,14 +9,14 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Security module (inspecto-security)
 
-The fifth Maven module (`inspecto-security`), shipped W6 (2026-07-06). It supplies the
+A profile-gated Maven module (`inspecto-security`, in the `edition-standard`/`edition-enterprise` profiles only — `pom.xml:76`, `:115`), shipped W6 (2026-07-06). It supplies the
 **Standard/Enterprise** auth implementation; the common core stays auth-free.
 
 * **SPI seam (in core)** — `com.gamma.control.Authenticator` / `Subject` (id + capabilities) /
   `TokenRelay`, discovered via `ServiceLoader`. **No-op wins**: with no provider on the classpath the
   Personal edition is byte-for-byte unchanged.
 * **Contents** — `OidcAuthenticator` (OIDC resource server on Nimbus JOSE+JWT / JWKS),
-  `RoleMapper` (token claims → Roles/Capabilities), `OidcTokenRelay`.
+  `RoleMapper` (claims → Roles → Capabilities; ⚠ **since RBAC R1 the role→grant table is NOT hardcoded here** — it resolves per request from `Roles.effective`, the bound space's authored `roles.toon` over the shipped seed, fail-closed on an unknown role, plus SEC-7d data scopes via `dataScopesFor` — `RoleMapper.java:14-27`), `OidcTokenRelay`, `FileKeystoreSecretsProvider` (the SEC-07 `${FILE}`/`${KEYSTORE}` secret schemes).
 * **Reactor gating** — the module only builds under the `edition-standard` Maven profile; the default
   `mvn -o clean test` never compiles it (verify with `-Pedition-standard`: **34 tests** in this module — `OidcAuthenticatorTest` 24 + `OidcTokenRelayTest` 7 + `FileKeystoreSecretsProviderTest` 3 — inside a **31-module / 4106-test** reactor, measured 2026-09-08; the bare default reactor is 23 / 3777).
 * **Around it (in core, W6/W6d)** — the AuthN gate + per-route capability checks

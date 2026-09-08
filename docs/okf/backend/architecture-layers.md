@@ -146,7 +146,7 @@ Eight ServiceLoader SPIs, all loaded by core:
 | `intelligence.spi.IntelligenceAgent` | `service/CollectorService.java:609` | `InspectoIntelligenceAgent` (intelligence) | no |
 | `catalog.spi.DescriptionProvider` | `catalog/MetadataGraphService.java:62` | `Noop` (core), `AiDescriptionProvider` (agent) | no |
 | `notify.NotificationChannel` | `notify/NotificationService.java:69` | `WebhookChannel` (core), `SmtpEmailChannel` (connectors) | no |
-| `pipeline.PipelineNodeType` | `pipeline/PipelineNodeTypes.java:31` | **none** — SPI defined, zero implementors/services files | **yes** (4.3.0) |
+| `pipeline.PipelineNodeType` | `pipeline/PipelineNodeTypes.java:31` | see the 🔴 warning at the top of this file — the "zero implementors" claim is refuted | **yes** (`since = "4.0.0"`) |
 
 Second-order SPI: `com.gamma.agent.model.HostedProviderPlugin` (owned by *inspecto-agent*, not
 core) — implemented by `inspecto-agent-hosted`'s `LangChain4jProviderPlugin`. Hosted never touches
@@ -171,7 +171,7 @@ core at all.
    `CollectorService.java:347,384`): `ops.EventObjectBridge` — promotes `SEQUENCE_GAP` /
    `FLOW_CONSERVATION_IMBALANCE` events into managed ALERT objects — and the notification
    subscriber.
-2. **`service.BatchEventBus`** — the batch-commit fan-out (`Consumer<BatchEvent>`), subscribed by
+2. **`etl.ConsignmentEventBus`** — the consignment-commit fan-out (`Consumer<ConsignmentEvent>`), subscribed by
    `JobService`, `EnrichmentService`, `MetricsService`, `CollectorService.onUpstreamCommit` (event
    triggers). **Do not conflate the two.**
 
@@ -203,7 +203,7 @@ core at all.
 - *Composition Root* — `CollectorService` ctor (overloaded: also does event wiring at construction).
 - *Facade + Service Locator* — `control.ApiContext` over host/spaces; routes pull deps at call
   time, no constructor injection; route instances are stateless.
-- *Strategy* — `BatchIngestStrategy` (Csv vs StreamingPlugin), `OutputFormat` (enum-as-strategy),
+- *Strategy* — `ConsignmentIngestStrategy` (Csv vs StreamingPlugin), `OutputFormat` (enum-as-strategy),
   `TransformCompiler` function registry, `RouteModule` (shape only — see below).
 - *SPI Registry* — the 8 ServiceLoader seams (§4).
 - *Bridge/anti-corruption* — `ops.EventObjectBridge` (events → managed objects).
