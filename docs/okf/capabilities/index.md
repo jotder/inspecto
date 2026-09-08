@@ -40,7 +40,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `AGT` · `EOI` | [Assistant](assistant/assistant.md) | `assistant/` | ✅ **area #11 — 2026-09-08** |
 | `UI` | [Surfaces & Lenses](surfaces/surfaces.md) | `surfaces/` | ✅ **area #12 — 2026-09-08** |
 | `PKG` | Editions & packaging | `editions/` | planned — ⚠ must absorb the design in `superpower/deployment-topology-plan.md` before that plan can move (plan §5.10) |
-| `CMP` | Compliance | `compliance/` | planned — new area; owns the `compliance/` tree |
+| `CMP` | [Compliance](compliance/compliance.md) | `compliance/` | ✅ **area #13 — 2026-09-08**; owns the `compliance/` tree |
 | `TOOL` | Guards & repository tooling | `tooling/` | planned — new area |
 
 Measured load per area is in
