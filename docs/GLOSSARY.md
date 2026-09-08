@@ -821,3 +821,57 @@ bump" figure is stale and its premise is untested** — re-measured 2026-08-27: 
 `EnrichmentService`. Only `BatchEvent` is named for the concept. **Before scoping a bump, check which of those
 8 expose `Batch` in a published signature** — the rest are unreleased and rename freely.
 When a rename lands, mark its row ✅ and record the commit.
+
+---
+
+## 14. Capability areas (the functional spine) *(added 2026-09-08 — docs consolidation step 2)*
+
+The **fifteen capability areas** are the one subject axis every other view keys to: `REQUIREMENTS.md` §3's
+requirement IDs, `BACKLOG.md` rows, `EDITIONS.md` gating debt and commit messages all cite them, and each
+area owns exactly one **capability spec** under `docs/okf/capabilities/<directory>/` (template:
+`superpower/docs-consolidation-plan.md` §5.2). The **ID prefixes are stable traceability handles and never
+change**; the *names* below are the canonical ones and replace the headings `REQUIREMENTS.md` §3 used
+before this pass. A directory name is the most expensive name to change later, so nothing may be created
+under `okf/capabilities/` except through this table.
+
+| ID prefix(es) | Canonical area name | Directory | Defined by | Rename note |
+|---|---|---|---|---|
+| `ACQ` | **Acquisition & connectivity** | `acquisition/` | §2 Connection · Collector | unchanged — the pilot |
+| `ING` | **Ingestion & parsing** | `ingestion/` | §2 Consignment · §5 Parser · Grammar | unchanged |
+| `PIP` | **Pipeline authoring** | `pipeline-authoring/` | §5 Pipeline · Step · §1-A Workbench | `PIP` is **one ID range, two specs** — authoring (the editor, the config contract, the Step catalog) here; execution below. `BACKLOG.md` §3 already splits it this way |
+| `PIP` | **Pipeline execution** | `pipeline-execution/` | §6-A Run · Job · Trigger · Executable | the second `PIP` spec; "orchestration" is folded into it — the word is not a glossary term |
+| `DAT` | **Data plane** | `data-plane/` | §6-B Dataset · Table · Query | was "Data plane: Datasets & Queries" — the sub-clause listed instances of the concept it named |
+| `BI` · `INV` | **Studio** | `studio/` | §1-A Studio · §7 | was two areas, "BI Studio & presentation" and "Investigation studios". ⛔ Both are non-canonical: Link Analysis and Geo Map Analysis live *inside* **Studio** (§1-A), so `INV` was never a sibling of `BI`; "Investigation" and "presentation" are undefined. One spec; both ID ranges keep their numbers |
+| `OPS` | **Observability & maintenance** | `observability/` | §8 Signal · Event · Metric · Alert · §6-A Job (maintenance tasks) | was "Observability & operations". ⛔ *Operations/Ops* is the **Ops Lens** (§1-A) — a *surface*, not a capability; one word, two concepts. The capability is what the Lens renders: the signal ledger, metrics, audit, and the maintenance Jobs (backup, purge, verify) |
+| `INC` | **Alerts & Incidents** | `incidents/` | §9 Incident · Case · §4 Alert Rule · Decision Rule | unchanged |
+| `SPC` | **Spaces & tenancy** | `spaces/` | §1 Space · Space Template | unchanged |
+| `MET` | **Component metamodel & Catalog** | `metamodel/` | §10 Component Type · Component · §3 Catalog · Schema | unchanged |
+| `API` | **Control API** | `control-api/` | *this section* — **Control API** | was "API & integration". "integration" is undefined here and collides with the warehouse *integrations* doc; the thing the rows describe is the versioned HTTP control plane |
+| `SEC` | **Security** | `security/` | §1-A Role · Capability · Access Policy · Attribute | unchanged |
+| `AGT` · `EOI` | **Assistant** | `assistant/` | §12 Assistant · Model Settings | was "Assistant & embedded intelligence" + "Agentic framework as a product". ⛔ "embedded intelligence" is a *module* name (`inspecto-intelligence`), "Agentic" has no entry, and `EOI` names a separate repo (`eoiagent`) — its rows are the Assistant's runtime and fold in here, numbers kept |
+| `UI` | **Surfaces & Lenses** | `surfaces/` | §1-A Lens · Capability · Workbench · Studio · Ops | was "Operator console UX". ⛔ "console" is not canonical — `STAKEHOLDER_OVERVIEW.md` §11 still lists its name as an *open decision* — and a `ui/` directory would collide with `inspecto-ui/`. The rows are the SPA shell: Lens switching, the design system, accessibility, the responsive sweep |
+| `PKG` | **Editions & packaging** | `editions/` | *this section* — **Edition** · `EDITIONS.md` | was "Packaging & editions"; **Edition** had no glossary entry until now (only `EDITIONS.md`), so the concept leads and the mechanism follows |
+| `CMP` | **Compliance** | `compliance/` | *this section* — **Compliance** · `compliance/controls-matrix.md` | **new area.** Its rows were orphaned under `NFR-7` with no functional home; `EDITIONS.md` already numbers the shipped controls `CMP-01…03`, so the prefix is inherited, not invented |
+| `TOOL` | **Guards & repository tooling** | `tooling/` | *this section* — **Guard** | **new area.** The repo's own hygiene: the vocabulary, secret, link, dependency, coverage and board guards; the docs lifecycle; the `.claude/` setup. Four `BACKLOG.md` rows mapped to no area before this |
+
+**Terms this section introduces** (they had none, and each is now a directory name):
+
+**Control API** — The versioned HTTP control plane (`ControlApi`, JDK `HttpServer`): the `/api/v1` business
+contract, its envelope and error-code catalog, the OpenAPI document, ETag concurrency, `GET /bootstrap`, and
+the Java embedding API's stability policy (`@PublicApi`). *Control* distinguishes it from the data plane
+(§6-B) — it moves configuration and commands, never rows.
+
+**Edition** — A **build flavour** of one Inspecto version — **Personal** · **Standard** · **Enterprise** —
+assembled by `package.ps1` from Maven profiles and `ServiceLoader` modules. ⛔ Never a branch (versions are
+branches; see `BRANCHING.md`) and never a runtime flag: a feature an edition lacks is a module that edition
+does not bundle. The per-feature table is `EDITIONS.md`.
+
+**Compliance** — The controls, evidence and packaging obligations that let a deployment pass an external
+audit (SOC 2 / ISO 27001 / HIPAA / PCI scope): SBOM per bundle, signed releases, the dependency-review
+baseline, and the controls matrix. Distinct from **Audit Log** (§9), which is a *product feature*
+Compliance cites as evidence.
+
+**Guard** — A repo-level check that fails the build or the push when a stated invariant is broken: the
+vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards plus the processor-board
+`--check`. ⛔ Not an **Expectation** (data-side, §4) and not a **Capability** (an authorization question,
+§1-A). A guard's *scope* is a silent exemption — every one lists what it declines to read.

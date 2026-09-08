@@ -19,11 +19,30 @@ restating mechanism becomes a fourth copy of the truth — the failure this tier
 
 ## Areas
 
-| Area | Capability | State |
-|---|---|---|
-| `ACQ` | [Acquisition & connectivity](acquisition/acquisition.md) | ✅ **pilot — the template's first instance** |
+Names and directories are fixed by [`GLOSSARY.md` §14](../../GLOSSARY.md#14-capability-areas-the-functional-spine)
+(the 2026-09-08 naming pass — four of the old `REQUIREMENTS.md` §3 headings were non-canonical and two areas
+were missing). ⛔ Create a directory here only with the name that table gives it.
 
-The remaining fourteen areas are listed with their measured load in
-[`docs-consolidation-plan.md`](../../superpower/docs-consolidation-plan.md) §5.1. ⚠ Four area *names* are
-non-canonical and need a `GLOSSARY.md` pass before their directories are created (§5.1.1) — `ACQ` was
-chosen as the pilot partly because its name is not one of them.
+| ID prefix(es) | Capability | Directory | State |
+|---|---|---|---|
+| `ACQ` | [Acquisition & connectivity](acquisition/acquisition.md) | `acquisition/` | ✅ **pilot — the template's first instance** |
+| `ING` | Ingestion & parsing | `ingestion/` | planned |
+| `PIP` | Pipeline authoring | `pipeline-authoring/` | planned — the first `PIP` spec |
+| `PIP` | Pipeline execution | `pipeline-execution/` | planned — the second `PIP` spec; near-certain §3 split (440 KB of as-built truth) |
+| `DAT` | Data plane | `data-plane/` | planned |
+| `BI` · `INV` | Studio | `studio/` | planned — one spec for both ID ranges |
+| `OPS` | Observability & maintenance | `observability/` | planned |
+| `INC` | Alerts & Incidents | `incidents/` | planned — 🔴 no dedicated backend concept file exists today |
+| `SPC` | Spaces & tenancy | `spaces/` | planned |
+| `MET` | Component metamodel & Catalog | `metamodel/` | planned |
+| `API` | Control API | `control-api/` | planned |
+| `SEC` | Security | `security/` | planned |
+| `AGT` · `EOI` | Assistant | `assistant/` | planned — one spec for both ID ranges |
+| `UI` | Surfaces & Lenses | `surfaces/` | planned |
+| `PKG` | Editions & packaging | `editions/` | planned — ⚠ must absorb the design in `superpower/deployment-topology-plan.md` before that plan can move (plan §5.10) |
+| `CMP` | Compliance | `compliance/` | planned — new area; owns the `compliance/` tree |
+| `TOOL` | Guards & repository tooling | `tooling/` | planned — new area |
+
+Measured load per area is in
+[`docs-consolidation-plan.md`](../../superpower/docs-consolidation-plan.md) §5.1. Replication order is
+one area per commit (plan §6 step 4); each commit must leave the link guard and the vocabulary guard green.

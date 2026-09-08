@@ -72,6 +72,12 @@ AI-driven autonomy without redesign.
 
 ## 3. Functional requirements
 
+> ⚠ **Area names below are the pre-2026-09-08 headings.** The canonical name and directory for every area —
+> including the `BI`+`INV` merge into **Studio**, the `EOI` fold into **Assistant**, the `PIP` split into
+> authoring/execution, and the two new areas `CMP` and `TOOL` — is fixed by
+> [`GLOSSARY.md` §14](GLOSSARY.md#14-capability-areas-the-functional-spine). IDs are unchanged. The
+> headings are re-keyed when each area's capability spec lands (consolidation plan §6 step 5).
+
 ### 3.1 Acquisition & connectivity (ACQ) — backend + UI Workbench
 
 > ⚠ **These rows now have an owner:** [`okf/capabilities/acquisition/acquisition.md`](okf/capabilities/acquisition/acquisition.md) §2 is the requirement-of-record for `ACQ`, and it CORRECTS this table in three places (`ACQ-4` is partial, not shipped — the NFS/SMB half was refused; `ACQ-6`'s route and `ACQ-7`'s config key were both wrong here). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
