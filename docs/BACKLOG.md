@@ -133,7 +133,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ### Authoring (Parse / Transform / pipeline editor)
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P2** · **GUARD-SWEEP-1 — (g) only.** (a)–(f), (h), (i) all shipped 2026-09-07: the edition profile in
+- ✅ **DONE 2026-09-08** · **GUARD-SWEEP-1 — COMPLETE.** (a)–(f), (h), (i) all shipped 2026-09-07: the edition profile in
   CI · the dependency-lock scope · the secrets emptiness floor · commit-lint on the push range (it was
   gated on `pull_request` in a repo that opens none, so it had never run) · a `typecheck` script covering
   all three tsconfigs, wired into `ui.yml` (CI checked only `tsconfig.app.json` — the gap that let a
@@ -142,11 +142,22 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   catalog floors reset from measurement (`addable >= 30` against 35, was `>= 10`; the perverse floor on
   PLANNED work removed) · three corpus sweeps turned from `assumeTrue` into assertions, so a broken walk
   fails instead of silently disarming.
-  **(g) — no coverage gate anywhere** — jacoco is behind a profile CI never activates and is report-only
-  (no `check` goal, no minimum); the UI has no vitest coverage config at all. ⛔ Deliberately NOT built
-  today: choosing a threshold for 4074 tests with no baseline is a policy decision about what number
-  blocks whom, not a task. Wanted first: turn coverage REPORTING on to establish the baseline, then pick
-  the number with that in hand. → `okf/backend/build-run/guard-coverage.md`
+  ✅ **(g) CLOSED 2026-09-08 — GUARD-SWEEP-1 IS COMPLETE.** Measured first, then gated, in that order
+  because the row was right that a threshold without a baseline is arbitrary. **Baselines:** backend
+  81.01% instructions / 67.19% branches / 80.88% lines across 26 reporting modules; UI 73.82% statements
+  / 70.04% branches / 77.77% lines. **Floors (operator decision, repo-wide with a modest margin):**
+  backend instr ≥78% / branch ≥64%, UI stmt ≥70% / branch ≥66% — deliberately BELOW the baseline, since a
+  floor at the current number fires on noise. Enforced by `tools/check-coverage.mjs` (`--backend` in
+  `ci.yml`, `--ui` in `ui.yml`), falsified in all four directions.
+  🔴 **The first baseline was wrong in a way that looked right:** "82.92% across 21 modules" while nine
+  more code modules were never instrumented — `asn-parser/asn-decoders/pom.xml` is a separate root the
+  reactor only AGGREGATES, and a Maven profile inherits through `<parent>`, never through aggregation. A
+  tenth of the codebase sat outside a "repo-wide" number while `mvn -Pcoverage` exited 0. Honest figure
+  is 81.01%. ⚠ `jacoco:check` was NOT used: it binds per module, so it would gate `inspecto-util` (49.6%)
+  and `asn-golden` (4.4%) on their own numbers rather than enforcing one repo-wide floor.
+  ⚠ A percentage is not "how much code has tests" — a module with zero tests writes no `jacoco.exec` and
+  vanishes from the denominator rather than lowering it (~800 lines here, immaterial).
+  → `okf/backend/build-run/guard-coverage.md`
 - **P2** · **Step Processor catalog** — 121 processors: 34 delivered / **16 partial / 69 planned** (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 - **P2** · **P4 Test mapping on a generic `parser` node** — only reachable where the parse node is per-format. ⚠ The "blocked on §1 decision (l)" gate is **discharged** — (l) was decided and shipped 2026-09-06 (`okf/frontend/features/pipeline-editor.md`); re-scope this row before building. ⚠ Offline, non-`DIRECT` types show blank (mock has no SQL engine) — recorded. → `okf/frontend/features/pipeline-editor.md`
 - **P2** · **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption. (Its `projection_author` ‘stale `columns.items`’ half was **fixed 2026-07-28** and the clause is retired.) This row is what keeps `superpower/agt-6-plan.md` out of the archive. → `superpower/agt-6-plan.md`
