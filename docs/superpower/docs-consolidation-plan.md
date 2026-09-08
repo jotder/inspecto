@@ -251,6 +251,15 @@ concepts, which is precisely what the vocabulary rule forbids.
 **Therefore step 2 of §6 gains a precondition: a `GLOSSARY.md` pass that gives every area a canonical name
 and an entry.** Directory names are the most expensive kind of name to change later.
 
+✅ **DONE 2026-09-08 — `GLOSSARY.md` §14.** Fifteen areas, seventeen spec slots (`PIP` is two), every one with a
+directory and a defining entry: `BI`+`INV` → **Studio** (`studio/`), `AGT`+`EOI` → **Assistant**, `OPS` →
+**Observability & maintenance** (`observability/` — the Ops Lens keeps the word *Ops*), `UI` → **Surfaces &
+Lenses** (`surfaces/`), `API` → **Control API**, `PKG` → **Editions & packaging** (`editions/`), plus the new
+`CMP` **Compliance** (prefix inherited from `EDITIONS.md`'s `CMP-01…03`) and `TOOL` **Guards & repository
+tooling**. Four terms that became directory names got their first entry: Control API, Edition, Compliance,
+Guard. `okf/capabilities/index.md` lists all seventeen slots; `REQUIREMENTS.md` §3 points at the table until
+step 5 re-keys its headings.
+
 ### 5.2 One capability spec per area, with a fixed section order
 
 `docs/okf/capabilities/<area>/<area>.md` — the operator's "single document under a functional directory".
@@ -819,8 +828,13 @@ control does not match.
 **Net: one file's first half is absorbed; no file is deleted.** That is the shape to expect per area —
 consolidation here means *one authority per subject*, not fewer files.
 
-**Still owed for ACQ** (the pilot deliberately did not do these): retitling `integrations.md` and re-keying
-its waiver; collapsing the delivery banner; and 🔴 **five UNTRACKED items §5 surfaced that have no board
+✅ **The owed tail was drained 2026-09-08** (`050cff9f`): `integrations.md` lines 15–203 became
+`acquisition/connectors-runbook.md` (the ACQ spec's §7 cites it as the runbook tier — *absorbed* meant the
+spec content, not the copy-pasteable how-to), the file was retitled as the DuckLake/warehouse doc, the waiver
+was **deleted** rather than re-keyed (adjudication `adj-g23` §A: its only hit was the H1), the moved text's
+`source.*` keys were corrected to `collector.*`, and the 64-line delivery banner collapsed to a pointer.
+The two ACQ ORPHANs had already landed (§5 rows for the controller-service gating + list/fetch split; §6.2 for
+the `inspecto-connect` reversal). **Still owed for ACQ:** 🔴 **five UNTRACKED items §5 surfaced that have no board
 row**, the substantial one being *credentials & network profiles as their own referenced resources* —
 today a `tunnel` is inline on the Connection, so two Collectors through one bastion duplicate it and a
 rotation edits N places.
@@ -888,11 +902,11 @@ whether this works; everything after step 3 is replication.
 |---|---|---|
 | 0 | ✅ **DONE 2026-09-08** — `tools/check-doc-links.mjs` written, wired into `.githooks/pre-push` + `ci.yml` | Falsified six ways (broken current link · that link made valid · a broken archive-internal link · a current link into a missing archive file · external/anchor targets · the emptiness floor). **Baseline: 1,378 links, ZERO dangling** — 14 pre-existing breaks were fixed in the same change (§6.1), so every later step's floor is zero, not a tolerance |
 | 0b | ✅ **DONE 2026-09-08** — the 5 directories joined `DOC_TREES`, all 13 violations drained, the `type: flow` instruction corrected | Guard green over 200 docs with the wider scope, and the scope itself **falsified per directory** with tracked probes (§9) |
-| 1 | **Resolve the archive's authority citations** (§5.5) — the ≥24 current docs that delegate their truth to `plans-archive/`, starting with `REQUIREMENTS.md` §8 and the `review-coverage.md` graphify `resource:` entry; fix the 5 bookkeeping defects | no current-tier doc cites an archive file *as its authority*; link guard green |
-| 1b | **Distil the 7 archive ORPHANs** (§5.5) into their area's §3/§4/§6 — 5 are "Refused & superseded" rows, 2 are "Not built" rows, 1 belongs in the `angular-ui` skill | each ORPHAN named in the audit has a destination; BACKLOG §6 stops citing an archive file as the sole home of C2/C4/C6 |
+| 1 | 🟡 **FIRST CUT 2026-09-08** (`7d2a3c27`) — `REQUIREMENTS.md` §8's four archive rows now point at current homes with a provenance line; `review-coverage.md`'s `resource:` names the reactor, not the archive; **all 5 bookkeeping defects fixed** (INDEX 46→54 rows incl. the 2 missing; `legacy-surface-removal` header; `4x-public-pkce` note; `metadata-network-design` links). **Remaining:** the other ~18 authority citations — `docs/api/README.md` "the design", `GLOSSARY.md`'s four rationales, `grammar-config.md:126`'s mockup, the okf "full phasing"/"grounded refutation" delegations, `completeness-kpi-plan.md:21` | no current-tier doc cites an archive file *as its authority*; link guard green |
+| 1b | 🟡 **2 of 7 DONE** — the two ACQ ORPHANs landed in the pilot (`acquire-controller-service-design` → §5; `brainstorm-tingly-storm` → §6.2). Remaining 5 land with their area: `modularization-optimization` C2/C4/C6 → `editions/` §6 · `snazzy-painting-platypus` → `surfaces/` §6 · `system-maintenance-plan` COULD list → `observability/` §5 · `frontend-review-and-completion-plan` → the `angular-ui` skill · `claude-usage-audit` → none (meta) | each ORPHAN named in the audit has a destination; BACKLOG §6 stops citing an archive file as the sole home of C2/C4/C6 |
 | 1.5 | **Drain the `okf/` duplication debt** (§5.8) — the 10 subjects stated 2-4× and the 17 surviving `> Moved from` banners | one account per subject; ⚠ **must precede step 3**, or the contradictions become load-bearing |
-| 2 | **`GLOSSARY.md` pass on the area names** (§5.1.1) — canonical name + entry for all 15; resolve `INV` vs `Studio`, the `OPS`/Ops-Lens collision, `EOI`, `UI`/console, and the missing **Edition** entry | every directory name resolves to a `GLOSSARY` entry; vocabulary guard green |
-| 3 | **Pilot ONE area end-to-end** — `ACQ` (7 requirement rows, self-contained, its own `okf/backend/acquisition/` tree, and 2 of the 7 ORPHANs land in it) | operator signs off the 8-section template **on the real thing** before it is replicated 14 times |
+| 2 | ✅ **DONE 2026-09-08** (`64cc47d5`) — `GLOSSARY.md` §14: every area named, directoried and defined; `INV`→Studio, `OPS`→Observability & maintenance, `EOI`→Assistant, `UI`→Surfaces & Lenses, `API`→Control API; **Edition**, **Control API**, **Compliance**, **Guard** entries added; `CMP` and `TOOL` areas created (§5.1.1) | every directory name resolves to a `GLOSSARY` entry; vocabulary guard green — **verified: 207 docs clean** |
+| 3 | ✅ **BUILT 2026-09-08** (`b8bcb803`, tail `050cff9f`) — `ACQ` (§5.8.3): all eight sections, 75 KB, machine-verified twice; both ACQ ORPHANs landed; the `integrations.md` split and delivery-banner collapse done. ⚠ The template has not been *judged* by the operator yet — the next area is the moment to change the shape if it is wrong | operator signs off the 8-section template **on the real thing** before it is replicated |
 | 4 | Replicate per area, **one commit each** | per area: link guard green · vocabulary guard green · `graphify update .` run |
 | 5 | **Strip `REQUIREMENTS.md` to the cross-area rollup** — §1/§2/§4/§5/§6/§7/§8; the 19 oversized Status cells move to §3/§4 of their capability doc | every `<AREA>-n` ID resolves to exactly one capability doc; no ID orphaned |
 | 6 | **Reconcile the 15 contradiction clusters** (§8) as §2/§5/§6 rows | each cluster has one answer; `STAKEHOLDER_OVERVIEW` §9/§10.3 no longer contradicts the build |
