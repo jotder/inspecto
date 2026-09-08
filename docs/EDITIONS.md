@@ -70,7 +70,7 @@ and the AuthN/AuthZ gate in `ControlApi.dispatch` are shipped in the core (editi
 when no implementation is on the classpath). The `inspecto-security` module ships the Standard
 implementation (`OidcAuthenticator`, Nimbus JOSE+JWT + JWKS) and is reactor-gated behind the
 `edition-standard` Maven profile, so it is never built or resolved by a routine Personal build.
-`package.ps1 -Edition Standard` builds and bundles it; see `docs/superpower/api-contract-design.md`
+`package.ps1 -Edition Standard` builds and bundles it; see `docs/okf/capabilities/control-api/control-api.md` (design of record; the 2026-07-06 design is archived)
 §10 W6 for the full slice and `docs/api/deployment/` for WSO2/Keycloak blueprints.
 
 ## Security direction (Standard)

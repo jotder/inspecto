@@ -54,11 +54,10 @@ spaces (`/spaces`,`/spaces/_meta`), pipelines, jobs (`/jobs/{name}/runs|trigger`
 objects (ops), catalog, config/assist, enrichment, per-space settings docs (`/settings/branding|geo` and
 `/nav/menus` — the Menu Builder tree; each a fixed-filename TOON in the space's config tree, PUT gated by
 write-root 503 + `canAuthorWorkbench`, no jail/conflict gates since nothing caller-supplied touches a path.
-**`canAuthorWorkbench` is deliberately the menu-curation gate too** (menu-builder open point O1, settled
-2026-07-25): curating the tree every business user sees is space config-authoring, so it reuses that
-capability rather than minting a distinct one — the UI now mirrors this gate instead of offering edits that
-the server would 403. Splitting curation into its own capability stays an open product question, see
-`BACKLOG.md` §3 Menu builder)
+**`/nav/menus` is gated by `canCurateMenus`** — split out of `canAuthorWorkbench` on 2026-07-25 (D4,
+shipped end-to-end `fc637b1b`/`0c375ff5`; `okf/backend/editions/auth-security.md`). ⚠ This paragraph said
+until 2026-09-08 that curation reused `canAuthorWorkbench` and that the split "stays an open product
+question" — both were superseded the same day they were written)
 — plus the v1-era additions: `GET /bootstrap`
 (server capabilities incl. `features.authMode`), `/auth/*` (the Standard-edition BFF session routes),
 `POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling
@@ -99,11 +98,13 @@ before the generic two-segment read).
 
 ## `/api/v1`
 
-Every business route is also dispatched under the versioned **`/api/v1`** prefix with a success/error
-**envelope** (structured errors from the `ErrorCodes` catalog), `WriteGates`, a `Correlation-ID` response
-header, and gzip (W1). Legacy unversioned routes stay **byte-for-byte unchanged**; their use is counted by
-`ControlApi.recordLegacyUsage` (see [events & metrics](events-metrics.md)). Contract detail:
-[API v1](api-v1.md).
+Every business route is dispatched **only** under the versioned **`/api/v1`** prefix (API-5, 2026-07-25)
+with a success/error **envelope** (structured errors from the `ErrorCodes` catalog), `WriteGates`, a
+`Correlation-ID` response header, and gzip (W1). The unversioned allow-list is `isInfraRoute` (`/health`,
+`/ready`, `/metrics`, `/metrics/acquisition`); `recordLegacyUsage` and the whole sunset apparatus were
+**deleted** with the surface. *(This section described the legacy routes as still served until 2026-09-08.)*
+Contract detail: [API v1](api-v1.md); requirement of record:
+[Control API capability spec](../../capabilities/control-api/control-api.md).
 
 ## Auth by edition
 

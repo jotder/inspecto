@@ -1,6 +1,6 @@
 # `docs/api/deployment/` — WSO2 gateway + Keycloak realm blueprints (W6)
 
-> Companion to [`../../superpower/api-contract-design.md`](../../archived-documents/plans-archive/api-contract-design.md) §8
+> Companion to the [Control API capability spec](../../okf/capabilities/control-api/control-api.md) §3.12 (the design of record; the 2026-07-06 design is archived provenance at [`api-contract-design.md`](../../archived-documents/plans-archive/api-contract-design.md) §8)
 > (security architecture) and [`../../EDITIONS.md`](../../EDITIONS.md) (Standard edition assembly).
 > These are **illustrative starting points**, not a tested live deployment — this sandbox has no
 > running WSO2/Keycloak instance to verify against. Adapt hostnames, realm/API names, and throttling

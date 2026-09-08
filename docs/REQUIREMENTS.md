@@ -193,15 +193,17 @@ AI-driven autonomy without redesign.
 
 ### 3.11 API & integration (API)
 
+> ⚠ **These rows now have an owner:** [`okf/capabilities/control-api/control-api.md`](okf/capabilities/control-api/control-api.md) §2 is the requirement-of-record for `API` (canonical area name **Control API**, `GLOSSARY.md` §14), and it CORRECTS this table in three places (`API-3`: `If-Match` is honoured not required and the SPA never sends it; `API-6`: the blueprints are untested documentation; `API-7`: no automated guard). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
+
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
 | API-1 | Versioned **`/api/v1`** business contract: response envelope, error-code catalog, Correlation-ID, gzip; the only surface for business routes since API-5 | Must | SHIPPED (W1) | All |
 | API-2 | OpenAPI 3.1 contract (`docs/api/openapi-v1.json`) enforced by `ApiContractTest` | Must | SHIPPED (W2) | All |
-| API-3 | Optimistic concurrency: `ContentHash` + ETag / If-None-Match / If-Match on Components | Must | SHIPPED (W3) | All |
+| API-3 | Optimistic concurrency: `ContentHash` + ETag / If-None-Match / If-Match on Components | Must | ✅ server SHIPPED (W3) — ⚠ **no client consumer** (corrected 2026-09-08): `If-Match` is honoured (stale ⇒ 409), not required, and the SPA never sends it | All |
 | API-4 | `GET /bootstrap` metadata-first boot (features, `authMode`, permissions) | Must | SHIPPED (W3/W6) | All |
 | API-5 | Retire the unversioned route surface — business routes require `/api/v1` | Should | SHIPPED (2026-07-25, BACKLOG D3: business routes are served **only** under `/api/v1/…`; a bare unversioned business path is no longer served and `/api/<non-v1>` returns a JSON 404 rather than the SPA shell. Infra probes stay unversioned: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`. The sunset machinery is gone with the surface — `Deprecation`/`Link`/`Sunset` headers, `-Dapi.legacy.routes=off` and `inspecto_legacy_api_requests_total` no longer exist, and the soak criterion was deliberately overridden: no live deployment, every in-repo caller migrated in the same change) | All |
-| API-6 | Gateway/IAM drop-in: WSO2 gateway + Keycloak blueprints for Standard | Must (S) | SHIPPED (design + security module seams) | S |
-| API-7 | Java embedding API stability policy (SemVer, `@PublicApi`) | Must | SHIPPED | All |
+| API-6 | Gateway/IAM drop-in: WSO2 gateway + Keycloak blueprints for Standard | Must (S) | 🟡 PARTIAL by construction (corrected 2026-09-08) — the seams shipped; the two blueprints are **untested documentation** nothing in the tree consumes, never verified against a live gateway | S |
+| API-7 | Java embedding API stability policy (SemVer, `@PublicApi`) | Must | SHIPPED as policy — ⚠ no automated surface guard (2026-09-08) | All |
 
 ### 3.12 Security (SEC)
 

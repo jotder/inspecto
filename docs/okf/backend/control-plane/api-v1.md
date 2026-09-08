@@ -10,7 +10,9 @@ timestamp: 2026-07-07T00:00:00Z
 # Versioned API (/api/v1)
 
 The Control API's stable, versioned **business contract** (W1–W8, shipped 2026-07-06/08), designed so a
-WSO2-style gateway + external IAM can front it later without reshaping routes. Design of record:
+WSO2-style gateway + external IAM can front it later without reshaping routes. **Design of record:
+[the Control API capability spec](../../capabilities/control-api/control-api.md)** (§3.1 carries the 33
+guidelines, §4 the decisions); provenance:
 [`api-contract-design.md`](../../../archived-documents/plans-archive/api-contract-design.md) (§10 worklog).
 
 * **Envelope + errors (W1)** — every `/api/v1` response is enveloped; errors carry a machine-readable
@@ -48,8 +50,9 @@ WSO2-style gateway + external IAM can front it later without reshaping routes. D
   `PUBLIC_PATHS`), lazily loaded via working-dir → repo-root → module-dir resolution — absent file ⇒ 404
   with a log line, never a crash.
 * **Optimistic concurrency (W3)** — Components carry a `ContentHash` (parity-pinned with the UI's
-  `content-hash.ts`); reads return `ETag`, conditional reads honor `If-None-Match`, writes require
-  `If-Match`. See [component registry](../components/component-registry.md). The read-side idiom is a
+  `content-hash.ts`); reads return `ETag`, conditional reads honor `If-None-Match`, writes **honour**
+  `If-Match` — a present, non-matching precondition is `409 CONFLICT_STALE_VERSION` (`ETags.requireMatch`);
+  an absent header passes. ⚠ The SPA sends neither header (corrected 2026-09-08 — this said "require"). See [component registry](../components/component-registry.md). The read-side idiom is a
   one-line `ETags.respond(ex, body)` wrapper (`ETags.java`) — hash the body → `If-None-Match` 304 →
   set the header → return body-or-`HANDLED`; the hash captures any body variance, so a changed body
   never yields a false 304. **Extended 2026-07-24** beyond `/bootstrap` + `GET /components/{type}/{id}`

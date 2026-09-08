@@ -1,6 +1,6 @@
 # `docs/api/` — the machine-readable v1 API contract
 
-> Companion to [`../superpower/api-contract-design.md`](../archived-documents/plans-archive/api-contract-design.md) (the design)
+> Companion to [`okf/capabilities/control-api/control-api.md`](../okf/capabilities/control-api/control-api.md) (**the design of record** — §3.1 the guidelines, §3.8 what the test proves, §4 the decisions; the 2026-07-06 design is archived provenance at [`api-contract-design.md`](../archived-documents/plans-archive/api-contract-design.md))
 > and [`../ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) §10 (the as-built route reference). Enforced against
 > the live server by `inspecto/src/test/java/com/gamma/control/ApiContractTest.java`.
 
@@ -25,7 +25,7 @@ if/when the file becomes unwieldy — that decision is reversible, the paths jus
 
 ## Authoring workflow (contract-first)
 
-1. **Design the endpoint in `api-contract-design.md` §6 terms** — one business capability, canonical
+1. **Design the endpoint in the capability spec's terms** (§3.1: business capability, canonical vocabulary, bounded-context tag) — one business capability, canonical
    GLOSSARY vocabulary, bounded-context tag.
 2. **Add the path + DTO schemas here first**, reusing the shared components (`Envelope` wrapper via
    `allOf`, `ErrorResponse` for every non-2xx, `Pagination` in `metadata`). Give safe GETs an
@@ -36,7 +36,7 @@ if/when the file becomes unwieldy — that decision is reversible, the paths jus
 5. `mvn -o clean test` — `ApiContractTest` fails if the doc, the examples, `ErrorCodes.java`, and the
    live surface disagree.
 
-## Contract rules (binding, from the design doc)
+## Contract rules (binding; restated in the capability spec §3.8)
 
 - **Additive-only within v1**: never remove/rename a field or an ErrorCode; deprecate via
   `metadata.warnings` with a sunset date; breaking ⇒ `/api/v2`.

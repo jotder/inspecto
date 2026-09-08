@@ -35,7 +35,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `INC` | [Alerts & Incidents](incidents/incidents.md) | `incidents/` | ✅ **area #3 — 2026-09-08** (🔴 the backend objects domain still has no concept file — §7 gap row) |
 | `SPC` | Spaces & tenancy | `spaces/` | planned |
 | `MET` | Component metamodel & Catalog | `metamodel/` | planned |
-| `API` | Control API | `control-api/` | planned |
+| `API` | [Control API](control-api/control-api.md) | `control-api/` | ✅ **area #4 — 2026-09-08** (absorbs the `docs/api/README.md` "the design" archive citation) |
 | `SEC` | [Security](security/security.md) | `security/` | ✅ **area #2 — 2026-09-08** |
 | `AGT` · `EOI` | Assistant | `assistant/` | planned — one spec for both ID ranges |
 | `UI` | Surfaces & Lenses | `surfaces/` | planned |

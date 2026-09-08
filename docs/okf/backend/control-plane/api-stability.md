@@ -103,7 +103,7 @@ above the generated commit list.
 Phase 6 deletion of the flat read path (Row 15; the `-Dingest.lane` flag ships, the deletion waits for the
 verification minor), and X5's cross-lane StepInfo envelope.
 
-## The public surface (2.0.0)
+## The public surface (as it stands for the pending 4.0.0; unchanged since 2.0.0 except where noted)
 
 Two audiences depend on the framework from outside:
 
@@ -137,7 +137,7 @@ Two audiences depend on the framework from outside:
 | `com.gamma.service.CollectorService` | 2.2.0 | Always-on host: registry, poll schedule, event bus, control surface (`fromArgs`, `runAllOnce`, `runPipeline`, `pause`/`resume`, `pipelines`, `statusStore`) |
 | `com.gamma.service.EnrichmentService` | 2.3.0 | Orchestrates Stage-2 enrichment against batch-commit events + schedules; exposes the run-audit read surface (`configs`, `views`, `runs`, `lineage`) backing `GET /enrichment[...]` (v2.9.0) |
 | `com.gamma.enrich.EnrichmentAuditReader` | 2.9.0 | Read side of the Stage-2 audit — reads back the `<job>_enrich_runs.csv` / `_enrich_lineage.csv` ledgers as JSON-ready rows |
-| `com.gamma.control.ControlApi` | 2.4.0 | Embedded REST control plane over a running `CollectorService`. History: v3.0 added scoped token auth; the **editions realignment (2026-06-16) removed token auth from the core** — the common core is auth-free (Personal), and Standard re-adds OIDC via the `Authenticator`/`Subject`/`TokenRelay` SPIs. v4.8: versioned `/api/v1` envelope alongside byte-for-byte legacy routes |
+| `com.gamma.control.ControlApi` | 2.4.0 | Embedded REST control plane over a running `CollectorService`. History: v3.0 added scoped token auth; the **editions realignment (2026-06-16) removed token auth from the core** — the common core is auth-free (Personal), and Standard re-adds OIDC via the `Authenticator`/`Subject`/`TokenRelay` SPIs. 2026-07-06: versioned `/api/v1` envelope (W1); 2026-07-25: the unversioned business surface retired (API-5). *(This cell said "v4.8 … alongside byte-for-byte legacy routes" until 2026-09-08 — no v4.8 ever existed and the legacy routes are gone.)* |
 | `com.gamma.assist.spi.AssistAgent` | 3.0.0 | SPI for the optional embedded assist agent; discovered via `ServiceLoader` (or `CollectorService.registerAgent`) and wired in-process before `start()`. Implemented in the optional `inspecto-agent` module (M0) |
 | `com.gamma.service.DbStatusStore` | 2.6.0 | Database-backed `StatusStore` (engine-neutral JDBC; DuckDB by default — zero extra dep; Postgres for a future distributed deployment, bring-your-own driver) — selected via `-Dstatus.backend=db` |
 | `com.gamma.report.ReportService` | 2.8.0 | Rolls `StatusStore` audit into a live status snapshot + a historical batch-audit report (backs `GET /status`, `/report`, `/pipelines/{name}/report`); rolls the Stage-2 run audit into `enrichmentReport` (backs `GET /enrichment/{job}/report`, v2.9.0); reports accept a `Window` date range + report duration percentiles p50/p95/p99 (v2.10.0) |
