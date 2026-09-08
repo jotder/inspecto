@@ -41,7 +41,7 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `UI` | [Surfaces & Lenses](surfaces/surfaces.md) | `surfaces/` | ✅ **area #12 — 2026-09-08** |
 | `PKG` | Editions & packaging | `editions/` | planned — ⚠ must absorb the design in `superpower/deployment-topology-plan.md` before that plan can move (plan §5.10) |
 | `CMP` | [Compliance](compliance/compliance.md) | `compliance/` | ✅ **area #13 — 2026-09-08**; owns the `compliance/` tree |
-| `TOOL` | Guards & repository tooling | `tooling/` | planned — new area |
+| `TOOL` | [Guards & repository tooling](tooling/tooling.md) | `tooling/` | ✅ **area #14 — 2026-09-09**; new area |
 
 Measured load per area is in
 [`docs-consolidation-plan.md`](../../superpower/docs-consolidation-plan.md) §5.1. Replication order is

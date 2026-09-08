@@ -15,7 +15,7 @@ supersedes-rows: REQUIREMENTS §3.7 OPS-1..OPS-6 (this file corrects them, see �
 > in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built (tracked and
 > untracked), §6 what was refused or superseded, §7 the pointers into code and docs, §8 how the whole
 > thing is verified. Everything named in backticks under §3 and §7 was checked against the tree on
-> 2026-09-08 by `verify_cap.py`; the deliberate exceptions are called out where they occur.
+> 2026-09-08 by a capability-pointer check (⚠ a scratch script, not in this repo — `TOOL` §5.2); the deliberate exceptions are called out where they occur.
 >
 > ⛔ **`OPS` is a capability; "Ops" is a Lens.** `docs/GLOSSARY.md` §14 fixes the name *Observability &
 > maintenance* (it *was* "Observability & operations"). The Ops **Lens** is a UI surface owned by the
@@ -495,7 +495,7 @@ pages for *what is*.
 
 ## 8. Verification
 
-* **Pointer check** — `verify_cap.py docs/okf/capabilities/observability/observability.md` (tree index of
+* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.) — (tree index of
   every backticked repo path, Java class and test name; control probe must pass first). Deliberate
   historical names it reports as MISSING: `ingestLock`, `FLOW_CONSERVATION_IMBALANCE` is a live alias,
   the `docs/superpower/system-maintenance-plan.md` path is quoted only as the dead pointer it was.

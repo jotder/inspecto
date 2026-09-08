@@ -590,7 +590,7 @@ this file and the concept pages for *what is*.
 
 ## 8. Verification
 
-* **Pointer check** — `verify_cap.py docs/okf/capabilities/studio/studio.md` indexes the tracked and
+* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.) indexes the tracked and
   untracked tree and checks every backticked repo path, Java class and test name behind a control probe
   that must pass first. **One MISSING hit is deliberate:** `inspecto-ui/src/app/inspecto/mock/sample-sources.ts`
   in §3.3 and §5.2 is quoted precisely *because* it no longer exists — it is the dead path `studio.md`

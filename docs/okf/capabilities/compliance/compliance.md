@@ -439,7 +439,7 @@ rather than assumed (§5.3).
 
 ## 8. Verification
 
-* **Pointer check** — `verify_cap.py docs/okf/capabilities/compliance/compliance.md`.
+* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.).
 * **The area's own measurement** — `grep -c '^| NFR-7 ·.*⬜ open' compliance/controls-matrix.md` reads
   **7** and closes at **0**. ⚠ Keep the anchor and the row prefix: unanchored it reports 9, and renaming
   the prefix disarms it silently.
