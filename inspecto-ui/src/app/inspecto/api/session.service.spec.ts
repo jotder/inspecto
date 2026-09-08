@@ -76,6 +76,22 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.eventsEnabled()).toBe(false);
     });
 
+    it('reads features.ops (EDG-01 cell 7 — the optional operational-objects module)', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'standard', features: { authMode: 'none', ops: true } });
+        await init;
+        expect(svc.opsEnabled()).toBe(true);
+    });
+
+    it('ops defaults to false when /bootstrap does not mention it — never assumed present', async () => {
+        const init = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'personal', features: { authMode: 'none' } });
+        await init;
+        expect(svc.opsEnabled()).toBe(false);
+    });
+
     it('OIDC bootstrap + refresh 401 ⇒ authenticated false, loginRequired true', async () => {
         const done = svc.init();
         httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });

@@ -45,6 +45,11 @@ function create(datasets: Dataset[] = [D1], opts: { canShare?: boolean; offerRes
                     exchangeEnabled: () => opts.canShare ?? false,
                     authMode: () => 'none',
                     capabilities: () => [],
+                    // ⚠ EDG-01 cell 7: the cross-entity tag menu reads opsEnabled, and a STUB must name
+                    // every signal the template calls or it throws "not a function" on render — the same
+                    // trap authMode/capabilities are listed for. Armed true so the menu renders as before;
+                    // these specs are about datasets/widgets, not edition gating.
+                    opsEnabled: () => true,
                 },
             },
             { provide: ExchangeService, useValue: { offer } },

@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { LensService, ObjectsService, Tag, TagAssignment, TagsService } from 'app/inspecto/api';
+import { LensService, ObjectsService, SessionService, Tag, TagAssignment, TagsService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -61,6 +61,10 @@ async function create(
         ],
     });
     await TestBed.compileComponents(); // data-table @defer block
+    // EDG-01 cell 7: opsEnabled defaults FALSE (the Personal/absent-module state), where this
+    // pane renders the explained alert instead of its content. These specs assert the INSTALLED
+    // path, so arm it before the component reads it.
+    TestBed.inject(SessionService).opsEnabled.set(true);
     const fixture = TestBed.createComponent(TagsComponent);
     fixture.detectChanges(); // ngOnInit → loadRegistry()
     return { fixture, api, objects, toastr };

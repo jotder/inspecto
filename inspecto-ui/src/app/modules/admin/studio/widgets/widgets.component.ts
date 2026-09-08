@@ -56,6 +56,13 @@ import { DashboardsService } from '../dashboards/dashboards.service';
 })
 export class WidgetsComponent implements OnInit {
     private api = inject(WidgetsService);
+    /**
+     * `bootstrap.features.ops` — cross-entity tags and comments are
+     * operational-object edges, so they live in the optional inspecto-ops module
+     * (EDITIONS CP-11, EDG-01 cell 7). The menu action is HIDDEN when absent, the
+     * geoLink precedent: an affordance that can only 503 is worse than none.
+     */
+    readonly opsEnabled = inject(SessionService).opsEnabled;
     private datasetsApi = inject(DatasetsService);
     private dashboardsApi = inject(DashboardsService);
     private dialog = inject(MatDialog);

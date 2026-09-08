@@ -152,6 +152,13 @@ interface PresentationSnapshot {
 })
 export class LinkAnalysisComponent implements OnInit {
     private fb = inject(FormBuilder);
+    /**
+     * `bootstrap.features.ops` — cross-entity tags and comments are
+     * operational-object edges, so they live in the optional inspecto-ops module
+     * (EDITIONS CP-11, EDG-01 cell 7). The menu action is HIDDEN when absent, the
+     * geoLink precedent: an affordance that can only 503 is worse than none.
+     */
+    readonly opsEnabled = inject(SessionService).opsEnabled;
     private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
     private router = inject(Router);

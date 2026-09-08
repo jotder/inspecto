@@ -7,8 +7,17 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, LensService, ObjectsService, Tag, TagAssignment, TagsService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    LensService,
+    ObjectsService,
+    Tag,
+    TagAssignment,
+    TagsService,
+    SessionService,
+} from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
@@ -40,6 +49,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
     selector: 'app-tags',
     standalone: true,
     imports: [
+        InspectoAlertComponent,
         AiExplainComponent,
         MatButtonModule,
         MatIconModule,
@@ -56,6 +66,12 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 })
 export class TagsComponent implements OnInit {
     private api = inject(TagsService);
+    /**
+     * `bootstrap.features.ops` — this pane's whole backend is the optional inspecto-ops
+     * module (EDITIONS CP-11, EDG-01 cell 7). The nav entry is hidden when it is absent,
+     * but a bookmark still lands here, so the pane explains itself rather than 503-toasting.
+     */
+    readonly opsEnabled = inject(SessionService).opsEnabled;
     private objects = inject(ObjectsService);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
@@ -97,6 +113,7 @@ export class TagsComponent implements OnInit {
         },
     ];
 
+    // ⚠ Nothing to load without the module: /tags* 503s on a Personal build.
     ngOnInit(): void {
         this.loadRegistry();
     }

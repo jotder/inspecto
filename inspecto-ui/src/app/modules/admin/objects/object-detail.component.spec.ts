@@ -59,6 +59,7 @@ function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) 
     // where the events section explains itself and no API call is made. Arm it for the
     // INSTALLED path these specs assert.
     TestBed.inject(SessionService).eventsEnabled.set(true);
+    TestBed.inject(SessionService).opsEnabled.set(true); // EDG-01 cell 7: the whole pane is gated
     const fixture = TestBed.createComponent(ObjectDetailComponent);
     fixture.detectChanges(); // ngOnInit → loadObject()
     return { fixture, api };

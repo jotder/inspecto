@@ -46,6 +46,18 @@ export class NavigationService {
      */
     private static readonly EVENTS_NAV_IDS = new Set(['events']);
 
+    /**
+     * The operational-object screens, whose whole backend is the optional `inspecto-ops` module
+     * (EDITIONS CP-11, EDG-01 cell 7). Hidden — not disabled — when `/bootstrap` reports it absent:
+     * every `/objects*`, `/notes*`, `/queues*` and `/tags*` path 503s on a Personal build.
+     *
+     * ⛔ `alerts` is deliberately NOT in this set. That pane reads `AlertsService` over config-authored
+     * alert RULES, which every edition serves. It is the adjacent nav id and shares the word "alert"
+     * with an `OperationalObject` type, which is exactly why an over-wide filter would take it — the
+     * spec asserts it survives.
+     */
+    private static readonly OPS_NAV_IDS = new Set(['incidents', 'cases', 'tags']);
+
     /** Remove every item whose id is in `ids`, at any depth, in place. */
     private static dropIds(items: GammaNavigationItem[], ids: Set<string>): void {
         for (const item of items) {
@@ -98,6 +110,9 @@ export class NavigationService {
         }
         if (!this.session.eventsEnabled()) {
             NavigationService.dropIds(_default, NavigationService.EVENTS_NAV_IDS);
+        }
+        if (!this.session.opsEnabled()) {
+            NavigationService.dropIds(_default, NavigationService.OPS_NAV_IDS);
         }
         const _compact = cloneDeep(compactNavigation);
         const _futuristic = cloneDeep(futuristicNavigation);

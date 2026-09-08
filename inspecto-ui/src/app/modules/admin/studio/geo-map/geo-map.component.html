@@ -376,10 +376,12 @@
                         <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
                         <span>Load view</span>
                     </button>
-                    <button mat-menu-item (click)="openTags(view)" [attr.aria-label]="'Tags for ' + view.name">
-                        <mat-icon svgIcon="heroicons_outline:tag"></mat-icon>
-                        <span>Tags</span>
-                    </button>
+                    @if (opsEnabled()) {
+                        <button mat-menu-item (click)="openTags(view)" [attr.aria-label]="'Tags for ' + view.name">
+                            <mat-icon svgIcon="heroicons_outline:tag"></mat-icon>
+                            <span>Tags</span>
+                        </button>
+                    }
                 </ng-template>
             </mat-menu>
 

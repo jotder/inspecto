@@ -32,7 +32,9 @@ import {
     TagRule,
     UpdateObject,
     WorkflowDef,
+    SessionService,
 } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { STATUS_BADGE_BASE, statusBadgeClasses, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -96,6 +98,7 @@ function mailDate(ms: number | undefined): string {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoAlertComponent,
         AiExplainComponent,
         ReactiveFormsModule,
         MatButtonModule,
@@ -113,6 +116,12 @@ function mailDate(ms: number | undefined): string {
 })
 export class ObjectMailComponent implements OnInit {
     private api = inject(ObjectsService);
+    /**
+     * `bootstrap.features.ops` — this pane's whole backend is the optional inspecto-ops
+     * module (EDITIONS CP-11, EDG-01 cell 7). The nav entry is hidden when it is absent,
+     * but a bookmark still lands here, so the pane explains itself rather than 503-toasting.
+     */
+    readonly opsEnabled = inject(SessionService).opsEnabled;
     private dialog = inject(MatDialog);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
@@ -344,6 +353,8 @@ export class ObjectMailComponent implements OnInit {
     /** True once the last fetched page came back full — there may be more the operator hasn't seen (R6). */
     readonly hasMore = signal(false);
 
+    // ⚠ Nothing to load without the module: every /objects* path 503s, and an absent optional
+    // module is a deployment state rather than an error to report.
     reload(): void {
         this.loadTags();
         this.loading.set(true);

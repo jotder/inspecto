@@ -11,7 +11,7 @@ import { NavigationService } from './navigation.service';
  * one-sided test.
  */
 describe('NavigationService — optional-module nav entries', () => {
-    function mount(geoLinkEnabled: boolean, eventsEnabled = true) {
+    function mount(geoLinkEnabled: boolean, eventsEnabled = true, opsEnabled = true) {
         TestBed.resetTestingModule();
         TestBed.configureTestingModule({
             providers: [
@@ -19,7 +19,11 @@ describe('NavigationService — optional-module nav entries', () => {
                 // Only the one signal the filter reads; the real service does an HTTP bootstrap.
                 {
                     provide: SessionService,
-                    useValue: { geoLinkEnabled: signal(geoLinkEnabled), eventsEnabled: signal(eventsEnabled) },
+                    useValue: {
+                        geoLinkEnabled: signal(geoLinkEnabled),
+                        eventsEnabled: signal(eventsEnabled),
+                        opsEnabled: signal(opsEnabled),
+                    },
                 },
             ],
         });
@@ -100,5 +104,33 @@ describe('NavigationService — optional-module nav entries', () => {
         ).toBeDefined();
         // Its other siblings are untouched too: an over-wide filter would empty the group.
         expect(findById(nav.default as never, 'processing-status')).toBeDefined();
+    });
+
+    /**
+     * EDG-01 cell 7 (EDITIONS CP-11): the operational-object screens follow `inspecto-ops`.
+     *
+     * ⛔ The `alerts` assertion is the one that matters. That pane reads config-authored alert RULES,
+     * which every edition serves — it is the ADJACENT nav id and shares the word "alert" with an
+     * `OperationalObject` of type ALERT, so an over-wide filter takes it and nothing else notices.
+     */
+    it('shows Incidents, Case Manager and Tags when the ops module registered its routes', async () => {
+        const nav = await firstValueFrom(mount(true, true, true).get());
+        for (const id of ['incidents', 'cases', 'tags']) {
+            expect(findById(nav.default as never, id), id + ' should be present').toBeDefined();
+        }
+    });
+
+    it('hides them when the ops module is absent (Personal) — but never Alerts', async () => {
+        const nav = await firstValueFrom(mount(true, true, false).get());
+        for (const id of ['incidents', 'cases', 'tags']) {
+            expect(findById(nav.default as never, id), id + ' should be hidden').toBeUndefined();
+        }
+        expect(
+            findById(nav.default as never, 'alerts'),
+            'Alerts reads config alert RULES, which every edition serves — it must survive',
+        ).toBeDefined();
+        // And the unrelated siblings are untouched: an over-wide filter would empty the group.
+        expect(findById(nav.default as never, 'processing-status')).toBeDefined();
+        expect(findById(nav.default as never, 'audit')).toBeDefined();
     });
 });

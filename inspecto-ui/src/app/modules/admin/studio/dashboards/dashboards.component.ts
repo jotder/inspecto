@@ -6,7 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage } from 'app/inspecto/api';
+import { apiErrorMessage, SessionService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
@@ -34,6 +34,13 @@ import { DashboardsService } from './dashboards.service';
 })
 export class DashboardsComponent implements OnInit {
     private api = inject(DashboardsService);
+    /**
+     * `bootstrap.features.ops` — cross-entity tags and comments are
+     * operational-object edges, so they live in the optional inspecto-ops module
+     * (EDITIONS CP-11, EDG-01 cell 7). The menu action is HIDDEN when absent, the
+     * geoLink precedent: an affordance that can only 503 is worse than none.
+     */
+    readonly opsEnabled = inject(SessionService).opsEnabled;
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
     private dialog = inject(MatDialog);

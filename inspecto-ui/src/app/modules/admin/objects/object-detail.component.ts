@@ -95,6 +95,11 @@ export class ObjectDetailComponent implements OnInit {
      * showing "no events recorded", which would be a lie about the data.
      */
     readonly eventsEnabled = this.session.eventsEnabled;
+    /**
+     * `bootstrap.features.ops` — this pane IS an operational object (EDITIONS CP-11, EDG-01 cell 7), so
+     * unlike `eventsEnabled` above (which degrades one tab) this gates the whole detail view.
+     */
+    readonly opsEnabled = this.session.opsEnabled;
     private route = inject(ActivatedRoute);
     private destroyRef = inject(DestroyRef);
     private router = inject(Router);

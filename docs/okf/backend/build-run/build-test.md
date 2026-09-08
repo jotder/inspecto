@@ -65,12 +65,16 @@ the vendored kernel + eoiagent model transport.
 `inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
 **seven** edition modules: `inspecto-security`, `inspecto-policy`, and the five EDG-01 ones
 (`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
-`inspecto-metrics`, `inspecto-events`) — see [editions model](../editions/editions-model.md). The agent modules build in an
+`inspecto-metrics`, `inspecto-events`, `inspecto-ops`) — see [editions model](../editions/editions-model.md). The agent modules build in an
 ordinary `mvn test` run; they are simply never *bundled*.
 
-⚠ **Two reactor sizes, two baselines** (2026-09-08, EDG-01 cell 6): the default (Personal) build is **23
-modules / 4004 tests**; `-Pedition-enterprise` is **31 modules / 4125** (`inspecto-events` is the 31st, and
-contributes 3). A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
+⚠ **THREE reactor sizes, three baselines** (2026-09-08, EDG-01 complete): the default (Personal) build is
+**23 modules / 3777 tests**; `-Pedition-standard` is **31 modules / 4106**; `-Pedition-enterprise` is
+**32 modules / 4126** (`inspecto-ops` contributes 228, of which 11 skip — the environment-gated
+`PostgresStateStoreTest`). ⚠ Run `-Pedition-standard` too, not just the other two: it is the only profile
+that proves an optional module is **self-contained**. `inspecto-ops` ships in Standard while
+`inspecto-policy` does not, so a dependency between them is legal in exactly one direction — and the wrong
+direction still PASSED locally off a stale `~/.m2`. A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
 do not read that as the total, and do not conclude a module "failed" when the build never reached it.
 
 🔴 **Never edit the tree while a verification is running, and do not trust a process check to tell you it

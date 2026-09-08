@@ -124,14 +124,16 @@
                         >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                         </button>
-                        <button
-                            mat-icon-button
-                            (click)="openTags(w)"
-                            [attr.aria-label]="'Tags for ' + w.id"
-                            matTooltip="Tags"
-                        >
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
-                        </button>
+                        @if (opsEnabled()) {
+                            <button
+                                mat-icon-button
+                                (click)="openTags(w)"
+                                [attr.aria-label]="'Tags for ' + w.id"
+                                matTooltip="Tags"
+                            >
+                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
+                            </button>
+                        }
                         <button
                             mat-icon-button
                             (click)="addToDashboard(w)"

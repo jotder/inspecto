@@ -21,10 +21,10 @@ Assembly mechanisms:
   ⚠ Maven only *warns* on a profile that does not exist and then builds the default, so the old
   `-Pedition-personal` produced a correct Personal jar for an incorrect reason — the kind of instruction
   that survives because it appears to work.
-* **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **eight**:
+* **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **nine**:
   `inspecto-security` (OIDC/Nimbus, role mapping, token relay — see [auth & security](auth-security.md)),
   `inspecto-policy` (Enterprise ABAC), and the five EDG-01 modules `inspecto-notify-channels`,
-  `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events`.
+  `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events`, `inspecto-ops`.
   Each joins the reactor only under `edition-standard`/`edition-enterprise`, so Personal never even
   compiles it.
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
@@ -39,7 +39,10 @@ One version spans all editions; artifacts differ by classifier. The matching bra
 
 ## Extracting a feature into an edition module — the as-built recipe (EDG-01, 2026-09-07/08)
 
-Six features were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91b6c9de`+`1de693a3` ·
+**EDG-01 is COMPLETE as of 2026-09-08**: all six "not for Personal" cells of the feature × edition matrix
+are now true of the build, after having been a stated product decision the code did not apply.
+
+Seven cells were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91b6c9de`+`1de693a3` ·
 `f39b531f` · `d409921a` · cell 6). The shape that worked, and the traps that cost a rebuild each:
 
 1. **Contribute through an SPI, never an `if (edition == …)`.** Routes go through the public
@@ -118,3 +121,57 @@ Six features were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `9
     the reactor dies in an earlier module, the new module is merely SKIPPED, which reads like success in a
     summary that only counts failures. Check the module actually **contributed tests**, not just that the
     build passed.
+
+## Extracting a feature that mandatory core CONSTRUCTS (EDG-01 cell 7, CP-11)
+
+The first six cells were leaves — routes, tasks or an exposition. `CP-11` was not: 31 domain files with 27
+code dependants, several of which **built** the feature. What that changes:
+
+18. 🔴 **A provider SPI goes where its ARGUMENTS live, not where the seam lives.** `ObjectAccess` belongs
+    in `inspecto-engine`, expressed in engine types. Its provider could not: opening the stores needs
+    `SpaceRoot` and `OperationalDb` from the **host** module above the engine, and that dependency may not
+    be inverted. So `ObjectEngineProvider` is declared in `com.gamma.service` — the `RouteModule`
+    precedent, not the `MaintenanceTaskProvider` one. Decide this before writing the interface; discovering
+    it afterwards means moving the file and every implementor.
+19. ⚠ **A seam is rarely enough on its own — expect to return a HANDLE.** `ObjectAccess`'s nine methods
+    covered none of: the boot-time backfill count core logs, the SLA sweep core *schedules*, the browsable
+    stores the DB browser lists, or `close()` for four DuckDB connections. Those are lifecycle, not domain
+    calls, so they sit on an `ObjectEngine` handle rather than widening the seam for every consumer.
+20. 🔴 **Watch for an erasure collision when the domain object implements the seam.** `ObjectService.open`
+    returns an `OperationalObject` and `link` an `ObjectLink`, both with the same parameter erasure as the
+    SPI's `String open` / `void link` — Java rejects it. Renaming the SPI would push awkward names
+    (`openObject`, `linkObjects`) into core to accommodate a module detail. Adapt on the **module's** side
+    instead, and let the module's own routes and jobs cast that adapter back down to the concrete engine —
+    resolved per-Space through `api.service()`, never a static, or one Space serves another's rows.
+21. 🔴 **Check what the OTHER matrix rows promise, and expect to amend some.** `OPS-01` promised Personal
+    an `objects` store and `SP-CTL-02` a gap watchdog that raises ALERT objects; both had to change with
+    the cell (operator-approved) rather than be left contradicting the build. Cell 6 hit the same wall with
+    §Audit and resolved it the other way, by keeping a narrow core read. **Read the neighbours before
+    scoping the cell** — this is recipe item 12, and it has now decided the shape of two cells running.
+22. ⚠ **A ServiceLoader-contributed Job Type is constructed with NO arguments** and `create` receives only
+    a `JobConfig` — neither the engine nor the data root. Defer resolution to run time:
+    `JobContext.services()` carries whatever core registered, and `spaceId()` keys a module-side registry.
+    ⚠ And a named `switch` case always beats a contributed provider, so a task must be **removed** from the
+    switch, not merely also provided.
+23. 🔴 **An optional module may only depend on one that ships in every edition where IT ships.**
+    `inspecto-ops` is Standard-and-above, `inspecto-policy` is Enterprise-only, so the test edge is legal
+    in exactly one direction. ⚠ `-Pedition-standard -DskipTests` **passed** with the wrong direction,
+    because this machine's `~/.m2` held a stale jar — a green local build is not evidence here, reactor
+    membership per profile is.
+24. ⚠ **A three-way outcome must not be squeezed into two.** `DecisionRoutes` reported "Incident already
+    open" when the module was merely ABSENT, so a Personal deployment claimed triage was underway for an
+    Incident that cannot exist. Absent, present-and-open, present-and-new are three answers. Same class as
+    cell 3b's `features.geoLink`, which advertised a button that 404'd.
+25. ⚠ **Registration order in a constructor is behaviour.** A Platform Service registered EAGERLY beside a
+    neighbour that reads the same field through a SUPPLIER produced 632 NPEs across 40 test classes: the
+    field is assigned 40 lines later. When adding to a list of registrations, ask whether the line
+    evaluates now or later — not whether it looks like its neighbours.
+26. ⚠ **Tests that needed a real engine were only ever testing the Standard shape.** Re-seating
+    `AlertServiceTest`/`ReconRunJobTest`/`DryRunServicesTest` onto a core `FakeObjectAccess` is a gain, not
+    a compromise: they now assert what core is responsible for (dedupe-then-open, right kind/scope/attrs),
+    which is identical on every edition. Move the ones that genuinely assert PERSISTENCE or the object
+    GRAPH into the module — a fake asserting its own bookkeeping is a test of the fake.
+27. ⚠ **The `V1Body` trap scales.** At one or two moved HTTP tests a local `json()` helper is right (cells
+    4, 6). At **seven** (cell 7) one module-local copy in the split package is better: the moved tests stay
+    byte-identical and reviewable as *moves*. The drift risk is bounded because core's `ApiContractTest`
+    pins the served envelope independently.

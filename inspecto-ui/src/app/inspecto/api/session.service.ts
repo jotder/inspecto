@@ -33,7 +33,7 @@ export interface OidcConfig {
 /** The slice of `GET /bootstrap` this service consumes (edition switch + session). */
 interface Bootstrap {
     edition?: string;
-    features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean };
+    features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean; ops?: boolean };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
     auth?: Partial<OidcConfig>;
 }
@@ -83,6 +83,16 @@ export class SessionService {
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
     readonly eventsEnabled = signal(false);
+    /**
+     * `bootstrap.features.ops` — operational objects are registered in this bundle (EDITIONS CP-11: the
+     * optional `inspecto-ops` module, Standard and above; EDG-01 cell 7).
+     *
+     * ⛔ This is NOT about alerting. The Alerts pane reads `AlertsService` over config-authored alert
+     * RULES, which every edition serves; an `OperationalObject` whose `objectType` is `ALERT` is a
+     * different thing entirely. Do not gate `/alerts*` on this flag.
+     * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
+     */
+    readonly opsEnabled = signal(false);
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
@@ -111,6 +121,7 @@ export class SessionService {
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
         this.eventsEnabled.set(boot.features?.events === true);
+        this.opsEnabled.set(boot.features?.ops === true);
 
         if (mode !== 'oidc') return; // Personal / offline — done, no login path.
 

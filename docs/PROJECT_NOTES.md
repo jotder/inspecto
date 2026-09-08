@@ -107,9 +107,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   exposition) — joining `inspecto-security` and `inspecto-policy`. Personal answers their surfaces **503
   naming the module**, never 404. 🔴 The load-bearing one was `/metrics`: a `PUBLIC_PATH` on an edition
   that ships no authenticator and binds every interface. Recipe + traps:
-  [editions model](okf/backend/editions/editions-model.md). Two cells remain and BOTH await an operator call
-  on scope — CP-13's events feed and CP-11 operational objects (`superpower/edg-01-edition-gating-plan.md`
-  §§18–19).
+  [editions model](okf/backend/editions/editions-model.md). ✅ **EDG-01 COMPLETE 2026-09-08** — all six
+  cells are now true of the build; the plan is archived. ⚠ The two hardest cells each had to change what
+  the product PROMISES, not just where code lives: cell 6 kept a narrow core `/audit/*` read because
+  gating `/events*` would have removed Personal's Audit-log screen (§Audit promises it), and cell 7
+  amended `OPS-01` and `SP-CTL-02` because they promised Personal an `objects` store and a gap watchdog
+  that raises ALERT objects. **Read what the neighbouring matrix rows promise before scoping a gating
+  cell** — neither collision appeared in the census.
 - **Keep the core lean.** All network deps live in `inspecto-connectors`; hosted-AI SDKs in
   `inspecto-agent-hosted` (physically absent from air-gapped builds). The zero-new-dep rule was retired
   2026-06-13 (logback replaced slf4j-simple, user-approved) — still no gratuitous deps.

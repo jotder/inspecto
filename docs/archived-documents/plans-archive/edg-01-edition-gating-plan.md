@@ -868,3 +868,46 @@ calls a static `load(Path)` on an ops-owned type and hands the result to `svc.ob
 * **C** — new `inspecto-ops` module; move the domain + routes + jobs; retype core dependants.
 * **D** — UI: `features.ops`, nav ids `incidents`/`cases`/`tags`, the 6 partial-degrade sites.
 * **E** — docs: amend `OPS-01` + `SP-CTL-02`, close `CP-11`, EDITIONS/BACKLOG/OKF.
+
+## 24. EDG-01 COMPLETE — 2026-09-08
+
+All six "not for Personal" cells of the `docs/EDITIONS.md` feature × edition matrix are now true of the
+build. The column had been a stated product decision the code did not apply; it is now a packaging fact.
+
+| Cell | Row | Module | Commit |
+|---|---|---|---|
+| 1 | `CP-15` delivery channels | `inspecto-notify-channels` | `9fdb99f8` |
+| 2 | `OPS-06` backup/restore | `inspecto-backup` | `c323f35c` |
+| 3a | route SPI made public | — | `91b6c9de` |
+| 3b | `CP-09` geo map + link analysis | `inspecto-geo-link` | `1de693a3` |
+| 4 | `SEC-10` exchange / sharing | `inspecto-exchange` | `f39b531f` |
+| 5 | `CP-13` metrics exposition | `inspecto-metrics` | `d409921a` |
+| 6 | `CP-13` events feed + audit export | `inspecto-events` | `fc1b00cf` |
+| 7 | `CP-11` operational objects | `inspecto-ops` | `dc7601ff` · `fa6f6ccd` · `8cbecfe8` · `e8d98918` · `52c89c9d` |
+
+**Verified baselines:** Personal 23 modules / 3777 tests · Standard 31 / 4106 · Enterprise 32 / 4126 —
+zero failures in all three, each sum re-derived from the build logs rather than taken from a report.
+
+### What the arc actually cost, versus what it was scoped as
+
+The row was scoped as "gate six cells". Three of them turned out to require changing what the product
+PROMISES, not merely where code lives:
+
+* **Cell 6** found that gating `/events*` would remove Personal's Audit-log screen, which §Audit promises
+  it. Resolved by keeping a narrow, fail-closed `/audit/*` read in core.
+* **Cell 7** found that `OPS-01` promised Personal an `objects` store and `SP-CTL-02` a gap watchdog that
+  raises ALERT objects. Both rows were amended (operator-approved).
+* Neither was in the original census, because a census looks at the feature being gated and not at what
+  its neighbours have already promised. **That is the single most valuable habit this arc produced**, and
+  it is recipe item 12/21 in the OKF concept.
+
+### The measurement lesson, three times over
+
+Every cell's census under-counted, and always in the same direction:
+
+* Cell 4: an import census could not see a fully-qualified reference (`ComponentRoutes` → exchange).
+* Cell 6: the plan said "the Events screen"; it was four SPA panes, one of them the Audit log.
+* Cell 7: grep said 23 dependants, the compiler said 27 — the four extra being a call through type
+  *inference*, an FQN construction, two import-less references, and a whole module never searched.
+
+⛔ **Nothing on this row remains open.** Follow-ons, if any, belong in `docs/BACKLOG.md` as their own rows.
