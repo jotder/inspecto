@@ -72,8 +72,9 @@ paid for violating them.
     [`CMP`](okf/capabilities/compliance/compliance.md),
     [`TOOL`](okf/capabilities/tooling/tooling.md),
     [`Editions & packaging`](okf/capabilities/editions/editions.md) (`PKG`),
-    [`Pipeline authoring`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) (`PIP-1`); the last slot is named in
-    `GLOSSARY.md` §14 and sized in [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
+    [`Pipeline authoring`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) (`PIP-1`),
+    [`Pipeline execution`](okf/capabilities/pipeline-execution/pipeline-execution.md) (`PIP-2`–`PIP-7`).
+    ✅ **All seventeen slots are written** (2026-09-09); the area table is `GLOSSARY.md` §14.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.
   - [`okf/frontend/`](okf/frontend/index.md) — the Angular console: architecture, conventions, the shared
@@ -118,7 +119,7 @@ to the table below — all in the same change.
 | [`pipeline-spec.md`](superpower/pipeline-spec.md) | IN FLIGHT | The consolidated Pipeline specification (2026-08-30) + §12's wave plan and §13's ten decisions. **16 of 17 waves done**; only row 15 remains. ⚠ Widest inbound surface of any plan here — 7 other docs cite it. |
 | [`pipeline-waves-drain-plan.md`](superpower/pipeline-waves-drain-plan.md) | IN FLIGHT | The drain of those waves; §3 is the D-9 design pass. Archive **together with `pipeline-spec.md`** when row 15 closes. |
 | [`elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) | PARTLY SHIPPED | Phases 0–5 done and Phase 6's slices A–C2 shipped; the **Phase 6 deletion half is row 15**, release-gated (BACKLOG §2). D-8/D-11 are P3. |
-| [`deployment-topology-plan.md`](superpower/deployment-topology-plan.md) | DECISIONS SIGNED | §10's D1–D8 signed 2026-09-06 (D3 = the shipped 2GB cap), so the gate this entry used to name is gone. Phases 0–5 all unbuilt; T2/T3/T4 need a real deployment (BACKLOG §2 · §3). |
+| [`deployment-topology-plan.md`](superpower/deployment-topology-plan.md) | DECISIONS SIGNED | §10's D1–D8 signed 2026-09-06 (🔴 **D3 names a 2GB default that does not exist** — corrected 2026-09-09; the resolver returns `null` and the plan's own GAP-4 note says so), so the gate this entry used to name is gone. Phases 0–5 all unbuilt; T2/T3/T4 need a real deployment (BACKLOG §2 · §3). |
 | [`compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md) | PARTLY SHIPPED | **C2 delivered 2026-08-28** → `compliance/controls-matrix.md`. C1/C3-remainder/C5/C6 are open and org-gated — this is **not** a doc-lifecycle violation. |
 | [`edg-01-edition-gating-plan.md`](archived-documents/plans-archive/edg-01-edition-gating-plan.md) | **ARCHIVED 2026-09-08 — COMPLETE** | EDG-01: all six "not for Personal" cells are now true of the build (CP-15 · OPS-06 · CP-09 · SEC-10 · CP-13 both halves · CP-11). Baselines: Personal 23 modules / 3777 tests, Standard 31 / 4106, Enterprise 32 / 4126. As-built recipe (27 items) distilled to [editions model](okf/backend/editions/editions-model.md); ⚠ two other matrix rows had to be amended with cell 7 — `OPS-01` and `SP-CTL-02`. Nothing open. |
 | [`agt-6-plan.md`](superpower/agt-6-plan.md) | PARTLY SHIPPED | A1–A5 shipped 2026-07-26/27. Left: the `kpi_report_builder` host (no viable pane — a new surface) and all of AGT-6b, blocked upstream on eoiagent. |

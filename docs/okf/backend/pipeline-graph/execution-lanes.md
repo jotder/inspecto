@@ -88,7 +88,7 @@ A flat `*_pipeline.toon` carrying `steps:` + `output_store:` arms on the *declar
 `pipeline_config:` job exists to run the chain over the landed store — `output_store:` does not create
 the job. 🔴 Author the chain, skip the job, and the pipeline ingests forever while the transform never
 runs. Two closures (2026-09-01): `pipeline_config` is a declared parameter of the `pipeline` Job Type,
-and `SchedulerAuditTask` reports the orphan — but ⚠ only from a `scheduler_audit` maintenance job
+and `SchedulerAuditTask` reports the orphan. 🔴 **The following sentence was HISTORY stated as current and is corrected 2026-09-09** — since 2026-09-01 the check is **default-on in every space** (`JobService.auditOrphanOutputStores`, kill switch `-Djobs.orphan.audit=false`), exactly as this page says 34 lines above. It *used* to fire only from a `scheduler_audit` maintenance job
 (`spaces/demo/config/jobs/scheduler_audit_job.toon` ships one; a space without it has no orphan
 detection). Full detail: [stage1-architecture §Step 3](../engine/stage1-architecture.md).
 

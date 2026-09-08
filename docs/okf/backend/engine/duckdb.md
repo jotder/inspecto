@@ -34,7 +34,12 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   multi-tenant boxes to prevent overcommit, and pair with `temp_directory` so an over-limit query spills to
   disk instead of OOM-ing. (Preview / dry-run connections — `ComponentPreview`, `PipelineDryRun`, enrichment
   `preview` — run over bounded samples and are deliberately left uncapped.)
-* **D11 SHIPPED 2026-08-26 — the pair is `memory_limit=2GB` + `maxConcurrentRuns=4`, both owned by the server
+* **D11 SHIPPED 2026-08-26 — 🔴 HALF-ON: `maxConcurrentRuns=4` is a CODE default; `memory_limit` has
+  NO default at all** (corrected 2026-09-09 — this headline read “the pair is `memory_limit=2GB` +
+  `maxConcurrentRuns=4`”, so a skimmer took away a shipped 2GB cap). `DuckDbUtil.memoryLimit(null)`
+  returns `null`, no `scheduler.toon` ships, and the committed corpus sets the key to `""`. 2GB was the
+  MEASURED recommendation (§below), never an installed default — BACKLOG GAP-4 is still open. Both are
+  owned by the server
   configuration.** ⚠ **Only `maxConcurrentRuns` defaults on in code** (`JobService.java:184`); `DuckDbUtil.memoryLimit`
   falls through config → served `scheduler.toon` → `-Dprocessing.duckdb.memory_limit` → **DuckDB's own default**, and no
   `scheduler.toon` ships — `BACKLOG.md` GAP-4 is open. *(This line said "both on by default" until 2026-09-08.)* They are surfaced in the UI at **Settings ▸ Scheduler ▸ Resource

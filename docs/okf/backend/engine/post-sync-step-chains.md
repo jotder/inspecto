@@ -26,7 +26,7 @@ Two lanes, two contracts — do not blur them:
 | Lane | Carrier | Contract | Authored as |
 |---|---|---|---|
 | **In-batch** (parser → filters → map → dedup → sink) | scratch relations inside the run | `PipelineNodeExecutor`, `steps:` chain | the canvas / flat TOON |
-| **Post-sync** (this page) | the **Consignment output registry** | `ConsignmentProcessor` + `ProcessorContext` | a `type: consignment_process` Job's `processor` / `chain_config` params |
+| **Post-sync** (this page) | the **Consignment output registry** | `ConsignmentProcessor` + `ProcessorContext` | a `type: consignment.process` ⚠ *(this read `consignment_process` with an underscore until 2026-09-09 — the registered id is dotted, and copying the old spelling authors an UNKNOWN job type)*`consignment.process` Job's `processor` / `chain_config` params |
 
 ⛔ **The sink stays terminal in the batch graph.** The first draft proposed `SINK_PERSISTENT` emitting
 `DATA` so a step could chain after it on the canvas. Refuted: that pipes the *scratch* (pre-write,

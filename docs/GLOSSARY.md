@@ -368,7 +368,7 @@ pipeline-level activation action. *(2026-09-05: the Load **drawer's** mapping gr
 Load pane — was deleted with `transform.map`; the projection is authored in the **Record Transformer**
 (Transform pane) and the checklist chip keeps the Load name.)*
 
-**Trigger** — The start condition of a run: `cron` \| `event` \| `manual` \| `on-pipeline`. Owned by the
+**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL`, with coalescing and **no** `catch_up`. See `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.2. Owned by the
 **Scheduler**.
 
 ---

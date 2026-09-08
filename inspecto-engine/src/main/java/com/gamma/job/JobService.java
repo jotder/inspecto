@@ -62,9 +62,12 @@ import java.util.concurrent.atomic.AtomicLong;
  * The cron/event triggers only <em>submit</em> work to an internal virtual-thread executor, so
  * the scheduler thread is never blocked by a long job. A per-job lock guarantees non-overlap:
  * if a job fires while its previous run is still in flight, the new fire records {@code SKIPPED}
- * rather than running concurrently. Different jobs run in parallel — unbounded by default, or capped
- * at {@code -Djobs.maxConcurrentRuns} total in-flight Runs (0 = unbounded, the default) when an
- * operator needs to bound aggregate resource use (e.g. as a prerequisite for a DuckDB memory cap).
+ * rather than running concurrently. Different jobs run in parallel, capped at
+ * {@link #DEFAULT_MAX_CONCURRENT_RUNS} (4) total in-flight Runs by default since D11 (2026-08-26) —
+ * owned by {@code scheduler.toon} via {@code PUT /system/scheduler}, with
+ * {@code -Djobs.maxConcurrentRuns} only a bootstrap default and {@code 0} meaning unbounded.
+ * (This paragraph said “unbounded by default … 0 = unbounded, the default” until 2026-09-09, which
+ * contradicted the constant twelve lines below it.)
  * The permit is acquired on the worker thread, never the submitting thread, so a full pool queues
  * Runs rather than blocking the cron/event/manual caller.
  *

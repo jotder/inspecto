@@ -9,7 +9,7 @@ documented as concepts.
 # Operations
 
 * [Dashboard](dashboard.md) - KPIs + charts landing page (the default route).
-* [Runs](runs.md) - ingest operations: Run list + statuses (Run ⊇ Batch ⊇ File).
+* [Runs](runs.md) - ingest operations: Run list + statuses (**Run ⊇ Consignment ⊇ File** — corrected 2026-09-09).
 * [Run detail](run-detail.md) - files + audit grids + batch detail for one Run.
 * [Events](events.md) - the Signal Ledger (filters, live tail, saved views).
 * [Alerts](alerts.md) - fired alerts.
