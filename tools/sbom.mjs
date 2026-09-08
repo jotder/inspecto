@@ -8,8 +8,9 @@
 //
 // WHY PER BUNDLE, NOT PER REACTOR: the reactor resolves ~94 third-party artifacts dominated by the
 // optional AI stack (controls-matrix CC9). A reactor SBOM attests a set no customer installs. The
-// bundle set is: inspecto (→ inspecto.jar, the shaded fat jar) plus, for Standard/Enterprise,
-// inspecto-security (+ inspecto-policy) and the postgresql.jar sidecar package.ps1 stages.
+// bundle set is enumerated ONCE in tools/bundle-modules.mjs — 2 first-party modules for Personal, 10
+// for Standard, 11 for Enterprise — plus the postgresql.jar sidecar package.ps1 stages for the
+// non-Personal editions. tools/check-sbom-modules.mjs holds that enumeration against package.ps1.
 //
 // ⛔ WHAT IT IS NOT: tools/dependencies.lock. That is the REVIEW baseline (coordinates only, every
 // reactor module, diffed in CI). This carries what an SBOM must: per-component SHA-256 of the
@@ -29,6 +30,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
+import { bundleModules, editionProfile } from './bundle-modules.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -47,25 +49,21 @@ if (!['Personal', 'Standard', 'Enterprise'].includes(edition)) {
     process.exit(2);
 }
 
-// ── the shipped module set per edition — the SAME table package.ps1 stages from ──────────────
-// artifactId → bundle file. `inspecto/` is artifactId inspecto-processor (the one dir≠artifactId).
+// ── the shipped module set per edition ────────────────────────────────────────────────────────
+// Derived from tools/bundle-modules.mjs, which package.ps1's staging steps are held against by
+// tools/check-sbom-modules.mjs. This used to be a literal here under a comment asserting it was the
+// same table package.ps1 staged from; it was not, and nothing could notice — see that file's header.
+//
 // CONNECTORS-BUNDLE-1 (2026-09-07): the connector sidecar ships in EVERY edition, so it belongs in
-// every SBOM. It is what brings sshj/BouncyCastle, commons-net, kafka-clients and javax.mail into a
-// deployment -- deliberately absent from the lean core, and previously absent from the bundle too,
-// which is why they never appeared in a shipped SBOM despite being reactor-governed.
-const SHIPPED = { 'inspecto-processor': 'inspecto.jar', 'inspecto-connectors': 'inspecto-connectors.jar' };
-const plModules = ['inspecto', 'inspecto-connectors'];
-let profile = null;
-if (edition !== 'Personal') {
-    SHIPPED['inspecto-security'] = 'inspecto-security.jar';
-    plModules.push('inspecto-security');
-    profile = 'edition-standard';
-}
-if (edition === 'Enterprise') {
-    SHIPPED['inspecto-policy'] = 'inspecto-policy.jar';
-    plModules.push('inspecto-policy');
-    profile = 'edition-enterprise';
-}
+// every SBOM. It is what brings sshj/BouncyCastle, commons-net and kafka-clients into a deployment --
+// deliberately absent from the lean core, and previously absent from the bundle too, which is why they
+// never appeared in a shipped SBOM despite being reactor-governed. javax.mail is NOT among them: it
+// moved to inspecto-notify-channels with SmtpEmailChannel in EDG-01 cell 1, and reaches a bill of
+// materials only through that module — which is why it appeared in none until this table was fixed.
+const modules = bundleModules(edition);
+const SHIPPED = Object.fromEntries(modules.map((m) => [m.artifactId, m.bundleFile]));
+const plModules = modules.map((m) => m.dir);
+const profile = editionProfile(edition);
 
 const M2 = process.env.M2_REPO || join(homedir(), '.m2', 'repository');
 const rootPom = readFileSync(join(repoRoot, 'pom.xml'), 'utf8');
@@ -185,9 +183,16 @@ function purl(c) {
 
 const thirdParty = resolve();
 // the PostgreSQL sidecar rides the Standard/Enterprise bundle from package.ps1, test-scoped in the
-// reactor — so dependency:list (runtime scope) never lists it; add it from the same pom property
-// package.ps1 reads, and only when the sidecar is actually there.
-if (edition !== 'Personal' && pgVersion && existsSync(join(bundleDir, 'postgresql.jar'))) {
+// CORE reactor — so dependency:list (runtime scope) does not list it there; add it from the same pom
+// property package.ps1 reads, and only when the sidecar is actually there.
+//
+// ⚠ It may ALREADY be in the resolved set: inspecto-connectors declares the driver at COMPILE scope for
+// its db collector and shades it (514 org/postgresql/* entries), and that sidecar ships in every edition
+// since CONNECTORS-BUNDLE-1. Pushing unconditionally therefore emitted the component TWICE for
+// Standard/Enterprise — a duplicate `bom-ref` and a duplicate SPDXID, both of which their schemas forbid,
+// in a document whose whole purpose is to be machine-validated by an auditor.
+const hasPg = (c) => c.group === 'org.postgresql' && c.artifact === 'postgresql';
+if (edition !== 'Personal' && pgVersion && existsSync(join(bundleDir, 'postgresql.jar')) && !thirdParty.some(hasPg)) {
     thirdParty.push({ group: 'org.postgresql', artifact: 'postgresql', type: 'jar', classifier: null, version: pgVersion, scope: 'runtime' });
 }
 
