@@ -318,7 +318,7 @@ files**, and of 245 `since` values **223 say `4.0.0`**, 22 name a version that s
 retired `3.x` line and can never be an ancestor; `v4.0.0` / `v4.0.0-RC1` were deleted with the `4.x` branch
 on 2026-08-17. Therefore `since = "4.0.0"` means *"will become public in 4.0.0"*, and **an element that has
 never been published may still move, rename or change freely** — `@PublicApi` alone does not make a change
-breaking. That premise has been written down and refuted three times (Source→Collector, the
+breaking. That premise has been written down and refuted three times (Source→Collector, the <!-- vocab-allow: names the Source→Collector rename itself -->
 `ConsignmentProcessor` widening, the Phase C cycle cuts): *check whether the element exists in `v3.11.0`*
 (`git ls-tree -r --name-only v3.11.0 | grep …`) before treating a relocation as a break. ⚠ **There is no
 automated guard** — no japicmp, no test that the marked surface did not shrink; the policy is prose.
