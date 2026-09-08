@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Collector Connectors
-description: The CollectorConnector SPI and the SFTP/FTP/FTPS/DB connectors, SSH tunnelling, profiles, and secret resolution.
+description: The CollectorConnector SPI and its eight registered schemes (sftp, ftp, ftps, db, s3, kafka, azure, gcs), SSH tunnelling and proxy dial-through, connection profiles, the graded connection workbench, and secret resolution.
 resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
 tags: [acquisition, connectors, sftp, ftp, jdbc, ssh-tunnel, secrets]
 timestamp: 2026-06-28T00:00:00Z

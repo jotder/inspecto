@@ -16,8 +16,10 @@ like any local push. In the one-shot CLI/`reprocess`/manual path, `CollectorProc
 `acquire` then `ingest` in one cycle. In the **always-on service** the two run on their own timers (B3b):
 `dispatchAcquireCycle()` fetches under `acquire.pollSeconds` / `acquire.maxConcurrent`, guarded per-pipeline by
 a dedicated `acquireGuard`, so a slow fetch neither blocks nor is blocked by ingest, and two acquisitions of
-one pipeline never overlap. `acquire` is a no-op for a `local` collector. Authoritative doc:
-[`data-acquisition-framework.md`](data-acquisition-framework.md).
+one pipeline never overlap. `acquire` is a no-op for a `local` collector. For what was *required* and what was *refused*, start at the capability spec
+[**Acquisition & connectivity (`ACQ`)**](../../capabilities/acquisition/acquisition.md); this page is the
+mechanism tier for the cycle. *(It used to name `data-acquisition-framework.md` as "authoritative" — a
+chain that ended in the never-maintained archive tier.)*
 
 > **Gotcha — manual run vs. background acquisition.** The manual "run now" acquires inline under the *ingest*
 > `runGuard`, which is separate from the background `acquireGuard`; a manual run can therefore overlap one
@@ -50,7 +52,15 @@ deferred knob (`acquire.maxFilesPerCycle`, BACKLOG §6).
   fingerprint SPI: `find`/`record` per `(sourceId, relativePath)`, `highWatermark(sourceId)` for incremental
   discovery, `dbWatermark` for row-level DB export. Implementations: `InMemoryAcquisitionLedger` (default,
   lost on restart) and `DbAcquisitionLedger` (durable DuckDB/Postgres, via `-Dacquire.ledger.backend=db`).
-  `DuplicatePolicy` modes: PATH / METADATA / CHECKSUM / SKIP / REPROCESS / VERSION / FAIL.
+  `DuplicatePolicy` is **three** enums, not one list (`DuplicatePolicy.java:17,38,56`) — ⚠ conflating
+  them is how this line came to name four tokens that do not exist:
+  · **`Mode`** (how a file already seen at the same path is judged) — `PATH`, `METADATA`, `CHECKSUM`,
+    `ETAG`; unknown input falls back to `PATH`, and `ETAG` degrades to `METADATA` when neither side
+    supplies an etag or version.
+  · **`OnChange`** (what to do when a known path's content changed) — `IGNORE`, `REPROCESS` (the
+    default), `ALERT` (emits `FILE_CHANGED`), `ARCHIVE_OLD_VERSION`.
+  · **`Decision`** (the verdict for one candidate) — `NEW`, `DUPLICATE`, `CHANGED`.
+  ⛔ There is no `SKIP`, `VERSION` or `FAIL`.
 * **D — Gap detection.** `GapDetector` (`com/gamma/acquire/GapDetector.java`) flags missing files in a
   sequence series and fires alerts via `AcquisitionTelemetry`.
 * **E/F — Retry + circuit breaker.** `RetryPolicy` (`com/gamma/acquire/retry/RetryPolicy.java`, configurable

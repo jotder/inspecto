@@ -764,6 +764,67 @@ on it** — the register cites where to look for every one.
 retire *recommendations* (`modules/security.md`, and trimming `conventions/multi-space.md`) that need a
 human read first.
 
+### 5.8.3 The ACQ pilot — BUILT 2026-09-08
+
+[`okf/capabilities/acquisition/acquisition.md`](../okf/capabilities/acquisition/acquisition.md) — the
+first capability spec, all eight sections, **75 KB**. The tier lives at
+[`okf/capabilities/`](../okf/capabilities/index.md) with its own listing, and a new frontmatter
+`type: Capability` (nothing validates the type vocabulary, so the addition is free).
+
+**Size budget held, barely.** §3 Specification is **39.6 KB** against the ~40 KB split threshold of §5.3,
+so ACQ stays a single document. ⚠ That is the *smallest* real area by as-built weight — `PIP` carries 440 KB
+across 23 files and will certainly split. Treat 40 KB as a real trigger, not a formality.
+
+**What writing §2 found, which is the argument for the whole exercise.** Three defects in
+`REQUIREMENTS.md` §3.1, each verified against source and each fixed in both places:
+
+- **`ACQ-4` read a flat `SHIPPED`** while half its scope — the NFS/SMB network-share half — had been
+  **refused by design**. A `Must` recorded green over a refusal is what makes a requirement register
+  untrustworthy; it is now 🟡 PARTIAL with the refusal owning §6.1.
+- **`ACQ-6`'s route** was `POST /sources/{id}/notify`; it is `/collectors/{id}/notify`.
+- **`ACQ-7`'s config key** was `source.duplicate.mode`; the block is `collector.duplicate`. A fourth,
+  `source.discovery` → `collector.discovery`, turned up while checking and is fixed too.
+
+🔴 **And the thing no requirement row said:** for **85 days the remote connectors were build-available and
+deploy-absent** — `inspecto-connectors` was a reactor module no bundle shipped, so `connector: s3` could
+be authored, compiled and tested and did nothing in a deployment (fixed 2026-09-07). *A requirement is not
+delivered until it is reachable.* §2 now carries that as a standing note, because no status token can.
+
+**Verification of the assembled doc, because 526 of its lines were distilled by an agent.** Two
+independent passes (each with a mandatory control probe) agree: **33/33 referenced source files exist,
+46/46 named test classes exist, every real config key and route resolves.** The residual flags are all
+explained by the doc's own framing — `acquire.maxFilesPerCycle` is listed in §5 as unbuilt and
+`POST /components/connection/{id}/test` in §6.4 as superseded, so both are *correctly* absent from code.
+One genuine imprecision was found and fixed: §3.9 was headed "the eight registered schemes", but eight is
+the count of the **optional module**; ten values resolve (8 in `inspecto-connectors` + `dataset` in
+`inspecto-engine` + the built-in `local`), and a bundle without the sidecar resolves only two.
+
+⚠ **The first verifier reported EVERYTHING missing — including files I had grepped minutes earlier.**
+`subprocess.run(..., shell=True)` on Windows runs **cmd.exe**, where `find`/`grep`/`cat` are not the Unix
+tools, so every probe returned empty. Same zero-for-everything shape as the AGT-5 gate. A verification
+harness needs a control probe *before* its results are read — the fixed one now fails loudly if the
+control does not match.
+
+#### The migration verdict for ACQ's six source files
+
+| File | Verdict |
+|---|---|
+| `acquisition/connectors.md` | **KEEP** — the densest and most nearly correct of the six; the ACQ mechanism tier |
+| `acquisition/framework.md` | **KEEP** — ~40 % is unique (the two-timer/two-guard split, B4 back-pressure, the MDC-routed singletons) |
+| `acquisition/data-acquisition-framework.md` | **Requirement body absorbed by §2; its 75-line delivery banner collapses.** ⛔ Two blocks extracted first: the mounted-share/UNC note (now §6.1) and the connector-status banner |
+| `backend/integrations.md` §"Remote source connectors" | **ABSORBED into §3.10–§3.12.** The file survives **retitled as the warehouse doc** — its second half (DuckLake + pg_duckdb) is a different subject and is what its inbound links target. 🔴 Its path-keyed `DOC_ALLOW` waiver must be re-keyed in the same commit |
+| `modules/connectors.md` | **KEEP** — answers packaging, not behaviour |
+| `acquisition/index.md` | **KEEP** — the section map, now pointing *up* to the capability spec |
+
+**Net: one file's first half is absorbed; no file is deleted.** That is the shape to expect per area —
+consolidation here means *one authority per subject*, not fewer files.
+
+**Still owed for ACQ** (the pilot deliberately did not do these): retitling `integrations.md` and re-keying
+its waiver; collapsing the delivery banner; and 🔴 **five UNTRACKED items §5 surfaced that have no board
+row**, the substantial one being *credentials & network profiles as their own referenced resources* —
+today a `tunnel` is inline on the Connection, so two Collectors through one bastion duplicate it and a
+rotation edits N places.
+
 ### 5.9 What the layer split has actually cost — the operator's complaint, measured
 
 **12 of the 16 areas have their as-built truth split across `okf/backend/` and `okf/frontend/`.** Worst

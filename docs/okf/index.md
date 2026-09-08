@@ -25,6 +25,14 @@ a new distilled section for the agentic framework.
   `C:/sandbox/agent-brainstorm`) that supplies Inspecto's model transport — distilled map + the
   Inspecto integration seam. The framework's authoritative docs live in its own repo.
 
+## Capabilities — the subject tier (new 2026-09-08)
+
+* [Capabilities](capabilities/index.md) — **one document per capability**, keyed to `REQUIREMENTS.md`
+  §3's area IDs. Answers *what was required · what is built · what is left · what was refused* in one
+  place, because the sections above answer only the second of those and answer it by CODE LAYER. A
+  capability doc owns its requirements, specification, decisions and refusals; mechanism stays in the
+  sections above and open work stays in [`BACKLOG.md`](../BACKLOG.md). First instance: **`ACQ`**.
+
 ## Cross-cutting
 
 * [`living-operational-system.md`](living-operational-system.md) — the platform-wide **north star**: seven

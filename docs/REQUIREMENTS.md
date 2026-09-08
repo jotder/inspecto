@@ -74,6 +74,8 @@ AI-driven autonomy without redesign.
 
 ### 3.1 Acquisition & connectivity (ACQ) — backend + UI Workbench
 
+> ⚠ **These rows now have an owner:** [`okf/capabilities/acquisition/acquisition.md`](okf/capabilities/acquisition/acquisition.md) §2 is the requirement-of-record for `ACQ`, and it CORRECTS this table in three places (`ACQ-4` is partial, not shipped — the NFS/SMB half was refused; `ACQ-6`'s route and `ACQ-7`'s config key were both wrong here). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
+
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
 | ACQ-1 | **Connections**: named endpoint+credential definitions (SFTP/FTP/FTPS, database), reused by many Collectors | Must | SHIPPED | All |
@@ -81,8 +83,8 @@ AI-driven autonomy without redesign.
 | ACQ-3 | Acquisition framework: ledgers, dedup, watermarks, gap detection, retry (Phases A–F) | Must | SHIPPED | All |
 | ACQ-4 | Object-storage (S3/GCS/Azure/MinIO) + network-share (NFS/SMB) connectors on the connector SPI | **Must** | SHIPPED (2026-07-08: `connector: s3` — SDK-free SigV4, covers S3/MinIO/GCS-interop; `connector: azure` — SDK-free SharedKey signing over JDK HttpClient, List Blobs pagination + Range resume + copy-status-guarded MOVE, etags feed ACQ-7, Azurite-compatible for LAN testing; NFS/SMB = documented OS-mounted-share pattern, UNC stays jail-rejected by design. `connector: gcs` — native GCS JSON API + service-account OAuth2, SDK-free RS256 JWT→bearer on JDK crypto, shipped 2026-07-22, closing the tier). ⚠ **They only became deployable on 2026-09-07** (CONNECTORS-BUNDLE-1): `inspecto-connectors` was a reactor module no bundle shipped, so for 85 days every remote connector was build-available and deploy-absent. It now rides every bundle as the shaded `inspecto-connectors.jar` sidecar. | All |
 | ACQ-5 | Streaming source consumer (e.g. a Kafka topic drained by a Collector) | Should | SHIPPED (2026-07-08: `connector: kafka` — a topic drained per scan cycle into virtual slice files on the existing CollectorConnector SPI, no core-engine change; `assign()`+`seek()`, no consumer group — the consumed frontier rides the ledger watermark and is persisted only post-commit (at-least-once, DB-export machinery); envelope-NDJSON or raw-value payloads, retention clamp + `max_records` cap, optional SASL PLAIN; kafka-clients 3.9.2 confined to inspecto-connectors, tested offline via in-jar `MockConsumer`, no broker) | All |
-| ACQ-6 | Push/event-driven file discovery (replace poll where the remote can notify) | Could | SHIPPED (2026-07-08: `POST /sources/{id}/notify` — external systems trigger an immediate scan, 202+runId on v1, `canOperateRuns`-gated, audited as `source.notified`; plus `source.discovery: watch` — WatchService push for local/mounted inboxes, debounced, poll loop stays on as backstop) | All |
-| ACQ-7 | etag/version-aware dedup dimensions | Should | SHIPPED (2026-07-08: `source.duplicate.mode: etag` — pre-fetch skip on the connector's listing etag/object version; ledger columns `etag`/`object_version` with in-place migration; degrades to size+mtime when the connector supplies neither) | All |
+| ACQ-6 | Push/event-driven file discovery (replace poll where the remote can notify) | Could | SHIPPED (2026-07-08: `POST /collectors/{id}/notify` — external systems trigger an immediate scan, 202+runId on v1, `canOperateRuns`-gated, audited as `source.notified`; plus `collector.discovery: watch` — WatchService push for local/mounted inboxes, debounced, poll loop stays on as backstop) | All |
+| ACQ-7 | etag/version-aware dedup dimensions | Should | SHIPPED (2026-07-08: `collector.duplicate.mode: etag` — pre-fetch skip on the connector's listing etag/object version; ledger columns `etag`/`object_version` with in-place migration; degrades to size+mtime when the connector supplies neither) | All |
 
 ### 3.2 Ingestion & parsing (ING) — backend
 
