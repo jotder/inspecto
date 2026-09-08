@@ -171,7 +171,12 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   / 70.04% branches / 77.77% lines. **Floors (operator decision, repo-wide with a modest margin):**
   backend instr ≥78% / branch ≥64%, UI stmt ≥70% / branch ≥66% — deliberately BELOW the baseline, since a
   floor at the current number fires on noise. Enforced by `tools/check-coverage.mjs` (`--backend` in
-  `ci.yml`, `--ui` in `ui.yml`), falsified in all four directions.
+  `ci.yml`, `--ui` in `ui.yml`), falsified in seven directions (re-done 2026-09-08).
+  🔴 **"falsified in all four directions" was itself false**, and for the half that mattered: `--ui`
+  could NEVER pass, so `ui.yml`'s "Coverage floors (UI)" step was red from the moment it landed. Fixed
+  2026-09-08; the shape is recorded in `okf/backend/build-run/guard-coverage.md`. **A falsification
+  claim that skips an entry point is not a falsification** — enumerate the invocations, not the
+  outcomes.
   🔴 **The first baseline was wrong in a way that looked right:** "82.92% across 21 modules" while nine
   more code modules were never instrumented — `asn-parser/asn-decoders/pom.xml` is a separate root the
   reactor only AGGREGATES, and a Maven profile inherits through `<parent>`, never through aggregation. A

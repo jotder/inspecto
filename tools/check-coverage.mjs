@@ -91,9 +91,19 @@ function pct(covered, missed) {
 }
 
 // ── backend ────────────────────────────────────────────────────────────────────────────────────────
-const csvs = findJacocoCsvs(repoRoot);
-if (csvs.length === 0) {
-    console.error('\n✖ Coverage guard: CANNOT RUN — no jacoco.csv found anywhere.');
+// ⚠ Gated on wantBackend, exactly as the UI probe below is gated on wantUi: findJacocoCsvs walks
+// the whole repo, and a `--ui` run in ui.yml has no Java build to find.
+const csvs = wantBackend ? findJacocoCsvs(repoRoot) : [];
+// ⚠ Only an EXPLICIT `--backend` requires its own input to exist — the same rule `--ui` follows
+// below. A no-flag run "checks what is present, requiring at least one" (the args comment above) and
+// leans on the both-missing check further down. ci.yml passes `--backend`, so a Java build that lost
+// `-Pcoverage` STILL fails loudly there, which is the property worth keeping.
+//
+// 🔴 This was a bare `csvs.length === 0`, which made `check-coverage.mjs --ui` impossible to pass: it
+// died demanding jacoco.csv before reaching the UI block, in the one job that by design never builds
+// Java. ui.yml's "Coverage floors (UI)" step was red from b4bdc6d6 until this fix.
+if (wantBackend && csvs.length === 0 && explicit) {
+    console.error('\n✖ Coverage guard: CANNOT RUN — --backend was requested but no jacoco.csv exists.');
     console.error('  Run `mvn -o clean test -Pcoverage -Pedition-enterprise` first.');
     console.error('  ⚠ Failing rather than passing on purpose: a guard that no-ops when its input is');
     console.error('    missing would pass on every build that forgot the profile.');
@@ -121,7 +131,11 @@ for (const csv of csvs) {
     perModule.push({ mod, instr: pct(m.ic, m.im), branch: pct(m.bc, m.bm), size: m.ic + m.im });
 }
 
-const backend = { instruction: pct(totals.ic, totals.im), branch: pct(totals.bc, totals.bm), line: pct(totals.lc, totals.lm) };
+// null when there is no backend data at all — the shape `ui` already uses, so the report can skip a
+// half it does not have instead of formatting nulls.
+const backend = csvs.length
+    ? { instruction: pct(totals.ic, totals.im), branch: pct(totals.bc, totals.bm), line: pct(totals.lc, totals.lm) }
+    : null;
 
 // ── UI (optional: present only after `npm run test:coverage`) ──────────────────────────────────────
 let ui = null;
@@ -151,15 +165,22 @@ const check = (label, actual, floor) => {
     return `${ok ? '✓' : '✖'} ${label.padEnd(22)} ${actual.toFixed(2).padStart(6)}%  (floor ${floor.toFixed(1)}%)`;
 };
 
-console.log(`\nBackend — ${csvs.length} module report(s), ${totals.ic + totals.im} instructions`);
-console.log('  ' + check('instructions', backend.instruction, FLOORS.backend.instruction));
-console.log('  ' + check('branches', backend.branch, FLOORS.backend.branch));
-console.log(`  · lines ${backend.line.toFixed(2)}% (reported, no floor)`);
+if (backend) {
+    console.log(`\nBackend — ${csvs.length} module report(s), ${totals.ic + totals.im} instructions`);
+    console.log('  ' + check('instructions', backend.instruction, FLOORS.backend.instruction));
+    console.log('  ' + check('branches', backend.branch, FLOORS.backend.branch));
+    console.log(`  · lines ${backend.line.toFixed(2)}% (reported, no floor)`);
 
-perModule.sort((a, b) => a.instr - b.instr);
-console.log('\n  lowest-covered modules (context for a drop, not individually gated):');
-for (const m of perModule.slice(0, 5)) {
-    console.log(`    ${m.instr.toFixed(1).padStart(5)}%  ${String(m.size).padStart(7)} instrs  ${m.mod}`);
+    perModule.sort((a, b) => a.instr - b.instr);
+    console.log('\n  lowest-covered modules (context for a drop, not individually gated):');
+    for (const m of perModule.slice(0, 5)) {
+        console.log(`    ${m.instr.toFixed(1).padStart(5)}%  ${String(m.size).padStart(7)} instrs  ${m.mod}`);
+    }
+} else {
+    // ⚠ Not a failure: ui.yml runs `--ui` in a job that never builds Java, and ci.yml runs its own
+    // `--backend`. Saying so beats silently reporting half the picture as if it were all of it — the
+    // same reasoning as the UI arm below.
+    console.log('\nBackend — no jacoco.csv (run `mvn -o clean test -Pcoverage -Pedition-enterprise`). Skipped.');
 }
 
 if (ui) {

@@ -296,9 +296,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   is a different gate, not a superset.** Proved 2026-08-11 (`842a3a77`): a spec asserting `toHaveLength`
   on an element list passed `npm run test:ci`, passed the production `npm run build`, and passed **both**
   `tsconfig.app.json` and `tsconfig.spec.json` — while failing `npx tsc -p tsconfig.json --noEmit`. The
-  root config sets no `types`, so every `@types/*` is ambient and **`@types/jasmine` supplies the global
-  `expect`**; only `tsconfig.spec.json` names `vitest/globals`, and the root config does not extend it.
-  The fix is importing `{ describe, expect, it }` from `vitest` in the spec (307 of 319 already do) —
+  root config sets no `types`, so every `@types/*` is ambient; only `tsconfig.spec.json` names
+  `vitest/globals`, and the root config does not extend it. The `@types/jasmine` that used to leak a
+  global `expect` in there was **removed as an orphan on 2026-09-08** (`89f09b6c`, with `jasmine-core`
+  and the five karma packages), so the root config now supplies no test globals at all — the gate is
+  unchanged, it just fails sooner. The fix is importing `{ describe, expect, it }` from `vitest` in the
+  spec (all 334 specs now do) —
   **never** editing the tsconfigs to paper over it. Commands + rationale: `angular-ui` skill §12 step 2b.
 
 - **`git mv` stages the rename from the INDEX, not the working tree.** Edit a doc and *then*

@@ -165,3 +165,32 @@ narrower than the thing it guards: a gated route in an optional module would hav
 been invisible to the drift check, both directions. **A guard whose scope is narrower than its subject is an
 exemption nobody wrote down.** Widened to every module's `src/main/java` in the same commit that opened the
 seam — the two must move together, or the seam opens a hole the guard used to cover by accident.
+
+## Instance, 2026-09-08: the guard that could not pass AT ALL
+
+The inverse of Shape 1. `tools/check-coverage.mjs` takes `--backend` / `--ui` so each CI job enforces
+the half it actually builds — `ci.yml` builds Java and never the UI, `ui.yml` the reverse. But the
+backend's must-exist check was written as a bare `if (csvs.length === 0) { process.exit(1) }`, with no
+reference to the `wantBackend` flag computed ten lines above it. So `check-coverage.mjs --ui` died
+demanding `jacoco.csv` before it ever reached the UI block — in the one job that by design never
+produces one. The "Coverage floors (UI)" step was red from `b4bdc6d6` until `--ui` was gated properly.
+
+Three things make this worth recording:
+
+- **The intent was documented in two places and the code contradicted both.** The comment beside the
+  `ui.yml` step says it "reports the backend as skipped here … rather than presenting half the picture
+  as all of it", and the script's own UI arm says the mirror-image thing. Prose describing the
+  behaviour is not the behaviour; only the exit code is.
+- **A dedicated error path was unreachable.** The `--ui`-requested-but-missing branch could never fire,
+  because the backend exit always won first. An error message nobody can reach is dead code that reads
+  like coverage.
+- **The failure was LOUD, not silent** — the step went red immediately. Shape 1 and Shape 2 are guards
+  that pass when they should fail; this one failed when it should pass, which is safer but still
+  worthless: a gate that cannot go green teaches people to ignore it, and it hid the real UI numbers
+  (74.18% statements / 70.24% branches, both comfortably over their floors) behind an infrastructure
+  error the whole time.
+
+**Falsify every ENTRY POINT, not just every outcome.** The original was described as "falsified in all
+four directions"; the flag combinations are what actually needed enumerating. The fix was re-checked
+across seven: `--ui` with and without UI data, `--backend` with and without jacoco, `--backend` with
+jacoco above and below the floors, and no-arg with only one half present and with neither.
