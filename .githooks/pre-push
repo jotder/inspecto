@@ -155,6 +155,23 @@ if ! run_guard tools/check-gate-tally.mjs "gate-tally guard"      "CI runs it to
   exit 1
 fi
 
+# Doc-link guard. Every relative markdown link in a current doc must resolve. Local as well as CI
+# because the thing it catches is created by ordinary, correct work: a class moves module, a plan gets
+# archived, a skill is copied to a new folder one level deeper — and the link that pointed at it is now
+# a 404 nobody sees. Its first run found 14, including SEVEN in `.claude/skills/*/SKILL.md` pointing at
+# `../../docs/…` (i.e. `.claude/docs/`, which does not exist) — skills telling an agent to read
+# PROJECT_NOTES / EDITIONS / BRANCHING, resolving to nothing at all.
+#
+# ⚠ It ignores broken links INSIDE docs/archived-documents/** (never-maintained tier, by policy) but not
+# links pointing INTO it, and it prints that exemption on every run — an unstated scope is an unaudited one.
+if ! run_guard tools/check-doc-links.mjs "doc-link guard" \
+     "CI runs it too — a broken doc link there is a red master."; then
+  echo "pre-push: refusing to push — a current doc links to something that does not exist (above)." >&2
+  echo "          Fix the LINK, not the guard: a moved target needs its new path, an archived one needs" >&2
+  echo "          the docs/archived-documents/… path, and a deleted one needs the link removed." >&2
+  exit 1
+fi
+
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
 echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2

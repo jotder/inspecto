@@ -74,6 +74,19 @@ jobs:
       - name: Guard — BACKLOG §2's gate tally matches its table
         run: node tools/check-gate-tally.mjs
 
+      # Doc-link guard (2026-09-08). ~1,380 relative links across the current doc tiers must resolve.
+      # Added because nothing policed links at all: DOCS-LINKS-1 was a manual sweep, and the invariant had
+      # rotted in four flavours by the time this ran — a module split (inspecto-engine -> inspecto-ops), a
+      # class named in a doc that never existed under that name, a plan archived out from under a live
+      # link, and seven `.claude/skills/*/SKILL.md` references off by one directory level, pointing the
+      # agent that reads them at nothing. Broken links INSIDE docs/archived-documents/** are ignored (that
+      # tier is never maintained, by CLAUDE.md policy); links pointing INTO it are not, and the exemption
+      # plus its count is printed on every run. Pure Node, ~instant. Falsified in both directions before
+      # wiring: a broken current link, the same link made valid, a broken archive-internal link, a current
+      # link into a missing archive file, external/anchor targets, and the emptiness floor.
+      - name: Guard — every relative doc link resolves
+        run: node tools/check-doc-links.mjs
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:

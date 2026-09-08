@@ -65,14 +65,20 @@ if (!gitAccess.ok && !gitAccess.tarball) {
 // The curated set of user-facing docs whose canonical vocabulary must stay pristine.
 const USER_FACING = [
     'docs/USER_GUIDE.md',
-    'docs/operations.md',
-    'docs/troubleshooting.md',
-    'docs/configuration.md',
-    'docs/integrations.md',
-    'docs/plugins.md',
-    'docs/performance.md',
-    'docs/parsing-options-reference.md',
-    'docs/api-stability.md',
+    // 🔴 EIGHT ENTRIES REMOVED 2026-09-08 — they had been dead paths for 54 days and pass 1 was scanning
+    // NOTHING for any of them. `docs/operations.md`, `troubleshooting.md`, `configuration.md`,
+    // `integrations.md`, `plugins.md`, `performance.md`, `parsing-options-reference.md` and
+    // `api-stability.md` all moved into `docs/okf/**` in the 2026-07-16 consolidation. `scanProse` returns
+    // `[]` for a file it cannot open, and the success line reported `USER_FACING.length` — so the guard
+    // announced "9 user-facing doc(s) … clean" while reading exactly one. A count taken from the LIST
+    // instead of from the READ is the same defect this file's own DOC_TREES_LABEL comment warns about.
+    //
+    // No coverage is lost: all eight live under `DOC_TREES` and are scanned by pass 3 through the SAME
+    // `scanProse` rules (shared "so the two can never drift"). The only difference is that pass 3 permits
+    // a reasoned DOC_ALLOW entry — and none of the eight has one.
+    //
+    // ⛔ Do not re-add a path here without checking it exists: the emptiness check below now fails the
+    // build on a dead entry, which is why this could sit unnoticed before and cannot now.
 ];
 
 // Pass 3 (§3.2, added 2026-08-04): the KNOWLEDGE trees — `docs/okf/**` (current knowledge) and
@@ -89,7 +95,30 @@ const USER_FACING = [
 // history warns about: a new tier is unscanned by default, and nothing says so.
 // `docs/stakeholders/**` joins them 2026-08-29 for the same reason — CLAUDE.md's doc-lifecycle §1 names
 // it part of the tier-1 canon, and a stakeholder brief is read by the least forgiving audience there is.
-const DOC_TREES = ['docs/okf', 'docs/superpower', 'compliance', 'docs/stakeholders'];
+//
+// `docs/roadmap`, `docs/ops`, `docs/api`, `docs/ui`, `docs/wiki` join them 2026-09-08 — the FOURTH
+// instance of this guard's own silent-exemption shape, and the one it had already written down: the
+// ROOT_CANON note below has named `ops/`, `roadmap/`, `api/` and `ui/` as unscanned since 2026-08-29,
+// as the reason root canon is a named file list. Naming a gap is not closing it. `docs/wiki/` was in no
+// list at all.
+//
+// What the gap was hiding: `docs/roadmap/STAKEHOLDER_OVERVIEW.md` — the document an executive reads, and
+// `INDEX.md`'s own stakeholder set — tripped `bare-flow` 46 times and `issue-key` 4 times while this
+// guard reported green. §11 of it told the reader to stand up a `type: flow` job, which is not a real
+// job type: past a certain age a banned synonym stops being wrong vocabulary and becomes wrong
+// instructions. The lesson is now on its third repetition: audit a guard's SCOPE separately from its
+// RULES, because a clean run says nothing about what it declined to look at.
+const DOC_TREES = [
+    'docs/okf',
+    'docs/superpower',
+    'compliance',
+    'docs/stakeholders',
+    'docs/roadmap',
+    'docs/ops',
+    'docs/api',
+    'docs/ui',
+    'docs/wiki',
+];
 
 // The ROOT CANON (CLAUDE.md doc-lifecycle §1) — tier-1 current knowledge that is not under a tree, so
 // every pass missed it: `docs/` also holds `ops/`, `roadmap/`, `api/`, `ui/` and the permanently
@@ -566,6 +595,23 @@ function scanProse(rel) {
 const violations = [];
 for (const rel of USER_FACING) violations.push(...scanProse(rel));
 
+// A curated entry that names a file which no longer exists scans NOTHING, and `scanProse` cannot tell the
+// difference — it returns `[]` for an unopenable path. That is how eight of this list's nine entries went
+// unscanned for 54 days while the guard reported them clean. The same self-retiring discipline the
+// DOC_ALLOW check applies below: a dead entry is a lie about coverage, so it fails the build.
+for (const rel of USER_FACING) {
+    if (existsSync(join(repoRoot, rel))) continue;
+    violations.push({
+        rel,
+        line: 0,
+        rule: 'stale-scope',
+        hit: rel,
+        src: '(USER_FACING entry)',
+        msg: 'This curated user-facing doc does not exist, so pass 1 scanned nothing for it — and would '
+            + 'have kept reporting it as clean. Point the entry at the file\'s real path or DELETE it.',
+    });
+}
+
 // Pass 3: the knowledge trees, filtered through DOC_ALLOW. Committed files only (`git ls-files`), for the
 // same local==CI reason as pass 2.
 const usedDocAllow = new Set();
@@ -672,4 +718,6 @@ const configScope = toonFiles === null
 const sourceScope = sourceFiles === null
     ? 'source pass skipped (not a git checkout)'
     : `${sourceFiles.length} Java/TS source file(s) clean`;
-console.log(`✓ Vocabulary guard: ${USER_FACING.length} user-facing doc(s) + ${treeScope} + ${configScope} + ${sourceScope} — no banned synonyms or concept-confusion.`);
+// Report the number of files actually READ, never `USER_FACING.length` — see the pass-1 note above.
+const userFacingRead = USER_FACING.filter((rel) => existsSync(join(repoRoot, rel))).length;
+console.log(`✓ Vocabulary guard: ${userFacingRead} user-facing doc(s) + ${treeScope} + ${configScope} + ${sourceScope} — no banned synonyms or concept-confusion.`);
