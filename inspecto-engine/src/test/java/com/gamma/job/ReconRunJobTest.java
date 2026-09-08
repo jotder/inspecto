@@ -84,7 +84,10 @@ class ReconRunJobTest {
                 "compareColumns", List.of(Map.of("column", "amount", "toleranceType", "percent", "tolerance", 0.5))));
         System.setProperty("assist.write.root", writeRoot.toString());
 
-        com.gamma.ops.ObjectService objects = new com.gamma.ops.ObjectService(new com.gamma.ops.InMemoryObjectStore());
+        // ⚠ The seam's test double since EDG-01 cell 7 — core cannot construct an ObjectService any more
+        // (com.gamma.ops is an optional module). The assertions are unchanged in substance: what this test
+        // is about is that ReconRunJob opens ONE Incident per reconciliation and dedupes the second run.
+        com.gamma.objects.FakeObjectAccess objects = new com.gamma.objects.FakeObjectAccess();
         JobConfig cfg = new JobConfig("nightly_recon", "recon.run", null, null, true, false,
                 Map.of("reconciliation", "orders_recon"), null, null);
         ReconRunJob job = new ReconRunJob(cfg, dataDir.toString(), () -> objects);
@@ -97,9 +100,9 @@ class ReconRunJobTest {
         assertEquals(1, incidentCount(objects), "deduped to one open Incident per reconciliation");
     }
 
-    private static int incidentCount(com.gamma.ops.ObjectService objects) {
-        return objects.query(com.gamma.ops.ObjectQuery.builder()
-                .objectType(com.gamma.objects.ObjectType.INCIDENT).build()).size();
+    private static int incidentCount(com.gamma.objects.FakeObjectAccess objects) {
+        return (int) objects.opened.stream()
+                .filter(o -> o.kind() == com.gamma.objects.ObjectType.INCIDENT).count();
     }
 
     @Test

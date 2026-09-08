@@ -65,7 +65,7 @@ class ObjectsAnalyticsJobTest {
     void flattensTheNestedRollupIntoTallRows() {
         Map<String, Object> rollup = seeded().analytics(ObjectType.INCIDENT);
 
-        Map<String, Double> rows = byKey(ObjectsAnalyticsJob.flatten(ObjectType.INCIDENT, rollup));
+        Map<String, Double> rows = byKey(com.gamma.opsjob.ObjectsAnalyticsJob.flatten(ObjectType.INCIDENT, rollup));
 
         assertEquals(2d, rows.get("INCIDENT|scalar|total"));
         assertEquals(2d, rows.get("INCIDENT|scalar|backlog"), "both are freshly opened ⇒ non-terminal");
@@ -81,7 +81,7 @@ class ObjectsAnalyticsJobTest {
 
     @Test
     void flattenToleratesAnEmptyRollup() {
-        Map<String, Double> rows = byKey(ObjectsAnalyticsJob.flatten(ObjectType.TASK, new LinkedHashMap<>()));
+        Map<String, Double> rows = byKey(com.gamma.opsjob.ObjectsAnalyticsJob.flatten(ObjectType.TASK, new LinkedHashMap<>()));
 
         assertEquals(0d, rows.get("TASK|scalar|total"), "absent scalars fold to 0, never to a null row");
         assertEquals(0d, rows.get("TASK|scalar|backlog"));
@@ -100,7 +100,7 @@ class ObjectsAnalyticsJobTest {
         System.setProperty("assist.write.root", write.toString());
         try {
             CapturingContext ctx = new CapturingContext();
-            JobResult result = new ObjectsAnalyticsJob(cfg(Map.of()), data.toString(), ObjectsAnalyticsJobTest::seeded)
+            JobResult result = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), data.toString(), ObjectsAnalyticsJobTest::seeded)
                     .run(ctx);
 
             assertEquals("SUCCESS", result.status(), result.message());
@@ -145,7 +145,7 @@ class ObjectsAnalyticsJobTest {
         String prior = System.getProperty("assist.write.root");
         System.setProperty("assist.write.root", write.toString());
         try {
-            ObjectsAnalyticsJob job = new ObjectsAnalyticsJob(cfg(Map.of("retention_days", "0")),
+            com.gamma.opsjob.ObjectsAnalyticsJob job = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of("retention_days", "0")),
                     data.toString(), ObjectsAnalyticsJobTest::seeded);
             job.run(new CapturingContext());
             Thread.sleep(2);   // the filename key is epoch millis
@@ -174,7 +174,7 @@ class ObjectsAnalyticsJobTest {
         String prior = System.getProperty("assist.write.root");
         System.setProperty("assist.write.root", write.toString());
         try {
-            JobResult result = new ObjectsAnalyticsJob(cfg(Map.of("retention_days", "7")),
+            JobResult result = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of("retention_days", "7")),
                     data.toString(), ObjectsAnalyticsJobTest::seeded).run(new CapturingContext());
 
             assertFalse(Files.exists(stale), "10-day-old sample is outside a 7-day window");
@@ -194,7 +194,7 @@ class ObjectsAnalyticsJobTest {
         String prior = System.getProperty("assist.write.root");
         System.setProperty("assist.write.root", write.toString());
         try {
-            new ObjectsAnalyticsJob(cfg(Map.of("types", "INCIDENT, case")), data.toString(),
+            new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of("types", "INCIDENT, case")), data.toString(),
                     ObjectsAnalyticsJobTest::seeded).run(new CapturingContext());
 
             List<Object> sampled = readBack(data).stream().map(r -> r.get("object_type")).distinct().toList();
@@ -214,7 +214,7 @@ class ObjectsAnalyticsJobTest {
         String prior = System.getProperty("assist.write.root");
         System.setProperty("assist.write.root", write.toString());
         try {
-            JobResult result = new ObjectsAnalyticsJob(cfg(Map.of()), data.toString(),
+            JobResult result = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), data.toString(),
                     ObjectsAnalyticsJobTest::seeded).run(new DryRunContext());
 
             assertEquals("SUCCESS", result.status());
@@ -230,7 +230,7 @@ class ObjectsAnalyticsJobTest {
 
     @Test
     void missingObjectEngineFailsClosed(@TempDir Path tmp) {
-        ObjectsAnalyticsJob job = new ObjectsAnalyticsJob(cfg(Map.of()), tmp.toString(), () -> null);
+        com.gamma.opsjob.ObjectsAnalyticsJob job = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), tmp.toString(), () -> null);
         assertThrows(IllegalStateException.class, () -> job.run(new CapturingContext()));
     }
 
@@ -239,7 +239,7 @@ class ObjectsAnalyticsJobTest {
         String prior = System.getProperty("assist.write.root");
         System.clearProperty("assist.write.root");
         try {
-            ObjectsAnalyticsJob job = new ObjectsAnalyticsJob(cfg(Map.of()), tmp.toString(),
+            com.gamma.opsjob.ObjectsAnalyticsJob job = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), tmp.toString(),
                     ObjectsAnalyticsJobTest::seeded);
             assertThrows(IllegalStateException.class, () -> job.run(new CapturingContext()));
         } finally {
@@ -253,11 +253,11 @@ class ObjectsAnalyticsJobTest {
         System.setProperty("assist.write.root", tmp.toString());
         try {
             assertThrows(IllegalArgumentException.class,
-                    () -> new ObjectsAnalyticsJob(cfg(Map.of("types", "GHOST")), tmp.toString(),
+                    () -> new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of("types", "GHOST")), tmp.toString(),
                             ObjectsAnalyticsJobTest::seeded).run(new CapturingContext()),
                     "an unknown type never silently samples a subset");
             assertThrows(IllegalArgumentException.class,
-                    () -> new ObjectsAnalyticsJob(cfg(Map.of("retention_days", "-1")), tmp.toString(),
+                    () -> new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of("retention_days", "-1")), tmp.toString(),
                             ObjectsAnalyticsJobTest::seeded).run(new CapturingContext()));
         } finally {
             restore(prior);

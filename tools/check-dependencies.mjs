@@ -66,7 +66,13 @@ function resolve() {
     // the one dependency tree a security reviewer most wants under review — inspecto-security's Nimbus
     // JOSE+JWT — was the one the guard never saw, while compliance/controls-matrix.md marked G7 CLOSED.
     // Enterprise is the superset, so this single flag covers Standard too.
-    const args = ['-B', 'dependency:list', '-DincludeScope=runtime', '-Pedition-enterprise'];
+    // ⚠ `package -DskipTests` runs BEFORE dependency:list on purpose (EDG-01 cell 7, 2026-09-08).
+    // `dependency:list` alone does not build, so an inter-module dependency on a module that has never
+    // been `install`ed cannot resolve and the guard reports CANNOT RUN — which reads like drift but is
+    // only a resolution artefact. A real `mvn test` resolves it from the reactor. inspecto-ops depends
+    // on inspecto-policy (test scope) for the ABAC row-scope test, which is what surfaced this.
+    const args = ['-B', '-DskipTests', 'package', 'dependency:list', '-DincludeScope=runtime',
+                  '-Pedition-enterprise'];
     if (process.env.MVN_OFFLINE === '1') args.unshift('-o');
     let out;
     try {

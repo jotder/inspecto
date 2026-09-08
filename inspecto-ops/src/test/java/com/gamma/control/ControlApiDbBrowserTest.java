@@ -254,7 +254,8 @@ class ControlApiDbBrowserTest {
         System.setProperty("objects.backend", "db");   // makes DbObjectStore live (a BrowsableStore)
         try (Ctx c = open(root)) {
             // a link target in the same space to satisfy the mandatory ≥1-link create contract
-            OperationalObject target = c.spaces.space(SpaceId.of("s1")).orElseThrow().service().objects()
+            OperationalObject target = TestOpsEngine
+                    .of(c.spaces.space(SpaceId.of("s1")).orElseThrow().service())
                     .open(ObjectType.INCIDENT, "link target", "d", "HIGH", "corr", java.util.Map.of());
 
             // seed one row via the API (POST /objects defaults to an INCIDENT)

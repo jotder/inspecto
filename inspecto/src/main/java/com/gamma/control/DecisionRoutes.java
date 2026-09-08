@@ -189,13 +189,20 @@ final class DecisionRoutes implements RouteModule {
                 // ⚠ Through the seam since EDG-01 cell 7, and empty on a bundle without inspecto-ops —
                 // in which case no Incident is raised and the decision still executes and audits.
                 com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
-                if (isHighSeverity(severity) && objects != null && !objects.hasActive(ObjectType.INCIDENT, corr)) {
-                    objects.open(ObjectType.INCIDENT, "Decision Rule " + alertName,
-                            "Raised by Decision Rule '" + ruleName + "'", severity, corr,
-                            Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
-                    incidentDetail = "opened Incident for '" + alertName + "' (" + severity + ")";
-                } else if (isHighSeverity(severity)) {
-                    incidentDetail = "decision '" + alertName + "' — Incident already open";
+                if (isHighSeverity(severity)) {
+                    // ⛔ Three outcomes, not two. An absent module must NOT be reported as "already open":
+                    // that is a different fact, and an operator reading it would believe an Incident exists.
+                    if (objects == null) {
+                        incidentDetail = "decision '" + alertName + "' — no Incident opened, operational "
+                                + "objects are not installed in this bundle";
+                    } else if (!objects.hasActive(ObjectType.INCIDENT, corr)) {
+                        objects.open(ObjectType.INCIDENT, "Decision Rule " + alertName,
+                                "Raised by Decision Rule '" + ruleName + "'", severity, corr,
+                                Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
+                        incidentDetail = "opened Incident for '" + alertName + "' (" + severity + ")";
+                    } else {
+                        incidentDetail = "decision '" + alertName + "' — Incident already open";
+                    }
                 }
                 detail = java.util.stream.Stream.of(authoredDetail, incidentDetail)
                         .filter(java.util.Objects::nonNull)
@@ -233,7 +240,11 @@ final class DecisionRoutes implements RouteModule {
                 String severity = paramStr(c, "severity", "error");
                 status = "executed";
                 com.gamma.objects.ObjectAccess objs = api.service().objects().orElse(null);
-                if (objs != null && !objs.hasActive(ObjectType.INCIDENT, corr)) {
+                // ⛔ Same three-way split as create-alert above: "not installed" is not "already open".
+                if (objs == null) {
+                    detail = "no Incident opened for rule '" + ruleName + "' — operational objects are not "
+                            + "installed in this bundle";
+                } else if (!objs.hasActive(ObjectType.INCIDENT, corr)) {
                     objs.open(ObjectType.INCIDENT, title,
                             "Raised by Decision Rule '" + ruleName + "'", severity, corr,
                             Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));

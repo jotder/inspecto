@@ -7,9 +7,7 @@ import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.notify.NotificationStore;
 import com.gamma.objects.IncidentAccess;
-import com.gamma.ops.InMemoryObjectStore;
-import com.gamma.ops.ObjectQuery;
-import com.gamma.ops.ObjectService;
+import com.gamma.objects.FakeObjectAccess;
 import com.gamma.objects.ObjectType;
 import com.gamma.util.RunLog;
 import org.junit.jupiter.api.Test;
@@ -44,14 +42,14 @@ class DryRunServicesTest {
         @Override public void error(String message, Throwable t, Object... kv) { info(message, kv); }
     }
 
-    private static PlatformServices granted(NotificationStore feed, ObjectService objects,
+    private static PlatformServices granted(NotificationStore feed, FakeObjectAccess objects,
                                             List<String> evaluations) {
         PlatformServiceRegistry registry = new PlatformServiceRegistry();
         registry.register("notifications", NotificationAccess.class, n -> {
             feed.add(n);
             return Optional.of(n);
         });
-        registry.register("incidents", IncidentAccess.class, IncidentAccess.over(objects::access));
+        registry.register("incidents", IncidentAccess.class, IncidentAccess.over(() -> objects));
         registry.register("alerts", AlertAccess.class, () -> {
             evaluations.add("evaluated");
             return List.of(new Alert("r1", "error", "orders", "failed_batches", 5, ">", 3, "1h", 0L, "m"));
@@ -63,7 +61,10 @@ class DryRunServicesTest {
     @Test
     void mutatingServicesRecordInsteadOfActUnderDryRun() {
         NotificationStore feed = new InMemoryNotificationStore();
-        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        // ⚠ The seam's test double since EDG-01 cell 7 — core cannot construct an ObjectService. What
+        // this test asserts is unchanged: the dry-run stand-in must reach NOTHING, so an empty recorder
+        // proves it exactly as an empty store did.
+        FakeObjectAccess objects = new FakeObjectAccess();
         List<String> evaluations = new ArrayList<>();
         CapturingLog log = new CapturingLog();
         PlatformServices dry = DryRunServices.wrap(granted(feed, objects, evaluations), log);
@@ -78,8 +79,7 @@ class DryRunServicesTest {
 
         assertTrue(emitted.isEmpty() && opened.isEmpty() && fired.isEmpty(), "stand-ins act on nothing");
         assertEquals(0, feed.recent(10).size(), "dry run stores no notification");
-        assertEquals(0, objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).size(),
-                "dry run opens no incident");
+        assertEquals(List.of(), objects.opened, "dry run opens no incident");
         assertEquals(List.of(), evaluations, "dry run never reaches the real evaluator");
         assertTrue(log.lines.stream().anyMatch(l -> l.contains("would emit notification") && l.contains("title=Breach")));
         assertTrue(log.lines.stream().anyMatch(l -> l.contains("would open incident") && l.contains("scope=orders")));
@@ -89,7 +89,7 @@ class DryRunServicesTest {
     @Test
     void readOnlyServicesPassThroughAndGrantsStayHonest() {
         PlatformServices dry = DryRunServices.wrap(
-                granted(new InMemoryNotificationStore(), new ObjectService(new InMemoryObjectStore()),
+                granted(new InMemoryNotificationStore(), new FakeObjectAccess(),
                         new ArrayList<>()),
                 new CapturingLog());
 

@@ -40,10 +40,21 @@ class ServiceBootstrapWorkflowTest {
         Path bad = dir.resolve("broken_workflow.toon");
         Files.writeString(bad, "workflow:\n  initial: OPEN\n");   // no object_type → invalid, must be skipped
 
-        List<Workflow> loaded = ServiceBootstrap.loadWorkflows(List.of(good, bad));
-        assertEquals(1, loaded.size(), "the malformed override is skipped");
-        assertEquals(ObjectType.TASK, loaded.get(0).objectType());
-        assertEquals("TODO", loaded.get(0).initialState());
+        // ⚠ Driven through the ENGINE since EDG-01 cell 7: the loader left ServiceBootstrap for this
+        // module and is private to the provider, so the assertion is now on observable behaviour — the
+        // override that registered — rather than on a returned list. That is the stronger form: it proves
+        // the valid file took effect, not merely that parsing returned one element.
+        var engine = new com.gamma.ops.OpsEngineProvider()
+                .open(com.gamma.service.SpaceRoot.under(dir), dir.toString());
+        engine.loadConfigs(List.of(good, bad));
+        com.gamma.ops.ObjectService svc = ((com.gamma.ops.ObjectServiceAccess) engine.access()).service();
+
+        assertEquals("TODO", svc.workflow(ObjectType.TASK).initialState(),
+                "the valid override is registered");
+        assertEquals(Workflow.defaultFor(ObjectType.INCIDENT).initialState(),
+                svc.workflow(ObjectType.INCIDENT).initialState(),
+                "the malformed override is skipped, leaving the built-in in place");
+        engine.close();
     }
 
     @Test
@@ -53,14 +64,17 @@ class ServiceBootstrapWorkflowTest {
         Files.writeString(dir.resolve("task_workflow.toon"), TASK_OVERRIDE);
 
         try (var svc = ServiceBootstrap.buildFrom(SpaceRoot.legacy(), new String[]{dir.toString()}, false)) {
-            Workflow task = svc.objects().workflow(ObjectType.TASK);
+            // ⚠ objects() is the narrow seam now — take it down to the engine, as the module's routes do.
+            com.gamma.ops.ObjectService engine =
+                    ((com.gamma.ops.ObjectServiceAccess) svc.objects().orElseThrow()).service();
+            Workflow task = engine.workflow(ObjectType.TASK);
             assertEquals("TODO", task.initialState(), "the authored override replaced the OPEN→CLOSED default");
             assertEquals("DOING", task.apply("TODO", "start").orElseThrow());
             assertTrue(task.isTerminal("DONE"));
 
             // a type with no override still gets its built-in default
             assertEquals(Workflow.defaultFor(ObjectType.ALERT).initialState(),
-                    svc.objects().workflow(ObjectType.ALERT).initialState());
+                    engine.workflow(ObjectType.ALERT).initialState());
         }
     }
 }

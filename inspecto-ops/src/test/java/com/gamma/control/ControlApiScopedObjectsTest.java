@@ -68,11 +68,11 @@ class ControlApiScopedObjectsTest {
     private record Seed(OperationalObject fraud, OperationalObject billing, OperationalObject untyped) {}
 
     private Seed seed(Ctx c) {
-        var objects = c.svc.objects();
+        var objects = TestOpsEngine.of(c.svc);
         OperationalObject fraud = objects.open(ObjectType.INCIDENT, "sim swap", "d", "HIGH", null, null, null,
-                "corr", Map.of(ObjectRoutes.ATTR_CASE_TYPE, "fraud"));
+                "corr", Map.of(com.gamma.opsapi.ObjectRoutes.ATTR_CASE_TYPE, "fraud"));
         OperationalObject billing = objects.open(ObjectType.INCIDENT, "rating drift", "d", "HIGH", null, null, null,
-                "corr", Map.of(ObjectRoutes.ATTR_CASE_TYPE, "billing"));
+                "corr", Map.of(com.gamma.opsapi.ObjectRoutes.ATTR_CASE_TYPE, "billing"));
         OperationalObject untyped = objects.open(ObjectType.INCIDENT, "disk full", "d", "LOW", null, null, null,
                 "corr", Map.of());
         objects.link(fraud.id(), billing.id(), "related_to", "sys");

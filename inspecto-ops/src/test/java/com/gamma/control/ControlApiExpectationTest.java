@@ -187,7 +187,7 @@ class ControlApiExpectationTest {
             String correlationId = "expectation:" + name;
 
             json(send(c.port, "POST", "/expectations/" + name + "/evaluate", null));
-            assertEquals(1, c.svc.objects().active(ObjectType.INCIDENT, correlationId).size(),
+            assertEquals(1, TestOpsEngine.of(c.svc).active(ObjectType.INCIDENT, correlationId).size(),
                     "a failed evaluation opens one Incident");
 
             // AGT-5 P1 D4: the failure also emits the canonical expectation.violated Signal (additive).
@@ -198,7 +198,7 @@ class ControlApiExpectationTest {
 
             // re-evaluate while the Incident is still open → still exactly one (deduped)
             json(send(c.port, "POST", "/expectations/" + name + "/evaluate", null));
-            assertEquals(1, c.svc.objects().active(ObjectType.INCIDENT, correlationId).size(),
+            assertEquals(1, TestOpsEngine.of(c.svc).active(ObjectType.INCIDENT, correlationId).size(),
                     "a second failure while the Incident is open does not open a duplicate");
         } finally {
             cleanup(target);

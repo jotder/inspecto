@@ -30,14 +30,14 @@ import java.util.function.Supplier;
  * fails the Run closed rather than degrading to signal-only. The service is resolved through a supplier (it is
  * wired onto the {@code JobService} after this built-in is constructed).
  */
-final class CaseRuleEvalJob implements Job {
+public final class CaseRuleEvalJob implements Job {
 
     private final JobConfig cfg;
     /** Live view of this space's {@link ObjectService} (wired post-construction on the JobService); {@code null}
      *  until wired and on the bare-JobService test constructors — then the Run fails closed. */
     private final Supplier<ObjectService> objects;
 
-    CaseRuleEvalJob(JobConfig cfg, Supplier<ObjectService> objects) {
+    public CaseRuleEvalJob(JobConfig cfg, Supplier<ObjectService> objects) {
         this.cfg = cfg;
         this.objects = objects;
     }

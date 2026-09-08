@@ -185,7 +185,8 @@ public final class ObjectRoutes implements RouteModule {
     // ── SEC-7d data-scoped grants ("a fraud analyst sees fraud cases") ───────────────
 
     /** Attribute key carrying an object's case type — the dimension {@link Subject#dataScopes()} filters on. */
-    static final String ATTR_CASE_TYPE = "caseType";
+    /** ⚠ Public since EDG-01 cell 7: the moved scoped-objects tests assert on this key. */
+    public static final String ATTR_CASE_TYPE = "caseType";
 
     /**
      * Whether the caller may see {@code o}: an unscoped caller (Personal — no Subject; or a role with

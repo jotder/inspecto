@@ -48,7 +48,7 @@ class ControlApiObjectsTest {
     @Test
     void queryAckResolveLifecycleAndErrorGates(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject seed = c.svc.objects().open(ObjectType.ALERT, "disk full", "msg",
+            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "disk full", "msg",
                     "CRITICAL", "pipeA", Map.of("rule", "r1"));
 
             // list + filter
@@ -83,7 +83,7 @@ class ControlApiObjectsTest {
     @Test
     void genericTransitionByTargetStatus(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject seed = c.svc.objects().open(ObjectType.ALERT, "t", "d", "INFO", "pipeB", Map.of());
+            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "t", "d", "INFO", "pipeB", Map.of());
             JsonNode out = json(send(c.port, "POST", "/objects/" + seed.id() + "/transition",
                     "{\"status\":\"ACKNOWLEDGED\",\"actor\":\"bob\"}"));
             assertEquals("ACKNOWLEDGED", out.get("status").asText());
@@ -96,7 +96,7 @@ class ControlApiObjectsTest {
     void createIncidentAndWalkLifecycle(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             // an existing object to satisfy the mandatory ≥1-link create contract (an incident-source)
-            OperationalObject src = c.svc.objects().open(ObjectType.ALERT, "source alert", "d", "HIGH", "corr", Map.of());
+            OperationalObject src = TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "source alert", "d", "HIGH", "corr", Map.of());
 
             // create an INCIDENT via POST /objects (type defaults to INCIDENT); dueInMinutes seeds the SLA deadline
             JsonNode created = json(send(c.port, "POST", "/objects",
@@ -151,7 +151,7 @@ class ControlApiObjectsTest {
     @Test
     void patchUpdatesOperatorFieldsAndMergesAttributes(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject seed = c.svc.objects().open(ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+            OperationalObject seed = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "bad rows", "d", "HIGH",
                     null, null, null, "corr", Map.of("category", "Pipeline / Ingest / Parse failure"));
 
             // priority + attribute merge in one PATCH; pre-existing attributes survive the merge
@@ -201,7 +201,7 @@ class ControlApiObjectsTest {
     @Test
     void commentsAttachmentsAndRca(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject caseObj = c.svc.objects().open(ObjectType.CASE, "investigation", "d",
+            OperationalObject caseObj = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "investigation", "d",
                     "HIGH", "corr", Map.of());
 
             // comment
@@ -239,7 +239,7 @@ class ControlApiObjectsTest {
         try (Ctx c = open(dir)) {
             c.svc.registerRcaTemplate(com.gamma.objects.RcaTemplate.fromMap(Map.of(
                     "name", "incident", "sections", List.of("Summary", "Root cause"))));
-            OperationalObject caseObj = c.svc.objects().open(ObjectType.CASE, "inv", "d", "HIGH", null, Map.of());
+            OperationalObject caseObj = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "inv", "d", "HIGH", null, Map.of());
 
             // the registry lists the loaded template
             JsonNode templates = json(send(c.port, "GET", "/rca/templates", null));
@@ -261,9 +261,9 @@ class ControlApiObjectsTest {
     @Test
     void linkObjectsAndTraverseGraph(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject caseObj = c.svc.objects().open(ObjectType.CASE, "investigation", "d",
+            OperationalObject caseObj = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "investigation", "d",
                     "HIGH", "corr", Map.of());
-            OperationalObject incident = c.svc.objects().open(ObjectType.INCIDENT, "bad rows", "d",
+            OperationalObject incident = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "bad rows", "d",
                     "HIGH", "corr", Map.of());
 
             // CASE CONTAINS INCIDENT

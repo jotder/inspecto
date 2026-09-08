@@ -96,9 +96,9 @@ class ControlApiTagRoutesTest {
     void tagRuleSaveApplyAutoApplyAndDelete(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject critical = c.svc.objects().open(ObjectType.INCIDENT, "rejected files spike", "d",
+            OperationalObject critical = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "rejected files spike", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
-            c.svc.objects().open(ObjectType.INCIDENT, "minor glitch", "d", "LOW", "LOW", null, null, "corr", Map.of());
+            TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "minor glitch", "d", "LOW", "LOW", null, null, "corr", Map.of());
 
             // a rule without criteria would tag everything → 422
             assertEquals(422, send(c.port, "POST", "/tags/rules",
@@ -153,7 +153,7 @@ class ControlApiTagRoutesTest {
     void appliesATagToAnObjectAndListsItBothWays(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+            OperationalObject inc = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "spike", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
             assertEquals(200, send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}").statusCode());
 
@@ -177,7 +177,7 @@ class ControlApiTagRoutesTest {
     void reapplyingIsIdempotentAndUnassignIsToo(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+            OperationalObject inc = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "spike", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
             send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}");
             String path = "/tags/assignments/object/" + inc.id();
@@ -200,7 +200,7 @@ class ControlApiTagRoutesTest {
     void refusesAnUnknownTagAnUnknownKindAndAnAbsentTarget(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+            OperationalObject inc = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "spike", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
 
             // A typo must not silently mint a tag — that is how a tag vocabulary rots.
@@ -219,9 +219,9 @@ class ControlApiTagRoutesTest {
     void oneTagSpansKindsAndAnUnknownTagListsEmpty(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject a = c.svc.objects().open(ObjectType.INCIDENT, "one", "d",
+            OperationalObject a = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "one", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
-            OperationalObject b = c.svc.objects().open(ObjectType.INCIDENT, "two", "d",
+            OperationalObject b = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "two", "d",
                     "LOW", "LOW", null, null, "corr", Map.of());
             send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}");
             send(c.port, "POST", "/tags/assignments/object/" + a.id(), "{\"tag\":\"q3-audit\"}");
@@ -239,7 +239,7 @@ class ControlApiTagRoutesTest {
     void renamingATagMovesTheEdgesTheCsvTheRuleAndTheFile(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+            OperationalObject inc = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "spike", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
             send(c.port, "POST", "/tags/rules",
                     "{\"name\":\"criticals\",\"tag\":\"urgent\",\"filter\":{\"severity\":\"CRITICAL\"}}");
@@ -271,7 +271,7 @@ class ControlApiTagRoutesTest {
     void deletingATagRemovesItsAssignmentsButNotWhileARuleAppliesIt(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
-            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+            OperationalObject inc = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "spike", "d",
                     "HIGH", "CRITICAL", null, null, "corr", Map.of());
             send(c.port, "POST", "/tags/rules",
                     "{\"name\":\"criticals\",\"tag\":\"urgent\",\"filter\":{\"severity\":\"CRITICAL\"}}");

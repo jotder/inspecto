@@ -143,7 +143,7 @@ class ControlApiFindingsSpecTest {
     @Test
     void aSubmittedFindingsValueIsJudgedAgainstTheEffectiveSpec(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
-            var seed = c.svc.objects().open(com.gamma.objects.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+            var seed = TestOpsEngine.of(c.svc).open(com.gamma.objects.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
                     null, null, null, "corr", java.util.Map.of());
             String path = "/objects/" + seed.id();
 
@@ -169,7 +169,7 @@ class ControlApiFindingsSpecTest {
                       {"key":"loss","label":"Loss","type":"number","tier":"optional","min":0,
                        "dependsOn":{"key":"outcome","equals":"LOSS"}}]}
                     """).statusCode());
-            var seed = c.svc.objects().open(com.gamma.objects.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+            var seed = TestOpsEngine.of(c.svc).open(com.gamma.objects.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
                     null, null, null, "corr", java.util.Map.of());
             String path = "/objects/" + seed.id();
 

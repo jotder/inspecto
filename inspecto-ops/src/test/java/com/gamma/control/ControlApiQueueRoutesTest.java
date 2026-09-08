@@ -59,8 +59,8 @@ class ControlApiQueueRoutesTest {
             assertEquals(200, send(c.port, "GET", "/queues/triage", null).statusCode());
             assertEquals(404, send(c.port, "GET", "/queues/none", null).statusCode());
 
-            OperationalObject i1 = c.svc.objects().open(ObjectType.INCIDENT, "one", "d", "HIGH", null, null, null, "corr", Map.of());
-            OperationalObject i2 = c.svc.objects().open(ObjectType.INCIDENT, "two", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject i1 = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "one", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject i2 = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "two", "d", "HIGH", null, null, null, "corr", Map.of());
 
             JsonNode a1 = json(send(c.port, "POST", "/objects/" + i1.id() + "/assign", "{\"queue\":\"triage\"}"));
             assertEquals("alice", a1.get("assignee").asText());
@@ -74,9 +74,9 @@ class ControlApiQueueRoutesTest {
     @Test
     void assignExplicitAndGates(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            c.svc.objects().registerQueue(com.gamma.ops.queue.Queue.fromMap(Map.of(
+            TestOpsEngine.of(c.svc).registerQueue(com.gamma.ops.queue.Queue.fromMap(Map.of(
                     "id", "manual", "members", List.of("alice"), "routing", "manual")));
-            OperationalObject i = c.svc.objects().open(ObjectType.INCIDENT, "x", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject i = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "x", "d", "HIGH", null, null, null, "corr", Map.of());
 
             // explicit assignee wins
             assertEquals("dana", json(send(c.port, "POST", "/objects/" + i.id() + "/assign",
@@ -97,7 +97,7 @@ class ControlApiQueueRoutesTest {
     @Test
     void watchUnwatchAndList(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject i = c.svc.objects().open(ObjectType.INCIDENT, "x", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject i = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "x", "d", "HIGH", null, null, null, "corr", Map.of());
 
             JsonNode watched = json(send(c.port, "POST", "/objects/" + i.id() + "/watch", "{\"user\":\"alice\"}"));
             assertEquals(List.of("alice"), asList(watched.get("watchers")));

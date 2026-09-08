@@ -53,10 +53,10 @@ import java.util.function.Supplier;
  * It is resolved through a supplier because it is wired onto the {@link JobService} after this built-in is
  * constructed.
  */
-final class ObjectsAnalyticsJob implements Job {
+public final class ObjectsAnalyticsJob implements Job {
 
     /** Dataset id, {@code physicalRef}, and the sample sub-directory under the space data dir. */
-    static final String CATALOG = "ops_analytics";
+    public static final String CATALOG = "ops_analytics";
 
     private static final Logger log = LoggerFactory.getLogger(ObjectsAnalyticsJob.class);
 
@@ -66,7 +66,7 @@ final class ObjectsAnalyticsJob implements Job {
      *  and on the bare-JobService test constructors — then the Run fails closed. */
     private final Supplier<ObjectService> objects;
 
-    ObjectsAnalyticsJob(JobConfig cfg, String dataDir, Supplier<ObjectService> objects) {
+    public ObjectsAnalyticsJob(JobConfig cfg, String dataDir, Supplier<ObjectService> objects) {
         this.cfg = cfg;
         this.dataDir = dataDir;
         this.objects = objects;
@@ -159,7 +159,8 @@ final class ObjectsAnalyticsJob implements Job {
      * Tall, not wide, because the breakdown keys (status / L1-category / priority) are open-ended rather
      * than a fixed enum, so wide columns would be unstable across runs and across spaces.
      */
-    static List<Object[]> flatten(ObjectType type, Map<String, Object> rollup) {
+    /** ⚠ Public since EDG-01 cell 7: its test moved with it and lives in the split com.gamma.job. */
+    public static List<Object[]> flatten(ObjectType type, Map<String, Object> rollup) {
         List<Object[]> out = new ArrayList<>();
         String t = type.name();
         out.add(new Object[]{t, "scalar", "total", num(rollup.get("total"))});

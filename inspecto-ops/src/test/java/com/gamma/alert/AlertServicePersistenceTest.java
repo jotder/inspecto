@@ -10,6 +10,7 @@ import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.objects.ObjectType;
 import com.gamma.ops.OperationalObject;
+import com.gamma.ops.link.ObjectLink;
 import com.gamma.etl.StatusStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -74,7 +75,7 @@ class AlertServicePersistenceTest {
     void firedAlertBecomesManagedObject(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertService svc = new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects);
+        AlertService svc = new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects.access());
 
         assertEquals(1, svc.evaluateAll().size(), "rule breaches and fires");
         List<OperationalObject> alerts = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build());
@@ -92,10 +93,10 @@ class AlertServicePersistenceTest {
     void activeAlertNotDuplicated(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects).evaluateAll();
+        new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects.access()).evaluateAll();
         // A fresh AlertService over the SAME object store fires again (its own cooldown is empty) — but
         // the still-OPEN object for this rule+pipeline suppresses the duplicate.
-        new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects).evaluateAll();
+        new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()), objects.access()).evaluateAll();
         assertEquals(1, objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).size(),
                 "an active alert object isn't duplicated");
     }
@@ -107,5 +108,40 @@ class AlertServicePersistenceTest {
         AlertService svc = new AlertService(List.of(errorRateRule()), configs(cfg), store(breachingLedger()));
         assertEquals(1, svc.evaluateAll().size());
         assertEquals(1, svc.recent(10).size());
+    }
+
+    /**
+     * <b>Moved here from {@code AlertServiceTest} in EDG-01 cell 7</b> (2026-09-08). It asserts the real
+     * object GRAPH — edge direction, both endpoint types, traversability from either end — which needs a
+     * live engine. Core kept the two tests that only assert AlertService's own decision (ALERT always,
+     * INCIDENT above a severity threshold) against a seam double; re-pointing this one at a fake would
+     * have made it a test of the fake.
+     */
+    @Test
+    void thePromotedIncidentIsLinkedEscalatedFromItsAlert(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        // ⚠ This class's own row() helper (4 args) — the test came from AlertServiceTest, whose helper
+        // takes six. One FAILED batch is all the failed_batches>=1 rule needs.
+        List<Map<String, String>> ledger = List.of(
+                row("FAILED", 10, 0, LocalDateTime.now().minusMinutes(5)));
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        AlertRule critical = new AlertRule("r-crit", "failed_batches", "gte", 1, "1h", "critical", "MINI_ETL");
+        new AlertService(List.of(critical), configs(cfg), store(ledger), objects.access()).evaluateAll();
+
+        OperationalObject alert = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).get(0);
+        OperationalObject incident =
+                objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).get(0);
+
+        // The correlation is a real edge in the object graph, not merely matching attributes: an operator
+        // opening the Incident can pivot to the Alert that raised it (and back).
+        List<ObjectLink> edges = objects.linksOf(incident.id());
+        assertEquals(1, edges.size(), "exactly one correlation edge");
+        ObjectLink edge = edges.get(0);
+        assertEquals(incident.id(), edge.fromId());
+        assertEquals(ObjectType.INCIDENT, edge.fromType());
+        assertEquals(alert.id(), edge.toId(), "Incident ESCALATED_FROM the ALERT that raised it");
+        assertEquals(ObjectType.ALERT, edge.toType());
+        assertEquals("ESCALATED_FROM", edge.relationship());
+        assertEquals(edges, objects.linksOf(alert.id()), "traversable from the Alert end too");
     }
 }

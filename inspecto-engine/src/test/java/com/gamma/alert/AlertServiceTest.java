@@ -6,12 +6,8 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
-import com.gamma.ops.InMemoryObjectStore;
-import com.gamma.ops.ObjectQuery;
-import com.gamma.ops.ObjectService;
+import com.gamma.objects.FakeObjectAccess;
 import com.gamma.objects.ObjectType;
-import com.gamma.ops.OperationalObject;
-import com.gamma.ops.link.ObjectLink;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.etl.StatusStore;
@@ -203,8 +199,15 @@ class AlertServiceTest {
 
     // ── signal→Incident promotion (critical/error breaches enter triage) ─────────────
 
-    private static int count(ObjectService objects, ObjectType type) {
-        return objects.query(ObjectQuery.builder().objectType(type).build()).size();
+    /**
+     * ⚠ Counts what the seam was ASKED to open, not what a store holds (EDG-01 cell 7). Core cannot
+     * construct an ObjectService any more, and what these tests are about is AlertService's own decision
+     * — ALERT always, INCIDENT only above a severity threshold — which is edition-independent. The
+     * companion test that asserts the resulting object GRAPH moved to inspecto-ops, where a real engine
+     * exists; a fake asserting its own bookkeeping would have been a test of the fake.
+     */
+    private static int count(FakeObjectAccess objects, ObjectType type) {
+        return (int) objects.opened.stream().filter(o -> o.kind() == type).count();
     }
 
     @Test
@@ -212,7 +215,7 @@ class AlertServiceTest {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         List<Map<String, String>> ledger = List.of(
                 row("FAILED", 10, 0, 0, 100, LocalDateTime.now().minusMinutes(5)));
-        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        FakeObjectAccess objects = new FakeObjectAccess();
         AlertRule critical = new AlertRule("r-crit", "failed_batches", "gte", 1, "1h", "critical", "MINI_ETL");
         AlertService svc = new AlertService(List.of(critical), configs(cfg), store(ledger), objects);
 
@@ -222,37 +225,11 @@ class AlertServiceTest {
     }
 
     @Test
-    void thePromotedIncidentIsLinkedEscalatedFromItsAlert(@TempDir Path dir) throws Exception {
-        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
-        List<Map<String, String>> ledger = List.of(
-                row("FAILED", 10, 0, 0, 100, LocalDateTime.now().minusMinutes(5)));
-        ObjectService objects = new ObjectService(new InMemoryObjectStore());
-        AlertRule critical = new AlertRule("r-crit", "failed_batches", "gte", 1, "1h", "critical", "MINI_ETL");
-        new AlertService(List.of(critical), configs(cfg), store(ledger), objects).evaluateAll();
-
-        OperationalObject alert = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).get(0);
-        OperationalObject incident =
-                objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).get(0);
-
-        // The correlation is a real edge in the object graph, not merely matching attributes: an operator
-        // opening the Incident can pivot to the Alert that raised it (and back).
-        List<ObjectLink> edges = objects.linksOf(incident.id());
-        assertEquals(1, edges.size(), "exactly one correlation edge");
-        ObjectLink edge = edges.get(0);
-        assertEquals(incident.id(), edge.fromId());
-        assertEquals(ObjectType.INCIDENT, edge.fromType());
-        assertEquals(alert.id(), edge.toId(), "Incident ESCALATED_FROM the ALERT that raised it");
-        assertEquals(ObjectType.ALERT, edge.toType());
-        assertEquals("ESCALATED_FROM", edge.relationship());
-        assertEquals(edges, objects.linksOf(alert.id()), "traversable from the Alert end too");
-    }
-
-    @Test
     void warningBreachStaysAnAlertWithNoIncident(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         List<Map<String, String>> ledger = List.of(
                 row("FAILED", 10, 0, 0, 100, LocalDateTime.now().minusMinutes(5)));
-        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        FakeObjectAccess objects = new FakeObjectAccess();
         // rule() builds a WARNING-severity rule.
         AlertService svc = new AlertService(List.of(rule("failed_batches", "gte", 1, "1h", "MINI_ETL")),
                 configs(cfg), store(ledger), objects);

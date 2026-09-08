@@ -467,6 +467,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         new AbsentExchangeRoutes().register(this);
         new AbsentMetricsRoutes().register(this);
         new AbsentEventsRoutes().register(this);
+        new AbsentObjectRoutes().register(this);
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────

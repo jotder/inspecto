@@ -105,7 +105,10 @@ class ControlApiPolicyEnforcementTest {
             writePolicies(c, List.of(Map.of("name", "hide-billing-incidents", "effect", "deny",
                     "target", Map.of("resourceKinds", List.of("incident")),
                     "when", "resource.caseType == 'billing'")));
-            var objects = c.svc().objects();
+            // ⚠ objects() is the narrow ObjectAccess seam since EDG-01 cell 7; this test seeds fixtures
+            // through the full engine, so take it back down — the same move the ops module's routes make.
+            com.gamma.ops.ObjectService objects =
+                    ((com.gamma.ops.ObjectServiceAccess) c.svc().objects().orElseThrow()).service();
             OperationalObject fraud = objects.open(ObjectType.INCIDENT, "sim swap", "d", "HIGH", null, null, null,
                     "corr", Map.of("caseType", "fraud"));
             OperationalObject billing = objects.open(ObjectType.INCIDENT, "rating drift", "d", "HIGH", null, null, null,

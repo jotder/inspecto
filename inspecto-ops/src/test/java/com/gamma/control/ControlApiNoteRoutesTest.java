@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Covers a comment on a saved {@code link-analysis-view}, the shipped {@code /objects/{id}/comments}
  * path still working (and staying a separate note family), an unknown target kind rejected, an absent
  * target rejected, and the SEC-7d data-scope guard still enforced when the target is an object — the
- * generic surface must not be a way around {@code ObjectRoutes.scoped}.
+ * generic surface must not be a way around {@code com.gamma.opsapi.ObjectRoutes.scoped}.
  */
 class ControlApiNoteRoutesTest {
 
@@ -107,7 +107,7 @@ class ControlApiNoteRoutesTest {
     @Test
     void objectSurfaceKeepsWorkingAndStaysASeparateFamily(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, false)) {
-            OperationalObject obj = c.svc.objects().open(ObjectType.CASE, "investigation", "d", "HIGH",
+            OperationalObject obj = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "investigation", "d", "HIGH",
                     null, null, null, "corr", Map.of());
 
             // the shipped route, unchanged
@@ -128,8 +128,8 @@ class ControlApiNoteRoutesTest {
     @Test
     void dataScopeGuardStillAppliesToObjectTargets(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, true)) {
-            OperationalObject billing = c.svc.objects().open(ObjectType.INCIDENT, "rating drift", "d", "HIGH",
-                    null, null, null, "corr", Map.of(ObjectRoutes.ATTR_CASE_TYPE, "billing"));
+            OperationalObject billing = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "rating drift", "d", "HIGH",
+                    null, null, null, "corr", Map.of(com.gamma.opsapi.ObjectRoutes.ATTR_CASE_TYPE, "billing"));
 
             assertEquals(404, get(c.port, "/notes/object/" + billing.id() + "/comments", "fraud").statusCode(),
                     "SEC-7d: an out-of-scope object's notes are indistinguishable from absence");

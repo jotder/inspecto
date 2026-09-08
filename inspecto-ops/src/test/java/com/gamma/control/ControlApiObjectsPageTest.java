@@ -52,7 +52,7 @@ class ControlApiObjectsPageTest {
         try (Ctx c = open(dir)) {
             Set<String> allIds = new HashSet<>();
             for (int i = 1; i <= 5; i++)
-                allIds.add(c.svc.objects().open(ObjectType.ALERT, "alert " + i, "msg", "CRITICAL", "pipeA",
+                allIds.add(TestOpsEngine.of(c.svc).open(ObjectType.ALERT, "alert " + i, "msg", "CRITICAL", "pipeA",
                         Map.of()).id());
 
             // page 1 — total across all pages, first-page request cursor is null

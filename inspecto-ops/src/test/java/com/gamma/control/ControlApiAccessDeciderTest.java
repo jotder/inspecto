@@ -122,7 +122,7 @@ class ControlApiAccessDeciderTest {
     @Test
     void rowScopeHidesADeniedObjectListAndById(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            var objects = c.svc().objects();
+            var objects = TestOpsEngine.of(c.svc());
             OperationalObject visible = objects.open(ObjectType.INCIDENT, "ok", "d", "LOW", null, null, null,
                     "corr", Map.of());
             OperationalObject hidden = objects.open(ObjectType.INCIDENT, "secret", "d", "LOW", null, null, null,

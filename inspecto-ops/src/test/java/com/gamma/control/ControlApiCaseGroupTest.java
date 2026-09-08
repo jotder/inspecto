@@ -49,11 +49,11 @@ class ControlApiCaseGroupTest {
     @Test
     void mergeOverHttpMovesMembersAndClosesTheSource(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject survivor = c.svc.objects().open(ObjectType.CASE, "ring A", "d", "HIGH", null, null, null, "corr", Map.of());
-            OperationalObject source = c.svc.objects().open(ObjectType.CASE, "ring A dup", "d", "HIGH", null, null, null, "corr",
+            OperationalObject survivor = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "ring A", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject source = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "ring A dup", "d", "HIGH", null, null, null, "corr",
                     Map.of("tags", "billing"));
-            OperationalObject member = c.svc.objects().open(ObjectType.INCIDENT, "i", "d", "HIGH", null, null, null, "corr", Map.of());
-            c.svc.objects().link(source.id(), member.id(), LinkRelationship.CONTAINS, null);
+            OperationalObject member = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "i", "d", "HIGH", null, null, null, "corr", Map.of());
+            TestOpsEngine.of(c.svc).link(source.id(), member.id(), LinkRelationship.CONTAINS, null);
 
             // gates first: empty sources → 400; unknown survivor → 404; a non-CASE source → 422
             assertEquals(400, send(c.port, "POST", "/objects/" + survivor.id() + "/merge", "{\"sources\":[]}").statusCode());
@@ -81,17 +81,17 @@ class ControlApiCaseGroupTest {
     @Test
     void splitOverHttpCarvesANewCaseAndDeleteLinkRemovesMembers(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            OperationalObject original = c.svc.objects().open(ObjectType.CASE, "big case", "d", "HIGH", null, null, null, "corr", Map.of());
-            OperationalObject i1 = c.svc.objects().open(ObjectType.INCIDENT, "one", "d", "HIGH", null, null, null, "corr", Map.of());
-            OperationalObject i2 = c.svc.objects().open(ObjectType.INCIDENT, "two", "d", "HIGH", null, null, null, "corr", Map.of());
-            c.svc.objects().link(original.id(), i1.id(), LinkRelationship.CONTAINS, null);
-            c.svc.objects().link(original.id(), i2.id(), LinkRelationship.CONTAINS, null);
+            OperationalObject original = TestOpsEngine.of(c.svc).open(ObjectType.CASE, "big case", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject i1 = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "one", "d", "HIGH", null, null, null, "corr", Map.of());
+            OperationalObject i2 = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "two", "d", "HIGH", null, null, null, "corr", Map.of());
+            TestOpsEngine.of(c.svc).link(original.id(), i1.id(), LinkRelationship.CONTAINS, null);
+            TestOpsEngine.of(c.svc).link(original.id(), i2.id(), LinkRelationship.CONTAINS, null);
 
             // gates: no title → 400; foreign member → 422; unknown member or case → 404
             assertEquals(400, send(c.port, "POST", "/objects/" + original.id() + "/split",
                     "{\"members\":[\"" + i1.id() + "\"]}").statusCode());
             // A member that EXISTS but this case does not contain — the "foreign member" the gate means.
-            OperationalObject foreign = c.svc.objects().open(ObjectType.INCIDENT, "three", "d", "HIGH",
+            OperationalObject foreign = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "three", "d", "HIGH",
                     null, null, null, "corr", Map.of());
             assertEquals(422, send(c.port, "POST", "/objects/" + original.id() + "/split",
                     "{\"title\":\"x\",\"members\":[\"" + foreign.id() + "\"]}").statusCode());

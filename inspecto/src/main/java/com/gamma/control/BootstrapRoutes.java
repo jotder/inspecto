@@ -75,6 +75,11 @@ final class BootstrapRoutes implements RouteModule {
         // core route is most likely to reclaim. The SPA drops the Events nav entry and falls the Ops lens
         // home back to pipelines when this is false, so nobody lands on a screen that only 503s.
         f.put("events", api.hasRoute("GET", "/events/search"));
+        // EDITIONS CP-11 (EDG-01 cell 7): true only when the optional inspecto-ops module registered the
+        // operational-object routes. ⚠ Probed on POST /objects — a LITERAL path, and a WRITE, so it cannot
+        // be confused with the GET /objects/([^/]+) catch-all that a future core route might reclaim.
+        // The SPA hides the Incidents, Cases and Tags nav entries and the cross-entity tag menus on it.
+        f.put("ops", api.hasRoute("POST", "/objects"));
         f.put("authMode", System.getProperty("auth.mode", "none"));
         return f;
     }

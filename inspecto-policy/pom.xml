@@ -51,6 +51,19 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- inspecto-ops (test scope): ControlApiPolicyEnforcementTest asserts ABAC ROW-SCOPE filtering
+             over /objects (SEC-7d), so it needs a real AccessDecider AND real operational objects.
+             🔴 The DIRECTION matters and the opposite one is a latent break: inspecto-ops ships in
+             STANDARD, where inspecto-policy is absent, so ops must never depend on policy. This module is
+             Enterprise-only, and every Enterprise reactor also builds inspecto-ops — so the edge is safe
+             this way round only. No cycle. (EDG-01 cell 7, 2026-09-08.) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

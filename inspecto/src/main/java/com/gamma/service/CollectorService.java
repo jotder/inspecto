@@ -419,12 +419,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // an optional edition module, so this mandatory boot path must not name a type that leaves with it.
         platformServices.register("incidents", com.gamma.objects.IncidentAccess.class,
                 com.gamma.objects.IncidentAccess.over(() -> objects().orElse(null)));
-        // ⚠ The seam is also a Platform Service (EDG-01 cell 7) — that is how a Job Type contributed by
-        // the optional inspecto-ops module reaches it: a ServiceLoader-discovered JobTypeProvider gets
-        // only a JobConfig, but a RUNNING job has JobContext.services(). Registered whatever the edition:
-        // on Personal the supplier yields null and a consumer finds nothing, which is the honest answer.
-        platformServices.register("objects", com.gamma.objects.ObjectAccess.class,
-                objects().orElse(null));
         platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,
                 com.gamma.pipeline.SchemaAccess.over(this::componentRegistry));
         platformServices.register("consignment-status",
@@ -476,6 +470,18 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Give the Job engine this space's seam so the recon.run built-in can promote a breach to an
         // Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
         if (this.jobs != null) this.jobs.objects(this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
+        // ⚠ The seam is also a Platform Service (EDG-01 cell 7) — that is how a Job Type contributed by
+        // the optional inspecto-ops module reaches it: a ServiceLoader-discovered JobTypeProvider gets only
+        // a JobConfig, but a RUNNING job has JobContext.services().
+        //
+        // 🔴 Registered HERE, after objectEngine is assigned, and that placement is load-bearing. It first
+        // sat beside the "incidents" registration ~40 lines above, which reads the same field — but that
+        // one wraps its access in a SUPPLIER and so defers it, whereas this passes the value EAGERLY. The
+        // field was still null there, so every CollectorService construction threw NPE: 632 errors across
+        // 40-odd test classes, from one line that looked symmetrical with its neighbour.
+        platformServices.register("objects", com.gamma.objects.ObjectAccess.class,
+                objects().orElse(null));
+
         // Phase D2: promote selected domain events to managed objects (SEQUENCE_GAP → ALERT) via an EventLog
         // subscriber. ⚠ Now ASKED FOR rather than constructed: core used to do
         // `new com.gamma.ops.EventObjectBridge(objects)::onEvent` by fully-qualified name with no import —

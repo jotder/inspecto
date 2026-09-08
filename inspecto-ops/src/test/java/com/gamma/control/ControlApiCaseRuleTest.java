@@ -82,14 +82,14 @@ class ControlApiCaseRuleTest {
             assertEquals(1, json(send(c.port, "GET", "/cases/rules", null)).size());
 
             // below threshold → nothing raised
-            c.svc.objects().open(ObjectType.INCIDENT, "one", "d", "HIGH", "CRITICAL", null, null, "k", Map.of());
+            TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "one", "d", "HIGH", "CRITICAL", null, null, "k", Map.of());
             JsonNode below = json(send(c.port, "POST", "/cases/rules/crit/evaluate", "{}"));
             assertEquals(1, below.get("matched").asInt());
             assertEquals(0, below.get("grouped").asInt());
             assertTrue(below.get("caseId").isNull());
 
             // threshold met → a case is opened grouping both incidents
-            c.svc.objects().open(ObjectType.INCIDENT, "two", "d", "HIGH", "CRITICAL", null, null, "k", Map.of());
+            TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "two", "d", "HIGH", "CRITICAL", null, null, "k", Map.of());
             JsonNode raised = json(send(c.port, "POST", "/cases/rules/crit/evaluate", "{}"));
             assertEquals(2, raised.get("grouped").asInt());
             assertTrue(raised.get("opened").asBoolean());
@@ -108,9 +108,9 @@ class ControlApiCaseRuleTest {
     @Test
     void caseAnalyticsRollup(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
-            c.svc.objects().open(ObjectType.CASE, "a", "d", "HIGH", "MAJOR", null, null, "k",
+            TestOpsEngine.of(c.svc).open(ObjectType.CASE, "a", "d", "HIGH", "MAJOR", null, null, "k",
                     Map.of("category", "Security / Data / Leak", "impactAmount", "1000", "recordsAffected", "50"));
-            c.svc.objects().open(ObjectType.CASE, "b", "d", "HIGH", "LOW", null, null, "k",
+            TestOpsEngine.of(c.svc).open(ObjectType.CASE, "b", "d", "HIGH", "LOW", null, null, "k",
                     Map.of("category", "Pipeline / Ingest / Parse", "impactAmount", "500"));
 
             JsonNode a = json(send(c.port, "GET", "/objects/analytics?type=CASE", null));
