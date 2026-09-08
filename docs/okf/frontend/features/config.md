@@ -14,6 +14,5 @@ Route `/config` (Settings nav group). Views/edits the TOON configuration for the
 never round-tripped raw — see [API & data](../conventions/api-and-data.md).
 
 The pane authors a *draft for manual commit* (copy the assembled `.toon`) — it never persists by name, so
-the dup-guard/name-at-save form rules don't apply. Known deferral: the dynamic field grid is still
-template-driven (`ngModel`) rendered from `FieldSpec[]`; the honest fix is a `FieldSpec → AttributeSpec`
-port onto `<inspecto-schema-form>`, not a mechanical reactive rewrite — still open.
+the dup-guard/name-at-save form rules don't apply. The dynamic field grid is `<inspecto-schema-form>` over `AttributeSpec[]` mapped from `FieldSpec[]`
+(the port `frontend/log.md` records; this paragraph called it "still open" until 2026-09-08).

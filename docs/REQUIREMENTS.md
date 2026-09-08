@@ -185,11 +185,13 @@ AI-driven autonomy without redesign.
 
 ### 3.10 Component metamodel & Catalog (MET)
 
+> ⚠ **These rows now have an owner:** [`okf/capabilities/metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md) §2 is the requirement-of-record for `MET`, and it CORRECTS this table (`MET-1`'s shape is the SPA's model, the server stores `Component(type, name, path, content)`; `MET-3`'s delete-protection covers pipeline `use:` refs and Exchange grants only and the derivation is `refsForComponent`, client-side). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
+
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| MET-1 | Everything authored is a **Component** `{kind, name, config, parts?, wiring?}`; kind registry declares config schemas | Must | SHIPPED | All |
+| MET-1 | Everything authored is a **Component** `{kind, name, config, parts?, wiring?}`; kind registry declares config schemas | Must | SHIPPED — ⚠ the shape is the SPA's `component-model/`; the server persists `Component(type, name, path, content)` and only 9 of 23 writable kinds have a `ConfigSpec` (corrected 2026-09-08) | All |
 | MET-2 | Derived **Registry** reuse graph + Catalog + lineage graph (canonical edge/node kinds, `CONSUMES` etc.) | Must | SHIPPED | All |
-| MET-3 | Single ref derivation (`deriveRefs`) feeding reuse graph, bundles, delete-protection | Must | SHIPPED (R1) | All |
+| MET-3 | Single ref derivation (`refsForComponent`, client-side; `deriveRefs` is its per-kind seam) feeding reuse graph, bundles, delete-protection | Must | SHIPPED (R1) — ⚠ server-side delete protection covers pipeline `use:` refs + Exchange grants only; widget→dataset / dashboard→widget refs are checked by `metadata_validate` and bundle import, not on delete (corrected 2026-09-08) | All |
 | MET-4 | **Stream** read-model in the Catalog (browsable data origins; IA reorg Phase B) | Should | SHIPPED (2026-07-08: `GET /catalog/streams` — every Collector as a data-origin catalog node (connector/connection/pipeline/discovery attrs), shaped to the UI `MetadataNode` contract the mock already served; UI needed no change) | All |
 | MET-5 | Draft/published Component version history (W3b) | Could | SHIPPED (2026-07-09: `ComponentStore.write` archives the prior copy under `<typeDir>/.history/<id>.v<N>.toon` — a sub-dir, not a sibling `.toon`, so the registry scan never mis-reads it as a duplicate — keep-N (`-Dcomponents.history.keep`, default 10); `GET /components/{type}/{id}/versions` + `POST …/versions/{v}/restore` (restore is itself a versioned write); reusable `ComponentHistoryDialog` + a History button on the dashboard editor; mock mirrors the archive/list/restore. Reactor 1139/0/0/3 + UI specs/live-walk green) | All |
 

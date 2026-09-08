@@ -63,7 +63,8 @@ paid for violating them.
     and answer it by CODE LAYER — which is why "consignment" could appear in 48 current-tier docs
     with none of them being its entry point. Built: [`ACQ`](okf/capabilities/acquisition/acquisition.md) (the
     pilot), [`SEC`](okf/capabilities/security/security.md), [`INC`](okf/capabilities/incidents/incidents.md) and
-    [`API`](okf/capabilities/control-api/control-api.md), [`SPC`](okf/capabilities/spaces/spaces.md); the other twelve slots are named in
+    [`API`](okf/capabilities/control-api/control-api.md), [`SPC`](okf/capabilities/spaces/spaces.md),
+    [`MET`](okf/capabilities/metamodel/metamodel.md); the other eleven slots are named in
     `GLOSSARY.md` §14 and sized in [`superpower/docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1.
   - [`okf/living-operational-system.md`](okf/living-operational-system.md) — the cross-cutting **north star**:
     seven cooperating networks over one metadata model, and what enforces each principle.

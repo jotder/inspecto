@@ -95,8 +95,9 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
     engine executes — and `transfer/bundle.ts` keeps it in the TYPE only so an older bundle still
     parses. But `supported()` reuses `ComponentStore.WRITABLE_TYPES`, which still carries `schema`, so
     **the server WRITES a schema item the UI and its offline mock expect skipped**: the same old bundle
-    imports differently offline and against a backend. Filed as **BUNDLE-SCHEMA-1** (`BACKLOG.md` §6) —
-    a product call, since whichever way it resolves, one of the three surfaces changes.
+    imports differently offline and against a backend. Filed as **BUNDLE-SCHEMA-1** and **FIXED 2026-08-31** (the archived board snapshot records the close; the mock
+    surface was deleted the same day, so only the server and the SPA remain and they agree) — ⚠ this paragraph
+    cited a live `BACKLOG.md` §6 row that does not exist (corrected 2026-09-08).
   * **Decision 2026-09-06 (operator) — the word `schema` in a bundle manifest means the REGISTRY id**
     (`registry/schemas/<id>`). A pipeline-owned `<name>_schema.toon` and its `_mapping.csv` / `_structure.csv`
     siblings travel under their own kind (with the pipeline's dependency closure), never as `schema`. This is the

@@ -10,8 +10,8 @@ timestamp: 2026-06-28T00:00:00Z
 # Components Registry
 
 Route under the Settings nav group. Manages reusable component definitions via `ComponentsService` —
-`ComponentType` = `grammar` · `schema` · `transform` · `sink` (the palette `COMPONENT_TYPES`), plus `rule`
+`COMPONENT_TYPES` = `grammar` · `schema` · `mapping` · `transform` · `sink` (the editable palette; the `ComponentType` union is wider), plus `rule`
 (used by the data-table [rule](../design-system/rule.md) save, but intentionally **not** in the palette).
 Grammars are created/edited from the [Pipelines](pipeline-editor.md) `GrammarEditorDialog`, or Onboarding's
-Parsing stage — one shared surface, see [Grammar configuration](grammar-config.md). Offline via the `mockFlows`
-`/components/{type}` CRUD store.
+Parsing stage — one shared surface, see [Grammar configuration](grammar-config.md). *(The offline mock store this page used to mention was deleted 2026-08-31.)* ⚠ The pane sends no `If-Match`
+(last-write-wins) and offers no `force` on a `409` delete — see the [MET capability spec](../../capabilities/metamodel/metamodel.md) §3.9.

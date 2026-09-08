@@ -318,7 +318,6 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | **Postgres multi-user** — pool behind `JdbcDrivers`, replace `browseConnection()`, **schema-per-Space** URL wiring, `CaseStore` PG impl, concurrency test | `BACKLOG.md` §3 *Postgres multi-user* — ⛔ **PARKED by §6**; `EDITIONS.md` OPS-03 | Isolation on Postgres is a **schema**, not a database (a connection binds one database) |
 | Canonical-pipeline selective bundle export / import; retire the `authored-pipeline` kind that still targets the retired `PipelineStore` | `BACKLOG.md` §3 *Canonical-pipeline selective bundle export/import* | |
 | Bundle residuals — `requires` present-but-different classification; per-editor "load as draft" import | `BACKLOG.md` §3 *Bundle / Exchange* | ⛔ do not fake a draft with a cross-kind `enabled: false` |
-| `BUNDLE-SCHEMA-1` — the server writes a `schema` item the UI skipped | `BACKLOG.md` §6 | Recorded as a standing note |
 | Space-to-space comparison (Maintenance COULD tier) | `BACKLOG.md` §3 *Job framework* | Builds on the preview's drift classification |
 | Cross-Space controller / connector-direct emission (S8) | `BACKLOG.md` §3 | Optional Signal-network slice |
 | Enterprise distributed tier — shared-state backends, distributed scheduler | `BACKLOG.md` §2 *E1*; `REQUIREMENTS.md` NFR-8 | Design only |

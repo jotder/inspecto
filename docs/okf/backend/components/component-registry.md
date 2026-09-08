@@ -12,9 +12,13 @@ timestamp: 2026-07-07T00:00:00Z
 Components are the `use:`-referenced building blocks of authored [Pipelines](../pipeline-graph/pipeline-graph-design.md). They
 live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<name>`.
 
-* **Types**: `connection`, `grammar`, `transform`, `sink`, `alert`. ⚠ **`schema` is NOT a component**
-  (retired 2026-07-31, unification W1): a schema lives only in the path-addressed config TOON the engine
-  executes (`processing.schema_file`), because no code path ever resolved a component id into a runnable
+* **Types**: `ComponentStore.WRITABLE_TYPES` is **23 kinds** (`ComponentStore.java:55-98`) — `grammar`, **`schema`**,
+  **`mapping`** (a CSV kind), `transform`, `sink`, the Studio kinds, the access/notification/findings kinds, `pattern-pack`,
+  `rule-template`; `connection` is deliberately excluded (its own secret-aware CRUD). ⚠ **`schema` IS a component
+  again** — the 2026-07-31 retirement (unification W1) was **reversed on 2026-08-05** by the ELT amendment (Schema =
+  structure-only component, Mapping = a new CSV kind); this paragraph said "NOT a component" until 2026-09-08. The
+  original reasoning, kept for the record: the W1 retirement happened because no code path had resolved a component id
+  into a runnable
   schema and `bindKindFor` never offered it as bindable. `ComponentStore.WRITABLE_TYPES`
   was **widened in W3** to also persist `dataset`, `widget`, `dashboard`, and `query` — the seam that lets the
   UI's Studio kinds store for real instead of mock-only. (The UI also persists a `rule` type, used by the
@@ -23,7 +27,13 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
   registry dir; `ComponentRegistry` holds the `Component` record (`type`, `name`, `ref`, `content`).
 * **Optimistic concurrency** (W3): `ContentHash` (mirrors the UI's `content-hash.ts`, parity-pinned by test)
   hashes each component's content; `/components` responses carry an **`ETag`**, reads honour
-  `If-None-Match` (304), and writes honour `If-Match` (precondition-failed on a stale hash).
+  `If-None-Match` (304), and writes honour `If-Match` — a stale hash is **`409 CONFLICT_STALE_VERSION`** (`ETags.requireMatch`;
+  not a 412 — corrected 2026-09-08). ⚠ The Components pane sends neither header. **History (MET-5, 2026-07-09):** every write
+  archives the prior copy to `<typeDir>/.history/<id>.v<N>.toon` (a sub-directory, so the registry scan never mis-reads it),
+  keep-N `-Dcomponents.history.keep` (default 10); `GET /components/{type}/{id}/versions` + `POST …/versions/{v}/restore`.
+  **Integrity:** `ComponentIntegrity` (broken widget→dataset/query, dashboard→widget, reconciliation→dataset refs; duplicates)
+  runs in `metadata_validate` and the bundle-import pre-check — ⚠ **not on delete**. Requirement of record:
+  [MET capability spec](../../capabilities/metamodel/metamodel.md).
 * **Safe delete**: `PipelineReferences` scans every authored Pipeline's nodes for `use:` references;
   `ComponentRoutes` returns `409` if a component is still referenced.
 
@@ -36,7 +46,7 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
 * `/pipelines…` — the `Pipeline*Routes` modules (`inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java`,
   alongside `PipelineGraphRoutes`, `PipelineRenameRoutes`, `PipelineSettingsRoutes` and the shared
   `PipelineSupport` helpers): `GET /pipelines`
-  (lifted pipelines), `GET /pipelines/node-types` (the editor palette catalog), `GET /pipelines/combined` (the
+  (lifted pipelines), `GET /pipelines/node-types` **and** `GET /pipelines/step-types` (the editor palette catalog — dual-read is the intended state, `GLOSSARY.md` §13), `GET /pipelines/combined` (the
   store-joined pipeline+job topology). Authoring goes through the graph round-trip — `PUT
   /pipelines/{name}/graph` (+ `GET …/graph/raw`) — owned by the
   [pipeline-graph bundle](../pipeline-graph/editable-round-trip.md); the old `/pipelines/authored/*`

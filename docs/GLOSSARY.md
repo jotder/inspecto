@@ -657,7 +657,7 @@ a suggested fix.
 ## 10. Component Metamodel (cross-cutting)
 
 > Every authored artifact above is a **Component**. The metamodel is the spine; see
-> [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md) and [`superpower/component-model.md`](archived-documents/plans-archive/component-model.md).
+> [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md) and [`archived-documents/plans-archive/component-model.md`](archived-documents/plans-archive/component-model.md) (provenance); the requirement of record is `okf/capabilities/metamodel/metamodel.md`.
 
 **Component** — A configured, named, persisted **instance**: `{ kind, name, config, parts?, wiring? }`. Atomic =
 no parts/wiring; composite = parts + a wiring strategy.
