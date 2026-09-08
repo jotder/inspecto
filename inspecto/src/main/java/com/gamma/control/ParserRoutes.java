@@ -13,7 +13,7 @@ import java.util.Map;
 import static com.gamma.util.Values.mapAt;
 
 /**
- * Parser-catalog routes (v5.3.0): the self-describing {@link ParserPlugin} registry served to
+ * Parser-catalog routes: the self-describing {@link ParserPlugin} registry served to
  * authoring UIs. {@code GET /parsers} lists every registered parser with its grammar schema (the
  * same {@code FieldSpec} vocabulary {@code GET /config/spec/&#123;type&#125;} serves), and
  * {@code POST /parsers/&#123;id&#125;/preview} parses a sample with an in-progress grammar —

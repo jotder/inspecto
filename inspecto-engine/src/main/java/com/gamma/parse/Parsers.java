@@ -10,7 +10,7 @@ import java.util.ServiceLoader;
 import java.util.regex.Pattern;
 
 /**
- * Registry of known {@link ParserPlugin}s: the four {@link BuiltinParsers built-ins} (the engine's
+ * Registry of known {@link ParserPlugin}s: the six {@link BuiltinParsers built-ins} (the engine's
  * own DuckDB-native frontends) plus any contributed via {@link ServiceLoader}
  * ({@code META-INF/services/com.gamma.parse.ParserPlugin}). Built once at class-load, immutable
  * thereafter — the source for {@code GET /parsers} and the preview dispatch.

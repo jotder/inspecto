@@ -25,6 +25,19 @@ const NOT_FOR_PERSONAL = new Set([
     'enrichment.graph.cluster', 'sink.archive',
 ]);
 const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact']);
+
+// Rows whose PERSONAL cell is PARTIAL even though the processor is delivered platform-wide: the capability
+// still runs on Personal, but a named part of it left with an optional module.
+//
+// WHY THIS EXISTS. Until 2026-09-08 the Personal cell could only be `—` (excluded) or the SAME glyph as the
+// global status — there was no way to express "delivered, but degraded on Personal". EDG-01 cell 7 produced
+// exactly that: `SP-CTL-02`'s gap watchdog still raises the EVENT on Personal, but promoting it to an ALERT
+// object is `EventObjectBridge`, which moved into `inspecto-ops`. The operator approved 🟡, and it was
+// hand-edited into the generated table — so `--check` went RED on master, and regenerating SILENTLY REVERTED
+// an approved product decision back to ✅. A generator that cannot express a decision the board must state
+// turns the guard into pressure to undo the decision. Add the row here instead of hand-editing the table.
+const PARTIAL_ON_PERSONAL = new Set(['control.gap.detector']);
+
 const GLYPH = { delivered: '✅', partial: '🟡', planned: '🔲' };
 
 const catalog = JSON.parse(readFileSync(CONTRACT, 'utf8'));
@@ -34,7 +47,7 @@ const rows = catalog.processors.map((p) => {
     counters[p.family] = (counters[p.family] ?? 0) + 1;
     const id = `SP-${p.family}-${String(counters[p.family]).padStart(2, '0')}`;
     const g = GLYPH[p.status];
-    const P = NOT_FOR_PERSONAL.has(p.id) ? '—' : g;
+    const P = NOT_FOR_PERSONAL.has(p.id) ? '—' : PARTIAL_ON_PERSONAL.has(p.id) ? GLYPH.partial : g;
     const S = ENTERPRISE_ONLY.has(p.id) ? '—' : g;
     const maps = p.nodeType ?? p.capability;
     return `| ${id} | ${p.emoji} ${p.label} (\`${p.id}\`) | ${familyLabel[p.family]} | ${P} | ${S} | ${g} | ${maps ? '`' + maps + '`' : '—'} | ${p.note ?? ''} |`;

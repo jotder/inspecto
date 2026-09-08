@@ -892,7 +892,7 @@
     "icon" : "heroicons_outline:bell-alert",
     "status" : "delivered",
     "nodeType" : "gap",
-    "note" : "same detector; gaps raise ALERT objects via the EventObjectBridge",
+    "note" : "same detector; a gap raises the `SEQUENCE_GAP` event in EVERY edition, but promoting it to a managed ALERT object is `EventObjectBridge`, which ships in the optional `inspecto-ops` module — so Personal is partial (EDG-01 cell 7, operator-approved 2026-09-08)",
     "addable" : true
   }, {
     "id" : "control.audit.stamp",
