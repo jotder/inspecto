@@ -183,6 +183,20 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `MVN_CMD=<mvn> MVN_OFFLINE=1 node tools/check-dependencies.mjs`; after a REVIEWED dependency change
   re-run with `--update` and commit `tools/dependencies.lock` in the same commit.
 
+  ⚠ **A FOURTH joined 2026-09-08: `node tools/check-coverage.mjs`** (GUARD-SWEEP-1g), enforcing
+  **repo-wide** coverage floors — backend instructions ≥78% / branches ≥64%, UI statements ≥70% /
+  branches ≥66%, against measured baselines of 81.01%/67.19% and 73.82%/70.04%. Like the dependency
+  guard it is **not** pre-push: it needs `mvn … -Pcoverage` (≈6 min) or a UI `test:coverage` run first,
+  so it lives in `ci.yml` (`--backend`) and `ui.yml` (`--ui`). ⚠ Those scope flags are load-bearing —
+  `ci.yml` never builds the UI and `ui.yml` never builds Java, so one "all inputs must exist" rule would
+  fail whichever job legitimately lacks the other half; each named scope still fails loudly when ITS own
+  input is missing. ⛔ Not `jacoco:check`: that goal binds per module, so it would gate `inspecto-util`
+  (49.6%) and `asn-golden` (4.4%) on their own numbers instead of the one repo-wide floor.
+  🔴 **The first baseline was wrong in a way that looked right** — "82.92% across 21 modules" while nine
+  more modules were never instrumented, because a Maven profile is inherited through `<parent>` and
+  never through aggregation, and `asn-parser/asn-decoders/pom.xml` is a separate root the reactor merely
+  aggregates. A tenth of the codebase sat outside a "repo-wide" number while `mvn -Pcoverage` exited 0.
+
 - **A guard, hook or reminder that never reaches anyone looks identical to one with nothing to say.**
   Three instances, all 2026-08-26: the committed-secret guard ran only in CI, i.e. only *after* a push
   had already made the secret public; the `PreCompact` hook emitted an invalid shape
