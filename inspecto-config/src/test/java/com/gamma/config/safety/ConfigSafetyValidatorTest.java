@@ -155,6 +155,37 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "dirs.database"), "an absolute path outside the root must be rejected: " + f);
     }
 
+    /** A clean pipeline whose {@code processing.duckdb.temp_directory} is {@code dir}. */
+    private static Map<String, Object> withDuckTempDir(Path root, String dir) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        Map<String, Object> duck = new LinkedHashMap<>();
+        duck.put("temp_directory", dir);
+        Map<String, Object> proc = new LinkedHashMap<>();
+        proc.put("duckdb", duck);
+        raw.put("processing", proc);
+        return raw;
+    }
+
+    /**
+     * ROADMAP §3.5's jail. {@code dirs.temp} was contained, but {@code ConsignmentIngestStrategy.scratchDir}
+     * prefers {@code processing.duckdb.temp_directory} and returned it raw: the spill knob was the one
+     * path the 422 gate never looked at, while the loader and the run path never contain it either.
+     */
+    @Test
+    void duckdbTempDirectoryOutsideRootIsRejected(@TempDir Path root) {
+        String outside = Path.of("/var/anywhere-else").toAbsolutePath().toString();
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", withDuckTempDir(root, outside), SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "processing.duckdb.temp_directory"),
+                "the DuckDB spill dir must be contained like dirs.temp: " + f);
+    }
+
+    @Test
+    void duckdbTempDirectoryUnderRootPasses(@TempDir Path root) {
+        List<Finding> f = ConfigSafetyValidator.check("pipeline",
+                withDuckTempDir(root, root.resolve("scratch").toString()), SafetyPolicy.withRoots(root));
+        assertTrue(f.isEmpty(), "a spill dir under the root is not a finding: " + f);
+    }
+
     // ── S5: the load-time refs the 422 gate had been blind to ───────────────────
 
     /** Overlay a {@code processing} block onto a clean pipeline. */

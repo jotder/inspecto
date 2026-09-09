@@ -37,7 +37,9 @@ These are built and integrated on the development line; the work remaining is ve
 
 Ordered by recommended sequence (see §6 for the rationale). **§3.1–§3.3 have all shipped since this
 horizon was written** (2026-07-07 → 2026-07-24); their scope prose is kept as the record of intent, each
-now headed by what was actually delivered. **§3.4–§3.5 remain the live NEXT items.**
+now headed by what was actually delivered. **§3.4–§3.5 were re-derived from source 2026-09-10:** of their five scope items, three have shipped, one is filed on
+the board, and one was never filed anywhere — each is marked below. ⛔ The board (`../BACKLOG.md` §0) owns the
+queue order; this page records direction.
 
 ### 3.1 `inspecto-security` module — Standard edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**
 
@@ -91,13 +93,13 @@ The single most important item for commercialization.
 
 ### 3.4 Pipeline authoring polish & streaming (T3) · Effort: **M**
 
-- **Scope:** round out the visual Pipeline editor; add a dedicated **run endpoint** for authored Pipelines (today they run via a job config); implement the **adapter stream-consumer runtime** for streaming sources (the land-then-ack seam exists; the consumer loop is the remaining piece).
+- **Scope:** round out the visual Pipeline editor (→ `../BACKLOG.md` §3 `AUTHORING-REDESIGN-1`, **P2**, open letters only); ✅ the dedicated **run endpoint** for authored Pipelines **SHIPPED** — `POST /pipelines/authored/{id}/run` (`CapabilityManifest`); the **adapter stream-consumer runtime** for streaming sources — the land-then-ack seam exists, the consumer loop does not; ⚠ this item was on **no board row** until 2026-09-10 (`acquisition.md` §"Open elsewhere" pointed back at this paragraph) — now `../BACKLOG.md` §3 **`STREAM-CONSUMER-1`** (P2).
 - **Exit criteria:** an operator can author, validate, run, and observe a Pipeline entirely from the console; a streaming source lands records through the adapter with at-least-once semantics.
 
 ### 3.5 Config-authoring completion (T3) · Effort: **S**
 
-- **Scope:** finish the config CRUD-from-body surface (a full listing/`PUT` route) so the assist agent's draft-only skills become one-click apply; jail the database temp directory in the safety validator.
-- **Exit criteria:** every assist skill that produces a config can persist it through a validated endpoint.
+- **Scope:** ✅ the config CRUD-from-body surface **SHIPPED** as `POST /config/write` · `POST /config/patch` · `DELETE /config/{type}/{name}` (`CapabilityManifest:46-48`) — the "full listing/`PUT` route" was never built and no board row asks for it; ✅ assist drafts persist through the **approval-gated** `component_apply` action (the L2 tier — `assistant.md` §3.6), which is deliberately *not* one-click: a mutating tool never applies its own change. ⚠ Kinds without a backend `ConfigSpec` (`grammar` / `transform` / `sink`) cannot be drafted-then-applied — `../BACKLOG.md` §3 P3 "AI drafting has no applicable component kind", demand-gated; ✅ **jail the database temp directory — SHIPPED 2026-09-10**: `processing.duckdb.temp_directory` was the one path the 422 gate skipped while its fallback `dirs.temp` was contained (`ConfigSafetyValidator`, pinned by `duckdbTempDirectoryOutsideRootIsRejected`). ⚠ The 2026-09-09 contradiction register called this a `PATH-2` standing refusal; it was not — `PATH-2` (`../BACKLOG.md` §6) refuses the static-serving jail and the store `fileFor` helpers, never this key.
+- **Exit criteria:** every assist skill that produces a config can persist it through a validated endpoint — **met for every kind that has a `ConfigSpec`**; the three kinds without one are the P3 row above.
 
 ---
 
@@ -144,7 +146,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 1. **Security first (3.1)** ✓ — it was the gating item for commercial deployment. Nothing else converted to revenue until a buyer could deploy securely. It was also self-contained (a new module behind an SPI), so it did not block other tracks.
 2. **Object storage second (3.2)** ✓ — the highest-demand ingestion gap, lowest technical risk (proven SPI + native engine support), compounding the value of the acquisition framework already shipped.
 3. **Parsing breadth third (3.3)** ✓ — widened the addressable feed set; modest effort; backward-compatible by construction.
-4. **Authoring polish fourth (3.4–3.5)** — compounds the value of everything beneath it and is the visible face of self-service, but depends on the platform underneath being solid first. **This is now the front of the queue.**
+4. **Authoring polish fourth (3.4–3.5)** — compounds the value of everything beneath it and is the visible face of self-service, but depends on the platform underneath being solid first. ⚠ **Not "the front of the queue"** (corrected 2026-09-10): the board's §0 order is release notes for the next MAJOR, then the Step Processor catalog partials by name; every authoring row is **P2**, and the run endpoint and the temp-directory jail have shipped. What remains of 3.4–3.5 is `AUTHORING-REDESIGN-1`'s open letters and `STREAM-CONSUMER-1`.
 5. **Distributed tier is demand-gated (L1)** — pulled forward only when a real workload requires it, never speculatively, to protect the lean single-node ethos.
 
 ---

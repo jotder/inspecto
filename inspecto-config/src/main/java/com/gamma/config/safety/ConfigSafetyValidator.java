@@ -130,6 +130,11 @@ public final class ConfigSafetyValidator {
     private static void checkPipeline(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
         for (String f : PIPELINE_DIRS) checkPath(raw, f, p, out);
         checkPath(raw, "output.ducklake.data_path", p, out);
+        // ROADMAP §3.5 "jail the database temp directory". The fallback `dirs.temp` is in PIPELINE_DIRS,
+        // but `ConsignmentIngestStrategy.scratchDir` PREFERS this explicit spill dir and returned it raw,
+        // and neither the loader nor the run path contains it — so the one knob that can point
+        // multi-hundred-GB spill data anywhere was the one path this gate never looked at.
+        checkPath(raw, "processing.duckdb.temp_directory", p, out);
         // S5: the refs the parser resolves and jails at LOAD time (PipelineConfigParser's
         // resolveSchemaRef / resolveGrammarRef). Without these the 422 write gate would accept a
         // config that the loader then refuses — the operator learns at run time what authoring

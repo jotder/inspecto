@@ -697,7 +697,7 @@ so they are not re-proposed as new ideas; none is scheduled.
 
 | Item | Board id | What remains |
 |---|---|---|
-| Adapter stream-consumer runtime | ROADMAP `3.4` | The land-then-ack seam exists; the consumer loop does not |
+| Adapter stream-consumer runtime | `STREAM-CONSUMER-1` (P2, filed 2026-09-10 — until then this cell pointed at ROADMAP §3.4, i.e. at no board row) | The land-then-ack seam exists; the consumer loop does not |
 | Outbound object-store export | `EXPORT-1` (P3) | The inverse direction of ACQ-4 — recommendation of record only |
 | Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
 | "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |

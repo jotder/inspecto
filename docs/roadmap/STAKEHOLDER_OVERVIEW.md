@@ -378,7 +378,7 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 - ✅ **`inspecto-security` module (Standard edition) — SHIPPED 2026-07-24.** An `Authenticator` SPI plus OIDC resource-server validation, RBAC/ABAC from token claims, HTTPS, and actor-attributed audit. Delivered as a Maven module assembled into Standard by profile; Personal simply does not bundle it. *Incremental hardening on the framework-free core — explicitly not a Spring/Quarkus migration.* ⚠ Residual hardening is tracked as `SEC-7` in `okf/capabilities/security/security.md` §2, not here.
 - 🟡 **Object-storage connectors — SHIPPED; network-share — REFUSED.** S3 / MinIO / GCS-interop and Azure Blob landed 2026-07-08 and native GCS 2026-07-22, all SDK-free on the connector SPI. ⛔ NFS/SMB was **not** built as a connector: the supported pattern is an OS-mounted share read as a local path, and a UNC path stays jail-rejected by design. So `ACQ-4` is PARTIAL rather than shipped — stating it as "planned" hid a **decision**, which is worse than hiding a delay.
 - ✅ **Unified `parsing:` grammar — SHIPPED 2026-07-07 (`ING-5`).** Today's frontends sit under one `parsing:` block with **JSON** and **text/regex** added, each a thin frontend producing rows for the shared backend; existing configs keep working via aliases.
-- **Pipeline authoring polish** — round out the visual editor and add a dedicated run endpoint for authored Pipelines; adapter stream-consumer runtime for streaming Collectors.
+- 🟡 **Pipeline authoring polish — PART-SHIPPED.** The dedicated run endpoint for authored Pipelines ✅ shipped (`POST /pipelines/authored/{id}/run`); rounding out the visual editor continues as open P2 letters; the adapter stream-consumer runtime for streaming Collectors is unbuilt and now on the board (`STREAM-CONSUMER-1`).
 - ✅ **Etag/version fingerprint dimensions — SHIPPED 2026-07-08 (`ACQ-7`).** Pre-fetch skip on the connector's listing etag or object version, degrading to size+mtime when the connector supplies neither. Its stated dependency landed first, as planned.
 
 ### 10.4 Later (future / vision)
@@ -396,7 +396,7 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 
 ### 10.6 Sequencing logic
 
-The recommended order is **(1) edition security → (2) object-storage connectors → (3) unified parsing/JSON → (4) authoring polish**, because: security unblocks commercial deployment (the gating item for revenue); object storage is the most-requested ingestion gap and reuses a proven SPI; parsing breadth widens the addressable feed set; and authoring polish compounds the value of everything beneath it. The Enterprise distributed tier is demand-gated — pulled forward only when a deployment's scale actually requires it.
+The recommended order is **(1) edition security → (2) object-storage connectors → (3) unified parsing/JSON → (4) authoring polish**, because: security unblocks commercial deployment (the gating item for revenue); object storage is the most-requested ingestion gap and reuses a proven SPI; parsing breadth widens the addressable feed set; and authoring polish compounds the value of everything beneath it. ⚠ Steps (1)–(3) have shipped; what remains of (4) is ranked **P2** on the board behind the next-MAJOR release notes and the Step Processor catalog — it is not the head of the queue. The Enterprise distributed tier is demand-gated — pulled forward only when a deployment's scale actually requires it.
 
 ---
 
