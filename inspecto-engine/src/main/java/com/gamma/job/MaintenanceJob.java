@@ -144,6 +144,38 @@ final class MaintenanceJob implements Job {
         return execute(ctx);
     }
 
+    /**
+     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 20 ids
+     * across 19 arms ({@code heartbeat} and {@code noop} share one).
+     *
+     * <p>⚠ <b>This constant and that switch are two declarations of one fact.</b>
+     * {@code MaintenanceTaskContractTest} re-parses this file's own {@code case} labels and fails when the
+     * two disagree, the way {@code MapNodeKeyContractTest} pins its pair — because the served
+     * {@link JobTypeDescriptor} for {@code maintenance} is built from this list, and a form that offers a
+     * task the switch cannot run (or hides one it can) is the defect this exists to prevent. Before
+     * 2026-09-09 that description was a hand-written string: it advertised four tasks Personal refuses and
+     * omitted seven the engine ships.
+     *
+     * <p>⛔ Adding a {@code case} without adding it here, or the reverse, fails that test by design.
+     */
+    public static final java.util.List<String> BUILT_IN_TASKS = java.util.List.of(
+            "cleanup", "ledger_prune", "dedup_prune", "runlog_prune", "notification_prune",
+            "event_prune", "partition_prune", "receipt_prune", "storage_report", "storage_trend",
+            "scheduler_audit", "metadata_validate", "file_repository_audit", "db_maintenance",
+            "retire_superseded", "compact", "reference_compact", "materialize", "heartbeat", "noop");
+
+    /**
+     * What <b>this</b> bundle can actually run: the built-ins, plus whatever a
+     * {@link MaintenanceTaskProvider} on the classpath contributed. On a Personal build the contributed
+     * half is empty, so the served description names exactly the tasks that will not throw — which is the
+     * point. Sorted within the contributed group so the string is deterministic.
+     */
+    public static java.util.List<String> availableTasks() {
+        java.util.List<String> all = new java.util.ArrayList<>(BUILT_IN_TASKS);
+        CONTRIBUTED.keySet().stream().sorted().forEach(all::add);
+        return java.util.List.copyOf(all);
+    }
+
     private JobResult execute(JobContext ctx) throws Exception {
         boolean dryRun = ctx != null && ctx.dryRun();
         String task = cfg.opt("task", "cleanup").toLowerCase();

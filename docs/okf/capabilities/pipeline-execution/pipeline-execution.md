@@ -511,8 +511,12 @@ Ranked. The first three are visible to an operator.
 
 1. 🔴 **A release gate rests on a class that does not exist, with a claim that is false of the class that
    does** (§2.3). Fix the row's name and its claim before anyone reasons about Row 15's readiness again.
-2. 🔴 **The served maintenance descriptor advertises four tasks Personal refuses and hides seven shipped
-   ones** (§2.2). It drives the authoring form. One list, derived from the dispatch, closes it.
+2. ✅ ~~**The served maintenance descriptor advertises four tasks Personal refuses and hides seven
+   shipped ones**~~ **FIXED 2026-09-09.** `MaintenanceJob.BUILT_IN_TASKS` is now the one declaration of
+   the switch's 20 ids, `availableTasks()` adds whatever a provider on **this** classpath contributed,
+   and the descriptor is built from that — so the form offers exactly what will not throw, per edition.
+   Pinned by `MaintenanceTaskContractTest`, which **re-parses the switch's own `case` labels**; proven by
+   mutation (removing one id failed three of its five tests, naming the id).
 3. 🔴 **Replay is backed by an in-memory capped map, lost on restart**, while a board row marks it ✅ in all
    three editions and another spec misattributes its 404 to the wrong flag (§2.3). Either persist the
    lookup or caveat the row.

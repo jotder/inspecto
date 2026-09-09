@@ -367,10 +367,15 @@ public final class JobService implements AutoCloseable {
                 List.of(EventType.REPORT_READY), List.of(ArtifactDecl.report("report"))),
                 c -> new ReportJob(c, reports, dataDir)));
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("maintenance", "Maintenance",
-                "Built-in housekeeping task (cleanup / ledger_prune / runlog_prune / notification_prune / "
-                        + "incident_purge / storage_report / storage_trend / scheduler_audit / backup / "
-                        + "backup_verify / restore / metadata_validate / file_repository_audit / "
-                        + "db_maintenance / compact / materialize).",
+                // DERIVED, never hand-written (2026-09-09). This description drives the Jobs authoring
+                // form, so a hand-maintained list is a form that lies: the string here used to advertise
+                // four tasks a Personal bundle REFUSES (incident_purge + the three backup tasks, all
+                // contributed by optional modules) and to hide seven the engine ships (dedup_prune,
+                // event_prune, partition_prune, receipt_prune, reference_compact, retire_superseded,
+                // heartbeat). MaintenanceJob.availableTasks() reports the built-in switch plus whatever
+                // this classpath contributed, so the form offers exactly what will not throw.
+                "Housekeeping task. Available in this bundle: "
+                        + String.join(" / ", MaintenanceJob.availableTasks()) + ".",
                 List.of(ParameterDecl.optional("task", ParamType.STRING, "cleanup", "Which maintenance task"),
                         ParameterDecl.optional("dir", ParamType.STRING, null, "Target directory (cleanup / compact / storage_report / backup source)"),
                         ParameterDecl.optional("retention_days", ParamType.INTEGER, "7", "Age threshold in days (required for the *_prune tasks and incident_purge)"),
