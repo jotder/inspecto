@@ -415,9 +415,9 @@
     "label" : "Schema drift & new-field detector",
     "emoji" : "🧬",
     "icon" : "heroicons_outline:arrow-trending-up",
-    "status" : "partial",
-    "capability" : "expectation",
-    "note" : "multi-schema dispatch refuses unknown shapes; no drift REPORT yet",
+    "status" : "delivered",
+    "nodeType" : "parser",
+    "note" : "the header each file carries vs `raw.fields[]` — width always, names when the schema was authored from the header; one `quality.schema_drift` WARN Signal per batch",
     "addable" : false
   }, {
     "id" : "quality.cluster.edit",

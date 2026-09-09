@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -913,4 +914,26 @@ public final class DuckDbCsvIngester {
 
     /** Escape single quotes for embedding inside a single-quoted SQL string literal. */
     private static String escapeSql(String s) { return s.replace("'", "''"); }
+
+    /**
+     * The header row of a header-bearing delimited file, named the way DuckDB names it — the OBSERVED
+     * shape {@link SchemaDrift} diffs against the declared one. Same dialect and read options as the real
+     * read, but {@code header=true} and no {@code columns=} so the names come from the file, and
+     * {@code all_varchar} + a one-row sample because we want names, never types. Lives here so the option
+     * builders stay private and the two reads can never drift apart on dialect.
+     */
+    static List<String> observedHeader(File file, PipelineConfig cfg, Connection conn) throws SQLException {
+        PipelineConfig.CsvSettings c = cfg.csv();
+        String delim = (c.delimiter() != null && !c.delimiter().isEmpty()) ? c.delimiter() : ",";
+        String sql = "DESCRIBE SELECT * FROM read_csv('" + escapeSql(file.getAbsolutePath().replace('\\', '/')) + "'"
+                + ", header=true, skip=" + c.skipHeaderLines()
+                // ignore_errors: a malformed DATA row must not hide the header — the real read judges rows.
+                + ", delim='" + escapeSql(delim) + "', all_varchar=true, sample_size=1, ignore_errors=true"
+                + readOptions(cfg) + dialectOptions(cfg) + ")";
+        List<String> names = new ArrayList<>();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) names.add(rs.getString("column_name"));
+        }
+        return names;
+    }
 }

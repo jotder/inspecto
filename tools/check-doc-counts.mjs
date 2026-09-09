@@ -44,6 +44,22 @@ const MANIFEST = {
         derive: () => json(`${CONTRACTS}/processor-catalog.contract.json`).processors.length,
         source: `${CONTRACTS}/processor-catalog.contract.json`,
     },
+    // The status SPLIT is a count too — "34 delivered / 18 partial" went stale in three docs the day one
+    // processor flipped, and the total-only marker above could not see it. `planned` is the remainder.
+    'processors-delivered': {
+        floor: 3,
+        what: 'Step Processors with status delivered',
+        derive: () => json(`${CONTRACTS}/processor-catalog.contract.json`).processors
+            .filter(p => p.status === 'delivered').length,
+        source: `${CONTRACTS}/processor-catalog.contract.json`,
+    },
+    'processors-partial': {
+        floor: 3,
+        what: 'Step Processors with status partial',
+        derive: () => json(`${CONTRACTS}/processor-catalog.contract.json`).processors
+            .filter(p => p.status === 'partial').length,
+        source: `${CONTRACTS}/processor-catalog.contract.json`,
+    },
     'processor-families': {
         floor: 1,
         what: 'Step Processor families',

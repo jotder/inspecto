@@ -2,6 +2,7 @@ package com.gamma.inspector;
 
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.*;
+import com.gamma.signal.SchemaDriftSignal;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +69,16 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
             tempDb = openTempDb(cfg, "duckdb_batch_");
             try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
                 configure(conn, cfg);
+
+                // SP-DQ-06 quality.schema.drift: read each header-bearing member's header ONCE, here,
+                // above the lane dispatch, so the native and the Java lane report the same drift.
+                // Detection only — the parse below runs unchanged; one WARN Signal per batch is the report.
+                List<SchemaDrift.Report> drifted = new ArrayList<>();
+                for (Consignment.Member m : batch.members()) {
+                    SchemaDrift.Report r = SchemaDrift.detect(m.file(), m.selection().schema(), cfg, conn);
+                    if (r != null && r.drifted()) drifted.add(r);
+                }
+                SchemaDriftSignal.emit(cfg.identity().pipelineName(), batch.batchId(), drifted);
 
                 // Native (read_csv) batches stream with NO per-member raw_f/raw_input table copies:
                 //   • single member → one streaming pass (read_csv → transform → COPY), chunked if

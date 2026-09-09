@@ -87,7 +87,7 @@ authoring document is the wrong one.** Measured from code and the committed cont
 |---|---|---|
 | Built-in node types | **30**<!--count:node-types--> | 20 in the glossary (and its list predates the per-format parsers), 28 in the active plan, 20 in the editor page |
 | Recipe catalogue | **16<!--count:step-types--> entries over 9 verbs**, and **no `map` verb** | the active plan says 9 entries and includes `map`, a verb deleted 2026-09-05 |
-| Step processors | **119<!--count:processors--> — 34 delivered, 18 partial, 67 planned** | ✅ all agree since 2026-09-09 — the editor and mapping pages said 121 and were corrected; ⚠ this cell still read "both say 121" until 2026-09-09. Now derived: `tools/check-doc-counts.mjs` |
+| Step processors | **119**<!--count:processors--> — **35**<!--count:processors-delivered--> delivered, **17**<!--count:processors-partial--> partial, 67 planned | ✅ all agree since 2026-09-09 — the editor and mapping pages said 121 and were corrected; ⚠ this cell still read "both say 121" until 2026-09-09. Now derived: `tools/check-doc-counts.mjs` |
 | Transform function catalogue | **23 in 7 categories** | the editor page says 24; the mapping page says both "~20" and "24", in one file |
 | Live "too many of a kind" refusals | **2** — one for a second parser, one for a conflicting map config | two documents cite refusals for a second join and a second sink; **neither constant exists** |
 
