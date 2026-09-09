@@ -499,9 +499,10 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   it, the Surfaces spec filed the ripple as unfinished, the Assistant spec found its own instance. Two of
   those documents tell a contributor to **edit a file that does not exist** — one of them as the definition of
   done for adding a page. → one sweep, one owner; the count is the acceptance test.
-- **P2** · **`SPEC-PLANSTALE-1` — active plans stale against their own content.** The compliance plan calls
-  three closed gaps open (one "confirmed still a gap"), claims a pipeline accessibility step that does not
-  exist, and declares four subdirectories of which three are absent. The pipeline spec's "what actually runs"
+- **P2** · **`SPEC-PLANSTALE-1` — active plans stale against their own content.** ✅ **The compliance plan's clause is DISCHARGED 2026-09-09 by archiving it** — which is the resolution this row itself named ("before step 7 of the consolidation moves it"). Its three defects (three closed gaps called open, one "confirmed still a gap"; a pipeline accessibility step that does not exist; four declared
+  subdirectories of which three are absent) are now frozen as provenance behind an ARCHIVED banner that
+  enumerates them, and its durable content is in `okf/capabilities/compliance/compliance.md` §3.10.
+  ⚠ What remains open here is the OTHER plan. The pipeline spec's "what actually runs"
   names five dead classes and says a new Step type cannot be added, contradicted by its own later row. The
   waves plan's conclusion contradicted its own table (fixed 2026-09-09, `2cd1661b`). ⚠ A plan in
   `superpower/` is the *design of record* for in-flight work, so a stale one is worse than a stale concept

@@ -26,7 +26,7 @@
 > (versions/releases) · [`api/deployment/`](../api/deployment/README.md) (WSO2 + Keycloak blueprints) ·
 > [`ops/backup-restore-runbook.md`](../ops/backup-restore-runbook.md) (MNT-5/6) ·
 > [`ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) (§7 telemetry catalog, §8 persisted state, §9 `-D` flags,
-> §11 troubleshooting) · [`superpower/compliance-certifications-plan.md`](compliance-certifications-plan.md)
+> §11 troubleshooting) · [`superpower/compliance-certifications-plan.md`](../archived-documents/plans-archive/compliance-certifications-plan.md)
 > (NFR-7 SOC 2 / ISO 27001 / FedRAMP posture) · [`REQUIREMENTS.md`](../REQUIREMENTS.md) (PKG/SEC/OPS/SPC/NFR).
 >
 > **On approval + ship**: distill as-built topology facts into `okf/backend/build-run/` (new
@@ -259,7 +259,7 @@ Overlays are **optional and composable per client policy**. Status: ✅ shipped 
 | 3.13 | **Network posture** | ✅ GAP-1 CLOSED 2026-08-29: `-Dcontrol.bind=<host-or-IP>` restricts the bind address on both the HTTP and HTTPS paths (`ControlApi`); single-origin CORS `-Dcontrol.cors` | ✅ |
 
 Compliance policy mapping (SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI scoping) is owned by
-[`compliance-certifications-plan.md`](compliance-certifications-plan.md); this matrix is its technical inventory.
+[`compliance-certifications-plan.md`](../archived-documents/plans-archive/compliance-certifications-plan.md); this matrix is its technical inventory.
 
 ---
 

@@ -1,7 +1,7 @@
 # Control matrix — the single mapping table (C2)
 
 **Status:** LIVING DOCUMENT, first cut 2026-08-28. · **Plan:**
-[`docs/superpower/compliance-certifications-plan.md`](../docs/superpower/compliance-certifications-plan.md)
+[`docs/archived-documents/plans-archive/compliance-certifications-plan.md`](../docs/archived-documents/plans-archive/compliance-certifications-plan.md)
 workstream **C2**. · **Owner:** enterprise-PM track; product rows are this repo's.
 **Requirement-of-record:** [`docs/okf/capabilities/compliance/compliance.md`](../docs/okf/capabilities/compliance/compliance.md) — the `CMP` capability spec (area #13, 2026-09-08). It carries the edition rows, the decisions, and 🔴 **three built mechanisms this table does not cover**: the anonymous public dashboard embed, the agent's approval gate and kill switch, and the accessibility gate.
 
@@ -76,7 +76,7 @@ Organizational (5.x), People (6.x) and Physical (7.x) themes are org- or custome
 
 Posture: **"FedRAMP-ready / supports your ATO"**, not authorization — Inspecto is self-hosted
 software, so there is no CSP boundary to authorize (plan §2b-3). Baseline target Moderate is an
-*assumption* pending plan §6 Q7.
+baseline **DECIDED: Moderate** (operator, 2026-08-30) — corrected here 2026-09-09, having read as an open assumption for ten days. ⛔ It is the baseline C6's statements are written against, **not** a commitment to authorization (self-hosted only; no 3PAO, ConMon or POA&M). Definitions and rationale: `docs/okf/capabilities/compliance/compliance.md` §3.2, §3.10.
 
 | Family | Product statement | Resp. | Gap |
 |---|---|---|---|

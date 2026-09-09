@@ -1,3 +1,30 @@
+> ⛔ **ARCHIVED 2026-09-09 — provenance only, and this one was a DRAFT. Do NOT quote it as a decision of
+> record.** Current truth:
+> [`okf/capabilities/compliance/compliance.md`](../../okf/capabilities/compliance/compliance.md) — §3.10
+> holds the **C1–C6 workstream definitions** (which lived only here, while `compliance/controls-matrix.md`
+> keys its whole gap ledger on them), the SOC 2 Type I/II mechanics and the 6-month/3-month window, the
+> HIPAA/PCI scope language, and the declared `compliance/` layout; §3.2 holds the signed FedRAMP baseline.
+>
+> ✅ **The decisions in §6 are distilled** — including **Q7 (2026-08-30: Moderate)**, which had never
+> reached the current tier: this spec and the matrix both still described the baseline as an open
+> assumption until 2026-09-09. ⛔ Moderate is what C6's statements are written **against**, not a
+> commitment to an authorization program (Q5: self-hosted only — no 3PAO, no ConMon, no POA&M).
+>
+> 🔴 **What is uniquely here is largely UNRATIFIED, which is the hazard of archiving a draft. These five
+> claims below are refuted in the current tier — do not act on them:**
+> 1. §1's five-step certification ladder is marked *"Recommended sequence (Q1 to confirm)"*, and Q1 then
+>    answered **"parallel, SOC 2 is not a gate"**. The ladder was never struck through.
+> 2. §2 calls the Audit Log **"immutable"**. That exact word is recorded as **⛔ refused, in writing**
+>    (`compliance.md` §6); the honest claim is AU-9-narrow, tamper-EVIDENT.
+> 3. §2 cites **"axe CI"** as SDLC evidence. No accessibility step exists in any workflow.
+> 4. §3/§4 declare `compliance/scope/`, `compliance/policies/` and `compliance/fedramp/`. **None exists**;
+>    only `evidence/` does.
+> 5. §3 asserts three gaps open — one as **"CONFIRMED STILL A GAP"** (the SBOM). G1, G3 and G5 all closed
+>    on 2026-09-02 as COMPLY-1/2/3.
+>
+> ⚠ §6 Q6 also stands answered and open three lines apart, and §5's org-side list (BAA templates,
+> HR/vendor/asset policies, risk assessments) is broader than the current tier's summary of it.
+
 # NFR-7 — Compliance certifications plan (SOC 2 Type I/II → ISO 27001 → FedRAMP alignment; HIPAA/PCI scoped)
 
 **Status:** DRAFT 2026-07-23 — **sequencing ANSWERED 2026-07-25 (§6 Q1: parallel, SOC 2 is not a gate).**

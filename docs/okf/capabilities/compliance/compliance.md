@@ -163,7 +163,12 @@ twin, deliberately: **one narrative, two mappings**.
 
 **NIST 800-53.** The posture is stated carefully as **"federal-ready, supports your authorisation"**,
 not authorisation itself, because self-hosted software has no service boundary to authorise. The
-moderate baseline is flagged as an **assumption pending an org answer**, not a commitment. Account
+moderate baseline was **ANSWERED by the operator on 2026-08-30: Moderate** — recorded here 2026-09-09,
+having lived only in the archived plan's §6 Q7 while this spec and the matrix both still called it an
+open assumption. ⛔ It is the baseline C6's implementation statements are **written against**, and it is
+still **not** a commitment to an authorization program: Q5 answered self-hosted-only, so C6 stays
+*alignment at the Moderate baseline* — no 3PAO, no ConMon, no POA&M. Both halves matter; dropping the
+second is how an alignment target becomes an implied promise. Account
 lifecycle is inherited from the customer's identity provider; validated cryptography is an open gap;
 and flaw remediation is the release cadence.
 
@@ -296,6 +301,41 @@ task and the secret resolver.
 matrix, because a matrix can only be audited against controls someone thought to list. Reading the
 product capability-first surfaced three in three areas.
 
+### 3.10 The C1–C6 workstreams, and the framework mechanics behind them
+
+⚠ Distilled 2026-09-09 from `compliance-certifications-plan.md`, archived the same day. 🔴 **These six
+identifiers were defined ONLY in that plan**, while `compliance/controls-matrix.md` keys its gap ledger and
+program table on them throughout (C3 and C6 alone appear more than twenty times between them). Archiving
+without this section would have left the matrix's own workstream column resolving into a never-maintained
+tier.
+
+| # | Workstream | State |
+|---|---|---|
+| **C1** | **Scoping decisions + framework applicability statements.** Four one-page statements: SOC 2 in-scope services; the ISO 27001 ISMS boundary; FedRAMP/HIPAA/PCI applicability given self-hosted deployment | open, org-side (`N1`) |
+| **C2** | **The control matrix** — the auditor-readable mapping of product controls to framework criteria | ✅ **delivered 2026-08-28** → `compliance/controls-matrix.md` |
+| **C3** | **Evidence automation** (product work) — make every control leave time-stamped evidence continuously | G1/G2/G3/G5 closed 2026-09-02; the CI-evidence doc + `N3` pen test + `N7` advisory-watch remain |
+| **C4** | **Close the product control gaps**, each its own small change on the normal release flow | RTO/RPO targets + restore drill (`G6`) remain |
+| **C5** | **Policy pack** — the written policies auditors require (access control, crypto, change management, incident response, retention). Templates versioned here so every deployment ships with its policy set; **content is org-owned** | open, org-side (`N4`) |
+| **C6** | **FedRAMP ATO-support package** — 800-53 implementation statements (SSP-ready), the customer-responsibility matrix (a C2 export), a hardening guide (TLS config, IdP claims contract, write-root/permissions, clock sync, CM-6 baseline), and a documented **FIPS mode** (run + verify the Nimbus/JCEKS/TLS paths on a FIPS-enabled JVM provider — a test-matrix leg, **not new crypto code**) | demand-gated (`N5`/`N6`) |
+
+**SOC 2 Type I vs Type II — the mechanic that drives the sequencing.** **Type I** attests control *design*
+at a point in time; **Type II** attests *operating effectiveness* over a window. Same controls — Type II
+adds the burden that every control must leave **time-stamped evidence continuously**, which is exactly why
+C3 is sequenced *before* the observation window opens. ⚠ **The window is 6 months as the target, and 3
+months is the floor auditors accept** — a number that existed nowhere in the current tier.
+
+**HIPAA / PCI — scoping statements only, demand-gated.** ⛔ Not certification work. One one-page
+applicability statement each, and the substance of the claim is: *self-hosted, so no PHI or PAN leaves the
+customer's deployment; Inspecto is in the data path only where the customer routes it.* 🔴 That sentence
+was the only draft scope language anywhere — `PHI` and `PAN` appeared in no current-tier doc — and it is
+where any future HIPAA or PCI conversation starts.
+
+**The declared `compliance/` layout.** The plan declared four subdirectories — `scope/` (C1 statements),
+`policies/` (C5 templates), `evidence/` (C3 output) and `fedramp/` (C6 package) — tracked in git because it
+is product documentation rather than secrets, and shipped in the deploy bundle's docs. ⚠ **Only `evidence/`
+exists**; the other three are aspirational, which is §5.3's finding 14. Treat the layout as intent, not as
+something to link.
+
 ## 4. Decisions (dated one-liners)
 
 | Date | Decision | Where |
@@ -423,7 +463,7 @@ product capability-first surfaced three in three areas.
 | A row-level delete for audit retention | **Refused** | a partition delete, so retention is a file operation |
 | Overriding the decision that a purged incident's history survives | **⛔ Not overridden** | the one-year window is an upper bound on the store, not a licence to erase the trail |
 | Claiming federal authorisation | **Refused** | self-hosted software has no service boundary to authorise; the posture is "supports your authorisation" |
-| Claiming the moderate baseline as a commitment | **Refused** | it is flagged as an assumption pending an org answer |
+| Claiming the moderate baseline as a **commitment** or an authorization program | **⛔ Still refused** | ⚠ Sharpened 2026-09-09, not reversed. The *baseline* is decided (Moderate, operator 2026-08-30, §3.2) — what stays refused is calling it a commitment: Q5 answered self-hosted-only, so C6 is alignment at that baseline, with no 3PAO, ConMon or POA&M. The old reason ("an assumption pending an org answer") was stale; the refusal itself was correct |
 | Confidentiality and privacy criteria | **Deferred to demand** | scope decision |
 | A third-party assessment, continuous-monitoring or remediation-plan program | **Stated posture, not a gap** | no hosted offering |
 | Starting the federal package unscoped | **⛔ Refused** | demand-gated |
@@ -435,7 +475,8 @@ product capability-first surfaced three in three areas.
 |---|---|---|
 | The matrix | `compliance/controls-matrix.md` | this file |
 | The evidence pack | `compliance/evidence/access-review.md`, `air-gap-posture.md`, `audit-log-extraction.md`, `audit-record-protection.md`, `release-verification.md`, `retention-configuration.md`, `rto-rpo-statement.md` | this file |
-| The live plan | `docs/superpower/compliance-certifications-plan.md` (workstreams C1–C6) | in flight |
+| The workstreams C1–C6 | §3.10 of this spec — **the definitions live here now** | current |
+| The plan's provenance | `docs/archived-documents/plans-archive/compliance-certifications-plan.md` | ⛔ **ARCHIVED 2026-09-09** — a DRAFT, and several of its unratified claims are refuted in the current tier; read its banner before quoting anything from it |
 | Bill of materials · signing · dependency review | `tools/sbom.mjs`, `tools/check-dependencies.mjs`, `tools/dependencies.lock`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `inspecto/package.ps1` | `PKG`, `TOOL` |
 | Audit trail · retention | `inspecto/src/main/java/com/gamma/control/AuditTrail.java`; `inspecto-event/src/main/java/com/gamma/event/EventStore.java` | `OPS` |
 | Access control · secrets | `inspecto/src/main/java/com/gamma/control/CapabilityManifest.java`, `Roles.java`; `inspecto-acquire/src/main/java/com/gamma/acquire/SecretResolver.java` | `SEC` |
