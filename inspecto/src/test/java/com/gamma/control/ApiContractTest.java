@@ -36,6 +36,29 @@ class ApiContractTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
+    /** OpenAPI operation keys, so a path's `parameters`/`summary` siblings are not counted as operations. */
+    private static final Set<String> HTTP_METHODS =
+            Set.of("get", "put", "post", "delete", "patch", "head", "options", "trace");
+
+    /**
+     * The documented-surface RATCHET — measured 2026-09-09 at 19 paths / 24 operations. ⚠ These are floors
+     * to be RAISED as more is documented, never lowered to make a red build green: their whole job is that
+     * a documented operation cannot quietly disappear. See
+     * {@link #openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted}.
+     */
+    private static final int MIN_DOCUMENTED_PATHS = 19;
+    private static final int MIN_DOCUMENTED_OPERATIONS = 24;
+
+    /**
+     * Emptiness floor for the live route table. Measured 2026-09-09 on the default reactor: **266**
+     * registrations plus 73 absent-module stubs. Set well below that on purpose, twice over — route
+     * modules arrive by {@code ServiceLoader}, so the real number moves with the {@code -Pedition-*}
+     * profile, and a floor sitting a few percent under one profile's count would go red the first time a
+     * module was legitimately retired. ⚠ This floor answers only "did the measurement see the table at
+     * all"; it is not a coverage target, and raising it toward the real count would make it a brittle pin.
+     */
+    private static final int MIN_LIVE_ROUTES = 200;
+
     /** Example file → the component schema it must satisfy (README authoring step 3). */
     private static final Map<String, String> EXAMPLES = Map.of(
             "envelope-health.json", "Envelope",
@@ -162,6 +185,99 @@ class ApiContractTest {
             }
         }
         assertFalse(probed.isEmpty(), "the contract should declare at least one x-probe");
+    }
+
+    /**
+     * How much of the live surface the contract documents — <b>measured, floored, and PRINTED</b>.
+     *
+     * <p><b>The gap this closes.</b> Every other assertion in this class runs doc → live: it checks that
+     * what the contract says is true. Nothing ran live → doc, so the contract documenting **19 paths of
+     * roughly 332 registrations** was invisible to the very test suite named as its enforcement. A gateway
+     * or an external consumer reading `openapi-v1.json` sees about 6 % of the surface, and "OpenAPI-first"
+     * is true only of what was written after W2.
+     *
+     * <p>⛔ <b>This test does not decide whether that is acceptable.</b> Documenting 300-odd routes and
+     * keeping deliberate exemplar coverage are both defensible, and the choice is the operator's — it is
+     * recorded as owed in {@code okf/capabilities/control-api/control-api.md} §5. What is NOT defensible
+     * is the number being unknown, so this measures it, prints it on every run, and ratchets it.
+     *
+     * <p>⚠ <b>Why the assertions are floors and not equalities.</b> A per-route live → doc comparison is
+     * not available: {@code registeredRoutes} holds compiled patterns ({@code /config/pipeline/([^/]+)})
+     * while OpenAPI holds templates ({@code /config/pipeline/{name}}), with no translation between them.
+     * So the documented counts are a ratchet to be RAISED when more is documented, and the live count
+     * carries an emptiness floor — this repo's recurring failure is a measurement that quietly covered
+     * nothing, and a floor a few percent under the real count would instead go red the first time a
+     * module was legitimately retired.
+     *
+     * <p>🔴 <b>What this measures is the CORE surface, and that is structural, not a profile setting.</b>
+     * The first draft of this javadoc said the live count was edition-dependent because route modules
+     * arrive by {@code ServiceLoader}. Measured under {@code -Pedition-enterprise}: <b>266, identical to
+     * the default reactor.</b> The reason is the dependency direction — every optional module
+     * ({@code inspecto-ops}, {@code inspecto-notify-channels}, {@code inspecto-geo-link}) depends on
+     * {@code inspecto-processor} and the core declares none of them, so the arrow points module → core and
+     * a test living IN the core can never have one on its classpath, whatever profile built the reactor.
+     * The 73 absent-module stubs are precisely those modules answering 503. It is the same structural fact
+     * {@code MaintenanceTaskContractTest} records for maintenance-task providers.
+     *
+     * <p>⚠ <b>So the printed percentage is an UPPER BOUND on the shipped Enterprise surface.</b> A full
+     * Enterprise bundle registers these 266 plus whatever the optional modules contribute, against the
+     * same 24 documented operations — real coverage there is lower than the figure this test prints. Do
+     * not quote it as the Enterprise number.
+     */
+    @Test
+    void openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted(@TempDir Path cfg) throws Exception {
+        JsonNode contract = contract();
+        int documentedPaths = 0;
+        int documentedOperations = 0;
+        for (var it = contract.path("paths").fields(); it.hasNext(); ) {
+            var entry = it.next();
+            documentedPaths++;
+            for (var opIt = entry.getValue().fieldNames(); opIt.hasNext(); )
+                if (HTTP_METHODS.contains(opIt.next())) documentedOperations++;
+        }
+
+        int liveRoutes;
+        int stubbed;
+        Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        System.clearProperty("assist.write.root");
+        try (CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+             ControlApi api = new ControlApi(svc, 0)) {
+            liveRoutes = routeSetSize(api, "registeredRoutes");
+            stubbed = routeSetSize(api, "stubbedRoutes");
+        }
+
+        assertTrue(liveRoutes >= MIN_LIVE_ROUTES,
+                "only " + liveRoutes + " live route registration(s), below the floor of " + MIN_LIVE_ROUTES
+                        + ". Either a route module failed to register or this measurement stopped seeing "
+                        + "the table — fix that rather than the floor; a coverage figure over nothing is "
+                        + "the bug this floor exists for");
+
+        assertTrue(documentedPaths >= MIN_DOCUMENTED_PATHS && documentedOperations >= MIN_DOCUMENTED_OPERATIONS,
+                "the contract documents " + documentedPaths + " path(s) / " + documentedOperations
+                        + " operation(s), below the ratchet of " + MIN_DOCUMENTED_PATHS + " / "
+                        + MIN_DOCUMENTED_OPERATIONS + ". Documented surface must never SHRINK: if an "
+                        + "operation was genuinely retired, lower this floor deliberately and say why in "
+                        + "control-api.md §2 in the same commit");
+
+        // Printed pass or fail. An unstated coverage figure is an unaudited one, which is how 6% survived.
+        System.out.printf(
+                "ApiContractTest coverage: OpenAPI documents %d path(s) / %d operation(s) against %d live "
+                        + "route registration(s) (+%d absent-module stubs) — %.1f%% of the CORE surface, "
+                        + "which is an UPPER BOUND: a full Enterprise bundle adds the optional modules' "
+                        + "routes against the same documented set. Exemplar coverage is a DECISION still "
+                        + "owed to the operator (control-api.md §5); raise MIN_DOCUMENTED_* when you "
+                        + "document more.%n",
+                documentedPaths, documentedOperations, liveRoutes, stubbed,
+                100.0 * documentedOperations / liveRoutes);
+    }
+
+    /** Read one of {@link ControlApi}'s private route sets. Same package, plain classpath, no module-info. */
+    private static int routeSetSize(ControlApi api, String field) throws Exception {
+        Field f = ControlApi.class.getDeclaredField(field);
+        f.setAccessible(true);
+        Object value = f.get(api);
+        assertTrue(value instanceof Set, field + " is no longer a Set — re-anchor this measurement");
+        return ((Set<?>) value).size();
     }
 
     // ── a minimal structural checker (required-tree + enums; no schema-validator dependency) ──

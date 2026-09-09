@@ -144,7 +144,7 @@ paragraph hit the same trap on its first attempt, where the atomic write then sa
 **Goal:** the failure *classes* that produced most of the 215 stop being able to recur. Highest leverage
 sprint in the plan: one guard each, instead of N fixes.
 
-> ### Progress — the enabler and one of the five classes are DONE 2026-09-09
+> ### Progress — the enabler + two of the five classes DONE 2026-09-09 (one leaves a decision owed)
 >
 > **`SPEC-STALEREF-1`'s class is closed.** `tools/check-doc-citations.mjs` is committed and wired into
 > `ci.yml` + `.githooks/pre-push`, falsified in both directions. ⚠ **That family is not one of the five
@@ -172,13 +172,28 @@ sprint in the plan: one guard each, instead of N fixes.
 > parses the TypeScript to hold it there. ⚠ A cross-language pin has to read the other side's source —
 > there is no shared artifact for two short lists, and inventing one costs more than it saves.
 >
-> **Still open: three of the five** — the generated-artifact guard (the API contract covers 19 of ~332
-> routes), the count guard, and the served-descriptor derivation. The call-site-audit row was already
+> **Then the first row, "a generated artifact is unverified by its producer", got its assertion.** Every
+> other check in `ApiContractTest` ran doc → live, so the contract covering a fraction of the surface was
+> invisible to the suite named as its enforcement. `openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted`
+> now runs live → doc: 19 paths / **24 operations against 266 live registrations + 73 absent-module stubs
+> = 9.0 %**, printed pass or fail. 🔴 **The measurement immediately corrected the finding that asked for
+> it** — "6 % of ~332" divided documented *paths* by *(method, pattern)* registrations, a `SPEC-COUNTS-1`
+> instance hiding inside a `SPEC-STALEREF-1` sibling. ⚠ A per-route comparison is unavailable (patterns vs
+> templates), so the guard ratchets and floors instead of pinning. 🔴 **And one of my own premises was wrong,
+> caught by running it:** I justified the floor as "the live count is edition-dependent". Measured under
+> `-Pedition-enterprise` it is **266, identical to the default reactor** — optional modules depend on
+> `inspecto-processor` and the core declares none of them, so a test in the core can never load one. The
+> figure is therefore the **core** surface and an **upper bound** on a shipped Enterprise bundle's coverage.
+> ⛔ **The posture decision — document the remaining surface, or adopt exemplar coverage deliberately —
+> is the operator's and is still owed. A guard measures; it must not decide.**
+>
+> **Still open: two of the five** — the count guard (`SPEC-COUNTS-1`) and deriving the remaining served
+> descriptor (the trigger vocabulary in the binding glossary). The call-site-audit row was already
 > discharged for the transform guard in Sprint 1.
 
 | Class | Instances found | The one fix |
 |---|---|---|
-| **A generated artifact is authoritative to its consumer and unverified by its producer** | the bill of materials (fixed this week); the served API contract covers **19 of ~332** routes with a test that cannot see the gap | A guard per generated artifact holding it against its own source of truth — the pattern the peer session just established |
+| 🟡 **A generated artifact is authoritative to its consumer and unverified by its producer** — **assertion DONE 2026-09-09, one decision owed** | the bill of materials (fixed this week); the served API contract documents 19 paths / **24 operations against 266 live registrations = 9.0 %** (measured; the "6 % of ~332" was a unit error) with a test that could not see the gap | **DONE:** `ApiContractTest.openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted` measures live → doc, **prints the figure every run**, ratchets the documented counts and floors the live one. Mutation-proven both ways. ⛔ **Owed to the operator, not to a guard:** document the rest, or adopt exemplar coverage deliberately |
 | ✅ **A hand-mirrored map drifts** — **CLOSED 2026-09-09** | four instances; the live one carried two keys where the server had three | **DONE:** `pipeline-editable.ts` carries `fields`, and `MapNodeKeyContractTest` **parses that TypeScript** to hold both sets against the Java ones. Mutation-proven in both languages. Not a fifth hand-edit |
 | **A count is stated N ways** | node types **5** ways, maintenance tasks **5**, job types **4**, processors **3**, transform functions **3**, triggers **4** | Derive from the committed contract where one exists; where none does, one guard that counts. In every case the *narrative* doc was wrong and the *generated* one was right |
 | **A guard is absent from one call site** | the transform guard: ten call sites, zero on any save path | Audit the **call-site list**, not the rule list. Ask which paths a guard does *not* sit on |
