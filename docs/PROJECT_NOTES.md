@@ -140,6 +140,47 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **A guard whose scope is mostly EXEMPTION is measuring the wrong thing — so measure the obvious
+  design before building it.** Three of Sprint 3's five guard designs died on measurement, and each would
+  have shipped green while proving little. The sharpest example: a guard that scans prose for a stated
+  count matched **14 lines over 238 current docs**, and its "failures" were a line reference
+  (`Roles.java:121-131`), a sentence about one specific node type, and correction notes naming the old
+  figure on purpose — while **missing** real phrasings like "the 119-entry catalog". ⛔ **A number in
+  prose is indistinguishable from a line number, a version or a date fragment.** The shippable shape is
+  the invariant the repo states about *itself*: a contract owns the number, docs mark the statement
+  (`<!--count:ID-->`), the guard DERIVES it (`tools/check-doc-counts.mjs`).
+- ⛔ **Name a count — or any id — after the SET, never the noun.** "Node types" denotes **three** sets in
+  this repo: 30 (`BuiltinNodeType`, the roster), 11 (`node-attributes.contract.json`, only types with an
+  attribute spec) and 16 (`step-types.contract.json`, recipe entries). "Transform functions" denotes 23
+  (SQL mapping) *or* 30 (ASN vendor plugin). The five-way and three-way count spreads were caused by the
+  **ambiguity, not the arithmetic** — nobody had written down that the noun covered several sets.
+- ⚠ **Some counts have no single true value, and a guard must refuse to assert one.** Job types are **10**
+  on Personal and **12** with `inspecto-ops`; maintenance tasks are **20** built-in ids across **19**
+  switch arms plus **4** contributed. Both assemble from a built-in list plus `ServiceLoader` discovery,
+  so "the count" does not exist until the classpath is fixed. A doc stating either must say which shape it
+  means. A guard measures; it must not decide.
+- 🔴 **A mutation that does not COMPILE proves nothing about a test.** Two trigger-vocabulary mutations
+  (removing an enum constant that is imported elsewhere; adding a component to a record) were caught by
+  the compiler, so the tests they were meant to exercise never ran. ⚠ **The tell is the absence of a
+  `Tests run:` line** — a bare non-zero exit looks identical to a working mutation test. Prefer mutations
+  that compile: ADD an enum constant, or **swap two same-typed record components** (legal, and it changes
+  the component list).
+- ⚠ **Falsify with COMMITTED files only.** `git checkout --` reverts to HEAD, so restoring a mutated file
+  destroys any *uncommitted* work in it. Doing this mid-falsification silently wiped four freshly-seeded
+  count markers and put a wrong figure into a commit message and a CI comment.
+- ⛔ **A ratchet floor must EQUAL the current count, not sit below it.** Floors set below the marked count
+  left slack: deleting a marker left 2 of 3 and the guard went green. Slack in a floor is exactly where
+  the thing being counted disappears unnoticed.
+- ⚠ **Re-sum a Maven reactor by hand; a naive grep under-reports by hundreds.** `[INFO] Tests run:` alone
+  gave **3422** against a true **4176**, because **four module summaries print at `[WARNING]` level** when
+  `Skipped > 0`, and per-*class* lines share the prefix with per-*module* ones (summing both gave 7552).
+  The module summary is the line with **no** `Time elapsed` and **no** `-- in <class>`, matched across
+  `INFO|WARNING|ERROR`.
+- ⚠ **Archiving a plan is not covered by any single guard.** `check-doc-citations` flags dead paths but
+  exempts `docs/superpower/` **as a source**, so it is blind to one in-flight plan linking another;
+  `check-doc-links` has no such exemption and catches those. **Java javadoc is outside both** — two
+  production files cited an archived plan as their design authority. Run both, and grep the code too.
+
 - 🔴 **This checkout can be worked by TWO shifts at once, and a shared tree breaks builds in ways that
   look like code defects.** Observed 2026-08-26: a second agent ran `mvn -o clean test` four minutes into
   another shift's identical run, and its `clean` wiped `target/` mid-flight ⇒ `NoClassDefFoundError` on a
