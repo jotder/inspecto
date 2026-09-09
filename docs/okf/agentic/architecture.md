@@ -2,7 +2,7 @@
 type: Concept
 title: eoiagent architecture
 description: Eleven stable ports behind hexagonal adapters, deployment profiles with a fail-closed capability matrix, and the core vs application-pack split.
-resource: C:/sandbox/agent-brainstorm/docs/architecture/
+resource: jotder/inspect-agent/docs/architecture/  # upstream GitHub repo; NOT a local path (corrected 2026-09-09)
 tags: [agentic, architecture, hexagonal, ports, application-pack]
 timestamp: 2026-07-07T00:00:00Z
 ---

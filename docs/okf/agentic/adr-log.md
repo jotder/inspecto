@@ -2,7 +2,7 @@
 type: Concept
 title: eoiagent ADR log
 description: The fourteen architecture decision records, one line each.
-resource: C:/sandbox/agent-brainstorm/docs/adr/
+resource: jotder/inspect-agent/docs/adr/  # upstream GitHub repo; NOT a local path (corrected 2026-09-09)
 tags: [agentic, adr, decisions]
 timestamp: 2026-07-07T00:00:00Z
 ---

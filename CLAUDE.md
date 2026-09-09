@@ -86,7 +86,12 @@ change that adds or retires a doc:
 
 1. **Current knowledge → `docs/okf/`** (one concept per file, cross-linked, graphify-indexed) plus
    the small root canon (GLOSSARY, INDEX, REQUIREMENTS, BACKLOG, USER_GUIDE, PROJECT_NOTES,
-   BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE, stakeholders/).
+   BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE) **and the audience- and surface-specific
+   trees** `docs/stakeholders/`, `docs/api/`, `docs/ui/`, `docs/ops/`, `docs/roadmap/`, `docs/wiki/`
+   and root `compliance/`. ⚠ Those six trees went unstated here until 2026-09-09 (consolidation
+   step 9) even though `tools/check-vocabulary.mjs` has always scanned them — **a tier definition
+   that omits part of its own tier is how a doc ends up with no stated home**, and it is the
+   condition step 9 exists to end.
 2. **Active plans → `docs/superpower/`** — a plan lives here ONLY while its work is in flight.
    **When the work ships: distill the durable as-built facts (decisions, seams, gotchas, deliberate
    deferrals) into the matching OKF concept, move still-open items to `docs/BACKLOG.md`, then

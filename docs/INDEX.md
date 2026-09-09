@@ -5,8 +5,11 @@
 > current. When you add or retire a doc, update this index in the same change.
 >
 > **Structure (binding — see root `CLAUDE.md` "Documentation lifecycle"):** current knowledge lives in the
-> **[OKF bundle](okf/index.md)** + the small root canon below · in-flight plans live in
-> [`superpower/`](superpower/) · everything else is archive.
+> **[OKF bundle](okf/index.md)**, the small root canon below, and the audience- and surface-specific trees
+> [`stakeholders/`](stakeholders/README.md), [`api/`](api/README.md), `ui/`, `ops/`, `roadmap/`, `wiki/` and
+> root `compliance/` · in-flight plans live in [`superpower/`](superpower/) · everything else is archive.
+> ⚠ **Those six trees were missing from this sentence and from `CLAUDE.md` until 2026-09-09** (step 9),
+> which left ~40 current documents inside no stated tier.
 >
 > **Consolidated 2026-09-07** — 879 lines → this. The page had become an archive log: 46 struck-through
 > per-plan narratives (443 lines) for plans already in `plans-archive/`, sitting under a heading that says

@@ -2,7 +2,7 @@
 type: Concept
 title: eoiagent governance & safety
 description: Approval gate + dry-run for every mutating action, Role×Capability×Profile policy, deterministic guardrails, append-only audit, eval-based certification.
-resource: C:/sandbox/agent-brainstorm/docs/specs/approval-governance.md
+resource: jotder/inspect-agent/docs/specs/approval-governance.md  # upstream GitHub repo; NOT a local path (corrected 2026-09-09)
 tags: [agentic, safety, approval, guardrails, audit, eval]
 timestamp: 2026-07-07T00:00:00Z
 ---

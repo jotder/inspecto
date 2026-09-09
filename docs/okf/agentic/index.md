@@ -10,7 +10,9 @@ transport and can power other applications. It is a **separate repo**: the upstr
 **`jotder/inspect-agent`** on GitHub, Maven groupId `com.eoiagent`, and this reactor pins
 **`0.2.0-SNAPSHOT`** (`pom.xml`). ⚠ **Corrected 2026-09-08:** this line named a local path
 `C:/sandbox/agent-brainstorm` that **does not exist on the shared sandbox**, and a version two bumps
-stale. Requirement-of-record: [Assistant capability spec](../capabilities/assistant/assistant.md) §3.9.
+stale. ⚠ **Its four sibling concepts kept that dead path in their `resource:` frontmatter until
+2026-09-09** — the correction was made here and never propagated, which is why a fix belongs everywhere
+the claim appears, not only where it was noticed. Requirement-of-record: [Assistant capability spec](../capabilities/assistant/assistant.md) §3.9.
 
 > **Authoritative docs live in that repo** (clone `jotder/inspect-agent` to read them) (`docs/` — itself an OKF bundle: architecture, 14 ADRs,
 > per-component specs, roadmap/backlog, packaging & licensing, security review, CI gates). This section

@@ -2,7 +2,7 @@
 type: Overview
 title: eoiagent overview
 description: Embeddable plain-Java agent platform — JDK 25, LangChain4j-based, 18-module reactor, offline-first, permissive-only licensing.
-resource: C:/sandbox/agent-brainstorm (separate repo)
+resource: jotder/inspect-agent  # upstream GitHub repo, not a local path (corrected 2026-09-09)
 tags: [agentic, eoiagent, overview, langchain4j]
 timestamp: 2026-07-07T00:00:00Z
 ---

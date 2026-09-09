@@ -778,7 +778,7 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 ## 7. Related sandboxes (separate repos — pointers only)
 
 - **agent-kernel** (`C:/sandbox/agent-kernel`) — DISCONTINUED; Inspecto vendored its reasoning layer 2026-07-07.
-- **eoiagent** (`C:/sandbox/agent-brainstorm`) — agent platform; Inspecto's model transport. Pinned to the
+- **eoiagent** (upstream repo `jotder/inspect-agent`, ⚠ not a local path — corrected 2026-09-09) — agent platform; Inspecto's model transport. Pinned to the
   released **`0.1.0`** (tag `v0.1.0`, EOI-7a 2026-07-08; trunk now `0.2.0-SNAPSHOT`). Rebuild into local `.m2`
   with `git checkout v0.1.0 && mvn -o clean install` until a registry is chosen (EOI-7b).
 - **CVVE** (`C:/sandbox/agentic-doc-validation`) — kernel's 3rd consumer; first real `HumanHandoff` driver.
