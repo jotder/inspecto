@@ -230,8 +230,51 @@ sections already carry an owner banner.
 
 ## Sprint 5 — Dissolve `superpower/`
 
-**Goal:** plan step 7, **now unblocked** — its stated precondition was authoring the deployment-topology
-spec first, and that shipped as area #15 (`896b2e4b`).
+> ### 🔴 ATTEMPTED 2026-09-09 — the exit criterion is UNREACHABLE as written, and one operator decision unblocks it
+>
+> **"Now unblocked" conflated two different things: the design being DISTILLED and the work having
+> SHIPPED.** `CLAUDE.md`'s lifecycle says a plan lives in `superpower/` *"ONLY while its work is in
+> flight"*. Surveyed against each plan's **own** status line, **zero of the ten are archivable today** —
+> every one records a specific, board-tracked reason to remain:
+>
+> | Plan | Its own stated reason to stay |
+> |---|---|
+> | `deployment-topology-plan.md` | "decisions SIGNED, **design DISTILLED, build not started**" — and `editions.md` §2 says in as many words: *"The plan stays in `superpower/`"* |
+> | `completeness-kpi-plan.md` | ⏸ **ON HOLD by operator decision, 2026-08-30** |
+> | `compliance-certifications-plan.md` | DRAFT; the `C3` remainder is org-gated (`N3`/`N7`) |
+> | `elt-final-amendment-plan.md` | APPROVED, but Phase 6's **deletion half is release-gated** (D-2) |
+> | `agt-6-plan.md` | "**Plan stays active** — what keeps this plan out of the archive is the `kpi_report_builder` host row + all of AGT-6b" |
+> | `parser-field-tiers-interview-plan.md` | READY TO RUN — **awaiting a scheduled session with a real onboarding user** |
+> | `pipeline-spec.md` · `pipeline-waves-drain-plan.md` | working document / IN FLIGHT; row 15 needs a **release**, not code |
+> | `docs-consolidation-plan.md` · this file | the programme itself |
+>
+> ⛔ **So `superpower/` cannot dissolve until the PRODUCT work ships — which is Sprint 6 and beyond, not a
+> documentation exercise.** I archived the deployment plan, then reverted it on finding that `editions.md`
+> already recorded the opposite decision. A sprint goal does not override a per-plan condition the plan
+> and its capability spec both state.
+>
+> ### The decision this needs — operator, not a shift
+>
+> **What does "in flight" mean for a plan whose decisions are signed, whose durable design is distilled,
+> and whose remaining deliverables are all filed as board rows?**
+>
+> * **Strict (today's rule, and what I followed):** in flight until the deliverables ship. `superpower/`
+>   holds ten plans indefinitely, and step 7 waits on product work.
+> * **Looser ("a plan is spent"):** once decisions are signed, design distilled and open items filed, the
+>   plan is provenance — archive it, and the **board** owns the remaining work. Under this reading
+>   **five** could move now (deployment-topology, completeness-kpi, compliance-certifications, agt-6,
+>   parser-field-tiers), leaving the four genuinely-active ones plus this file.
+>
+> ⚠ The looser reading has a real cost worth pricing before choosing it: `archived-documents/` is
+> **never maintained and never linked as current** by policy, so the acceptance criteria a future builder
+> needs would live in a tier nobody updates. That is survivable only if each plan's *durable* content is
+> distilled first — which is why this shift distilled the deployment plan's **SCR-1…SCR-11 deliverable
+> table** into `editions.md` §5.2. Before this shift those acceptance criteria existed **nowhere else**:
+> §5.10 had checked the *topology* design and missed the *deliverables*, so archiving would still have
+> lost design even after its stated precondition was met.
+
+**Goal:** plan step 7 — its stated precondition (authoring the deployment-topology spec first) **is** met:
+that shipped as area #15 (`896b2e4b`). What is not met is the lifecycle condition above.
 
 Its stated exit: *"all 20 untracked items filed; `superpower/` holds only working assets; the 50 inbound
 links repointed."*

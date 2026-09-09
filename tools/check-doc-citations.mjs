@@ -216,6 +216,15 @@ for (const p of trackedPaths()) {
     if (!byBasename.has(base)) byBasename.set(base, []);
     byBasename.get(base).push(p);
     TOP_LEVEL.add(p.split('/')[0]);
+    // 🔴 Also the first segment RELATIVE TO EACH BASE. `docs/BACKLOG.md` cites its siblings as
+    // `superpower/x.md` and `okf/backend/y.md`, which are real claims about this repo even though
+    // `superpower` and `okf` are not top-level names. Without this the whole idiom was SKIPPED as
+    // "some other repository" — and adding the rooted test in the guard's first version therefore made
+    // eight already-dead `superpower/…` citations invisible instead of fixing them. Found 2026-09-09
+    // when archiving a plan did not turn a single citation of it red.
+    for (const b of BASES) {
+        if (b !== '.' && p.startsWith(b + '/')) TOP_LEVEL.add(p.slice(b.length + 1).split('/')[0]);
+    }
 }
 
 /** True when some tracked file IS this path or ends with it after a `/` — see the header's tail rule. */

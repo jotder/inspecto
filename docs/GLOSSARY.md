@@ -68,7 +68,7 @@ still import. *(Added 2026-07-06 R6; provenance `docs/archived-documents/plans-a
 
 ## 1-A. Personas & Surfaces
 
-> Added Wave 0 (2026-07-02) per `superpower/frontend-review-and-completion-plan.md`.
+> Added Wave 0 (2026-07-02) per `archived-documents/plans-archive/frontend-review-and-completion-plan.md`.
 
 **Lens** — A persona-scoped view of the one operator console: **Business** (consume data, investigate
 provenance/lineage, raise Requirements) · **Builder** (author in Workbench + Studio) · **Ops** (built-in
@@ -388,7 +388,7 @@ of what a Pipeline landed. Its kinds are an **open registry** keyed by string id
 Phase 3 S3 (table-entry `collect`), deferred by its own design spike as genuine new design. **Job is again the
 canonical user-facing term** for any scheduled Executable over data at rest (maintenance, periodic
 report/enrich, dataset operations); the authoring contract completes in
-`superpower/job-parameter-contract-plan.md`. Table-entry Pipelines remain an *additive complement* (S3 design
+`archived-documents/plans-archive/job-parameter-contract-plan.md`. Table-entry Pipelines remain an *additive complement* (S3 design
 of record), never the Job's replacement; §13 row.
 
 **Scheduler** — The Operations engine that owns **Triggers** and starts **Executables** (Pipelines or Jobs). It
@@ -718,15 +718,15 @@ Never use Entity/Link for artifacts (Component/Part) or assets (Asset/Lineage).
 **Entity Projection** *(P3)* — The **mapping** (not a store) that folds a **Dataset**'s rows into an
 Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
 Built **frontend-mock-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
-relationships remain open. Design: [`superpower/link-analysis-and-graphsource.md`](archived-documents/plans-archive/link-analysis-and-graphsource.md);
-plan: [`superpower/link-analysis-studio-plan.md`](archived-documents/plans-archive/link-analysis-studio-plan.md).
+relationships remain open. Design: [`archived-documents/plans-archive/link-analysis-and-graphsource.md`](archived-documents/plans-archive/link-analysis-and-graphsource.md);
+plan: [`archived-documents/plans-archive/link-analysis-studio-plan.md`](archived-documents/plans-archive/link-analysis-studio-plan.md).
 
 **Link Analysis Studio** — The Builder-lens Studio pane (`/studio/link-analysis`) for graph investigation:
 pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, neighborhood, centrality,
 communities). A saved investigation is a **Link-Analysis View** (Component kind `link-analysis-view`); when
 its source is `entity-projection` it is a **Widget** (a Graph Visualization Type bound to a Dataset).
 
-### Geo (Geo Map Analysis) *(added 2026-07-05 — plan: [`superpower/geo-map-analysis-plan.md`](archived-documents/plans-archive/geo-map-analysis-plan.md))*
+### Geo (Geo Map Analysis) *(added 2026-07-05 — plan: [`archived-documents/plans-archive/geo-map-analysis-plan.md`](archived-documents/plans-archive/geo-map-analysis-plan.md))*
 
 **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic
 investigation: pick a **GeoSource** + **GeoQuery**, render on the offline MapLibre host, investigate (search,
@@ -794,7 +794,7 @@ alongside the retained `flow` (`PipelineProjection.graph()`'s `flows`/`pipelines
 node/edge's `flow`/`pipeline` field, `ViewRoutes`/`ViewDefinition`'s `flow`/`pipeline`, the `/provenance`
 routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** — the words a user READS were never part of the tier plan and had drifted furthest: ~50 operator-visible strings still said "flow" (404 `no authored flow '<id>'`, `422 flow validation failed`, `Invalid flow '<name>'`, the conservation-imbalance ALERT body, `unsafe flow id`, the `[FLOWJOB]` log tag, a `ConfigSpecs` attribute description, three UI labels). All renamed; the surviving `flow` strings are exactly the CONTRACTS this row's earlier tiers deliberately kept — the dual-emit JSON keys, the legacy `flow:` job key, the `?flow=` query param and the `flow` agent-tool argument. Pinned by the new `flow-message` rule in `tools/check-vocabulary.mjs`, which tells a contract from a message BY SHAPE (a contract is the bare token `"flow"`; a message is a sentence), so no rename is forced on a caller-facing key. |
 | Data Store | **Dataset** | Studio datasets UI; `dataset-types.ts` (already "Dataset" — verify no "store" labels); backend `ComponentStore` stays = *physical store*, not a Dataset |
-| Data Source *(browsable origin)* | **Stream** (event/fact) + **Reference** (dimension) | ✅ **DONE end-to-end** (2026-07-14, uncommitted on `master`; plan `superpower/source-collector-stream-reference-rename.md`). Two Catalog data-origin concepts (§3): **Stream** = time-series/append-only event origin; **Reference** = mutable/versioned dimension origin → **Reference Dataset** (§6-B). Backend: `NodeKind.SOURCE→STREAM`, `IdScheme` token `source:→stream:`; `GET /catalog/streams` now emits `kind:"STREAM"`; **new `GET /catalog/references`** (REFERENCE_DATASET origins). UI: Catalog **References** tab added alongside the existing **Streams** tab; `NodeKind` union + graph glyph/colour tokens realigned `SOURCE→STREAM`. The acquisition *config* is **Connection** + **Collector**. |
+| Data Source *(browsable origin)* | **Stream** (event/fact) + **Reference** (dimension) | ✅ **DONE end-to-end** (2026-07-14, uncommitted on `master`; plan `archived-documents/plans-archive/source-collector-stream-reference-rename.md`). Two Catalog data-origin concepts (§3): **Stream** = time-series/append-only event origin; **Reference** = mutable/versioned dimension origin → **Reference Dataset** (§6-B). Backend: `NodeKind.SOURCE→STREAM`, `IdScheme` token `source:→stream:`; `GET /catalog/streams` now emits `kind:"STREAM"`; **new `GET /catalog/references`** (REFERENCE_DATASET origins). UI: Catalog **References** tab added alongside the existing **Streams** tab; `NodeKind` union + graph glyph/colour tokens realigned `SOURCE→STREAM`. The acquisition *config* is **Connection** + **Collector**. |
 | Cube *(noun / summary asset)* | **Matrix** | ✅ **DONE** (2026-08-04, additive label, not a model rename — no version bump). User-facing name for a summary **Derived Table** (§6-B); the model type stays `Derived Table` / `NodeKind.DERIVED_TABLE`. Landed: `nodeKindLabel()` (`inspecto-ui/.../catalog/catalog-graph.ts`) maps `DERIVED_TABLE`→"Matrix" for the Catalog legend, graph-node tooltip, and node-detail dialog (incl. its neighbour grid). No prior UI copy said "Cube" as a noun (only the `heroicons_outline:cube` icon id and the sanctioned verb sense in GLOSSARY/USER_GUIDE, both correctly kept — see §5 of the archived `vocabulary-and-config-contract-plan.md`). Persisted materialization is still Phase C. |
 | Issue | **Incident** | ✅ **DONE** (`2878b31`, breaking → 5.0): `ObjectType.INCIDENT`, `/objects?type=INCIDENT` + `objectType` value, UI `/issues`→`/incidents` (route file renamed), ops-mock seeds INCIDENT. No DB migration (in-memory `ObjectStore`). |
 | Incident lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` | **`IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`** (§9) | ✅ **DONE end-to-end** (2026-07-12, mail-like Incidents/Case Manager — provenance `docs/archived-documents/plans-archive/incidents-mail-ui-design.md`): UI `object-mail.component` + mock (`128aeaa`/`175a6e7`); backend pass shipped the built-in INCIDENT `Workflow` (actions `accept/resolve/archive/reopen`; ARCHIVED terminal; reopen clears `closedAt`; `assign` no longer moves status) + `PATCH /objects/{id}`. Still config-replaceable via `*_workflow.toon`; UI keeps normalizing legacy names for overridden deployments. |

@@ -550,6 +550,28 @@ Nothing a shift can close from this checkout.
 * **The deployment gap ledger** — service wrappers, the embedded-database memory cap default, surge
   admission, the vault and key-management provider, launcher token-line debris, and the thirteen archived
   documents a broken permission silently drops from every bundle. **Phases 0 through 5 are all unbuilt.**
+
+#### The deployment script suite — distilled here 2026-09-09 so its plan could be archived
+
+⚠ **These acceptance criteria existed only in `deployment-topology-plan.md` §7.** That plan's *topology*
+design was distilled into §§3.9–§3.13 when this spec was written, but its **deliverable table was not** —
+so `SCR-1` through `SCR-11` appeared nowhere outside the plan, and archiving it would have lost the
+definition of "done" for every unbuilt script. Board rows: `SPEC-DEPLOY-ROWS-1` (the family) and
+§3's *Deployment topology gaps* (`GAP-3`/`GAP-9`/`GAP-10`).
+
+| ID | Deliverable | Tier | Acceptance |
+|---|---|---|---|
+| `SCR-1` | `preflight` | all | §8's install checks as a machine-readable report (`--json`, each row PASS/WARN/FAIL); **any FAIL blocks install**. Runs offline and catches every §8 row |
+| `SCR-3` | Service wrappers | T2+ | a systemd unit (`Restart=on-failure`, `WorkingDirectory=` the bundle root, `EnvironmentFile=`) **and** a Windows service. ⚠ Recovery from process death is **restart**, not failover — this wrapper *is* the recovery mechanism (§3.11) |
+| `SCR-4` | Proxy / TLS templates | T2a / T3 | nginx and IIS reference configs: TLS, HSTS, gzip for the static UI, and network restriction of `/metrics` + `/health/details` — which are **unauthenticated by design**, so the proxy is the only thing that fences them |
+| `SCR-5` | `backup-offsite` | T2+ | copies verified archives off-box after `backup_verify`; acceptance is that a **restore succeeds from the off-site copy alone** |
+| `SCR-6` | `verify` | all | §9's acceptance block as a script — probes, an evidence table, an exit code; green on the reference deploys and **red on each seeded fault** |
+| `SCR-7` | `upgrade` / `rollback` | T2+ | §6's procedure automated including N-1 retention; drilled in **both** directions on a reference deploy |
+| `SCR-9` | Launcher hygiene | all | remove the dead `CONTROL_TOKEN` / `ASSIST_TOKEN` lines from `serve.*` and `package.ps1` — token auth was removed 2026-06-16 and no Java code reads them. Acceptance: grep-clean |
+| `SCR-10` | Bundle-docs ACL fix | — | thirteen files under `archived-documents/plans-archive/` carry a broken deny-ACL and are **silently skipped from every bundle**; needs an Administrator `takeown` + `icacls` pass |
+| ~~`SCR-2`~~ | ~~Launcher `lib/` support~~ | — | ✅ **SUPERSEDED by PG-1**: `postgresql.jar` is staged into every Standard and Enterprise bundle and auto-detected |
+| ~~`SCR-8`~~ | ~~`package.ps1 -Edition Enterprise`~~ | — | ✅ **SHIPPED as EDG-01.** The row named a blocker that was already gone |
+| ~~`SCR-11`~~ | ~~Container image~~ | — | ✅ **SHIPPED as PKG-3** — the Dockerfile is generated at `package.ps1:1041-1065`. ⛔ Kubernetes stays out of scope until decision D1 says otherwise |
 * **The Standard runtime not re-verified against the token library** — skip-runtime until confirmed.
 * **Multi-user relational deployment** — parked until a multi-operator install exists.
 * **Step-processor gaps** — eighteen partial and sixty-seven planned rows on the board.

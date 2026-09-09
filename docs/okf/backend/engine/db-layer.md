@@ -18,7 +18,7 @@ timestamp: 2026-07-16T00:00:00Z
 > **⚠️ Keep this current.** This doc is derived from the source files listed below — when any of
 > them changes (a table's DDL/columns, a store's backend wiring, the per-space file layout, a
 > `-D*.backend` toggle, or Postgres behavior), update the matching section here (and
-> [`superpower/db-browser-design.md`](../../../archived-documents/plans-archive/db-browser-design.md) if browsable tables/stores
+> [`archived-documents/plans-archive/db-browser-design.md`](../../../archived-documents/plans-archive/db-browser-design.md) if browsable tables/stores
 > change). A `PostToolUse` hook (`.claude/hooks/post-tool-db-layer-doc.sh`) reminds you on edits to
 > these files. Source of truth for the DDL is each store's `initSchema()` — keep the SQL blocks in §3
 > byte-accurate.
@@ -734,7 +734,7 @@ Postgres instance — not a code change.
 The **Data Browser** pane (a per-space DB client) browses these stores live. Backend: `/db/catalog`,
 `/db/table`, `/db/query` in [`control/DbBrowserRoutes.java`](../../../../inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java)
 (read-only, `SqlGuard`-checked). UI: `inspecto-ui` → **Catalog › Data Browser**. Design + phasing in
-[`superpower/db-browser-design.md`](../../../archived-documents/plans-archive/db-browser-design.md).
+[`archived-documents/plans-archive/db-browser-design.md`](../../../archived-documents/plans-archive/db-browser-design.md).
 
 - **Business-data stores** (§1) read via an ephemeral DuckDB sandbox (`read_parquet`/`read_csv`).
 - **Operational tables** (§3) browse through each store's *live* connection via

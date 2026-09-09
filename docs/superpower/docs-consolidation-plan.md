@@ -870,6 +870,18 @@ it worth reading.
 
 ### 5.10 ⚠ One active plan cannot be archived yet — `deployment-topology-plan.md`
 
+> 🔴 **Re-measured 2026-09-09: this section was half right, and the half it missed is the load-bearing
+> one.** Its stated blocker — "its distillation target does not exist" — is discharged: `editions.md`
+> §§3.9–§3.13 are that design, and the §5.10 probe for `warm standby` now hits. **But it checked the
+> TOPOLOGY design and never checked the DELIVERABLES**: `SCR-1` through `SCR-11` and their acceptance
+> criteria appeared nowhere outside the plan, so archiving it would have lost design even after the
+> precondition was met. Those are now distilled into `editions.md` §5.2.
+>
+> ⛔ **And the plan still cannot move**, for a reason §5.10 does not name: its own status line reads
+> *"build not started"*, and `CLAUDE.md`'s lifecycle keeps an in-flight plan in `superpower/`. Nine of the
+> other plans are in the same position — see `post-consolidation-sprints.md` §Sprint 5 for the survey and
+> the one operator decision that unblocks step 7.
+
 The 8 active plans hold **~51 open items, of which 20 are not tracked in `BACKLOG.md`** — so a naive
 "distil and archive" would silently drop them. The distribution is lopsided:
 
