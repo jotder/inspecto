@@ -428,7 +428,7 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
   was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
   artifact exists.** → the owning specs' §2 tables, which now carry the measured number.
-- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof; TWO closed, four open.** `SEC-4` HTTPS has
+- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof; THREE closed, three open.** `SEC-4` HTTPS has
   zero tests (no test under `inspecto/src/test` references a keystore); ✅ ~~**EDG-01 cell 7** — the largest
   extraction — is the only one of seven cells with no Personal-side falsification test~~ **CLOSED
   2026-09-09** by `NoOperationalObjectsShipInThePersonalBuildTest`: all **49** stubbed paths answer 503
@@ -439,8 +439,17 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   structurally cannot see it, and there are two such catch-alls. ⚠ `AbsentExchangeRoutes` was briefly
   suspected of the same gap and is **not**: `NoExchangeShipsInThePersonalBuildTest` already covers it (a
   class-name grep missed it because that test exercises paths, not the class);
-  the four-stage write-gate **order** is depended on by thirteen route modules and verified by reading call
-  sites; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing is);
+  ✅ ~~the four-stage write-gate **order** is depended on by thirteen route modules and verified by reading
+  call sites~~ **CLOSED 2026-09-09** by `WriteGateOrderTest`: a four-rung ladder on `POST /config/write`
+  where **every rung violates more than one gate**, so the winner proves the order — 503 beats an invalid
+  payload and a traversal, the spec 422 beats the jail, the jail beats the conflict, and 409 is what is
+  left. 🔴 The gap was wider than this row said: **`WriteGates` had no test of any kind**, so the four
+  statuses were unasserted too — now covered, including that `isSafeName` and `safeName` can never
+  disagree. Mutation-proven at both levels (a 403→422 one-token change fails 2 of 9; moving gate 1 below
+  the 422 block fails rung 1). ⚠ **A grep cannot see this order**: canonical gate 2 is thrown as
+  `respondJson(ex, 422, …)` with `findings`, **not** through `WriteGates`, so counting `WriteGates.` call
+  sites makes the jail look like it precedes validation. It does not — assert on the 422 that carries
+  `findings`; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing is);
   and **`PipelineScheduler` has no test class at all**, recorded only in prose. → pick by name; each is one
   test class.
   • ✅ ~~`DuckLakeRegistrar` has no test~~ — **`DuckLakeRegistrarTest` shipped 2026-09-09**, 5 tests, 0.6 s.
