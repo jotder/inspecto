@@ -119,9 +119,13 @@ jobs:
       # Job types and maintenance tasks are excluded on purpose: their totals are EDITION-dependent
       # (10 vs 12; 20 built-in + 4 contributed), so asserting one number would assert a falsehood.
       # Falsified in four directions before wiring: a hand-edited doc number failed with its
-      # file:line; ADDING a processor to the contract failed all six statements at once; deleting a
-      # marker failed the scope floor; a typo'd id failed as unknown. ⚠ The floors are set EQUAL to
-      # the marked counts — the first version left slack and a deleted marker went green.
+      # file:line; ADDING a processor to the contract failed all EIGHT of its statements at once;
+      # deleting a marker failed the scope floor; a typo'd id failed as unknown; and the guard is
+      # cwd-independent (ROOT resolves from the script path), while a run finding no files fails on
+      # the floors rather than passing over nothing. ⚠ The floors are set EQUAL to the marked counts
+      # — the first version left slack and a deleted marker went GREEN. ⚠ This comment said "six"
+      # until it was re-measured against the committed tree: two markers had been wiped by a
+      # `git checkout --` during falsification, so the first figure was taken from a smaller corpus.
       - name: Guard — every stated product count is derived from its contract
         run: node tools/check-doc-counts.mjs
 
