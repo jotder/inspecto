@@ -90,11 +90,12 @@ checksum, the signature and the bill of materials. Those functions now live near
 exists at the commit the row was written**, and it did — so a citation can satisfy the rule on the day
 and mislead a reader a week later. **Cite the symbol, not the line.**
 
-🔴 **The signing pipeline covers two editions, not three.** The workflow's own step is titled for every
-edition and is followed by exactly two packaging steps, Personal and Enterprise — the Enterprise one
-labelled a superset of Standard. **No Standard bundle is built, checksummed, signed, given a bill of
-materials or published**, while the editions board marks both supply-chain controls green for Standard.
-That is a column with no artifact behind it.
+✅ **The signing pipeline covers all three editions since 2026-09-10** (`STANDARD-BUNDLE-1`, editions §3.7).
+Until then the workflow's step was titled for every edition and followed by exactly two packaging steps,
+Personal and Enterprise (labelled a superset of Standard): no Standard bundle was built, checksummed, signed,
+given a bill of materials or published, while the editions board marked both supply-chain controls green
+for Standard — a column with no artifact behind it. The Standard step now also **refuses** a bundle that
+carries the policy jar, so the artifact a Standard customer verifies is the edition they bought.
 
 **One internal inconsistency, and it is the file catching itself.** The availability criterion still
 says what is missing is a recovery-objective statement and a drill record. The consolidated gap ledger,

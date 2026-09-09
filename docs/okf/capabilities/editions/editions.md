@@ -85,7 +85,7 @@ files. The corrections below are the requirement of record.
 
 | Row | Register says | Correction of record |
 |---|---|---|
-| **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🔴 **Two-thirds shipped.** The fat JAR ships. The per-edition bundles are **two of three** — no Standard artifact is ever produced by any automated path (§3.7). And **no released artifact contains the trimmed runtime**: the release pipeline passes `-NoRuntime` for every bundle, because the runner has no module cache. The runtime is real, buildable, and shipped in nothing. |
+| **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🟡 **Bundles three of three since 2026-09-10** (`STANDARD-BUNDLE-1` — the release pipeline gained the Standard step, §3.7); until then no Standard artifact was produced by any automated path. Still open for the runtime: **no released artifact contains the trimmed runtime**: the release pipeline passes `-NoRuntime` for every bundle, because the runner has no module cache. The runtime is real, buildable, and shipped in nothing. |
 | **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | ✅ **Corrected 2026-09-09.** The generator had declared **four** first-party jars against the **ten** a Standard bundle carries and the eleven an Enterprise one does, knowing none of the seven gating modules; the mail dependency consequently appeared in **no** bill of materials (§3.7). The set now lives once in `tools/bundle-modules.mjs` and a CI guard holds it against the staging script.
 A **duplicate `postgresql` component**, carrying an invalid `bom-ref` / `SPDXID`, was fixed in the same pass. The isolation half still does not hold as written: the connector sidecar ships in **every** edition by a 2026-09-07 decision, and the mail dependency **left** it for `inspecto-notify-channels` in gating cell 1. "Lean" was measured and belongs to the *bundle*, not the reactor (§3.7). |
 | **PKG-3** | Runnable, self-contained example suite — `SHIPPED` (should), all editions | 🟡 **Shipped and largely unexercised.** Thirty examples in seven categories are tracked and staged into every bundle. **One** of the thirty runs in any pipeline, and only on a tag. "Runnable" is proven for one example and asserted for twenty-nine. |
@@ -266,8 +266,11 @@ launchers infer the edition from **jar presence**: the authentication jar means 
 delegated authentication; the policy jar as well means Enterprise. The release pipeline builds Personal and
 Enterprise only, labelling the Enterprise step "superset of Standard". That label is true at the module
 level and **false at runtime identity** — hand that bundle to a Standard customer and it self-identifies as
-Enterprise and enables attribute-based access control, a tier they have not purchased. One added packaging
-step closes it (§5).
+Enterprise and enables attribute-based access control, a tier they have not purchased. ✅ **Closed 2026-09-10
+(`STANDARD-BUNDLE-1`):** the release pipeline packages, signs and publishes a distinct
+`inspecto-deploy-standard.zip` built by `-Edition Standard` (no policy jar), and the collect step **fails the
+release** if a policy jar is found inside it — so a Standard customer receives a bundle whose jar presence
+yields `standard`. The reporting defect (the two-valued edition string) is untouched by this and stays open.
 
 ### 3.6 The runtime image and the Java floor
 
@@ -348,9 +351,11 @@ and the release pipeline installs only the agent dependency, never this reactor.
 edition to expose it, because the policy module gained a test-scoped edge to the operational-objects module
 in gating cell 7 and resolution covers every scope. Tracked in §5.3.
 
-🔴 **No Standard artifact exists, and four documents disagree about it.** The release pipeline packages
-**Personal and Enterprise**, both with the runtime skipped and both signed. There is no Standard step and
-no Standard artifact. Against that:
+✅ **CLOSED 2026-09-10 (`STANDARD-BUNDLE-1`) — the release pipeline packages, checksums, signs, SBOMs and
+publishes all three editions:** `inspecto-deploy-{personal,standard,enterprise}.zip` + `.sha256` + `.asc` and
+`inspecto-<edition>.{cdx,spdx}.json`, with the Standard collect step refusing a bundle that carries the policy
+jar. Until then the pipeline packaged **Personal and Enterprise** only — no Standard step, no Standard
+artifact — while four documents disagreed about it (kept as the record of what each said):
 
 | Where | What it says |
 |---|---|
@@ -359,8 +364,9 @@ no Standard artifact. Against that:
 | The branching policy's manual fallback | Uploads Personal and **Standard** jars |
 | The board's status note | "The script builds and bundles it" — true of the script, false of any release |
 
-No two of the four agree, and the editions board marks both supply-chain controls green for Standard — a
-column with **no artifact behind it**, which is the same hole the compliance area found from its side.
+No two of the four agreed, and the editions board marked both supply-chain controls green for Standard — a
+column with **no artifact behind it**, the same hole the compliance area found from its side. With the step
+in place the column is backed; `BRANCHING.md`'s classifier note now names all three flavours.
 
 The bundle filenames carry **no edition**, so all three flavours emit the same path and the release pipeline
 renames them afterwards. That is why the omission is easy to miss: nothing in the build's output names what
@@ -622,6 +628,7 @@ root, `EnvironmentFile=`).
 
 | Date | Decision | Who |
 |---|---|---|
+| 2026-09-10 | **Standard ships as its own release artifact** — the pipeline packages, signs and publishes three bundles and refuses a Standard bundle that carries the policy jar; a Standard customer never receives Enterprise identity (`STANDARD-BUNDLE-1`, chosen over licence-key gating and "document the exposure") | operator |
 | 2026-06-16 | **Hand-rolled bearer-token authentication removed from the common core.** Personal is genuinely authentication-free and authentication becomes an edition concern behind a seam — so fixes land once, and the code matches "editions add modules, never branches" | engineering |
 | 2026-07-06 | **The authenticator seam and its gate ship in the core, edition-neutral** and no-op when absent; the authentication module supplies the implementation, profile-gated | engineering |
 | 2026-07-07 | **The trimmed runtime's module set is sufficient for the token library** — dependency analysis, a library probe, and a boot on the exact image. The skip-runtime switch is demoted from requirement to option | engineering |
@@ -725,14 +732,15 @@ citations elsewhere in this spec still resolve.
    fails first — the policy module's cell-7 test-scoped edge to the operational-objects module must resolve
    even though the document lists runtime scope only — and on a clean runner every edition would. Either the
    pipeline installs the reactor before packaging, or the generator resolves within a build phase.
-2. 🔴 **No Standard artifact is built, checksummed, signed, given a bill of materials, or published**
-   (§3.7). Either the release pipeline gains the step, or both supply-chain rows lose their Standard
-   column. Four documents currently describe an artifact that does not exist.
+2. ✅ **SHIPPED 2026-09-10** — the release pipeline gained the Standard step (`STANDARD-BUNDLE-1`, §3.7); the
+   Standard supply-chain columns now have an artifact behind them. *(Was: no Standard artifact is built,
+   checksummed, signed, given a bill of materials, or published; four documents described one that did not exist.)*
 3. 🔴 **An Enterprise bundle handed to a Standard customer self-identifies as Enterprise and enables
    attribute-based access control** (§3.5) — because the launchers detect the edition from jar presence and
    the pipeline builds Enterprise as a "superset of Standard". One added packaging step closes it; until
-   then the superset label is a commercial exposure, not a convenience. ⛔ **Decided 2026-09-10: build the
-   distinct Standard bundle** (`BACKLOG.md` §3 `STANDARD-BUNDLE-1`) — not licence-key gating, not "document it".
+   then the superset label is a commercial exposure, not a convenience. ⛔ Decided 2026-09-10: build the
+   distinct Standard bundle — not licence-key gating, not "document it". ✅ **CLOSED the same day** (§3.5,
+   §3.7): the Standard collect step fails the release if `inspecto-policy` is inside the bundle.
 4. 🔴 **The reported edition string is two-valued and derived from a launch flag** (§3.5) — Enterprise is
    unreportable, and the deployment plan's edition probe inherited the defect, so the acceptance contract
    cannot verify an Enterprise deployment. Derive it from what registered, the way the feature flags

@@ -75,7 +75,7 @@ modules get assembled* from the same commit. See the editions plan for the assem
 ## 2. Versioning — SemVer + Conventional Commits
 
 Releases are SemVer, tagged `vMAJOR.MINOR.PATCH` (e.g. `v4.0.0`). One version spans all editions;
-artifacts are differentiated by classifier (`-personal`, `-standard`), **not** by version.
+artifacts are differentiated by classifier (`-personal`, `-standard`, `-enterprise` — all three released since 2026-09-10), **not** by version.
 
 Commit messages use **Conventional Commits** (already the repo convention):
 
