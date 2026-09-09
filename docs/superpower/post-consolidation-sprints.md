@@ -304,13 +304,21 @@ No exit criterion — this is the resumption of normal service, not a project.
 **One decision is pending and its premise is half wrong.** `MAPPING-SPELLING-1` asks whether the schema
 generators should emit the new mapping spelling. Measured 2026-09-09:
 
-* the generators write the legacy shape ✅ **but not** the type field — that is deliberately omitted, with a
-  code comment saying so;
-* **all 24 committed schemas are already on the new spelling** — zero carry the legacy one.
+* **all 24 committed schemas are already on the new spelling** — zero carry the legacy one, and zero carry
+  `transformType`;
+* the disk-writing generator (`SchemaExtractor`, the `create-schema` CLI) writes the **legacy** shape and
+  **deliberately omits** the type field, with a code comment saying so;
+* 🔴 **but the two generators disagree, which this note originally got wrong**: `ConfigPreviewRoutes.java:330`
+  *does* emit `transformType: "DIRECT"`. ⚠ It only **returns** a suggestion for the UI and never writes, so
+  it does not shape the corpus — which is exactly why the two must be decided together rather than described
+  as one "the generators".
 
 So the row conflates two migrations: the **spelling** change (already complete in the committed corpus) and
-the **external sidecar** extraction (not started, and its only example in the tree is untracked). ⛔ Correct
-the row before answering it, or the answer authorises work that is partly done and partly a different task.
+the **external sidecar** extraction (not started — all 24 schemas still carry the mapping inline and there
+are zero committed `*_mapping.csv`). ⛔ Correct the row before answering it, or the answer authorises work
+that is partly done and partly a different task. ✅ **Corrected on the board 2026-09-09** with the measured
+counts and the generator disagreement; the question is now narrowed to *"should `create-schema` emit
+`mapping.fields[]`?"* plus a separate call on the sidecar.
 
 **Two more calls that are product, not engineering:** whether an Enterprise bundle may keep
 self-identifying as Enterprise when handed to a Standard customer (§editions), and whether the seven
