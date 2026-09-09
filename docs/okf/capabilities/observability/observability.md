@@ -367,6 +367,66 @@ host's — the rules are `DAT`'s.
 
 There is no metrics-browsing UI and no backup/restore screen beyond the Jobs form — both by design.
 
+### 3.9 The completeness KPI — design of record (not built)
+
+⚠ Distilled 2026-09-09 from `completeness-kpi-plan.md`, archived the same day. K1, K2's analysis half,
+K3 and K5 shipped; **K2's wiring and K4 are ON HOLD by operator decision (2026-08-30)**. The hold is on the
+**work**, not the document, and it has no dated lift condition. ⚠ The shipped half is dormant —
+`VolumeBaseline` and `FileSequenceGaps` have **no production caller**, because K4 was to be the caller.
+
+**The two deviation bases (operator, 2026-08-30 — ⛔ do not re-ask):**
+
+- **File deviation is EXACT, from the sequence template** — the template already implies how many files a
+  period should hold.
+- **Record deviation is STATISTICAL, from a rolling prior-period baseline.** ⛔ There is no declared
+  expected row count and **inventing one was refused**: a fabricated target would make every deviation an
+  artefact of the fabrication rather than a fact about the data.
+
+**Two ways this can silently report nothing. Both must fail loudly** — a completeness KPI that quietly
+reports zero is worse than one that is absent, because it manufactures false confidence in exactly the
+number it exists to check.
+
+1. `-Dconsignment.outputs.backend=none` makes recording a no-op (fail-open by design). The job must
+   **refuse and say so**, never emit zeros.
+2. ⚠ **`bounds` is nullable** for sinks with no partition or event time — dataset and enrichment sinks.
+   Those pipelines' daily counts are **UNKNOWN, not zero**, and the KPI must carry that distinction **end to
+   end**. 🔴 Only the first trap ever reached the board; this one is now `KPI-UNKNOWN-1`.
+
+**Why `consignment_outputs` is the substrate, and what was rejected** (the correction is load-bearing — the
+operator's own first choice could not answer the question):
+
+- ⛔ **`CommitLog`** was that first choice. One row per batch, **no partition or day column**: a batch spans
+  record-days and a record-day receives rows from many batches, so per-day counts are **not derivable**.
+  Durable and default-on — simply the wrong shape.
+- ⛔ **The `_lineage_<runTimestamp>.csv` ledger** *does* carry `partition,row_count` per record-day, but it
+  is **buffered rather than fsync'd** and written **one file per run**, so reading it means globbing many
+  files and it can lose a tail on a crash. Not a ledger to build a KPI on.
+- ✅ **`consignment_outputs`** — durable, a per-output-file `rows` count, `record_day`/`bounds`, written from
+  the ordinary ingest path, on by default since 2026-08-10. See `okf/backend/engine/db-layer.md` §3.9.
+
+⚠ **Naming tension, stated rather than hidden.** The requirement is "a KPI *not related with* Consignment"
+and the chosen store is *named* `consignment_outputs`. The coupling is nominal — it is the ordinary
+per-output-file registry on the normal write path, not a Consignment-only structure. **If the name later
+matters, that is a rename, not a redesign.**
+
+**Verify gates.** These are the acceptance criteria; K1's and K3's had no home anywhere before this.
+
+| Slice | Gate |
+|---|---|
+| **K1** | a day receiving rows from several batches sums correctly · a disabled registry **refuses** rather than returning zeros · a null-`bounds` sink reads UNKNOWN |
+| **K2** | a window-edge silent hour is found · an interior hole is exact · the undetectable tail and the uncountable empty bucket are both pinned |
+| **K3** | steady reports no deviation · a halved day breaches · an empty history reads `NO_BASELINE` · the unknown-day bucket neither raises the baseline nor stands in for a missing target day |
+| **K4** | real cron arming · a breach opens **exactly one** Incident across repeated runs · a pipeline whose registry is off **fails the run visibly** |
+
+🔴 **K1 is the whole risk.** K2–K4 are assembly over existing parts; K1 is the only slice that has to be
+right about what the data actually says.
+
+`VolumeBaseline`'s contract is worth keeping here because it is counter-intuitive: a day **absent** from
+K1's series is **not a zero** (absence covers both "received nothing" and "was not expected to run"), so
+absent days never enter the baseline and an absent target day is `NO_OBSERVATION`; the baseline is the
+**lower median, not a mean**, so one recompute spike neither manufactures nor masks the next day's breach;
+and a **zero baseline yields a null deviation** — undefined, not −100 %.
+
 ## 4. Decisions (dated one-liners)
 
 | Date | Decision | Who / where |
@@ -408,7 +468,7 @@ There is no metrics-browsing UI and no backup/restore screen beyond the Jobs for
 | Deployment-topology live validation (closes OPS-5's "needs a live deploy" too) | §2 *Deployment topology live validation* |
 | Compliance program NFR-7 external sub-items; G6 restore drill record + RTO/RPO targets | §2 *Compliance program (NFR-7)*; §5 *Compliance repo-side artifacts* |
 | GAP-4 DuckDB `memory_limit` default (the missing half of D11) | §3 P2 *Deployment topology gaps* |
-| Completeness KPI — K2 wiring, K4 `kpi.completeness` job type (signal + deduped Incident) — **on hold by operator, 2026-08-30**; the shipped half (`VolumeBaseline`, `FileSequenceGaps`) has no production caller | §2 *Completeness KPI hold*; §3 P2; live plan `docs/superpower/completeness-kpi-plan.md` |
+| Completeness KPI — K2 wiring, K4 `kpi.completeness` job type (signal + deduped Incident) — **on hold by operator, 2026-08-30**; the shipped half (`VolumeBaseline`, `FileSequenceGaps`) has no production caller. Design of record is now §3.9 of this spec, not the plan | §2 *Completeness KPI hold*; §3 P2; `KPI-UNKNOWN-1`; archived plan `docs/archived-documents/plans-archive/completeness-kpi-plan.md` |
 | Signal/Decision follow-ons: optional S8 (connector-direct emission, cross-space controller); a general event-triggered consequence policy gate (today `/apply`-only); RFC 6902 AG-UI deltas | §3 P3 *Signal / Decision networks* |
 | Maintenance COULD tier: space-to-space comparison; predictive maintenance (AGT-5) | §3 P3 *Job framework* |
 | D8 residuals (soft-bounce retry, SES/SNS, GeoIP, per-user prefs) — `INC`'s, listed for the ledger's sake | §3 P2 *Notifications*, `D8-SUPPRESS-1` |
@@ -473,6 +533,8 @@ There is no metrics-browsing UI and no backup/restore screen beyond the Jobs for
 | A full `ConsignmentEventBus` → Signal migration | **Not attempted** | `ConsignmentAuditWriter` emits additively; the run-claim seam makes a bus migration hazardous |
 | Growing the `EventType` enum for business signals | **⛔ Standing** | they ride `Signal` on one `SIGNAL` Event |
 | Conscripting `ConservationCheck` into the completeness KPI | **⛔ Refused** | node-level conservation is a different invariant |
+| Inventing a **declared expected row count** to measure record deviation against | **⛔ Refused** 2026-08-30 | none exists; a fabricated target makes every deviation an artefact of the fabrication. Record deviation is statistical, off a rolling prior-period baseline — §3.9 |
+| Reporting **0** where a sink's `bounds` is null, or where the registry is off | **⛔ Refused** | UNKNOWN and REFUSE respectively; a quiet zero manufactures confidence in the very number the KPI exists to check — §3.9, `KPI-UNKNOWN-1` |
 | Consignment **sealing** (`OPEN→SEALED→REOPENED`, seal signals) | **Dropped, not deferred** 2026-08-30 | replaced by the completeness KPI; K5's archive banner enumerates the superseded sites |
 | Record-level lineage & replay (OPS-6) | **Won't (now)** | per-batch ancestry is the grain |
 | Postgres multi-user (`OPS-03`) | **Parked** 2026-09-06 | until a multi-operator install exists |

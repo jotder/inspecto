@@ -17,7 +17,9 @@ import java.util.regex.Pattern;
 
 /**
  * <b>Windowed two-token sequence-gap analysis</b> — "how many files are missing for this pipeline over this
- * period?" (completeness-kpi-plan K2). Pure and side-effect-free, like {@link GapDetector}: it is handed the
+ * period?" (completeness-KPI K2; design of record:
+ * docs/okf/capabilities/observability/observability.md §3.9 — the plan was archived 2026-09-09).
+ * Pure and side-effect-free, like {@link GapDetector}: it is handed the
  * observed file names and answers about them, so it can be unit tested directly and carries no opinion about
  * where the names came from.
  *

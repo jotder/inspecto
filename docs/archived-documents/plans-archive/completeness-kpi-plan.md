@@ -1,3 +1,21 @@
+> ⛔ **ARCHIVED 2026-09-09 — provenance only. Do NOT read this for current behaviour or for the design.**
+> The design of record is now
+> [`okf/capabilities/observability/observability.md`](../../okf/capabilities/observability/observability.md)
+> §3.9 — both deviation bases, the two silent-zero traps, the rejected substrates, and all four verify
+> gates. K2's structural limits are in
+> [`okf/capabilities/acquisition/acquisition.md`](../../okf/capabilities/acquisition/acquisition.md); the
+> `dailyVolume` read is in [`okf/backend/engine/db-layer.md`](../../okf/backend/engine/db-layer.md) §3.9.
+>
+> ⚠ **ARCHIVED DOES NOT MEAN DONE, and it did not lift the hold.** K2's wiring and K4 remain **ON HOLD by
+> operator decision (2026-08-30)**, with no dated lift condition. The hold was always on the **work**, never
+> on this document; the work now lives on `BACKLOG.md` §3 (P2) plus `KPI-UNKNOWN-1`. The shipped half is
+> dormant — `VolumeBaseline` and `FileSequenceGaps` still have no production caller, because K4 was to be it.
+>
+> 🔴 **The status header immediately below is internally stale and was never corrected:** it says "K4 and
+> K5 are NOT started", while §4's own slice table says **K5 SHIPPED 2026-09-07**. `BACKLOG.md` and
+> `INDEX.md` carried the same error — a three-way split, fixed in the current tier on 2026-09-09. Read §4,
+> not the header.
+
 # Pipeline completeness KPI — a scheduled per-pipeline job
 
 **Status:** ⏸ **ON HOLD by operator decision, 2026-08-30.** K1, K2's analysis half and K3 are shipped

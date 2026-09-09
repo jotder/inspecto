@@ -324,8 +324,12 @@ delegating their truth to the archive:
   — the mockup the build is measured against.
 - `docs/api/README.md` calls `api-contract-design.md` "**the design**"; `GLOSSARY.md` delegates four
   separate rationales; `okf/` concepts delegate "the full phasing (L0–S3)" and "the grounded refutation".
-- In-flight `superpower/completeness-kpi-plan.md:21` says it "deliberately overrides
-  `consignment-elt-architecture.md` §8's central claim" — unreadable without the archived claim.
+- ✅ **RESOLVED 2026-09-09.** This read "In-flight `superpower/completeness-kpi-plan.md:21` says it
+  'deliberately overrides `consignment-elt-architecture.md` §8's central claim' — unreadable without the
+  archived claim." That plan is now archived too, so the citation is archive-to-archive and the
+  concern is moot: the override itself is recorded in the current tier as a **dropped, not deferred**
+  refusal (`okf/capabilities/observability/observability.md` §6) and as the design of record (§3.9),
+  neither of which needs §8's text to be readable.
 
 **The seven ORPHANs** (each needs a destination before anything is deleted):
 

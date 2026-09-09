@@ -511,7 +511,7 @@ editions = build flavors, never branches · no component version pinning in v1 �
 fail-closed gates · the DuckDB native-access launch flag · markers-LAST · algebraic-only measures ·
 sealing/completeness tier out of this plan's critical path. ⚠ **Superseded 2026-08-30**: sealing was not
 merely left alone, it was **dropped** — the operator replaced the consignment doc's §8 state machine with a
-scheduled completeness KPI (`superpower/completeness-kpi-plan.md`). There is no `OPEN/SEALED/REOPENED`, no
+scheduled completeness KPI (`archived-documents/plans-archive/completeness-kpi-plan.md`). There is no `OPEN/SEALED/REOPENED`, no
 lateness horizon and no `partition_state` table to come back to.
 
 ---

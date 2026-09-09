@@ -292,6 +292,16 @@ filled fires again, because it is genuinely a new hole. Same `shared()` idiom as
 grammar cannot express, and bounding the series by what was *observed* hides the largest holes — if the last
 three hours produced nothing, the observed maximum simply moves earlier and the detector reports no gap.
 
+⛔ **Two of `FileSequenceGaps`' limits are STRUCTURAL, pinned by tests, and must not be "fixed" into
+guarantees.** They are properties of the naming, not of the implementation:
+
+- **Only interior holes are countable.** `1,2,4` is short of 3; `1,2,3` is **not** complete, because the
+  highest sequence received is not knowably the highest sent. **A truncated tail is undetectable from
+  file names alone.**
+- **An empty bucket yields no file count.** A silent hour's expected file count is unknowable, so empty
+  buckets are counted as *buckets*, apart from the missing-file total. Estimating them is K3's rolling
+  baseline's job — mixing an estimate into an exact count would make the exact half untrustworthy.
+
 Config: `collector.gap_detection: { enabled: true, sequence: "…" }` — `enabled` defaults to `true` when the
 block is present, and an absent block is `DISABLED`.
 

@@ -348,6 +348,13 @@ win when the two disagree, since a partition value may have been cut in another 
 an interval is for. Nothing in the engine reads the column today; it survives because it is in the schema and
 cheap.
 
+**The per-day read over these columns is `DbConsignmentOutputStore.dailyVolume`** — files + rows per
+(pipeline, record-day), the completeness KPI's K1, shipped `31e00005`. ⚠ It has **no production caller**:
+K4, the job that was to call it, is on hold. ⛔ Two contracts a caller must honour, or the number lies: a
+day **absent** from the series is **not a zero** (absence covers both "received nothing" and "was not
+expected to run"), and a **null-`bounds` sink reads UNKNOWN, never 0**. Design of record:
+`okf/capabilities/observability/observability.md` §3.9.
+
 **`supersedeOtherRevisions(table, keep)` is scoped the opposite way to `supersede(consignment)`**, and has to
 be: a full recompute invalidates work it did not do, spread across however many earlier runs wrote that store
 (addressing step 6). The `keep` argument is required, not optional — a call that omitted it would mark the
