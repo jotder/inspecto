@@ -406,6 +406,10 @@ public final class RecipeCompiler {
         if (!(sql instanceof String s) || s.isBlank()) {
             refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
                     "sql step needs a non-blank sql: expression"));
+        } else {
+            // The linear Recipe surface is the OTHER way author SQL reaches disk, and it was unguarded
+            // too. One helper so both surfaces refuse the same shapes with the same code and message.
+            PipelineEditable.refuseUnsafeSql(s, id, refusals);
         }
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SQL.type(), new LinkedHashMap<>(cfg));
     }

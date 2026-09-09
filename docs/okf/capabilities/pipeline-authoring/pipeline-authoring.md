@@ -396,10 +396,15 @@ migration to reach semantics that composition already provides.
 
 Ranked. The first is the only one that can put a broken artifact into production.
 
-1. 🔴 **The transform guard is absent from every save path** (§3.5). Author SQL is checked at preview and
-   at execution and nowhere in between, so a pipeline carrying a file-reading or data-definition statement
-   saves and arms cleanly and fails only when it runs. **No test covers it.** The fix is one call in the
-   lowering path plus one in the Recipe compiler, and a test at each.
+1. ✅ ~~**The transform guard is absent from every save path**~~ **FIXED 2026-09-09.** `SqlGuard` had ten
+   call sites and none was a save, so a hand-written `read_csv(...)`, a data-definition statement or a
+   multi-statement string saved and armed cleanly and failed only at run — fail-late, never fail-open.
+   `PipelineEditable.refuseUnsafeSql` now runs it on the graph save (once per `transform.sql` node, before
+   classification, so it covers the chain **and** the projection slot) and `RecipeCompiler` calls the same
+   helper, so both surfaces refuse identically with `SQL_STEP_REFUSED` carrying the guard's own message —
+   the author is told *which* construct tripped it. ⚠ Blankness stays `SQL_STEP_EMPTY`'s business so one
+   defect never reports twice. Pinned by `SqlSavePathGuardTest` (9 tests) and mutation-proven: removing the
+   two call sites failed exactly the two integration tests and left the seven helper tests green.
 2. 🔴 **`fields[]` is documented as inert in the config-key reference and as executable in the editor
    page** (§2.3). Code says executable. That wrong reasoning is what produced the live client-mirror
    drift, so correcting the reference is the actual fix for the drift row, not a cosmetic edit.

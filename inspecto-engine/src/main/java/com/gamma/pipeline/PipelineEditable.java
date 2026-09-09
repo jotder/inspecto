@@ -75,6 +75,9 @@ public final class PipelineEditable {
     public static final String UNSUPPORTED_BRANCH_STEP = "UNSUPPORTED_BRANCH_STEP";
     /** A {@code transform.sql} node whose {@code sql} is absent or blank — the one key the step cannot do without. */
     public static final String SQL_STEP_EMPTY = "SQL_STEP_EMPTY";
+    /** Author SQL the sandbox guard refuses. Carries the guard's own message, so the author is told
+     *  WHICH function, keyword or statement shape tripped it rather than that "the SQL is invalid". */
+    public static final String SQL_STEP_REFUSED = "SQL_STEP_REFUSED";
 
     /**
      * The map-node config keys an author owns — they lower to {@code processing.map} verbatim and lift
@@ -87,6 +90,32 @@ public final class PipelineEditable {
     // joining this allow-list is silently dropped on save, which is the failure both constants exist
     // to make impossible.
     static final Set<String> MAP_AUTHORED = Set.of("columns", "rules", "fields");
+
+    /**
+     * Refuse author SQL the sandbox guard would reject — on the SAVE path, which is where it was missing.
+     *
+     * <p>{@link com.gamma.sql.SqlGuard} had ten call sites and none of them was a save: it ran at
+     * {@code POST /components/transform/describe} (the pane's preview) and at execution
+     * ({@code RowShaper}), so a hand-written {@code read_csv(...)}, a data-definition statement or a
+     * multi-statement string SAVED cleanly, ARMED cleanly, and failed only when the pipeline ran. The
+     * refusal was real but arrived at the worst possible moment. Fail-LATE, never fail-open — execution
+     * always refused it, so this was never a way to run blocked SQL.
+     *
+     * <p>The neighbouring {@link #SQL_STEP_EMPTY} check already made this argument for the blank case:
+     * "a blank one would save, load and throw at the first run". Content deserves the same treatment.
+     *
+     * <p>⚠ Blankness stays {@code SQL_STEP_EMPTY}'s business — this returns early on a blank or non-string
+     * value so one defect never reports twice. ⚠ WARNING-level findings do not refuse: the guard emits
+     * those for shapes that are legal but suspicious, and a save is not the place to argue with them
+     * ({@code PipelineValidator} already carries {@code SQL_STEP_UNAUDITED} as a warning).
+     */
+    static void refuseUnsafeSql(Object raw, String nodeId, List<PipelineCompileException.Refusal> refusals) {
+        if (!(raw instanceof String sql) || sql.isBlank()) return;
+        for (com.gamma.config.spec.Finding f : com.gamma.sql.SqlGuard.check(sql)) {
+            if (f.severity() == com.gamma.config.spec.Severity.ERROR)
+                refusals.add(new PipelineCompileException.Refusal(SQL_STEP_REFUSED, nodeId, f.message()));
+        }
+    }
 
     /**
      * Whether a node occupies the <b>projection slot</b> — the position {@code PipelineLift} fills
@@ -689,6 +718,11 @@ public final class PipelineEditable {
             String unhomed = unhomedBinding(n);
             if (unhomed != null)
                 refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_BINDING, n.id(), unhomed));
+            // Guard author SQL HERE, before the classification below, so one call covers both places a
+            // transform.sql node can land: the ordered chain, and the projection SLOT (which since
+            // 2026-09-05 may also be a transform.sql). See refuseUnsafeSql for why this belongs on the
+            // save path at all.
+            if (BuiltinNodeType.TRANSFORM_SQL.type().equals(t)) refuseUnsafeSql(n.cfg("sql"), n.id(), refusals);
             if (BuiltinNodeType.ACQUISITION.type().equals(t)) acq = n;
             else if (isParserType(t)) {
                 // One parse slot in the flat file. Last-one-wins predates the family, but with two
