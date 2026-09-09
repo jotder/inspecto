@@ -428,13 +428,27 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
   was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
   artifact exists.** → the owning specs' §2 tables, which now carry the measured number.
-- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof.** `SEC-4` HTTPS has zero tests (no test
-  under `inspecto/src/test` references a keystore); **EDG-01 cell 7** — the largest extraction, 44 stubbed
-  paths — is the only one of seven cells with no Personal-side falsification test; the four-stage write-gate
-  **order** is depended on by thirteen route modules and verified by reading call sites; `DuckLakeRegistrar`
-  has no test; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing
-  is); and **`PipelineScheduler` has no test class at all**, recorded only in prose. → pick by name; each is
-  one test class.
+- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof; ONE closed, five open.** `SEC-4` HTTPS has
+  zero tests (no test under `inspecto/src/test` references a keystore); **EDG-01 cell 7** — the largest
+  extraction, 44 stubbed paths — is the only one of seven cells with no Personal-side falsification test;
+  the four-stage write-gate **order** is depended on by thirteen route modules and verified by reading call
+  sites; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing is);
+  and **`PipelineScheduler` has no test class at all**, recorded only in prose. → pick by name; each is one
+  test class.
+  • ✅ ~~`DuckLakeRegistrar` has no test~~ — **`DuckLakeRegistrarTest` shipped 2026-09-09**, 5 tests, 0.6 s.
+  It pins the **reachability** half (`output.ducklake` → `cfg.output().duckLake()`, plus the shorthand
+  sink inheriting it) and every **no-op guard** the class javadoc claims. Mutation-proven: nulling the one
+  line that wires it (`PipelineConfigParser:860`) fails 2 of the 5, naming that line.
+  ⚠ **Its NON-FATAL promise is still owed and is NOT provable in this reactor** — keep this sub-item open.
+  Measured: the five tests cost **0.4 s**; two more that drove an *enabled* block cost **262 s**, because
+  `INSTALL ducklake FROM core` is a **network** fetch that runs before any failure the promise covers, and
+  `DuckDbUtil.jdbcUrl` has no settings hook to make it fail fast. ⛔ Adding 4.4 minutes to an offline build
+  is a defect, and a `@Tag`-excluded test that never runs is not a guard — so it needs a reachable catalog,
+  i.e. a live deployment, which puts it with the `SCR-4`/`5`/`7` scripts rather than the reactor.
+  🔴 **Filing note worth keeping:** grounding this I grepped `PipelineConfig.java` for the assignment,
+  found the field declared and consumed but never written, and nearly filed the whole DuckLake path as dead
+  code. The assignment is in the **parser**, a different file. Same wrong-path probe as ever — and it is
+  why the reachability assertion now exists.
 - **P3** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
   `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
   vendor-transform plugin registers ~40 legacy functions through a real seam and **reaches no bundle and no

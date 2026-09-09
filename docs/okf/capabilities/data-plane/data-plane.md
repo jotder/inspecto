@@ -523,6 +523,17 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 
 ## 8. Verification
 
+> 🔴 **One promise here is not provable in this reactor, and it is worth knowing before trying.**
+> `DuckLakeRegistrar`'s class javadoc promises that "any connectivity or SQL failure is caught … without
+> aborting ETL success for the file" — load-bearing, because its one caller (`ConsignmentIngestor:288`)
+> runs it inside the batch's **durable finalisation**, where a throw would demote a batch whose data is
+> already written. Measured 2026-09-09: the reachability and guard tests cost **0.4 s**, while two tests
+> that drove an *enabled* block cost **262 s**, because `INSTALL ducklake FROM core` is a **network**
+> fetch that runs before any failure the promise covers, and `DuckDbUtil.jdbcUrl` exposes no settings
+> hook to make it fail fast. ⛔ So it needs a reachable catalog — a live deployment, not the reactor — and
+> it stays open under `SPEC-NOPROOF-1`. Adding 4.4 minutes to an offline build would be a defect, and a
+> `@Tag`-excluded test that never runs is not a guard.
+
 ### 8.1 Relations, guards, compiler — `inspecto-engine` · `inspecto-sql` (default reactor)
 
 | Class | Proves |
@@ -530,6 +541,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 | `DatasetRelationTest` | view / `physicalRef` forms; `physicalRefWithDatabaseSubtreeReadsMappedOutputOnly`; the mixed-schema-partition read (`union_by_name`); calculated wrap |
 | `ExpressionGuardTest` · `ExpressionGuardContractTest` | the three rules, window-`OVER` gating; the contract JSON both sides read |
 | `SqlGuardTest` · `SqlSandboxTest` · `SqlOracleTest` | statement guard; open / seal settings; the sealed oracle |
+| `DuckLakeRegistrarTest` *(new 2026-09-09)* | that the DuckLake catalog step is **reachable** — `output.ducklake` → `cfg.output().duckLake()`, and the single-destination shorthand sink inheriting it — plus every no-op guard (empty outputs, absent block, `enabled: false`, absent flag). ⚠ It does **not** prove the *non-fatal* promise: see §8.3 |
 | `MeasureCompilerTest` · `MeasureCompilerGrainExecutionTest` · `MeasureGrammarContractTest` | `AGGS`, grains; the compiled SQL **executed** in the sandbox; the cross-language grammar |
 | `ParametersTest` · `QueryExecutorBindsTest` | `$` resolution incl. verbatim unknowns; positional binds |
 | `MaterializeTaskTest` | compile / snapshot, the atomic swap, the registered `dataset` |
