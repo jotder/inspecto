@@ -20,10 +20,17 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 > [`build-test.md`](../../backend/build-run/build-test.md) owns bundling and reactor sizes. Neither is
 > retired by this spec — both stay as the concept tier, and both are corrected below.
 >
-> ⚠ **This spec also absorbs a live plan.** `superpower/deployment-topology-plan.md` is the only plan in
+> ⚠ **This spec absorbs a plan that is now archived.** `deployment-topology-plan.md` was the only plan in
 > the consolidation whose archival would lose *design* rather than provenance, and its stated distillation
-> target never existed. §3.9–§3.13 are that design, distilled. **The plan stays in `superpower/`** — its
-> Phases 0–5 are unbuilt, so it is still in flight; what moves here is the part that is settled.
+> target (`okf/backend/build-run/deployment-topologies.md`) never existed. §3.9–§3.13 are that design as
+> narrative; **§3.14 holds the six tables verbatim**, because acceptance criteria and contract service
+> levels cannot survive being summarised by a count.
+>
+> 🔴 **This banner read "The plan stays in `superpower/`" until 2026-09-09**, and that sentence is why an
+> earlier attempt to archive the plan was reverted. It is **superseded by operator decision** the same day:
+> a plan whose decisions are signed, whose design is distilled and whose open items are filed is
+> provenance, and the **board** owns the remainder. Phases 0–5 are still unbuilt — that is now §3 P2
+> *Deployment topology gaps* and `SPEC-DEPLOY-ROWS-1`, not a reason for the document to stay current.
 >
 > ✅ **The loudest finding in this area was not about editions at all — and is now fixed (2026-09-09).**
 > The bill of materials that ships inside every signed bundle **declared the wrong module set** — four
@@ -501,6 +508,116 @@ version is part of the procedure rather than a suggestion. Automating both direc
 D5). Windows and Linux bundles ship today; the proposal is Windows Server 2019 and later plus the long-term
 support Linux distributions on 64-bit. Until it is written down, "supported platform" has no answer.
 
+### 3.14 The six tables the plan held — verbatim, because counts cannot carry them
+
+⚠ Distilled 2026-09-09 when `deployment-topology-plan.md` was archived. §3.9–§3.13 above deliberately
+render the plan's design as prose with counts, which is right for narrative and **wrong for numbers an
+operator or an auditor has to act on**: a count cannot tell you the RTO you signed up to, or which
+acceptance row failed. These six are reproduced rather than summarised.
+
+#### Indicative sizing (§4)
+
+| Tier | App host | Postgres | Notes |
+|---|---|---|---|
+| T1 | 2 vCPU · 8 GB · SSD 20 GB+ | — | ~90 MB idle footprint (NFR-2) |
+| T2 | 4–8 vCPU · 16–32 GB · SSD 100 GB+ | optional, 2 vCPU · 8 GB | `memory_limit` ≈ 25–50 % RAM ÷ concurrency |
+| T3 | 8–16 vCPU · 32–64 GB · SSD 250 GB+ | 4 vCPU · 16 GB, PITR | + gateway/IAM hosts per vendor sizing |
+| T4 | T3 × 2 sites | + streaming replica | + replication bandwidth ≈ daily delta |
+
+⚠ **`memory_limit` ≈ 25–50 % RAM ÷ concurrency is the sizing rule**, and it is the only stated guidance
+anywhere for a knob whose absent 2 GB "default" has been asserted in seven documents (§5.3).
+
+#### Failure → tier response (§5)
+
+| Failure | Tier response |
+|---|---|
+| Process crash | Service wrapper auto-restart; `/ready` gates traffic; the in-flight run resumes or re-runs idempotently |
+| Disk loss | Restore the last verified backup; Datasets rebuild from re-ingest where retained |
+| Postgres down | 🔴 Stores **degrade to memory (alert!)**; reconnect means a restart after DB recovery |
+| Node loss | T2/T3: rebuild from bundle + restore, within the RTO below. T4: promote the standby |
+| Site loss | T4 only: DNS/LB failover to site B |
+
+The Postgres row is the one §3.11 quotes a cell of: degradation is silent by design, which is why the
+acceptance block has to assert every subsystem is `UP` rather than merely that the service answers.
+
+#### Recovery targets — D6, signed 2026-09-06 (§5)
+
+⛔ **These are contract service levels, not suggestions.** They existed **only** in the archived plan until
+2026-09-09; `editions.md` recorded that "recovery targets as contract service levels" had been signed
+without ever carrying the numbers.
+
+| Tier | Backup cadence | RPO | RTO | DR drill |
+|---|---|---|---|---|
+| T1 | daily `config_backup` (04:00 sample job) | ≤ 24 h | ≤ 4 h (reinstall + restore) | — |
+| T2 | hourly config + daily full (post-CHECKPOINT) + volume snapshot | ≤ 1 h | ≤ 1 h | yearly restore test |
+| T3 | T2 + Postgres PITR/WAL archiving + off-site copy | ≤ 15 min | ≤ 2 h (rebuild) | half-yearly restore drill |
+| T4 | T3 + spaces-tree sync + streaming replica | ≤ 5–15 min (async) | ≤ 30 min (promote) | quarterly failover drill |
+
+⚠ `compliance/evidence/rto-rpo-statement.md` still carries `<OPERATOR TO STATE>` placeholders and an empty
+drill table. Transcribing these into it is **G6's** job, not a documentation edit — it needs the drill
+record too, and an auditor-facing statement should be filled by the operator, not inferred from a spec.
+
+#### Preflight — the nine rows §3.12 does not reproduce (§8)
+
+§3.12 lists the five that encode a lesson. The rest are the system requirements, and `SCR-1`'s acceptance
+is "catches every §8 row", so the list has to exist somewhere checkable:
+
+| Check | Detail |
+|---|---|
+| Artifact integrity | `.sha256` match always; `.asc` GPG signature when policy requires |
+| OS / arch | Matches the bundle variant (Windows vs `-linux`); **glibc** for the DuckDB JNI on Linux |
+| Runtime | `runtime/` present, or host JDK ≥ 24 (≥ 25 with agent/intelligence modules) with native-access support |
+| Resources | CPU/RAM/disk ≥ the tier row above; temp-dir capacity vs `max_temp_directory_size` |
+| Port | `control.port` (default 8080) free |
+| Filesystem | Write permission on the bundle root and the `spaces/` tree |
+| OS limits (Linux) | **open-files `ulimit`** sane for Parquet partition fan-out |
+| Network posture | CORS origin decided (the firewall half is in §3.12) |
+| Postgres (if used) | Reachable; `${ENV:…}` credentials resolve |
+| Gateway (T3) | Gateway JWKS reachable; the `X-JWT-Assertion` header agreed |
+| Model host (optional) | Local model endpoint reachable |
+
+#### Acceptance — VER-1…VER-12 (§9)
+
+⛔ No `VER-` identifier existed anywhere in the current tier before 2026-09-09, yet `SCR-6`'s whole
+acceptance is "§9's acceptance block as a script".
+
+| Row | Block | Assertion |
+|---|---|---|
+| **VER-1** | basic | `/health` = 200 `{"status":"UP"}`; `/ready` reports the expected pipeline count |
+| **VER-2** | basic | `/api/v1/bootstrap` `data.edition` matches intent. 🔴 **Cannot pass for Enterprise** — the value is two-valued (§3.5); probe `data.features` instead, noting four of nine optional modules have no flag |
+| **VER-3** | basic | `/api/v1/health/details` shows every intended subsystem `UP` — **not** silently `NOT_CONFIGURED` or an in-memory fallback. The counter-check to graceful degradation |
+| **VER-4** | basic | `/metrics` scrapes and parses (Prometheus text 0.0.4) |
+| **VER-5** | basic | functional round-trip: `seed-inbox` → poll → Dataset partitions written → run + events visible; UI loads with client-side route fallback |
+| **VER-6** | standard | unauthenticated call → 401; valid IAM token → 200 with `permissions[]`; expired token rejected |
+| **VER-7** | standard | handshake pins TLS 1.3 (T2b) or proxy chain + HSTS (T2a); `/metrics` unreachable from a non-monitoring address |
+| **VER-8** | standard | incident round-trip via `seed-ops` with `objects.backend=db`, still present after a service restart |
+| **VER-9** | standard | `config_backup` (`dryRun=true`, then real) → `backup_verify` green → restore dry-run into a scratch space |
+| **VER-10** | enterprise | request via the gateway with Backend-JWT only → accepted; tampered or unsigned assertion → rejected |
+| **VER-11** | enterprise | tenant-A subject reading a tenant-B space → deny + an `access.denied` event present (decision-audit evidence) |
+| **VER-12** | enterprise (T4) | failover drill: promote the standby per runbook **inside the RTO target**, then fail back |
+
+#### Phase sequencing, and the T4 mechanics (§6, §11)
+
+| Phase | Contains |
+|---|---|
+| **0** hygiene & unblockers | the bind flag, `SCR-9`, `SCR-10`, `SCR-8` — makes all three editions packagable and the docs honest |
+| **1** script suite | `SCR-1`…`SCR-6` — T1/T2 installable and verifiable **by a client operator, not just by us** |
+| **2** T2 reference deployment | one real server, both TLS variants, Postgres-backed, monitored; validates the sizing and recovery tables above; also closes OPS-5's "needs a live deploy" |
+| **3** T3 reference | live Keycloak + gateway pair (resolves D8/GAP-7), tenant-isolation evidence pack |
+| **4** T4 DR pack | standby runbook + quarterly-drill template; publish the SLOs per D6 |
+| **5** (optional, per D1) | container image |
+
+⚠ **Each phase ends with its own acceptance evidence pack** — that is the exit criterion, and it is what
+makes the phases sequential rather than a wish list.
+
+**The T4 promote runbook order**, which is the part that must not be improvised: stop A if alive → promote
+Postgres → start B → repoint LB/DNS → the full acceptance block. Replication is Postgres **PITR/WAL
+archiving** plus a scheduled post-CHECKPOINT `spaces/` sync (`robocopy`/`rsync`).
+
+⚠ **`SCR-3` carries an open vendor decision**: the Windows service wrapper is **WinSW or an `sc.exe`
+wrapper**, undecided. The systemd side is settled (`Restart=on-failure`, `WorkingDirectory=` the bundle
+root, `EnvironmentFile=`).
+
 ## 4. Decisions (dated one-liners)
 
 | Date | Decision | Who |
@@ -722,7 +839,8 @@ this area has three sites whose line citations drifted (§3.2).
 | The authentication story | [`auth-security.md`](../../backend/editions/auth-security.md) | — |
 | Bundling and reactor sizes | [`build-test.md`](../../backend/build-run/build-test.md) | ⚠ Its jar *table* omits what its own prose gets right |
 | The feature board | `docs/EDITIONS.md` | See §2 |
-| The deployment design | this spec §3.9–§3.13; the build plan is `superpower/deployment-topology-plan.md` | Phases 0–5 unbuilt |
+| The deployment design | this spec §3.9–§3.13 (narrative) and **§3.14 (the six tables verbatim)** | current |
+| The build plan's provenance | `docs/archived-documents/plans-archive/deployment-topology-plan.md` | ⛔ **ARCHIVED 2026-09-09**; Phases 0–5 remain unbuilt and are tracked on §3 P2 + `SPEC-DEPLOY-ROWS-1` |
 | The backup runbook | `docs/ops/backup-restore-runbook.md` | — |
 
 ## 8. Verification

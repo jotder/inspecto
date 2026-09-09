@@ -1,3 +1,31 @@
+> ⛔ **ARCHIVED 2026-09-09 — provenance only. This was the BUILD plan; the design is elsewhere.**
+> Current truth: [`okf/capabilities/editions/editions.md`](../../okf/capabilities/editions/editions.md)
+> §3.9–§3.13 for the design as narrative, and **§3.14 for the six tables reproduced verbatim** — indicative
+> sizing, failure→tier response, the **signed D6 RPO/RTO service levels**, the nine preflight rows §3.12
+> does not carry, **VER-1…VER-12**, and the phase sequencing including the T4 promote order.
+>
+> 🔴 **Why §3.14 exists.** `editions.md` deliberately renders tables as prose with counts, which is right
+> for design narrative and wrong for numbers someone has to act on. Before 2026-09-09 the current tier said
+> "recovery targets as contract service levels" were signed **without carrying the numbers**, said "twelve
+> acceptance rows" while no `VER-` identifier existed anywhere, and quoted a single cell of a failure table
+> that lived only here. Three `SCR-*` acceptance criteria were defined as "catches every §8 row" / "§9's
+> acceptance block as a script" — i.e. they pointed at this file. That is now closed.
+>
+> ⚠ **Phases 0–5 are still unbuilt.** Archiving did not build anything: they are `BACKLOG.md` §3 P2
+> *Deployment topology gaps*, §2 *Deployment topology live validation*, and `SPEC-DEPLOY-ROWS-1` — which was
+> **recounted from fourteen to fifteen items** on 2026-09-09, because its own enumeration had missed `SCR-4`
+> (the proxy/TLS reference configs). A row whose purpose is to catch homeless items had a homeless item.
+>
+> ⚠ **Three current-tier docs recorded "the plan stays in `superpower/`"** — this spec's how-to-read banner,
+> `okf/capabilities/index.md`, and `editions.md` §7. All three were **amended** by operator decision rather
+> than silently contradicted: an unamended sentence of exactly that kind caused an earlier archival of this
+> plan to be reverted.
+>
+> ⚠ Where this file and the current tier disagree, **the current tier is newer**: `SCR-11` still reads open
+> below and shipped as PKG-3; `SCR-2` is superseded by PG-1; D3 signed a 2 GB memory default that does not
+> exist (GAP-4). ⛔ `compliance/evidence/rto-rpo-statement.md` still holds `<OPERATOR TO STATE>`
+> placeholders — transcribing the signed targets into it is **G6's** job, not a doc edit.
+
 # Deployment Topology & Operations Plan — Inspecto
 
 > **Status: decisions SIGNED, DESIGN DISTILLED, build not started — 2026-07-24, §10 signed 2026-09-06,
@@ -26,7 +54,7 @@
 > (versions/releases) · [`api/deployment/`](../api/deployment/README.md) (WSO2 + Keycloak blueprints) ·
 > [`ops/backup-restore-runbook.md`](../ops/backup-restore-runbook.md) (MNT-5/6) ·
 > [`ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) (§7 telemetry catalog, §8 persisted state, §9 `-D` flags,
-> §11 troubleshooting) · [`superpower/compliance-certifications-plan.md`](../archived-documents/plans-archive/compliance-certifications-plan.md)
+> §11 troubleshooting) · [`superpower/compliance-certifications-plan.md`](compliance-certifications-plan.md)
 > (NFR-7 SOC 2 / ISO 27001 / FedRAMP posture) · [`REQUIREMENTS.md`](../REQUIREMENTS.md) (PKG/SEC/OPS/SPC/NFR).
 >
 > **On approval + ship**: distill as-built topology facts into `okf/backend/build-run/` (new
@@ -259,7 +287,7 @@ Overlays are **optional and composable per client policy**. Status: ✅ shipped 
 | 3.13 | **Network posture** | ✅ GAP-1 CLOSED 2026-08-29: `-Dcontrol.bind=<host-or-IP>` restricts the bind address on both the HTTP and HTTPS paths (`ControlApi`); single-origin CORS `-Dcontrol.cors` | ✅ |
 
 Compliance policy mapping (SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI scoping) is owned by
-[`compliance-certifications-plan.md`](../archived-documents/plans-archive/compliance-certifications-plan.md); this matrix is its technical inventory.
+[`compliance-certifications-plan.md`](compliance-certifications-plan.md); this matrix is its technical inventory.
 
 ---
 
