@@ -232,6 +232,64 @@ describe('PipelineEditorComponent', () => {
         return (c as unknown as { canvas: ReturnType<typeof canvasMock> }).canvas;
     }
 
+    /** `servedVerbs` is private; read it the way this file already reads `canvas`. */
+    function verbsOf(c: PipelineEditorComponent): unknown {
+        return (c as unknown as { servedVerbs: () => unknown }).servedVerbs();
+    }
+
+    describe('the palette host error arms (§3.7)', () => {
+        it('falls back to the node-type groups with null, never an empty taxonomy', () => {
+            // The default mock already makes processorCatalog throw — that is the degraded server.
+            const c = make();
+            expect(c.paletteProcessors()).toBeNull();
+            expect(c.paletteGroups().length).toBeGreaterThan(0);
+        });
+
+        it('keeps a served taxonomy, so the null above is a real signal and not the only outcome', () => {
+            // ⚠ The payload is `{families, processors}`, NOT an array — my first draft passed an array,
+            // `groupByFamily` threw reading `catalog.families`, and RxJS routed that into the ERROR arm.
+            // The test then "proved" the fallback while actually exercising a broken fixture.
+            api.processorCatalog = vi.fn().mockReturnValue(
+                of({
+                    families: [{ code: 'XFM', label: 'Transformers', icon: 'heroicons_outline:funnel' }],
+                    processors: [
+                        {
+                            id: 'SP-XFM-01',
+                            family: 'XFM',
+                            label: 'Record Transformer',
+                            emoji: '🧮',
+                            icon: 'heroicons_outline:funnel',
+                            status: 'delivered',
+                            addable: true,
+                        },
+                    ],
+                }),
+            );
+            const c = make();
+            expect(c.paletteProcessors()).not.toBeNull();
+            expect(c.paletteProcessors()!.length).toBeGreaterThan(0);
+        });
+
+        it('empties the palette when the node-type route itself fails', () => {
+            api.nodeTypes = vi.fn().mockReturnValue(throwError(() => new Error('500')));
+            const c = make();
+            expect(c.paletteGroups()).toEqual([]);
+        });
+
+        it('falls back to the client verb map when the served verbs error', () => {
+            const c = make();
+            expect(verbsOf(c)).toBeNull();
+        });
+
+        it('treats a served-but-EMPTY verb list as not served', () => {
+            // "an empty palette is never what a real server means" — the component says so in a comment,
+            // and this is the only place that holds it to it.
+            api.stepTypes = vi.fn().mockReturnValue(of([]));
+            const c = make();
+            expect(verbsOf(c)).toBeNull();
+        });
+    });
+
     /**
      * P6-e — the stream-config export re-homed. ⛔ Deleting the shell without this would have left the
      * `inspecto-stream-config` format IMPORT-only: the create dialog still reads a bundle, and
@@ -3455,4 +3513,30 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
         expect(rows.map((r) => r.rowId)).toEqual(['src', 'flt']);
         expect(rows.every((r) => r.kind === 'node')).toBe(true);
     });
+
+    /**
+     * SPEC-NOPROOF-1 / pipeline-authoring §3.7 item 7 — the palette's silent fallback had no HOST-level
+     * spec. The rendering *given* nothing was tested; the three error arms that PRODUCE the nothing were
+     * not, even though this file's own default mock has made `stepTypes` and `processorCatalog` throw all
+     * along. They ran in every test here and nothing asserted their result.
+     *
+     * ⚠ The distinction under test is `null` vs `[]`, and it is not cosmetic. `null` means "not served —
+     * fall back", `[]` means "served, and genuinely empty". The palette renders those differently, so an
+     * error arm that set `[]` would turn a degraded server into a confident claim that this build has no
+     * processors at all.
+     *
+     * ⛔ These tests pin the CURRENT behaviour, which is silent. Whether a degraded palette should also
+     * raise the alert component — §3.7's own argument, since nothing fires it today — is a product
+     * decision and deliberately NOT asserted here; asserting it would encode an unmade decision.
+     *
+     * <p><b>Mutation-proven 2026-09-09:</b> setting the `processorCatalog` error arm to `[]` instead of
+     * `null`, and dropping the empty-means-not-served mapping for `servedVerbs`, each fail exactly their
+     * own test (2 of 190).
+     *
+     * <p>⚠ <b>The positive control earned its place.</b> My first served-catalog fixture was an ARRAY, but
+     * the payload is `{families, processors}` — `groupByFamily` threw reading `catalog.families` and RxJS
+     * routed it into the ERROR arm. Without a test asserting a SERVED taxonomy is non-null, the
+     * fallback tests would have passed while exercising a broken fixture instead of a real error. A
+     * negative test needs a probe that would otherwise succeed.
+     */
 });

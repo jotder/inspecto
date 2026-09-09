@@ -435,9 +435,15 @@ Ranked. The first is the only one that can put a broken artifact into production
    an unchecked map, and the compiler silently drops the node — so an invented vocabulary survives
    unnoticed. This is the one place PIP-1's "author-time validation" does not hold, and it should either be
    an error or be stated in the requirement.
-7. 🔴 **The palette's silent fallback has no host-level spec** (§3.7). The rendering given nothing is
-   tested; the error arm that produces the nothing is not. By this project's own convention a degraded
-   route is what the alert component exists for, and nothing fires it.
+7. 🟡 ~~**The palette's silent fallback has no host-level spec**~~ **TESTED 2026-09-09** (§3.7). Five
+   tests in `pipeline-editor.component.spec.ts` pin all three host error arms: a failed processor-catalog
+   leaves `paletteProcessors` **`null`** (not `[]`) so the node-type groups stay, a failed node-type route
+   empties the palette, and a served-but-EMPTY verb list is treated as *not served*. ⚠ The `null`-vs-`[]`
+   distinction is the load-bearing one — `[]` would turn a degraded server into a confident claim that
+   this build has no processors. Mutation-proven (each semantic flipped fails exactly its own test).
+   ⛔ **Still a product decision, deliberately not encoded in a test:** whether a degraded palette should
+   also fire the alert component. By this project's convention it should, and nothing fires it today — but
+   asserting that would bake in a decision nobody has made.
 8. ⚠ **`A6` is an orphan decision.** The export-home decision of 2026-08-17 appears **exactly once** in
    the entire current document set, with no board row and no other home. This spec's §4 is now its second.
 9. ⚠ **Every executor line-number citation in the authoring documents is wrong, and so is its package
