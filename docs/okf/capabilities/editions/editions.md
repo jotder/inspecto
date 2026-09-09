@@ -729,6 +729,13 @@ this area has three sites whose line citations drifted (§3.2).
 
 **What is actually enforced today**
 
+* **The Personal-side refusal of cell 7's extraction** — `NoOperationalObjectsShipInThePersonalBuildTest`
+  (added 2026-09-09, closing part of `SPEC-NOPROOF-1`). All **49** stubbed operational-object paths answer
+  **503 naming `inspecto-ops`** rather than 404, `features.ops` stays present-and-false, and a source
+  cross-check pins the stub surface against the test's own list. ⚠ That cross-check is not redundant: a
+  path shadowed by one of the two catch-alls is **invisible** to an over-the-wire check, proven by
+  mutation. Cell 7 was the only one of the seven gating cells without such a test.
+
 * **Per-jar shape assertions** on every staged artifact, reading inside the zip for classes and provider
   registrations — the strongest control in this area, and the one that caught the unshaded authentication
   jar.

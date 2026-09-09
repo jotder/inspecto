@@ -428,44 +428,6 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
   was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
   artifact exists.** → the owning specs' §2 tables, which now carry the measured number.
-- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof; THREE closed, three open.** `SEC-4` HTTPS has
-  zero tests (no test under `inspecto/src/test` references a keystore); ✅ ~~**EDG-01 cell 7** — the largest
-  extraction — is the only one of seven cells with no Personal-side falsification test~~ **CLOSED
-  2026-09-09** by `NoOperationalObjectsShipInThePersonalBuildTest`: all **49** stubbed paths answer 503
-  naming `inspecto-ops` (not 404 — a lost stub; not 200 — a leaked module), `features.ops` is present and
-  false, and a source cross-check pins the stub's surface against the test's own list. ⚠ The stated "44"
-  was **49**. 🔴 Mutation-proven both ways, and the second case is why the cross-check exists: removing a
-  stub the `/objects/([^/]+)` catch-all shadows fails **only** the cross-check — an over-the-wire test
-  structurally cannot see it, and there are two such catch-alls. ⚠ `AbsentExchangeRoutes` was briefly
-  suspected of the same gap and is **not**: `NoExchangeShipsInThePersonalBuildTest` already covers it (a
-  class-name grep missed it because that test exercises paths, not the class);
-  ✅ ~~the four-stage write-gate **order** is depended on by thirteen route modules and verified by reading
-  call sites~~ **CLOSED 2026-09-09** by `WriteGateOrderTest`: a four-rung ladder on `POST /config/write`
-  where **every rung violates more than one gate**, so the winner proves the order — 503 beats an invalid
-  payload and a traversal, the spec 422 beats the jail, the jail beats the conflict, and 409 is what is
-  left. 🔴 The gap was wider than this row said: **`WriteGates` had no test of any kind**, so the four
-  statuses were unasserted too — now covered, including that `isSafeName` and `safeName` can never
-  disagree. Mutation-proven at both levels (a 403→422 one-token change fails 2 of 9; moving gate 1 below
-  the 422 block fails rung 1). ⚠ **A grep cannot see this order**: canonical gate 2 is thrown as
-  `respondJson(ex, 422, …)` with `findings`, **not** through `WriteGates`, so counting `WriteGates.` call
-  sites makes the jail look like it precedes validation. It does not — assert on the 422 that carries
-  `findings`; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing is);
-  and **`PipelineScheduler` has no test class at all**, recorded only in prose. → pick by name; each is one
-  test class.
-  • ✅ ~~`DuckLakeRegistrar` has no test~~ — **`DuckLakeRegistrarTest` shipped 2026-09-09**, 5 tests, 0.6 s.
-  It pins the **reachability** half (`output.ducklake` → `cfg.output().duckLake()`, plus the shorthand
-  sink inheriting it) and every **no-op guard** the class javadoc claims. Mutation-proven: nulling the one
-  line that wires it (`PipelineConfigParser:860`) fails 2 of the 5, naming that line.
-  ⚠ **Its NON-FATAL promise is still owed and is NOT provable in this reactor** — keep this sub-item open.
-  Measured: the five tests cost **0.4 s**; two more that drove an *enabled* block cost **262 s**, because
-  `INSTALL ducklake FROM core` is a **network** fetch that runs before any failure the promise covers, and
-  `DuckDbUtil.jdbcUrl` has no settings hook to make it fail fast. ⛔ Adding 4.4 minutes to an offline build
-  is a defect, and a `@Tag`-excluded test that never runs is not a guard — so it needs a reachable catalog,
-  i.e. a live deployment, which puts it with the `SCR-4`/`5`/`7` scripts rather than the reactor.
-  🔴 **Filing note worth keeping:** grounding this I grepped `PipelineConfig.java` for the assignment,
-  found the field declared and consumed but never written, and nearly filed the whole DuckLake path as dead
-  code. The assignment is in the **parser**, a different file. Same wrong-path probe as ever — and it is
-  why the reachability assertion now exists.
 - **P3** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
   `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
   vendor-transform plugin registers ~40 legacy functions through a real seam and **reaches no bundle and no

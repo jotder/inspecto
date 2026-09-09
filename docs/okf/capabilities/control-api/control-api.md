@@ -551,6 +551,14 @@ Renaming would break every stored client link; migrating an offset pager with no
 
 ## 8. Verification
 
+> **The four-stage write-gate ORDER is pinned as of 2026-09-09** (`WriteGateOrderTest`, closing part of
+> `SPEC-NOPROOF-1`). The sequence `.claude/skills/endpoint` makes binding — write-root **503** →
+> spec/`ConfigSafetyValidator` **422** → path jail **403** → conflict **409** — was depended on by thirteen
+> route modules and verified only by reading call sites, and `WriteGates` itself had **no test of any
+> kind**. Every rung of the new ladder violates **more than one** gate, so the responder proves the order.
+> ⚠ A grep of `WriteGates.` call sites cannot see this: canonical gate 2 is thrown as
+> `respondJson(ex, 422, …)` carrying `findings`, never through the helper.
+
 ### 8.1 Contract-surface tests — `inspecto/src/test/java/com/gamma/control/` (default reactor)
 
 | Class | Proves |
