@@ -342,12 +342,13 @@ The architecture choices translate directly into cost-of-ownership advantages th
 | Pipeline-graph platform (authoring + execution) | **In mainline** | NiFi-style Pipelines run as first-class jobs; visual editor shipped |
 | Data-plane provenance / lineage | **In mainline** | Per-edge counts, conservation checks, Sankey overlay (off by default) |
 | Auth-free common core (edition realignment) | **In mainline** | Core is auth-free; security becomes an edition module |
-| Standard edition security (`inspecto-security`) | **Planned** | OIDC resource-server + RBAC/ABAC behind an SPI |
-| Object-storage / NFS-SMB connectors | **Planned** | On the existing connector SPI |
-| Unified `parsing:` grammar (JSON / regex frontends) | **Planned** | Additional thin frontends over the shared backend |
+| Standard edition security (`inspecto-security`) | **Shipped** | OIDC resource-server + RBAC/ABAC behind an SPI — delivered 2026-07-24 as the `inspecto-security` module, assembled into Standard by a Maven profile (`ROADMAP.md` §3.1) |
+| Object-storage connectors (S3 / GCS / Azure / MinIO) | **Shipped** | On the connector SPI, SDK-free — S3/MinIO 2026-07-08, Azure 2026-07-08, GCS 2026-07-22 |
+| Network-share (NFS / SMB) access | **Not a connector — by decision** | ⛔ **Refused as an SPI connector**; the supported pattern is an **OS-mounted share** read as a local path, and a UNC path stays jail-rejected. `ACQ-4` is therefore PARTIAL, not shipped (`okf/capabilities/acquisition/acquisition.md` §2/§6.1) |
+| Unified `parsing:` grammar (JSON / regex frontends) | **Shipped** | Additional thin frontends over the shared backend — delivered 2026-07-07 (`ING-5`) |
 | Enterprise distributed tier | **Future** | Shared-state backends + distributed scheduler |
 
-"In mainline" means built, tested, and integrated on the development line, targeting the next release; "shipped" means released on the active line. The detailed status of the flow-graph track and acquisition framework is maintained in the engineering docs.
+"In mainline" means built, tested, and integrated on the development line, targeting the next release; "shipped" means released on the active line. The detailed status of the pipeline-graph track and the acquisition framework is maintained in the engineering docs — since 2026-09-09 the **requirement of record** for every area is its capability spec under [`okf/capabilities/`](../okf/capabilities/index.md) §2.
 
 ---
 
@@ -368,22 +369,24 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 - **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-Collector merge, incremental Pipelines, materialized views, and a visual editor. *Status: built; final hardening and live end-to-end verification with real job configs.*
 - **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, and the Sankey overlay. *Status: built and tested; off by default.*
 - **Edition realignment** — the auth-free common core that makes the three-edition model real. *Status: in mainline; commit/release gated on stakeholder go-ahead.*
-- **The `sink.view` consumer** — query a flow's logical views over REST. *Status: shipped in mainline.*
+- **The `sink.view` consumer** — query a Pipeline's logical views over REST. *Status: shipped in mainline.*
 
-### 10.3 Next (committed direction, not yet started)
+### 10.3 Next (committed direction)
 
-- **`inspecto-security` module (Standard edition)** — an `Authenticator` SPI plus OIDC resource-server validation, RBAC/ABAC from token claims, HTTPS, and actor-attributed audit. This is the single highest-leverage item for commercialization. *Incremental hardening on the framework-free core — explicitly not a Spring/Quarkus migration.*
-- **Object-storage & network-share connectors** — S3 / GCS / Azure Blob / MinIO and NFS/SMB on the existing connector SPI; the analytical engine already speaks object storage natively.
-- **Unified `parsing:` grammar** — promote today's frontends under one `parsing:` block and add **JSON** and **text/regex** frontends, each a thin frontend producing rows for the shared backend (existing configs keep working via aliases).
+> 🔴 **Corrected 2026-09-09 (docs-consolidation step 6).** This heading read "**not yet started**" and listed four items that had shipped between 2026-07-07 and 2026-07-24 — including the one it called "the single highest-leverage item for commercialization". **This is the document an executive reads**, so the error was the most expensive kind of staleness in the doc set: it under-promised a delivered product. Each verdict below was re-checked against the capability spec that owns the row, not against another roadmap.
+
+- ✅ **`inspecto-security` module (Standard edition) — SHIPPED 2026-07-24.** An `Authenticator` SPI plus OIDC resource-server validation, RBAC/ABAC from token claims, HTTPS, and actor-attributed audit. Delivered as a Maven module assembled into Standard by profile; Personal simply does not bundle it. *Incremental hardening on the framework-free core — explicitly not a Spring/Quarkus migration.* ⚠ Residual hardening is tracked as `SEC-7` in `okf/capabilities/security/security.md` §2, not here.
+- 🟡 **Object-storage connectors — SHIPPED; network-share — REFUSED.** S3 / MinIO / GCS-interop and Azure Blob landed 2026-07-08 and native GCS 2026-07-22, all SDK-free on the connector SPI. ⛔ NFS/SMB was **not** built as a connector: the supported pattern is an OS-mounted share read as a local path, and a UNC path stays jail-rejected by design. So `ACQ-4` is PARTIAL rather than shipped — stating it as "planned" hid a **decision**, which is worse than hiding a delay.
+- ✅ **Unified `parsing:` grammar — SHIPPED 2026-07-07 (`ING-5`).** Today's frontends sit under one `parsing:` block with **JSON** and **text/regex** added, each a thin frontend producing rows for the shared backend; existing configs keep working via aliases.
 - **Pipeline authoring polish** — round out the visual editor and add a dedicated run endpoint for authored Pipelines; adapter stream-consumer runtime for streaming Collectors.
-- **Etag/version fingerprint dimensions** — richer dedup for object-store connectors (depends on those connectors landing).
+- ✅ **Etag/version fingerprint dimensions — SHIPPED 2026-07-08 (`ACQ-7`).** Pre-fetch skip on the connector's listing etag or object version, degrading to size+mtime when the connector supplies neither. Its stated dependency landed first, as planned.
 
 ### 10.4 Later (future / vision)
 
 - **Enterprise distributed tier** — shared-state backends (Postgres for status, object store for events, shared secrets), distributed scheduler coordination, work distribution, and per-tenant ABAC. The seams are already open; this is opt-in and against the single-JVM default by design.
 - **Richer "AI behind every screen" UX** — inline natural-language authoring across the console (a parallel track; benefits from GPU availability on the deployment).
 - **Multi-step agent graphs** — provision → watch → roll back orchestration, beyond today's single-shot generate→validate→return skills.
-- **Push-based / event-notification discovery** — react to source-side notifications rather than polling.
+- ✅ **Push-based / event-notification discovery — SHIPPED 2026-07-08 (`ACQ-6`), not Later.** `POST /collectors/{id}/notify` lets an external system trigger an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. ⚠ Corrected 2026-09-09; `ROADMAP.md` had it demand-gated here too.
 
 ### 10.5 Cross-cutting & continuous
 

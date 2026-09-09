@@ -27,7 +27,7 @@ These are built and integrated on the development line; the work remaining is ve
 | N1 | **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental Pipelines, materialized views, visual editor | L | Built & tested | A representative `type: pipeline` job runs end-to-end against seeded data; visual editor verified live; design doc §14 closed |
 | N2 | **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, Sankey overlay | M | Built & tested (off by default) | Provenance verified against a real Pipeline-job run (not just synthetic injection); overlay confirmed against recorded data |
 | N3 | **`sink.view` consumer** — REST query of a Pipeline's logical views | S | Shipped in mainline | Done — `/views`, `/views/{name}`, `/views/{name}/data` live with tests |
-| N4 | **Edition realignment** — auth-free common core | M | In mainline, uncommitted/ungated | Stakeholder go-ahead to commit/release; confirms the three-edition model is real |
+| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-standard` / `edition-enterprise` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
 
 **Now-horizon focus:** finish live end-to-end verification of N1/N2 with real job configs (current verification used synthetic data on a config-less dev backend), then make the release call on N4.
 
@@ -69,7 +69,7 @@ The single most important item for commercialization.
 > plain JDK crypto, so no cloud SDK jar enters the build and it stays air-gappable. The etag/version
 > follow-on landed with them (listing ETag → `RemoteFile.etag`, GCS `generation` → `RemoteFile.version`,
 > consumed by `source.duplicate.mode: etag`, ACQ-7).
-> **Not delivered:** the **NFS/SMB-CIFS** half of this item — there is no share connector; mounted shares
+> **Not delivered, and not pending — REFUSED by decision** (framing corrected 2026-09-09, step 6): the **NFS/SMB-CIFS** half of this item — there is no share connector; mounted shares
 > are read through the local input path. As-built:
 > [`../okf/backend/acquisition/connectors.md`](../okf/backend/acquisition/connectors.md).
 
@@ -108,7 +108,7 @@ The single most important item for commercialization.
 | L1 | **Enterprise distributed tier** — shared-state backends (Postgres status store, object-store events, shared secrets), distributed scheduler coordination, work distribution, per-tenant ABAC | XL | A deployment whose scale or multi-tenancy actually exceeds the single-node design |
 | L2 | **Richer "AI behind every screen" UX** — inline natural-language authoring across the console | M | **Promoted 2026-07-25 → AGT-6a, MoSCoW `Should`, scoped in [`../superpower/agt-6-plan.md`](../superpower/agt-6-plan.md) §3** — no longer demand-gated: it reuses the shipped L1 draft tools (no new backend capability) and local models suffice, so GPU availability is not a gate. Still listed here pending a horizon refresh of this table. |
 | L3 | **Multi-step agent graphs** — provision → watch → roll back orchestration | L | **= AGT-6b**, scoped in [`../superpower/agt-6-plan.md`](../superpower/agt-6-plan.md) §4. Demand beyond the three code-defined seeded runbooks — **plus** one upstream prerequisite: the eoiagent per-tool `DryRunProvider` seam, without which a model-composed plan cannot be previewed per step. |
-| L4 | **Push/event-notification discovery** — react to source-side notifications instead of polling | M | A source that emits change notifications |
+| ~~L4~~ | ✅ **Push/event-notification discovery — SHIPPED 2026-07-08 as `ACQ-6`, not Later.** `POST /collectors/{id}/notify` triggers an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. 🔴 Corrected 2026-09-09 (docs-consolidation step 6): this row's stated trigger — "a source that emits change notifications" — had already been met and the work delivered fourteen months of roadmap-time earlier than this table claims. | — | — |
 | L5 | **Cross-unit parallelism / Stage-2 streaming** — finer-grained parallelism within a run | M | A workload bottlenecked on per-unit sequencing |
 
 **Guiding rule for Later:** these are deliberately deferred against the single-JVM, crash-isolated ethos. The seams are kept open (stateless engine, pluggable stores, stateless-JWT auth), so none of them require a rewrite when pulled forward — only assembly.
@@ -135,8 +135,8 @@ NOW (§2)                    DELIVERED (Jul 2026)                    NEXT       
 N1 Pipeline-graph (verify)  3.1 inspecto-security + RBAC/ABAC ✓  →  3.4 Pipeline authoring polish  →  L1 Distributed tier
 N2 Provenance (verify)          [revenue gate cleared 07-24]             + streaming                    L2 Inline AI UX
 N3 Views consumer ✓         3.2 Object-storage connectors ✓      →  3.5 Config-authoring           →  L3 Agent graphs
-N4 Edition realignment          [NFS/SMB-CIFS still open]                completion                    L4 Push discovery
-   (release decision)       3.3 Unified parsing / JSON / regex ✓                                       L5 Finer parallelism
+N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         completion                    L4 Push discovery ✓
+   (release only — built)   3.3 Unified parsing / JSON / regex ✓                                       L5 Finer parallelism
 ```
 
 **Why this order** (1–3 are now retrospective):
