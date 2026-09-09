@@ -305,6 +305,18 @@ name claims every edition is signed when **two of three** are, with no artifact 
 
 ### 5.2 UNTRACKED — found 2026-09-09, no board row yet
 
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-GREENCELL-1`, `SPEC-GLOSSARY-1`.
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+
 1. 🔴 **Five capability specs cite a pointer-check tool that is not in the repository.** Their verification
    sections instruct a next shift to run a checker that exists only in a session scratchpad. It is the
    script that caught stale class names in two areas, so it earns its place — but as written, five specs

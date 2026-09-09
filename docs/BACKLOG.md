@@ -78,6 +78,29 @@ decided and buildable, §2 where it became an org action, §6 where the answer w
 turned out to be already answered by shipped code (`description`, `duplicate_check` owner, `engine: auto`) and one
 half of a fourth (the id slug). New decisions get a row here at handoff time.
 
+**One, filed 2026-09-09 (`CONSUMER-PAIRS-1`).** — **For each shipped server half with no client, does the
+client adopt it or does the half get retired?** The consolidation found **ten** of these across seven areas,
+and they are one decision, not ten defects — every instance is a Must whose other half was never built, so
+each is either unfinished product or dead surface, and only the operator can say which:
+
+| The shipped half | The missing half | Area |
+|---|---|---|
+| `If-Match` honoured on config writes | the SPA sends none (two panes) | `API`, `MET` |
+| cursor pagination (`metadata.pagination`) | no consumer of `nextCursor`; four endpoints page for curl only | `API` |
+| `permissions[]` in the v1 envelope | 🔴 **structurally unreachable** — the shell's interceptor unwraps to `event.body.data` and discards it | `SEC`, `UI` |
+| `GET /signals/stream` (SSE) | nothing opens an `EventSource`; the Events pane polls | `OPS` |
+| `POST /queries/{id}/run` | the Query Library never calls it | `DAT`, `BI` |
+| `GET /bi/datasets` | no caller | `BI` |
+| Expectations routes (`ING-6`, a Must) | no UI at all | `ING` |
+| materialization | no UI triggers it and no committed job schedules one | `DAT` |
+| queue / watcher / escalation-policy routes (`INC-4`) | no consumer | `INC` |
+| `AgentAskResult.artifact` — ⚠ **the inverse**: the client consumer is live and there is no producer | | `AGT` |
+
+**Recommended: decide per row, in one sitting, and record the verdict in the owning capability spec's §2.**
+⛔ Do not file ten separate build rows — that is what made them invisible for a month. The `permissions[]`
+case is the one with a forced answer: it cannot reach a consumer without an interceptor change, so "adopt"
+there means a client change first. → the ten owning specs' `UNTRACKED` sections, all now pointing here.
+
 ## 2. Externally gated
 
 Nothing a shift can close from this checkout. Listed so the gate is named, not guessed.
@@ -208,6 +231,31 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **Deployment topology gaps** — GAP-3 service wrappers (SCR-3) · GAP-4 DuckDB `memory_limit` default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-9 launcher token-line debris (SCR-9) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `superpower/deployment-topology-plan.md` §11
 - **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
+
+### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
+
+- **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** Five instances,
+  and the pattern matters more than any one: **no Standard artifact is built** at all while both supply-chain
+  controls show Standard green; **the trimmed runtime ships in nothing** while `OPS-07` is green in all three
+  editions (every release passes `-NoRuntime`); **intake caps** are advertised by `JOB-04` and are off by
+  default; `BI-4`/`BI-6`/`BI-7` promise Standard+ for **ungated code**, so a Personal install can mint a
+  public share link; and replay was green and uncaveated over an in-memory map (fixed 2026-09-09, `2cd1661b`).
+  → the rule this needs is one line: **a green cell must name the evidence that makes it true**, and a cell
+  whose evidence is "the script can do it" is not describing the bundle a customer receives.
+- **P2** · **`SPEC-AGT-EDITIONS-1` — seven `AGT` rows claim edition `All` and no bundle carries the code.**
+  The assistant and intelligence modules are plain reactor modules, built and tested on every run and staged
+  by nothing, so `/assist/*` and `/agent/*` answer 503 in **every** artifact `package.ps1` produces —
+  deliberately (`CP-14`, `PKG-5`) but not as `All` says. Either the cells become "built, not bundled" or the
+  packaging switch lands. Blocked by the same Java-floor question as `PKG-5`, which itself has no owner.
+  → `okf/capabilities/assistant/assistant.md` §2.
+- **P2** · **`SPEC-DEPLOY-ROWS-1` — fourteen deployment items have no board row.** Twelve from the deployment
+  plan (the preflight tool, the acceptance script, the off-site backup copy, upgrade/rollback automation, the
+  sizing table, the disaster-recovery pack, phases 0–5, the platform list, the government-variant refusal)
+  plus two board cells with no home at all (distributed scheduler coordination, the shared object store) —
+  despite the board's closing claim that every planned row has a backlog home. ⚠ The words `preflight`,
+  `standby` and `disaster recovery` appear **nowhere** in this file. Their only durable home today is
+  `okf/capabilities/editions/editions.md` §3.9–§3.13, which is why that spec had to be written before the
+  plan could move. → `superpower/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
 *(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
@@ -277,6 +325,45 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   — the guard's stale-allowlist rule fails the build until you do, which is the rename announcing itself.
   → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
 
+
+### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
+
+These four are the **classes** behind roughly half of the consolidation's findings. Each is one guard, not N
+fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidation-sprints.md`.
+
+- **P2** · **`SPEC-STALEREF-1` — twenty-three stale paths, dead citations and phantom rows.** The largest
+  single family, and the one nothing checks. Instances: **twenty-plus dead class citations** surviving the
+  2026-08-31 Consignment rename (five of them in the active pipeline plan's "what actually runs" section, two
+  cited *by line number*); a **deleted component named as the current mapping UI**; every `RowShaper` line
+  citation wrong **and its package path wrong**; `pipeline-graph-design.md` §14 cited when the file has eleven
+  sections; `BUNDLE-SCHEMA-1` cited as a §6 row by two current docs and present only in an archive snapshot;
+  `docs/okf/agentic/` pointing at a local path that does not exist; a dead archive pointer; and a tracked hook
+  comment naming a hook that does not exist. 🔴 **The fix is one guard**: a citation check over each
+  document's backticked symbols and paths against `git ls-files` and the module tree — which is exactly the
+  §7 pointer check every capability spec already describes, and which caught the phantom `BatchGraphRunner`
+  the moment it ran. Committing that checker is the enabler. → `okf/capabilities/tooling/tooling.md` §5.
+- **P2** · **`SPEC-COUNTS-1` — eight facts, each counted two to six ways, and the narrative doc is wrong every
+  time.** Measured 2026-09-09: builtin node types **30** (docs said 20/28/20/29 — five ways); parser frontends
+  **six ways** (3/5/6/7/9/10 across five pages and the user guide); maintenance tasks **19+4** (docs said
+  4/16/13, and the *served descriptor* was one of the wrong ones — fixed `f0e4dee2`); job types **12** (docs
+  said 4/9/4/10); transform functions **23** (24, and "~20" in the same file); processors **119** (121); the
+  dependency count **95 across 25 modules** generated against **94** in four prose sites; and the staged-jar
+  set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
+  was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
+  artifact exists.** → the owning specs' §2 tables, which now carry the measured number.
+- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof.** `SEC-4` HTTPS has zero tests (no test
+  under `inspecto/src/test` references a keystore); **EDG-01 cell 7** — the largest extraction, 44 stubbed
+  paths — is the only one of seven cells with no Personal-side falsification test; the four-stage write-gate
+  **order** is depended on by thirteen route modules and verified by reading call sites; `DuckLakeRegistrar`
+  has no test; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing
+  is); and **`PipelineScheduler` has no test class at all**, recorded only in prose. → pick by name; each is
+  one test class.
+- **P3** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
+  `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
+  vendor-transform plugin registers ~40 legacy functions through a real seam and **reaches no bundle and no
+  document**; `AssistDialog` is dead code whose doc comment describes an unwired flow. Each needs a
+  keep-or-delete verdict, not a build. ⛔ Demand-gated: do not "tidy" them without one, because at
+  least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
@@ -333,6 +420,36 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   the package or record why the repo copy deliberately diverges — comparing version markers will never tell you.
   (The optional `graphifyy[sql]` half is **already satisfied** — `tree-sitter-sql 0.3.11` is installed.)
 
+
+### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
+
+- **P2** · **`SPEC-MOCKRESIDUE-1` — the deleted mock backend's documentation residue is repo-wide and
+  unowned.** **Twenty current-tier documents** still describe the offline mock layer that was deleted
+  2026-08-31, and the residue **spans areas**, so each spec filed it and none owns it: the Studio spec filed
+  it, the Surfaces spec filed the ripple as unfinished, the Assistant spec found its own instance. Two of
+  those documents tell a contributor to **edit a file that does not exist** — one of them as the definition of
+  done for adding a page. → one sweep, one owner; the count is the acceptance test.
+- **P2** · **`SPEC-PLANSTALE-1` — active plans stale against their own content.** The compliance plan calls
+  three closed gaps open (one "confirmed still a gap"), claims a pipeline accessibility step that does not
+  exist, and declares four subdirectories of which three are absent. The pipeline spec's "what actually runs"
+  names five dead classes and says a new Step type cannot be added, contradicted by its own later row. The
+  waves plan's conclusion contradicted its own table (fixed 2026-09-09, `2cd1661b`). ⚠ A plan in
+  `superpower/` is the *design of record* for in-flight work, so a stale one is worse than a stale concept
+  page. → each plan's own header, before step 7 of the consolidation moves it.
+- **P2** · **`SPEC-GLOSSARY-1` — five load-bearing words undefined, or defined twice.** `Segment` (the
+  plugin-ingest spine) has no entry; `Control` and `Evidence` — the two nouns every compliance sentence turns
+  on — are undefined while `Compliance` is defined; **"Case" means two different things one layer apart** (the
+  agent's 256-entry investigation ring and the operational object); the field-classification vocabulary
+  (PII/INTERNAL) has no owner and is a free string in tests and the UI; and two `Stream` read models sit under
+  one word. 🔴 The glossary is **binding** (`CLAUDE.md`), so this is not cosmetic: one word meaning two
+  things is the exact failure its ban list exists to prevent. → `docs/GLOSSARY.md`.
+- **P3** · **`SPEC-ORPHANPAGE-1` — shipped surfaces with no concept page.** Roughly twenty across areas: nine
+  panes in the shell tier (two of them the very rows that area owns), eleven shared components and six shared
+  libraries, three Ops Lens screens (audit log, processing status, the scheduler), the Notification Center,
+  the Catalog read model (`com.gamma.catalog`, mentioned by eight files and owned by none), the operational
+  objects domain, and a guarantees panel whose own docblock cites a plan its page does not link. ⚠ Filed
+  as P3 deliberately — an undocumented pane is a smaller problem than a *wrongly* documented one, and
+  `SPEC-STALEREF-1` is the same budget better spent.
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 
 One line each; the reasoning is in the pointer. Reopen only on the stated trigger.

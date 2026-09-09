@@ -698,6 +698,18 @@ so they are not re-proposed as new ideas; none is scheduled.
 
 ### 🔴 UNTRACKED — no board row exists; file before scheduling
 
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> (none cross-cutting — every item here is area-specific).
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+
 | Item | Where its design lives | Why it matters |
 |---|---|---|
 | Credentials & network profiles as **their own referenced resources** | `plans-archive/acquire-controller-service-design.md` §2.1 | The one untracked item with real design content and no home. Today a `tunnel` is **inline** on the Connection, so two Collectors through the same bastion duplicate it — and a rotation edits N places |

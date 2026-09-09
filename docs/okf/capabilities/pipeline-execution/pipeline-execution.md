@@ -507,6 +507,18 @@ fires. A hanging Job is a recorded gap, and the watchdog that exists covers only
 
 ### 5.3 `UNTRACKED` — found writing this spec, no board row exists
 
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> `SPEC-STALEREF-1`, `SPEC-GREENCELL-1`, `SPEC-GLOSSARY-1`, `SPEC-PLANSTALE-1`.
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+
 Ranked. The first three are visible to an operator.
 
 1. 🔴 **A release gate rests on a class that does not exist, with a claim that is false of the class that

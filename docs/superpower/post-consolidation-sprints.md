@@ -1,6 +1,6 @@
 # Post-consolidation plan — six sprints
 
-> **Status: Sprint 1 DONE 2026-09-09; Sprints 2–6 proposed.** Written the shift the seventeenth capability spec landed
+> **Status: Sprints 1 and 2 DONE 2026-09-09; Sprints 3–6 proposed.** Written the shift the seventeenth capability spec landed
 > (`35cc8579`). It sequences what the consolidation left behind: the remaining steps of
 > [`docs-consolidation-plan.md`](docs-consolidation-plan.md) (steps 5–9, whose exit criteria are already
 > written there and are **reused verbatim** below, never re-invented), plus the ~215 findings the seventeen
@@ -91,10 +91,51 @@ from different angles:
 
 Then apply the P1 rule to each survivor: name the file, or demote to §1 (decision) or P2 (design).
 
-**Exit:** every numbered item in every spec's §5.3 either carries a `BACKLOG.md` row id or is struck in
-place with a one-line reason. `grep -c UNTRACKED docs/okf/capabilities/*/*.md` tells you when you are done.
-**First command:** `grep -n "UNTRACKED" -A3 docs/okf/capabilities/editions/editions.md` — start with the
-largest list.
+**Exit (as refined — see below):** every **cross-cutting** finding carries a `docs/BACKLOG.md` row; every
+area-specific one is acknowledged as living in its own spec's §5, which is its correct home.
+
+### Sprint 2 — outcome (2026-09-09)
+
+**Measured, not estimated: 217 findings across all 17 specs, 213 of them open.** The “~215” above was right,
+though it took four passes to extract cleanly — the later specs use numbered lists under a `§5.x UNTRACKED`
+heading, the earlier eight use **tables** under an unnumbered `### UNTRACKED`, and one uses neither shape.
+
+🔴 **The exit criterion was wrong and is refined here.** It demanded a board row *or* a strike for every
+one of the 213. That is the wrong target: **not every finding needs a board row.** A finding that is
+area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 **is already filed**
+— copying it onto the board gives it two homes and one of them goes stale, which is the very failure
+`SPEC-STALEREF-1` exists to catch. So: **the board holds what crosses areas; a spec holds what belongs to
+one.** Roughly 80 of the 213 are area-specific design and stay put, with a banner in each spec saying so.
+
+**Twelve rows filed** — one operator decision and eleven work rows:
+
+| Row | Section | Holds |
+|---|---|---|
+| `CONSUMER-PAIRS-1` | §1 decision | 🔴 **Ten** shipped halves with no counterpart — not seven. The plan under-counted because it missed the UI-half cases and the one **inverse** (a live client consumer with no producer) |
+| `SPEC-STALEREF-1` | §4 | **23 stale paths and dead citations — the largest family, and one this plan did not predict.** Twenty-plus dead class names survive the Consignment rename, five of them in an active plan's “what actually runs” section |
+| `SPEC-COUNTS-1` | §4 | Eight facts counted two to six ways; the *generated* artifact was right every time |
+| `SPEC-NOPROOF-1` | §4 | Six Musts with no automated proof, including a scheduler with **no test class at all** |
+| `SPEC-DEADSEAM-1` | §4 | Four declared seams with no implementation or caller — keep-or-delete verdicts, not builds |
+| `SPEC-GREENCELL-1` | §3 | Five board cells green over something absent or bounded |
+| `SPEC-AGT-EDITIONS-1` | §3 | Seven rows claim edition `All` where no bundle carries the code |
+| `SPEC-DEPLOY-ROWS-1` | §3 | Fourteen deployment items with no board row at all |
+| `SPEC-MOCKRESIDUE-1` | §5 | Twenty current docs describing a backend deleted 2026-08-31 |
+| `SPEC-PLANSTALE-1` | §5 | Active plans stale against their own content |
+| `SPEC-GLOSSARY-1` | §5 | Five load-bearing words undefined, or meaning two things |
+| `SPEC-ORPHANPAGE-1` | §5 | ~20 shipped surfaces with no concept page (P3 on purpose) |
+
+⚠ **The per-spec banners attribute by FAMILY, not per item.** Keyword attribution is a heuristic and it
+produced at least two marginal matches on inspection, so the banner says so and tells a reader to check the
+row before acting. Shipping false precision here would have manufactured exactly the stale-citation class
+`SPEC-STALEREF-1` was filed to kill.
+
+🔴 **A mistake worth recording:** the row-insertion script truncated `docs/BACKLOG.md` to **zero bytes,
+twice.** Opening a file for write truncates it *before* the write, so a payload that fails to encode destroys
+it — here a lone surrogate escape (the UTF-16 half-pair spelling of an emoji instead of the full code-point
+spelling). Both times it was restored intact with `git checkout --`, because every prior edit was committed;
+nothing was lost. **The fix is structural: encode the payload FIRST, write a temp file, then replace.**
+⛔ Never open a tracked file for write before the bytes are known good — and note that this very
+paragraph hit the same trap on its first attempt, where the atomic write then saved the file.
 
 ---
 

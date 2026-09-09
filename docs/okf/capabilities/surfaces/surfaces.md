@@ -347,6 +347,18 @@ test suite, with one board row between them. Everything in §5.2 is consequently
 
 ### 5.2 UNTRACKED — found 2026-09-08, no board row yet
 
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+
 1. 🔴 **No capability guard and no structural directive exist.** Gating is per-pane and by convention, so
    a new authoring surface that forgets its check is caught by nothing. A route guard, a directive, or a
    lint rule would make the convention enforceable. This is the area's highest-value hardening.

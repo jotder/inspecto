@@ -394,6 +394,18 @@ what it promises is absence.
 
 ### 5.2 UNTRACKED — found 2026-09-08, no board row yet
 
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-DEADSEAM-1`, `SPEC-GLOSSARY-1`, `SPEC-MOCKRESIDUE-1`, `SPEC-PLANSTALE-1`, `SPEC-ORPHANPAGE-1`, `SPEC-AGT-EDITIONS-1`.
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+
 1. 🔴 **The whole area's edition cells are wrong and nothing tracks the reconciliation.** Seven `AGT`
    rows claim `All`; no bundle carries the code. Either the rows say "not bundled", or a packaging
    decision changes that. The editions board already says the truth, so this is a requirements-board

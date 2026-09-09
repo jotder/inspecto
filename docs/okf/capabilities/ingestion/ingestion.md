@@ -352,6 +352,18 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 ### `UNTRACKED` — surfaced by this spec, no board row
 
+> ✅ **Filed 2026-09-09 (Sprint 2).** These findings are no longer untracked. The **cross-cutting** ones
+> — those no single area owned, which is why they sat here — are filed as cross-cutting
+> `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
+> starting point and read the row before acting on it:
+> `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-NOPROOF-1`, `SPEC-GLOSSARY-1`.
+>
+> ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
+> area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
+> copying it onto the board would give it two homes and one of them would go stale. The board holds what
+> **crosses** areas; a spec holds what belongs to **one**. See
+> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+
 | Item | Evidence | Why it matters |
 |---|---|---|
 | **Expectations have no UI** | zero "expectation" hits under `inspecto-ui/src/app`; routes exist | `ING-6` is a Must reachable only by `curl`; the `<inspecto-query-panel>` it was meant to reuse exists |
