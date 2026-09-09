@@ -354,8 +354,15 @@ message · otherwise **200** with the tool's `value`.
   (condition tree), `kpi_report_builder` (measures), `pipeline_author` (graph). Only `component_draft`
   presumes a model composed something, and it merely *validates*. Anyone planning "NL authoring" on top
   of these must scope the NL→structure model hop explicitly. → [[inline-ai-authoring]].
-  **That hop is now scoped** (A5, 2026-07-26): `superpower/agt-6-plan.md` §3.4. Two things to know before
+  **That hop is now scoped** (A5, 2026-07-26): `archived-documents/plans-archive/agt-6-plan.md` §3.4. Two things to know before
   touching it, both non-obvious from this module:
+  - ⛔ **Two unrelated `ToolSpec` types exist, and the only one IN THIS REPO is the wrong one.** The live
+    one is upstream: `com.eoiagent.core.ToolSpec` (`name, description, jsonSchema, mutating, requiredRole,
+    capability`), which ships in a jar and so answers no grep here. The in-tree
+    `com.gamma.agent.kernel.tool.ToolSpec` is the superseded agent-kernel record —
+    `(String id, int version, String description, Duration maxExecutionTime)`: no schema, no `mutating`.
+    ⚠ It is not dead code — `AlertRuleTool` and `SqlOracleTool` still use it — so it cannot be deleted to
+    remove the ambiguity. **Do not touch it when you mean the tool belt.**
   - ⚠ **Build it on native function-calling, NOT on `Investigator`'s prose-scrape.** `ChatRequest` already
     carries `List<ToolSpec>`, and `ToolMapping.toLc4j` turns each `ToolSpec.jsonSchema()` into a real
     LangChain4j `JsonObjectSchema` sent over the provider's tool-calling protocol, with arguments parsed
@@ -396,6 +403,9 @@ periodic state-watch, shipped 2026-07-21) — and the P2 authoring tier is now c
 shipped 2026-07-22). Remaining items are deliberate deferrals, not gaps:
 the embedding-retrieval upgrade (assessed **not warranted** at the 256-cap corpus; drop-in seam preserved
 behind `CaseSimilarity.score`) · hosted providers (Standard+) · the optional S8 signal-backbone slice.
-One actionable cross-repo gotcha remains: the eoiagent gate has no per-tool `DryRunProvider` seam
-through `PlatformBuilder` (a refactor to let the framework populate `ApprovalRequest.preview` instead of
-`AgentApprovals`' own previewer — functional parity today, so low priority). See `docs/BACKLOG.md`.
+One actionable cross-repo item remains, and it is **no longer a gate**: the eoiagent per-tool
+`DryRunProvider` seam **shipped upstream 2026-09-08**, so what is left is consuming it — let the framework
+populate `ApprovalRequest.preview` instead of `AgentApprovals`' own previewer. 🔴 This paragraph read
+"has no per-tool `DryRunProvider` seam ... so low priority" until 2026-09-09, a day-one contradiction of
+the discharge recorded in `assistant.md` §4. Functional parity holds today; it is P2, not blocked.
+See `docs/BACKLOG.md`.

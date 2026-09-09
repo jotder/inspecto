@@ -15,7 +15,10 @@ diff against current state. Panes **adopt** it; they never fork it. Backend half
 order: [[embedded-intelligence]].
 
 Shipped 2026-07-26 (A1–A3, then **A4** — see *Explain this screen* below). Plan:
-`superpower/agt-6-plan.md` — still active for the deferred `kpi_report_builder` host + A5.
+[`archived-documents/plans-archive/agt-6-plan.md`](../../../archived-documents/plans-archive/agt-6-plan.md)
+— **ARCHIVED 2026-09-09.** ⚠ It stayed in `superpower/` for **43 days after both things it was "still
+active" for were settled**: A5 shipped 2026-07-27 and the `kpi_report_builder` host shipped 2026-07-28
+(`3750a87b`). Only AGT-6b is still open, and that is a board row gated upstream — not a plan in flight.
 
 ## Shape
 
@@ -459,11 +462,24 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
 
 ## Not shipped
 
-- **`kpi_report_builder` has no viable host pane.** It emits N widgets *plus* a dashboard, and no pane
-  holds a dataset **and** operator-built measures **and** can create both: `studio/widgets/explore` has
-  dataset + measures (`controls()`, whose `ChannelValue.agg` enum matches the tool's exactly) but saves
-  exactly **one** widget; `studio/dashboards/dashboard-editor` can build a dashboard but has no measures.
-  That host is a new flow, not an adoption. → `BACKLOG.md`.
+- ~~**`kpi_report_builder` has no viable host pane.**~~ ✅ **SHIPPED 2026-07-28 (`3750a87b`) — and the
+  premise was resolved by INVERTING it, not by building the new flow everyone predicted.** 🔴 This doc,
+  `assistant.md` §5.1 and the board all carried "a new surface, not an adoption" for **43 days after it
+  shipped as an adoption**; that stale row was the stated reason the plan could not be archived.
+  The refuted reasoning is worth keeping, because it was careful and still wrong: no pane holds a dataset
+  **and** operator-built measures **and** can create both — `studio/widgets/explore` has dataset +
+  measures (`controls()`, whose `ChannelValue.agg` enum matches the tool's exactly) but saves exactly
+  **one** widget, and `studio/dashboards/dashboard-editor` builds a dashboard but has no measures.
+  ✅ **The resolution: the tool builds the measures, so the pane only has to supply a dataset.**
+  `dashboard-editor` gained a *Report dataset* select and hosts it
+  (`dashboard-editor.component.ts:260-289`, `.html:75-99`).
+  Three as-built gotchas that until now existed **only in code comments**:
+  - ⚠ **`[args]` is identity-only.** Pass anything else and the tool's derived measures are silently
+    overwritten (`.html:77-78`, `.ts:270-274`).
+  - ⚠ **Applying is N separate non-atomic POSTs** — no batch route exists — and it **stops on the first
+    partial failure** (`.ts:281-289`), so a half-built dashboard is a reachable end state.
+  - ⛔ **Orphans are deliberately NOT compensated.** An id collision may belong to someone else's widget,
+    so deleting on rollback could destroy another operator's work. Leaving the orphan is the safer loss.
 - ~~**"Why is this red"**~~ — **SHIPPED 2026-07-26**, see *Why is this red* below.
 - **A5's D9 prerequisite is DONE (2026-07-27) — the `ConfigSpec` → JSON Schema projection ships.**
   `ConfigJsonSchema` (`inspecto-config`, `com.gamma.config.spec`) turns any `ConfigSpecs.forType(kind)` into
@@ -490,9 +506,12 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
     schemas, and belong with A5.1/A5.3 respectively.
   - ⚠ **`InspectoPackTest` asserts a hardcoded tool count** (now 23) — every new tool goes stale there.
     Same trap class as `OidcAuthenticatorTest`'s hand-written capability sets.
-- **A5** — true natural-language authoring. **Now scoped** (2026-07-26): `superpower/agt-6-plan.md` §3.4.
+- **A5** — true natural-language authoring. **Now scoped** (2026-07-26): `archived-documents/plans-archive/agt-6-plan.md` §3.4.
   Two facts that matter to this surface specifically: NL is a **mode of `<inspecto-ai-assist>`, not a fourth
   sibling** (unlike the A4 pair, all four of this component's properties — draft, diff, Apply,
   `canAuthorWorkbench` — apply), and it is **opt-in per pane**, explicitly *not* Expectations, where the
   dialog already holds `table`+`column` and the profiling is deterministic SQL. See also the shape warning
   in [[embedded-intelligence]].
+  ⛔ **Rejected alternative: fold the prose into `args` as an `instruction` key.** That pushes the NL parse
+  *into* the tool and breaks the one property all five draft tools rely on — they are deterministic and
+  model-free. (The other two rejections are recorded above; this third was only in the plan.)

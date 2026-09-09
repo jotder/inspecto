@@ -40,7 +40,34 @@ item, not a shipped artifact (corrected 2026-09-08).
 | **Integrate** | Versioned **`/api/v1`** REST contract (OpenAPI-enforced), gateway/IAM-ready | ✅ Shipped |
 | **Secure** | Auth-free Personal; Standard: OIDC SSO, HTTPS, RBAC seams, attributed audit | ✅ Module shipped; hardening = MUST remainder |
 | **AI assist** | 7 draft-only assistant skills (diagnose, explain, KPI→SQL, NL→schedule, …), fully offline-capable | ✅ Shipped |
-| **AI next** | Embedded intelligence: governed autonomy ladder (explain → draft → act-with-approval) | 📋 Designed, awaiting P0 sign-off |
+| **AI next** | Embedded intelligence: governed autonomy ladder (explain → draft → act-with-approval) | ✅ **P0–P5 complete 2026-07-21**; inline authoring A1–A5 shipped 2026-07-26/28. Open: AGT-6b (model-composed graphs), gated upstream |
+
+### How the ladder is packaged — sell the ladder, not the ceiling
+
+> ⚠ **This is a product read from the codebase and roadmap, NOT a validated market position.** It is
+> recorded here because it was the only copy, in a plan now archived; the client-segment confirmation that
+> would firm it up is `AGT-SEGMENT-1` on the board. Do not quote it to a customer as researched.
+
+Clients buy the rung they trust, and can prove what happened at every rung:
+
+| Tier | Rungs | Edition | Pitch |
+|---|---|---|---|
+| **A — Explain & Investigate** | L0 QA + L1 investigation (Cases, RCA, ranked root cause + fix draft) | **All**, incl. air-gapped | "Ask your platform why a batch failed; get a ranked root cause and a fix draft. Fully offline, local models, nothing leaves the box." |
+| **B — Author & Act with approval** | L1 authoring + L2 gated action | **Standard+**, opt-in (`-Dintelligence.act.enabled`) | "The agent drafts; your operator approves in an inbox with a full diff. Every action rides the same audited route a human uses." |
+| **C — Bounded autonomy** | L3 (`ops_monitor`, policy + budgets) | **Enterprise**, demand-gated | "Hands-off remediation inside limits you set — with a kill switch, per-class budgets, and a SHADOW mode to watch what it *would* do first." |
+
+**Tier A is the wedge** — highest value, lowest risk, and it works in the deployments these buyers
+actually have: regulated, air-gapped, no cloud LLM permitted. Most competitors cannot offer a capable
+agent under those constraints. **That, not autonomy, is the moat.**
+
+**SHADOW-first is the Tier C on-ramp. Never lead with `AUTO`.** The recommended sequence is: enable
+`SHADOW` for one action class → review the `/autonomy` ledger for a soak period → promote a single class
+to `AUTO` with a conservative hourly budget.
+
+⛔ **Anti-positioning, deliberate.** Do **not** market autonomy as the default or the differentiator — for
+this buyer profile an over-eager autonomous agent is a liability. The winning sentence is: *"AI that helps
+you understand and author, that acts only when you approve, that can run with zero network egress, and
+that logs everything."*
 
 ## What's deliberately NOT in scope (this horizon)
 

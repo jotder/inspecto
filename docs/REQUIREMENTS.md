@@ -184,10 +184,10 @@ caveat (live e2e via `examples/06-serve/pipeline-job`).*
   and signed (`docs/ops/provenance-conservation-verification.md`); running it needs the first live
   deployment. Owner: ops, first live deployment.*
 - **AGT-6a** AI behind every screen (inline NL authoring) — *promoted Could→Should 2026-07-25 and scoped
-  in `superpower/agt-6-plan.md` §3: phases A1 (one shared inline surface) → A2 (four-pane adoption wave:
+  in `archived-documents/plans-archive/agt-6-plan.md` §3: phases A1 (one shared inline surface) → A2 (four-pane adoption wave:
   Pipelines/Expectations/Dashboards/Queries) → A3 (pane-context grounding) → A4 (read-only "explain this
   screen" breadth). **No new backend capability** — it reuses the shipped L1 draft tools, so the risk is
-  UI-side only and drafts persist nothing. Ready to schedule pending decision asks D1–D4.*
+  UI-side only and drafts persist nothing. ✅ **DELIVERED — A1–A5 all shipped 2026-07-26/28** (A5 2026-07-27, the `kpi_report_builder` host 2026-07-28 as an ADOPTION, `3750a87b`); D1–D4 were answered 2026-07-26. 🔴 This row read "Ready to schedule pending decision asks D1–D4" until 2026-09-09, six weeks after delivery. What remains is the **ambition** (every screen), not the capability — 12 panes measured, nothing adopted since 2026-07-26.*
 
 *Closed 2026-07-08: **ACQ-7** etag/version dedup · **ACQ-6** push discovery (notify + watch) ·
 **PIP-7** maintenance library (ledger_prune/db_maintenance/compact) · **PIP-6** job templates ·
@@ -219,7 +219,7 @@ scope cuts and the P1–P5 phasing, all since shipped).*
   moving SNAPSHOT) and P1–P5 all shipped. As-built in `okf/backend/agent/embedded-intelligence.md`; only the
   follow-ons in `BACKLOG.md` §2 remain open (embedding recall PARKED, eoiagent `DryRunProvider` seam, the
   QA-only/local-models-only scope cuts).
-- **AGT-6b** Multi-step agent graphs — *scoped 2026-07-25 in `superpower/agt-6-plan.md` §4 and kept
+- **AGT-6b** Multi-step agent graphs — *scoped 2026-07-25 in `archived-documents/plans-archive/agt-6-plan.md` §4 and kept
   demand-gated. Today's `runbook_operator` already runs **code-defined** seeded sequences as one
   approval-gated unit; 6b is the model-**composed** graph. Two upstream blockers recorded: the eoiagent
   approval gate is synchronous per-call (nesting gated calls deadlocks — hence one approval per plan),

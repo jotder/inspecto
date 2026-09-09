@@ -354,6 +354,8 @@ what it promises is absence.
 | 2026-07-22 | `kpi_report_builder` ships with ad-hoc aggregation/field measures and **no server-side named-Measure resolver** | operator sign-off |
 | 2026-07-25 | **AGT-6 split**: 6a promoted to a schedulable Should, 6b left a demand-gated Could | operator, in session |
 | 2026-07-26 | Inline authoring decisions: one **shared standalone surface, adopted never forked**; **apply goes through the plain validated route** so the *human* is the audited actor; **no edition gate**, because draft-only carries no security weight; **deterministic derive first**, no model in the loop | operator |
+| 2026-07-27 | ⚠ **D3's amendment, which the row above states in its superseded form.** A5 reintroduces local inference, so "there is not even a local-inference cost" no longer holds for the NL path. The *conclusion* stands — no edition gate, available wherever the module is, air-gapped included, because local models remain sufficient (the AGT-3 claim) — but the **503-on-stub degrade is what now keeps that promise honest** on a build with no model configured | operator |
+| 2026-07-28 | **The `kpi_report_builder` host shipped as an ADOPTION** (`3750a87b`), inverting its own blocking premise: the tool builds the measures, so the host pane need only supply a dataset. ⚠ Recorded here 2026-09-09 — the board, this spec §5.1 and `inline-ai-authoring.md` all read "no viable host pane" for 43 days afterwards, and that stale row was the stated reason `agt-6-plan.md` stayed out of the archive | `inline-ai-authoring.md` |
 | 2026-07-26 | The tool route's gate order is fixed: **503 → 404 → mutating 403 → 422 → 200**, and **a draft carrying findings is a 200, not an error** | shipped |
 | 2026-07-27 | Containment **is the request shape**: exactly one non-mutating tool is offered, the merge is **schema-keyed and never a blind copy**, and the **pane's own arguments are applied last and win** | shipped |
 | 2026-07-27 | The repair loop is capped at **three turns**, then hands over the **fewest-findings** draft — the cap is a hand-over, not a failure | answered |
@@ -367,7 +369,7 @@ what it promises is absence.
 | 2026-07-21 | AGT-5 **P1–P5 complete**, plus P4 polish (a second pilot class and a periodic state watch) | `embedded-intelligence.md` |
 | 2026-07-22 | `kpi_report_builder` shipped, completing the P2 authoring tier | `embedded-intelligence.md` |
 | 2026-07-25 | The parent embedded-intelligence plan **archived**; remaining items declared **deliberate deferrals, not gaps** | `embedded-intelligence.md` §Still open |
-| 2026-07-25 | **AGT-6a scoped** — inline authoring must reuse the shipped draft tools and add **no new backend capability** | live plan `superpower/agt-6-plan.md` §3 |
+| 2026-07-25 | **AGT-6a scoped** — inline authoring must reuse the shipped draft tools and add **no new backend capability** | live plan `archived-documents/plans-archive/agt-6-plan.md` §3 |
 | 2026-07-26 | **A1 shipped — deterministic single-tool dispatch (`runTool`)**: a named tool is invoked directly rather than composed by the model | `embedded-intelligence.md` §AGT-6a A1 |
 | 2026-07-28 | The `projection_author` "stale `columns.items`" half fixed, retiring that clause of the AGT-6a host row | `BACKLOG.md` §3 |
 | 2026-08-01 | The run-claim hand-off seam moved to `PipelineRunGuard`; **never investigate inline** | `embedded-intelligence.md`; `OPS` §3.1 |
@@ -383,9 +385,8 @@ what it promises is absence.
 | Item | Row |
 |---|---|
 | **`EOI-7b`** — publish the upstream artifacts to a registry; closes when continuous integration no longer clones and builds the upstream from source | §2, checkable in one grep |
-| **`AGT-6b`** multi-step agent graphs — first cut must generalise the seeded runbook actions, ⛔ never free-form reasoning over mutating tools. Its gate was re-run 2026-09-08 and holds on its second precondition | §2 |
+| **`AGT-6b`** multi-step agent graphs — first cut must generalise the seeded runbook actions, ⛔ never free-form reasoning over mutating tools. Its gate was re-run 2026-09-08 and holds on its second precondition. ✅ **No new operator surface is required**: the plan appears in the existing `/approvals` inbox as a resolved step list with per-step previews, and `/autonomy` already records what/why/spend — a scoping fact that was only in the archived plan §5 | §2 |
 | **`AGT-5` per-tool dry-run seam** — gate discharged 2026-09-08, now actionable: let the framework populate the approval preview | §3 P2 |
-| **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption | §3 P2 |
 | **AI drafting has no applicable component kind** — restoring inline draft for a kind needs a backend `ConfigSpec` that none of `grammar`/`transform`/`sink` has | §3 P3 |
 | **`AGT-6a` tool `args` runtime validation** — declined in favour of a contract test; revisit when the belt is bigger | §6 |
 | **`AGT-5` embedding recall** — parked; the Case store is a 256-cap ring | §6 |

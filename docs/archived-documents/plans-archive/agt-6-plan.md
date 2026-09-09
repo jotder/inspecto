@@ -1,3 +1,24 @@
+> ⛔ **ARCHIVED 2026-09-09 — provenance only. Do NOT read this for current behaviour.**
+> Read [`okf/frontend/features/inline-ai-authoring.md`](../../okf/frontend/features/inline-ai-authoring.md)
+> (A1–A5 as-built), [`okf/capabilities/assistant/assistant.md`](../../okf/capabilities/assistant/assistant.md)
+> (the decisions) and [`okf/backend/agent/embedded-intelligence.md`](../../okf/backend/agent/embedded-intelligence.md)
+> (the backend seams) instead.
+>
+> 🔴 **Why this sat here for 43 days after it was archivable.** The header below says what keeps this
+> plan out of the archive is the `kpi_report_builder` host + AGT-6b + one cosmetic audit defect. **Two of
+> those three were discharged on 2026-07-28**, one day after the last edit: the host shipped as `3750a87b`
+> — as an **adoption**, inverting this plan's own premise that it needed a new surface — and the
+> `projection_author` defect was fixed the same day. Only AGT-6b remained, and that is a board row gated
+> upstream, not work in flight. ⚠ The lesson is not about this plan: **a plan's stated reason to stay is a
+> hypothesis, and nobody re-grounded it.** `BACKLOG.md` even carried "this row is what keeps
+> `superpower/agt-6-plan.md` out of the archive" against a row that no longer had any work in it.
+>
+> ⚠ **What in here is NOT distilled, deliberately:** §2's commercial framing is an unvalidated product
+> read. Its load-bearing parts (the tier packaging, the wedge argument, the SHADOW-first on-ramp, the
+> anti-positioning sentence) are now in `stakeholders/PRODUCT_CAPABILITIES.md` **with the caveat attached**,
+> and the client-segment question that would firm it up is `AGT-SEGMENT-1` on the board. Everything else
+> here is either distilled or superseded.
+
 # AGT-6 Plan — Inline AI Authoring & Agent Graphs
 
 > ## ⚠️ AS-BUILT UPDATE — 2026-07-26: A1–A4 SHIPPED, and three of this plan's premises were WRONG
