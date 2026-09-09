@@ -430,10 +430,46 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   dependency count **95 across 25 modules** generated against **94** in four prose sites; and the staged-jar
   set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
   was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
-  artifact exists.** → the owning specs' §2 tables, which now carry the measured number.
+  artifact exists.**
+  ✅ **CLASS CLOSED 2026-09-09 for every count a contract owns** — `tools/check-doc-counts.mjs`, wired
+  into `ci.yml` + `.githooks/pre-push`, falsified in four directions. Twenty statements across eleven
+  documents now carry a `<!--count:ID-->` marker and are **derived** from the owning contract at run
+  time: processors **119** (8 sites), step types **16** (5), node types **30** (3, from the
+  `BuiltinNodeType` enum — no contract owns the roster), SQL mapping functions **23** (2), processor
+  families **8**, and node types carrying an attribute spec **11**.
+  🔴 **The ambiguity was the root cause, not the arithmetic.** "Node types" denoted THREE sets — 30 in
+  the enum, 11 in `node-attributes.contract.json`, 16 in `step-types.contract.json` — so a single
+  number could not be right; that distinction is now stated in `pipeline-editor.md`. Likewise
+  "transform functions" denotes two unrelated registries (23 SQL mapping vs 30 ASN vendor), which is
+  why the marker id is `sql-mapping-functions` and not the noun.
+  ⛔ **`job types` and `maintenance tasks` are deliberately NOT guarded**, and this is a measurement
+  result: both are assembled from a built-in list plus `ServiceLoader` discovery, so both totals are
+  **edition-dependent** (job types 10 on Personal, 12 with `inspecto-ops`; maintenance 20 built-in ids
+  across 19 switch arms plus 4 contributed). "The count" does not exist until the classpath is fixed,
+  so a guard asserting one number would assert a falsehood in the name of ending wrong counts. A doc
+  stating either must say which shape it means — a writing rule, not something a guard can settle.
+  ⚠ Still hand-typed and unguarded, for want of a generated artifact: parser frontends (six ways), the
+  dependency count, and the staged-jar set. → `tools/check-doc-counts.mjs` · the owning specs' §2
+  tables, which carry the measured number.
+- **P3** · **`CONTRACT-ORPHAN-1` — `bind-kinds.contract.json` has no producer and no consumer.**
+  Found 2026-09-09 while grounding `SPEC-COUNTS-1`: seven of the eight files under
+  `inspecto-ui/src/app/inspecto/contracts/` are verified against their generator by a contract test
+  (`ProcessorCatalogContractTest`, `NodeAttributesContractTest`, `StepTypesContractTest`,
+  `MeasureGrammarContractTest`, `ExpressionGuardContractTest`, and two `*.contract.spec.ts`).
+  `bind-kinds.contract.json` is verified by **nothing**, and **nothing reads it either** — a repo-wide
+  search finds no Java, TypeScript or test reference; the only hits are stale `graphify-out` manifests
+  from when it lived under `inspecto/mock/`, deleted with the offline mock backend. Its content
+  (`categories` SOURCE/PARSE/TRANSFORM/SINK/CONTROL, `bindableCategories` = PARSE, a 4-entry
+  `derivedUse` map) duplicates knowledge that lives in `NodeCategory` and the grammar-binding rules.
+  ⚠ This is the purest form of the *first* failure class — a committed generated artifact unverified
+  by its producer — and it survived the sweep that closed the rest because it has no consumer to
+  notice. ⛔ Decide before deleting: is it a stale copy (delete), or a contract whose consumer was
+  removed with the mock backend and should be re-derived from `NodeCategory` (add the test)? Not
+  deleted unilaterally — dead code here has been a deliberate RETAIN before (`MOCK-DEAD-COMPUTE-1`).
+  → `okf/capabilities/tooling/tooling.md` §5 · `inspecto-ui/src/app/inspecto/contracts/`
 - **P3** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
   `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
-  vendor-transform plugin registers ~40 legacy functions through a real seam and **reaches no bundle and no
+  vendor-transform plugin registers **30** legacy functions through a real seam (🔴 this said "~40" until 2026-09-09; counted from `LegacyVendorFunctions`' 30 `f.put(` registrations — ⚠ and note this is a DIFFERENT set from the 23 SQL mapping functions, which is why `check-doc-counts.mjs` names its id `sql-mapping-functions` rather than the ambiguous noun) and **reaches no bundle and no
   document**; `AssistDialog` is dead code whose doc comment describes an unwired flow. Each needs a
   keep-or-delete verdict, not a build. ⛔ Demand-gated: do not "tidy" them without one, because at
   least one (the vendor plugin) may be deliberately operator-side.

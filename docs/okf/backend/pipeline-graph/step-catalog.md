@@ -16,7 +16,7 @@ describe the chain, and this page is the one place both are laid out side by sid
    (`step-types.contract.json`, served as `GET /pipelines/step-types`). Each has a recipe **verb**
    (what the Recipe view and `steps[]` chain call it) and a **node type** (what the graph, the flat
    file and the palette call it). Part A documents every one.
-2. **Step Processors** — the 119-entry product taxonomy the palette lists in eight families
+2. **Step Processors** — the 119<!--count:processors-->-entry product taxonomy the palette lists in eight families
    (`processor-catalog.contract.json`, `ProcessorCatalog.java`, served as
    `GET /pipelines/processor-catalog`). A processor is a *label* over a Step kind or an engine
    capability, never a Java class of its own ([catalog-vs-executors](../engine/catalog-vs-executors.md)).
@@ -331,7 +331,7 @@ but execute only when a `route:` pairs them.
 
 # Part B — the Step Processor catalog (the palette's taxonomy)
 
-The palette lists **119** processors in eight families. A **delivered** processor is a label over a
+The palette lists **119**<!--count:processors--> processors in eight families. A **delivered** processor is a label over a
 Step kind or an engine capability that ships today; the *Maps to* column says which. A **partial**
 processor has something real behind it, but not as a chain Step or not the whole promise — the
 *What exists today* column is the honest boundary. A **planned** processor renders inactive in the

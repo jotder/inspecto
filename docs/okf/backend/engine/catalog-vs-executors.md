@@ -9,7 +9,7 @@ timestamp: 2026-09-04T00:00:00Z
 
 # Step Processor catalog vs. real node executors
 
-The [Step Processor catalog](../../frontend/features/pipeline-editor.md) (119 entries, 8 families,
+The [Step Processor catalog](../../frontend/features/pipeline-editor.md) (119<!--count:processors--> entries, 8<!--count:processor-families--> families,
 `ProcessorCatalog.java`) is a **taxonomy/palette layer**, not a 1:1 map to engine code. Five catalog entries
 that read like a "Mapping and Transformer" family — spanning the `DQ` and `XFM` families — all resolve to
 three [node types](node-types.md): `transform.map` (2), `transform.sql` (2 — repointed 2026-09-04 when the

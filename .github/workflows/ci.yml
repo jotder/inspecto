@@ -104,6 +104,27 @@ jobs:
       - name: Guard — every cited path and type name exists
         run: node tools/check-doc-citations.mjs
 
+      # Doc-count guard (2026-09-09, SPEC-COUNTS-1). Six product counts were each stated several
+      # ways — node types five ways, maintenance tasks five, job types four, processors three,
+      # transform functions three — and in every case the narrative doc was wrong and the generated
+      # one was right. The consolidation repaired the instances; nothing held them, because each
+      # number is restated by hand in two to eight current documents. This guard makes every marked
+      # statement DERIVED from the committed contract that owns it, parsed at run time.
+      # 🔴 It is deliberately NOT a prose scanner. That design was built as a census first and
+      # measured: over 238 current docs it matched 14 lines, whose "failures" were a line reference
+      # (Roles.java:121-131), a sentence about one specific node type, and correction notes naming
+      # the old figure on purpose — while MISSING real phrasings like "the 119-entry catalog". A
+      # number in prose is indistinguishable from a line number or a version, so that guard would be
+      # mostly exemption, the shape this repo has recorded as a failure three times over.
+      # Job types and maintenance tasks are excluded on purpose: their totals are EDITION-dependent
+      # (10 vs 12; 20 built-in + 4 contributed), so asserting one number would assert a falsehood.
+      # Falsified in four directions before wiring: a hand-edited doc number failed with its
+      # file:line; ADDING a processor to the contract failed all six statements at once; deleting a
+      # marker failed the scope floor; a typo'd id failed as unknown. ⚠ The floors are set EQUAL to
+      # the marked counts — the first version left slack and a deleted marker went green.
+      - name: Guard — every stated product count is derived from its contract
+        run: node tools/check-doc-counts.mjs
+
       # SBOM module-set guard (2026-09-09). tools/sbom.mjs built its first-party table from FOUR artifacts
       # under a comment claiming it was "the SAME table package.ps1 stages from". It was not, and had not
       # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Enterprise, so every shipped

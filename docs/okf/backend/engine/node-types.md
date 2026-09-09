@@ -163,7 +163,7 @@ over a DuckDB relation, so they operate on the previous node's output metadata, 
   same-batch Steps depend on. **It is a change of execution moment, not a rename.**
 
 ⚠ **The fold has already happened where it safely could — at the authoring layer.**
-`PipelineProjection.RECIPE_VERBS` offers **16 entries over 9 verbs** — `collect · parse` (one entry per
+`PipelineProjection.RECIPE_VERBS` offers **16<!--count:step-types--> entries over 9 verbs** — `collect · parse` (one entry per
 FORMAT, seven of them) `· dedup · transform→filter · transform→join · sql · lookup · summarize · route ·
 sink`. ⛔ There is **no `map` verb**: `transform.map` was deleted 2026-09-05. `select`, `derive`, `split`, `merge`, `validate` and
 `dedup.marker` are **not offered**, and one verb (`transform`) already covers two types. What is

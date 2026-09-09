@@ -118,7 +118,7 @@ widens the dock to 420px (`InspectoSplitDirective.ensureAtLeast` — never persi
 (`GET /pipelines/processor-catalog`, `ProcessorCatalog` in `inspecto-engine`, pinned by
 `processor-catalog.contract.json`): eight families (Collectors & Ingestion · Extraction & Format Parsers ·
 Data Quality · Transformers & Dimensional Modeling · Analytics/Time-Series · Enrichment & AI/ML · Control &
-Governance · Sinks), **119** processors, **every one visible** *(⚠ this said 121 until 2026-09-09; `processor-catalog.contract.json` carries 119 — 34 delivered / 18 partial / 67 planned)*. A processor whose `addable` flag is true (it maps
+Governance · Sinks), **119**<!--count:processors--> processors, **every one visible** *(⚠ this said 121 until 2026-09-09; `processor-catalog.contract.json` carries 119 — 34 delivered / 18 partial / 67 planned)*. A processor whose `addable` flag is true (it maps
 onto an authorable node type) is an ordinary add/drag entry for THAT node type; a planned processor, or a
 capability that is not a Step (a Collector guarantee, a job type, a Studio surface), renders **inactive** —
 `role=button aria-disabled`, tooltip and accessible name carrying why, a `soon` / `via <capability>` chip —
@@ -193,6 +193,7 @@ closing D1–D9 (full history: `NodeConfigNameContractTest` docblock and git his
 - **A served empty array ≠ absent**: empty = the server says the type has no schema (honoured, never
   re-enables the client table); absent = catalog not yet answered (`??`).
 - 🔴 **The Step vocabulary feeds TWO committed contracts**:
+  ⚠ **It covers 11<!--count:node-types-with-attributes--> of the 30<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster, this contract is the subset with attributes, and `step-types.contract.json` holds 16<!--count:step-types--> recipe entries. Three different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
   `inspecto/contracts/node-attributes.contract.json` (`NodeAttributesContractTest` +
   `node-attributes.spec.ts`) AND `inspecto/contracts/step-types.contract.json`
   (`StepTypesContractTest`). Regen flags `-Dnode.attributes.write=true` / `-Dstep.types.write=true`

@@ -91,7 +91,7 @@ Every count in this area is stated two or more ways, and the pattern from the au
 | Job types | **10 core + 2 from the operations module = 12** | the glossary says 4 in its binding entry and 9 in its own rename table; the jobs concept page says 4, naming a deprecated enum; the board lists 10 — but a *different* 10, omitting alert evaluation and the sample, and including the two module ones |
 | Maintenance tasks | **19 built-in + 4 contributed = 23** | the requirement says 4; the board says 16; the jobs page says 13 + 3; **the served descriptor says 16** |
 | Trigger vocabulary | **two models** — pipeline: interval, cron, event (`commit`/`dataset`), manual, default-poll, with coalescing and no catch-up; job: cron, on-pipeline, on-signal + guard, manual, with catch-up | the binding glossary entry lists 4 and **omits on-signal entirely** while counting one mechanism twice; the active plan says 3; the jobs page says 4; the board and the boundary page say 5 |
-| Built-in node types | **30** | an execution page says 29 — a *fifth* wrong count of this one, which the authoring spec did not catch |
+| Built-in node types | **30**<!--count:node-types--> | an execution page says 29 — a *fifth* wrong count of this one, which the authoring spec did not catch |
 | Lanes | the declared owner says **five**; three other pages say **two**, three different ways | and the owner's own table **omits the post-sync lane** that another page calls one of two |
 
 🔴 **The served maintenance descriptor is wrong in both directions at once, and it drives the UI.** The

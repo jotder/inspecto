@@ -46,7 +46,7 @@ There is also a **third, utility-only reader family** outside both authorities: 
 
 History: 18 parser-only when the ratchet landed (2026-08-31); 17 after `output_store` was declared the
 same day (gap 8); **16** after CONSIGNMENT-HOME-1 declared `collector.consignment.max_files`
-(2026-09-02), which took `collector` off the list. The 16 current entries are exactly
+(2026-09-02), which took `collector` off the list. The 16<!--count:step-types--> current entries are exactly
 `UNDECLARED_BLOCKS`.
 
 ⚠ **Granularity is the block, deliberately.** Leaf drift *inside* a declared block is not covered —

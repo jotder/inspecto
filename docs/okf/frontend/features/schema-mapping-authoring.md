@@ -48,7 +48,7 @@ catalog and by persisting `fields[]`.
   template, params}`; `SqlFunctionParam = {name, label, type, default, options, optional}` where `type`
   drives BOTH the rendered control and the escaping: `column` → quoted identifier, `text` → single-quoted
   literal with quotes doubled, `number` → validated then verbatim, `enum` → one of `options` verbatim,
-  `sql` → verbatim (the deliberate escape hatch, `custom` only). **23** functions *(corrected 2026-09-09 — this file said both “~20” here and “24” below)* across Keep · Text ·
+  `sql` → verbatim (the deliberate escape hatch, `custom` only). **23**<!--count:sql-mapping-functions--> functions *(corrected 2026-09-09 — this file said both “~20” here and “24” below)* across Keep · Text ·
   Numbers · Dates · Logic · Convert · Custom. A row's source column binds to the template's `{source}`
   automatically — that IS the operator's "auto map parameters against sql functions".
   ⚠ **Every conversion is `TRY_CAST`, never bare `CAST`, and division guards with `NULLIF`** — a
@@ -241,7 +241,7 @@ catalog and by persisting `fields[]`.
 > ⚠ **Superseded 2026-09-04/05 by §0 — the three bullets below described the pre-redesign state.**
 
 - **An expression-building surface DOES exist** — the Transform pane's function picker per row over
-  `SQL_FUNCTIONS` (**23** functions in 7 categories — corrected 2026-09-09), with a form control per declared parameter and
+  `SQL_FUNCTIONS` (**23**<!--count:sql-mapping-functions--> functions in 7 categories — corrected 2026-09-09), with a form control per declared parameter and
   "Try it on the sample" (§0).
 - **CodeMirror has THREE hosts**, not two: the SQL query workbench (`inspecto/data-table/sql/`), the
   enrichment editor (`inspecto/enrichment/enrichment-editor.component.ts`) and **the Transform pane's SQL
@@ -365,7 +365,7 @@ separate caption saying so.
 🔴 **What prompted them: the mockup's sample was chosen to flatter the design.** Both boards were drawn
 over a 7-column orders CSV, where "one row per field" reads as clarity. This product's real feeds are not
 that shape — ASN.1, fixed-width and network sources routinely carry hundreds of fields — and at 600 the
-same table is a wall. The evidence was already in the repo (the parser lanes, the **119**-processor catalog — corrected 2026-09-09)
+same table is a wall. The evidence was already in the repo (the parser lanes, the **119**<!--count:processors-->-processor catalog — corrected 2026-09-09)
 and was not applied. Both mockup boards now carry 65 columns instead of 7.
 
 ### D8 — Parse does NOT drop columns; Transform owns exclusion

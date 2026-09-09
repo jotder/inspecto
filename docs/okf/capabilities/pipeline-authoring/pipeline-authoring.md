@@ -85,9 +85,9 @@ authoring document is the wrong one.** Measured from code and the committed cont
 
 | Fact | Measured | What the docs say |
 |---|---|---|
-| Built-in node types | **30** | 20 in the glossary (and its list predates the per-format parsers), 28 in the active plan, 20 in the editor page |
-| Recipe catalogue | **16 entries over 9 verbs**, and **no `map` verb** | the active plan says 9 entries and includes `map`, a verb deleted 2026-09-05 |
-| Step processors | **119 — 34 delivered, 18 partial, 67 planned** | the editor page and the mapping page both say 121; the board and the Step catalog say 119 |
+| Built-in node types | **30**<!--count:node-types--> | 20 in the glossary (and its list predates the per-format parsers), 28 in the active plan, 20 in the editor page |
+| Recipe catalogue | **16<!--count:step-types--> entries over 9 verbs**, and **no `map` verb** | the active plan says 9 entries and includes `map`, a verb deleted 2026-09-05 |
+| Step processors | **119<!--count:processors--> — 34 delivered, 18 partial, 67 planned** | ✅ all agree since 2026-09-09 — the editor and mapping pages said 121 and were corrected; ⚠ this cell still read "both say 121" until 2026-09-09. Now derived: `tools/check-doc-counts.mjs` |
 | Transform function catalogue | **23 in 7 categories** | the editor page says 24; the mapping page says both "~20" and "24", in one file |
 | Live "too many of a kind" refusals | **2** — one for a second parser, one for a conflicting map config | two documents cite refusals for a second join and a second sink; **neither constant exists** |
 
@@ -515,11 +515,11 @@ of those citations is wrong (§5.2 item 9).
 | The authored map keys | `PipelineEditable.MAP_AUTHORED` (3 keys) | ✅ Client mirror pinned to it by `MapNodeKeyContractTest` (2026-09-09) |
 | Live refusal codes | `PipelineEditable` constants | ⚠ Two docs cite two that do not exist |
 | Graph validation | `PipelineValidator` | 🔴 Unknown type is a WARNING (§2.1) |
-| The Recipe layer | `RecipeCompiler` (16 entries, 9 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); no guard call (§3.5) |
+| The Recipe layer | `RecipeCompiler` (16<!--count:step-types--> entries, 9 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); no guard call (§3.5) |
 | The transform guard | `SqlGuard` — 10 call sites | 🔴 **Zero on any save path** |
 | The legacy read bridge | `DataTransformer.recordFields` | — |
 | The function catalogue | `sql-functions.ts` (23 in 7 categories) | ⚠ Counted 24 and ~20 in docs |
-| The processor catalogue | `processor-catalog.contract.json` (119 = 34/18/67) | ⚠ Counted 121 in two docs |
+| The processor catalogue | `processor-catalog.contract.json` (119<!--count:processors--> = 34/18/67) | ✅ The two docs that counted 121 were corrected 2026-09-09; every statement of this number is now derived from the contract by `tools/check-doc-counts.mjs` |
 | The editor shell | `PipelineEditorComponent` + its template chain | ⚠ Dispatch is hard-coded, not a registry |
 | The palette | `PipelinePaletteComponent` + two served routes | 🔴 Host error arm unspecced |
 | The transform pane | `PipelineTransformSqlDefinitionComponent` + the reconciler | — |
