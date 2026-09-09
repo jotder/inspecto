@@ -82,7 +82,7 @@ that is not `local` needs a saved Connection profile.
 recursion, gap detection) · `05-acquisition/*` and `06-serve/{sequence-gap,checksum-change,
 incremental-watermark}` for the duplicate and gap policies.
 
-## `parse` → the seven `parser.*` frontends
+## `parse` → the **7**<!--count:parser-node-types--> `parser.*` frontends
 
 **Function.** Turns a landed file into typed rows named by the schema's `raw.fields[]`
 (`selector` = position, header name, JSON key, capture group or dotted record path, depending on the

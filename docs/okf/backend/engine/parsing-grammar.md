@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Parsing & Grammar
-description: Three parse frontends over one DuckDB backend; CSV knobs, delimited grammar files, plugin ingesters.
+description: Three parse mechanisms over one DuckDB backend; CSV knobs, delimited grammar files, plugin ingesters.
 resource: inspecto-etl/src/main/java/com/gamma/etl/DuckDbCsvIngester.java
 tags: [engine, parsing, grammar, csv, plugin]
 timestamp: 2026-06-28T00:00:00Z
@@ -9,7 +9,8 @@ timestamp: 2026-06-28T00:00:00Z
 
 # Parsing & Grammar
 
-**Three frontends, one backend.** All formats converge on the same DuckDB backend (mapping + transform +
+**Three frontend mechanisms, one backend.** (⚠ The config's `frontend:` *token* set is finer — one per
+format; see [ingestion.md](../../capabilities/ingestion/ingestion.md) §3.3.) All formats converge on the same DuckDB backend (mapping + transform +
 partition + lineage). The frontends:
 
 1. DuckDB-native `read_csv` — delimited files, SQL*Plus dumps.

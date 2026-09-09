@@ -37,7 +37,7 @@ cannot — and that **a failed Consignment leaves no trace of having been proces
 **In scope:** the poll cycle's ingest half (`CollectorProcessor.ingest`, `MultiCollectorProcessor`),
 `ConsignmentPlanner` and `collector.consignment`; `ConsignmentIngestor`, the two `ConsignmentIngestStrategy`
 implementations, union and generation modes, the crash-safe commit order (`CommitLog`, `MarkerManager`,
-`PartitionWriter` staging and reveal); the `parsing:` block and its ten frontend tokens; `ParserPlugin` and
+`PartitionWriter` staging and reveal); the `parsing:` block and its **10**<!--count:parsing-frontend-tokens--> frontend tokens; `ParserPlugin` and
 `Parsers`; `StreamingFileIngester` / `RecordSink` / `DuckDbRecordSink` (the wrap-SPI); the delimited, fixed-width,
 JSON, text/regex, XLSX, Parquet, ASN.1 and XML lanes; Grammars, Grammar Templates and the `grammar` kind; the
 Unpack stage, its caps, verdicts and ledger; schema casting, cast-failure measurement, quarantine reasons and
@@ -71,9 +71,9 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 
-- **`ING-2` names three frontends; `PipelineConfigParser.FRONTENDS` (`:1590-1591`) accepts ten tokens for
+- **`ING-2` names three frontends; `PipelineConfigParser.FRONTENDS` (`:1590-1591`) accepts **10**<!--count:parsing-frontend-tokens--> tokens for
   eight formats** — `delimited`, `fixedwidth`/`fixed_width`, `json`, `text_regex`, `xlsx`/`excel`, `parquet`,
-  `asn1`, `plugin` — and `BuiltinParsers.IDS` (`:29`) serves six DuckDB-native built-ins including **`parquet`**,
+  `asn1`, `plugin` — and `BuiltinParsers.IDS` (`:29`) serves **6**<!--count:builtin-parsers--> DuckDB-native built-ins including **`parquet`**,
   which appears on **no** board row, no `step-catalog.md` row and no `EDITIONS.md` `SP-PRS-*` row. The
   documentation states the count as three, five, six, seven and ten in six places; the code says ten tokens,
   eight formats, six built-ins.
@@ -371,7 +371,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 |---|---|---|
 | **Expectations have no UI** | zero "expectation" hits under `inspecto-ui/src/app`; routes exist | `ING-6` is a Must reachable only by `curl`; the `<inspecto-query-panel>` it was meant to reuse exists |
 | **`parquet` is a built-in frontend on no board** | `BuiltinParsers.IDS`; `FRONTENDS` | shipped, untested-as-a-row, invisible to `EDITIONS.md` and `step-catalog.md` |
-| **The frontend count is stated six ways** (3 / 5 / 6 / 7 / 9 / 10) across five pages and the user guide | §2 | the truth is ten tokens, eight formats, six built-ins — recorded here once |
+| **The frontend count is stated six ways** (3 / 5 / 6 / 7 / 9 / 10) across five pages and the user guide | §2 | FOUR sets share one noun: **10**<!--count:parsing-frontend-tokens--> `parsing.frontend` tokens (eight formats once the two aliases fold), **6**<!--count:builtin-parsers--> DuckDB-native built-ins, **7**<!--count:parser-node-types--> `parser.*` node types, and three byte→row *mechanisms* (a prose taxonomy, not a count in code). The three derivable sets are marked and derived by `tools/check-doc-counts.mjs` (2026-09-09); the mechanism sense is written as *mechanisms*, never *frontends* |
 | **`Segment` has no glossary entry** | `GLOSSARY.md` | the load-bearing plugin-ingest word is undefined in the binding vocabulary |
 | **`ingestable` is a display flag with a stale reading in `onboarding.md`** ("XML today") | `parser-plugins.md` vs `onboarding.md:210-212` | corrected with this spec |
 | **The "Batch" names survive in `transforms-seams.md`, `duckdb.md`, `FEATURE_INVENTORY.md`** | `ConsignmentIngestStrategy`, `CsvIngestStrategy` | 8 days after the rename; corrected in the seams page with this spec, the rest are a sweep |

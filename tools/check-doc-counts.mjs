@@ -90,7 +90,56 @@ const MANIFEST = {
             .filter(k => !k.startsWith('_')).length,
         source: `${CONTRACTS}/node-attributes.contract.json`,
     },
+    // ── "parser frontends" — the loudest instance of the class: stated as 3 / 5 / 6 / 7 / 9 / 10.
+    // ⚠ Not one wrong number: FOUR sets sharing one noun. Each derivable set gets its own id; the one
+    // that is a prose taxonomy (the three byte→row MECHANISMS: DuckDB-native read, read_text + SQL,
+    // the StreamingFileIngester plugin) has no owner in code and is deliberately not here.
+    // "Eight formats" (= the ten tokens minus two aliases) is not derivable either: the aliases live in
+    // two `equals` calls, not a structure, so a guard would have to mirror them — write "ten tokens"
+    // with the marker and let the prose bound "eight" to it.
+    'parsing-frontend-tokens': {
+        floor: 5,
+        what: 'parsing.frontend tokens accepted at config load (aliases counted: fixed_width, excel)',
+        derive: () => javaSetOf('inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java',
+            'FRONTENDS'),
+        source: 'inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java',
+    },
+    'builtin-parsers': {
+        floor: 3,
+        what: 'DuckDB-native built-in parsers served by GET /parsers (NOT the plugin ids, NOT the tokens)',
+        derive: () => javaSetOf('inspecto-engine/src/main/java/com/gamma/parse/BuiltinParsers.java', 'IDS'),
+        source: 'inspecto-engine/src/main/java/com/gamma/parse/BuiltinParsers.java',
+    },
+    'parser-node-types': {
+        floor: 4,
+        what: 'parser.* node types in the step catalog (bare `parser` excluded)',
+        derive: () => json(`${CONTRACTS}/step-types.contract.json`)
+            .filter(e => String(e.type).startsWith('parser.')).length,
+        source: `${CONTRACTS}/step-types.contract.json`,
+    },
+    // A FIFTH set, found while placing the markers above: the frontends the UI ships its OWN schema-form
+    // specs for (plugin parsers render the served `grammarSchema` instead). The union type is the owner;
+    // its neighbouring comment and `duckdb.md` both said "four" — stale since `xlsx` gained an arm.
+    'ui-specced-frontends': {
+        floor: 1,
+        what: 'built-in frontends the UI carries its own schema-form specs for (the ParsingFrontend union)',
+        derive: () => {
+            const src = read('inspecto-ui/src/app/inspecto/grammar/parsing-attributes.ts');
+            const m = src.match(/export type ParsingFrontend = ([^;]+);/);
+            if (!m) throw new Error('ParsingFrontend: union type not found — re-anchor this parse');
+            return (m[1].match(/'[a-z_]+'/g) || []).length;
+        },
+        source: 'inspecto-ui/src/app/inspecto/grammar/parsing-attributes.ts',
+    },
 };
+
+/** Count the string literals in a Java `Set.of("a", "b", …)` field. Re-anchor here if the field moves. */
+function javaSetOf(rel, field) {
+    const src = read(rel);
+    const m = src.match(new RegExp(`\\b${field}\\s*=\\s*Set\\.of\\(([^)]*)\\)`));
+    if (!m) throw new Error(`${field}: Set.of(...) literal not found — re-anchor this parse`);
+    return (m[1].match(/"[^"]+"/g) || []).length;
+}
 
 // ── DELIBERATELY NOT IN THE MANIFEST, and this is a measurement result rather than an omission ──
 // `job types` (12) and `maintenance tasks` (24) are two of the six counts SPEC-COUNTS-1 named, and

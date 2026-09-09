@@ -26,7 +26,8 @@ timestamp: 2026-07-16T00:00:00Z
 ## 1. The unifying model: a parser *frontend* feeding the DuckDB *backend*
 
 Every format you listed converges on the **same** typing/transform/partition backend. Only the
-**frontend** (how raw bytes become rows) changes. There are exactly three frontends:
+**frontend** (how raw bytes become rows) changes. There are exactly three frontend *mechanisms* (the
+config's `frontend:` tokens in §5 are a finer set — one token per format, several formats per mechanism):
 
 ```
                                          ┌──────────────────────────────────────────┐
@@ -229,7 +230,7 @@ with no `ingester` anywhere is refused (`:1129-1131`).
 
 ```yaml
 parsing:
-  frontend: delimited        # delimited | fixedwidth | json | text_regex | asn1 | plugin
+  frontend: delimited        # delimited | fixedwidth (fixed_width) | json | text_regex | xlsx (excel) | parquet | asn1 | plugin
   # ── shared options ──────────────────────────────────────────────────────────
   encoding: utf-8            # utf-8 | utf-16 | latin-1
   compression: auto          # auto | gzip | zstd | none
@@ -303,11 +304,12 @@ parsing:
       record_tag: "0xA1"
 ```
 
-**Mapping to reality:** all six frontends are **implemented**: `delimited` (= today's
+**Mapping to reality:** all **10**<!--count:parsing-frontend-tokens--> `parsing.frontend` tokens are **implemented**: `delimited` (= today's
 `csv_settings`), `plugin` (= `processing.ingester`/`segments`), `fixedwidth` (native
 `read_csv`+`substring`; binary via the shipped `com.gamma.ingester.FixedWidthRecordIngester`
 plugin — §6.3), `json` (`read_ndjson`/`read_json`, selectors = top-level JSON keys — §6.4), and
 `text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5),
+`xlsx`/`excel` (DuckDB `excel` extension, three-layer fail-closed load), `parquet` (native),
 and `asn1` (synthesized `Asn1RecordIngester` binding, grammar inline — P3c).
 `text_regex.record_split` is `[LIVE]` too (`blank_line` or any literal delimiter — shipped, see
 §6.6; verified in code 2026-08-28). `quote`/`escape`/`comment` are `[LIVE]`

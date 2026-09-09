@@ -279,7 +279,7 @@ in-motion/at-rest line stays an engine seam.
 Consignment out (+ rejects)*. **User surface** — ⚠ **`map` was DELETED 2026-09-05** (corrected 2026-09-09; the deletion is recorded further down this same section). `PipelineProjection.RECIPE_VERBS` serves **16 entries over 9 verbs** and has **no `map`**: `collect` · `parse`(×7) ·
 `dedup` · `transform` · `summarize` · `sink` — plus self-describing **plugin Steps** (`ConsignmentProcessor`
 SPI, declared grain `RECORD | FILE | BATCH`). ⛔ *Node* (user-facing) → **Step**. The **closed
-`BuiltinNodeType` vocabulary** (**30** ids — ⚠ this said 20 until 2026-09-09 and the list below predates the seven per-format parsers — served verbatim by `GET /pipelines/node-types`): the SOURCE pair
+`BuiltinNodeType` vocabulary** (**30** ids — ⚠ this said 20 until 2026-09-09 and the list below predates the **7**<!--count:parser-node-types--> per-format parsers — served verbatim by `GET /pipelines/node-types`): the SOURCE pair
 (`acquisition` / `adapter`), `parser`, the TRANSFORM family (`transform.*` + `enrichment`), the three
 `sink.*` kinds, and the CONTROL trio (`gap` / `alert` / `event`) — remains the **compile-target set** the
 verbs lower onto; it leaves the user surface at the amendment's Phase 5 but is still the served palette

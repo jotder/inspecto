@@ -4,7 +4,7 @@ import { timeZoneOptions } from 'app/inspecto/schema/time-zones';
 /**
  * The Parsing stage's frontend catalog + per-frontend schema-form specs, flat-keyed (`__` path
  * separator, see `onboarding-config-utils`) over the Stage-1 `parsing:` TOON block. Deliberately
- * only the FOUR **built-in** frontends. Plugin parsers are NOT specced here: their options form is the
+ * the **built-in** frontends named by `ParsingFrontend`. Plugin parsers are NOT specced here: their options form is the
  * SERVED `grammarSchema` from `GET /parsers` (`fieldSpecsToAttributes`), and since W2/U-E (2026-07-31) the
  * Parsing stage authors them — the old "TOON-managed, read-only" guard is gone (it had become a lockout;
  * see `parsing-pane.component`).

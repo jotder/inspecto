@@ -448,8 +448,14 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   across 19 switch arms plus 4 contributed). "The count" does not exist until the classpath is fixed,
   so a guard asserting one number would assert a falsehood in the name of ending wrong counts. A doc
   stating either must say which shape it means — a writing rule, not something a guard can settle.
-  ⚠ Still hand-typed and unguarded, for want of a generated artifact: parser frontends (six ways), the
-  dependency count, and the staged-jar set. → `tools/check-doc-counts.mjs` · the owning specs' §2
+  ✅ **Parser frontends CLOSED 2026-09-09** — the "six ways" were FOUR sets sharing one noun: **10**<!--count:parsing-frontend-tokens-->
+  `parsing.frontend` tokens (`PipelineConfigParser.FRONTENDS`), **6**<!--count:builtin-parsers--> DuckDB-native built-ins
+  (`BuiltinParsers.IDS`), **7**<!--count:parser-node-types--> `parser.*` node types (`step-types.contract.json`), and three
+  byte→row *mechanisms* — a prose taxonomy with no owner in code, so written as *mechanisms* and not guarded.
+  "Eight formats" (tokens minus two aliases) is not derivable without mirroring the alias pairs, so prose binds
+  it to the marked ten. → `okf/capabilities/ingestion/ingestion.md` §3.3 / §7.
+  ⚠ Still hand-typed and unguarded, for want of a generated artifact: the dependency count and the
+  staged-jar set. → `tools/check-doc-counts.mjs` · the owning specs' §2
   tables, which carry the measured number.
 - **P3** · **`CONTRACT-ORPHAN-1` — `bind-kinds.contract.json` has no producer and no consumer.**
   Found 2026-09-09 while grounding `SPEC-COUNTS-1`: seven of the eight files under

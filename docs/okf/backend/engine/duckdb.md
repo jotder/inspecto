@@ -192,7 +192,7 @@ time, so a value stops depending on which box processed it.
   header per column, so a schema giving *any* field a zone writes `""` for all the others — null-only
   checks would refuse every such schema at load.
 * **Surfaces** (`inspecto-ui`): a `source_timezone` select on the Grammar editor's **Types** tab across
-  all four frontends — parsing-level (no `delimited__` prefix, matching `encoding`/`compression`) and
+  all **5**<!--count:ui-specced-frontends--> UI-specced frontends — parsing-level (no `delimited__` prefix, matching `encoding`/`compression`) and
   with **no default** — plus a **Source zone** column in the columns table, rendered only on rows whose <!-- vocab-allow: "Source zone" is the shipped UI column label for a temporal ORIGIN zone, not the acquisition entity -->
   type carries an instant. One shared vocabulary in `inspecto/schema/time-zones.ts`; the offline mock
   mirrors the server's refusals on both the schema and the pipeline write.
