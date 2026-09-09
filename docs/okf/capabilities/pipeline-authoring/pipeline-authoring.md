@@ -114,8 +114,10 @@ The code comment beside the allow-list says why this matters:
 > failure both constants exist to make impossible
 
 This is not a harmless doc bug. **The reasoning that `fields` is inert is what produced the live drift**
-recorded in §5: the client mirror of the authored-key set carries two keys where the server carries three,
-and the missing one is `fields`. It is the fourth hand-mirrored map in this repository to drift.
+recorded in §5: the client mirror of the authored-key set carried two keys where the server carries three,
+and the missing one was `fields`. It was the fourth hand-mirrored map in this repository to drift, and
+✅ **it is fixed and pinned as of 2026-09-09** — `MapNodeKeyContractTest` parses `pipeline-editable.ts`
+and holds both sets against the Java ones, so the mirror cannot drift silently again.
 
 ## 3. Specification
 
@@ -386,8 +388,9 @@ migration to reach semantics that composition already provides.
   kind still targets the **retired** graph-shaped store.
 * **AI drafting has no applicable component kind** — three kinds have no backend spec, and no low-risk
   slice survives; design first.
-* **The client mirror of the authored-key set has drifted** — the fourth hand-mirrored map here to do so.
-  ⛔ Do not fix it by hand-editing the list a fifth time; pin it (§2.3).
+* ✅ ~~**The client mirror of the authored-key set has drifted**~~ — **FIXED + PINNED 2026-09-09.** It was
+  the fourth hand-mirrored map here to do so and the first to end up held by a test: the Java set is the
+  source of truth and `MapNodeKeyContractTest` parses the TypeScript to keep it there (§2.3).
 * **Two author-facing messages name things that do not exist** — one warns that only three Step kinds may
   run inside a branch when the code's own set also contains the transform-SQL kind.
 * **The open Step-kind registry** — gated, and it is what the retired closure was superseded *by* (§2.1).
@@ -503,7 +506,7 @@ of those citations is wrong (§5.2 item 9).
 | The at-rest projection | `PipelineLift.stageTwo` | Execution spec's |
 | Executor dispatch | `RowShaper.shape` in `com.gamma.pipeline.exec` | ⚠ Four docs cite the wrong package **and** wrong lines |
 | The executable map-node keys | `RowShaper.MAP_NODE_CONFIG_KEYS` | 🔴 Contradicted by the config-key reference (§2.3) |
-| The authored map keys | `PipelineEditable.MAP_AUTHORED` (3 keys) | 🔴 Client mirror carries 2 |
+| The authored map keys | `PipelineEditable.MAP_AUTHORED` (3 keys) | ✅ Client mirror pinned to it by `MapNodeKeyContractTest` (2026-09-09) |
 | Live refusal codes | `PipelineEditable` constants | ⚠ Two docs cite two that do not exist |
 | Graph validation | `PipelineValidator` | 🔴 Unknown type is a WARNING (§2.1) |
 | The Recipe layer | `RecipeCompiler` (16 entries, 9 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); no guard call (§3.5) |

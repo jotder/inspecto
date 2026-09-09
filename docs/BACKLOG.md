@@ -291,7 +291,21 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   phase. ⛔ Do not "fix" it by narrowing the scope filter: the failure is in **resolution**, which precedes
   filtering. Context: `docs/okf/capabilities/editions/editions.md` §5.3 item 1.
 
-- **P2** · **`MAP_AUTHORED` has drifted between its two homes — the FOURTH hand-mirrored map to do so.**
+- ✅ **`MAP_AUTHORED` drift FIXED + PINNED 2026-09-09** — it was the FOURTH hand-mirrored map here to
+  drift, and it is now the first to be held by a test rather than a fifth hand-edit.
+  `pipeline-editable.ts` carries `fields`, and `MapNodeKeyContractTest.theClientMirrorMatchesTheServerSets`
+  **parses that TypeScript file** and asserts both sets against the Java ones — the Java side is the source
+  of truth, so the mirror can no longer drift silently. Mutation-proven in both languages: removing
+  `fields` again fails exactly 1 of 4 Java tests naming the missing key, and exactly 1 of 74 UI tests
+  (`lowers an authored fields projection instead of refusing it`, exit 1). ⚠ There is no shared artifact to
+  compare against and inventing one for two short lists would cost more than it saves, so a cross-language
+  pin parses the other side's source — the same idiom `MapNodeKeyContractTest` already used on RowShaper.
+  🔴 **The live cost, now measured:** for four days the client REFUSED a key the server accepts (`lower`
+  reported `UNSUPPORTED_MAP_KEY` and advertised `[columns, rules]` as the accepted set) and dropped it on
+  the round trip — exactly the failure `MAP_AUTHORED`'s own Java comment says the constant exists to make
+  impossible, reproduced on the client because the list was a hand copy.
+
+  *The original row:* **`MAP_AUTHORED` has drifted between its two homes — the FOURTH hand-mirrored map to do so.**
   `pipeline-editable.ts:197` declares `['columns', 'rules']`; `PipelineEditable.java:89` declares
   `Set.of("columns", "rules", "fields")` — `fields` was added 2026-09-05 and the mirror was not. The TS
   comment at `:191` says outright that it "mirrors `PipelineEditable.MAP_AUTHORED`", and the client's job is

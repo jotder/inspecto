@@ -194,7 +194,13 @@ const isQuarantine = (n: AuthoredNode): boolean => !!n.config?.['dir'] && n.conf
  * Anything else on a map node refuses — the AUTHOR-1 lesson, that a key with no home must say so rather
  * than be answered `written: true` and dropped.
  */
-const MAP_AUTHORED = ['columns', 'rules'];
+// 🔴 `fields` was MISSING here until 2026-09-09. It joined the server's set on 2026-09-05 with the
+// Record Transformer projection and this mirror never followed, so for four days the client REFUSED a
+// key the server accepts (`lower` reported it unsupported and named `[columns, rules]` as the accepted
+// set) and DROPPED it on the round trip. That is the same failure PipelineEditable.MAP_AUTHORED's own
+// comment says both constants exist to make impossible — reproduced on the client because this list is
+// a hand copy. `MapNodeKeyContractTest` now parses THIS line and fails if the two sides diverge again.
+const MAP_AUTHORED = ['columns', 'rules', 'fields'];
 const MAP_DERIVED = ['schema', 'csv'];
 
 /** The four PRE-parse row-filter lists — regexes/prefixes over one raw column, anchored on

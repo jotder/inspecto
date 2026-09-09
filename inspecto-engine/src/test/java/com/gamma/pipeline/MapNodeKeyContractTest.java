@@ -32,6 +32,10 @@ class MapNodeKeyContractTest {
 
     private static final String ROW_SHAPER = "inspecto-engine/src/main/java/com/gamma/pipeline/exec/RowShaper.java";
 
+    /** The editor's hand-written mirror of both sets — see {@link #theClientMirrorMatchesTheServerSets()}. */
+    private static final String TS_EDITABLE =
+            "inspecto-ui/src/app/modules/admin/pipelines/pipeline-editable.ts";
+
     /**
      * The map-path region of RowShaper: {@code columnsOf} (the projection), {@code csvSettingsOf} and
      * {@code formatList} (the settings it compiles with), and {@code mappingSchemaOf} (the rules). It ends
@@ -76,6 +80,46 @@ class MapNodeKeyContractTest {
 
         assertEquals(new TreeSet<>(RowShaper.MAP_NODE_CONFIG_KEYS), read,
                 "MAP_NODE_CONFIG_KEYS must list exactly the node config keys the map path reads");
+    }
+
+    /**
+     * <b>The client mirror is a hand copy, and it drifted.</b> {@code pipeline-editable.ts} restates both
+     * sets so the editor can refuse an unhomed key without a round trip. Nothing connected the two, and
+     * on 2026-09-05 {@code fields} joined the server's set with the Record Transformer projection while
+     * the mirror stayed at two keys — so the client refused a key the server accepts and dropped it on the
+     * round trip, which is precisely what {@link PipelineEditable#MAP_AUTHORED}'s own comment says these
+     * constants exist to prevent.
+     *
+     * <p>⛔ This is the FOURTH hand-mirrored map in this repository to drift, so the fix is not a fifth
+     * hand-edit: the Java set is the source of truth and this test reads the TypeScript to hold it there.
+     * A cross-language pin has to parse the other side's source — there is no shared artifact to compare
+     * against, and inventing one for two short lists would cost more than it saves.
+     */
+    @Test
+    void theClientMirrorMatchesTheServerSets() throws IOException {
+        String ts = Files.readString(repoFile(TS_EDITABLE));
+
+        assertEquals(new TreeSet<>(PipelineEditable.MAP_AUTHORED), tsList(ts, "MAP_AUTHORED"),
+                "pipeline-editable.ts's MAP_AUTHORED must mirror PipelineEditable.MAP_AUTHORED — a key "
+                        + "the server lowers and the client refuses is unauthorable, and one the client "
+                        + "drops is silently lost on save");
+        assertEquals(new TreeSet<>(PipelineEditable.MAP_DERIVED), tsList(ts, "MAP_DERIVED"),
+                "pipeline-editable.ts's MAP_DERIVED must mirror PipelineEditable.MAP_DERIVED — a key the "
+                        + "server drops as lift-derived but the client refuses blocks a legitimate save");
+    }
+
+    /** The quoted members of a `const NAME = ['a', 'b'];` array literal in TypeScript source. */
+    private static Set<String> tsList(String source, String name) {
+        Matcher decl = Pattern.compile("const " + name + "\\s*=\\s*\\[([^\\]]*)\\]").matcher(source);
+        assertTrue(decl.find(),
+                "cannot find `const " + name + " = [...]` in " + TS_EDITABLE + " — it was renamed or "
+                        + "restructured, so re-anchor this parser rather than deleting the check; an "
+                        + "unparseable mirror must FAIL, never pass silently");
+        Set<String> members = new TreeSet<>();
+        Matcher quoted = Pattern.compile("'([^']+)'").matcher(decl.group(1));
+        while (quoted.find()) members.add(quoted.group(1));
+        assertTrue(!members.isEmpty(), name + " parsed as empty from " + TS_EDITABLE);
+        return members;
     }
 
     /** Walk up from the module's CWD to the repo root, so the path works under surefire and an IDE alike. */

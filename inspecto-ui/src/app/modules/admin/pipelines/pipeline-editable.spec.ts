@@ -871,6 +871,23 @@ describe('mock pipeline-editable — the authored map projection (processing.map
         expect(refusals[0].message).toContain('flavour');
     });
 
+    /**
+     * 🔴 `fields` was REFUSED here until 2026-09-09, and this is the regression test for the drift rather
+     * than for the key. `fields` joined the server's authored set on 2026-09-05 with the Record
+     * Transformer projection; this file's hand-written `MAP_AUTHORED` mirror stayed at two keys, so the
+     * client rejected a key the server lowers — unauthorable — and dropped it on the round trip. The two
+     * sides are now pinned together by `MapNodeKeyContractTest`, which parses this module's own source.
+     */
+    it('lowers an authored fields projection instead of refusing it', () => {
+        const fields = [{ name: 'id_upper', expr: 'UPPER(id)' }];
+        const g = saveable([{ id: 'map', type: 'transform.sql', config: { fields } }]);
+
+        const res = lowerGraph(g as never, {}, true);
+        expect('config' in res, `a server-supported key must not refuse: ${JSON.stringify(res)}`).toBe(true);
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
+        expect((processing['map'] as Record<string, unknown>)['fields']).toEqual(fields);
+    });
+
     it('refuses authored columns alongside a declared mapping_file', () => {
         const refusals = refusalsOf(
             saveable([{ id: 'map', type: 'transform.sql', config: { columns } }], { mapping_file: 'm.toon' }),

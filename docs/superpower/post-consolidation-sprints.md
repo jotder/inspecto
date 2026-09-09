@@ -144,7 +144,7 @@ paragraph hit the same trap on its first attempt, where the atomic write then sa
 **Goal:** the failure *classes* that produced most of the 215 stop being able to recur. Highest leverage
 sprint in the plan: one guard each, instead of N fixes.
 
-> ### Progress — the enabler is DONE 2026-09-09; the five table classes below are still open
+> ### Progress — the enabler and one of the five classes are DONE 2026-09-09
 >
 > **`SPEC-STALEREF-1`'s class is closed.** `tools/check-doc-citations.mjs` is committed and wired into
 > `ci.yml` + `.githooks/pre-push`, falsified in both directions. ⚠ **That family is not one of the five
@@ -163,11 +163,23 @@ sprint in the plan: one guard each, instead of N fixes.
 > allow rule reused by both checks: a citation is fine when the line records the history (names the
 > replacement, or states the absence). **Look for the self-stated invariant before writing any of the
 > five guards below; if a guard needs a waiver list to go green, it is measuring the wrong thing.**
+>
+> **Then the second row of the table, "a hand-mirrored map drifts", also closed** — and it validated that
+> rule. `MAP_AUTHORED` was live-broken: `pipeline-editable.ts` carried `['columns','rules']` against the
+> server's three, so for four days the editor **refused a key the server accepts** and dropped it on the
+> round trip, advertising the wrong accepted set in its own refusal message. The fix is the pin the plan
+> asked for and not a fifth hand-edit: the Java set is the source of truth and `MapNodeKeyContractTest`
+> parses the TypeScript to hold it there. ⚠ A cross-language pin has to read the other side's source —
+> there is no shared artifact for two short lists, and inventing one costs more than it saves.
+>
+> **Still open: three of the five** — the generated-artifact guard (the API contract covers 19 of ~332
+> routes), the count guard, and the served-descriptor derivation. The call-site-audit row was already
+> discharged for the transform guard in Sprint 1.
 
 | Class | Instances found | The one fix |
 |---|---|---|
 | **A generated artifact is authoritative to its consumer and unverified by its producer** | the bill of materials (fixed this week); the served API contract covers **19 of ~332** routes with a test that cannot see the gap | A guard per generated artifact holding it against its own source of truth — the pattern the peer session just established |
-| **A hand-mirrored map drifts** | four instances; the authored-key mirror is **live** today, carrying two keys where the server has three | Pin it verbatim, or derive one side. ⛔ Not a fifth hand-edit |
+| ✅ **A hand-mirrored map drifts** — **CLOSED 2026-09-09** | four instances; the live one carried two keys where the server had three | **DONE:** `pipeline-editable.ts` carries `fields`, and `MapNodeKeyContractTest` **parses that TypeScript** to hold both sets against the Java ones. Mutation-proven in both languages. Not a fifth hand-edit |
 | **A count is stated N ways** | node types **5** ways, maintenance tasks **5**, job types **4**, processors **3**, transform functions **3**, triggers **4** | Derive from the committed contract where one exists; where none does, one guard that counts. In every case the *narrative* doc was wrong and the *generated* one was right |
 | **A guard is absent from one call site** | the transform guard: ten call sites, zero on any save path | Audit the **call-site list**, not the rule list. Ask which paths a guard does *not* sit on |
 | **A served descriptor drifts from its own dispatch** | the maintenance descriptor (Sprint 1); the trigger vocabulary in the binding glossary | Derive the descriptor from the dispatch |
