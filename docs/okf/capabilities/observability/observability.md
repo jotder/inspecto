@@ -65,7 +65,7 @@ itself healthy** — without shell scripts, OS cron, or an external monitoring s
 
 ## 2. Requirements of record
 
-The board rows are `docs/REQUIREMENTS.md` §3.7 `OPS-1`…`OPS-6` plus the `EDITIONS.md` rows `OPS-01`…`OPS-08`,
+The board rows were `docs/REQUIREMENTS.md` §3.7 (that section was stripped to an index on 2026-09-09 — this file is their only home now) `OPS-1`…`OPS-6` plus the `EDITIONS.md` rows `OPS-01`…`OPS-08`,
 `JOB-03`, `CP-13`, `SEC-09`. Below, each row is restated as the requirement actually holds, with the
 correction the board needs. **Where a cell below says CORRECTION, the board was wrong on 2026-09-08 and
 has been amended in the same commit as this file.**

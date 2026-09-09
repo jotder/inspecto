@@ -56,7 +56,7 @@ UI's capability seam (`LensService`) and sign-in / sign-out flow.
 
 ## 2. Requirements of record
 
-Nine requirements in `REQUIREMENTS.md` §3.12, all recorded shipped; **two of them are not flat green when
+Nine requirements from `REQUIREMENTS.md` §3.12 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped; **two of them are not flat green when
 read against the build**, and one is spelled with a vendor name the product retired. ⚠ **`EDITIONS.md`'s
 feature × edition matrix is authoritative for the Edition column**; this table mirrors it.
 
@@ -68,7 +68,7 @@ feature × edition matrix is authoritative for the Edition column**; this table 
 | `SEC-4` | HTTPS via pure-JDK `HttpsServer` + keystore | Must (S) | ✅ SHIPPED — ⚠ **untested** (§8.7) | S/E |
 | `SEC-5` | BFF session: the refresh token never reaches the browser (httpOnly cookie, `SameSite=Strict`, `Origin` CSRF) | Must (S) | ✅ SHIPPED (W6d) | S/E |
 | `SEC-6` | UI OIDC login driven by `bootstrap.features.authMode`; Personal = no-op | Must (S) | ✅ SHIPPED (W6d/W7) — ⚠ the coupling is a launcher convention (§2 note 2) | S/E |
-| `SEC-7` | RBAC/ABAC hardening: reject `X-Actor` on Standard; per-resource `permissions[]`; `canTriageRequirements` route; data-scoped grants | Must (S) | ✅ SHIPPED (2026-07-07/08) — ⚠ `permissions[]` is **emitted and never read** (§3.13) | S/E |
+| `SEC-7` | RBAC/ABAC hardening: reject `X-Actor` on Standard; per-resource `permissions[]`; `canTriageRequirements` route; data-scoped grants | Must (S) | ✅ SHIPPED (2026-07-07/08) — ⚠ `permissions[]` is **emitted and never read** (§3.13) Designs of record: `docs/archived-documents/plans-archive/resource-permissions-design.md` and `docs/archived-documents/plans-archive/rbac-groundwork.md`. | S/E |
 | `SEC-8` | Secrets: env / file / keystore; Vault option future | Should | 🟡 **PARTIAL by design** — `${ENV}`/`${SYS}` everywhere, `${FILE}`/`${KEYSTORE}` S/E (2026-09-06); Vault / KMS **unbuilt, Enterprise-only, gated on a client policy** (§5) | All · S/E · E |
 | `SEC-9` | Write-root gate (`-Dassist.write.root` → 503 fail-closed), separate from auth, always on | Must | ✅ SHIPPED | All |
 

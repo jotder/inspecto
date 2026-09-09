@@ -57,7 +57,7 @@ Components SPA.
 
 ## 2. Requirements of record
 
-Five requirements in `REQUIREMENTS.md` §3.10, all recorded shipped. **Two describe a shape and a scope the
+Five requirements from `REQUIREMENTS.md` §3.10 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped. **Two describe a shape and a scope the
 backend does not have.** ⚠ **`EDITIONS.md`'s feature × edition matrix is authoritative for the Edition
 column**; this table mirrors it.
 
@@ -67,7 +67,7 @@ column**; this table mirrors it.
 | `MET-2` | Derived **Registry** reuse graph + Catalog + lineage graph (canonical edge / node kinds) | Must | ✅ SHIPPED | All |
 | `MET-3` | Single ref derivation (`deriveRefs`) feeding reuse graph, bundles, **delete-protection** | Must | ✅ SHIPPED (R1) — ⚠ the single derivation is **client-side** (`refsForComponent`); server-side delete protection covers **pipeline `use:` refs and Exchange grants only** — a widget a dashboard tiles, or a dataset a widget binds, deletes unblocked (§3.4) | All |
 | `MET-4` | **Stream** read model in the Catalog | Should | ✅ SHIPPED 2026-07-08 — ⚠ `/catalog/streams` is **per-Collector**; the glossary's grouped Stream (`stream:` membership) is a different node (§3.6) | All |
-| `MET-5` | Draft / published Component version history (W3b) | Could | ✅ SHIPPED 2026-07-09 — ⚠ undocumented in its own concept page until this spec | All |
+| `MET-5` | Draft / published Component version history (W3b) | Could | ✅ SHIPPED 2026-07-09 — ⚠ undocumented in its own concept page until this spec ⚠ **Named for grep:** the history UI is `ComponentHistoryDialog` (`inspecto-ui/src/app/inspecto/components/component-history.dialog.ts`). | All |
 
 **Corrections this table makes to its predecessor and its concept page**, each verified against source:
 

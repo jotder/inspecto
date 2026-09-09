@@ -58,7 +58,7 @@ export; the Studio Datasets and Query Library panes.
 
 ## 2. Requirements of record
 
-Six requirements in `REQUIREMENTS.md` §3.4, all recorded shipped. **Three carry a client half that is
+Six requirements from `REQUIREMENTS.md` §3.4 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped. **Three carry a client half that is
 absent or a doc that says the opposite of the code.** ⚠ **`EDITIONS.md`'s feature × edition matrix is
 authoritative for the Edition column**; this table mirrors it.
 
@@ -68,8 +68,8 @@ authoritative for the Edition column**; this table mirrors it.
 | `DAT-2` | **Query** as a first-class Component (`sql \| structured`) + Query Library + `$`-**Parameters** + **Result Set** | Must | ✅ SHIPPED (R3 + W4) | All |
 | `DAT-3` | Live query execution `POST /queries/{id}/run` on DuckDB with **server-side** parameter resolution | Must | ✅ **server SHIPPED — no client consumer.** The SPA never calls the route; the Query Library previews through `/db/query` after resolving `$`-parameters **client-side** (§3.4) | All |
 | `DAT-4` | **Matrix** materialization: persisted summary Derived Tables as managed assets | Should | ✅ SHIPPED 2026-07-08 (`task: materialize`) — ⚠ the glossary still says "not yet surfaced" (§2 corrections); no UI action triggers it | All |
-| `DAT-5` | Row-level calculated columns on Datasets | Should | ✅ SHIPPED 2026-07-08; window functions 2026-07-24 | All |
-| `DAT-6` | Optional Postgres state store | Should | ✅ SHIPPED — **single operator only** (one shared `Connection` per store); the multi-user deployment is `OPS-03`, **PARKED**; the proving test is **opt-in** and covers 9 of 12 families (§3.8) | S/E (`OPS-02`) |
+| `DAT-5` | Row-level calculated columns on Datasets | Should | ✅ SHIPPED 2026-07-08; window functions 2026-07-24 Design of record: `docs/archived-documents/plans-archive/calculated-columns-design.md`. | All |
+| `DAT-6` | Optional Postgres state store | Should | ✅ SHIPPED — **single operator only** (one shared `Connection` per store); the multi-user deployment is `OPS-03`, **PARKED**; the proving test is **opt-in** and covers 9 of 12 families (§3.8) ⚠ **How the driver reaches a deployment (2026-09-09):** as the third-party `postgresql.jar` sidecar that `package.ps1 -Edition Standard|Enterprise` stages — it is test-scoped in the reactor, so it is staged but **not** first-party (`editions.md` §3.3). 🔴 `REQUIREMENTS.md` added "NOT via `inspecto-connectors`, which no bundle ships"; the second half went stale on 2026-09-07 when `CONNECTORS-BUNDLE-1` made that sidecar ride **every** bundle (`from: 'all'` in `tools/bundle-modules.mjs`). The driver is simply a separate jar, not a connector. | S/E (`OPS-02`) |
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 

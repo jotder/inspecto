@@ -51,7 +51,7 @@ settings documents; the seeded isolation policies as the tenancy contract; and t
 
 ## 2. Requirements of record
 
-Five requirements in `REQUIREMENTS.md` §3.9, all recorded shipped. **One is wrong about what exists, and one
+Five requirements from `REQUIREMENTS.md` §3.9 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped. **One is wrong about what exists, and one
 Must overstates what "isolated" means on two of three editions.** ⚠ **`EDITIONS.md`'s feature × edition
 matrix is authoritative for the Edition column**; this table mirrors it.
 
@@ -61,7 +61,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
 | `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT ABSENT** — the server-side catalog exists; **one** template ships (`orders-starter`); **none of the four named verticals exists** in any shipped artifact (§2 corrections) | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
-| `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) | E |
+| `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
 
 **Corrections this table makes to its predecessor**, each verified against source:
 

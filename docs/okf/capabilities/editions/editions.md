@@ -72,14 +72,15 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 ## 2. Requirements of record
 
-`docs/REQUIREMENTS.md` §3.16 carries four rows, all marked `SHIPPED`. **Three of the four overstate what
+`docs/REQUIREMENTS.md` §3.16 carried four rows, all marked `SHIPPED`. **Three of the four overstate what
 ships**, and the fourth is accurate about the mechanism while its status is contradicted in three other
 files. The corrections below are the requirement of record.
 
 | Row | Register says | Correction of record |
 |---|---|---|
-| **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🔴 **Two-thirds shipped.** The fat JAR ships. The per-edition bundles are **two of three** — no Standard artifact is ever produced by any automated path (§3.7). And **no released artifact contains the trimmed runtime**: the release pipeline passes the skip-runtime switch for every bundle, because the runner has no module cache. The runtime is real, buildable, and shipped in nothing. |
-| **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | ✅ **Corrected 2026-09-09.** The generator had declared **four** first-party jars against the **ten** a Standard bundle carries and the eleven an Enterprise one does, knowing none of the seven gating modules; the mail dependency consequently appeared in **no** bill of materials (§3.7). The set now lives once in `tools/bundle-modules.mjs` and a CI guard holds it against the staging script. The isolation half still does not hold as written: the connector sidecar ships in **every** edition by a 2026-09-07 decision, and the mail dependency **left** it for `inspecto-notify-channels` in gating cell 1. "Lean" was measured and belongs to the *bundle*, not the reactor (§3.7). |
+| **PKG-1** | One fat JAR + trimmed runtime; per-edition bundles via the packaging script — `SHIPPED`, all editions | 🔴 **Two-thirds shipped.** The fat JAR ships. The per-edition bundles are **two of three** — no Standard artifact is ever produced by any automated path (§3.7). And **no released artifact contains the trimmed runtime**: the release pipeline passes `-NoRuntime` for every bundle, because the runner has no module cache. The runtime is real, buildable, and shipped in nothing. |
+| **PKG-2** | Lean bill of materials: framework-free core, network dependencies isolated in the connector module — `SHIPPED`, all editions | ✅ **Corrected 2026-09-09.** The generator had declared **four** first-party jars against the **ten** a Standard bundle carries and the eleven an Enterprise one does, knowing none of the seven gating modules; the mail dependency consequently appeared in **no** bill of materials (§3.7). The set now lives once in `tools/bundle-modules.mjs` and a CI guard holds it against the staging script.
+A **duplicate `postgresql` component**, carrying an invalid `bom-ref` / `SPDXID`, was fixed in the same pass. The isolation half still does not hold as written: the connector sidecar ships in **every** edition by a 2026-09-07 decision, and the mail dependency **left** it for `inspecto-notify-channels` in gating cell 1. "Lean" was measured and belongs to the *bundle*, not the reactor (§3.7). |
 | **PKG-3** | Runnable, self-contained example suite — `SHIPPED` (should), all editions | 🟡 **Shipped and largely unexercised.** Thirty examples in seven categories are tracked and staged into every bundle. **One** of the thirty runs in any pipeline, and only on a tag. "Runnable" is proven for one example and asserted for twenty-nine. |
 | **PKG-4** | Verify the Standard bundle's runtime module set against the token library — `SHIPPED` (must, Standard), verified 2026-07-07 | ⚠ **The evidence covers five of the twelve modules.** The recorded verification names the four the token library needs plus the elliptic-curve provider; the remaining seven in the image are unattributed by it. The status is then stated three ways: the register says resolved, the backlog says not re-verified, and the build concept page says the runtime step is unproven. All three are moot for shipped artifacts, which contain no runtime at all. |
 | **OPS-07** (`EDITIONS.md`) | Embedded trimmed JVM runtime in the bundle — ✅ in all three editions | 🔴 **No shipped artifact contains it.** Same root cause as PKG-1. The row describes a capability of the script, not a property of the bundle a customer receives. |
@@ -148,6 +149,13 @@ line** — the same lesson the compliance area recorded about its own citations.
 | Personal | none (default reactor) | 2 — the fat JAR and the connector sidecar |
 | Standard | 8 | 11 — those two, the eight, and the database driver |
 | Enterprise | 9 | 12 — the eleven plus the policy engine |
+
+🔴 **Staged is not the same as first-party, and the difference is exactly one jar.** The database driver
+is `postgresql.jar`, which is **third-party**: Standard stages **11** jars of which **10** are first-party,
+and Enterprise stages **12** of which **11** are. Conflating the two counts is what made the
+bill-of-materials correction hard to state (§2 `PKG-2`) — quote the staged count or the first-party count,
+never one as the other. Until 2026-09-09 this file described the jar only as "the database driver", so the
+name a reader would grep for lived solely in `REQUIREMENTS.md`.
 
 The eight Standard modules are the authentication module plus the seven produced by the edition-gating
 work: notification channels, backup tasks, geographic and link analysis, exchange and sharing, the metrics
@@ -256,9 +264,14 @@ step closes it (§5).
 
 ### 3.6 The runtime image and the Java floor
 
-The trimmed runtime is built from **twelve** platform modules — seven derived by dependency analysis of the
-fat JAR, five added because they are loaded reflectively and analysis of a fat JAR cannot see them. The
-tool is located in three places in order, and its absence **throws**, pointing at the skip switch.
+The trimmed runtime is built by **`jlink`** from **twelve** platform modules — seven derived by dependency
+analysis of the fat JAR, five added because they are loaded reflectively and analysis of a fat JAR cannot
+see them. The tool is located in three places in order, and its absence **throws**, pointing at the skip
+switch **`-NoRuntime`**.
+
+⚠ **The recorded verification attributes only five of the twelve**: `java.base`, `java.sql`,
+`java.net.http`, `jdk.httpserver` and `jdk.crypto.ec`. The other seven in the image are unattributed by it
+(§2 `PKG-4`) — moot for shipped artifacts, which carry no runtime at all, but not moot the day one ships.
 
 **Cross-platform, from one host.** The invoked tool is always the Windows one; the *target* platform is
 selected by the module path, so pointing it at a Linux module cache produces a Linux-native image on a

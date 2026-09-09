@@ -57,7 +57,7 @@ conventions that consume all of it.
 
 ## 2. Requirements of record
 
-Seven requirements in `REQUIREMENTS.md` §3.11, all recorded shipped. **Three are not flat green when read
+Seven requirements from `REQUIREMENTS.md` §3.11 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped. **Three are not flat green when read
 against the build.** ⚠ **`EDITIONS.md`'s feature × edition matrix is authoritative for the Edition
 column**; this table mirrors it.
 

@@ -82,7 +82,7 @@ The single most important item for commercialization.
 
 > **Delivered (ING-5).** The unified `parsing:` block — aliasing `csv_settings` / `processing.ingester` so
 > existing configs keep working — plus the **JSON/NDJSON** and **text/regex** frontends, with no engine
-> change. **Deferred:** LDIF block-records remain PROPOSED (`REQUIREMENTS.md` §3.2).
+> change. **Deferred:** LDIF block-records remain PROPOSED (`okf/capabilities/ingestion/ingestion.md` §2 `ING-5` — the requirement of record since `REQUIREMENTS.md` §3 became an index).
 
 - **Scope:** promote today's frontends under one `parsing:` block (with `csv_settings`/plugin aliases so existing configs keep working), and add two new thin frontends producing rows for the shared backend:
   - **JSON** — wrap native JSON/NDJSON reads; lean on expression-mapping rules for nesting.

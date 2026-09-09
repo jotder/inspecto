@@ -57,7 +57,7 @@ it.
 
 ## 2. Requirements of record
 
-Five requirements in `REQUIREMENTS.md` §3.8. **Four of the five status or edition cells are wrong when read
+Five requirements from `REQUIREMENTS.md` §3.8 (that section was stripped to an index on 2026-09-09 — this file is their only home now). **Four of the five status or edition cells are wrong when read
 against the build** — the largest correction rate of the three specs so far, and the reason it is worth
 writing: three of the four went wrong on the same day, when EDG-01 cell 7 moved the whole objects domain
 out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but none of these. ⚠

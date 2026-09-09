@@ -56,7 +56,7 @@ reject rows; Expectations; the source time zone at parse; the Parse pane, gramma
 
 ## 2. Requirements of record
 
-Six requirements in `REQUIREMENTS.md` §3.2, all recorded shipped. **Two describe a narrower build than
+Six requirements from `REQUIREMENTS.md` §3.2 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped. **Two describe a narrower build than
 exists, one describes a broader one, and one has no UI at all.** ⚠ **`EDITIONS.md`'s feature × edition
 matrix is authoritative for the Edition column**; this table mirrors it.
 

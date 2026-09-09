@@ -70,239 +70,63 @@ AI-driven autonomy without redesign.
 
 ---
 
-## 3. Functional requirements
+## 3. Functional requirements — an INDEX; the capability specs are the requirement of record
 
-> ⚠ **Area names below are the pre-2026-09-08 headings.** The canonical name and directory for every area —
-> including the `BI`+`INV` merge into **Studio**, the `EOI` fold into **Assistant**, the `PIP` split into
-> authoring/execution, and the two new areas `CMP` and `TOOL` — is fixed by
-> [`GLOSSARY.md` §14](GLOSSARY.md#14-capability-areas-the-functional-spine). IDs are unchanged. The
-> headings are re-keyed when each area's capability spec lands (consolidation plan §6 step 5).
-
-### 3.1 Acquisition & connectivity (ACQ) — backend + UI Workbench
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/acquisition/acquisition.md`](okf/capabilities/acquisition/acquisition.md) §2 is the requirement-of-record for `ACQ`, and it CORRECTS this table in three places (`ACQ-4` is partial, not shipped — the NFS/SMB half was refused; `ACQ-6`'s route and `ACQ-7`'s config key were both wrong here). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| ACQ-1 | **Connections**: named endpoint+credential definitions (SFTP/FTP/FTPS, database), reused by many Collectors | Must | SHIPPED | All |
-| ACQ-2 | **Collectors**: configured collection tasks (paths/queries, cadence, filename patterns, dedup policy) bound to one Connection | Must | SHIPPED | All |
-| ACQ-3 | Acquisition framework: ledgers, dedup, watermarks, gap detection, retry (Phases A–F) | Must | SHIPPED | All |
-| ACQ-4 | Object-storage (S3/GCS/Azure/MinIO) + network-share (NFS/SMB) connectors on the connector SPI | **Must** | SHIPPED (2026-07-08: `connector: s3` — SDK-free SigV4, covers S3/MinIO/GCS-interop; `connector: azure` — SDK-free SharedKey signing over JDK HttpClient, List Blobs pagination + Range resume + copy-status-guarded MOVE, etags feed ACQ-7, Azurite-compatible for LAN testing; NFS/SMB = documented OS-mounted-share pattern, UNC stays jail-rejected by design. `connector: gcs` — native GCS JSON API + service-account OAuth2, SDK-free RS256 JWT→bearer on JDK crypto, shipped 2026-07-22, closing the tier). ⚠ **They only became deployable on 2026-09-07** (CONNECTORS-BUNDLE-1): `inspecto-connectors` was a reactor module no bundle shipped, so for 85 days every remote connector was build-available and deploy-absent. It now rides every bundle as the shaded `inspecto-connectors.jar` sidecar. | All |
-| ACQ-5 | Streaming source consumer (e.g. a Kafka topic drained by a Collector) | Should | SHIPPED (2026-07-08: `connector: kafka` — a topic drained per scan cycle into virtual slice files on the existing CollectorConnector SPI, no core-engine change; `assign()`+`seek()`, no consumer group — the consumed frontier rides the ledger watermark and is persisted only post-commit (at-least-once, DB-export machinery); envelope-NDJSON or raw-value payloads, retention clamp + `max_records` cap, optional SASL PLAIN; kafka-clients 3.9.2 confined to inspecto-connectors, tested offline via in-jar `MockConsumer`, no broker) | All |
-| ACQ-6 | Push/event-driven file discovery (replace poll where the remote can notify) | Could | SHIPPED (2026-07-08: `POST /collectors/{id}/notify` — external systems trigger an immediate scan, 202+runId on v1, `canOperateRuns`-gated, audited as `source.notified`; plus `collector.discovery: watch` — WatchService push for local/mounted inboxes, debounced, poll loop stays on as backstop) | All |
-| ACQ-7 | etag/version-aware dedup dimensions | Should | SHIPPED (2026-07-08: `collector.duplicate.mode: etag` — pre-fetch skip on the connector's listing etag/object version; ledger columns `etag`/`object_version` with in-place migration; degrades to size+mtime when the connector supplies neither) | All |
-
-### 3.2 Ingestion & parsing (ING) — backend
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/ingestion/ingestion.md`](okf/capabilities/ingestion/ingestion.md) §2 is the requirement-of-record for `ING`, and it CORRECTS this table (`ING-2` understates the build — ten frontend tokens, eight formats, six DuckDB-native built-ins incl. `parquet`; `ING-5`'s LDIF note is stale — blank-line records are live; `ING-6` has no UI and evaluates at rest, not at ingest). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| ING-1 | Stage-1 M..N multiplexer: parse → transform → partition → commit, batch-atomic | Must | SHIPPED | All |
-| ING-2 | Format frontends: delimited grammar, fixed-width (text+binary), plugin `StreamingFileIngester` SPI (binary/multi-segment) | Must | SHIPPED — ⚠ understated (corrected 2026-09-08): `PipelineConfigParser.FRONTENDS` is ten tokens / eight formats (`delimited`, `fixedwidth`, `json`, `text_regex`, `xlsx`, `parquet`, `asn1`, `plugin`) and `BuiltinParsers.IDS` six built-ins incl. `parquet`, which is on no board | All |
-| ING-3 | Compressed input streaming (gzip/bz2/zip) | Must | SHIPPED | All |
-| ING-4 | Schema casting + reject routing (quarantine semantics: unreadable / mismatch / sink-flush fail) | Must | SHIPPED | All |
-| ING-5 | Unified `parsing:` config block + **JSON/NDJSON** + **text/regex** frontends | **Must** | SHIPPED (2026-07-07; `parsing:` aliases `csv_settings`/`processing.ingester`; ~~LDIF block-records stay PROPOSED~~ LDIF block records are LIVE via `text_regex.record_split: blank_line` (2026-08-28; corrected 2026-09-08)) | All |
-| ING-6 | **Expectation** engine: data-quality rules validating records against a Schema (non-null, range, regex, referential) | **Must** | ✅ server SHIPPED — ⚠ **no UI** (corrected 2026-09-08: no file under `inspecto-ui/src/app` mentions Expectations; evaluation is an at-rest COUNT, not ingest-time validation). Detail (2026-07-07: `com.gamma.expectation` — authored `expectation` components, request-driven evaluation counts violations in the target's at-rest Parquet via a server-built COUNT in a DuckDB sandbox; a FAILED check opens a deduped `expectation:<name>` Incident + emits `EXPECTATION_FAILED` → notifications; `/expectations*` CRUD+evaluate) | All |
-
-### 3.3 Pipelines (PIP) — backend + UI Workbench
-
-> ⚠ **These rows have TWO owners — `PIP` is one ID range and two specs** (`GLOSSARY.md` §14).
-> **`PIP-1` is authoring** → [`okf/capabilities/pipeline-authoring/pipeline-authoring.md`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) §2, which CORRECTS it below.
-> **`PIP-2`–`PIP-7` are execution** → [`okf/capabilities/pipeline-execution/pipeline-execution.md`](okf/capabilities/pipeline-execution/pipeline-execution.md) §2,
-> which CORRECTS them (2026-09-09). *("orchestration" left this heading 2026-09-09 — it is not a glossary term;
-> `GLOSSARY.md` §14 names the two areas **Pipeline authoring** and **Pipeline execution**.)*
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| PIP-1 | Authored **Pipeline** DAGs (Steps = the `BuiltinNodeType` set: SOURCE/Parser/Transform/Enrichment/Sink/CONTROL) with author-time validation, visual editor | Must | SHIPPED — ⚠ **three corrections 2026-09-09** (owner §2): **(a)** "**closed**" is SUPERSEDED doctrine (`GLOSSARY.md` D0-B, 2026-08-09 — the real guarantee is compiler *totality*, which survives an OPEN Step-kind registry); the set is closed **in fact** only because that registry is unbuilt. **(b)** 🔴 **author-time validation does NOT hold for an unknown node type** — `PipelineValidator` emits a WARNING, `PipelineCodec` stores `config` as an unchecked map, and the compiler silently DROPS the node, so an invented vocabulary survives unnoticed. **(c)** 🔴 **`SqlGuard` is absent from every SAVE path** (it runs at `/components/transform/describe` and at execution only), so author SQL with DDL/DML or a file-reading function saves and arms cleanly and fails only at run — and no test covers it. Counts: **30** builtin node types (not 20/28), **119** processors, **23** transform functions. SHIPPED (live e2e verified 2026-07-07 — `examples/06-serve/pipeline-job`, manual + `on_pipeline` triggers). ⚠ *Scope corrected 2026-08-02:* "embedded Job, sub-Pipeline" was never in `BuiltinNodeType` and is **not** shipped — what the e2e proves is the Pipeline→Job **trigger** coupling (`on_pipeline`), i.e. producer/consumer over a shared store, not nesting. Ruled out by design, see GLOSSARY §5 | All |
-| PIP-2 | Medallion ELT: raw → clean partitioned Tables → Derived Tables (bronze→silver→gold) | Must | SHIPPED | All |
-| PIP-3 | Incremental event-driven processing: on-pipeline commit Triggers, watermarks, cron + catch-up | Must | SHIPPED | All |
-| PIP-4 | **Scheduler** + **Jobs** (atomic Executables; **Run ⊇ Consignment ⊇ File** status hierarchy) | Must | SHIPPED — 🔴 *the grain was RENAMED 2026-08-03 and this row said `Batch` until 2026-09-09* (`GLOSSARY.md` §6-A; identity is `(consignment_id, run_id)` because the Run is the ATTEMPT, so a reprocess is a new Run over the same Consignment). ⚠ Two schedulers exist, not one — an ingest engine and a Job engine, independently triggered (owner §3.1) | All |
-| PIP-5 | Async Run triggers: `202 + runId` + poll, `Idempotency-Key` replay — jobs **and** pipelines | Must | SHIPPED (W5/W5b) | All |
-| PIP-6 | Job templates (reusable parameterized Job definitions) | Could | SHIPPED (2026-07-08: `*_job_template.toon` — declared params + defaults, `${param}` substitution; jobs reference `template:` + `params:`, resolved at load so the scheduler sees only plain JobConfigs; instance keys override the template block) | All |
-| PIP-7 | Maintenance job library (retention, compaction, housekeeping) | Should | 🔴 **SHIPPED, and understated ~5× — with NOTHING armed** (corrected 2026-09-09): `MaintenanceJob` handles **19** built-in task ids, plus **4** contributed by optional modules (`backup`/`backup_verify`/`restore`, `incident_purge`) = **23**, of which 19 reach Personal. The “curated library” is **five example job files**; no `scheduler.toon` ships and the default space schedules **no** maintenance job — the whole posture is opt-in (deliberate for `incident_purge`: *nothing schedules it, and nothing should*). 🔴 The **served** task descriptor is wrong BOTH ways — it advertises 4 tasks Personal refuses and hides 7 shipped ones — and it drives the authoring form (owner §2.2). Previously: (2026-07-08: MAINTENANCE tasks now `cleanup` + `ledger_prune` + `db_maintenance` + `compact` — compaction is quiet-window + crash-journal safe, readers are glob-based so it is query-transparent; ⚠ reprocess of a compacted-away batch is unsupported, keep `min_age_days` beyond the reprocess horizon. Curated library at `examples/06-serve/maintenance-library`) | All |
-
-### 3.4 Data plane: Datasets & Queries (DAT) — backend + Studio
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/data-plane/data-plane.md`](okf/capabilities/data-plane/data-plane.md) §2 is the requirement-of-record for `DAT` (canonical area name **Data plane**, `GLOSSARY.md` §14), and it CORRECTS this table (`DAT-3`: the SPA never calls `POST /queries/{id}/run` and resolves `$`-parameters client-side; `DAT-4`: no UI triggers a materialization). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| DAT-1 | **Dataset** umbrella (Table / Derived Table / View) over partitioned Parquet, described by Schemas, browsable in the Catalog | Must | SHIPPED | All |
-| DAT-2 | **Query** as a first-class Component (`sql \| structured`) + Query Library + `$`-**Parameters** + **Result Set** descriptor | Must | SHIPPED (R3+W4) | All |
-| DAT-3 | Live query execution `POST /queries/{id}/run` on DuckDB with server-side parameter resolution | Must | ✅ server SHIPPED — ⚠ **no client consumer** (corrected 2026-09-08): the Query Library resolves `$`-parameters client-side and previews through `/db/query`; `$current_user`/`$role` never reach an operator's query. Detail (2026-07-08: the missing server-side *structured* evaluator is BI-7's `POST /bi/query` — spec-based measures/dimensions/filters compiled and executed server-side; `query` components stay `type: sql` and the 422 on `type: structured` remains the honest boundary (no client authors them). Minor caveat: pagination stays offset-based) | All |
-| DAT-4 | **Matrix** materialization: persisted summary Derived Tables as managed assets | Should | SHIPPED (2026-07-08: `task: materialize` on the maintenance runner — BI-7 spec-compiled SELECT (or raw snapshot) over the source Dataset's trusted relation, `COPY TO` Parquet with PIP-7's hide-old/reveal-new atomic swap (crash leaves only glob-invisible leftovers, self-cleaning), and the target registered/refreshed as a normal `dataset` component — so a Matrix is queryable everywhere a Dataset is, zero net-new read paths) | All |
-| DAT-5 | Row-level calculated columns on Datasets | Should | SHIPPED (2026-07-08: `dataset.calculated: [{name, expr}]` — `DatasetRelation` wraps the base relation `SELECT *, (expr) AS name`; every expr passes the new **`ExpressionGuard`** (fragment-level safety: closed token alphabet + keyword deny-set killing subquery smuggling + function-call whitelist killing `read_parquet`/UDFs + comment-sequence rejection; design: `archived-documents/plans-archive/calculated-columns-design.md`); fail-closed 422, inherited by every consumer incl. DAT-4 materialization. Deliberate v1 cuts: no window/aggregate functions, no quoted identifiers) | All |
-| DAT-6 | Optional Postgres state store (swap embedded state) | Should | SHIPPED (2026-07-07: all 6 JDBC state stores — jobs/provenance/objects/links/notes/status — verified against real Postgres; ⚠ **the verification is now OPT-IN** — the embedded-Postgres harness and its per-platform binaries were removed 2026-09-07 (operator: install Postgres separately or point at an existing server), so `PostgresStateStoreTest` runs only with `-Dinspecto.test.pg.url` / `INSPECTO_TEST_PG_URL` and otherwise reports 11 SKIPPED with that reason. Only the JDBC client driver remains; DuckDB-only `quantile_cont` made dialect-aware; `postgres` backend alias; PG driver reaches a deployment as the `postgresql.jar` sidecar `package.ps1 -Edition Standard|Enterprise` copies — NOT via `inspecto-connectors`, which no bundle ships. ⚠ **Single-operator only**: every `Db*Store` serialises on one shared `Connection`; the multi-user deployment (EDITIONS OPS-03) is unbuilt and **PARKED** by BACKLOG §6) | S/E |
-
-### 3.5 Studio: authoring & presentation (BI) — UI + backend
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/studio/studio.md`](okf/capabilities/studio/studio.md) §2 is the requirement-of-record for `BI`+`INV` (ONE capability — `GLOSSARY.md` §14), and it CORRECTS this table. Until the consolidation reaches step 5 these tables remain, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| BI-1 | Studio authoring: **Widgets** (Visualization Type + Config + Result-Set binding), **Dashboards**; real persistence via the widened component store | Must | SHIPPED (W3 widened `WRITABLE_TYPES`) — ⚠ **Datasets left Studio** (corrected 2026-09-08): `/studio/datasets` and the Studio root both redirect to `/catalog/datasets` (Phase B.2 — a Dataset is a Catalog asset owned by `MET`/`DAT`) | All |
-| BI-2 | **VizPlugin** registry of Visualization Types | Must | SHIPPED — **13 types** (`BUILTIN_VIZ_PLUGINS` is the canonical list; counted 2026-09-08): `kpi`, `table`, `bar`, `line`, `area`, `pie`, `bubble`, `gauge`, `scatter`, `funnel`, `geo-map`, `link-analysis`, `reconciliation`. ⚠ The archived plan's "8 viz plugins" is a 2026-07 snapshot | All |
-| BI-3 | KPI & Reports gallery; dashboard quick-filter bar, drill-through, time grain, PNG export; **Measures** in Explore | Should | SHIPPED | All |
-| BI-4 | Scheduled report/export delivery | Should | SHIPPED — ⚠ **four formats**, not two (corrected 2026-09-08): `json` (rollup default), `csv`, `png` (`TablePngRenderer`) and `pdf` (`PdfRenderer`, 2026-07-20), the latter three requiring `scope: dataset`. (2026-07-08: REPORT job `out_dir`/`format` renders a timestamped artifact — new `scope: dataset` exports a headless BI query; `REPORT_READY` event → webhook/SMTP notification. Caveat: SMTP delivers the artifact *path*, not an attachment — the SMTP channel is text-only) | S/E |
-| BI-5 | Alerting on **Measures** (BI thresholds raising Alerts) | Could | SHIPPED (2026-07-08: `*_alert.toon` measure rules — `dataset:` + `measure: agg(field)` evaluated via the headless BI evaluator on every sweep, firing the existing ALERT_FIRED→notification path. v1 = whole-dataset measures, no per-rule filters) | All |
-| BI-6 | Public/embedded Dashboard sharing | Could | SHIPPED (2026-07-08: backend — fail-closed HMAC share tokens (inert without `-Dbi.share.secret`, expiring, tamper=404), anonymous resolve + a public BI query fenced to the dashboard's own datasets. **UI** — `/share/:token` guest embed viewer (no shell, no guard): tiles render read-only through the normal VizPlugin→viz-render path, per-tile data via the fenced query with widget controls mapped back to validated agg/field pairs (measure-id parity with the backend); view-bound/expression-measure widgets degrade to an explicit "not embeddable" tile, per-tile errors never take down the page; `/public` added to the space-interceptor's server-global set; mock answers an honest 501 (no HMAC secret offline). Gauntlet green + live-preview verified. **In-app mint dialog added 2026-07-09** — `ShareDashboardDialog` + a Share button on the dashboard editor call `POST /dashboards/{id}/share` and show the `/share/{token}` link with copy + expiry) | S/E |
-| BI-7 | Semantic / headless BI API | Could | SHIPPED (2026-07-08: `POST /bi/query` — spec-based measures/dimensions/filters compiled server-side (the declared backend twin of the UI QuerySpec seam), SqlGuard-checked, sandbox-executed; `GET /bi/datasets`). ~~Open follow-up: swapping the UI viz layer onto it~~ — **done**: `DatasetResultService`'s live path IS `/bi/query` and every Widget renders through it (corrected 2026-09-08). ⚠ `GET /bi/datasets` has **no client consumer** — Dataset listing goes through the component registry | S/E |
-| BI-8 | Widget/Dashboard template marketplace | Could | SHIPPED (2026-07-08: backend — `GET /bi/templates` + parameterized all-or-nothing `apply` writing real Studio-editable components (templates reshaped to UI-native `{vizType, controls}` widgets / `{name, tiles}` dashboards, so applied boards render immediately). **UI** — `/studio/templates` gallery pane over `GET /bi/templates` + an apply dialog (dataset picker + optional id prefix → routes to the created dashboard); nav entry; mock lists offline, apply 501 (writes server-side). Gauntlet green. Cross-space sharing stays `/bundle/*`; an external *marketplace/exchange* remains out of scope by design) | All |
-
-### 3.6 Studio: the investigation studios (INV) — UI + backend
-
-> ⚠ **Owned by [`okf/capabilities/studio/studio.md`](okf/capabilities/studio/studio.md) §2** — `INV` is not a sibling of `BI`; Link Analysis and Geo Map Analysis live INSIDE Studio (`GLOSSARY.md` §14). ⛔ **`INV-3` was moved to `INC`** ([`okf/capabilities/incidents/incidents.md`](okf/capabilities/incidents/incidents.md)) — a Case is an operational object, not a studio.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| INV-1 | **Link Analysis Studio**: Entity Projection over a Dataset, shared G6 host, 11 layouts, Louvain communities, pattern matching, saved **Link-Analysis Views** | Should | SHIPPED (2026-07-08: real backend Entity Projection — `POST /inv/projection`, DuckDB-side fold over the sandbox executor, heaviest-first with truncation; the studio is backend-first with the offline sample fold as fallback; saved views persist server-side — `link-analysis-view`/`geo-map-view` joined `ComponentStore.WRITABLE_TYPES`. ~~Open per design §7: `attrCols` mapping surface + the schema-relationship model~~ — **BOTH SHIPPED** (`attrCols` on both sides; relationship inference 2026-07-20); ⚠ the "offline sample fold as fallback" is also gone — a backend failure now surfaces (corrected 2026-09-08)) | S (edition-added) |
-| INV-2 | **Geo Map Analysis Studio**: offline MapLibre basemap (⚠ **not PMTiles** — four slimmed Natural Earth GeoJSON layers + glyph fonts, ~2.7 MB; zero `.pmtiles` files ship and no code references the protocol; corrected 2026-09-08), GeoSource/GeoQuery, heatmap, od-routes, time slider + playback, intelligence toolbox (co-location/frequent/stay-points), measure/radius/polygon/notes tools, layer manager + GeoJSON overlays, saved **Geo Views** | Should | SHIPPED — ⚠ corrected 2026-09-08: the **Phase 4 server-side projection SHIPPED** (`POST /geo/projection`, `POST /geo/routes`), and the DuckDB `spatial` extension is a **deliberate refusal**, not a pending phase (no geometry op is needed; the hardened sandbox disables extension loading) | S/E (decided 2026-09-02, EDITIONS CP-09 — one cell covers BOTH studios; ✅ **GATED 2026-09-07** — EDG-01 cell 3b moved `GeoRoutes`+`InvRoutes` into `inspecto-geo-link`; Personal gets a core 503 stub. ~~code is core and ungated~~ was stale for one day) |
-| INV-3 | **Cases** grouping Incidents; RCA templates; correlation ids end-to-end | Must | SHIPPED — ⛔ **ROW MOVED to `INC` 2026-09-08** ([`okf/capabilities/incidents/incidents.md`](okf/capabilities/incidents/incidents.md) §2 owns it): a Case is one `ObjectType` value on the operational-objects tables, reached at `/cases`, never from `/studio/*` | **S/E**, not `All` — corrected 2026-09-08: the Case machinery is `inspecto-ops` (`EDITIONS` `CP-11`, gated by EDG-01 cell 7, which amended five neighbouring rows and missed this one) |
-| INV-4 | Cross-studio bridges (e.g. geo co-location → graph dialog) | Could | SHIPPED — ⚠ **exactly one bridge exists** (geo co-location → a graph dialog over the shared G6 host); the full hand-off into `/studio/link-analysis` is deferred and there is no link→geo bridge (corrected 2026-09-08) | S/E with the studios |
-
-### 3.7 Observability & maintenance (OPS) — backend + the Ops Lens's data contracts
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/observability/observability.md`](okf/capabilities/observability/observability.md) §2 is the requirement-of-record for `OPS`, and it CORRECTS this table (`OPS-2`'s exposition has been gated since 2026-09-07; `OPS-3`'s log is append-only, not tamper-evident, and does not audit sign-ins; `OPS-4`'s "off by default" is true of the job-run projection only; `OPS-1`'s live tail is polling). Renamed from "Observability & operations" per `GLOSSARY.md` §14 — *Ops* is the Lens, `OPS` the capability. Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| OPS-1 | One **Signal** ledger; **Events**, Alerts, Notifications as *views* over it; live tail, saved views, CSV export | Must | SHIPPED (R4) — ⚠ live tail is client **polling**; the SSE `GET /signals/stream` has no client (corrected 2026-09-08) | Recording **All**; the `/events*` feed **S/E** (`inspecto-events`, EDG-01 cell 6) |
-| OPS-2 | **Metrics** (Prometheus-compatible) — throughput, error rate, lag, run durations | Must | SHIPPED (`GET /metrics`, `MetricRegistry.scrape()`; deliberately an unauthenticated infra route — `PUBLIC_PATHS`) | S/E — ✅ **GATED since 2026-09-07** (EDG-01 cell 5: the exposition is `inspecto-metrics`, Personal answers `503`; `MetricRegistry` stays core). ~~the code is core and ungated in every bundle; the gating is EDG-01 debt~~ (stale until 2026-09-08). `GET /metrics/acquisition` (JSON, authenticated) stays core, All |
-| OPS-3 | Three-layer audit: file/batch audit, provenance rows, **append-only** who-did-what **Audit Log** | Must | SHIPPED (actor attribution hardening on Standard — see SEC-7). ⚠ Corrected 2026-09-08: append-only by construction, **not tamper-evident** (`compliance/controls-matrix.md` AU-9); **sign-ins are not audited** (mutations, exports and access-denied are); the CSV export is core `GET /audit/export` | All |
-| OPS-4 | Durable Run reporting (success rate, p50/p95) | Should | SHIPPED — ⚠ "off by default" is true of the **job-run DB projection only** (`-Djobs.backend` default `none`); the batch-audit report (`/status`, `/report`, p50/p95/p99) is always on over the `db` status store (corrected 2026-09-08) | All |
-| OPS-5 | Per-edge **Provenance** + conservation invariant → Alerts + Sankey overlay | Should | PARTIAL (built/tested; off by default; verified vs synthetic data only. Executable verification protocol signed 2026-07-08: `docs/ops/provenance-conservation-verification.md` — enable on a real feed, soak through natural variation, cross-check invariants against ground truth, log the outcome. Cannot close offline; needs the first live deployment to run it) | All |
-| OPS-6 | Record-level lineage & replay (per-record ancestry) | **Won't (now)** | — (per-batch ancestry is the accepted grain) | — |
-
-### 3.8 Alerts & Incidents (INC) — backend + UI Ops
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/incidents/incidents.md`](okf/capabilities/incidents/incidents.md) §2 is the requirement-of-record for `INC`, and it CORRECTS this table in four places (`INC-2`/`INC-4` are Standard+ since EDG-01 cell 7, not `All`; `INC-4` has no UI and its queue store is in-memory only; `INC-5`'s Diagnosis produces NO Incident). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| INC-1 | **Alert Rules** watch Metrics; fired **Alerts** with severity | Must | SHIPPED | All |
-| INC-2 | **Alert → Incident → Case** lifecycle, object-link graph, SLA, comments | Must | SHIPPED | **S/E** (`inspecto-ops`, EDG-01 cell 7 2026-09-08 — Personal 503s the object routes; corrected 2026-09-08) |
-| INC-3 | **Notification** delivery channels (email/webhook) + per-user preferences | **Must** | PARTIAL (2026-07-07: `WebhookChannel` in core, ServiceLoader-discovered, `notify.*` sysprops, `ALERT_FIRED` rule. ⚠ **The email half became deployable only on 2026-09-07** (CONNECTORS-BUNDLE-1): `SmtpEmailChannel` lives in `inspecto-connectors`, which no bundle shipped until the sidecar landed. 🔴 It still fails QUIETLY when SMTP is unconfigured — `MailSendJob` returns `JobResult.ok("no email channel configured — nothing sent")`, a SUCCESS a scheduled job reports green forever (BACKLOG §6). Preferences remain single-global until the auth module adds users; bounce suppression / soft-bounce retry / SES-SNS are deliberate deferrals (D8)) | S/E for the channels (decided 2026-09-02, EDITIONS CP-15 — ⚠ code ungated, EDG-01); the in-app feed stays All (CP-12) |
-| INC-4 | Incident workflow depth: queues, escalation, watchers | Should | 🟡 **backend only, no UI** (corrected 2026-09-08 — routes + TOON shipped 2026-07-08; the SPA has no queue, watcher or escalation-policy surface; `QueueStore` is in-memory only, no board row) — as shipped 2026-07-08: **queues** first-class — `*_queue.toon` / `POST /queues`, members + `round_robin`\|`least_loaded`\|`manual` routing via `QueueRouter`; **assignment** `POST /objects/{id}/assign` (person or queue-routed) advances the workflow + emits `OBJECT_ASSIGNED` (the assignment history); **watchers** `POST /objects/{id}/watch`\|`unwatch` + `GET .../watchers`; **escalation** `*_escalation.toon` policy the SLA sweep applies on breach — severity bump + queue re-route + `OBJECT_ESCALATED` notify. Queue store in-memory (Db parity a noted follow-on, as links/notes began); per-user notification delivery still rides the global channel tags) | **S/E** (`inspecto-ops`; corrected 2026-09-08) |
-| INC-5 | **Diagnosis**: AI-assisted RCA of a failing Run/Collector producing an Incident | Should | 🟡 **PARTIAL** (corrected 2026-09-08) — the RCA ships (`FailureReactor` → `DiagnosisStore`, `GET /assist/diagnoses`); **nothing creates an Incident from a Diagnosis**, the only bridge is a drafted Alert Rule the operator may adopt — `okf/capabilities/incidents/incidents.md` §3.9 | All |
-
-### 3.9 Spaces & tenancy (SPC)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/spaces/spaces.md`](okf/capabilities/spaces/spaces.md) §2 is the requirement-of-record for `SPC`, and it CORRECTS this table (`SPC-3`: the four vertical templates were mock-only seed packs deleted 2026-08-31 — one template ships; `SPC-1`: "isolated" is a layout on P/S and an enforced boundary only on E). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| SPC-1 | Isolated **Spaces** (config/data/audit/duckdb per Space), CRUD without restart, one-time migrator | Must | SHIPPED | All |
-| SPC-2 | Whole-Space zip export/import with dry-run preview | Must | SHIPPED | All |
-| SPC-3 | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT ABSENT** (corrected 2026-09-08) — the server catalog (`spaces/_templates/<id>/template.toon`, `GET /spaces/templates`) ships **one** template, `orders-starter`; the four verticals were mock-only seed packs deleted with the mock backend 2026-08-31 and never rebuilt — `okf/capabilities/spaces/spaces.md` §5 | All |
-| SPC-4 | **Metadata Bundle v2**: selective config-only transfer with lineage refs, provenance/contentHash, `requires`, drift fit-check | Should | SHIPPED (2026-07-07: `BundleRoutes` export/preview/import over the `ComponentStore` kinds — real content+contentHash, drift fit-check, idempotent import; connection/pipeline/job/view kinds deferred to their own stores) | All |
-| SPC-5 | Per-tenant ABAC | Could | SHIPPED (2026-07-24: `PolicyEngine.SEED` — engine-resident `space-isolation` / `space-isolation-rows` deny policies on the `AccessDecider` seam; engage once a `space` claim is mapped via `roles.toon`, exempt `canConfigureAccess` holders, tailorable in `access-policies.toon`) | E |
-
-### 3.10 Component metamodel & Catalog (MET)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md) §2 is the requirement-of-record for `MET`, and it CORRECTS this table (`MET-1`'s shape is the SPA's model, the server stores `Component(type, name, path, content)`; `MET-3`'s delete-protection covers pipeline `use:` refs and Exchange grants only and the derivation is `refsForComponent`, client-side). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| MET-1 | Everything authored is a **Component** `{kind, name, config, parts?, wiring?}`; kind registry declares config schemas | Must | SHIPPED — ⚠ the shape is the SPA's `component-model/`; the server persists `Component(type, name, path, content)` and only 9 of 23 writable kinds have a `ConfigSpec` (corrected 2026-09-08) | All |
-| MET-2 | Derived **Registry** reuse graph + Catalog + lineage graph (canonical edge/node kinds, `CONSUMES` etc.) | Must | SHIPPED | All |
-| MET-3 | Single ref derivation (`refsForComponent`, client-side; `deriveRefs` is its per-kind seam) feeding reuse graph, bundles, delete-protection | Must | SHIPPED (R1) — ⚠ server-side delete protection covers pipeline `use:` refs + Exchange grants only; widget→dataset / dashboard→widget refs are checked by `metadata_validate` and bundle import, not on delete (corrected 2026-09-08) | All |
-| MET-4 | **Stream** read-model in the Catalog (browsable data origins; IA reorg Phase B) | Should | SHIPPED (2026-07-08: `GET /catalog/streams` — every Collector as a data-origin catalog node (connector/connection/pipeline/discovery attrs), shaped to the UI `MetadataNode` contract the mock already served; UI needed no change) | All |
-| MET-5 | Draft/published Component version history (W3b) | Could | SHIPPED (2026-07-09: `ComponentStore.write` archives the prior copy under `<typeDir>/.history/<id>.v<N>.toon` — a sub-dir, not a sibling `.toon`, so the registry scan never mis-reads it as a duplicate — keep-N (`-Dcomponents.history.keep`, default 10); `GET /components/{type}/{id}/versions` + `POST …/versions/{v}/restore` (restore is itself a versioned write); reusable `ComponentHistoryDialog` + a History button on the dashboard editor; mock mirrors the archive/list/restore. Reactor 1139/0/0/3 + UI specs/live-walk green) | All |
-
-### 3.11 API & integration (API)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/control-api/control-api.md`](okf/capabilities/control-api/control-api.md) §2 is the requirement-of-record for `API` (canonical area name **Control API**, `GLOSSARY.md` §14), and it CORRECTS this table in three places (`API-3`: `If-Match` is honoured not required and the SPA never sends it; `API-6`: the blueprints are untested documentation; `API-7`: no automated guard). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| API-1 | Versioned **`/api/v1`** business contract: response envelope, error-code catalog, Correlation-ID, gzip; the only surface for business routes since API-5 | Must | SHIPPED (W1) | All |
-| API-2 | OpenAPI 3.1 contract (`docs/api/openapi-v1.json`) enforced by `ApiContractTest` | Must | SHIPPED (W2) | All |
-| API-3 | Optimistic concurrency: `ContentHash` + ETag / If-None-Match / If-Match on Components | Must | ✅ server SHIPPED (W3) — ⚠ **no client consumer** (corrected 2026-09-08): `If-Match` is honoured (stale ⇒ 409), not required, and the SPA never sends it | All |
-| API-4 | `GET /bootstrap` metadata-first boot (features, `authMode`, permissions) | Must | SHIPPED (W3/W6) | All |
-| API-5 | Retire the unversioned route surface — business routes require `/api/v1` | Should | SHIPPED (2026-07-25, BACKLOG D3: business routes are served **only** under `/api/v1/…`; a bare unversioned business path is no longer served and `/api/<non-v1>` returns a JSON 404 rather than the SPA shell. Infra probes stay unversioned: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`. The sunset machinery is gone with the surface — `Deprecation`/`Link`/`Sunset` headers, `-Dapi.legacy.routes=off` and `inspecto_legacy_api_requests_total` no longer exist, and the soak criterion was deliberately overridden: no live deployment, every in-repo caller migrated in the same change) | All |
-| API-6 | Gateway/IAM drop-in: WSO2 gateway + Keycloak blueprints for Standard | Must (S) | 🟡 PARTIAL by construction (corrected 2026-09-08) — the seams shipped; the two blueprints are **untested documentation** nothing in the tree consumes, never verified against a live gateway | S |
-| API-7 | Java embedding API stability policy (SemVer, `@PublicApi`) | Must | SHIPPED as policy — ⚠ no automated surface guard (2026-09-08) | All |
-
-### 3.12 Security (SEC)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/security/security.md`](okf/capabilities/security/security.md) §2 is the requirement-of-record for `SEC`, and it CORRECTS this table (`SEC-3` named a retired vendor class; `SEC-8` is partial by design, not shipped; risk R4 below was stale). Until the consolidation reaches step 5 this table remains, but the capability doc wins where they differ.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| SEC-1 | **Auth-free common core** — no auth/RBAC/user management code in core; Personal boots login-free | Must | SHIPPED | P |
-| SEC-2 | `Authenticator` / `Subject` / `TokenRelay` SPIs, AuthN gate, per-route capability checks, `UNAUTHENTICATED`/`PERMISSION_DENIED` | Must | SHIPPED (W6) | All (no-op on P) |
-| SEC-3 | `inspecto-security` module: OIDC resource server (Nimbus/JWKS), `RoleMapper`, `OidcTokenRelay` (vendor-neutral since D15, 2026-07-25) — reactor-gated behind `edition-standard` | Must (S) | SHIPPED | S/E |
-| SEC-4 | HTTPS via pure-JDK `HttpsServer` + keystore | Must (S) | SHIPPED | S/E |
-| SEC-5 | BFF session: refresh token never reaches the browser (httpOnly cookie, SameSite=Strict + Origin CSRF) | Must (S) | SHIPPED (W6d) | S/E |
-| SEC-6 | UI OIDC login driven by `bootstrap.features.authMode`; offline/Personal = no-op | Must (S) | SHIPPED (W6d/W7) | S/E |
-| SEC-7 | RBAC/ABAC hardening: reject X-Actor on Standard, **per-resource** `permissions[]`, `canTriageRequirements` backend route, data-scoped grants | **Must (S)** | SHIPPED (2026-07-07/08: **X-Actor rejected outright when an `Authenticator` is active** (Standard) — actor authoritative from the Subject; Personal unchanged. **`canTriageRequirements` route** shipped — `RequirementRoutes` `/decision`+`/deliver` gated server-side on the capability while submission stays open (with UI-6). **Per-resource `permissions[]`** shipped — the v1 envelope emits `grants ∩ resource state` when a route declares the applicable set (`ApiContext.resourcePermissions`; components/expectations/requirements opted in; design: `archived-documents/plans-archive/resource-permissions-design.md`). **Data-scoped grants** shipped 2026-07-08 (SEC-7d, closes `archived-documents/plans-archive/rbac-groundwork.md` §4 Q2, model signed by product in-session: **attribute scopes**) — `Subject.dataScopes` (null = unscoped, every plain role unchanged); an object's `caseType` attribute is the scoping dimension; `ObjectRoutes` row-filters lists, 404s any direct route to an out-of-scope object (read AND mutate, existence-hiding), and prunes the correlation graph; `RoleMapper` resolves scopes from a `data_scopes` claim ∪ `case:<scope>` role names. Personal edition byte-identical (no Subject ever attaches)) | S/E |
-| SEC-8 | Secrets: env/file/keystore; Vault option future | Should | 🟡 PARTIAL by design — the Vault half is unbuilt (built half 2026-09-06, EDITIONS SEC-07: `SecretsProvider` SPI in the core `inspecto-acquire`; `${ENV}`/`${SYS}` resolve in **every** edition, `${FILE}`/`${KEYSTORE:alias}` (JCEKS) arrive by ServiceLoader from `inspecto-security`, which only `package.ps1 -Edition Standard\|Enterprise` bundles; a Personal bundle **refuses** those two schemes with an edition-naming message, never a silent null. Vault/cloud-KMS unbuilt — Enterprise-only, gated on a client policy (D4)) | All (`${ENV}`/`${SYS}`) · S/E (`${FILE}`/`${KEYSTORE}`) · E (Vault/KMS, unbuilt) |
-| SEC-9 | Write-root gate (`-Dassist.write.root` → 503 fail-closed) — separate from auth, always on | Must | SHIPPED | All |
-
-### 3.13 Assistant (AGT)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §2 is the requirement-of-record for `AGT`+`EOI` (ONE capability — `GLOSSARY.md` §14), and it CORRECTS this table.
+> **Stripped to this index on 2026-09-09** (docs-consolidation plan step 5). Until then this section
+> carried the full status text for all sixteen areas *while* seventeen capability specs each claimed to
+> be the requirement-of-record for their rows — so **every one of the 101 IDs had two owners**, which
+> is the exact condition the consolidation existed to end. Each area's §2 states its rows as they
+> actually hold, and **corrects this file** where the two disagreed; those corrections are why the
+> duplicate could not simply be left alone.
 >
-> 🔴 **Read its §3.10 before reading any Edition cell below as a promise.** `inspecto-agent`, `inspecto-agent-hosted` and `inspecto-intelligence` are **never bundled** (`EDITIONS.md` `CP-14`; `okf/backend/build-run/build-test.md`), so `/assist/*` and `/agent/*` answer **503 in every artifact `package.ps1` produces**. SHIPPED here means *built and tested in the reactor*, not reachable by an operator — and that is the intended default (`BACKLOG.md` `PKG-5`).
+> ⚠ **Nothing was deleted unchecked.** Every ID was confirmed to resolve to a spec that names it
+> (101/101), and each row's distinctive facts — backticked identifiers, dates, commit hashes —
+> were diffed against its owner. **11 facts that lived only here were migrated into their owner spec
+> first**: identifiers each spec described in prose but never named, so they were ungreppable from the
+> page that owns them (`PipelineCodec`, `postgresql.jar`, `jlink`/`-NoRuntime`, `*_job_template.toon`,
+> `backup_verify`, `AccessDecider`, `ShareDashboardDialog`, `ComponentHistoryDialog`,
+> `SettingsDrawerComponent`, `EgressGuardTest`, two archived designs of record). 🔴 The diff also
+> caught this file **naming the wrong module** for the notification channels and citing **two commit
+> hashes that are not valid objects** in this repository — both corrected in the owning specs rather
+> than carried over.
+>
+> ⛔ **Do not re-add status text here.** A second home for a requirement is how the seventeen
+> contradictions in `superpower/docs-consolidation-plan.md` §5.5 were created. State it once, in the
+> owning spec.
 
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| AGT-1 | **Assistant** skills (7, read-only/draft-only, abstain-only escalation): diagnose, explain, KPI→SQL, NL→schedule, report narrative/SQL, suggest config | Must | SHIPPED — built and tested; ⚠ **not bundled** | 🔴 **none** — `CP-14`; the `All` here was wrong (corrected 2026-09-08) |
-| AGT-2 | Pluggable model transport: **eoiagent** gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | SHIPPED — built and tested | 🔴 **none** — `CP-14` (corrected 2026-09-08) |
-| AGT-3 | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds (`EgressGuardTest` invariant) | Must | SHIPPED | All — ⚠ vacuously: the guarantee is that code is ABSENT, and in a stock bundle the whole layer is absent (`CP-14`) |
-| AGT-4 | Model Settings pane + per-tier connectivity probes | Should | SHIPPED — the pane ships in the SPA; what it configures does not | 🔴 **none** — `CP-14` (corrected 2026-09-08) |
-| AGT-5 | **Embedded intelligence** (`inspecto-intelligence` module): ContextBroker grounding, tool belt L0–L3, autonomy ladder (Explain → Draft → Act-with-approval → bounded autonomy) | Should | SHIPPED — P0 2026-07-07 (sign-off given), **P1–P5 COMPLETE 2026-07-21** (+ polish); as-built in `okf/backend/agent/embedded-intelligence.md`, follow-ons in `BACKLOG.md` §2 | 🔴 **none** — `CP-14` (corrected 2026-09-08). ⚠ "L3 = S+" is a paper designation: L3 is a `-D` switch (`-Dintelligence.opsmonitor.enabled`, default off), the very mechanism EDG-01 rejected for edition boundaries; nothing in code edition-gates it |
-| AGT-6a | **AI behind every screen** — inline natural-language authoring on every console pane, reusing the shipped L1 draft tools (no new backend capability) | Should | PLANNED — **scoped 2026-07-25** (`superpower/agt-6-plan.md` §3); ~~ready to schedule pending D1–D4~~ — ⚠ **corrected 2026-09-08: `superpower/agt-6-plan.md` records D1–D4 + D8–D11 ANSWERED and phases A1–A5 SHIPPED** (six draft tools live on five panes, the glossary component on twelve); the plan stays open only for the `kpi_report_builder` host | All |
-| AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) beyond the code-defined seeded runbooks | Could | PLANNED — demand-gated (`superpower/agt-6-plan.md` §4); upstream prerequisite = the eoiagent per-tool `DryRunProvider` seam | All (L3 = S+, opt-in) |
+| Area | IDs | Requirement of record |
+|---|---|---|
+| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/capabilities/acquisition/acquisition.md) §2 |
+| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/capabilities/ingestion/ingestion.md) §2 |
+| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) §2 |
+| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/capabilities/pipeline-execution/pipeline-execution.md) §2 |
+| `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](okf/capabilities/data-plane/data-plane.md) §2 |
+| `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](okf/capabilities/studio/studio.md) §2 |
+| `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](okf/capabilities/observability/observability.md) §2 |
+| `INC` — **Alerts & Incidents** | `INC-1` … `INC-5` | [`incidents/incidents.md`](okf/capabilities/incidents/incidents.md) §2 |
+| `SPC` — **Spaces & tenancy** | `SPC-1` … `SPC-5` | [`spaces/spaces.md`](okf/capabilities/spaces/spaces.md) §2 |
+| `MET` — **Component metamodel & Catalog** | `MET-1` … `MET-5` | [`metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md) §2 |
+| `API` — **Control API** | `API-1` … `API-7` | [`control-api/control-api.md`](okf/capabilities/control-api/control-api.md) §2 |
+| `SEC` — **Security** | `SEC-1` … `SEC-9` | [`security/security.md`](okf/capabilities/security/security.md) §2 |
+| `AGT · EOI` — **Assistant** | `AGT-1`, `AGT-2`, `AGT-3`, `AGT-4`, `AGT-5`, `AGT-6a`, `AGT-6b` · `EOI-1` … `EOI-7` | [`assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §2 |
+| `UI` — **Surfaces & Lenses** | `UI-1` … `UI-8` | [`surfaces/surfaces.md`](okf/capabilities/surfaces/surfaces.md) §2 |
+| `PKG` — **Editions & packaging** | `PKG-1` … `PKG-4` | [`editions/editions.md`](okf/capabilities/editions/editions.md) §2 |
 
-### 3.14 Assistant: the agent runtime (EOI) — upstream repo `jotder/inspect-agent`, product name *eoiagent*
+⚠ **Two of the seventeen areas have no rows here, and that is correct.** `CMP` (**Compliance**) was
+orphaned across `EDITIONS.md` and `compliance/controls-matrix.md` and never had a `REQUIREMENTS.md`
+section; `TOOL` (**Guards & repository tooling**) owns §4 `NFR-9`/`NFR-10` rather than functional rows.
+Both are areas by [`GLOSSARY.md` §14](GLOSSARY.md#14-capability-areas-the-functional-spine), which is
+the authority for what an area is called and where it lives — ⛔ never this table.
 
-> ⚠ **Owned by [`okf/capabilities/assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §2** — `EOI` is not a separate area; its rows are the Assistant's runtime (`GLOSSARY.md` §14). ⚠ The upstream **repository** is `jotder/inspect-agent`; *eoiagent* is the product name and Maven groupId. `okf/agentic/` still points at a local sandbox path that does not exist.
+⚠ **Citations of the old `§3.1`…`§3.16` subsections resolve HERE.** Roughly thirty-five documents cite
+them, and the useful ones are citations of *origin* — a spec recording which board rows it superseded, which
+is exactly why those subsections are gone. Ten sentences that made a present-tense claim about this
+section's *content* ("six requirements in §3.4, all recorded shipped") were repaired in the same change;
+`supersedes-rows:` frontmatter was deliberately left alone, because it records what WAS superseded.
 
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| EOI-1 | Embeddable, framework-free Java agent library (no Spring; classpath, not JPMS) | Must | SHIPPED | — |
-| EOI-2 | Pluggable models: `LlmGateway` seam, OpenAI-compatible + local (Ollama) portability | Must | SHIPPED | — |
-| EOI-3 | Governance: approval gate + dry-run for every mutating action | Must | SHIPPED | — |
-| EOI-4 | Audit trail + observability of agent decisions | Must | SHIPPED | — |
-| EOI-5 | Core vs **application-pack** split (host apps ship packs; core stays generic) | Must | SHIPPED | — |
-| EOI-6 | Eval harness for skill/orchestration regression | Should | SHIPPED | — |
-| EOI-7 | Cut a **0.1.0 release** + publish artifacts (today: `0.1.0-SNAPSHOT`, local-`.m2`/source-build only; Inspecto CI builds it from source) | **Must** | PARTIAL (2026-07-08: **(a) cut + pinned** — `v0.1.0` tagged on eoiagent `main`, trunk bumped to `0.2.0-SNAPSHOT`, released jars in local `.m2`; both Inspecto agent poms pin `eoiagent.version 0.1.0` (~~no SNAPSHOT anywhere~~ — 🔴 **FALSE as of 2026-09-08: the reactor's PARENT pom pins `<eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>`** (not the two agent poms), and CI clones `jotder/inspect-agent` and rebuilds it from the branch head on every run, so the build is not reproducible from published artifacts — which is exactly what (b) was for), reactor green; reproduce with `git checkout v0.1.0 && mvn -o clean install`. Remaining: **(b) publish** — the registry decision (Nexus? GitHub Packages?), infra/product call) | — |
-
-### 3.15 Surfaces & Lenses (UI)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/surfaces/surfaces.md`](okf/capabilities/surfaces/surfaces.md) §2 is the requirement-of-record for `UI`, and it CORRECTS this table. 🔴 **The Edition column here is unsupported:** `EDITIONS.md` has **no `UI` row at all**, yet these eight rows claim `All` under this file's note that the matrix is authoritative — and the shell IS gated in three places (`CP-13` events, `CP-09` geo/link, `CP-11` objects). The sibling areas were re-grounded 2026-09-08; `UI` was not.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| UI-1 | **Lens** switcher (Business/Builder/Ops) + Capability-gated panes | Must | SHIPPED — ⚠ corrected 2026-09-08: **a Lens never hides a pane** (nav filtering by Lens was declined outright 2026-07-03, per-route Lens tagging with it); and **no route guard or structural directive enforces a Capability** — each pane calls the check itself | All |
-| UI-2 | Shared design system (status-badge, empty-state, skeleton, grid, connectivity-banner, data-table family) + no-hardcoded-colors CI gate + `/design` gallery | Must | SHIPPED | All |
-| UI-3 | Accessibility: WCAG 2.2 AA target, axe-core gate in CI | Must | 🟡 SHIPPED-with-scope (corrected 2026-09-08): the gate is broad (**204 of 334** spec files) but runs in jsdom with **seven rules disabled** — contrast and every page-level rule — and **seven audit findings remain open** (two Moderate). "WCAG 2.2 AA" is a **self-assessment** dated 2026-06-16 over 17 pages, explicitly not a certification; the route-level browser pass is future work. ⚠ `compliance/controls-matrix.md` carries **no accessibility control** | All |
-| UI-4 | ~~Offline mock-first operation (one `MockStore`, seed packs, v1-envelope parity)~~ | Must | SUPERSEDED (mock backend deleted 2026-08-31 — the UI now requires a real ControlApi; see `docs/INDEX.md` mock-backend-removal entry) | All |
-| UI-5 | Responsive sweep (32 routes × 2 breakpoints) | Must | 🟡 **provenance, not a gate** (corrected 2026-09-08): **no automated responsive test exists**, and the "32 routes all green" record lives only in an archived review sheet that nothing re-runs. No document agrees on the denominator (32 / 47 / ~35 / 44), and ≥12 routes have been added since | All |
-| UI-6 | **Requirement** intake: Business submits (KPI/Report/Reconciliation/Rule), Builder triages, delivery recorded | Should | SHIPPED (2026-07-07: `RequirementRoutes` — `/requirements` submit/list + `/requirements/{id}/decision`+`/deliver` over the `requirement` component store; UI moved off generic component CRUD to these routes; offline mock parity) | All |
-| UI-7 | **Reconciliation** + **Breaks** (auto-close on re-match; manual resolutions preserved) | Must | SHIPPED | All |
-| UI-8 | Settings drawer + consolidated admin settings pane | Should | SHIPPED (2026-07-07, `7e06463`/`12ead9c`: `SettingsDrawerComponent` + the master-detail `/settings/<section>` pane; later host for Settings ▸ Scheduler 2026-08-25 and Settings ▸ Operational database) | All |
-
-### 3.16 Editions & packaging (PKG)
-
-> ⚠ **These rows now have an owner:** [`okf/capabilities/editions/editions.md`](okf/capabilities/editions/editions.md) §2 is the
-> requirement-of-record for `PKG`, and it CORRECTS every status below. 🔴 **Two of the four
-> overstate what SHIPS:** no Standard artifact is ever built, and no released bundle contains the jlink
-> runtime. The third — the SBOM generator declaring 4 first-party jars where a Standard bundle carries
-> 10 — was **fixed 2026-09-09** and is now guarded in CI (`tools/check-sbom-modules.mjs`).
-> Re-grounded 2026-09-09. Area renamed per `GLOSSARY.md` §14.
-
-| ID | Requirement | MoSCoW | Status | Edition |
-|---|---|---|---|---|
-| PKG-1 | One fat JAR + jlink runtime; per-edition bundles via `package.ps1 -Edition` | Must | 🔴 **SHIPPED in part** (corrected 2026-09-09): the fat JAR ships; per-edition bundles are **two of three** (`release.yml` packages Personal + Enterprise, never Standard); and **no released artifact contains the jlink runtime** — every release step passes `-NoRuntime`. See owner §2/§3.7 | All |
-| PKG-2 | Lean SBOM: framework-free core, network deps isolated in `inspecto-connectors` | Must | ✅ **SHIPPED** (generator fixed 2026-09-09): it had declared **4** first-party jars where Standard stages **10** and Enterprise **11** (11 and 12 jars counting the `postgresql.jar` sidecar) — it knew none of the seven EDG-01 modules, so javax.mail, moved to `inspecto-notify-channels` by cell 1, appeared in **no** shipped SBOM. The set now lives once in `tools/bundle-modules.mjs`, and `tools/check-sbom-modules.mjs` fails CI when it drifts from what `package.ps1` stages. A duplicate `postgresql` component (an invalid `bom-ref`/`SPDXID`) was fixed in the same pass. Isolation is half-superseded: the connector sidecar ships in EVERY edition (`CONNECTORS-BUNDLE-1`) | All |
-| PKG-3 | Runnable, self-contained example suite (`inspecto/examples/`) | Should | 🟡 **SHIPPED, one-thirtieth exercised** (corrected 2026-09-09): 30 examples in 7 categories are tracked and staged into every bundle, and **exactly one** runs in any pipeline (`release.yml`, on a tag only). `ci.yml` runs none | All |
-| PKG-4 | Verify the Standard bundle's jlink module set against Nimbus (until then: run Standard with `-NoRuntime`) | **Must (S)** | ⚠ **SHIPPED, evidence covers 5 of the 12 modules** (corrected 2026-09-09): the recorded verification attributes `java.base`/`java.sql`/`java.net.http`/`jdk.httpserver` + `jdk.crypto.ec`; the other seven in the image are unattributed by it. Status is also stated three ways (this row RESOLVED · `BACKLOG.md` "not re-verified" · `build-test.md` "unproven as of 2026-08-27") — all moot for shipped artifacts, which carry no runtime at all | S |
-
----
+**`PIP` is one ID range across two specs**, which is why it takes two rows: authoring owns the DAG, the
+Step vocabulary and author-time validation; execution owns Runs, Jobs, triggers and the maintenance
+library. The split is fixed by `GLOSSARY.md` §14, not chosen here.
 
 ## 4. Non-functional requirements
 
