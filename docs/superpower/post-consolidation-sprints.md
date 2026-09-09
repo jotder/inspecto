@@ -1,6 +1,6 @@
 # Post-consolidation plan — six sprints
 
-> **Status: PROPOSED 2026-09-09, not started.** Written the shift the seventeenth capability spec landed
+> **Status: Sprint 1 DONE 2026-09-09; Sprints 2–6 proposed.** Written the shift the seventeenth capability spec landed
 > (`35cc8579`). It sequences what the consolidation left behind: the remaining steps of
 > [`docs-consolidation-plan.md`](docs-consolidation-plan.md) (steps 5–9, whose exit criteria are already
 > written there and are **reused verbatim** below, never re-invented), plus the ~215 findings the seventeen
@@ -50,8 +50,30 @@ Five items, each naming the file it changes. First act of the shift is a 30-minu
 | 5 | **Row 15's true readiness** — this session corrected the row that named a non-existent class, but the real blocker is untouched: §6 step 2, the parity gate through the compiled-recipe path | `pipeline-waves-drain-plan.md` §2.3 | A release-gated deletion whose gate nobody can currently evaluate |
 
 **Exit:** items 1–4 shipped with a test each; item 5 has a written verdict on whether the parity gate holds.
-**First command:** `node tools/check-sbom-modules.mjs` — see what the peer session's new guard already
-covers before touching item 1.
+
+### Sprint 1 — outcome (2026-09-09)
+
+**The skim earned its keep: two items outranked things queued above, and both named their file.**
+
+| Item | State |
+|---|---|
+| `SBOM-RESOLVE-1` | ✅ `ad62d5a0` — `release.yml` installs the reactor under `-Pedition-enterprise` before packaging. The **profile** is load-bearing: the nine edition modules are profile-scoped, so a plain install leaves `inspecto-ops` absent, and that is the artifact Enterprise fails on. `ci.yml` already recorded this reasoning for the dependency guard; release.yml never got it |
+| **The coverage guard's missing scope floor** *(added by the skim)* | ✅ `4be5c791` — it failed only on ZERO reports, so one stale module CSV passed as repo-wide: measured, it printed *"every floor met"* over **1 module / 427 instructions**. Now `MIN_BACKEND_MODULE_REPORTS = 20` against 29 modules with tests. Falsified both ways on one tree |
+| The served maintenance descriptor | ✅ `f0e4dee2` — derived from the dispatch. `MaintenanceTaskContractTest` re-parses the switch's own `case` labels; mutation-proven (removing one id failed 3 of 5 tests, naming it) |
+| `SqlGuard` on the save path | ✅ — one helper, both surfaces (graph save and Recipe compile), `SQL_STEP_REFUSED` carrying the guard's own message. Mutation-proven: removing the two call sites failed **exactly** the two integration tests and left the seven helper tests green, with the message *"Expected PipelineCompileException to be thrown, but nothing was thrown"* — the defect stated as a test |
+| Replay's unstated bound | ✅ — `EDITIONS.md` `CP-03` gains the caveat, and the observability row's **404 is un-misattributed**: it was grouped with the `-Djobs.backend` projection routes, and the two failure modes are opposite |
+| Row 15's true readiness | ✅ verdict recorded in `pipeline-waves-drain-plan.md` §2.3 — see below |
+
+**Row 15's verdict.** Gate re-run: newest master-ancestor tag is still `v3.11.0`, so it holds. 🔴 The waves plan's own conclusion was **stale against its own table** — it claimed the lane flag "was
+never built" two lines under a row recording it BUILT 2026-09-02, so its "two independent reasons" are now
+**one**: step 4, no release has carried a flagged legacy path. ⚠ Step 2 is narrower than it reads: the
+fixture round-trip sweep is green, but that proves projection parity, **not** the full suite executing through
+the compiled path. And the blocker the backlog cited was a class that does not exist.
+
+⚠ **Carried out of Sprint 1:** the packaging script's two Windows-shaped defects (32 destinations using a
+literal backslash, and the script has never run on Linux). It names its file, but it **cannot be verified from
+this sandbox** — proving it needs a Linux runner, which makes it a different shape of work from the rest of
+this sprint. It belongs with the first-tag work, not with a shift that can only edit it blind.
 
 ---
 

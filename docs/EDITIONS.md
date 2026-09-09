@@ -304,7 +304,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 |---|---|---|---|---|---|
 | CP-01 | Control API v1 (JDK HttpServer, envelope, ETag/If-Match, idempotency keys) | ✅ | ✅ | ✅ | |
 | CP-02 | Pipeline authoring: graph editor + Recipe view (insert-between, insert-into-branch, undo/redo, snapshots, save-as-template) | ✅ | ✅ | ✅ | insert-into-branch 2026-09-02 |
-| CP-03 | Pipeline lifecycle: validate → save → arm/activate → test-run → run → replay; run-level ledgers | ✅ | ✅ | ✅ | |
+| CP-03 | Pipeline lifecycle: validate → save → arm/activate → test-run → run → replay; run-level ledgers | ✅ | ✅ | ✅ | ⚠ **`replay` is BOUNDED and this cell said nothing about it** (added 2026-09-09): `POST /jobs/runs/{runId}/replay` resolves the original run through `JobService.runById` → `liveRuns`, an **in-memory** insertion-ordered map with an eviction hook capped at `LIVE_RUN_CAP`. So replay of a run that has been evicted — or of **any** run after a restart — is a `404`. Everything else in this row is durable; replay is not. Persisting the lookup is a design call, filed. Owner: [`okf/capabilities/pipeline-execution/pipeline-execution.md`](okf/capabilities/pipeline-execution/pipeline-execution.md) §2.3 |
 | CP-04 | Pipeline bundle export/import (server-side, dependency closure) | ✅ | ✅ | ✅ | selective pipeline export/import for the canonical file is a BACKLOG design item |
 | CP-05 | Onboarding wizard (Collection → Parse → Schema → Sink) | ✅ | ✅ | ✅ | |
 | CP-06 | Component registry (schemas, grammars, mappings, connections, enrichments, findings-spec, policies…) with `.history/` | ✅ | ✅ | ✅ | |

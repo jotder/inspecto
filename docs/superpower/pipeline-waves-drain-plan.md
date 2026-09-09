@@ -326,8 +326,27 @@ sequence out in four steps, and **two of them are unmet**:
 | 3. legacy read path **kept behind a flag** for one verification minor | ✅ **BUILT 2026-09-02** — `-Dingest.lane=auto\|graph\|flat` (`ConsignmentIngestStrategy.LANE_PROPERTY`, default `auto`; `graph` disables the flat lane), pinned by `IngestLaneFlagTest`. (Until then this cell read "THE FLAG DOES NOT EXIST" — true when written 2026-08-31.) |
 | 4. the release | 🔴 newest tag **`v3.12.0` shipped 2026-06-05** — ten weeks BEFORE the converter — and is **not an ancestor of `master`** |
 
-⇒ **Two independent reasons row 15 cannot close by writing code**: no release has ever carried a flagged
-legacy path (step 4), and the flag that would make such a release meaningful was never built (step 3).
+⇒ 🔴 **CORRECTED 2026-09-09 — this conclusion contradicted the table two lines above it.** It read
+*"two independent reasons … and the flag that would make such a release meaningful was never built (step 3)"*,
+while the step-3 row already records the flag **BUILT 2026-09-02**. One reason survives, and it is step 4:
+**no release has ever carried a flagged legacy path.**
+
+**Gate re-run 2026-09-09** — `git tag --merged master --sort=-v:refname | head -1` → **`v3.11.0`**, unchanged,
+so the gate still holds. `git merge-base --is-ancestor v3.12.0 master` still returns non-zero, confirming why
+the earlier gate was unfalsifiable by construction.
+
+⚠ **Step 2 is the one genuinely open engineering question, and it is narrower than it looks.**
+`RecipeConverterTest.everyRepoFixtureRoundTripsThroughTheRecipeProjection` is green over every committed
+fixture (12 tests, re-run 2026-09-09), but that proves *round-trip* parity of the projection — `compile(toRecipe(cfg))
+== cfg` — **not** the full suite EXECUTING through the compiled-recipe path, which is what §6 step 2 asks for.
+Those are different claims and only the first is evidenced. State which one a future shift means before
+calling step 2 met.
+
+🔴 **What was NEVER the blocker:** `BACKLOG.md` cited this row's parity blocker as
+*"`BatchGraphRunner` has zero production callers"*. That class does not exist — it was renamed away
+2026-08-31 — and `ConsignmentGraphRunner` has two production callers (`engages()` drives the lane admission,
+`run(...)` executes at `ConsignmentIngestStrategy:355`). Corrected in the backlog 2026-09-09; do not
+re-derive the gate from it.
 
 ⛔ **And building the flag is explicitly warned against**: the amendment's own §8 says of this work
 *"Do not start it on momentum."* Building it would also not close row 15 — **row 15 IS the deletion**, and
