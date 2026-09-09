@@ -30,7 +30,7 @@
 
 ## 1. Feature inventory
 
-### A — Stage-1 ingest: M..N multiplexer basics
+### A — Stage-1 ingest: M..N multiplexer basics [`ING`]
 
 | Feature | TOON skeleton | Doc / code |
 |---|---|---|
@@ -40,7 +40,7 @@
 | Multi-source (many `active: true` pipelines in one service) | one `*_pipeline.toon` per source under `config/` | `ADVANCED_GUIDE §3` · `CollectorService.runAllOnce` |
 | File-pattern glob | `processing:` / `  file_pattern: "glob:**/*.{csv,csv.gz}"` | `configuration.md` |
 
-### B — Parsing frontends
+### B — Parsing frontends [`ING`]
 
 | Feature | TOON skeleton | Status / code |
 |---|---|---|
@@ -61,7 +61,7 @@
 | `text_regex` frontend (flat XML, `attr: value` logs) | `parsing:` / `  frontend: text_regex` / `  text_regex: { pattern: "…(?P<name>…)…" }` | `[LIVE]` `DuckDbCsvIngester` (named groups = selectors; `record_split: blank_line` or a literal delimiter string now supported for multi-line block records — see §6) |
 | Unified `parsing:` block (`delimited`/`plugin` aliases) | `parsing:` / `  frontend: delimited\|fixedwidth\|json\|text_regex\|plugin` | `[LIVE]` `PipelineConfigParser` (aliases `csv_settings` + `processing.ingester`; legacy configs unchanged) |
 
-### C — Schema & validation
+### C — Schema & validation [`MET` · `ING`]
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -76,7 +76,7 @@
 > **Gotcha:** type-cast failures are `TRY_CAST` → NULL (row still written); only **structural**
 > errors (wrong column count) are rejected to `errors/<base>_errors.csv`.
 
-### D — Transforms (Stage-1) & Stage-2 enrichment
+### D — Transforms (Stage-1) & Stage-2 enrichment [`PIP`]
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -86,7 +86,7 @@
 | Stage-2 enrichment (`*_enrich.toon`) | `name: KPI` / `input: {database: …}` / `references: {…}` / `output: {…}` / `transform: "SELECT … GROUP BY …"` | `configuration.md` · events_daily_kpi |
 | Enrichment reference join | `references:` / `  region_dim: { path: ref/region_dim.parquet, format: PARQUET }` | events_daily_kpi |
 
-### E — Output / sinks
+### E — Output / sinks [`PIP`]
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -98,7 +98,7 @@
 | DuckDB scratch/memory tuning | `processing:` / `  duckdb: { temp_directory: temp/big, memory_limit: "16GB" }` | `configuration.md` |
 | Auto-chunking (huge single files) | `processing:` / `  chunking: { max_file_bytes: 8589934592 }` — on by default at 8 GiB; `0` disables | `configuration.md` |
 
-### F — Jobs (`*_job.toon`)
+### F — Jobs (`*_job.toon`) [`PIP`]
 
 Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enum `JobType.PIPELINE`).
 
@@ -114,7 +114,9 @@ Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enu
 
 > **Gotcha:** `on_pipeline:` matches the **lowercased** pipeline name (`ConsignmentEvent.pipeline()`).
 
-### G — Authored flows (`*_flow.toon`)
+### G — Authored Pipelines (`*_pipeline.toon`) [`PIP`]
+
+> 🔴 **Heading corrected 2026-09-09 (step 8).** It read "Authored flows (`*_flow.toon`)" — the banned synonym *and* the retired representation. `*_flow.toon` write routes have answered **405 since W5**; measured today, **one** grandfathered file survives (`sales_rollup_flow.toon`, allowlisted in `tools/check-vocabulary.mjs`) against **35** `*_pipeline.toon`. The authored DAG is a **Pipeline** (`GLOSSARY.md` §5) — ⛔ author no new `*_flow.toon`.
 
 Node types from `PipelineNodeTypes.catalog()`. (⚠ **Corrected 2026-08-18**: the `demo` space no longer
 ships an authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
@@ -138,7 +140,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | `sink.view` (no bytes; `derived_sql` registered) | `store: active_subs` / `source_store: subscriber` | `ADVANCED_GUIDE §5.3` |
 | `incremental_column` (flow job watermark) | in the `*_job.toon`: `flow: f` / `incremental_column: event_dt` | `ADVANCED_GUIDE §5.3` |
 
-### H — Connections (`*_connection.toon`)
+### H — Connections (`*_connection.toon`) [`ACQ`]
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -149,7 +151,9 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | DB-export source (JDBC + watermark) | `connection: { connector: db, options: { watermark_column: updated_at } }` | `okf/backend/acquisition/data-acquisition-framework.md` |
 | Secret via env / sys property | `password: "${ENV:MY_SECRET}"` / `"${SYS:my.prop}"` | `configuration.md` · `SecretResolver` |
 
-### I — Acquisition (`source:` block)
+### I — Acquisition (`collector:` block) [`ACQ`]
+
+> 🔴 **Heading corrected 2026-09-09 (step 8).** It read "`source:` block". Measured: **zero** committed `.toon` files carry a `source:` key and **22** carry `collector:` — the acquisition-entity rename to **Collector** (`GLOSSARY.md` §2/§3, 2026-07-14) never reached this heading, so the canon advertised a key the product does not read.
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -166,7 +170,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | Post-action (MOVE/DELETE/RENAME) | `source:` / `  post_action: { on_success: MOVE, archive_path: archive/yyyy/MM/dd }` | `configuration.md` |
 | Regex include/exclude | `source:` / `  include[1]: "regex:CDR_[0-9]{8}.*\\.csv"` | `configuration.md` |
 
-### J — Operational intelligence
+### J — Operational intelligence [`OPS` · `AGT`]
 
 | Feature | TOON skeleton / flag | Doc |
 |---|---|---|
@@ -180,7 +184,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 | Provenance data plane | `-Dprovenance.backend=duckdb` | `ADVANCED_GUIDE §5.3` |
 | RCA templates (`*_rca.toon`) | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `ADVANCED_GUIDE §10` (gap) |
 
-### K — Views, metrics, events (serve mode)
+### K — Views, measures, events (serve mode) [`DAT` · `OPS`]
 
 `GET /metrics` (Prometheus — optional `inspecto-metrics`) · `GET /events` / `/events/search` (optional `inspecto-events`; the core audit read is `/audit/search` / `/audit/export`) · `GET /views` / `/views/{name}/data`
 (a `sink.view` registration, or a hand-authored definition — see below) · `GET /catalog` /

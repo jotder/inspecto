@@ -140,7 +140,9 @@ board exists for the cells that *differ* or are *undecided*.
 changes state carries the date in Notes. Source of truth for *what* a feature is stays
 [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
 
-### Core engine — platform capabilities (identical across editions by construction)
+### Core engine — platform capabilities (identical across editions by construction) [`ING` · `MET` · `PIP`]
+
+> ⚠ **Two rows in this table have no capability owner** (measured 2026-09-09, step 8): **`XFM-04`** (Decision Rules) and **`OUT-04`** (auto-chunking + DuckDB scratch/memory tuning) are cited by **no** capability spec, while `XFM-01..03`/`OUT-01..03` moved to the Step Processors table as `SP-XFM-*`. They were left behind by that split. `XFM-04`'s subject (Decision Rule) belongs to `INC` by [`GLOSSARY.md` §14](GLOSSARY.md#14-capability-areas-the-functional-spine) and `OUT-04`'s to `PIP` execution — ⛔ but neither spec claims them yet, so this note records the gap rather than asserting an owner.
 
 > Split 2026-09-02: the per-processor rows (parsers, transforms, sinks, acquisition adapters — the former
 > ING-03/04, PRS-*, XFM-01..03, OUT-01..03) moved to the **Step Processors** table below; this table keeps
@@ -161,7 +163,7 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | 🟡 | ✅ | ✅ | P is 🟡 (corrected 2026-09-08): four of the listed tasks are not on Personal. `event_prune` added 2026-09-02 (COMPLY-3). ⚠ **`incident_purge` is an `inspecto-ops` task (EDG-01 cell 7) — unknown on Personal**; backup/restore/verify are `inspecto-backup` (cell 2), also not Personal (corrected 2026-09-08) |
 | JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | |
 
-### Step Processors (one row per processor; the board's authoring surface)
+### Step Processors (one row per processor; the board's authoring surface) [`ING` · `PIP`]
 
 Generated from the processor catalog (`ProcessorCatalog`, served on `GET /pipelines/processor-catalog`, mirrored to
 `processor-catalog.contract.json`) — edit the catalog, regenerate this table; do not hand-edit rows. **Status**: ✅ delivered
@@ -298,7 +300,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | ~~SP-XFM-02~~ | ~~🔄 Field type cast & renamer matrix (`transform.cast`)~~ | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 2026-09-04** — cast is the `convert.type` row, rename is the Field-name alias |
 
 
-### Control plane & authoring
+### Control plane & authoring [`API` · `PIP` · `BI` · `INV` · `INC` · `OPS`]
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
@@ -318,7 +320,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | CP-14 | Assist / Intelligence agents (`/assist/*`, `/agent/*`) | — | — | — | never bundled by design; routes answer 503 in every bundle (`build-test.md`). ✅ **This row is the accurate one** — `REQUIREMENTS.md` §3.13 said `All` for every `AGT` row until 2026-09-08; requirement-of-record is [`okf/capabilities/assistant/assistant.md`](okf/capabilities/assistant/assistant.md) §3.10. ⚠ The three modules are **plain reactor modules, not edition-gated ones**: they build and test on every run and ship in nothing (`PKG-5`) |
 | CP-15 | Delivery channels (mail, webhooks, delivery-status receipts) | — | 🟡 | 🟡 | ✅ **GATED 2026-09-07 (EDG-01 cell 1) — the P cell is now true of the build.** Both transports moved into `inspecto-notify-channels`, a Standard+/Enterprise-only module: `WebhookChannel` came out of `inspecto-engine` (an unconditional dependency, so it shipped everywhere) and `SmtpEmailChannel` out of `inspecto-connectors` (whose sidecar `package.ps1` copies into EVERY edition by explicit decision). Personal now registers **zero** `NotificationChannel` providers — pinned by `NoChannelShipsInThePersonalBuildTest`, which runs in the DEFAULT build and asserts the SPI is empty. In-app delivery is intrinsic to `NotificationService` and is unaffected. ⚠ Still 🟡 for S/E: soft-bounce retry and the SES/SNS adapter remain deferred (D8) — bounce suppression itself SHIPPED 2026-09-07. ⛔ The inbound `DeliveryStatusAdapter`s stay in `inspecto-connectors`: they are inert without a configured signing key and `DeliveryStatusRoutes` 404s an unconfigured adapter. |
 
-### Security & identity
+### Security & identity [`SEC`]
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
@@ -335,7 +337,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SEC-11 | X-Actor header removal | 🔲 | 🔲 | 🔲 | already **rejected** on S/E when an `Authenticator` is active; full removal gated on **the next MAJOR tag** (restated 2026-09-07, `BACKLOG.md` §2 — the API-v1 sunset it used to cite was deleted 2026-07-25) |
 | SEC-12 | OIDC end-session redirect (`bootstrap.auth.endSessionUrl`) | — | 🟡 | 🟡 | **SPA half shipped 2026-07-26** (RP-Initiated Logout via `endSessionUrl`, `SessionService.logout()`); the server publishes **no** `auth` block, so the value comes from the UI build's `environment.ts` — configured at build time, not deployment. Server-published OIDC config refused as scoped (`BACKLOG.md` §6). `okf/capabilities/security/security.md` §2 |
 
-### State, scale & operations
+### State, scale & operations [`OPS` · `DAT`]
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
@@ -348,7 +350,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | OPS-07 | Embedded trimmed JVM runtime in the bundle (jlink) | 🟡 | 🟡 | 🟡 | 🔴 **AMENDED 2026-09-09 — buildable, shipped in nothing.** `package.ps1` builds a 12-module image, but **every** `release.yml` step passes `-NoRuntime` (the runner has no jmods cache), so no published artifact contains a runtime and the target must supply Java 24+. The old ✅✅✅ described a capability of the script, not a property of the bundle. Owner: [`okf/capabilities/editions/editions.md`](okf/capabilities/editions/editions.md) §2 |
 | OPS-08 | Timezones: `-Dops.timezone` + per-source `parsing.source_timezone` | ✅ | ✅ | ✅ | |
 
-### Compliance & supply chain
+### Compliance & supply chain [`CMP`]
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
@@ -365,7 +367,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 decided Enterprise-only on 2026-09-02. Everything 🔲 already has a BACKLOG home; a 🔲 cell that gets
 scheduled should cite its row here.
 
-### Edition-gating debt (opened by the 2026-09-02 decisions)
+### Edition-gating debt (opened by the 2026-09-02 decisions) [`PKG`]
 
 | ID | Work | Cells | Notes |
 |---|---|---|---|
