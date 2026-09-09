@@ -46,6 +46,26 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress -DskipTests install
         working-directory: eoiagent-src
 
+      # SBOM-RESOLVE-1 (2026-09-09): install THIS reactor too, or packaging cannot generate its bill of
+      # materials and the tag fails. `package.ps1` runs `mvn ... package` and then invokes tools/sbom.mjs as
+      # a SEPARATE process; that fresh session shells `mvn dependency:list`, which resolves sibling reactor
+      # modules only from `~/.m2` — never from a jar built in an earlier invocation. The step above installs
+      # the AGENT dependency, never this reactor. A non-zero exit from the generator throws by design
+      # (`a bundle ships with its SBOM or not at all`), so the release stops.
+      #
+      # ci.yml:130-135 already records this exact reasoning for the dependency guard, which shells the same
+      # command; release.yml never got the same treatment.
+      #
+      # `-Pedition-enterprise` and NOT the default reactor: the nine edition modules are profile-scoped, so
+      # a plain install leaves `inspecto-ops` and `inspecto-policy` absent — and Enterprise is the flavour
+      # that fails first, because `inspecto-policy` gained a TEST-scoped edge to `inspecto-ops` in EDG-01
+      # cell 7 and resolution covers every scope regardless of the generator's `-DincludeScope=runtime`.
+      # Enterprise is the superset (9 modules vs Standard's 8), so one pass covers every edition packaged
+      # below. ⛔ Do NOT "fix" this by narrowing the scope filter: the failure is in RESOLUTION, which
+      # precedes filtering.
+      - name: Install the reactor into .m2 so the SBOM generator can resolve it (SBOM-RESOLVE-1)
+        run: mvn --batch-mode --no-transfer-progress -DskipTests -Pedition-enterprise install
+
       - name: Install UI dependencies
         run: npm ci
         working-directory: inspecto-ui

@@ -39,7 +39,7 @@ a new dependency — not a build. The rule that fell out: **a P1 must name the f
 cannot is a decision (§1) or a design (P2).
 
 Do next, in order (refreshed 2026-09-09 — `SBOM-RESOLVE-1` is queued; GUARD-SWEEP-1 and DAT-6-CI-1 done):
-1. **`SBOM-RESOLVE-1` (§4)** — the only queued P1. The bill of materials cannot generate on a clean
+1. ~~**`SBOM-RESOLVE-1` (§4)**~~ ✅ **SHIPPED 2026-09-09** — `release.yml` now installs the reactor under `-Pedition-enterprise` before the packaging steps. Was the only queued P1. The bill of materials cannot generate on a clean
    runner, so the first tag fails at packaging; it names the file it changes (`release.yml`). Filed
    2026-09-09 while fixing the generator's module table, and it is **not** a regression from that fix —
    Enterprise failed identically before it. Everything else below was already drained: MERGE-ATTRS-1,
@@ -215,8 +215,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 a test that post-dates it. What was left was one release-gated wire change; `SBOM-RESOLVE-1` joined it
 2026-09-09.)*
 
-- **P1** · **`SBOM-RESOLVE-1` — the bill of materials cannot be generated on a clean runner, so the first
-  tag fails at packaging.** `tools/sbom.mjs` resolves through `mvn dependency:list`, and Maven will **not**
+- ~~**P1** · **`SBOM-RESOLVE-1`**~~ ✅ **SHIPPED 2026-09-09.** `release.yml` gained a reactor
+  `mvn -DskipTests -Pedition-enterprise install` before the packaging steps — the profile matters, because
+  the nine edition modules are profile-scoped and a plain install leaves `inspecto-ops` absent, which is
+  the artifact Enterprise fails on. Enterprise is the superset (9 vs Standard's 8), so one pass covers
+  every edition packaged below. Verified: `mvn -o -DskipTests -Pedition-enterprise install` BUILD SUCCESS
+  over 32 modules, with `inspecto-ops` and `inspecto-policy` jars refreshed in `~/.m2`. ⚠ A truly clean
+  BEFORE could not be reproduced on this sandbox (a prior build had primed `~/.m2`); the clean-runner
+  failure is the one recorded when this row was filed. ⛔ `release.yml` does **not** invoke the generator —
+  `package.ps1:555` does, after staging — so there is no second staging gap here; that was checked and
+  refuted. Original diagnosis below.
+- **(shipped, kept for the reasoning)** **the bill of materials could not be generated on a clean runner, so the first
+  tag failed at packaging.** `tools/sbom.mjs` resolves through `mvn dependency:list`, and Maven will **not**
   resolve a sibling reactor module from a jar built in an *earlier* invocation — only from the local
   repository, or from an artifact produced in the same session. `inspecto/package.ps1` runs `mvn … package`
   and then invokes the generator as a **separate** process, so every reactor dependency must already be
