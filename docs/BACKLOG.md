@@ -428,9 +428,17 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
   was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
   artifact exists.** → the owning specs' §2 tables, which now carry the measured number.
-- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof; ONE closed, five open.** `SEC-4` HTTPS has
-  zero tests (no test under `inspecto/src/test` references a keystore); **EDG-01 cell 7** — the largest
-  extraction, 44 stubbed paths — is the only one of seven cells with no Personal-side falsification test;
+- **P2** · **`SPEC-NOPROOF-1` — six Musts with no automated proof; TWO closed, four open.** `SEC-4` HTTPS has
+  zero tests (no test under `inspecto/src/test` references a keystore); ✅ ~~**EDG-01 cell 7** — the largest
+  extraction — is the only one of seven cells with no Personal-side falsification test~~ **CLOSED
+  2026-09-09** by `NoOperationalObjectsShipInThePersonalBuildTest`: all **49** stubbed paths answer 503
+  naming `inspecto-ops` (not 404 — a lost stub; not 200 — a leaked module), `features.ops` is present and
+  false, and a source cross-check pins the stub's surface against the test's own list. ⚠ The stated "44"
+  was **49**. 🔴 Mutation-proven both ways, and the second case is why the cross-check exists: removing a
+  stub the `/objects/([^/]+)` catch-all shadows fails **only** the cross-check — an over-the-wire test
+  structurally cannot see it, and there are two such catch-alls. ⚠ `AbsentExchangeRoutes` was briefly
+  suspected of the same gap and is **not**: `NoExchangeShipsInThePersonalBuildTest` already covers it (a
+  class-name grep missed it because that test exercises paths, not the class);
   the four-stage write-gate **order** is depended on by thirteen route modules and verified by reading call
   sites; the palette's **host-level** silent fallback is unspecced (only its rendering-given-nothing is);
   and **`PipelineScheduler` has no test class at all**, recorded only in prose. → pick by name; each is one
