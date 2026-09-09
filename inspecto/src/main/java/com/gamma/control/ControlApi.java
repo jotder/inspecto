@@ -309,20 +309,28 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         String keystore = System.getProperty("https.keystore");
         if (blank(keystore)) return HttpServer.create(bindAddress(port), 0);
         char[] password = System.getProperty("https.keystore.password", "").toCharArray();
+        javax.net.ssl.SSLContext ssl;
+        // ⚠ The catch covers IOException as well as GeneralSecurityException, and that is the point:
+        // KeyStore.load signals a WRONG PASSWORD — the likeliest operator mistake here — as a plain
+        // IOException ("keystore password was incorrect"), not a security exception. Catching only the
+        // latter let that case escape without the one piece of context the operator needs, the property
+        // to fix. Found 2026-09-09 by ControlApiHttpsTest (SEC-4 had no test at all).
+        // ⚠ The bind stays OUTSIDE this block on purpose: a port already in use is not a keystore
+        // problem, and wrapping it would mislabel it.
         try (var in = Files.newInputStream(Path.of(keystore.trim()))) {
             java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
             ks.load(in, password);
             javax.net.ssl.KeyManagerFactory kmf =
                     javax.net.ssl.KeyManagerFactory.getInstance(javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
             kmf.init(ks, password);
-            javax.net.ssl.SSLContext ssl = javax.net.ssl.SSLContext.getInstance("TLSv1.3");
+            ssl = javax.net.ssl.SSLContext.getInstance("TLSv1.3");
             ssl.init(kmf.getKeyManagers(), null, null);
-            HttpsServer https = HttpsServer.create(bindAddress(port), 0);
-            https.setHttpsConfigurator(new HttpsConfigurator(ssl));
-            return https;
-        } catch (java.security.GeneralSecurityException e) {
+        } catch (java.security.GeneralSecurityException | IOException e) {
             throw new IOException("failed to configure HTTPS from -Dhttps.keystore=" + keystore, e);
         }
+        HttpsServer https = HttpsServer.create(bindAddress(port), 0);
+        https.setHttpsConfigurator(new HttpsConfigurator(ssl));
+        return https;
     }
 
     public int port() { return http.getAddress().getPort(); }
