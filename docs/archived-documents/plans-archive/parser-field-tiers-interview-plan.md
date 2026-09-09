@@ -1,3 +1,25 @@
+> ⛔ **ARCHIVED 2026-09-09 by operator decision — and this one is NOT a spent plan.**
+> It is an **unexecuted research instrument**: the D13 observation session has never been run, so there
+> are no as-built facts here, and its own final line said it would archive *after* the session. It was
+> archived before, deliberately, as part of dissolving `superpower/`.
+>
+> ⚠ **The session is still owed and this kit is still runnable.** Board row: `BACKLOG.md` §2 *D13 parser
+> field tiers*. What changed is where the gate lives: it used to close "when this file gains a dated
+> session record", which archiving would have made **uncheckable** — no shift may maintain a file in this
+> tier. It now closes on the deliverable, which is checkable in the current tier.
+>
+> ✅ **The load-bearing half is preserved in the current tier**, not here: the two questions, the
+> **pre-agreed analysis rule**, the capture marks and the deliverable are in
+> [`okf/frontend/features/grammar-config.md`](../../okf/frontend/features/grammar-config.md)
+> §"The D13 field-tier session". That rule had to move: its entire evidentiary force comes from being
+> agreed BEFORE the session, and a rule re-derived afterwards from a never-maintained tier is not that.
+>
+> 🔴 **Re-ground before running any of it.** The field inventory and the task script were prepared
+> 2026-08-28 against a four-**tab** delimited pane. The Parse redesign (`d012f721`, 2026-09-04) turned tabs
+> into sections and **dissolved the `files` section for every format**, so the tab-switch timing and the
+> **F**/`grammarTabsFor` rule below describe a UI that no longer exists. The per-field tier/default table
+> is a re-derivable snapshot of `parsing-attributes.ts` — regenerate it, do not trust this copy.
+
 # Parser field tiers — interview #2 observation-session kit (D13)
 
 **Status:** READY TO RUN — awaiting a scheduled session with a real onboarding user. ·

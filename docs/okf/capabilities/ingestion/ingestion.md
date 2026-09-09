@@ -259,7 +259,10 @@ five DuckDB-native formats, with `ParserTreeComponent` for hierarchical previews
 `GrammarEditorDialog` by operator decision (its geometry lives in `ingester_config`). Previews call
 `POST /config/preview/parsing` and `/config/preview/schema` (`ConfigPreviewRoutes`). Field **tiers**
 (`required | optional | advanced`, D13) drive disclosure — ⚠ every `tier: 'required'` field still ships
-`required: false` validators (an open observation question). **A Grammar lives inline on its Step**; a
+`required: false` validators (an open observation question). ⚠ **The lone hard default in the entire
+parser/grammar surface is `transform.route`'s `mode: 'case'`** — so "required" means *shown in the top
+disclosure tier*, never *validator-enforced*. The pre-agreed rule that will decide it is in
+`okf/frontend/features/grammar-config.md` §"The D13 field-tier session". **A Grammar lives inline on its Step**; a
 **Grammar Template** is a copy source (operator, 2026-08-15, reversing the 2026-08-04 `use: grammar/<id>`
 binding — that form stays read-supported, never authored); "Save as template…" was replaced by a **Grammar
 CSV** round-trip (2026-08-19). Parse **does not drop columns** (D8, 2026-09-04) — exclusion is
@@ -343,7 +346,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Unpack (5)(8)(10) — partial never fails; nested refused; crash mid-archive re-ingests committed Entries by design | `BACKLOG.md` §6 | LEAVE |
 | **ASN.1 grammar as a stored module reference**, not pasted text; a drop-in `plugins/` jar directory | `BACKLOG.md` §3 *Parsing (Stage-1)* | the prerequisite for a per-vendor transform home |
 | **P4 test mapping on a generic `parser` node** | `BACKLOG.md` §3 *Authoring* | re-scope before building |
-| **D13 parser field tiers** — the onboarding-observation session; `tier: 'required'` ships `required: false` | `BACKLOG.md` §2 | externally gated |
+| **D13 parser field tiers** — the onboarding-observation session; `tier: 'required'` ships `required: false`. The pre-agreed analysis rule and the deliverable that closes it are in `okf/frontend/features/grammar-config.md`; the kit itself is archived but still runnable | `BACKLOG.md` §2 | externally gated |
 | **Row 15** — delete the legacy flat read path (`-Dingest.lane` is the precondition) | `BACKLOG.md` §2 | release-gated |
 | D-8 **XLSX export** (zero groundwork, no spreadsheet library) | `BACKLOG.md` §3 | |
 | Column metadata editing on the Transform pane (Parse D2) | `BACKLOG.md` §3 (e) | needs a backend home |

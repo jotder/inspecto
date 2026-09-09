@@ -159,6 +159,11 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
   the quote char — RFC-4180 doubling — on BOTH engines). ⛔ `engine`/`strict_mode` carry **no spec
   default**: a default materializes into every `value()` and would mutate faithful copies of stored
   grammars.
+  ⚠ **`xlsx.stop_at_empty` is the THIRD field in that class**, recorded here 2026-09-09 from the D13 kit
+  where it was the only mention. ⛔ Do not "fix" it by copying the engine default across: the engine
+  *does* default it to `false` (`okf/backend/config/parsing-options-reference.md`, in the xlsx example),
+  and that is a **different layer** — an engine default applies at load, whereas a *spec* default would
+  be written into every saved grammar copy. The two are meant to disagree, so neither is the bug.
 - **Columns table ①–⑤** (`<inspecto-schema-fields-editor>`): include / `#` sequence / **icon-only
   type menu** (mat-menu over the four honest `SCHEMA_TYPES`; no classic dropdown) / Name /
   **Synonym** — a new optional identifier, unique across synonyms ∪ names (D3), persisted as the
@@ -496,6 +501,53 @@ Grammar, and only the Onboarding Parsing stage can author those (the host-owned 
 write). The Pipelines `GrammarEditorDialog` lets an operator **test** a plugin Grammar but refuses to
 **save** one, pointing at the Parsing stage instead — rather than writing a `parser_type` key no
 engine code has ever read, which is what the dialog did before this unification.
+
+## The D13 field-tier session — PENDING, and its analysis rule is pre-agreed
+
+D13 (operator, 2026-07-25) parked every parser/grammar field's `tier:` assignment until **a real
+onboarding-observation session** — ⛔ *explicitly not an engineering guess*. The session has **not
+happened**. The full kit (session protocol, per-lane task script, per-field capture sheets, field
+inventory) is provenance in
+[`archived-documents/plans-archive/parser-field-tiers-interview-plan.md`](../../../archived-documents/plans-archive/parser-field-tiers-interview-plan.md),
+archived 2026-09-09 by operator decision. ⚠ **The kit is still runnable and the session is still owed** —
+archived here means "not maintained", not "abandoned". Board row: `BACKLOG.md` §2 *D13 parser field tiers*.
+
+**Two questions, not one** — the second is easy to lose:
+
+1. **Tier placement** per field: `required` (top, always visible) / `optional` (second disclosure) /
+   `advanced` (collapsed). Today's values in `parsing-attributes.ts` are engineering guesses.
+2. **What "required" MEANS.** Every `tier: 'required'` field ships `required: false` validators, so
+   "required" today means *shown in the top disclosure tier*, never *validator-enforced*. The session must
+   observe whether users submit with a top-tier field untouched **and get a bad outcome** — that, not
+   intuition, decides whether the tier gains real validation.
+
+**The analysis rule, agreed BEFORE the session so the data decides.** 🔴 This is the load-bearing part and
+it lives here rather than only in the archive for one reason: a rule re-derived *after* the session is no
+longer pre-agreed, and the kit's whole evidentiary force rests on it being fixed in advance.
+
+Capture marks: **T** touched · **D** default-and-fine · **S** stumbled · **A** asked · **M** missed-but-needed
+· **F** found-late.
+
+- **required tier:** any field marked **M**, or **T** in ≥3 of 4 lanes' happy paths. If a required-tier
+  field is ever **M**, that is the evidence for adding a real validator (question 2) — **one observation
+  suffices to file it; two decide it**.
+- **optional tier:** **T** or **S** only on the dirty-data task, or lane-specific touches (e.g.
+  `xlsx__range`).
+- **advanced tier:** never touched in any task, and no **A** — **regardless of what an engineer thinks its
+  importance is**.
+- An **F** keeps the field in its evidence-assigned tier but files a *tab placement* note: `grammarTabsFor`
+  membership is a separate, cheaper fix than tiering.
+
+**Deliverable, and therefore the board gate:** one PR updating `tier:` values in `parsing-attributes.ts`
+(and `node-attributes.ts` where the session reached node config), **each change annotated with the
+observation that earned it**, plus a decision note on question 2 (validator or visual-only) into this file.
+
+🔴 **The kit's field inventory and task script are STALE — re-ground before running it.** They were
+prepared 2026-08-28 against a four-**tab** delimited pane ("Dialect / Types / Robustness / Files"). The Parse
+redesign (`d012f721`, 2026-09-04) turned tabs into sections and **dissolved the `files` section for every
+format**, so the kit's tab-switch timing and its **F**/`grammarTabsFor` rule describe a UI that no longer
+exists. The per-field tier/default inventory is a **re-derivable snapshot** of `parsing-attributes.ts`, not
+durable design — regenerate it from the file rather than trusting the copy in the archive.
 
 ## Deferred (logged to `docs/BACKLOG.md`)
 
