@@ -230,48 +230,47 @@ sections already carry an owner banner.
 
 ## Sprint 5 — Dissolve `superpower/`
 
-> ### 🔴 ATTEMPTED 2026-09-09 — the exit criterion is UNREACHABLE as written, and one operator decision unblocks it
+> ### ✅ DONE 2026-09-09 — the operator took the decision, and five plans are archived
 >
-> **"Now unblocked" conflated two different things: the design being DISTILLED and the work having
-> SHIPPED.** `CLAUDE.md`'s lifecycle says a plan lives in `superpower/` *"ONLY while its work is in
-> flight"*. Surveyed against each plan's **own** status line, **zero of the ten are archivable today** —
-> every one records a specific, board-tracked reason to remain:
+> **The decision: the looser reading.** Once a plan's decisions are signed, its design is distilled and its
+> open items are filed, the plan is **provenance** — archive it, and the **board** owns the remainder.
 >
-> | Plan | Its own stated reason to stay |
+> ⚠ **Archiving was never the work; distilling was.** Surveying the ten plans against their own status
+> lines had produced "zero are archivable", and that survey was wrong in one direction and incomplete in
+> the other:
+>
+> * 🔴 **`agt-6-plan.md` was archivable under the STRICT reading too, and had been for 43 days.** Its
+>   stated blocker was the `kpi_report_builder` host + AGT-6b + a cosmetic defect; two of the three were
+>   discharged on 2026-07-28, the day after its last edit. The host shipped as an **adoption**, inverting
+>   the plan's own premise. Four documents — including a board row that said of itself *"this row is what
+>   keeps `superpower/agt-6-plan.md` out of the archive"* — carried the refuted claim for six weeks.
+>   ⛔ **A plan's stated reason to stay is a HYPOTHESIS.** I reported it as fact.
+> * 🔴 **The looser reading's own precondition — "design distilled" — was NOT met for four of the five.**
+>   Roughly fifteen items existed only in the plans, and every one is now in the current tier:
+>
+> | Plan | What would have gone dark |
 > |---|---|
-> | `deployment-topology-plan.md` | "decisions SIGNED, **design DISTILLED, build not started**" — and `editions.md` §2 says in as many words: *"The plan stays in `superpower/`"* |
-> | `completeness-kpi-plan.md` | ⏸ **ON HOLD by operator decision, 2026-08-30** |
-> | `compliance-certifications-plan.md` | DRAFT; the `C3` remainder is org-gated (`N3`/`N7`) |
-> | `elt-final-amendment-plan.md` | APPROVED, but Phase 6's **deletion half is release-gated** (D-2) |
-> | `agt-6-plan.md` | "**Plan stays active** — what keeps this plan out of the archive is the `kpi_report_builder` host row + all of AGT-6b" |
-> | `parser-field-tiers-interview-plan.md` | READY TO RUN — **awaiting a scheduled session with a real onboarding user** |
-> | `pipeline-spec.md` · `pipeline-waves-drain-plan.md` | working document / IN FLIGHT; row 15 needs a **release**, not code |
-> | `docs-consolidation-plan.md` · this file | the programme itself |
+> | `deployment-topology-plan.md` | six tables — sizing, failure→tier, **the signed D6 RPO/RTO service levels**, nine preflight rows, **VER-1…VER-12**, phase sequencing + the T4 promote order. Three `SCR-*` acceptance criteria were defined as pointers *into* the plan |
+> | `compliance-certifications-plan.md` | **the C1–C6 workstream definitions** the controls matrix keys its whole ledger on, and **a signed operator decision** (Q7, FedRAMP Moderate) that the current tier still described as an open assumption |
+> | `completeness-kpi-plan.md` | a signed **refusal** (inventing an expected row count), the second silent-zero trap, K2's two structural limits, all four verify gates — plus **two Java javadocs** citing the plan as their design authority |
+> | `parser-field-tiers-interview-plan.md` | the **pre-agreed analysis rule**, whose entire force comes from being agreed *before* the session — and a board gate that closed on this file's own path, which archiving would have made uncheckable |
 >
-> ⛔ **So `superpower/` cannot dissolve until the PRODUCT work ships — which is Sprint 6 and beyond, not a
-> documentation exercise.** I archived the deployment plan, then reverted it on finding that `editions.md`
-> already recorded the opposite decision. A sprint goal does not override a per-plan condition the plan
-> and its capability spec both state.
+> ⚠ **Two guards with different scopes each caught half of one move**, and neither could have caught the
+> other's half: the citation guard flags dead paths but exempts `superpower/` **as a source**, so it was
+> blind to a sibling plan's links; the doc-link guard has no such exemption and caught them. Java javadoc
+> and an active plan's own citations are outside both — the fourth instance in this programme of
+> **a guard's scope being a silent exemption**.
 >
-> ### The decision this needs — operator, not a shift
+> ⚠ Each archived plan carries an **ARCHIVED banner** naming where its durable content went and — for the
+> DRAFT — enumerating the claims the current tier refutes, so an unratified proposal cannot be mistaken
+> for a decision of record. ⛔ Archived does not mean done: the completeness KPI is still on hold, the
+> interview is still owed, and Phases 0–5 are still unbuilt.
 >
-> **What does "in flight" mean for a plan whose decisions are signed, whose durable design is distilled,
-> and whose remaining deliverables are all filed as board rows?**
->
-> * **Strict (today's rule, and what I followed):** in flight until the deliverables ship. `superpower/`
->   holds ten plans indefinitely, and step 7 waits on product work.
-> * **Looser ("a plan is spent"):** once decisions are signed, design distilled and open items filed, the
->   plan is provenance — archive it, and the **board** owns the remaining work. Under this reading
->   **five** could move now (deployment-topology, completeness-kpi, compliance-certifications, agt-6,
->   parser-field-tiers), leaving the four genuinely-active ones plus this file.
->
-> ⚠ The looser reading has a real cost worth pricing before choosing it: `archived-documents/` is
-> **never maintained and never linked as current** by policy, so the acceptance criteria a future builder
-> needs would live in a tier nobody updates. That is survivable only if each plan's *durable* content is
-> distilled first — which is why this shift distilled the deployment plan's **SCR-1…SCR-11 deliverable
-> table** into `editions.md` §5.2. Before this shift those acceptance criteria existed **nowhere else**:
-> §5.10 had checked the *topology* design and missed the *deliverables*, so archiving would still have
-> lost design even after its stated precondition was met.
+> **Remaining in `superpower/` (five entries, all genuinely in flight):** `pipeline-spec.md` +
+> `pipeline-waves-drain-plan.md` (they move together when row 15 closes, and row 15 needs a **release**),
+> `elt-final-amendment-plan.md` (Phase 6's deletion half is release-gated), `docs-consolidation-plan.md`
+> and this file — plus `assets/` and `design/` working files. ⛔ This file archives when its last sprint
+> closes.
 
 **Goal:** plan step 7 — its stated precondition (authoring the deployment-topology spec first) **is** met:
 that shipped as area #15 (`896b2e4b`). What is not met is the lifecycle condition above.
