@@ -659,6 +659,17 @@ procedure lives in a 71 KB *reference*.
 
 **What is actually enforced today**
 
+* **The event-trigger filters** — `PipelineSchedulerEventTriggerTest` (2026-09-09, closing the last of
+  `SPEC-NOPROOF-1`): a **non-SUCCESS** commit triggers nothing, a trigger naming itself does not
+  re-fire on its own commit (the self-loop guard, whose absence turns one commit into an unbounded run
+  loop), a paused pipeline stays paused for EVENT triggers, `from` tolerates case and a `flows/` prefix,
+  and a `on: commit` pipeline ignores a Dataset write. Mutation-proven. 🔴 **The board row that asked for
+  this said the scheduler "has no test class at all" — literally true, materially misleading**:
+  `CollectorServiceTriggerTest` already proved its loop semantics end-to-end (DEFAULT_POLL, interval,
+  cron, manual, the event trigger, the `on: dataset` fence) under a collaborator's name. ⚠ Grep the
+  behaviour, not the identifier. ⛔ `dueThisTick`/`cronDue` stay proven from the outside: they are private
+  and `runOne` calls real ETL, so reaching them directly would need reflection or a production change.
+
 * **A lane-parity test that diffs flat against graph writes** — parity is proven, not asserted. The
   strongest control in this area.
 * **A stage-two lift test** covering the happy path and the route refusal.
