@@ -858,12 +858,17 @@ Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
 
 # ── step 6b: bundle serve scripts (run the control plane + operator UI) ─────────
 # Unlike run.sh (one-shot ETL), serve.sh launches the long-running ControlApi service with the
-# HTTP control plane + operator UI. It serves the bundled SPA from ./ui via -Dui.dir. Tokens are
-# read from the environment so secrets stay out of the bundle: CONTROL_TOKEN (required to use the
-# control plane) and ASSIST_TOKEN (optional, enables the assist/catalog read routes).
+# HTTP control plane + operator UI. It serves the bundled SPA from ./ui via -Dui.dir.
+# NOTE (SCR-9, 2026-09-09): the CONTROL_TOKEN / ASSIST_TOKEN lines were REMOVED from serve.sh,
+# serve.bat and the Dockerfile. They translated into -Dcontrol.token / -Dassist.read.token, which
+# have had ZERO Java readers since the token plane left the core on 2026-06-16 -- so the scripts
+# emitted them inertly while telling the operator CONTROL_TOKEN was "required to use the control
+# plane". Someone following that instruction would think they had secured an auth-free service.
+# Real authentication is the inspecto-security module (Standard+, OIDC); see docs/EDITIONS.md.
 $serveShContent = @'
 #!/usr/bin/env bash
-# Usage: CONTROL_TOKEN=... [ASSIST_TOKEN=...] [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
+# Usage: [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
+# The core is AUTH-FREE by design. Real authentication is the `inspecto-security` module (Standard+, OIDC) — see docs/EDITIONS.md.
 # Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" ./serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
 set -euo pipefail
@@ -875,8 +880,6 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
 # binary; a networked deployment without it still falls back to INSTALL inside ExcelExtension.
 [ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
-[ -n "${CONTROL_TOKEN:-}" ] && JAVA_OPTS+=("-Dcontrol.token=${CONTROL_TOKEN}")
-[ -n "${ASSIST_TOKEN:-}" ]  && JAVA_OPTS+=("-Dassist.read.token=${ASSIST_TOKEN}")
 [ -n "${CORS_ORIGIN:-}" ]   && JAVA_OPTS+=("-Dcontrol.cors=${CORS_ORIGIN}")
 [ -n "${HTTPS_KEYSTORE:-}" ]          && JAVA_OPTS+=("-Dhttps.keystore=${HTTPS_KEYSTORE}")
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
@@ -956,8 +959,9 @@ Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
 
 $serveBatContent = @'
 @echo off
-rem Usage: set CONTROL_TOKEN=... && serve.bat
-rem Optional env: ASSIST_TOKEN, PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
+rem Usage: serve.bat
+rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
+rem The core is AUTH-FREE by design; real auth is the inspecto-security module (Standard+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
 setlocal
@@ -970,8 +974,6 @@ rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bu
 rem per-platform binary; a networked deployment without it still falls back to INSTALL
 rem inside ExcelExtension.
 if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
-if not "%CONTROL_TOKEN%"=="" set "OPTS=%OPTS% -Dcontrol.token=%CONTROL_TOKEN%"
-if not "%ASSIST_TOKEN%"=="" set "OPTS=%OPTS% -Dassist.read.token=%ASSIST_TOKEN%"
 if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
 if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%"
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
@@ -1040,7 +1042,7 @@ Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 
 # ── step 6b-2: Dockerfile wrapping serve.sh (PKG-3, backend-hardening plan item 6) ──────
 # Containerized deployment over EXISTING seams only: serve.sh already reads PORT/SPACES_ROOT/
-# CONTROL_TOKEN/... from the environment, so the Dockerfile adds no configuration surface of its
+# CORS_ORIGIN/... from the environment, so the Dockerfile adds no configuration surface of its
 # own. The base image provides java; .dockerignore excludes the embedded runtime/ so serve.sh's
 # `[ -x runtime/bin/java ]` preference misses and it falls back to the image JVM (an embedded
 # per-platform runtime inside a container would be dead weight, and the Windows one can't run).
@@ -1049,8 +1051,8 @@ Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 # plan's curl one-liner would have reported unhealthy forever), and bash is in the Ubuntu base.
 $dockerfileContent = @'
 # Build from an unzipped inspecto-deploy bundle:  docker build -t inspecto .
-# Run:  docker run -p 8080:8080 -e CONTROL_TOKEN=... inspecto
-# All serve.sh env vars pass straight through (-e PORT / SPACES_ROOT / ASSIST_TOKEN /
+# Run:  docker run -p 8080:8080 inspecto
+# All serve.sh env vars pass straight through (-e PORT / SPACES_ROOT /
 # CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS ...). Persist data by mounting the spaces
 # root:  -v /srv/inspecto/spaces:/app/spaces
 FROM eclipse-temurin:24-jre
@@ -1351,8 +1353,8 @@ Write-Host "  4. ETL pipeline (one-shot):"
 Write-Host "       run.bat voucher         (Windows)"
 Write-Host "       bash run.sh voucher     (Linux)"
 Write-Host "  4b. Control plane + operator UI (long-running service):"
-Write-Host "       set CONTROL_TOKEN=secret && serve.bat        (Windows)"
-Write-Host "       CONTROL_TOKEN=secret bash serve.sh           (Linux)"
+Write-Host "       serve.bat                (Windows)"
+Write-Host "       bash serve.sh            (Linux)"
 Write-Host "       then open http://localhost:8080/  (UI served from ./ui)"
 Write-Host "  5. Pre-ETL utilities:"
 Write-Host "       ura.bat help            (Windows)"

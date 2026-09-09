@@ -17,8 +17,12 @@ timestamp: 2026-07-16T00:00:00Z
 >
 > - ⛔ **`-Dcontrol.token` is a DEAD flag** — **zero** Java readers in the tree. It survives here in 3
 >   launch examples, plus 27 `Authorization: Bearer secret` curls and 6 `CONTROL_TOKEN` uses, none of
->   which authenticates anything. `package.ps1`, `serve.sh` and `serve.bat` still emit it inertly. For
->   real auth read [auth & security](../editions/auth-security.md).
+>   which authenticates anything. ✅ **The LAUNCHERS are clean as of 2026-09-09 (`SCR-9`)** — `package.ps1`
+>   no longer emits the flag into `serve.sh`, `serve.bat` or the `Dockerfile`, and no longer prints
+>   `CONTROL_TOKEN=secret` as the way to start the service. ⚠ **The examples on THIS page are not**: the
+>   3 launch examples and 27 `Authorization: Bearer secret` curls below still show an auth that does
+>   nothing, and they are doc debt this row does not cover. For real auth read
+>   [auth & security](../editions/auth-security.md).
 > - ⛔ **`-Dui.static.log=DEBUG` does not exist** — no such key in any Java source, so the two places
 >   that tell you to turn it on to make an abort visible cannot work.
 > - ⚠ **`java -jar` and `mvn clean package`** are both wrong for this repo: the launcher uses `-cp`
