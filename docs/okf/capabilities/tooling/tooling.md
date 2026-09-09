@@ -312,11 +312,16 @@ name claims every edition is signed when **two of three** are, with no artifact 
    the link guard cannot catch it because a script name in prose is not a markdown link. Two honest fixes:
    commit the checker into the tooling directory, or reword the five sections. §7 does the second; the
    first is the better answer and is an operator call.
-2. 🔴 **The coverage guard has no minimum module count.** Run in this checkout it found **one** module
-   report, computed 97.89% over its 427 instructions against a 78% floor, and reported every floor met
-   with a success exit. It fails only on *zero* reports, so a single stale build directory manufactures a
-   green number. The doctrine page records the previous instance of exactly this shape and the floor was
-   never added — this is the highest-value fix in the area, and it is one comparison.
+2. ✅ ~~**The coverage guard has no minimum module count.**~~ **FIXED 2026-09-09.** It had found **one**
+   module report, computed 97.89% over its 427 instructions against a 78% floor, and reported every floor
+   met with a success exit — it failed only on *zero* reports, so a single stale build directory
+   manufactured a green number. `tools/check-coverage.mjs` now carries `MIN_BACKEND_MODULE_REPORTS = 20`
+   (29 reactor modules hold a `src/test` directory, so the floor sits well below the real set and far above
+   one). Falsified in both directions on the same tree: the previous version printed *"every floor met"*
+   and exited 0; the current one exits 1 naming the module it found. ⚠ The scope check is deliberately
+   skipped when there are **zero** backend reports, because `ui.yml` runs this guard for the client half
+   alone. The lesson the doctrine page gains: a guard that rejects *none* of its input still accepts a
+   **fraction** of it, which is the same shape and harder to see.
 3. 🔴 **Three of seven vocabulary bans have no rule at all** (§2), one is enforced only in configuration
    keys and one only in prose. Either the requirement's scope claim narrows to what is enforced, or the
    rules grow. The board row that suspected this can then close.

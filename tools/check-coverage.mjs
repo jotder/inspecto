@@ -27,6 +27,20 @@ const FLOORS = {
     ui: { statements: 70.0, branches: 66.0 },
 };
 
+// ⚠ SCOPE FLOOR (2026-09-09). The header above closes the case of ZERO reports. It does not close the
+// case of a FEW: `csvs.length === 0` is satisfied by a SINGLE module's CSV, so `-pl inspecto-engine
+// -Pcoverage` followed by this guard reported a repo-wide pass over one module — measured here at
+// 1 report / 427 instructions, printed as "every floor met". That is the same shape the header warns
+// about, only harder to see: a guard that accepts a FRACTION of its input rather than none of it.
+//
+// 29 reactor modules carry a `src/test` directory as of 2026-09-09, and a full `-Pedition-enterprise
+// -Pcoverage` pass emits one report each. 20 is deliberately well below that, so adding or retiring a
+// module never breaks the guard, and far above 1, so a partial run cannot pass as repo-wide.
+//
+// ⛔ If this fires, run the FULL reactor. Do not lower the number to make a red build green: the floors
+// above are a percentage of whatever was measured, and they are meaningless without knowing WHAT was.
+const MIN_BACKEND_MODULE_REPORTS = 20;
+
 const repoRoot = process.cwd();
 
 // Which halves to enforce. ⚠ Explicit scope matters: ci.yml builds Java and never the UI, ui.yml the
@@ -154,6 +168,20 @@ if (wantUi && ui === null && explicit) {
 }
 if (csvs.length === 0 && ui === null) {
     console.error('\n✖ Coverage guard: CANNOT RUN — no coverage data of either kind was found.');
+    process.exit(1);
+}
+
+// A PARTIAL backend run must not pass as repo-wide (see MIN_BACKEND_MODULE_REPORTS). ZERO backend reports
+// is a different and legitimate case — ui.yml runs this guard for the client half alone — so this fires
+// only when backend data exists but covers too little of the reactor to mean anything.
+if (csvs.length > 0 && csvs.length < MIN_BACKEND_MODULE_REPORTS) {
+    console.error(`
+✖ Coverage guard: CANNOT RUN — only ${csvs.length} backend module report(s) found, `
+        + `below the ${MIN_BACKEND_MODULE_REPORTS} needed for a repo-wide number.`);
+    console.error('  The floors are repo-wide percentages; over a fraction of the reactor they mean nothing,');
+    console.error('  and this guard used to report "every floor met" over a single module.');
+    console.error('  Run the full reactor:  mvn -o clean install -Pedition-enterprise -Pcoverage');
+    console.error(`  Found: ${csvs.map((c) => c.replace(repoRoot + sep, '').split(sep + 'target')[0]).join(', ')}`);
     process.exit(1);
 }
 
