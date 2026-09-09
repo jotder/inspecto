@@ -187,9 +187,32 @@ sprint in the plan: one guard each, instead of N fixes.
 > ⛔ **The posture decision — document the remaining surface, or adopt exemplar coverage deliberately —
 > is the operator's and is still owed. A guard measures; it must not decide.**
 >
-> **Still open: two of the five** — the count guard (`SPEC-COUNTS-1`) and deriving the remaining served
-> descriptor (the trigger vocabulary in the binding glossary). The call-site-audit row was already
-> discharged for the transform guard in Sprint 1.
+> ✅ **ALL FIVE CLASSES CLOSED 2026-09-09.** The last two went the same way as the first three — by
+> measuring before designing, and both times the obvious design was the wrong one.
+>
+> **`SPEC-COUNTS-1` (a count is stated N ways).** `tools/check-doc-counts.mjs`, wired into `ci.yml` +
+> `.githooks/pre-push`, falsified in five directions. 20 statements across 11 docs are now DERIVED from
+> the contract that owns them. 🔴 **The root cause was the noun, not the arithmetic**: "node types"
+> denoted three sets (30 in the enum / 11 with attribute specs / 16 recipe entries), so no single number
+> could be right and nobody had written that down. 🔴 **The prose-scanning design was built as a census
+> FIRST and measured unshippable**: 14 matches over 238 docs, whose "failures" were line references and
+> deliberate correction notes, while MISSING real phrasings. A number in prose is indistinguishable from
+> a line number. ⛔ `job types` and `maintenance tasks` are deliberately excluded — both totals are
+> edition-dependent, so asserting one number would be a falsehood.
+>
+> **The served descriptor (the trigger vocabulary).** `TriggerVocabularyContractTest`, 6 tests.
+> 🔴 `ExpressionDecl.TriggerKind` turned out to be a **parallel hand-maintained list that only decorates
+> the published descriptor** — referenced nowhere else in the engine bar one `ON_SIGNAL` import, while the
+> dispatch decides a trigger from config predicates and a literal `"manual"`. Now pinned to `JobConfig`'s
+> record components by reflection, and to the binding glossary, parsed.
+>
+> The call-site-audit row was already discharged for the transform guard in Sprint 1.
+>
+> ⚠ **Two things the sprint taught that outlast it.** First, **measure the obvious guard before building
+> it**: three of the five designs died on measurement — the citation allowlist, the prose count scanner,
+> and asserting one number for an edition-dependent set — and each would have shipped as mostly exemption.
+> Second, **a mutation that does not compile proves nothing**: two of the descriptor mutations were caught
+> by the compiler, so those tests were never exercised until the mutations were redesigned to compile.
 
 | Class | Instances found | The one fix |
 |---|---|---|
@@ -197,7 +220,7 @@ sprint in the plan: one guard each, instead of N fixes.
 | ✅ **A hand-mirrored map drifts** — **CLOSED 2026-09-09** | four instances; the live one carried two keys where the server had three | **DONE:** `pipeline-editable.ts` carries `fields`, and `MapNodeKeyContractTest` **parses that TypeScript** to hold both sets against the Java ones. Mutation-proven in both languages. Not a fifth hand-edit |
 | ✅ **A count is stated N ways** — **CLOSED 2026-09-09** | node types **5** ways, maintenance tasks **5**, job types **4**, processors **3**, transform functions **3**, triggers **4** | **DONE:** `tools/check-doc-counts.mjs`, wired into `ci.yml` + `.githooks/pre-push`, falsified in **four** directions. 20 statements across 11 docs carry a `<!--count:ID-->` marker and are **derived** from the owning contract at run time. 🔴 The root cause was the **noun**, not the arithmetic: "node types" denoted three sets (30 roster / 11 with attribute specs / 16 recipe entries), so no single number could be right — marker ids name the SET. ⛔ `job types` and `maintenance tasks` are deliberately excluded: both totals are edition-dependent, so one number would be a falsehood. ⚠ The prose-scanning design was built as a census FIRST and measured unshippable — 14 matches over 238 docs, all false positives (line numbers), while missing real phrasings |
 | **A guard is absent from one call site** | the transform guard: ten call sites, zero on any save path | Audit the **call-site list**, not the rule list. Ask which paths a guard does *not* sit on |
-| **A served descriptor drifts from its own dispatch** | the maintenance descriptor (Sprint 1); the trigger vocabulary in the binding glossary | Derive the descriptor from the dispatch |
+| ✅ **A served descriptor drifts from its own dispatch** — **CLOSED 2026-09-09** | the maintenance descriptor (Sprint 1); the trigger vocabulary in the binding glossary | **DONE:** `TriggerVocabularyContractTest` (6 tests, 0.09 s). 🔴 The grounding found worse than a stale glossary: `ExpressionDecl.TriggerKind` is the vocabulary the server PUBLISHES in every parameter descriptor's `availableIn`, and it is referenced **nowhere else in the engine** bar one `ON_SIGNAL` import — the real dispatch decides a trigger from config predicates (`hasCron()`, `hasSignal()`, `onPipeline()`) and a literal `"manual"`. A fifth job trigger could be added and the served vocabulary could never mention it, with nothing failing. Now derived: the enum against `JobConfig`'s record components by reflection, and **both vocabularies against `GLOSSARY.md`, parsed** — the same technique that closed the hand-mirrored-map class, because a binding glossary that is hand-typed is a mirror like any other. ⛔ No trigger name is written down in the test. Mutation-proven in four compiling directions |
 
 **Exit:** each class has a guard wired into a pipeline, and each guard is **falsified in both directions** —
 proven to fail on a seeded defect and to pass clean. A guard that has never been seen to fail is not yet a
