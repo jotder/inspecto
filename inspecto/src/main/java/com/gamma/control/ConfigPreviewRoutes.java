@@ -317,22 +317,25 @@ final class ConfigPreviewRoutes implements RouteModule {
             List<com.gamma.pipeline.exec.SchemaSuggest.Field> inferred =
                     com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows);
             List<Map<String, Object>> fields = new ArrayList<>();
-            List<Map<String, Object>> rules = new ArrayList<>();
+            List<Map<String, Object>> mappingFields = new ArrayList<>();
             for (com.gamma.pipeline.exec.SchemaSuggest.Field f : inferred) {
                 Map<String, Object> field = new LinkedHashMap<>();
                 field.put("name", f.name());
                 field.put("selector", f.name());
                 field.put("type", f.type());
                 fields.add(field);
-                Map<String, Object> rule = new LinkedHashMap<>();
-                rule.put("targetColumn", f.name());
-                rule.put("sourceExpression", f.name());
-                rule.put("transformType", "DIRECT");
-                rules.add(rule);
+                // MAPPING-GEN-1: the same field-list spelling the CLI generator writes (SchemaExtractor) —
+                // this route used to say `transformType: DIRECT` where the CLI omitted it; now neither
+                // generator speaks `rules[]` at all, so there is nothing left to disagree about.
+                Map<String, Object> mf = new LinkedHashMap<>();
+                mf.put("name", f.name());
+                mf.put("from", f.name());
+                mf.put("fn", "keep");
+                mappingFields.add(mf);
             }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("fields", fields);
-            out.put("mapping", Map.of("rules", rules));
+            out.put("mapping", Map.of("fields", mappingFields));
             // B3: only when the caller posted the draft it is holding. Without one there is nothing to have
             // drifted FROM, and the response stays the pre-B3 full suggestion.
             if (body.get("config") instanceof Map<?, ?>)

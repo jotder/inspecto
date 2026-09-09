@@ -274,8 +274,13 @@ class ControlApiOnboardingLifecycleTest {
             assertEquals("DOUBLE", out.get("fields").get(1).get("type").asText());
             assertEquals("DATE", out.get("fields").get(2).get("type").asText(),
                     "date-only strings demote from TIMESTAMP to DATE");
-            assertEquals("ORDER_ID", out.get("mapping").get("rules").get(0).get("targetColumn").asText());
-            assertEquals("DIRECT", out.get("mapping").get("rules").get(0).get("transformType").asText());
+            // MAPPING-GEN-1: both generators speak the Record Transformer field list; the legacy rules[]
+            // (and the transformType this route alone used to stamp) are read-only history.
+            assertNull(out.get("mapping").get("rules"), "no legacy rules[] in a generated mapping");
+            assertEquals("ORDER_ID", out.get("mapping").get("fields").get(0).get("name").asText());
+            assertEquals("ORDER_ID", out.get("mapping").get("fields").get(0).get("from").asText());
+            assertEquals("keep", out.get("mapping").get("fields").get(0).get("fn").asText(),
+                    "the fn marker is what RecordTransform.isFieldList keys on");
 
             assertEquals(400, post(c.port, "/config/suggest/schema", "{}").statusCode(),
                     "no sampleRows is the caller's error, said up front");

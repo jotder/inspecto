@@ -64,7 +64,7 @@ function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleR
                     { name: 'ID', selector: 'ID', type: 'BIGINT' },
                     { name: 'AMT', selector: 'AMT', type: 'DOUBLE' },
                 ],
-                mapping: { rules: [] },
+                mapping: { fields: [] },
             }),
         ),
         ...config,

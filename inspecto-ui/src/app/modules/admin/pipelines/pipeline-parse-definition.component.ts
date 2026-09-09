@@ -1544,7 +1544,10 @@ export class PipelineParseDefinitionComponent {
                 mapping: {
                     canonicalName,
                     rawName: mappingRawName,
-                    rules: fields.map((f) => ({ targetColumn: f.name, sourceExpression: f.name })),
+                    // MAPPING-GEN-1 (2026-09-10): the Record Transformer field list, like every committed
+                    // schema and the two server generators — never the legacy rules[] the engine reads only
+                    // through a bridge. `fn: keep` is the marker RecordTransform.isFieldList keys on.
+                    fields: fields.map((f) => ({ name: f.name, from: f.name, fn: 'keep' })),
                 },
             };
 

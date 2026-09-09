@@ -180,17 +180,21 @@ public class SchemaExtractor {
             mapping.put("canonicalName", sourceName);
             mapping.put("rawName",       sourceName);
 
-            List<Map<String, String>> rules = new ArrayList<>();
+            // MAPPING-GEN-1 (2026-09-10): emit the Record Transformer field list — the spelling every
+            // committed schema uses (24 of 24) and the editor round-trips — never the legacy
+            // `rules[{targetColumn, sourceExpression, transformType}]`, which the engine reads only through
+            // RecordTransform.fromMappingRules, the bridge for schemas written before 2026-09-05. The `fn`
+            // marker is what RecordTransform.isFieldList keys on: a pass-through is `keep`, and a field
+            // without a marker is NOT a field list, so every generated row carries one.
+            List<Map<String, String>> mappingFields = new ArrayList<>();
             for (Map<String, String> f : fields) {
-                // transformType is omitted: a blank/absent type means DIRECT (the generated
-                // mapping is all pass-through). Hand-add transformType only for non-DIRECT rules
-                // (EXPR / CONCAT_DT / FILENAME_DATE).
-                Map<String, String> rule = new LinkedHashMap<>();
-                rule.put("targetColumn",    f.get("name"));
-                rule.put("sourceExpression", f.get("name"));
-                rules.add(rule);
+                Map<String, String> mf = new LinkedHashMap<>();
+                mf.put("name", f.get("name"));
+                mf.put("from", f.get("name"));
+                mf.put("fn",   "keep");
+                mappingFields.add(mf);
             }
-            mapping.put("rules", rules);
+            mapping.put("fields", mappingFields);
             schemaConfig.put("mapping", mapping);
 
             Files.writeString(Paths.get(schemaPath), JToon.encode(schemaConfig), StandardCharsets.UTF_8);

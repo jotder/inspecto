@@ -245,7 +245,7 @@ async function create(
                     suggestSchema: () =>
                         of({
                             fields: [],
-                            mapping: { rules: [] },
+                            mapping: { fields: [] },
                             drift: {
                                 drifted: true,
                                 added: [{ name: 'DURATION', type: 'VARCHAR' }],

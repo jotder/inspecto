@@ -515,7 +515,9 @@ export interface DerivedSchemaResult {
  *  `drift` (B3) is present only when the caller posted the draft it holds. */
 export interface SchemaSuggestion {
     fields: { name: string; selector: string; type: string }[];
-    mapping: { rules: { targetColumn: string; sourceExpression: string; transformType: string }[] };
+    /** The Record Transformer field list (MAPPING-GEN-1, 2026-09-10) — one `keep` per inferred field;
+     *  the legacy `rules[]` is no longer emitted by any generator. */
+    mapping: { fields: { name: string; from: string; fn: string }[] };
     drift?: SchemaDrift;
 }
 

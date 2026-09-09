@@ -38,8 +38,7 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (refreshed 2026-09-10 — **`MAPPING-GEN-1` is the one queued P1**; `SBOM-RESOLVE-1`, GUARD-SWEEP-1 and DAT-6-CI-1 done):
-0. **`MAPPING-GEN-1` (§3 Authoring)** — decided 2026-09-10; names its file (`SchemaExtractor.java:193`).
+Do next, in order (refreshed 2026-09-10 — **no P1 is queued**: `MAPPING-GEN-1` shipped the day it was decided; `SBOM-RESOLVE-1`, GUARD-SWEEP-1 and DAT-6-CI-1 done):
 1. ~~**`SBOM-RESOLVE-1` (§4)**~~ ✅ **SHIPPED 2026-09-09** — `release.yml` now installs the reactor under `-Pedition-enterprise` before the packaging steps. Was the only queued P1. The bill of materials cannot generate on a clean
    runner, so the first tag fails at packaging; it names the file it changes (`release.yml`). Filed
    2026-09-09 while fixing the generator's module table, and it is **not** a regression from that fix —
@@ -171,18 +170,6 @@ it was; both are corrected below.
 Grouped by area. A row with lettered items keeps the letters of its source doc so the two stay aligned.
 
 ### Authoring (Parse / Transform / pipeline editor)
-
-- **P1** · **`MAPPING-GEN-1` — `create-schema` must emit `mapping.fields[]`** (⛔ decided 2026-09-10; was §1
-  `MAPPING-SPELLING-1`). Measured 2026-09-09: **24** committed `*_schema.toon`, **24** on `mapping.fields[…]`, **0** on
-  legacy `mapping.rules[…]`, **0** carrying `transformType`, **0** committed `*_mapping.csv` sidecars. The CLI generator
-  (`SchemaExtractor.java:193`, the only generator that writes to disk) still emits `rules[{targetColumn, sourceExpression}]`,
-  which the engine reads only through `RecordTransform.fromMappingRules` — the read-time bridge for pre-2026-09-05
-  schemas. Build: emit `fields[]` with the catalog `fn` marker; **keep** the `rules[]` read bridge (one branch); settle
-  `transformType` one way for both generators (`SchemaExtractor:185` omits it, `ConfigPreviewRoutes:330` writes `DIRECT`
-  — the latter never writes to disk); then rewrite `okf/backend/config/configuration.md` §2 (~90 lines documenting the
-  emitted shape). Only `SchemaExtractorMergeTest` constrains it. ⛔ **No corpus migration — there is none to do.**
-  ⚠ TOON writes a tabular array as `fields[3]{…}:`, so `grep "fields:"` reads exactly like absence — probe `fields\[`.
-  → `okf/backend/config/configuration.md` §2 · `superpower/docs-consolidation-plan.md` §5.8.2 D-1
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **Step Processor catalog** — 119 processors: **35**<!--count:processors-delivered--> delivered / **17**<!--count:processors-partial--> partial / 67 planned (`processor-catalog.contract.json`, counted 2026-09-10 — `quality.schema.drift` DELIVERED 2026-09-10 as a per-batch `quality.schema_drift` Signal; the earlier count was 34/18 on 2026-09-08 — the earlier "69 planned" was a grep artefact) (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`

@@ -195,13 +195,18 @@ raw:
       type: DOUBLE
 
 mapping:
-  rules[3]:
-    - targetColumn: ACCOUNT_NUMBER
-      sourceExpression: ACCOUNT_NUMBER
-    - targetColumn: REVERSAL_DATE
-      sourceExpression: REVERSAL_DATE
-    - targetColumn: AMOUNT
-      sourceExpression: AMOUNT
+  canonicalName: reversals
+  rawName: reversals
+  fields[3]:                     # the Record Transformer field list — what create-schema emits
+    - name: ACCOUNT_NUMBER
+      from: ACCOUNT_NUMBER
+      fn: keep                   # pass-through; the type cast comes from raw.fields[].type
+    - name: REVERSAL_DATE
+      from: REVERSAL_DATE
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep
 ```
 
 **Partition columns** are declared by `partitionKey:` (shorthand — derives `year`/`month`/`day` from
@@ -212,21 +217,37 @@ matching pattern in the right list: a `TIMESTAMP` value like `2018-04-09-00.00.0
 match a date-only pattern, and any unparsed value falls into the `1900/01/01` sentinel partition.
 (`VARCHAR` partition columns pass through as-is; `DOUBLE`/`INTEGER` use `TRY_CAST`.)
 
-`create-schema` generates pass-through rules with **no `transformType`** — a blank or omitted type means `DIRECT`, so the common case stays uncluttered. Add a `transformType` only for the non-`DIRECT` rules below.
+`create-schema` generates one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; it wrote the
+legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that
+marker, not the key name, is what `RecordTransform.isFieldList` keys on, so a row without one is not a field list.
+The **23**<!--count:sql-mapping-functions--> verbs are the served catalog (`GET /components/transform/describe`,
+`sql-functions.contract.json`): `keep` · `text.*` (trim, upper, lower, replace, substring, split_part, join, pad_left)
+· `num.*` (round, multiply, divide, abs) · `date.*` (parse, format, part, truncate, `concat_parts`, `from_filename`)
+· `logic.*` (default_if_empty, if_then_else) · `convert.type` · `custom` (any per-row DuckDB scalar expression, emitted
+verbatim). Arguments ride an `args` map; the editor's Fields | SQL views and the mapping grid author exactly this shape.
 
 **`selector`** is the zero-based column index in the raw source CSV — decoupled from position in the output schema, so source column order changes do not break the pipeline.
+
+#### Legacy spelling: `mapping.rules[]` + `transformType` (READ ONLY)
+
+Schemas written before 2026-09-05 may still carry `rules[{targetColumn, sourceExpression, transformType}]`. The
+engine keeps reading them through **`RecordTransform.fromMappingRules`** — one branch, deliberately retained — so
+nothing needs migrating (the committed corpus is already all `fields[]`). ⛔ **No generator writes this shape any
+more**: not `create-schema`, not `POST /config/suggest/schema`, and not the editor's Parse pane (which wrote it until
+2026-09-10). The mapping below is kept only so an old file can
+be read, and so its `transformType` values are understood when met:
 
 **`transformType`** controls how the source expression is evaluated. It is **optional and
 case-insensitive — blank or omitted means `DIRECT`**. An unrecognised *non-blank* value (a typo
 like `EXPER`) is rejected at transform time rather than silently treated as `DIRECT`. Recognised
-values:
+values, with the `fields[]` verb that replaces each:
 
 | Value | `sourceExpression` format | Description |
 |---|---|---|
-| `DIRECT` *(default — leave blank/omit)* | column name | Pass-through with a type cast (DATE/TIMESTAMP/DOUBLE/VARCHAR) driven by the field's declared type in `raw.fields[]`. ⚠ Those four are the **only** coerced types (`TransformCompiler.direct`): any other declared type — notably `INTEGER` — falls through uncast and lands as VARCHAR. For a true integer column declare the field `VARCHAR` and add an `EXPR` rule, `TRY_CAST(COL AS INTEGER)`. |
-| `EXPR` | any DuckDB **scalar** expression | Emitted **verbatim**. Unqualified column names resolve against the source row, so the full DuckDB scalar-function library is available — e.g. `UPPER(TRIM(MSISDN))`, `TRY_CAST(AMT AS DOUBLE) / 100.0`, `CASE WHEN ERRORCODE='0' THEN 'OK' ELSE 'FAIL' END`. You own validity and any explicit cast. **Per-row scalar only** — no aggregates or joins (those are Stage-2). |
-| `CONCAT_DT` | `DATE_COL\|TIME_COL` | Concatenate two raw columns into a single TIMESTAMP: `COALESCE(TRY_STRPTIME(date \|\| ' ' \|\| time, ...))` |
-| `FILENAME_DATE` | `COL\|PREFIX` or `COL\|PREFIX\|FORMAT` | Extract an 8-digit date from a filename-style column using a fixed prefix. The default format is `%Y%m%d`. **Restricted to `EVENT_DATE` only** — an `IllegalArgumentException` is thrown at startup if used on any other target column. |
+| `DIRECT` *(default — leave blank/omit)* → **`keep`** | column name | Pass-through with a type cast (DATE/TIMESTAMP/DOUBLE/VARCHAR) driven by the field's declared type in `raw.fields[]`. ⚠ Those four are the **only** coerced types (`TransformCompiler.direct`): any other declared type — notably `INTEGER` — falls through uncast and lands as VARCHAR. For a true integer column declare the field `VARCHAR` and add an `EXPR` rule, `TRY_CAST(COL AS INTEGER)`. |
+| `EXPR` → **`custom`** | any DuckDB **scalar** expression | Emitted **verbatim**. Unqualified column names resolve against the source row, so the full DuckDB scalar-function library is available — e.g. `UPPER(TRIM(MSISDN))`, `TRY_CAST(AMT AS DOUBLE) / 100.0`, `CASE WHEN ERRORCODE='0' THEN 'OK' ELSE 'FAIL' END`. You own validity and any explicit cast. **Per-row scalar only** — no aggregates or joins (those are Stage-2). |
+| `CONCAT_DT` → **`date.concat_parts`** | `DATE_COL\|TIME_COL` | Concatenate two raw columns into a single TIMESTAMP: `COALESCE(TRY_STRPTIME(date \|\| ' ' \|\| time, ...))` |
+| `FILENAME_DATE` → **`date.from_filename`** | `COL\|PREFIX` or `COL\|PREFIX\|FORMAT` | Extract an 8-digit date from a filename-style column using a fixed prefix. The default format is `%Y%m%d`. **Restricted to `EVENT_DATE` only** — an `IllegalArgumentException` is thrown at startup if used on any other target column. |
 
 **`FILENAME_DATE` example** — <data_source> CDR files carry the event date in the filename (`cbs_cdr_vou_20180409_601_101_057726.add`) rather than a data column:
 ```yaml
