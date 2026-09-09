@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Performance Assessment & Bottleneck Analysis
-> **Deep reference — the detail tier.** Start at [Build & run section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/performance.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [Build & run section index](index.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `performance.md` (docs consolidation, 2026-07-16).)*
 
 Measured on JDK 26 / DuckDB 1.5.2 via `PipelineBenchmark` (a stage-isolating
 benchmark in the test tree). Reproduce with:
@@ -175,7 +175,7 @@ byte-identical table contents between the two engines on clean input. Short
 rows, footers, and blank lines are rejected identically via
 `ignore_errors=true, null_padding=false`; rejected rows are captured from
 DuckDB's `reject_errors` table into the same `errors/<base>_errors.csv` the Java
-path writes. The existing `BatchProcessorTest` / `CollectorProcessorPollTest`
+path writes. The existing `ConsignmentIngestorTest` / `CollectorProcessorPollTest`
 configs are clean, so `auto` already runs them through the native engine and
 they pass unchanged.
 

@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Database / Persistence Layer
-> **Deep reference — the detail tier.** Start at [Engine section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/DB_LAYER.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [Engine section index](index.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `DB_LAYER.md` (docs consolidation, 2026-07-16).)*
 
 > **Scope:** how Inspecto stores state on disk — the three data classes, the operational
 > (relational) table schemas, the per-space file topology, and how to run operational data on
@@ -336,7 +336,7 @@ declaration, and neither ever guesses which column is temporal:
 
 | Path | Bounds come from | Absent when |
 |---|---|---|
-| Ingest (`BatchProcessor`) | `__event_time`, the coerced column `DataTransformer` materialises from the schema's date partition and excludes from written output | the schema declares no date partition, or every row failed to parse |
+| Ingest (`ConsignmentIngestor`) | `__event_time`, the coerced column `DataTransformer` materialises from the schema's date partition and excludes from written output | the schema declares no date partition, or every row failed to parse |
 | Pipeline sink (`PartitionSinkWriter`) | `TRY_CAST(<source> AS TIMESTAMP)`, where `source` is a `partitions[]` entry's declared raw column — the same word `PartitionDef.source` uses | no entry declares a `source`, entries disagree on it, or it is not a plain identifier |
 
 Enrichment writes and every row predating these columns still read back `NULL`.
@@ -388,7 +388,7 @@ no-ops when the store is absent so no call site branches on default-off:
 
 | Path | Hook | Where `row_count` comes from |
 |---|---|---|
-| Ingest (+ routed rules, multi-destination fan-out) | `BatchProcessor.finalizeSource`, **after** the manifest write | `LineageCollector`'s matrix, summed per output file |
+| Ingest (+ routed rules, multi-destination fan-out) | `ConsignmentIngestor.finalizeSource`, **after** the manifest write | `LineageCollector`'s matrix, summed per output file |
 | Enrichment | `EnrichmentEngine.runResult` (routed files register from their own relation) | `ConsignmentOutputs.countByPartition` |
 | Pipeline sinks | `PartitionSinkWriter.write` | `ConsignmentOutputs.countByPartition` (replaced its old whole-table `COUNT(*)`) |
 | §7.3 summaries | `ConsignmentProcessJobType` after `SummaryWriter` reveals the files | the number of summary rows in that partition |
@@ -443,7 +443,7 @@ CREATE TABLE IF NOT EXISTS file_stages (
 ```
 
 Phase 4 §2.4's per-file stage progression: one row per `(source_id, relative_path)` file at each
-boundary `BatchProcessor.finalizeSource` genuinely crosses, so *"where is file X right now"* is a
+boundary `ConsignmentIngestor.finalizeSource` genuinely crosses, so *"where is file X right now"* is a
 query instead of a re-read of the manifest and a guess about how far a crashed commit got.
 **Insert-only** — a stage is a fact about a point in time, never updated; a file's history is its
 own append-only progression through `finalizeSource`'s documented crash-safe ordering (register →
@@ -451,7 +451,7 @@ manifest → backup → markers LAST → ledger/watermark). `(source_id, relativ
 `AcquisitionLedger` uses.
 
 Written by `FileStages.record`, an ambient per-space registry (the `ConsignmentOutputStores` idiom)
-called from `BatchProcessor.finalizeSource` after each of the six boundaries; default-off and
+called from `ConsignmentIngestor.finalizeSource` after each of the six boundaries; default-off and
 best-effort, same fail-open contract as `consignment_outputs` — absence means no index, never a
 change to the commit ordering itself. Read by `FileStages.stages(sourceId, relativePath)`, exposed
 at `GET /runs/{name}/files/stage?path=<relative>`.

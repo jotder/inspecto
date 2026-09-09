@@ -541,7 +541,7 @@ One archived plan also cites a reflex-layer history file that **does not exist**
 
 ## 8. Verification
 
-* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.). **One MISSING hit
+* **Pointer check** — a capability-pointer check over this file (`tools/check-doc-citations.mjs` — **committed 2026-09-09**, wired into `ci.yml` and `.githooks/pre-push`). **One MISSING hit
   is expected and correct:** `DryRunProvider` is an **upstream** class, so it is absent from this tree by
   definition — the verifier indexes this repository only. Confirm it in the resolved artifact, not here.
 * **The invariant that matters most** is the air-gap test: it asserts that hosted SDK classes are absent

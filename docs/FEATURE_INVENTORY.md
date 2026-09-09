@@ -54,7 +54,7 @@
 | External grammar file (reusable `*.grammar.toon`) | `processing:` / `  grammar: config/x/x.grammar.toon` | `[LIVE]` |
 | Fixed-width text (`frontend: fixedwidth`, `record: line`) | `frontend: fixedwidth` / `fixedwidth:` / `  fields[N]{name,start,length}:` | `[LIVE]` `configuration.md` |
 | Fixed-length binary (`record: bytes`) | `processing:` / `  ingester: …FixedWidthRecordIngester` / `  ingester_config: { record_length: 256 }` | `[LIVE]` `okf/backend/config/parsing-options-reference.md` |
-| Plugin/segments (multi-event-type, e.g. CALL/SMS) | `processing:` / `  ingester: com.acme.MyIngester` / `  segments: { CALL: …, SMS: … }` | `[LIVE]` `StreamingPluginBatchStrategy` |
+| Plugin/segments (multi-event-type, e.g. CALL/SMS) | `processing:` / `  ingester: com.acme.MyIngester` / `  segments: { CALL: …, SMS: … }` | `[LIVE]` `StreamingPluginIngestStrategy` |
 | Multi-schema dispatch (column-count + filename glob) | `processing:` / `  schemas[N]{column_count,file_pattern,schema_file,table}:` | `[LIVE]` `configuration.md` · voucher pipeline |
 | `FILENAME_DATE` transform (date in filename) | `rules[1]{…}: EVENT_DATE,FILENAME\|prefix_,FILENAME_DATE` | `[LIVE]` `TransformCompiler` |
 | JSON / NDJSON frontend | `parsing:` / `  frontend: json` / `  json: { format: newline }` | `[LIVE]` `DuckDbCsvIngester` (`read_ndjson`/`read_json`; selectors = JSON keys) |
@@ -112,7 +112,7 @@ Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enu
 | Pipeline job (`type: pipeline`) | `job: { name: …, type: pipeline, flow: cdr_flow, on_pipeline: events }` | `ADVANCED_GUIDE §5.3` |
 | Manual trigger only | `job: { name: …, type: report, enabled: true }` → `POST /jobs/{n}/trigger` | `ADVANCED_GUIDE §5.4` |
 
-> **Gotcha:** `on_pipeline:` matches the **lowercased** pipeline name (`BatchEvent.pipeline()`).
+> **Gotcha:** `on_pipeline:` matches the **lowercased** pipeline name (`ConsignmentEvent.pipeline()`).
 
 ### G — Authored flows (`*_flow.toon`)
 

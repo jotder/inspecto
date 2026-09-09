@@ -18,7 +18,7 @@
   export: the `inspecto-spa` public client (Authorization Code + PKCE, no client secret — a browser
   SPA cannot keep one), a `roles` protocol mapper so an access token's role grants land in the JWT
   claim `inspecto-security`'s `RoleMapper` reads, and realm roles matching the taxonomy in
-  [`../../superpower/rbac-groundwork.md`](../../archived-documents/plans-archive/rbac-groundwork.md) §3.
+  [`../../archived-documents/plans-archive/rbac-groundwork.md`](../../archived-documents/plans-archive/rbac-groundwork.md) §3.
 
 ## How the pieces fit (§8 recap)
 

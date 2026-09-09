@@ -100,19 +100,24 @@ Three gotchas that cost a debug cycle each — do not "clean these up":
 - Adopting a pipeline draft **preserves the open pipeline's `name` and `active`** — the tool echoes the
   graph, not the lifecycle, and adopting must never silently rename or activate a live pipeline.
 
-## Offline
+## Offline — GONE, and the gates it mirrored are the server's
 
-`inspecto/mock/handlers/agent.handler.ts` (gated on `mockOps`) mocks `POST /agent/tools/{name}` for all
-five authoring tools plus the two read tools **and reproduces the gates** (403 mutating, 404 unknown, 422 missing args), because the
-surface's degrade paths are what most need exercising offline. Result shapes mirror `InspectoTools` — if
-those change, change these too. Registered in `mock-api.interceptor.ts`; the rest of `/agent/*` stays
-real.
+🔴 **This section described a subsystem that no longer exists. Corrected 2026-09-09.** The offline mock
+backend was **deleted 2026-08-31**: `mock/handlers/agent.handler.ts`, `mock-api.interceptor.ts`,
+`agent.handler.spec.ts` and the `mockOps` flag are all absent from the tree, and the UI now requires a
+real `ControlApi`. The page had kept describing the mock's gate-reproduction in the present tense, which
+is why the citation guard flags a doc that talks about a file as if it were there.
 
-⚠ **The mock must never be more lenient than the server** — three shipped bugs hid behind that (see the
-audit below). Its strictness is pinned in `agent.handler.spec.ts`, not left to the preview, which cannot
-catch what the mock permits. Where full parity would mean re-implementing a backend subsystem (the config
-spec system, `ConditionSql`'s typed casts), the mock mirrors **acceptance** — the same inputs are refused,
-the same inputs render nothing — and says so at the branch.
+**The gates themselves are real and are the server's.** `AgentRoutes.java:68` states them and
+`:96-104` implement them — module absent → **503**, unknown tool → **404**, a MUTATING tool → **403**, and
+a refused argument → **422** carrying its message. Result shapes come from `InspectoTools`
+(`inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`), pinned by
+`InspectoToolsTest`; the route surface is pinned by `AgentRoutesTest`.
+
+⚠ **What the deletion cost is the offline exercise of the degrade paths**, which is what this section
+said most needed it — three shipped bugs had hidden behind a mock more lenient than the server. Those
+paths are now covered only where `AgentRoutesTest` reaches them; whether the front end has its own
+proof of the 403/404/422 renderings is untracked, and belongs to `SPEC-NOPROOF-1` rather than here.
 
 ## Why is this red (`<inspecto-ai-status>`, A4-status — shipped 2026-07-26)
 

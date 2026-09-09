@@ -68,7 +68,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `active` | parser-only | the arming gate: poll cycle + `MultiCollectorProcessor`; manual trigger ignores it | editor lifecycle toggle / hand |
 | `template` | parser-only — **deliberate** (a lifecycle flag, kept out of schema forms; [pipeline-identity](../control-plane/pipeline-identity.md)) | parser refusal (`template`+`active`), `CollectorService.refuseIfTemplate`, `PipelineScheduler.selectDue` | written only by `save-as-template` |
 | `produces` | spec | catalog registration: `REFERENCE_DATASET` origin vs Stream | Settings dialog (`GET/POST /pipelines/{n}/settings`) |
-| `reference` | spec (`load`/`key`/`refresh_seconds`) | `BatchIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
+| `reference` | spec (`load`/`key`/`refresh_seconds`) | `ConsignmentIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
 | `stream` | spec | `MetadataGraphBuilder` Stream grouping | hand-authored (default = pipeline name) |
 | `dirs` | spec block (5 of 9 leaves — see census caveat) | `CollectorProcessor`; `dirs.backup` doubles as the park home (`StepDisableArming`) | create scaffold derives the convention set; hand after |
 | `collector` | spec block (1 leaf only — `collector.consignment.max_files`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
@@ -76,8 +76,8 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
 | `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
-| `sinks` | parser-only | `IngestSinkWriter` / `BatchGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
-| `route` | parser-only | `BatchGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
+| `sinks` | parser-only | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
+| `route` | parser-only | `ConsignmentGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
 | `steps` | parser-only — **entry kept deliberately** (no item-schema facility; declaring it would game the ratchet) | `PipelineLift` authored-order chain → at-rest `pipeline_config:` job | Recipe view step cards (`<app-pipeline-step-cards>`) |
 | `trigger` | parser-only | `PipelineScheduler` (`every:`/`cron:` per-tick gate); dataset-commit trigger (`on:dataset`) | canvas trigger nodes (`trigger__every`/`trigger__cron` borrow the top-level keys); `trigger.type` is derived |
 

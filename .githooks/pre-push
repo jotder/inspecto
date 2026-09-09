@@ -172,6 +172,27 @@ if ! run_guard tools/check-doc-links.mjs "doc-link guard" \
   exit 1
 fi
 
+# Citation guard (2026-09-09, SPEC-STALEREF-1). The link guard above sees markdown `[text](target)` links.
+# It cannot see the commoner way a doc points at the tree: a backticked path or class name in PROSE. That
+# was unchecked and had rotted — the 17-spec consolidation measured 23 stale citations and this guard,
+# once run, found 152: 39 dead paths and 113 citations of Java types the 2026-08-31 Consignment rename
+# retired. One of them was a release gate resting on `BatchGraphRunner`, a class that does not exist,
+# while `ConsignmentGraphRunner` has two production callers.
+#
+# ⚠ Two deliberate ALLOW rules, both printed on every run with their counts: a dead path is fine on a line
+# that states the absence, and an old type name is fine on a line that also names its replacement — that
+# is what RECORDING a rename or a deletion looks like, and it is why this guard needs no waiver list.
+# Its old-name set is PARSED from tools/rename-batch-to-consignment.mjs, never mirrored: a hand-mirrored
+# map drifts, and that is one of the very failure classes this guard exists to close.
+if ! run_guard tools/check-doc-citations.mjs "citation guard" \
+     "CI runs it too — a stale citation there is a red master."; then
+  echo "pre-push: refusing to push — a current doc cites something that is not there (above)." >&2
+  echo "          Fix the CITATION, not the guard. A renamed type needs its current name; a moved path" >&2
+  echo "          needs its new one. If the line is deliberately recording history, say so ON the line:" >&2
+  echo "          name the replacement, or state that the path no longer exists." >&2
+  exit 1
+fi
+
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
 echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2

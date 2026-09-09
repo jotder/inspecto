@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Plugin Ingester
-> **Deep reference — the detail tier.** Start at [Parser Plugins](parser-plugins.md) for the summary; this page is the long form it points to. *(Moved from `docs/plugins.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [Parser Plugins](parser-plugins.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `plugins.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
@@ -211,7 +211,7 @@ database/events/
 
 In **generation mode** each bounded generation writes its own per-partition file (`<stem>_gNNNNN_out.*`), which coexist in the partition directories — valid Hive layout, the same trade-off the CSV auto-chunker makes. In **union mode** the batch's members are consolidated, so each partition gets a single file (named for the sole member's stem when the batch has one survivor, else the batch id).
 
-All lineage (input → output row counts), audit files (`_batches_`, `_lineage_`, `_status_`), and per-batch JSON manifests are written identically to the CSV path — one consolidated `BatchRow` per batch, with the segment keys used as the `schemaLabel`.
+All lineage (input → output row counts), audit files (`_batches_`, `_lineage_`, `_status_`), and per-batch JSON manifests are written identically to the CSV path — one consolidated `ConsignmentRow` per batch, with the segment keys used as the `schemaLabel`.
 
 ### Reference implementation: `TypedRecordIngester`
 
@@ -301,7 +301,7 @@ Use `<scope>provided</scope>` because the deployment server already has the fat 
 
 **3. Write the segment schema files.** One toon per segment key. Use the JToon `partitions[N]{column,source,type}:` tabular form (see the warning earlier — YAML-style lists silently break partitioning). `raw.fields` describes the data columns your ingester emits; ingester-derived columns (like `EVENT_TYPE`) go in `partitions[]` and must be `define`d on the sink.
 
-**4. Test locally before deploying.** Pattern after `TypedRecordIngesterTest` / `BatchProcessorPluginDeepTest`: construct a `PipelineConfig` from an in-test temp pipeline toon, build a `Batch`, and call `BatchProcessor.process(batch, cfg, audit)`. This exercises the full plugin path including `DataTransformer` + `PartitionWriter` against a real DuckDB instance. Smoke-test with rows on **at least two distinct dates** — single-date tests can mask the partition-fan-out bug class — and with **two members sharing a partition** to confirm union consolidation.
+**4. Test locally before deploying.** Pattern after `TypedRecordIngesterTest` / `ConsignmentIngestorPluginDeepTest`: construct a `PipelineConfig` from an in-test temp pipeline toon, build a `Consignment`, and call `ConsignmentIngestor.process(batch, cfg, audit)`. This exercises the full plugin path including `DataTransformer` + `PartitionWriter` against a real DuckDB instance. Smoke-test with rows on **at least two distinct dates** — single-date tests can mask the partition-fan-out bug class — and with **two members sharing a partition** to confirm union consolidation.
 
 **5. Package and deploy.**
 

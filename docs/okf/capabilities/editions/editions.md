@@ -722,6 +722,6 @@ this area has three sites whose line citations drifted (§3.2).
 5. **Build with the Standard profile alone.** It is the only profile that proves an optional module is
    self-contained, and no pipeline runs it.
 
-**A capability-pointer check over this file** — ⚠ **the checker is NOT in this repo**; it was a session
-scratch script and committing it is filed as a fix. Re-derive by grepping this file's backticked paths and
+**A capability-pointer check over this file** — it is **`tools/check-doc-citations.mjs`, committed 2026-09-09**
+and wired into `ci.yml` and `.githooks/pre-push`. It checks this file's backticked paths and
 class names against `git ls-files` and the module tree.

@@ -91,8 +91,8 @@ Two more counters: `inspecto_poll_cycles_total`, `inspecto_active_runs`.
   (enrich / report / maintenance / **flow**). Home-grown `Scheduler` + `CronExpression`; Quartz was rejected.
 
 ### The bus is SYNCHRONOUS — the #1 deadlock trap
-`BatchEventBus.subscribe(handler)` runs the handler **inline on the publishing thread**. The committing batch's
-virtual thread publishes a `BatchEvent` *while `ingestLock` may be held*. Therefore **a subscriber must be fast
+`ConsignmentEventBus.subscribe(handler)` runs the handler **inline on the publishing thread**. The committing batch's
+virtual thread publishes a `ConsignmentEvent` *while `ingestLock` may be held*. Therefore **a subscriber must be fast
 and must never run another ingest inline** — that would deadlock on `ingestLock`. Both real subscribers hand off:
 - `JobService.onBatchEvent` → submits to its own vthread executor.
 - `CollectorService.onUpstreamCommit` (event-triggered flows) → hands off to **`triggerWorkers`** (a third vthread
@@ -127,9 +127,9 @@ If you add a bus subscriber that does real work, **hand off to an executor**; ne
 7. **Dedup** — PATH mode → `MarkerManager.isAlreadyProcessed`; content mode → `AcquisitionLedger.find` +
    `DuplicatePolicy.decide`. `inspecto_duplicates_skipped_total`.
 8. **Batch planning** — `ConsignmentPlanner.plan()` groups survivors by schema into `Batch`es.
-9. **Batch processing** — `BatchProcessor.process(batch, cfg, audit)` (inner vthread pool).
+9. **Batch processing** — `ConsignmentIngestor.process(batch, cfg, audit)` (inner vthread pool).
 
-### Commit ordering invariant (`BatchProcessor.commit`) — crash-safety
+### Commit ordering invariant (`ConsignmentIngestor.commit`) — crash-safety
 Order matters; a crash between any two steps must leave the batch re-runnable, never half-committed-as-done:
 1. **DuckLake register** (optional, non-fatal).
 2. **Manifest write** (`ManifestStore`) — the reprocess anchor.
@@ -165,7 +165,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 
 ### 5.2 ETL batch pipeline (`com.gamma.etl`, `com.gamma.inspector`)
 - **Responsibility:** turn a planned `Batch` into committed partitioned output with full audit + lineage.
-- **Process:** `BatchProcessor.process` → a `BatchIngestStrategy` (CSV streaming, fixed-width, plugin segments,
+- **Process:** `ConsignmentIngestor.process` → a `ConsignmentIngestStrategy` (CSV streaming, fixed-width, plugin segments,
   selector multi-schema) → DuckDB transform → `PartitionWriter` (Hive partitions, `OVERWRITE_OR_IGNORE`,
   excludes internal `__src_id`) → `commit()` ordering invariant (§4).
 - **Events:** `BATCH_COMMITTED`, `BATCH_FAILED` (attrs: `batchId`, `outputRows`, `durationMs`, `rejectedCount`,
@@ -173,7 +173,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 - **Metrics:** `inspecto_batches_total{status}`, `_batch_duration_seconds`, `_output_rows_total`,
   `_partitions_written_total`, `_rejected_files_total`; gauges `_committed_batches`, `_paused`,
   `_quarantine_files`, `_inbox_oldest_seconds`.
-- **State:** `database/` output tree; `BatchAuditWriter` CSVs (`_status_/_batches_/_lineage_`); manifests dir;
+- **State:** `database/` output tree; `ConsignmentAuditWriter` CSVs (`_status_/_batches_/_lineage_`); manifests dir;
   `CommitLog`; backup dir; quarantine + per-file error CSVs (`errors/`).
 - **Config:** `processing.*`, `schema`/`grammar`/`segments`, `csv_settings`, `dirs.*`, `duplicate.mode`.
 - **Failure modes:** field/schema mismatch → quarantine (`field_mismatch`); unreadable → `unreadable`;
@@ -210,7 +210,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   non-overlap via `LockingRunner` (a concurrent fire while in-flight records `SKIPPED`). **Catch-up (T26):** on
   startup an enabled `catch_up: true` cron job whose last audited run missed a fire runs once.
 - **FLOW chaining (T32 Phase B):** a `FLOW` job is a first-class participant — cron / `on_pipeline` / manual fire it
-  like any job, and on success `PipelineJobRunner` publishes a `BatchEvent(jobName)` so downstream `on_pipeline` jobs
+  like any job, and on success `PipelineJobRunner` publishes a `ConsignmentEvent(jobName)` so downstream `on_pipeline` jobs
   chain off it. **Guidance:** when a flow reads a store a pipeline writes, trigger it with `on_pipeline: <producer>`
   rather than a time cron, so it runs only after the producer's commit is durable (avoids a half-written read).
 - **Deletion fence (T25 × T32):** before a `MAINTENANCE` job that declares `store:` deletes, `fenceDelete`
@@ -234,7 +234,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   drives in-mem + SQL). SLF4J records are captured as `LOG` events via an appender.
 - **Alerts (`com.gamma.alert`):** `AlertRule` (`*_alert.toon`: metric ∈ {error_rate, failed_batches,
   rejected_files, duration_ms}, comparator, threshold, window `Ns/m/h/d` or `Nb`, severity, onPipeline).
-  `AlertService` evaluates on every terminal `BatchEvent` over the ledger window, with a per-rule cooldown; on
+  `AlertService` evaluates on every terminal `ConsignmentEvent` over the ledger window, with a per-rule cooldown; on
   breach emits `ALERT_FIRED` and (if `ObjectService` wired) opens a managed `ALERT` object (dup-suppressed).
 - **Objects (`com.gamma.ops`):** managed Cases/Issues/Alerts with a workflow lifecycle, comments, attachments,
   RCA, and correlation links/graph. `EventObjectBridge` promotes `SEQUENCE_GAP` events → `ALERT` objects
@@ -350,9 +350,9 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | File | Columns (header) | Writer |
 |---|---|---|
 | `<jobs.audit.dir>/jobs_runs.csv` | run_id,job,type,trigger,start_time,end_time,status,duration_ms,message | JobService |
-| `<status_dir>/<pipeline>_status_<ts>.csv` | start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,duration_ms,error,batch_id | BatchAuditWriter |
-| `<status_dir>/<pipeline>_batches_<ts>.csv` | batch_id,pipeline,schema_name,output_table,start/end_time,status,member_count,rejected_count,total_input_rows,total_output_rows,output_file_count,total_output_bytes,duration_ms,error | BatchAuditWriter |
-| `<status_dir>/<pipeline>_lineage_<ts>.csv` | batch_id,src_id,input_file,output_file,partition,row_count | BatchAuditWriter |
+| `<status_dir>/<pipeline>_status_<ts>.csv` | start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,duration_ms,error,batch_id | ConsignmentAuditWriter |
+| `<status_dir>/<pipeline>_batches_<ts>.csv` | batch_id,pipeline,schema_name,output_table,start/end_time,status,member_count,rejected_count,total_input_rows,total_output_rows,output_file_count,total_output_bytes,duration_ms,error | ConsignmentAuditWriter |
+| `<status_dir>/<pipeline>_lineage_<ts>.csv` | batch_id,src_id,input_file,output_file,partition,row_count | ConsignmentAuditWriter |
 | `<output.database>_audit/<job>_enrich_runs.csv` | run_id,job,trigger,reason,scope,input_partition_count,start/end_time,status,output_partition_count,output_file_count,total_output_rows,total_output_bytes,duration_ms,error | EnrichmentAuditWriter |
 | `<output.database>_audit/<job>_enrich_lineage.csv` | run_id,job,partition,output_file,bytes | EnrichmentAuditWriter |
 
@@ -362,13 +362,13 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | `poll` | input drop zone / remote materialisation | CollectorProcessor |
 | `database` | partitioned Parquet/CSV output (`year=/month=/day=`) | PartitionWriter |
 | `backup` | copies of originals after commit | FileBackup |
-| `temp` | streaming scratch + DuckDB temp | CsvBatchStrategy |
+| `temp` | streaming scratch + DuckDB temp | CsvIngestStrategy |
 | `errors` | per-file field-validation error CSVs | CsvIngester |
 | `quarantine` | rejects under reason subdirs `field_mismatch/`, `unreadable/`, `empty/`, `corrupt_download/` (mirrors poll rel-path) | QuarantineManager |
 | `markers` | `*.processed` sentinels (mirror poll structure) + `.last_cleanup` | MarkerManager |
-| `manifests_dir` | batch manifests (reprocess anchor) | BatchManifest |
+| `manifests_dir` | batch manifests (reprocess anchor) | ConsignmentManifest |
 | `commit_log` | fsync'd one-line-per-commit log | CommitLog |
-| `status_dir` | the three audit CSVs above | BatchAuditWriter |
+| `status_dir` | the three audit CSVs above | ConsignmentAuditWriter |
 | `log_dir` | per-pipeline logs | logging |
 
 ### Write-root artifacts (jailed under `-Dassist.write.root`, 503 if unset)
@@ -567,7 +567,7 @@ also auto-promoted to an `ALERT` object via `EventObjectBridge` (find it in `/ob
 skipped until the breaker half-opens. Check connectivity (`POST /connections/{id}/test`), then it self-recovers.
 
 **A job isn't firing.** Cron: is it enabled + a valid `cron`? `GET /jobs` shows `nextFire`. Event: does
-`on_pipeline` exactly match the upstream's `BatchEvent.pipeline()` (**lowercased** for pipelines)? Catch-up only
+`on_pipeline` exactly match the upstream's `ConsignmentEvent.pipeline()` (**lowercased** for pipelines)? Catch-up only
 runs for `catch_up: true` cron jobs with a prior audited run. Manual: `POST /jobs/{n}/trigger`. A `SKIPPED` run
 means the previous run is still in flight (`LockingRunner`).
 
@@ -584,7 +584,7 @@ pipeline **or** an in-flight FLOW job (T32). Event attrs `activeProducers`/`acti
 in a quiet window, or make slices disjoint. (Non-blocking — it warns/alerts, doesn't stop the delete.)
 
 **Alerts not firing.** Any `*_alert.toon` armed? (`GET /alerts/rules`; `POST /alerts/evaluate` returns 503 if
-none.) Alerts evaluate on terminal `BatchEvent`s; a per-rule cooldown suppresses re-fires within the window.
+none.) Alerts evaluate on terminal `ConsignmentEvent`s; a per-rule cooldown suppresses re-fires within the window.
 
 **Write endpoint returns 503.** `-Dassist.write.root` is unset. This gates all config/connection/flow/component
 writes by design (fail-closed).
@@ -604,7 +604,7 @@ are computed at scrape time by `MetricsService`'s collector. Confirm the service
 
 - **Synchronous bus + `ingestLock` ⇒ deadlock** if a subscriber runs ingest inline. Always hand off to a vthread
   pool (`triggerWorkers` / job `workers`).
-- **`BatchEvent.pipeline()` is the LOWERCASED pipeline name.** Any name matching (event triggers, `on_pipeline`)
+- **`ConsignmentEvent.pipeline()` is the LOWERCASED pipeline name.** Any name matching (event triggers, `on_pipeline`)
   must account for this.
 - **Commit writes markers + ledger + watermark LAST** (after backup/manifest) so a crash never strands a file as
   "done". Preserve this ordering in any commit-path change.

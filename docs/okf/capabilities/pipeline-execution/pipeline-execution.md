@@ -105,7 +105,7 @@ that will be refused and can never reach seven that work.
 ### 2.3 Three rows that are green over something bounded or absent
 
 🔴 **A release gate rests on a class that does not exist.** The backlog's pipeline-graph row — cited as
-Row 15's parity blocker — reads *"`BatchGraphRunner` has zero production callers, blocked on ingest output
+Row 15's parity blocker — reads *"`ConsignmentGraphRunner` has zero production callers, blocked on ingest output
 parity, do not discharge by wiring `engages()`"*. Measured: **there is no such class** (it was renamed in
 the 2026-08-31 Consignment commit), and the class that does exist is **called in production twice over** —
 its `engages()` drives the live lane admission, and its `run(...)` is invoked on the ingest path. The row
@@ -682,6 +682,6 @@ procedure lives in a 71 KB *reference*.
 6. **Author a maintenance job by copying the post-sync page's job type id.** The underscore makes it an
    unknown type.
 
-**A capability-pointer check over this file** — ⚠ **the checker is NOT in this repo**; it was a session
-scratch script and committing it is filed as a fix. Re-derive by grepping this file's backticked symbols
+**A capability-pointer check over this file** — it is **`tools/check-doc-citations.mjs`, committed 2026-09-09**
+and wired into `ci.yml` and `.githooks/pre-push`. It checks this file's backticked symbols
 against `git ls-files` and the module tree — and in this area, that check would have caught item 7 of §5.3.

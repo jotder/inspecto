@@ -166,7 +166,7 @@ JDBC jar, but so was assumed of `excel`, which is NOT — measure on the sealed 
 v3 macros as the UDF registry — measured 2026-08-29 on `duckdb_jdbc 1.5.2.1`: `CREATE MACRO` (scalar and
 table) works and **survives the seal**, but `DuckDBConnection` exposes **no** Java-side scalar-UDF API, so
 "UDF" can only ever mean a SQL macro, per-connection, re-created on every scratch connection
-(`EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) and needing a component kind +
+(`EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) and needing a component kind +
 registry that do not exist. Dynamic/environment values — none in v1; when needed, render at read time
 (the standing rule) or `SET VARIABLE`/`getvariable()`.
 
@@ -185,9 +185,13 @@ registry that do not exist. Dynamic/environment values — none in v1; when need
   `TransformCompiler` now compiles PARTITION and event-time columns only.
 * **"Cast & rename matrix"** is nothing more than a `DIRECT` rule where the row's `targetColumn` differs
   from the source field name — no separate rename mechanism exists.
-* **UI:** bespoke rule-grid component `app-pipeline-load-definition`
-  (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-load-definition.component.ts`) — NOT the generic
-  `<inspecto-schema-form>` used by attribute-spec-driven node types.
+* **UI:** `app-mapping-editor-dialog`
+  (`inspecto-ui/src/app/modules/admin/components/mapping-editor.dialog.ts`) — NOT the generic
+  `<inspecto-schema-form>` used by attribute-spec-driven node types. 🔴 **Corrected 2026-09-09**: this
+  named a *bespoke* `app-pipeline-load-definition` component, which does not exist and appears nowhere in
+  the UI — a deleted component named as the current mapping UI. Its replacement is also not bespoke: the
+  dialog edits `rules[{targetColumn, sourceExpression, transformType}]` over the **shared**
+  `<inspecto-editable-grid>` (`mapping-editor.dialog.ts:30,121-128`).
 * **Persistence:** rules save as a sidecar CSV next to the schema file — `x_schema.toon` → `x_mapping.csv`
   — via `MappingCsv.siblingFor()` (`inspecto-util/.../MappingCsv.java:34-42`), pushed through
   `PUT /pipelines/{name}/graph`.

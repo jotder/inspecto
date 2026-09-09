@@ -15,7 +15,7 @@ supersedes-rows: REQUIREMENTS §3.7 OPS-1..OPS-6 (this file corrects them, see �
 > in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built (tracked and
 > untracked), §6 what was refused or superseded, §7 the pointers into code and docs, §8 how the whole
 > thing is verified. Everything named in backticks under §3 and §7 was checked against the tree on
-> 2026-09-08 by a capability-pointer check (⚠ a scratch script, not in this repo — `TOOL` §5.2); the deliberate exceptions are called out where they occur.
+> 2026-09-08 by a capability-pointer check (`tools/check-doc-citations.mjs`, committed 2026-09-09); the deliberate exceptions are called out where they occur.
 >
 > ⛔ **`OPS` is a capability; "Ops" is a Lens.** `docs/GLOSSARY.md` §14 fixes the name *Observability &
 > maintenance* (it *was* "Observability & operations"). The Ops **Lens** is a UI surface owned by the
@@ -470,7 +470,7 @@ There is no metrics-browsing UI and no backup/restore screen beyond the Jobs for
 | `-D` capability switches for edition gating | **Refused** 2026-09-07 | a switch leaves the code in the Personal bundle — ServiceLoader modules instead |
 | Gating the audit CSV alone (an `if` inside core `/events/export`) | **Refused** 2026-09-08 | §Assembly bans conditionals inside core routes; the feed moved whole and a core `AuditLogRoutes` was added |
 | `scheduler` / `trigger` as Component kinds | **Deliberately not kinds** | cron and event are mutually exclusive job fields with no second consumer |
-| A full `BatchEventBus` → Signal migration | **Not attempted** | `BatchAuditWriter` emits additively; the run-claim seam makes a bus migration hazardous |
+| A full `ConsignmentEventBus` → Signal migration | **Not attempted** | `ConsignmentAuditWriter` emits additively; the run-claim seam makes a bus migration hazardous |
 | Growing the `EventType` enum for business signals | **⛔ Standing** | they ride `Signal` on one `SIGNAL` Event |
 | Conscripting `ConservationCheck` into the completeness KPI | **⛔ Refused** | node-level conservation is a different invariant |
 | Consignment **sealing** (`OPEN→SEALED→REOPENED`, seal signals) | **Dropped, not deferred** 2026-08-30 | replaced by the completeness KPI; K5's archive banner enumerates the superseded sites |
@@ -508,10 +508,10 @@ pages for *what is*.
 
 ## 8. Verification
 
-* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.) — (tree index of
+* **Pointer check** — a capability-pointer check over this file (`tools/check-doc-citations.mjs` — **committed 2026-09-09**, wired into `ci.yml` and `.githooks/pre-push`) — (tree index of
   every backticked repo path, Java class and test name; control probe must pass first). Deliberate
   historical names it reports as MISSING: `ingestLock`, `FLOW_CONSERVATION_IMBALANCE` is a live alias,
-  the `docs/superpower/system-maintenance-plan.md` path is quoted only as the dead pointer it was.
+  the `docs/archived-documents/plans-archive/system-maintenance-plan.md` path is quoted only as the dead pointer it was.
 * **Tests that pin this capability** (≈41 classes across seven modules, 2026-09-08 count by name
   pattern): core `inspecto` — `AuditLogRoutesTest`, `AuditTrailTest`, `ControlApiAuditTest`,
   `ControlApiHealthDetailsTest`, `ControlApiProvenanceTest`, `ControlApiSchedulerSettingsTest`,

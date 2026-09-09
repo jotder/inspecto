@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Parsing Options Reference
-> **Deep reference — the detail tier.** Start at [Parsing Grammar](../engine/parsing-grammar.md) for the summary; this page is the long form it points to. *(Moved from `docs/parsing-options-reference.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [Parsing Grammar](../engine/parsing-grammar.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `parsing-options-reference.md` (docs consolidation, 2026-07-16).)*
 
 > Companion to `docs/Parsing Options Reference.pdf`. The PDF is an excellent **generic DuckDB
 > `read_csv` cheat-sheet**; this document (1) **validates and corrects** that material against

@@ -68,7 +68,7 @@ who want an Incident at a warning severity, or without an Alert Rule, now pick `
 instead of relying on the `create-alert` side effect.
 The **record-routing** consequences (`route`/`tag`/`quarantine`/`drop`) are applied by the engine
 itself, per batch, via `com.gamma.etl.DecisionRuleApplier` — invoked from
-`BatchIngestStrategy.writeAndTrace`, the shared tail of every ingest path (Java parse engine +
+`ConsignmentIngestStrategy.writeAndTrace`, the shared tail of every ingest path (Java parse engine +
 all three native `read_csv` streaming paths), between `DataTransformer` and `PartitionWriter`:
 
 - **Rule loading** — `com.gamma.pipeline.DecisionRules` maps each space to its component-registry

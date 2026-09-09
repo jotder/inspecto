@@ -500,7 +500,7 @@ of the component-suite refusal and which the consolidation plan assigns to this 
 
 ## 8. Verification
 
-* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.).
+* **Pointer check** — a capability-pointer check over this file (`tools/check-doc-citations.mjs` — **committed 2026-09-09**, wired into `ci.yml` and `.githooks/pre-push`).
 * **The pipeline is the gate**, in order: the colour-token check, formatting, three type-check
   configurations, the test suite with coverage, a coverage floor, then the production build. The colour
   check runs **first** deliberately — it is the cheapest and the most often tripped.

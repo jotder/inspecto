@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # API Stability Policy
-> **Deep reference — the detail tier.** Start at [Control-plane section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/api-stability.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [Control-plane section index](index.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `api-stability.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation.
 
@@ -163,18 +163,18 @@ build against an API jar), so wrapping would duplicate data shapes for no payoff
 | `com.gamma.signal` | `Ref`, `Severity`, `Signal` |
 | `com.gamma.util` | `CronExpression` (relocated from `com.gamma.service`, WS-D §1.7) |
 | `com.gamma.service` | (`CollectorService` already public) |
-| `com.gamma.etl` / `com.gamma.enrich` / `com.gamma.job` / `com.gamma.event` / `com.gamma.report` | `BatchEvent`, `StatusStore` (StatusStore relocated from `com.gamma.service`, WS-D §1.7); `EnrichmentAuditReader`, `EnrichmentConfig`; `JobConfig`; `EventLog`; `ReportService.Window` |
+| `com.gamma.etl` / `com.gamma.enrich` / `com.gamma.job` / `com.gamma.event` / `com.gamma.report` | `ConsignmentEvent`, `StatusStore` (StatusStore relocated from `com.gamma.service`, WS-D §1.7); `EnrichmentAuditReader`, `EnrichmentConfig`; `JobConfig`; `EventLog`; `ReportService.Window` |
 
 ## Explicitly internal (do not depend on)
 
 `CsvIngester`, `DuckDbCsvIngester`, `DataTransformer`, `TransformCompiler`,
 `PartitionWriter`, `OutputFormat`, `LineageCollector`, `SchemaSelector`,
-`BatchProcessor`, `BatchPlanner`, `MarkerManager`, `QuarantineManager`,
-`DuckLakeRegistrar`, `CommitLog`, `BatchAuditWriter`, the `com.gamma.util.*` CLI
+`ConsignmentIngestor`, `BatchPlanner`, `MarkerManager`, `QuarantineManager`,
+`DuckLakeRegistrar`, `CommitLog`, `ConsignmentAuditWriter`, the `com.gamma.util.*` CLI
 tools, and all of
 `ManifestStore`/`Batch`/`PartitionDef`/`PartitionOutput`/`LineageRow` are
 implementation detail. (The `com.gamma.inspector` batch-ingest strategy seam —
-`BatchIngestStrategy`, `CsvBatchStrategy`, `StreamingPluginBatchStrategy`, `DuckDbRecordSink`,
+`ConsignmentIngestStrategy`, `CsvIngestStrategy`, `StreamingPluginIngestStrategy`, `DuckDbRecordSink`,
 `IngestOutcome`, `MemberAudit`, all package-private — is likewise internal.) They are stable enough for the framework's own use but
 carry no cross-version guarantee. Plugin authors interact with them only
 indirectly (e.g. you emit records that `DataTransformer` later reads —

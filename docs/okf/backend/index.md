@@ -16,7 +16,7 @@ Start with the [Overview](overview.md) and [Architecture](architecture.md), then
 
 * [Overview](overview.md) - what the backend is, the tech stack, the module map.
 * [Architecture](architecture.md) - the framework-free design (JDK HttpServer, manual DI, ServiceLoader SPI, virtual threads).
-* [Architecture layers](architecture-layers.md) - the platform layer map, storage-per-concern table (moved from `docs/architecture-layers.md`).
+* [Architecture layers](architecture-layers.md) - the platform layer map, storage-per-concern table (moved from the retired root-level `architecture-layers.md`).
 * [Modules](modules/) - the five Maven modules (engine, connectors, agent, agent-hosted, security).
 
 ## Layers

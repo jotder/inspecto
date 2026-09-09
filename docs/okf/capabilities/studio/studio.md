@@ -602,10 +602,10 @@ this file and the concept pages for *what is*.
 
 ## 8. Verification
 
-* **Pointer check** — a capability-pointer check over this file (⚠ **the checker is NOT in this repo** — it was a session scratch script (recorded 2026-09-09 as `TOOL` §5.2 item 1). Until it is committed to `tools/`, re-derive the check by grepping this file's backticked paths and class names against `git ls-files`.) indexes the tracked and
+* **Pointer check** — a capability-pointer check over this file (`tools/check-doc-citations.mjs` — **committed 2026-09-09**, wired into `ci.yml` and `.githooks/pre-push`) indexes the tracked and
   untracked tree and checks every backticked repo path, Java class and test name behind a control probe
-  that must pass first. **One MISSING hit is deliberate:** `inspecto-ui/src/app/inspecto/mock/sample-sources.ts`
-  in §3.3 and §5.2 is quoted precisely *because* it no longer exists — it is the dead path `studio.md`
+  that must pass first. **One MISSING hit is deliberate:** `inspecto-ui/src/app/inspecto/mock/sample-sources.ts` no longer exists,
+  and §3.3 and §5.2 quote it precisely *because* of that — it is the dead path `studio.md`
   was sending readers to. Do not "fix" it by deleting the citation.
 * **Backend tests** (14 classes): `ControlApiBiQueryTest`, `ControlApiBiTemplatesTest`,
   `ControlApiShareTest`, `ControlApiComponentSharesTest`, `ControlApiAlertRuleWriteTest`,

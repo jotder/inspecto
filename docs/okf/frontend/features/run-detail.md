@@ -42,7 +42,7 @@ action needs an explicit step, unlike the read-only tabs. Remaining known gap: n
 reprocess is still whole-batch only (tracked separately if ever prioritized).
 
 **Files tab: real field names + the live step gauge (2026-08-13).** The Files tab's `GET /runs/{name}/files`
-rows are the `_status_` ledger header **verbatim** (`BatchAuditWriter`): `start_time, end_time, filename,
+rows are the `_status_` ledger header **verbatim** (`ConsignmentAuditWriter`): `start_time, end_time, filename,
 status, parsed_rows, error_rows, output_paths, output_sizes_bytes, duration_ms, error, consignment_id`. Status
 is `SUCCESS` or one of `QUARANTINED_UNREADABLE|QUARANTINED_MISMATCH|QUARANTINED_EMPTY` — there is no per-file
 `FAILED` (that only exists at the batch-summary level). Alongside the file-history grid, the tab now renders
@@ -58,12 +58,17 @@ surfaces this: an `<inspecto-alert variant="info">` above the grid, shown only w
 contains a `FAILED` row, explains that the files will reappear as Pending on the Files tab with nothing
 further needed. The all-`SUCCESS` case renders no banner.
 
-⚠ **The offline mock must mirror the server's exact row shapes** (`inspecto/mock/handlers/demo.handler.ts`) —
-this was drifted before 2026-08-13 (invented `file_name`/`quarantined_at`/`PROCESSED` spellings that also made
-the offline Files tab always show "0 Succeeded"), pinned now in `demo.handler.spec.ts`. The mock's **batches**
+⚠ **The row shapes are the server's, and the mock that had to mirror them is deleted.** Corrected
+2026-09-09: `mock/handlers/demo.handler.ts` and `demo.handler.spec.ts` went with the offline mock backend
+on **2026-08-31**, so the pinning this paragraph described no longer exists — the authority is now
+`ConsignmentAuditWriter.java:48`, whose header is
+`consignment_id,pipeline,schema_name,output_table,start_time,end_time,status,…`. The drift history is kept
+because it names the failure class: before 2026-08-13 the mock had invented
+`file_name`/`quarantined_at`/`PROCESSED` spellings, which also made the offline Files tab always show
+"0 Succeeded". The mock's **batches**
 rows had the same drift class (invented `status: 'COMMITTED'`, `input_files`/`input_rows`/`output_rows`/
 `rejected_files`/`committed_at` columns) — also fixed 2026-08-13 (`de781124`): `batches()` now returns the
-real `BatchAuditWriter` header verbatim (`consignment_id, pipeline, schema_name, output_table, start_time,
+real `ConsignmentAuditWriter` header verbatim (`consignment_id, pipeline, schema_name, output_table, start_time,
 end_time, status, member_count, rejected_count, total_input_rows, total_output_rows, output_file_count,
 total_output_bytes, duration_ms, error, cast_failures`), status is `SUCCESS`/`FAILED` (the mock never
 generates `EMPTY`), `cast_failures` of `-1` ("not measured") is written blank not as `"-1"`, and

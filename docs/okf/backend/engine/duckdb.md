@@ -23,7 +23,7 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
 * **Memory / spill caps (opt-in; one knob for every scratch connection).** `DuckDbUtil.applyDuckDbSettings`
   sets `memory_limit` / `temp_directory` (spill) / `max_temp_directory_size` when a value is configured;
   unset ⇒ DuckDB's own default (≈ 80% RAM **per instance** — the aggregate-overcommit hazard under
-  concurrency). The batch-ingest path caps its connections via `BatchIngestStrategy.configure`
+  concurrency). The batch-ingest path caps its connections via `ConsignmentIngestStrategy.configure`
   (per-pipeline `processing.duckdb.*`). The **flow-job** (`PipelineJobRunner`) and **enrichment**
   (`EnrichmentEngine`) run scratch connections have no per-config `processing.duckdb` section, so they call
   `DuckDbUtil.applyGlobalDuckDbSettings`, which reads the global JVM fallbacks
@@ -50,7 +50,7 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   also be read from `-D` at use time (`SchedulerRoutes`, the 2026-08-15 operational-db decision).
   `JobService.setMaxConcurrentRuns` is the matching seam. ⚠ Preview / dry-run connections remain
   **uncapped** and must stay so: only `EnrichmentEngine`, `PipelineJobRunner` (via
-  `applyGlobalDuckDbSettings`) and `BatchIngestStrategy` (per-config path) resolve a limit.
+  `applyGlobalDuckDbSettings`) and `ConsignmentIngestStrategy` (per-config path) resolve a limit.
   `max_temp_directory_size` still gets **no** default — none is defensible without the volume size.
   **Same-day review hardening + follow-ups, all shipped 2026-08-26:** the Run bound counts in-flight Runs
   even while unbounded (🔴 a `Semaphore` subclass that re-derived "did this Run take a permit?" from
@@ -81,7 +81,7 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
     exactly the overcommit case it was meant to prevent. Until then, set `-Dprocessing.duckdb.memory_limit`
     explicitly on high-concurrency boxes. `processing.duckdb.max_temp_directory_size` likewise has no default
     (DuckDB uses ≈90% of the disk), though spill already lands on the data volume via the batch scratch dir
-    (`BatchIngestStrategy.scratchDir` → `dirs.temp`). Read-path connection reuse is explicitly **not** the
+    (`ConsignmentIngestStrategy.scratchDir` → `dirs.temp`). Read-path connection reuse is explicitly **not** the
     lever here (see BACKLOG §6 C6).
   * **D11 — MEASURED 2026-07-27. The number is `2GB`, and two long-standing beliefs here are wrong.**
     Measured on a 32 GiB host, DuckDB 1.5.2.1, over a CDR-shaped 12-column CSV. What the numbers say:
@@ -124,7 +124,7 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   `duckdb_extensions()` reported **icu installed: true, loaded: true**. The widespread "DuckDB defaults to
   UTC" belief holds only for an **ICU-less** build, and this is not one. Consequently a SQL-side
   `now()::TIMESTAMP` writer and a Java-side `LocalDateTime.ofInstant(…, ZoneId.systemDefault())` reader are
-  **the same wall clock** and agree — e.g. `BatchIngestStrategy:215`'s `__valid_from` and
+  **the same wall clock** and agree — e.g. `ConsignmentIngestStrategy:215`'s `__valid_from` and
   `ReferenceCompactor:142`'s retention cutoff are a genuine matched pair, *not* the off-by-the-UTC-offset
   bug they resemble. ⛔ "Fixing" that reader to UTC would **create** the skew and drop rows outside `keep`.
   ⚠ Note the asymmetry: DuckDB follows `systemDefault()` but is **blind to `-Dops.timezone`** — nothing in

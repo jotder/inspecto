@@ -42,7 +42,7 @@ column is not evidence that it *is* event time:
 
 | Path | Source of event time | Absent when |
 |---|---|---|
-| Ingest (`BatchProcessor` → `DataTransformer`) | `__event_time`, coerced from the schema's date `PartitionDef` and **excluded from written output** | no date partition declared, or every row failed to parse |
+| Ingest (`ConsignmentIngestor` → `DataTransformer`) | `__event_time`, coerced from the schema's date `PartitionDef` and **excluded from written output** | no date partition declared, or every row failed to parse |
 | Pipeline sink (`PartitionSinkWriter`) | `TRY_CAST(<source> AS TIMESTAMP)`, where `source` is a `partitions[]` entry's declared raw column | no entry declares one, entries disagree, or it is not a plain identifier |
 
 Enrichment and the Consignment processor **record a producer since 2026-08-10**, and both record bounds since
@@ -172,7 +172,7 @@ old revision in. Traced per reader:
 | `DatasetRelation` (`physicalRef`) | yes — `sourceLiteral` (walks; no connection in scope) | the dataset read of a sink store |
 | `DatasetRelation` (`view`) + `ViewQuery` | yes — **rendered at read time**, see below | executes a *persisted* definition |
 | `DbBrowserRoutes.browseStore`, `ExpectationEvaluator` | yes — `sourceLiteral` (since 2026-09-06) | both read a pipeline sink store and were missing from this table: the Data Browser re-globbed at scan time and showed a superseded revision during a recompute; an Expectation counted it |
-| `EnrichmentEngine` ×2, `BatchIngestStrategy` | ⛔ no, correctly | read Stage-1 ingest output / the ingest-written reference store — append-only, never `supersedeOtherRevisions` targets, so no catalog-marked file can appear |
+| `EnrichmentEngine` ×2, `ConsignmentIngestStrategy` | ⛔ no, correctly | read Stage-1 ingest output / the ingest-written reference store — append-only, never `supersedeOtherRevisions` targets, so no catalog-marked file can appear |
 | `ReferenceCompactor` | ⛔ no, correctly | owns an equivalent safety model (`*.refcompact.tmp` / `*.parquet.refcompacting` + journal) — a second authority, not a missing one |
 
 **A persisted read has to be rendered, not stored.** `PipelineJobRunner.deriveViewSql` builds a

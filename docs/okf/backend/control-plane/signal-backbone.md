@@ -11,7 +11,7 @@ timestamp: 2026-07-19T00:00:00Z
 
 Shipped end-to-end (S0–S7, `docs/archived-documents/plans-archive/event-signal-backbone-plan.md`):
 one canonical `Signal` envelope replaces three previously-disconnected event models (`Event`,
-the old 3-field `Signal`, `BatchEvent`) plus the isolated `AgentEvent` island, then that one ledger
+the old 3-field `Signal`, `ConsignmentEvent`) plus the isolated `AgentEvent` island, then that one ledger
 is projected out to five consumers — notification templating, `$`-parameter chaining, agent
 diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a gated write-back path.
 
@@ -42,8 +42,8 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   `correlationId = capabilityId`, `source = Ref("agent-capability", capabilityId)`.
 * **`JobTypeCatalog`** flags a Job Type whose declared `emits` disagrees with what it actually fires
   (caught a real bug: `report` declared `emits=[]` while firing `REPORT_READY`).
-* **`BatchAuditWriter`** additively emits `pipeline.batch.committed|failed` Signals alongside the
-  pre-existing `BatchEvent` fan-out (both fire; `BatchEventBus` itself is untouched — see the
+* **`ConsignmentAuditWriter`** additively emits `pipeline.batch.committed|failed` Signals alongside the
+  pre-existing `ConsignmentEvent` fan-out (both fire; `ConsignmentEventBus` itself is untouched — see the
   run-claim hand-off note below for why a full bus migration was deliberately not attempted).
 * **`DottedPath`** (`inspecto-util/src/main/java/com/gamma/util/DottedPath.java`) — one shared `a.b.c`
   resolver now used by `{{template}}` interpolation (`NotificationTemplate`), `$signal.<path>` job
@@ -159,7 +159,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 
 * **The run-claim hand-off seam is load-bearing for every piece above that subscribes to
   `EventLog`.** The publishing thread holds that pipeline's `PipelineRunGuard` claim (before 2026-08-01,
-  the global `ingestLock`); any subscriber (`SignalIngress`, `BatchAuditWriter`, a future triage consumer)
+  the global `ingestLock`); any subscriber (`SignalIngress`, `ConsignmentAuditWriter`, a future triage consumer)
   that starts new synchronous work inline risks blocking on it — hand off to a bounded queue + its own virtual-thread
   executor, exactly `FailureReactor`'s and `SignalIngress`'s pattern. Never "simplify" a subscriber to
   run inline.

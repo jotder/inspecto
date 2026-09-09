@@ -27,7 +27,7 @@ main agent must not have to read raw files itself.
 
 ## Orientation (where things live)
 
-`inspecto/src/main/java/com/gamma/`: `etl/` (PipelineConfig, BatchProcessor, CsvIngester) ·
+`inspecto/src/main/java/com/gamma/`: `etl/` (PipelineConfig, ConsignmentIngestor, CsvIngester) ·
 `inspector/` (CollectorProcessor poll cycle) · `acquire/` (CollectorConnector SPI, ledger, retry,
 ConnectionProfile/SecretResolver) · `service/` (CollectorService host, ControlApi ~50 routes, JobService) ·
 `ops/` `event/` `alert/` `metrics/` `catalog/` `config/` (ConfigSpec/ConfigSafetyValidator) · `sql/`.

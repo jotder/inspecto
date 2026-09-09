@@ -306,7 +306,7 @@ no backup and the connector can `STREAM` (and nothing downstream needs a seekabl
 **Stage, then land (B3).** A connector writes to the destination `RemoteAcquisitionHandler` hands it, and
 that destination is **never the inbox**. Fetches go to `collector.fetch.staging_dir` (default
 `<dirs.temp>/acquire`); only once complete and integrity-verified is the file **atomically renamed** into
-`dirs.poll`. Backup is a separate, later, post-commit step (`BatchProcessor.backupFile`), not where fetch
+`dirs.poll`. Backup is a separate, later, post-commit step (`ConsignmentIngestor.backupFile`), not where fetch
 lands. Three properties depend on this:
 
 - **A partial download is never ingestible.** `fetchTo` *resumes by appending to its destination*, so if

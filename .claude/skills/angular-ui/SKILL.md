@@ -565,7 +565,7 @@ src/app/
 - **Persona lens ("View as") + the Capability seam:** `LensService` (`inspecto/api`) mirrors
   `SpacesService`'s shape (signal + `localStorage` restore/persist) for the three lenses
   (business/builder/ops — `docs/GLOSSARY.md` §1-A). A lens is a **UI-side annotation, never a permission**
-  (Lens ≠ Role — `docs/superpower/rbac-abac-plan.md`). Panes gate on
+  (Lens ≠ Role — `docs/archived-documents/plans-archive/rbac-abac-plan.md`). Panes gate on
   the **named capability signals** — `lens.canAuthorWorkbench()` (Workbench create/edit/delete),
   `lens.canOperateRuns()` (Runs trigger/pause/reprocess), `lens.canTriageRequirements()` (C1 triage) —
   **never on `readOnly()`/lens identity**; add a new named capability per distinct authorization question.

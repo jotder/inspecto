@@ -519,7 +519,7 @@ Renaming would break every stored client link; migrating an offset pager with no
 | `ControlApiLegacySunsetTest` | `ControlApiVersionedSurfaceTest` | `api-v1.md` |
 | Per-context v1 migration | one global flip | archived design §10 |
 | The design's full `metadata.etag` / `links` / `permissions` envelope with per-resource ∩ state permissions | session-wide `permissions[]`, refined by SEC-7b `resourcePermissions` | `api-v1.md` |
-| `docs/api/openapi-v1.yaml` per context | `openapi-v1.json` with tags | `docs/api/README.md` |
+| `docs/api/openapi-v1.json` per context | `openapi-v1.json` with tags | `docs/api/README.md` |
 | `KeycloakTokenRelay`, the issuer-derived token endpoint | `OidcTokenRelay`, mandatory `-Dauth.oidc.tokenEndpoint` (D15) | `SEC` §4 |
 | Scoped token auth in the core (`-Dcontrol.token`, `/connect`) | the auth-free core + SPIs (2026-06-16) | `SEC` §3.1 |
 | `/flows`, `/sources`, `/issues`; the ingest-ops `/pipelines` | `/pipelines`, `/collectors`, `/incidents`; `/runs` | `GLOSSARY.md` §13 |

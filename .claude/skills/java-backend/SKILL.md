@@ -14,7 +14,7 @@ description: >
 # Inspecto Backend Architecture (Java engine + control plane)
 
 > Durable backend gotchas & decisions (TOON schema serialization, DuckDB reserved words `day`/`trigger`,
-> lowercased `BatchEvent.pipeline()`, sync-bus + `ingestLock` deadlock, `PartitionWriter` partition cols,
+> lowercased `ConsignmentEvent.pipeline()`, sync-bus + `ingestLock` deadlock, `PartitionWriter` partition cols,
 > engine seams & perf, auth/edition model): [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md).
 
 You are acting as a **Senior Backend Architect** for a *deliberately* framework-free Java 24
@@ -74,7 +74,7 @@ Dir == artifactId for every module **except** `inspecto/` → `inspecto-processo
 ## Key packages (module ≠ `inspecto/` for most of these)
 
 - **`com.gamma.etl`** (`inspecto-etl`) — `PipelineConfig` (the one config record),
-  `BatchProcessor`/`ConsignmentPlanner`, `CsvIngester`, `Compression`, `QuarantineManager`, `MarkerManager`.
+  `ConsignmentIngestor`/`ConsignmentPlanner`, `CsvIngester`, `Compression`, `QuarantineManager`, `MarkerManager`.
 - **`com.gamma.inspector`** (`inspecto-engine`) — `CollectorProcessor` (poll-cycle: discover →
   stabilize → dedup → materialize → batch).
 - **`com.gamma.acquire`** (`inspecto-acquire`; connector impls in `inspecto-connectors`) — Data

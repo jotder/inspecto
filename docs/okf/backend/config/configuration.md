@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Configuration Reference
-> **Deep reference — the detail tier.** Start at [TOON Configuration](toon-config.md) for the summary; this page is the long form it points to. *(Moved from `docs/configuration.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [TOON Configuration](toon-config.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `configuration.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 

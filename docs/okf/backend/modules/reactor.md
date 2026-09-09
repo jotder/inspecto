@@ -160,7 +160,7 @@ is maintainability-only, **not** a split blocker.
 **§1.7 cycle-breaking prep that made the SCC coherent (all DONE, shipped before the split):**
 - ✅ `CronExpression` + `Scheduler` `service` → `util` (the two edges into `service` from scheduling).
 - ✅ `StatusStore` (interface) `service` → `etl` — broke the `service ↔ catalog` cycle (impls stay in `service`).
-- ✅ `BatchEventBus` `service` → `etl` (beside its `BatchEvent` payload).
+- ✅ `ConsignmentEventBus` `service` → `etl` (beside its `ConsignmentEvent` payload).
 - ✅ `ReportRunner` SPI inverts `job→report` — `ReportService implements ReportRunner` (covariant `Object` returns).
 
 **As-built facts (verified by the full reactor build, not just import scans):**
@@ -203,13 +203,13 @@ increment 1 below then reshaped the bottom row:
 - **What the map showed as feasible — and increment 1 (2026-07-22) then DID.** The SCC was held
   together substantially by `etl` importing *up* into `event`/`pipeline`/`query`/`signal` via only
   **two files**: `etl.DecisionRuleApplier` (`pipeline.DecisionRules` + `query.ConditionSql`) and
-  `etl.BatchAuditWriter` (`event.EventLog` + `signal.Signal` for the `pipeline.batch.*` observability
+  `etl.ConsignmentAuditWriter` (`event.EventLog` + `signal.Signal` for the `pipeline.batch.*` observability
   tail). Both were cut without touching behavior:
     - `DecisionRuleApplier` → relocated to `com.gamma.pipeline` (its cohesive home with `DecisionRules`);
       all 3 callers (`inspector`/`enrich`/`job`) are higher-layer, so no etl→pipeline edge returns.
-    - `BatchAuditWriter` → the inlined Signal build+emit moved to the new `com.gamma.signal.PipelineBatchSignal`,
-      wired via an injected `setTerminalBatchSink(Consumer<BatchEvent>)` that `CollectorProcessor` sets to
-      `PipelineBatchSignal::emit`. `BatchEvent` already carried every field the Signal needs, so it is a
+    - `ConsignmentAuditWriter` → the inlined Signal build+emit moved to the new `com.gamma.signal.PipelineConsignmentSignal`,
+      wired via an injected `setTerminalBatchSink(Consumer<ConsignmentEvent>)` that `CollectorProcessor` sets to
+      `PipelineConsignmentSignal::emit`. `ConsignmentEvent` already carried every field the Signal needs, so it is a
       pure fan-out split. (One test method moved etl→signal to keep etl-test clean of the up-packages.)
   **Result — the mega-SCC fragmented (verified by re-mapping, full reactor green, 1884 tests):**
 
@@ -249,7 +249,7 @@ Relocating `DecisionRuleApplier` had a bonus effect: it was `enrich`'s *only* im
 Result: `pipeline` is now a clean base (no more up-imports within this cluster); `query` and `enrich`
 sit above it one-way; `job` sits above all three. Verified by the full reactor `mvn -o clean test`:
 **1884 tests, 0 failures, 0 errors, 3 skipped** — exact match to baseline (relocations only, callers'
-imports updated in `EnrichmentEngine`/`BatchIngestStrategy`/`SqlTemplateJob`/`JobService`/
+imports updated in `EnrichmentEngine`/`ConsignmentIngestStrategy`/`SqlTemplateJob`/`JobService`/
 `DecisionRoutes`/`DecisionRuleWiringTest`, javadoc `@link`s fixed in `ConservationCheck`/`ViewQuery`/
 `PartitionSinkWriter`/`ViewStore`). This is package-level layering only (all four packages are still
 one `fp-engine` module) — a prerequisite for ever extracting `fp-query`/`fp-job`/`fp-enrich` as

@@ -113,7 +113,7 @@ default ⇒ every existing pipeline parses/runs identically):
 Design (c) from the plan (§2): a `produces: reference` + `load: upsert` store is **append-only Parquet,
 latest-version-wins**, the current view derived at read time. `load: replace` (default) is untouched.
 
-- **Write** (`BatchIngestStrategy.stampReferenceVersions`, called from `writeAndTrace` — the single tail
+- **Write** (`ConsignmentIngestStrategy.stampReferenceVersions`, called from `writeAndTrace` — the single tail
   every ingest strategy routes through, so all paths get it): gated on
   `cfg.producesReference() && cfg.reference().load()==UPSERT`, it materialises `__ref_versioned` from
   the `transformed` table with the §2.1 system columns appended — `__key_hash`
@@ -217,7 +217,7 @@ P3 makes that derived view the *physical* truth — compaction output **is** the
    whole batch `QUARANTINED_UNREADABLE`; now falls back to `TRY_CAST` (native ISO parse).
 2. The collector-level `duplicate:` block is a **no-op on the legacy local poll path** — real
    dedup there is `processing.duplicate_check` (marker files); without it the same file re-ingests
-   every cycle (idempotent output, but a spurious `BatchEvent` per cycle re-fires enrichments).
+   every cycle (idempotent output, but a spurious `ConsignmentEvent` per cycle re-fires enrichments).
 3. Without `dirs.status_dir` no batch audit lands — `/runs/{name}/batches` stays empty forever.
 
 (2) and (3) are why the guided create derives the full orders-convention dir set +

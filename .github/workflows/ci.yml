@@ -87,6 +87,23 @@ jobs:
       - name: Guard — every relative doc link resolves
         run: node tools/check-doc-links.mjs
 
+      # Citation guard (2026-09-09, SPEC-STALEREF-1). The link guard above only sees markdown links; the
+      # commoner way a doc points at the tree is a backticked path or class name in PROSE, and nothing
+      # checked those. The consolidation measured 23 stale citations by hand; this guard's first run found
+      # 152 — 39 dead paths and 113 citations of types the 2026-08-31 Consignment rename retired, one of
+      # them a release gate resting on `BatchGraphRunner`, a class that does not exist while
+      # `ConsignmentGraphRunner` has two production callers. Nine capability specs' §8 sections described
+      # running this check and, until now, said it existed only in a session scratchpad.
+      # Its old-name set is PARSED from tools/rename-batch-to-consignment.mjs rather than mirrored here —
+      # a hand-mirrored map drifts, which is one of the failure classes this guard closes. Two allow rules,
+      # both printed with their counts on every run: a dead path is fine on a line that states the absence,
+      # an old name is fine on a line that also names its replacement. Falsified in both directions before
+      # wiring: a seeded dead path and a seeded bare old name each failed with their line number, each
+      # allow-rule turned the same line green, the clean corpus passed, and a run from the wrong directory
+      # FAILED on the emptiness floor rather than passing over nothing.
+      - name: Guard — every cited path and type name exists
+        run: node tools/check-doc-citations.mjs
+
       # SBOM module-set guard (2026-09-09). tools/sbom.mjs built its first-party table from FOUR artifacts
       # under a comment claiming it was "the SAME table package.ps1 stages from". It was not, and had not
       # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Enterprise, so every shipped

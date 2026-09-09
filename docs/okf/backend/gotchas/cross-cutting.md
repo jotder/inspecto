@@ -15,7 +15,7 @@ timestamp: 2026-07-16T00:00:00Z
   (`fields[N]{name,selector,type}: …`), not via `toToon(schemaMap)`. See [TOON config](../config/toon-config.md).
 * **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch
   this whenever generating SQL with date/trigger columns. See [DuckDB](../engine/duckdb.md).
-* **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
+* **`ConsignmentEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — e.g.
   `runPipeline("up_stream")`, not `"UP_STREAM"`.
 * **Synchronous bus + a held run claim ⇒ never dispatch inline** — the

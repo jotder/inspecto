@@ -17,7 +17,7 @@ Inspecto (repo `inspecto`) — Java 26 build / Maven `release=24`, multi-module 
 
 ## Key packages (under `inspecto/src/main/java/com/gamma/`)
 
-- **`etl/`** — `PipelineConfig` (the one config record), `BatchProcessor`/`ConsignmentPlanner`, `CsvIngester`,
+- **`etl/`** — `PipelineConfig` (the one config record), `ConsignmentIngestor`/`ConsignmentPlanner`, `CsvIngester`,
   `Compression` (.gz/.bz2/.zip), `QuarantineManager`, `MarkerManager`.
 - **`inspector/`** — `CollectorProcessor` (poll-cycle entry: discover → stabilize → dedup → materialize → batch).
 - **`acquire/`** — Data Acquisition SPI: `CollectorConnector` + `LocalFileSystemConnector`, `RemoteFile`,

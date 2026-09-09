@@ -386,7 +386,7 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
   `Investigator(service, components, browseStores, gateway)` test ctors; `toResult(AgentAnswer)` seam.
 - **`EventLog.global()` is JVM-wide** — scope Signal-tool test assertions by a unique correlationId.
 - **Two parallel bus systems stay separate**: the canonical Signal bus (`EventLog`, `EventType.SIGNAL`)
-  vs. the legacy `BatchEventBus` (`FailureReactor`) — no migration, per the standing run-claim
+  vs. the legacy `ConsignmentEventBus` (`FailureReactor`) — no migration, per the standing run-claim
   decision.
 
 ## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)

@@ -40,8 +40,8 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
 * **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
   resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): it reads the
   real store over `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by
-  `compileSql`. ⚠ *(Until 2026-09-08 this named an offline arm serving `inspecto/mock/sample-sources.ts`,
-  a path that no longer exists, and an AlaSQL arm for `sql()`.)* `sql()` runs authored SQL server-guarded and
+  `compileSql`. ⚠ *(Until 2026-09-08 this named an offline arm serving `inspecto/mock/sample-sources.ts`, a path that no longer exists,
+  and an AlaSQL arm for `sql()`.)* `sql()` runs authored SQL server-guarded and
   `columns()` answers the declared columns, else a 1-row probe. It is the layer UNDER
   `DatasetResultService`: that one runs a `QuerySpec`, this one supplies rows a screen reads directly.
   ⚠ **Every result is a PAGE** — it carries `truncated` and an `error` string, and a consumer that

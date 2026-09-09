@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # DuckLake & Warehouse Query Layer
-> **Deep reference — the detail tier.** Start at [Backend section index](index.md) for the summary; this page is the long form it points to. *(Moved from `docs/integrations.md` (docs consolidation, 2026-07-16). Retitled 2026-09-08: the remote-connector runbook that used to open this page is now [`acquisition/connectors-runbook.md`](acquisition/connectors-runbook.md); this file keeps only the warehouse subject its inbound links target.)*
+> **Deep reference — the detail tier.** Start at [Backend section index](index.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `integrations.md` (docs consolidation, 2026-07-16). Retitled 2026-09-08: the remote-connector runbook that used to open this page is now [`acquisition/connectors-runbook.md`](acquisition/connectors-runbook.md); this file keeps only the warehouse subject its inbound links target.)*
 
 > Part of the [Inspecto](../../../inspecto/README.md) documentation. See the [docs index](../INDEX.md).
 

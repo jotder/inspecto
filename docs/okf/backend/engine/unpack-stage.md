@@ -24,7 +24,7 @@ timestamp: 2026-08-22T00:00:00Z
 work unchanged, with **zero** modification to the Consignment model.
 
 ⛔ **Do not "update the Consignment" with expanded members.** `Batch`, `Batch.Member` and
-`BatchManifest` are immutable records and `ManifestStore` has no merge; adding members mid-flight
+`ConsignmentManifest` are immutable records and `ManifestStore` has no merge; adding members mid-flight
 means a mutation API on the crash-safe commit path, for no gain. Expanding one step earlier is free.
 
 **Engine-aware:** a format the chosen lane decodes itself is left alone — but only for `STREAM`
@@ -50,7 +50,7 @@ reverse-engineered per consumer, and `ArchiveDecompressorPlugin.entryName` — t
 `entryPath` — lives in the same class so the two halves of the format cannot drift.
 
 ⚠ **`srcIdToFile` is a FIVE-site concern, not three.** The three `srcIdToFile.put` sites
-(`CsvBatchStrategy`, `NativeCsvStreamingEngine`, `UnionModeIngester`) are the obvious ones; the wrap
+(`CsvIngestStrategy`, `NativeCsvStreamingEngine`, `UnionModeIngester`) are the obvious ones; the wrap
 lane names its file at `DuckDbRecordSink` construction rather than per row, so
 `GenerationModeIngester` and `UnionModeIngester`'s sink path are two more. Grepping `srcIdToFile`
 alone leaves that lane leaking the temp name.

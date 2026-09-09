@@ -554,6 +554,6 @@ references, one architecture, one seam, one pointer, four untyped indexes and tw
 5. **Add a type to the enum and nothing else, then save a graph using it.** The refusal you get names
    which of the five registration points you missed — and no build or test failed on the way.
 
-**A capability-pointer check over this file** — ⚠ **the checker is NOT in this repo**; it was a session
-scratch script and committing it is filed as a fix. Re-derive by grepping this file's backticked symbols
+**A capability-pointer check over this file** — it is **`tools/check-doc-citations.mjs`, committed 2026-09-09**
+and wired into `ci.yml` and `.githooks/pre-push`. It checks this file's backticked symbols
 and paths against `git ls-files` and the module tree.

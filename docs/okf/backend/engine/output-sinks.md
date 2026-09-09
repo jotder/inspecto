@@ -57,17 +57,17 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   (synthesises the shorthand, never throws); `PipelineConfigParser` parses the `sinks:` list (each entry
   needs a non-blank `database`); `ConfigSafetyValidator.checkSink` path-jails every `database` /
   `ducklake.data_path` and allow-lists format/compression.
-* **Ingest fan-out** — `BatchIngestStrategy.writeAndTrace` (the shared choke point) fans the main
+* **Ingest fan-out** — `ConsignmentIngestStrategy.writeAndTrace` (the shared choke point) fans the main
   partitioned write to every `cfg.sinks()` destination, each under its own `database` root (the `dbDir`
   suffix beyond `dirs.database` is preserved) and its own format/compression. **Predicate =
-  `cfg.sinks().size() > 1`** — *not* the whole-graph `BatchGraphRunner.engages`, which miscounts a
+  `cfg.sinks().size() > 1`** — *not* the whole-graph `ConsignmentGraphRunner.engages`, which miscounts a
   multi-schema batch. A single destination is byte-for-byte the legacy write. **Direct fan-out, not
-  `BatchGraphRunner`** — the ingest commit model is already "write everything, finalise once," and
+  `ConsignmentGraphRunner`** — the ingest commit model is already "write everything, finalise once," and
   `finalizeSource` (backup / markers-LAST / ledger) is per-source-file, so it runs exactly once
-  regardless of destination count. `BatchGraphRunner` stays the flow-job executor, unused by ingest.
+  regardless of destination count. `ConsignmentGraphRunner` stays the flow-job executor, unused by ingest.
 * **Bypass guards** — paths that skip `writeAndTrace` (native single-member `streamingIngest`/
   `chunkedIngest`; plugin `GenerationModeIngester`) materialise via the union path when `sinks>1`
-  (`CsvBatchStrategy`, `StreamingPluginBatchStrategy`).
+  (`CsvIngestStrategy`, `StreamingPluginIngestStrategy`).
 * **Editor round-trip** — `PipelineEditable.lower` no longer refuses `MULTI_SINK`; a graph with >1
   distinct sink database lowers to a `sinks:` list (the shorthand stays consistent with the first
   destination). Safe because a `transform.route`/`derive` node is not `LOWERABLE` (fails
@@ -86,7 +86,7 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
 
 Tests: `PipelineConfigSinksTest`, `ConfigSafetyValidatorTest` (per-sink jail/allow-list),
 `PipelineLiftTest.liftsSinksListToADataFedFanOut`,
-`BatchProcessorSinksTest.fanOutWritesEachDestinationAndFinalisesOnce`,
+`ConsignmentIngestorSinksTest.fanOutWritesEachDestinationAndFinalisesOnce`,
 `PipelineEditableTest.twoDistinctDatabasesLowerToASinksList`,
 `ControlApiPipelineCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline`.
 

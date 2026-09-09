@@ -11,7 +11,7 @@ timestamp: 2026-07-16T00:00:00Z
 > **Deep reference — the detail tier.** Start at [Operations](operations.md) for the summary; this page is the long form it points to.
 
 > 🔴 **NOT the authority on `-D` flags, auth headers, launchers, or the Java floor.** This page is 66 KB
-> moved wholesale from `docs/operations.md` on 2026-07-16 and its long tail is still sound — the `ura`
+> moved wholesale from the retired root-level `operations.md` on 2026-07-16 and its long tail is still sound — the `ura`
 > utility suite, output structure, the status log, batch processing, deployment and Collector onboarding.
 > Its *cross-cutting* material has drifted, and a 2026-09-08 sweep verified four defects against source:
 >
@@ -28,7 +28,7 @@ timestamp: 2026-07-16T00:00:00Z
 >   the same file already says Incident elsewhere.
 >
 > For the curated flag table read [Operations](operations.md); for build, reactor and `package.ps1` read
-> [Build & Test](build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from `docs/operations.md` (docs consolidation, 2026-07-16).)*
+> [Build & Test](build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from the retired root-level `operations.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 
@@ -342,7 +342,7 @@ triggers:
 
 Chains form naturally — set `on_pipeline` to an upstream enrichment's `name` and it fires on that enrichment's own commit. Recomputes for one job are serialised (a per-job lock), and idempotent writes make event + schedule overlap converge.
 
-**Run-level audit & lineage.** Every recompute — event, scheduled, or CLI — is recorded under a `_audit` sibling of the output root (`<output.database>_audit/`), so it never collides with the partitioned output tree. Three append-only artifacts per job, all keyed by a correlating `run_id` (which is also the chain `BatchEvent` id, linking the audit to `/metrics` and the `inspecto.events` log):
+**Run-level audit & lineage.** Every recompute — event, scheduled, or CLI — is recorded under a `_audit` sibling of the output root (`<output.database>_audit/`), so it never collides with the partitioned output tree. Three append-only artifacts per job, all keyed by a correlating `run_id` (which is also the chain `ConsignmentEvent` id, linking the audit to `/metrics` and the `inspecto.events` log):
 
 | File | Rows |
 |---|---|
@@ -915,7 +915,7 @@ When a batch contains exactly one member file, the output retains the legacy `<b
 
 ### Crash semantics — batch commit ordering
 
-`BatchProcessor.commit` writes durable state in a specific order so a process crash mid-commit is idempotent on rerun:
+`ConsignmentIngestor.commit` writes durable state in a specific order so a process crash mid-commit is idempotent on rerun:
 
 1. **DuckLake register** (optional, non-fatal — log and continue if catalog is unreachable).
 2. **Manifest write** — required for reprocess; this is what `ura reprocess` reads.
@@ -932,7 +932,7 @@ A crash at any point before step 4 leaves the input file in the inbox without a 
 |---|---|
 | `0` | All planned batches succeeded; no files quarantined. |
 | `1` | Invalid invocation (missing `pipeline.toon` argument). |
-| `2` | At least one batch threw an exception. Per-batch stack traces are in the log; aggregate `BatchProcessingException` message is on stderr. |
+| `2` | At least one batch threw an exception. Per-batch stack traces are in the log; aggregate `ConsignmentProcessingException` message is on stderr. |
 
 Wrapper scripts (`run.sh`, `run.bat`, cron jobs) should treat non-zero as failure and alert.
 

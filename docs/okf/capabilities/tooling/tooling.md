@@ -317,13 +317,22 @@ name claims every edition is signed when **two of three** are, with no artifact 
 > **crosses** areas; a spec holds what belongs to **one**. See
 > [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
 
-1. 🔴 **Five capability specs cite a pointer-check tool that is not in the repository.** Their verification
-   sections instruct a next shift to run a checker that exists only in a session scratchpad. It is the
-   script that caught stale class names in two areas, so it earns its place — but as written, five specs
-   name a verification step nobody else can run. **This is this area's own disease, self-inflicted**, and
-   the link guard cannot catch it because a script name in prose is not a markdown link. Two honest fixes:
-   commit the checker into the tooling directory, or reword the five sections. §7 does the second; the
-   first is the better answer and is an operator call.
+1. ✅ ~~**Capability specs cite a pointer-check tool that is not in the repository.**~~ **FIXED 2026-09-09
+   as `tools/check-doc-citations.mjs`**, wired into `ci.yml` and `.githooks/pre-push`. It was **nine**
+   specs, not the five counted here — this row was itself an instance of `SPEC-COUNTS-1`. The better of
+   the two options was taken (commit the checker, not reword the sections), and the nine §8 sections now
+   name a step anybody can run.
+
+   🔴 **Its first run found 152 stale citations, against the 23 the consolidation had counted by hand** —
+   39 dead paths and 113 citations of Java types the 2026-08-31 Consignment rename retired, across 37
+   files. All 152 are repaired in the same commit. The load-bearing design lesson is what the guard does
+   **not** do: the first version checked that every backticked CamelCase name exists in the tree, and
+   measurement killed it — 4,654 such citations, 56 distinct names absent, and the large majority of those
+   absences were legitimate (third-party types, deliberately-unbuilt designs, renames recorded on
+   purpose). That guard would have been ~45 entries of allowlist and 11 of rule. ⚠ **A guard whose scope
+   is mostly exemption is this area's recorded failure three times over**, so check B narrowed to the one
+   objective invariant available: the rename map the repository itself commits, PARSED from the codemod
+   rather than mirrored, because a hand-mirrored map drifts.
 2. ✅ ~~**The coverage guard has no minimum module count.**~~ **FIXED 2026-09-09.** It had found **one**
    module report, computed 97.89% over its 427 instructions against a 78% floor, and reported every floor
    met with a success exit — it failed only on *zero* reports, so a single stale build directory
@@ -415,9 +424,9 @@ name claims every edition is signed when **two of three** are, with no artifact 
 
 **Gap rows.** The doctrine page is a **rules register, not an inventory**: it never enumerates the roster
 with wiring, scope and floors, which is why §3.2 exists. Its own resource line omits the client token
-guard it discusses. The prior inventory lived only in two stretches of note prose. And 🔴 **the pointer
-check five specs cite is not in this repository** (§5.2 item 1) — until that is resolved, this file's §8
-names what a next shift can actually run.
+guard it discusses. The prior inventory lived only in two stretches of note prose. And ✅ **the pointer
+check the specs cite is now in this repository** — `tools/check-doc-citations.mjs`, committed
+2026-09-09 and wired into both pipelines (§5.2 item 1, now closed; it was **nine** specs, not five).
 
 ## 8. Verification
 

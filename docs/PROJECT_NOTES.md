@@ -57,7 +57,7 @@ Authoritative shape, version management, and the module-extraction playbook:
 
 agent-kernel is GONE (discontinued upstream, replaced 2026-07-07): its reasoning layer is vendored at
 `inspecto-agent … com/gamma/agent/kernel/**`; model transport is **eoiagent** (`com.eoiagent:*:0.1.0-SNAPSHOT`,
-local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-kernel-replacement-plan.md`.
+local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents/plans-archive/agent-kernel-replacement-plan.md`.
 
 ---
 
@@ -458,7 +458,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   a **review** device, never a vulnerability scanner. ⚠ Its lock was generated on a developer machine;
   if CI ever resolves differently the remedy is one `--update` commit, but a persistent local-vs-CI
   split is a design problem to settle, not to paper over.
-- **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
+- **`ConsignmentEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — tests call
   `runPipeline("up_stream")`, not `"UP_STREAM"`.
 - **Synchronous bus + a held run claim ⇒ never dispatch inline** — the event bus publishes **synchronously on
@@ -571,8 +571,8 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   (default 256 MB); generation budget `processing.streaming.flush_records` (default 5,000,000).
 - **DuckDB `Appender` ingest** (vs JDBC `executeBatch`) ≈ **75× faster** (1M-row bench ~6.9k → ~510k rows/s).
 - **Modularity seams** (behavior-preserving; SQL/`.toon`/on-disk output unchanged): `OutputFormat`
-  (enum-as-strategy), `TransformCompiler` (`transformType → ColumnRule`), `BatchIngestStrategy` (Csv/Plugin →
-  typed `IngestOutcome`; `BatchProcessor` is a thin coordinator).
+  (enum-as-strategy), `TransformCompiler` (`transformType → ColumnRule`), `ConsignmentIngestStrategy` (Csv/Plugin →
+  typed `IngestOutcome`; `ConsignmentIngestor` is a thin coordinator).
 - **Auto-derive `duckdb_threads`** — `DuckDbUtil.effectiveWorkerThreads`: `0`=auto `max(1,cores/concurrency)`,
   `>0`=verbatim, `-1`=DuckDB per-core default; single-batch→all cores. Avoids the threads×cores oversubscription
   stall (~+15% tax, widens with cores).
@@ -582,15 +582,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `PartitionOutput(partition, outputFile, bytes)` is an *ephemeral* return value — produced by
   `PartitionWriter.reveal()`, consumed once, discarded — in **three** paths: ingest, `EnrichmentEngine`, and
   `PartitionSinkWriter`. (`DecisionRuleApplier` is *not* a fourth: its `RouteSink` already calls
-  `LineageCollector`, and `BatchIngestStrategy.writeAndTrace` seeds its accumulators from `applied.outputs()`, so
-  routed-rule outputs reach the ingest hook for free. The hook is `BatchProcessor.finalizeSource`, once per
+  `LineageCollector`, and `ConsignmentIngestStrategy.writeAndTrace` seeds its accumulators from `applied.outputs()`, so
+  routed-rule outputs reach the ingest hook for free. The hook is `ConsignmentIngestor.finalizeSource`, once per
   Consignment — *not* `writeAndTrace`, which has four callers and is invoked **per segment** in union mode
   and **per chunk** in chunked mode. ⚠ Since 2026-08-29 that multiplicity is load-bearing: those callers pass a
   **write scope** so the batch's shared branch-commit ledger keeps their sinks distinct — without it the second
   and later writes read as "already committed" and their rows vanish. See
   [`okf/backend/engine/branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md) §"The lane fork".)
   The durable registry (`DbConsignmentOutputStore`, plan §11.3) is **default-off** and `ServiceStores` degrades a
-  failed open to `null`, so **never read a missing registry row as proof a file does not exist** — `BatchManifest`/
+  failed open to `null`, so **never read a missing registry row as proof a file does not exist** — `ConsignmentManifest`/
   `ManifestStore` stays the artifact of record. Note also that no per-file row count exists at write time (a
   multi-file partitioned `COPY` reports none): ingest sums `LineageCollector`'s per-`(srcId, partition)` counts,
   while enrichment and sinks use `ConsignmentOutputs.countByPartition` (needs no `__src_id`).

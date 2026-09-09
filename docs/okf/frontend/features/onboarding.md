@@ -267,7 +267,7 @@ Opt-in pane authoring the companion `EnrichmentConfig` (`<pipeline>_enrich`): re
 (**by-name first** — the picker offers only pipeline-produced Reference Datasets, minus self — with
 a file-path fallback) + CodeMirror transform SQL. Wiring is derived, never asked: input = this
 pipeline's Stage-1 output, `triggers.on_pipeline` = the engine-normalized id
-(`name.toLowerCase().replace(' ','_')` — what `BatchEvent.pipeline()` carries), output = the
+(`name.toLowerCase().replace(' ','_')` — what `ConsignmentEvent.pipeline()` carries), output = the
 space's `enriched/` convention. **Every save re-registers** (`POST /enrichment`) because
 enrichments do not hot-reload by mtime; a register failure downgrades to a warning (the file is
 saved; it loads on restart).

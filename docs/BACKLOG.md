@@ -182,7 +182,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Authoring (Parse / Transform / pipeline editor)
 
-- **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `BatchIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
+- **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **Step Processor catalog** — 119 processors: 34 delivered / **18 partial / 67 planned** (`processor-catalog.contract.json`, counted 2026-09-08 — the earlier "69 planned" was a grep artefact) (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 - **P2** · **P4 Test mapping on a generic `parser` node** — only reachable where the parse node is per-format. ⚠ The "blocked on §1 decision (l)" gate is **discharged** — (l) was decided and shipped 2026-09-06 (`okf/frontend/features/pipeline-editor.md`); re-scope this row before building. ⚠ Offline, non-`DIRECT` types show blank (mock has no SQL engine) — recorded. → `okf/frontend/features/pipeline-editor.md`
 - **P2** · **`kpi_report_builder` host (AGT-6a)** — no viable host pane; a new surface, not an adoption. (Its `projection_author` ‘stale `columns.items`’ half was **fixed 2026-07-28** and the clause is retired.) This row is what keeps `superpower/agt-6-plan.md` out of the archive. → `superpower/agt-6-plan.md`
@@ -331,8 +331,27 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
 These four are the **classes** behind roughly half of the consolidation's findings. Each is one guard, not N
 fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidation-sprints.md`.
 
-- **P2** · **`SPEC-STALEREF-1` — twenty-three stale paths, dead citations and phantom rows.** The largest
-  single family, and the one nothing checks. Instances: **twenty-plus dead class citations** surviving the
+- ✅ **`SPEC-STALEREF-1` — the class is CLOSED 2026-09-09; the guard is `tools/check-doc-citations.mjs`.**
+  Committed and wired into `ci.yml` and `.githooks/pre-push`, falsified in both directions (a seeded dead
+  path and a seeded bare old type name each failed with their line number; each allow-rule turned the same
+  line green; the clean corpus passed; a run from the wrong directory FAILED on its emptiness floor rather
+  than passing over nothing). 🔴 **It found 152 stale citations, not 23** — 39 dead paths and 113 dead type
+  citations across 37 files, all repaired in the same commit. Three lessons worth more than the fixes:
+  **(a)** the first design — "every backticked CamelCase name must exist in the tree" — was killed by
+  measurement: 4,654 such citations, 56 distinct absences, and most were legitimate (third-party types,
+  deliberately-unbuilt designs, renames recorded on purpose), so it would have shipped as ~45 entries of
+  allowlist and 11 of rule. The guard narrowed to the one objective invariant available: the rename map the
+  repo itself commits, **parsed** from `tools/rename-batch-to-consignment.mjs`, never mirrored.
+  **(b)** Both checks needed an *allow* rule, and the same one twice: a dead path is fine on a line that
+  states the absence, an old name is fine on a line that also names its replacement — that is what
+  RECORDING history looks like, and it is what let the guard ship with **no waiver list at all**.
+  **(c)** ⛔ **A rename codemod over prose inverts any sentence whose subject is the old name's absence.**
+  The bulk repair rewrote "the phantom `BatchGraphRunner`" into "the phantom `ConsignmentGraphRunner`" —
+  the live class — in this very row, and one more like it; both were caught on diff review and restored.
+  The codemod's own header had warned of exactly this ("DOCS ARE NOT SWEPT … the canon carries deliberate
+  history that a rename would falsify"). Read the diff, not just the guard's exit code.
+
+  *The original row, kept because it names the instances:* **twenty-plus dead class citations** surviving the
   2026-08-31 Consignment rename (five of them in the active pipeline plan's "what actually runs" section, two
   cited *by line number*); a **deleted component named as the current mapping UI**; every `RowShaper` line
   citation wrong **and its package path wrong**; `pipeline-graph-design.md` §14 cited when the file has eleven
@@ -340,7 +359,7 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   `docs/okf/agentic/` pointing at a local path that does not exist; a dead archive pointer; and a tracked hook
   comment naming a hook that does not exist. 🔴 **The fix is one guard**: a citation check over each
   document's backticked symbols and paths against `git ls-files` and the module tree — which is exactly the
-  §7 pointer check every capability spec already describes, and which caught the phantom `BatchGraphRunner`
+  §7 pointer check every capability spec already describes, and which caught the phantom `BatchGraphRunner` (the live class is `ConsignmentGraphRunner`)
   the moment it ran. Committing that checker is the enabler. → `okf/capabilities/tooling/tooling.md` §5.
 - **P2** · **`SPEC-COUNTS-1` — eight facts, each counted two to six ways, and the narrative doc is wrong every
   time.** Measured 2026-09-09: builtin node types **30** (docs said 20/28/20/29 — five ways); parser frontends
@@ -549,7 +568,7 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
 
 | Canonical row | Also appears as |
 |---|---|
-| Row 15 — ELT Phase 6 deletion half (§2) | pipeline-spec §12 row 15 · Platform Services Stage 2 precondition (§3) · 🔴 ~~`BatchGraphRunner` parity blocker~~ **THE CLASS DOES NOT EXIST** (corrected 2026-09-09 — see §3) · §5 "archive pipeline-spec + waves-plan when Row 15 closes" |
+| Row 15 — ELT Phase 6 deletion half (§2) | pipeline-spec §12 row 15 · Platform Services Stage 2 precondition (§3) · 🔴 ~~`BatchGraphRunner` parity blocker~~ **THAT CLASS DOES NOT EXIST** (the live one is `ConsignmentGraphRunner`) (corrected 2026-09-09 — see §3) · §5 "archive pipeline-spec + waves-plan when Row 15 closes" |
 | D13 parser field tiers (§2) | `superpower/parser-field-tiers-interview-plan.md` (the interview-#2 kit) |
 | AGT-5 `DryRunProvider` (§2) | AGT-6b row (§2) · `superpower/agt-6-plan.md` §4.2 G2 |
 | EXECUTION-RESIDUALS X4 record-level replay (§3) | `okf/frontend/features/run-detail.md` + `USER_GUIDE.md` "reprocess is whole-batch only" · `INDEX.md`'s `EXECUTION-RESIDUALS-SKETCHES` pointer (which cites §4 — the row is in §3) |

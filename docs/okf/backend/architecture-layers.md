@@ -22,7 +22,7 @@ timestamp: 2026-07-16T00:00:00Z
 > [reactor.md](modules/reactor.md) (whose own module list is also stale — see architecture.md).
 > **Still sound and unique to this page:** §5's two-event-buses distinction and §7's DuckDB
 > open-per-use / `SqlSandbox` boundary. *(Assessed 2026-09-08; this page is a retirement candidate —
-> `docs/superpower/docs-consolidation-plan.md` §5.8.1 group 7.)* *(Moved from `docs/architecture-layers.md` (docs consolidation, 2026-07-16).)*
+> `docs/superpower/docs-consolidation-plan.md` §5.8.1 group 7.)* *(Moved from the retired root-level `architecture-layers.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 >
@@ -97,14 +97,14 @@ Direct files / lines, role, and outbound `com.gamma` dependencies (import counts
 | L2 | `assist` (+`spi`) | 4/327 | Assist value types + `AssistAgent` SPI | api:4, service:1 |
 | L2 | `intelligence.spi` | 1/71 | `IntelligenceAgent` SPI | intelligence:5, service:1 |
 | L2 | `ingester` | 2/259 | Reference `StreamingFileIngester` implementations | etl:6 |
-| L3 | `service` | 23/4360 | `CollectorService` host (1,178 lines), `SpaceManager`, `Scheduler`, `BatchEventBus`, `DbStatusStore` | etl:15, event:10, pipeline:6, enrich:6, util:6, job:5, catalog:5, inspector:3, acquire:3, +6 more |
+| L3 | `service` | 23/4360 | `CollectorService` host (1,178 lines), `SpaceManager`, `Scheduler`, `ConsignmentEventBus`, `DbStatusStore` | etl:15, event:10, pipeline:6, enrich:6, util:6, job:5, catalog:5, inspector:3, acquire:3, +6 more |
 | L3 | `report` | 1/300 | Report generation service | service:3, etl:1, api:1 |
 | L4 | `control` | 49/6190 | `ControlApi` dispatcher + ~24 `RouteModule`s + `ApiContext` + auth SPI | pipeline:36, service:18, event:14, config.spec:14, query:13, +15 more |
 
 ### Known dependency cycles (module-extraction blockers)
 
 - **`service` ↔ `job` ↔ `pipeline.exec`** (3-way): `CollectorService` → `JobService`; `job` →
-  `service.BatchEventBus` and → `pipeline.exec.PipelineJobRunner`; `pipeline.exec` → `job.Job*`
+  `service.ConsignmentEventBus` and → `pipeline.exec.PipelineJobRunner`; `pipeline.exec` → `job.Job*`
   types and → the consignment-commit bus. Break by extracting job contract types.
   **DONE (WS-D §1.7 + `ff33246a`):** `CronExpression` moved `service` → `util`, and the bus was both
   renamed and relocated — it is `com.gamma.etl.ConsignmentEventBus` in `inspecto-etl` today, so this

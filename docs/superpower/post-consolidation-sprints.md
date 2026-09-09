@@ -144,6 +144,26 @@ paragraph hit the same trap on its first attempt, where the atomic write then sa
 **Goal:** the failure *classes* that produced most of the 215 stop being able to recur. Highest leverage
 sprint in the plan: one guard each, instead of N fixes.
 
+> ### Progress — the enabler is DONE 2026-09-09; the five table classes below are still open
+>
+> **`SPEC-STALEREF-1`'s class is closed.** `tools/check-doc-citations.mjs` is committed and wired into
+> `ci.yml` + `.githooks/pre-push`, falsified in both directions. ⚠ **That family is not one of the five
+> rows below** — it is the *enabler* the board row named, and it was taken first because nine capability
+> specs' §8 sections instructed a next shift to run a checker that existed only in a session scratchpad.
+> It found **152** stale citations against the 23 counted by hand (39 dead paths, 113 dead type names,
+> 37 files), all repaired in the same commit.
+>
+> 🔴 **The transferable finding, and it changes how the five below should be attempted.** The first
+> design of that guard was the obvious one — *every backticked CamelCase name must exist in the tree* —
+> and measurement killed it: 4,654 citations, 56 distinct absences, and the large majority legitimate
+> (third-party types, deliberately-unbuilt designs, renames recorded on purpose). It would have shipped
+> as roughly 45 entries of allowlist and 11 of rule, and **a guard whose scope is mostly exemption is a
+> recorded failure of this repo three times over.** What made it shippable was narrowing to an invariant
+> the repository states about *itself* — the committed rename map, parsed rather than mirrored — plus one
+> allow rule reused by both checks: a citation is fine when the line records the history (names the
+> replacement, or states the absence). **Look for the self-stated invariant before writing any of the
+> five guards below; if a guard needs a waiver list to go green, it is measuring the wrong thing.**
+
 | Class | Instances found | The one fix |
 |---|---|---|
 | **A generated artifact is authoritative to its consumer and unverified by its producer** | the bill of materials (fixed this week); the served API contract covers **19 of ~332** routes with a test that cannot see the gap | A guard per generated artifact holding it against its own source of truth — the pattern the peer session just established |

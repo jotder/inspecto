@@ -16,7 +16,7 @@ virtual-thread `workers` executor. Four trigger modes:
   now returns a `CronHandle`; `JobService.removeJob` cancels it, so a deleted/replaced job's self-re-arming
   chain actually stops instead of ticking as an inert no-op forever (the fire-time `jobs.containsKey` guard
   stays as a second line of defence against the cancel/fire race).
-* **Event** — jobs with `on_pipeline` subscribe to the `BatchEventBus`; `onBatchEvent` matches a `SUCCESS`
+* **Event** — jobs with `on_pipeline` subscribe to the `ConsignmentEventBus`; `onBatchEvent` matches a `SUCCESS`
   status + pipeline name, then `submit()`s. This is the **deadlock-safe** path — `submit` hands work to
   `workers` and returns immediately, so the synchronous [event bus](events-metrics.md) never holds a
   `PipelineRunGuard` claim across a new run.
@@ -257,8 +257,8 @@ ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-loc
     here is a pack the engine accepts.
 - ✅ **Three sites stay on `systemDefault()`, to match their writers — DECIDED 2026-08-15. The sweep is
   CLOSED; this is the end state, not a deferral.** `AlertService:374` (cutoff vs. the ledger's
-  `end_time`/`start_time`, written by `BatchProcessor:298/360/375/386`), `ReferenceCompactor:142` (literal vs.
-  the `__valid_from` column, written by `BatchIngestStrategy:215`), `InspectoTools:385` (parse vs. the audit
+  `end_time`/`start_time`, written by `ConsignmentIngestor:298/360/375/386`), `ReferenceCompactor:142` (literal vs.
+  the `__valid_from` column, written by `ConsignmentIngestStrategy:215`), `InspectoTools:385` (parse vs. the audit
   CSV, written by `JobService:714…1010`). Each is the **read half of a write/read pair** over a **zone-naive**
   stored string, self-consistent precisely because both halves use `systemDefault()`. The operations zone
   answers "when does the operator's schedule fire"; **none of these three is an operator-facing clock** — they

@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 ---
 
 # Data Acquisition & File Collection Requirements
-> **Deep reference — the detail tier.** Start at [Data Acquisition Framework](framework.md) for the summary; this page is the long form it points to. *(Moved from `docs/data_acquisition_framework.md` (docs consolidation, 2026-07-16).)*
+> **Deep reference — the detail tier.** Start at [Data Acquisition Framework](framework.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `data_acquisition_framework.md` (docs consolidation, 2026-07-16).)*
 
 > **Status: the framework is built — Phases A–F have all shipped on `master`.** *(⚠ do not restore a `4.x`
 > attribution: that branch and its `v4.0.0`/`v4.0.0-RC1` tags were deleted 2026-08-17 — `docs/BRANCHING.md`

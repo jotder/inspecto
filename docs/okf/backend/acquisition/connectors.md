@@ -26,7 +26,7 @@ timestamp: 2026-06-28T00:00:00Z
 A connector writes to the destination `RemoteAcquisitionHandler` hands it, and that destination is **never
 the inbox**. Fetches go to a staging tree — `collector.fetch.staging_dir`, default `<dirs.temp>/acquire` —
 and only once the file is complete and integrity-verified is it **atomically renamed** into `dirs.poll`.
-Backup is a separate, later step (`BatchProcessor.backupFile`, post-commit), not where fetch lands.
+Backup is a separate, later step (`ConsignmentIngestor.backupFile`, post-commit), not where fetch lands.
 
 Three properties depend on this, all pinned by `RemoteAcquisitionStagingTest`:
 

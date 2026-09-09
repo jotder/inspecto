@@ -91,7 +91,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 - **`ingest-wrap-spi.md` names the mode selector `processing.streaming.generation_threshold_bytes`**; the
   parser reads **`large_file_bytes`** (`PipelineConfigParser.java:243`) and no other page or code uses the
   first name. Corrected with this spec.
-- **`transforms-seams.md` still describes `BatchIngestStrategy` / `CsvBatchStrategy` and a `DATA_RULES`
+- **`transforms-seams.md` still describes `ConsignmentIngestStrategy` / `CsvIngestStrategy` and a `DATA_RULES`
   registry**; the types are `ConsignmentIngestStrategy` / `CsvIngestStrategy` / `StreamingPluginIngestStrategy`
   (2026-08-31) and `DATA_RULES` does not exist (`configuration.md` corrected it 2026-09-08). Corrected with
   this spec.
@@ -371,7 +371,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | **The frontend count is stated six ways** (3 / 5 / 6 / 7 / 9 / 10) across five pages and the user guide | §2 | the truth is ten tokens, eight formats, six built-ins — recorded here once |
 | **`Segment` has no glossary entry** | `GLOSSARY.md` | the load-bearing plugin-ingest word is undefined in the binding vocabulary |
 | **`ingestable` is a display flag with a stale reading in `onboarding.md`** ("XML today") | `parser-plugins.md` vs `onboarding.md:210-212` | corrected with this spec |
-| **The "Batch" names survive in `transforms-seams.md`, `duckdb.md`, `FEATURE_INVENTORY.md`** | `BatchIngestStrategy`, `CsvBatchStrategy` | 8 days after the rename; corrected in the seams page with this spec, the rest are a sweep |
+| **The "Batch" names survive in `transforms-seams.md`, `duckdb.md`, `FEATURE_INVENTORY.md`** | `ConsignmentIngestStrategy`, `CsvIngestStrategy` | 8 days after the rename; corrected in the seams page with this spec, the rest are a sweep |
 
 ## 6. Refused & superseded
 
@@ -462,7 +462,7 @@ It costs nothing, is pinned, and a hand-authored file may still carry it; the re
 | `route:` on the poll path, the lane flag, the engagement predicate | `docs/okf/backend/engine/branch-aware-ingest.md` (`Concept`) | — | §3.2 |
 | The run budget, the broker, the fetch lane | `docs/okf/backend/engine/consignment-concurrency.md` (`Concept`) | — | bounds |
 | The Appender, threads, the source zone | `docs/okf/backend/engine/duckdb.md` (`Concept`) | `DuckDbUtil.java` | §3.4, §3.8 |
-| The strategy seams — ⚠ still names `BatchIngestStrategy` and `DATA_RULES` | `docs/okf/backend/engine/transforms-seams.md` (`Concept`) | — | corrected with this spec |
+| The strategy seams — ⚠ still names `ConsignmentIngestStrategy` and `DATA_RULES` | `docs/okf/backend/engine/transforms-seams.md` (`Concept`) | — | corrected with this spec |
 | The Parse pane, the drawer, templates as copies, D8–D10 | `docs/okf/frontend/features/grammar-config.md` (`Feature`) · `schema-mapping-authoring.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/pipelines` | §3.9 |
 | Onboarding as the editor's checklist; the parse flow | `docs/okf/frontend/features/onboarding.md` (`Feature`) | — | §3.9 |
 | ⚠ **No page owns Expectations as a subject** (`com.gamma.expectation`); the only accounts are `REQUIREMENTS.md`'s cell and `decision-rules.md`'s condition-tree paragraph | *(gap)* | `inspecto/src/main/java/com/gamma/expectation` | §3.7 |

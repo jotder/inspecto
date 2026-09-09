@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Transforms & Modularity Seams
-description: TransformCompiler (transformType → ColumnRule) and the BatchIngestStrategy seam.
+description: TransformCompiler (transformType → ColumnRule) and the ConsignmentIngestStrategy seam.
 resource: inspecto-etl/src/main/java/com/gamma/etl/TransformCompiler.java
 tags: [engine, transform, seam, strategy]
 timestamp: 2026-06-28T00:00:00Z
@@ -21,9 +21,10 @@ These behavior-preserving seams keep the engine modular (SQL / `.toon` / on-disk
 * **`ConsignmentIngestStrategy`** (`inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestStrategy.java`) — a
   package-private interface, one method `IngestOutcome ingest(Consignment, PipelineConfig)`, with two
   implementations: `CsvIngestStrategy` (default) and `StreamingPluginIngestStrategy` (renamed 2026-08-31; this
-  page said `BatchIngestStrategy` / `CsvBatchStrategy` / `StreamingPluginBatchStrategy` until 2026-09-08) (the
+  page said `BatchIngestStrategy` → `ConsignmentIngestStrategy`, `CsvBatchStrategy` → `CsvIngestStrategy` and
+  `StreamingPluginBatchStrategy` → `StreamingPluginIngestStrategy` until 2026-09-08) (the
   [plugin](ingestion.md) path). Each owns its DuckDB connection lifecycle; the shared commit+audit tail in
-  `BatchProcessor` is path-agnostic. The interface also carries static helpers (`dropTable`, `dropView`,
+  `ConsignmentIngestor` is path-agnostic. The interface also carries static helpers (`dropTable`, `dropView`,
   `partitionColumns`).
 
 Related: `OutputFormat` is the third such enum-as-strategy seam (see [output & sinks](output-sinks.md)).
