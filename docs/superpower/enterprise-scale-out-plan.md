@@ -1,0 +1,450 @@
+# Enterprise Scale-Out on Kubernetes — Design Plan
+
+> **Status: DRAFT for operator sign-off — 2026-09-10. Nothing here is built; nothing here is decided
+> until §9 is signed.**
+>
+> **What this plan does.** Turns the operator's 2026-09-10 direction — *"on Enterprise I plan K8s
+> scaling"* — into a design the code can actually carry, sequenced so that the first two of its three
+> phases pay for themselves on a **single node** before a pod exists. It proposes **shared-nothing
+> partitioning** (N pods, each owning a slice of Spaces, all writing one shared lakehouse) and
+> **refuses** replacing the embedded engine with a distributed one.
+>
+> ⚠ **This plan REVISES signed decisions, and says so.** `NFR-8` already names the *"Enterprise
+> distributed tier"* as the *"opt-in escape hatch"* — it does **not** need reversing. What does: the
+> container decision **D1** (signed 2026-09-06: *"a container image as a convenience with orchestration
+> out of scope"*) and two refusals in `okf/capabilities/editions/editions.md` §6 — *Active/active
+> deployment: ⛔ NOT OFFERED* and *Orchestration platform support: ⛔ OUT OF SCOPE "until that decision
+> changes."* That decision is changing. §2 carries the exact amendments, to be applied to the recording
+> documents **on sign-off, not before** — a contradicted-but-unamended decision is what caused a plan
+> archival to be reverted on 2026-09-09, and this repo's rule is amend, never silently contradict.
+>
+> **On approval + ship:** distil the as-built facts into `okf/capabilities/editions/editions.md`
+> (a new §3.15 alongside the T1–T4 topologies) and `okf/backend/build-run/`, move still-open items to
+> `BACKLOG.md`, then archive this plan per the doc lifecycle.
+>
+> Companions: [`okf/capabilities/editions/editions.md`](../okf/capabilities/editions/editions.md)
+> §3.9–§3.14 (the topologies, the signed RPO/RTO table, the T4 promote order) ·
+> [`roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) L1 (the four workstreams, sized XL) ·
+> [`archived-documents/plans-archive/postgres-multi-user-plan.md`](../archived-documents/plans-archive/postgres-multi-user-plan.md)
+> §5–6 (the connection pool this plan un-parks) ·
+> [`archived-documents/plans-archive/deployment-topology-plan.md`](../archived-documents/plans-archive/deployment-topology-plan.md)
+> §10 (D1–D8 as signed) · [`REQUIREMENTS.md`](../REQUIREMENTS.md) (`NFR-8`).
+
+**Coverage map:** what changes and why §1 · what it amends §2 · the seams, grounded §3 · the scaling
+model §4 · the four workstreams §5 · sequencing §6 · the first test §7 · risks §8 · decisions asked §9 ·
+spikes §10 · positioning §11 · defects found while grounding §12.
+
+---
+
+## 1. What changes, and why
+
+Inspecto's scale ceiling is single-node by signed design (`NFR-8`, *accepted constraint*). Measured on
+one node it is fast — native ingest at 523K rows/s on 12 columns, DuckDB transforms at 1.4M rows/s
+(`okf/backend/build-run/performance.md`) — but wide telecom schemas bring the ceiling down hard: a
+537-column CDR projects to ~11K rows/s per batch, ~45K rows/s aggregate on a 16-core box. A tier-1
+operator at billions of records a day sits **at or beyond** that. The market read of 2026-09-10 also
+found the closest competitor (Definite) shipping the same DuckDB + DuckLake stack **on Kubernetes**.
+
+The operator's direction: Enterprise scales out on Kubernetes. This plan's job is to make that true
+**without abandoning the thesis** — one artifact, one config, DuckDB's per-core speed — and without
+pretending that `replicas: 4` is scale.
+
+🔴 **The one architectural truth to design around: Kubernetes does not make DuckDB distributed.**
+DuckDB is an embedded, single-process engine. Four replicas of today's artifact are four in-process
+schedulers firing the same pipelines four times into four private databases. Scale must come from
+**partitioning the work**, and correctness from **coordinating the partitions**. Everything below
+follows from that.
+
+---
+
+## 2. What this plan amends — exact text, applied on sign-off
+
+| Recording document | Today (verbatim) | Proposed on sign-off |
+|---|---|---|
+| `REQUIREMENTS.md` `NFR-8` | *"Single-node by design; Enterprise distributed tier is the opt-in escape hatch \| ACCEPTED CONSTRAINT"* | **Unchanged in substance** — the escape hatch is now being built. Status cell gains: *"escape hatch IN DESIGN 2026-09-10 → `superpower/enterprise-scale-out-plan.md`"* |
+| `editions.md` §4, 2026-09-06 row | *"a container image as a convenience with orchestration out of scope"* | Add a dated row: *"2026-09-10 — D1 REVISED by operator: the container image becomes the **Enterprise unit of deployment**; orchestration is IN SCOPE for Enterprise only (Personal/Standard stay single-artifact, no orchestrator). Design: `superpower/enterprise-scale-out-plan.md`."* |
+| `editions.md` §6 *Active/active deployment* | *"⛔ NOT OFFERED — both schedulers are in-process; the single-node ceiling is an accepted constraint (`NFR-8`). The escape hatch is a priced roadmap conversation, not a configuration"* | *"⚠ **SUPERSEDED 2026-09-10** for Enterprise: active/active becomes **partitioned scale-out** (shared-nothing by Space), not replicated active/active. Personal/Standard: still not offered. → plan §4"* |
+| `editions.md` §6 *Orchestration platform support* | *"⛔ OUT OF SCOPE per the signed container decision … not on the roadmap until that decision changes"* | *"⚠ **That decision changed 2026-09-10.** Kubernetes is the Enterprise orchestrator; Personal/Standard remain orchestrator-free. → plan §5.4"* |
+| `ROADMAP.md` L1 | *"Enterprise distributed tier … \| XL \| A deployment whose scale or multi-tenancy actually exceeds the single-node design"* | Trigger cell: *"Operator direction 2026-09-10; sized as three M phases in the plan, each independently shippable"* |
+| `editions.md` §3.9 topology table | T1–T4 | Add **T5 — partitioned scale-out on Kubernetes** (Enterprise; identity as T3; state on Postgres + object store) — *pending D8 below* |
+
+⛔ None of these edits is made by this draft. They are the operator's to sign.
+
+---
+
+## 3. The seams, grounded (2026-09-10)
+
+Every claim below was read from source on 2026-09-10, with the premise it corrected noted where there
+was one. A design plan that mis-states where a scheduler lives is the failure class this repo spent
+Sprint 3 closing.
+
+### 3.1 Two in-process schedulers, no coordination anywhere
+
+- **`PipelineScheduler`** (`inspecto/src/main/java/com/gamma/service/PipelineScheduler.java:86-170`) is
+  constructed **per Space** by `CollectorService` (`CollectorService.java:580`), holding the registry,
+  the `PipelineRunGuard` and a virtual-thread `triggerWorkers` pool (`CollectorService.java:201`) by
+  reference. "Run now" is decided at `:228-259` (`selectDue`/`dueThisTick`) and `:372-399` from the
+  **local clock and a local `lastRunAtMs` map**. Event fan-out (`onUpstreamCommit` `:407-425`,
+  `onDatasetWrite` `:435-449`) hands off through an in-heap per-pipeline `TriggerCoalescer`.
+- **`JobService`** (`inspecto-engine/src/main/java/com/gamma/job/JobService.java:129, :527-562`) arms
+  cron on a per-instance 2-thread `ScheduledExecutorService` (`com.gamma.util.Scheduler:37-100`) —
+  self-rearming one-shots, no cross-process timer.
+- **Neither file contains a lock service, a lease, or a database-backed claim.** Two pods hosting the
+  same Space run every cron twice.
+
+### 3.2 `PipelineRunGuard` is pure JVM heap — the seam a lease replaces
+
+`inspecto/src/main/java/com/gamma/service/PipelineRunGuard.java:55-112`: a binary `Semaphore` per
+pipeline id in a `ConcurrentHashMap` (`:58, :80-82`), deliberately non-reentrant (`:31-35`);
+`tryAcquire` for the poll cycle (skip, never queue — `:89-92`), `acquire` for operator triggers
+(`:94-98`); released by `Claim.close()` in `runOne`'s `finally` (`PipelineScheduler.java:302-322`).
+It guards **ingest exclusion per pipeline**, not acquisition (that is the separate `acquireGuard`,
+`PipelineScheduler.java:141`). It is the single most important seam in this plan and it is small.
+
+### 3.3 Twelve operational store families — ten verified on Postgres, two code-capable
+
+⚠ Premise corrected: this plan's author had "9 of 12". The roster of record is
+`OperationalDb.Family` (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`),
+**twelve** entries: `JOB_RUNS, PROVENANCE, CONSIGNMENT_OUTPUTS, FILE_STAGES, DELIVERY_RECEIPTS,
+DEDUP_LEDGER, OBJECTS, LINKS, NOTES, TAGS, STATUS, ACQUISITION_LEDGER`. All twelve route through
+`JdbcDrivers.connect` (`inspecto-util/src/main/java/com/gamma/util/JdbcDrivers.java:24-40`), which
+handles `jdbc:postgresql:` uniformly. `PostgresStateStoreTest` (`inspecto-ops/src/test/java/com/gamma/service/PostgresStateStoreTest.java:50-51`)
+round-trips **ten** against real Postgres; **`DbDeliveryReceiptStore` and `DbDedupLedger` are not
+exercised** — same factory, portable SQL, simply untested.
+
+The defaults that a second pod turns into split-brain (`ServiceStores.java`):
+
+| Property | Default | Backends | Line |
+|---|---|---|---|
+| `jobs.backend` | `none` | duckdb · postgres · `jdbc:` | `:60-72` |
+| `provenance.backend` | `none` | duckdb · postgres · `jdbc:` | `:82-94` |
+| `consignment.outputs.backend` | **`duckdb`** (local file) | duckdb · postgres · `jdbc:` | `:119-131` |
+| `dedup.ledger.backend` | **`duckdb`** (local file) | duckdb · postgres · `jdbc:` | `:143-155` |
+| `file.stages.backend` | `none` | duckdb · postgres · `jdbc:` | `:194-206` |
+| `delivery.receipts.backend` | `none` | duckdb · postgres · `jdbc:` | `:178-191` |
+| `status.backend` | `db` | — | `:259-293` |
+| `objects.backend` (4 families) | `memory` | resolved in `inspecto-ops` | `:232-239` |
+| **`events.backend`** | **`memory`** | **`memory` · `parquet` only — NO database backend** | `:216-230` |
+
+🔴 **Events have no shared backend at all.** `EventLog` is a per-process, per-Space static registry
+(`inspecto-event/src/main/java/com/gamma/event/EventLog.java:42, :61`). The Signal ledger — the spine
+of Ops — is invisible across pods today.
+
+### 3.4 No connection pool — one `Connection` per store
+
+`AbstractJdbcStore.java:39-40`: *"all subclass access is serialised on the store's monitor"*; one
+connection per store, opened at `CollectorService` construction, closed at shutdown;
+`browseConnection()` (`:66`) hands that same connection to `DbBrowserRoutes`. The parked
+`postgres-multi-user-plan.md` (PARKED 2026-09-06) designed exactly what N pods need: **P1** a pool
+behind `JdbcDrivers` (HikariCP in-process, never a customer-run PgBouncer), **P2** a borrow-scoped
+replacement for `browseConnection()`, **P3** schema-per-Space URL wiring (not database-per-Space),
+**P4** a `CaseStore` seam for the JSONL ring. Its reopen trigger was *"the first multi-operator
+install"*. **This plan is that trigger.**
+
+### 3.5 `DuckLakeRegistrar` — the shared-lakehouse enabler already exists
+
+`inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java:40-63` reads
+`output.ducklake.{enabled, catalog_url, data_path, schema, table}`, wired at
+`PipelineConfigParser.java:860` (and plural `sinks[].ducklake` at `:890`), and issues
+`ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s')` with the catalog URL **interpolated raw** — free-form.
+DuckLake's own documentation: *"If you would like to operate a multi-user lakehouse with potentially
+remote clients, use PostgreSQL as the catalog database"*, with concurrent writers coordinated by
+Postgres transactions. A Postgres-backed shared catalog is therefore **a configuration change, not a
+code change** — verified 2026-09-10, spike S1 confirms it end-to-end.
+
+⚠ Two caveats. It registers files **after** the Parquet write rather than making the write visible
+through the catalog (§3.6). And it is **non-fatal on any failure** (`:83-85`) — correct for an opt-in
+sidecar, wrong for the mechanism every pod's visibility depends on (D10).
+
+### 3.6 🔴 The Parquet reveal assumes POSIX atomic rename
+
+`inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java:226-243` (`reveal`): a cross-directory
+`Files.move` to a temp name, then a **same-directory `ATOMIC_MOVE`**, with the comment at `:220-224`
+saying why: *"a same-dir rename is atomic on every platform, unlike a cross-dir one."* This is a hard
+filesystem assumption. An S3/GCS mount — even through a FUSE gateway — does not give same-directory
+atomic rename. ⚠ `PartitionSinkWriter` (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/PartitionSinkWriter.java`) follows the same
+convention by its documentation; not re-read line by line (spike S2).
+
+**This is the design fork of §5.4:** keep the rename on a shared POSIX volume, or make DuckLake's
+catalog commit the visibility mechanism and retire the rename. This plan recommends the latter — it is
+what DuckLake is for.
+
+### 3.7 The inbox is single-process by construction
+
+`CollectorProcessor.java:313` walks `dirs.poll` locally. The duplicate check
+(`MarkerManager.java:40-59`) is a bare `Files.exists` on a marker — **no lock, no claim** — so two
+pods polling one inbox both see "not processed" and both ingest. `StabilityGate.SHARED`
+(`StabilityGate.java:75-80`) and `AcquisitionLedgers`' transient maps (`:29-38`) are in-heap and
+per-Space-keyed: safe in one process, disagreeing across pods. **Consequence: an inbox must have
+exactly one owning pod.** Shared-nothing partitioning gives that for free; a shared inbox would need
+a claim protocol this plan does not propose.
+
+### 3.8 Spaces are the partition unit — almost
+
+`SpaceRoot` (`inspecto/src/main/java/com/gamma/service/SpaceRoot.java:25-227`) namespaces every store
+URL and directory under `<space>/{config,data,audit,duckdb}`; `ConfigRegistry` is instantiated per
+`CollectorService` (`CollectorService.java:448`), i.e. per Space. Almost everything is already
+Space-scoped. ⚠ **`IntakeGovernor` is not** (`inspecto-acquire/src/main/java/com/gamma/acquire/IntakeGovernor.java:11-16, :39,
+:83-88`): documented *"process-wide and keyed by pipeline id"*, no Space key — two Spaces with a
+same-named pipeline share admission-control state. A Spaces-isolation defect independent of this plan;
+filed §12. `MetricRegistry.global()` is process-global but labels carry pipeline and space, so it is
+additive, not colliding.
+
+### 3.9 Write gates pass a shared mount unchanged
+
+`WriteGates.requireWriteRoot` (`inspecto/src/main/java/com/gamma/control/WriteGates.java:19-25`) jails
+against `-Dassist.write.root`; `WriteGates.jail` (`:54-59`) delegates to `PathJail.contains`
+(`inspecto-config/src/main/java/com/gamma/config/safety/PathJail.java:142-159`) over `SafetyPolicy.defaultPolicy()` roots
+(`SafetyPolicy.java:83-92`). Both are pure path-containment checks with no host or process identity: a
+shared volume mounted at the same path on every pod **passes both, and neither prevents two pods
+writing under one root concurrently**. That protection has to come from the lease (§5.2), not the gates.
+
+### 3.10 The container image is one process, one volume
+
+`inspecto/package.ps1:1052-1067`: `FROM eclipse-temurin:24-jre`, `COPY . /app`, `EXPOSE 8080`, a
+`/dev/tcp` health probe, `ENTRYPOINT ["./serve.sh"]`; the comment at `:1056-1057` says *"Persist data
+by mounting the spaces root: `-v /srv/inspecto/spaces:/app/spaces`"*; `.dockerignore` strips the
+jlink `runtime/` so the container uses the base JVM. It packages exactly one `ControlApi` process and
+knows nothing of replicas, shared storage or coordination. It is the right **unit**; it is not yet a
+**member**.
+
+---
+
+## 4. The scaling model — decision D2
+
+Two models exist. Only one preserves the thesis.
+
+| | **A — shared-nothing partitioning** *(recommended)* | **B — distributed engine** *(refused)* |
+|---|---|---|
+| Unit of scale | A pod owns a slice of Spaces; N pods, N slices | A cluster runs one logical engine |
+| Analytical engine | DuckDB per pod, unchanged, per-core speed intact | Trino / Spark replaces DuckDB |
+| Shared state | Postgres (operational stores, lease, DuckLake catalog) + object store (Parquet) | Same, plus the engine's own coordination |
+| Cross-slice query | Any pod attaches the shared DuckLake catalog and reads all slices' Parquet | Native |
+| What it costs | A lease, a partition map, one Parquet-visibility change | The lean thesis, the 90 MB artifact, and years |
+| Ceiling | Linear in pods for ingest; a single very wide feed still lands on one pod unless split at source | Effectively unbounded |
+| Competitive position | "Same binary, same config, N pods" — a cleaner scale story than Definite's Helm chart | Cloudera-lite, on their ground, without their maturity |
+
+**Recommendation: A.** Model B is not deferred; it is refused, for the same reason active/active was
+refused on the single-node design — it changes what the product is.
+
+⚠ A's honest limit, stated up front: **one feed's throughput is bounded by one pod.** A 537-column CDR
+stream that cannot be split at source scales by the pod's cores, not by the cluster. Partitioning
+raises the *aggregate* ceiling, not the *per-feed* one. For tier-1 telecom that means splitting feeds
+by switch, region or hour at source — an onboarding pattern, not a code change, and one to say aloud
+in the first sales conversation.
+
+---
+
+## 5. The four workstreams
+
+These are `ROADMAP.md` L1's four, grounded and reshaped by §3. Each names its invariant — the thing
+a test must be able to falsify.
+
+### 5.1 Shared state — every store on Postgres, none may degrade
+
+**Invariant:** *In Enterprise mode, no operational store falls back to memory or a local file; a store
+that cannot reach its backend fails boot.* Today stores "degrade to memory, never block boot"
+(`editions.md` §3.11) — the acceptance row `VER-3` exists because of it. On one node that is graceful
+degradation. On N pods it is **silent split-brain**: two pods each believing they own the truth.
+
+Work:
+- An **edition-level profile** that sets every `*.backend` to Postgres and makes fallback a boot
+  failure. Not a new flag per store — one switch, `-Dinspecto.topology=partitioned` (name is D-open),
+  that `ServiceStores` reads once. ⚠ Personal/Standard behaviour is unchanged.
+- **`events.backend=db`** — the one store with no shared backend (§3.3). A Postgres `EventStore`
+  behind the same `EventStore` interface `InMemoryEventStore` and `ParquetEventStore` implement.
+  The Signal ledger must be visible from every pod or Ops sees a different world per replica.
+- **Cover the two untested stores** in `PostgresStateStoreTest` — `DbDeliveryReceiptStore`,
+  `DbDedupLedger` (§3.3). Twelve of twelve, or the plan's own claim is unverified.
+- **Un-park the connection pool** — `postgres-multi-user-plan.md` P1 + P2 (HikariCP behind
+  `JdbcDrivers`; a borrow-scoped `browseConnection()`). One connection per store per pod is fine for
+  one pod and a connection storm for twenty.
+- **`DuckLakeRegistrar` failure becomes fatal** in partitioned mode (D10).
+
+**Why this ships value with zero pods:** durable restarts, `VER-3` becomes true rather than aspired
+to, and every T2/T3 Postgres-backed deployment gets a pool. It is also the *entire* prerequisite for
+T4 active/passive standby.
+
+### 5.2 The lease — one run per pipeline per trigger across N pods
+
+**Invariant:** *Across N processes sharing one Postgres, a given pipeline runs at most once per
+trigger, and a lease abandoned by a dead pod is reclaimable within a bounded time.*
+
+Work:
+- Extract **`RunLease`** as an interface at the `PipelineRunGuard` seam (§3.2). Two implementations:
+  `HeapRunLease` (today's `Semaphore` map, the default — Personal/Standard change nothing) and
+  `PostgresRunLease` — a lease row per pipeline with owner id, acquired-at and a TTL heartbeat;
+  `tryAcquire` is a conditional `UPDATE … WHERE owner IS NULL OR expires < now()`. ⛔ Postgres
+  **advisory locks** are the tempting alternative and are rejected: they die with the connection, and
+  a pool (§5.1) recycles connections — a lease must survive its connection.
+- **`lastRunAtMs` moves to the lease row.** Today it is a local map (§3.1); an interval trigger on a
+  pod that has never run the pipeline would otherwise fire immediately after a failover.
+- **`JobService` cron arming goes through the same lease** — the per-instance `Scheduler` keeps
+  firing everywhere, but `submit` becomes `if (lease.tryAcquire(job)) submit`. Two arming pods, one run.
+- **`TriggerCoalescer`** stays local: coalescing is per-pod, the lease is what makes that safe.
+
+**Why this ships value with zero pods:** this *is* T4. The signed RPO/RTO table promises a T4
+active/passive standby with a 30-minute RTO and a promote runbook (`editions.md` §3.14). With a lease,
+the standby is simply a second pod that never wins the lease until the first stops heart-beating —
+the promote runbook's "stop A → start B" becomes automatic.
+
+### 5.3 Work distribution — Spaces to pods
+
+**Invariant:** *Every Space has exactly one owning pod at any moment; no pod polls an inbox it does
+not own.*
+
+Work:
+- **Partition by Space, not by pipeline** (D3). Spaces are already the tenant boundary and the
+  namespace for every store and directory (§3.8); pipelines within a Space share inboxes, ledgers and
+  dedup state. Splitting a Space across pods would re-open every §3.7 race.
+- **Static assignment first.** A `partition.toon` (or the Kubernetes ConfigMap that renders it)
+  mapping Space → pod ordinal, read at boot; a pod hosts only the Spaces assigned to it. Dynamic
+  rebalancing (a pod dies, its Spaces migrate) is **phase C+1**, explicitly deferred — it needs the
+  lease's heartbeat and a controller, and static assignment already delivers scale.
+- **Inbox ownership follows Space ownership.** `dirs.poll` lives on the owning pod's volume (a
+  per-pod PVC) or on an object-store prefix only that pod polls. ⛔ No shared inbox (§3.7).
+- **Fix `IntakeGovernor`'s missing Space key** (§3.8, §12) — required before two Spaces may ever
+  share a pod safely, which they do in this model.
+- **Per-tenant ABAC** — the security module's existing data-scoped grants, extended so a subject's
+  Space grant is enforced identically on whichever pod serves the request.
+
+### 5.4 The shared lakehouse — visibility is the catalog commit
+
+**Invariant:** *A Parquet file written by any pod is visible to every pod exactly when its DuckLake
+catalog transaction commits — never before, never partially.*
+
+The fork (D4):
+- **(i) Shared POSIX volume** (NFS / CephFS PVC mounted on every pod). Keeps `PartitionWriter`'s
+  rename reveal (§3.6) untouched. Costs a POSIX-semantics filer in every Enterprise deployment, and
+  the reveal's atomicity is then only as good as the filer's rename guarantee.
+- **(ii) Object store + DuckLake catalog on Postgres** *(recommended)*. Pods write Parquet to
+  S3/MinIO under a path they own; the write becomes visible when `DuckLakeRegistrar`'s catalog
+  transaction commits. The same-directory rename is **no longer the visibility mechanism** and can be
+  skipped on object-store paths. DuckLake's documented multi-client mode is exactly this.
+
+Work under (ii):
+- `PartitionWriter` gains a **visibility strategy**: `RenameReveal` (today, local paths) and
+  `CatalogCommit` (object-store paths, partitioned mode). Spike S2 confirms `PartitionSinkWriter`
+  shares the seam.
+- `DuckLakeRegistrar` moves from *opt-in sidecar* to *the write path's commit step* in partitioned
+  mode; its catalog URL is `ducklake:postgres:…`; failure is fatal (D10).
+- **Reads attach the shared catalog.** Any pod's dashboards and Query Library can read every slice's
+  Parquet through one `ATTACH`. This is what makes model A a platform rather than N isolated islands —
+  and it is the property that lets one pod serve BI over data another pod ingested.
+- `dirs.database` becomes a URI (`s3://…`) in partitioned mode; `PathJail` and the write-root gate
+  (§3.9) need an object-store-aware containment rule, since prefix containment is not path
+  containment.
+
+---
+
+## 6. Sequencing — three M's, not one XL
+
+`ROADMAP.md` L1 is sized XL as one project. Sequenced as below, each phase is an **M**, ships alone,
+and is worth having if the next phase never happens. Stop between any two.
+
+| Phase | Delivers | Value before any pod exists | Verify gate |
+|---|---|---|---|
+| **A — shared state** (§5.1) | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
+| **B — the lease** (§5.2) | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Standard |
+| **C — partition + lakehouse** (§5.3, §5.4) | Space→pod map, inbox ownership, `CatalogCommit` visibility, Helm chart, per-tenant ABAC | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed |
+
+⚠ **The Helm chart is the last artefact of phase C, not the first of phase A.** By then Kubernetes is
+packaging, not architecture. Writing the chart first is how a team ends up with `replicas: 4` and
+four schedulers.
+
+---
+
+## 7. The first test to write — before any Enterprise code
+
+**`RunLeaseContractTest`**: boot **two** `ControlApi` instances in one JVM against one Postgres (the
+same gating `PostgresStateStoreTest` uses), sharing one Space's config; fire one interval trigger and
+one operator trigger; assert **exactly one run** per trigger across both instances, and that the
+losing instance's `tryAcquire` returned false rather than blocking. Then kill the owner mid-run
+(close its lease connection) and assert the lease is reclaimable after TTL and **not before**.
+
+Mutation-proven before it counts: remove the conditional `WHERE` from the lease `UPDATE` → both
+instances run (fails); shorten TTL to zero → the live owner's lease is stolen (fails); swap in
+`HeapRunLease` → the two-instance test fails, because heap state is not shared — which is the point.
+
+⚠ Two instances in one JVM share `static` registries (`EventLog.SPACES`, `StabilityGate.SHARED`,
+`AcquisitionLedgers`, §3.7–3.8). The test must either run each instance in its own classloader or
+scope those registries per instance — the second is a §5.3 deliverable anyway. **Do not let the test
+pass because two "pods" secretly shared a heap.**
+
+---
+
+## 8. Risks
+
+| Risk | Why it is real here | Mitigation |
+|---|---|---|
+| **Split-brain that looks like success** | Every store degrades silently today (§3.3); two pods each "own" a Space and both report healthy | Phase A's fail-closed boot; the §7 test; `VER-3` asserting every subsystem is `UP` **and shared** |
+| **Duplicate runs from cron** | `JobService` arms per instance (§3.1) | Lease on `submit`, not on arming; test with two instances and one cron |
+| **A stolen lease** | TTL too short vs a long ingest; heartbeat missed under GC pause | TTL ≥ 3× heartbeat; heartbeat on its own thread; the §7 TTL test |
+| **Rename atomicity on object storage** | `PartitionWriter:220-243` is explicit about needing POSIX (§3.6) | Model (ii): catalog commit is visibility; `RenameReveal` only on local paths |
+| **Wide single feeds** | Partitioning does not split one feed (§4) | Say it in sales; onboarding pattern: split by switch/region/hour at source |
+| **Connection storms** | One connection per store per pod (§3.4) × 12 stores × N pods | Phase A's pool, sized per scheme |
+| **Dynamic rebalancing creep** | "A pod died, move its Spaces" is a controller, not a config | Explicitly phase C+1; static assignment first |
+| **The 90 MB claim** | Enterprise now needs Postgres + object store | Keep the claim for Personal/Standard; Enterprise says "same artifact, plus your Postgres and S3" (D9) |
+
+---
+
+## 9. Decisions asked — operator to sign
+
+| # | Question | Recommendation |
+|---|---|---|
+| **D1′** | Revise the signed container decision so the image is the Enterprise unit of deployment and orchestration is in scope for Enterprise? | **Yes.** Personal/Standard stay orchestrator-free; §2 amendments applied on signature |
+| **D2** | Scaling model | **A — shared-nothing partitioning.** B refused, not deferred |
+| **D3** | Partition unit | **Space**, not pipeline — it is already the namespace for every store and directory |
+| **D4** | Shared lakehouse | **(ii) object store + DuckLake catalog on Postgres**, catalog commit as visibility; (i) shared POSIX volume kept as a documented fallback for sites without object storage |
+| **D5** | Lease mechanism | **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator) |
+| **D6** | Events across pods | **Add `events.backend=db`** on the existing `EventStore` seam |
+| **D7** | Connection pool | **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work |
+| **D8** | Tier naming | **T5 — partitioned scale-out on Kubernetes**, added to §3.9's table; T4 stays as the single-node standby shape |
+| **D9** | The "zero external runtime services" claim | **Keep it for Personal/Standard; Enterprise states its two dependencies** (Postgres, S3-compatible object store) |
+| **D10** | `DuckLakeRegistrar` failure in partitioned mode | **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see |
+| **D11** | Dynamic rebalancing | **Deferred to phase C+1**; static Space→pod assignment first |
+| **D12** | The partitioned-mode switch's name | Open — `-Dinspecto.topology=partitioned` proposed |
+
+---
+
+## 10. Spikes before phase A starts (each ≤ half a day)
+
+- **S1** — `ATTACH 'ducklake:postgres:…'` from two DuckDB processes writing to one MinIO bucket:
+  confirm concurrent registration and cross-process visibility with DuckDB 1.5.2's `ducklake`
+  extension. This is the plan's load-bearing assumption; it is verified from documentation, not yet
+  from this codebase.
+- **S2** — Read `PartitionSinkWriter` line by line; confirm it shares `PartitionWriter`'s reveal
+  seam (§3.6) so `CatalogCommit` lands once, not twice.
+- **S3** — HikariCP offline availability in the Maven cache (`-o`); if absent, the pool is a
+  dependency sign-off per the repo's no-heavy-transitive rule.
+- **S4** — Two `ControlApi` instances in one JVM: which `static` registries collide (§7's caveat),
+  and whether per-instance scoping is a small change.
+
+---
+
+## 11. What it does to the positioning
+
+A genuinely **two-message product**, and both messages hold:
+
+- **Personal / Standard** — *the 90 MB artifact: zero external services, runs on a laptop or an
+  air-gapped server.* Unchanged.
+- **Enterprise** — *the same artifact as a pod, scaled by partition: one binary, one config, N pods,
+  your Postgres, your S3.* A cleaner scale story than the closest competitor's Helm chart, because there
+  is no second architecture to learn.
+
+It does not break the air-gap wedge — regulated on-prem estates already run Kubernetes (OpenShift is
+standard in banks and telecoms). It **does** put tier-1 telecom back in reach, with the per-feed
+caveat of §4 said aloud.
+
+---
+
+## 12. Defects found while grounding — filed, not fixed here
+
+- **`IntakeGovernor` has no Space key** (§3.8) — process-wide, keyed by pipeline id, unlike its stated
+  sibling idioms. Two Spaces with a same-named pipeline share admission state **today**, single node.
+  → `BACKLOG.md` §3 `SPACES-GOVERNOR-1`.
+- **`DbDeliveryReceiptStore` and `DbDedupLedger` are the two stores `PostgresStateStoreTest` does not
+  cover** (§3.3). Not a scale-out item — a gap in DAT-6's own claim of coverage. → phase A, or a
+  board row if phase A does not start.
+- **`events.backend` has no database option** (§3.3). Single-node consequence: a Postgres-backed T2
+  deployment still loses its Signal ledger on restart unless `parquet` is chosen. → phase A.
