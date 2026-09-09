@@ -38,7 +38,8 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (refreshed 2026-09-09 — `SBOM-RESOLVE-1` is queued; GUARD-SWEEP-1 and DAT-6-CI-1 done):
+Do next, in order (refreshed 2026-09-10 — **`MAPPING-GEN-1` is the one queued P1**; `SBOM-RESOLVE-1`, GUARD-SWEEP-1 and DAT-6-CI-1 done):
+0. **`MAPPING-GEN-1` (§3 Authoring)** — decided 2026-09-10; names its file (`SchemaExtractor.java:193`).
 1. ~~**`SBOM-RESOLVE-1` (§4)**~~ ✅ **SHIPPED 2026-09-09** — `release.yml` now installs the reactor under `-Pedition-enterprise` before the packaging steps. Was the only queued P1. The bill of materials cannot generate on a clean
    runner, so the first tag fails at packaging; it names the file it changes (`release.yml`). Filed
    2026-09-09 while fixing the generator's module table, and it is **not** a regression from that fix —
@@ -59,58 +60,7 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-**One, filed 2026-09-08 (`MAPPING-SPELLING-1`), PREMISE CORRECTED 2026-09-09 — read the correction before
-answering.** — **Should `create-schema` emit `mapping.fields[]` instead of the legacy `mapping.rules[]`?**
-
-🔴 **The row as filed asked for work that is already done, and missed the work that is not.** It said
-"migrate the 24 committed `*_schema.toon`". Measured against the tree:
-
-| Measured 2026-09-09 | Count |
-|---|---|
-| Committed `*_schema.toon` | **24** |
-| …carrying `mapping.fields[…]` — the **current** spelling | **24** |
-| …carrying `mapping.rules[…]` — the **legacy** spelling | **0** |
-| …carrying `transformType` | **0** |
-| Committed `*_mapping.csv` sidecars | **0** |
-
-⚠ **My first probe got this backwards** and it is worth recording why: TOON writes a tabular array as
-`fields[3]{name,from,fn}:`, so `grep "fields:"` matches **nothing** and reads exactly like absence. Probe
-`fields\[` — or open the file.
-
-**So the row conflated two different migrations.**
-
-* **The spelling migration is COMPLETE in the committed corpus** — every schema is on `mapping.fields[]`,
-  carrying the catalog `fn` marker that `RecordTransform.isFieldList` requires. ⛔ There is nothing to
-  migrate, so do not authorise it.
-* **What is at zero is the SIDECAR extraction** — all 24 still carry the mapping **inline**, and there are
-  **zero committed `*_mapping.csv`**. The single sidecar in the tree is untracked. That is a separate,
-  unstarted task and it needs its own decision.
-
-🔴 **The live defect the row was pointing at, stated precisely: the CLI generator writes a shape no
-committed schema uses.** `SchemaExtractor.java:193` (the `create-schema` tool, and the only generator that
-**writes to disk**) emits `mapping.rules[{targetColumn, sourceExpression}]`. The engine understands that
-only through `RecordTransform.fromMappingRules`, which `DataTransformer.recordFields`' own javadoc calls
-**"THE read-time bridge"** for schemas written before 2026-09-05. So the tool produces configs that survive
-on a back-compatibility path while the entire committed corpus is on the preferred one.
-
-⚠ **And the two generators disagree with each other about `transformType`** — the row treated them as one:
-
-* `SchemaExtractor.java:185-186` **deliberately omits** it, with the reason in a code comment: *"a
-  blank/absent type means DIRECT (the generated mapping is all pass-through)"*.
-* `ConfigPreviewRoutes.java:330` emits `transformType: "DIRECT"` explicitly. ⚠ But that route only
-  **returns** a suggestion for the UI — it never writes — so it does not shape the corpus. Only the CLI does.
-
-**Cost of switching, so the answer can be priced.** `SchemaExtractorMergeTest` is the only test covering the
-generator. ⛔ The `rules`-writing tests (`ComponentStoreTest`, `MappingComponentTest`) are about the
-standalone **Mapping component kind** — a different surface from a schema's inline `mapping:` block — and do
-not constrain this. Keeping the `rules[]` read path costs nothing either way: it is one branch in
-`recordFields`, and hand-authored configs may still use it.
-
-**Recommended, unchanged in direction but narrowed in scope:** have `create-schema` emit `mapping.fields[]`
-with the `fn` marker, **keep** the `rules[]` read bridge, decide the `transformType` disagreement one way
-for both generators, then rewrite `okf/backend/config/configuration.md` §2 (~90 lines that correctly
-document today's emitted shape). ⛔ **Do not** include a corpus migration — there is none to do.
-→ `superpower/docs-consolidation-plan.md` §5.8.2 D-1 · `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §2
+*(2026-09-10: six decisions closed in one sitting — `MAPPING-SPELLING-1` both halves → §3 `MAPPING-GEN-1` + §6; OpenAPI posture → §4 `OPENAPI-GEN-1`; Enterprise self-identification → §3 `STANDARD-BUNDLE-1`; `AGT-SEGMENT-1` keeps its caveat with a named trigger; drift refusal → §6; `CONTRACT-ORPHAN-1` was moot — its "no producer, no consumer" premise was a false negative, the producer test and consumer had existed since 2026-08-15.)*
 
 *(Previously:)* All 28 rows were decided on 2026-09-06 in one sitting; every answer is recorded in its owning doc (grep
 `Decision 2026-09-06` / `Decided 2026-09-06` / `Ratified 2026-09-06`), and the work each unblocked is ranked below — P1 where it was
@@ -222,6 +172,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Authoring (Parse / Transform / pipeline editor)
 
+- **P1** · **`MAPPING-GEN-1` — `create-schema` must emit `mapping.fields[]`** (⛔ decided 2026-09-10; was §1
+  `MAPPING-SPELLING-1`). Measured 2026-09-09: **24** committed `*_schema.toon`, **24** on `mapping.fields[…]`, **0** on
+  legacy `mapping.rules[…]`, **0** carrying `transformType`, **0** committed `*_mapping.csv` sidecars. The CLI generator
+  (`SchemaExtractor.java:193`, the only generator that writes to disk) still emits `rules[{targetColumn, sourceExpression}]`,
+  which the engine reads only through `RecordTransform.fromMappingRules` — the read-time bridge for pre-2026-09-05
+  schemas. Build: emit `fields[]` with the catalog `fn` marker; **keep** the `rules[]` read bridge (one branch); settle
+  `transformType` one way for both generators (`SchemaExtractor:185` omits it, `ConfigPreviewRoutes:330` writes `DIRECT`
+  — the latter never writes to disk); then rewrite `okf/backend/config/configuration.md` §2 (~90 lines documenting the
+  emitted shape). Only `SchemaExtractorMergeTest` constrains it. ⛔ **No corpus migration — there is none to do.**
+  ⚠ TOON writes a tabular array as `fields[3]{…}:`, so `grep "fields:"` reads exactly like absence — probe `fields\[`.
+  → `okf/backend/config/configuration.md` §2 · `superpower/docs-consolidation-plan.md` §5.8.2 D-1
+
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **Step Processor catalog** — 119 processors: **35**<!--count:processors-delivered--> delivered / **17**<!--count:processors-partial--> partial / 67 planned (`processor-catalog.contract.json`, counted 2026-09-10 — `quality.schema.drift` DELIVERED 2026-09-10 as a per-batch `quality.schema_drift` Signal; the earlier count was 34/18 on 2026-09-08 — the earlier "69 planned" was a grep artefact) (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 - **P3** · **P4 Test mapping on a generic `parser` node** — **RE-SCOPED and DEMOTED P2→P3 2026-09-09**, which is what the row's own "re-scope this row before building" asked for. Grounded against source:
@@ -232,7 +194,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **Canonical-pipeline selective bundle export/import** — the metadata bundle's `authored-pipeline` kind still targets the RETIRED `*_flow.toon` `PipelineStore`; a canonical `*_pipeline.toon` transfers only via the datasource zip or the client-side stream-config bundle. Wanted: one selective export/import with dependency closure (schemas, per-segment schemas, grammar/enrichment companions, Connection as secret-free requirement) and retire/repoint the `authored-pipeline` kind. **Decided 2026-09-06 (operator): in bundle manifests `schema` = the REGISTRY id (`registry/schemas/<id>`); a pipeline-owned `<name>_schema.toon` (+ its `_mapping.csv`/`_structure.csv` siblings) travels under its own kind, not as `schema`.** Apply this in `BundleRoutes`/`transfer/bundle.ts` when the row is built → `okf/frontend/features/onboarding.md`
 
 - **P3** · **AI drafting has no applicable component kind** — restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes them) or rework `SchemaEditorDialog`. No low-risk slice survives — design first. → `okf/frontend/features/inline-ai-authoring.md`
-- **P3** · **`AGT-SEGMENT-1` — the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" moat argument and the SHADOW-first on-ramp were written as a read of the codebase + roadmap and **never validated against a client segment** — the archived plan's own words. Telecom vs general regulated enterprise changes the emphasis. ⚠ Needs **product input**, not engineering; nothing in the product depends on it, but the framing is now quoted in a stakeholder-facing doc, so it must carry its caveat until this closes. (Was `agt-6-plan.md` D6, which had no board home at all.) → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
+- **P3** · **`AGT-SEGMENT-1` — the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" moat argument and the SHADOW-first on-ramp were written as a read of the codebase + roadmap and **never validated against a client segment** — the archived plan's own words. Telecom vs general regulated enterprise changes the emphasis. ⛔ **Decided 2026-09-10: keep the caveat — reopen on the first customer conversation**, not before; guessing a segment now would replace one unvalidated read with another. ⚠ Needs **product input**, not engineering; nothing in the product depends on it, but the framing is now quoted in a stakeholder-facing doc, so it must carry its caveat until this closes. (Was `agt-6-plan.md` D6, which had no board home at all.) → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
 ### Onboarding, Catalog, Parsing
 
 
@@ -270,6 +232,13 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
 ### Deployment & packaging
 
+- **P2** · **`STANDARD-BUNDLE-1` — build a DISTINCT Standard bundle** (⛔ decided 2026-09-10 over "licence-key gating"
+  and "document the exposure"). Today the launchers detect the edition from jar presence and Enterprise is packaged
+  as a superset of Standard, so an Enterprise bundle handed to a Standard customer self-identifies as Enterprise and
+  enables ABAC (`okf/capabilities/editions/editions.md` §3.5, gap 3). One packaging step: the Standard flavour excludes
+  the Enterprise-only jars, so identity follows what is shipped. Same step produces the missing Standard
+  artifact/checksum/SBOM (gap 2) — do both in one pass. → `okf/capabilities/editions/editions.md` §3.5/§3.7
+
 - **P2** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints). ✅ **Its gate — a DB-backed `DeliveryReceiptStore` — was DISCHARGED 2026-09-07** (the same day it was verified still holding): `DbDeliveryReceiptStore` shipped in `inspecto-engine/.../notify/`, wired `SpaceRoot.deliveryReceiptsDbUrl` → `OperationalDb.Family.DELIVERY_RECEIPTS` → `ServiceStores.openDeliveryReceiptStore` → `CollectorService`, behind `-Ddelivery.receipts.backend`. ⛔ Default `none` — an absent receipt DB is the shipped behaviour, not degraded correctness, and a default-ON family creates a DB file in the CWD for every Personal install. Schema + rationale: `okf/backend/engine/db-layer.md` §3.12. ✅ **The suppression policy SHIPPED the same day** — `SuppressionList` (complaint ⇒ permanent · hard bounce ⇒ `-Dnotify.suppression.bounce.ttl`, default `P30D` · ⛔ soft bounce never · off via `-Dnotify.suppression=off`), consulted in `NotificationService`'s ChannelConfig delivery loop. 🔴 It **arms only over a durable store** (`DeliveryReceiptStore.durable()`) and WARNs when a TTL is set over one that cannot honour it — suppressing nothing while appearing configured is the `ConservationCheck` trap. ✅ **`GET/DELETE /notifications/suppressions` SHIPPED too** — the 2026-09-06 decision is fully discharged. `DELETE` records an **override** (operator call 2026-09-07) that forgives history up to its timestamp; a later bounce re-suppresses on its own, and the receipts survive as the audit trail. ⛔ Rejected: pruning the target's receipts — audit loss AND a permanent mask over a dead address. **What remains on D8: soft-bounce retry scheduling and the SES/SNS adapter** (the latter needs subscription confirmation + an outbound cert fetch from a callback path — its own review). Covers EDITIONS `CP-15` (Standard+). → `okf/backend/control-plane/events-metrics.md` §Decision
 
 - **P2** · **AGT-5 per-tool dry-run seam — GATE DISCHARGED 2026-09-08, now actionable.** This sat in §2 as externally gated on eoiagent shipping a per-tool `DryRunProvider`. **It has shipped**: `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunProvider.java`, `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunResult.java`, and four per-tool dry-run tools, under an **Accepted** ADR-0008 enforcing approval + dry-run in the runtime (upstream `jotder/inspect-agent`, verified via the git-tree API 2026-09-08). ⚠ The gate was not "waiting" — it was **held shut by a broken check**: the `gh search code` probe it named returns 0 for every term in that repo, control included. **What this unblocks:** inspecto can now drop its parallel `AgentApprovals` previewer and consume the upstream per-tool seam on `PlatformBuilder`. ⛔ Still separately gated: `incident_explain` waits on the eoiagent **host** seam, and the local-models-only scope cut stands. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
@@ -305,6 +274,12 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   rows, VER-1…VER-12, and the phase sequencing incl. the T4 promote order).
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
+
+- **P2** · **`OPENAPI-GEN-1` — generate the OpenAPI path/method skeleton from the route table** (⛔ decided 2026-09-10
+  over "exemplar coverage, deliberately" and "document the rest by hand"). `openapi-v1.json` documents 24 operations
+  against 266 live registrations (9.0 %, measured and ratcheted by `ApiContractTest`). Derive every path + method from
+  the registrations so structural coverage is 100 % and a route can never be undocumented; the hand-written exemplars
+  keep the request/response schemas. → `okf/capabilities/control-api/control-api.md` §2 `API-2` / §5
 
 *(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
 "LEAVE unless someone is already in the file" is not work — and moved to §6. A fourth was already closed by
@@ -458,22 +433,6 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   ⚠ Still hand-typed and unguarded, for want of a generated artifact: the dependency count and the
   staged-jar set. → `tools/check-doc-counts.mjs` · the owning specs' §2
   tables, which carry the measured number.
-- **P3** · **`CONTRACT-ORPHAN-1` — `bind-kinds.contract.json` has no producer and no consumer.**
-  Found 2026-09-09 while grounding `SPEC-COUNTS-1`: seven of the eight files under
-  `inspecto-ui/src/app/inspecto/contracts/` are verified against their generator by a contract test
-  (`ProcessorCatalogContractTest`, `NodeAttributesContractTest`, `StepTypesContractTest`,
-  `MeasureGrammarContractTest`, `ExpressionGuardContractTest`, and two `*.contract.spec.ts`).
-  `bind-kinds.contract.json` is verified by **nothing**, and **nothing reads it either** — a repo-wide
-  search finds no Java, TypeScript or test reference; the only hits are stale `graphify-out` manifests
-  from when it lived under `inspecto/mock/`, deleted with the offline mock backend. Its content
-  (`categories` SOURCE/PARSE/TRANSFORM/SINK/CONTROL, `bindableCategories` = PARSE, a 4-entry
-  `derivedUse` map) duplicates knowledge that lives in `NodeCategory` and the grammar-binding rules.
-  ⚠ This is the purest form of the *first* failure class — a committed generated artifact unverified
-  by its producer — and it survived the sweep that closed the rest because it has no consumer to
-  notice. ⛔ Decide before deleting: is it a stale copy (delete), or a contract whose consumer was
-  removed with the mock backend and should be re-derived from `NodeCategory` (add the test)? Not
-  deleted unilaterally — dead code here has been a deliberate RETAIN before (`MOCK-DEAD-COMPUTE-1`).
-  → `okf/capabilities/tooling/tooling.md` §5 · `inspecto-ui/src/app/inspecto/contracts/`
 - **P3** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
   `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
   vendor-transform plugin registers **30** legacy functions through a real seam (🔴 this said "~40" until 2026-09-09; counted from `LegacyVendorFunctions`' 30 `f.put(` registrations — ⚠ and note this is a DIFFERENT set from the 23 SQL mapping functions, which is why `check-doc-counts.mjs` names its id `sql-mapping-functions` rather than the ambiguous noun) and **reaches no bundle and no
@@ -571,6 +530,13 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
 
 One line each; the reasoning is in the pointer. Reopen only on the stated trigger.
 *(Triggers audited 2026-09-07 — every countable one was recounted against the code; none had fired.)*
+
+- **Mapping sidecars for the committed schemas** — ⛔ decided 2026-09-10: inline `mapping:` is the norm; **0** of 24
+  schemas use a `*_mapping.csv` and nothing depends on one (the single sidecar in the tree is untracked evidence).
+  Trigger: an operator picks the sidecar form in the mapping editor for a committed pipeline. → `MAPPING-GEN-1` (§3)
+- **`quality.schema.drift` refusing a file** — ⛔ decided 2026-09-10: **detection only**. A width change already
+  rejects rows or quarantines; refusing a header renamed at equal width would block feeds that parse fine. Trigger:
+  an operator asks for a refuse policy by name. → `okf/backend/pipeline-graph/step-catalog.md` DQ row
 
 - **ARCH-OPS-SCC** LEAVE (85-file ripple — recounted 2026-09-07, still **exactly** 85) · **ARCH-F-CARVEOUT**
   LEAVE (148 refs / 28 files — recounted, 27 files, module split unchanged) · `{etl, etl.unpack}` and

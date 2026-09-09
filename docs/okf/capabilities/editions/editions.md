@@ -731,7 +731,8 @@ citations elsewhere in this spec still resolve.
 3. 🔴 **An Enterprise bundle handed to a Standard customer self-identifies as Enterprise and enables
    attribute-based access control** (§3.5) — because the launchers detect the edition from jar presence and
    the pipeline builds Enterprise as a "superset of Standard". One added packaging step closes it; until
-   then the superset label is a commercial exposure, not a convenience.
+   then the superset label is a commercial exposure, not a convenience. ⛔ **Decided 2026-09-10: build the
+   distinct Standard bundle** (`BACKLOG.md` §3 `STANDARD-BUNDLE-1`) — not licence-key gating, not "document it".
 4. 🔴 **The reported edition string is two-valued and derived from a launch flag** (§3.5) — Enterprise is
    unreportable, and the deployment plan's edition probe inherited the defect, so the acceptance contract
    cannot verify an Enterprise deployment. Derive it from what registered, the way the feature flags
