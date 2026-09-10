@@ -287,7 +287,21 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   client could hold an ETag to send back** — the ETag and `permissions[]` die at the identical line. Widening
   what that interceptor preserves is the precondition for both halves, and the row's "interceptor change comes
   FIRST" instinct is right for a reason it does not state.
-  **(2) 🔴 (b)'s premise — that this finishes an existing gate — is REFUTED.** Every affordance gate in the SPA
+  **(1b) ⚠ THE PRECONDITION IS STILL UNBUILT — corrected 2026-09-10.** `v1.interceptor.ts:20` still does
+  `event.clone({ body: event.body.data })`. Sprint 8 identified this as step one and did **not** build it;
+  a hand-off note briefly claimed (a) was "unblocked", which was false. Nothing about (a) can start until
+  the interceptor preserves what a caller needs.
+  **(2) 🔴 (b)'s premise — that this finishes an existing gate — is REFUTED, and the "disagreement"
+  framing was wrong too.** `permissions[]` is `grants ∩ applicable` (`Envelope.java:17-20`), where `grants`
+  is the same `subject.capabilities()` that `/bootstrap` reports and `applicable` is a route-declared set;
+  a route declaring nothing keeps the session-wide array. **So it is always a SUBSET — the two can never
+  contradict**, and the only rule needed is "prefer the narrower when present". What matters instead is
+  whether adoption buys anything: **only four routes narrow it** — `AlertRoutes:54`, `ComponentRoutes:233`
+  and `ExpectationRoutes:61` each narrow to ONE static capability the client can already derive, while
+  `RequirementRoutes:51` switches on the **resource's own lifecycle status** (`submitted`/`accepted` →
+  triage applies; `rejected`/`delivered` are terminal → **empty set**). ⇒ Requirements is the single pane
+  today where a session-only gate offers a Triage action the server will refuse. Smallest correct adoption
+  is that one pane, with absent `permissions` falling back to the session capability. Every affordance gate in the SPA
   today is a `LensService.can*` signal fed from `SessionService.capabilities()`, a **single session-wide array
   populated once from `GET /bootstrap`**. The envelope's `permissions[]` is **per response**, so adopting it is
   net-new plumbing at a *narrower scope*, not wiring up a field the panes already expect — and **no pane
