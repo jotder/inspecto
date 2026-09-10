@@ -108,7 +108,9 @@ paid for violating them.
 ## Stakeholder set (audience-targeted)
 
 - [`stakeholders/`](stakeholders/README.md) — per-audience reading map: executive brief, product
-  capabilities, technical architecture, operations guide, testing guide.
+  capabilities, technical architecture, operations guide, testing guide, and the **competitive landscape**
+  ([`stakeholders/COMPETITIVE_LANDSCAPE.md`](stakeholders/COMPETITIVE_LANDSCAPE.md), 2026-09-10 — a living
+  two-sided alignment doc: what ships vs who we meet, counts derived by the count guard, market claims dated).
 - [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks.
 
 ## In-flight plans (`superpower/` — a plan lives here ONLY while its work is active)

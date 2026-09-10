@@ -13,6 +13,7 @@
 | **Tester / QA** | [`TESTING_GUIDE.md`](TESTING_GUIDE.md) | [`../USER_GUIDE.md`](../USER_GUIDE.md) (expected behavior) · [`../BACKLOG.md`](../BACKLOG.md) |
 | **End user (any Lens)** | [`../USER_GUIDE.md`](../USER_GUIDE.md) | — |
 | **Mixed exec + technical briefing** | [`../roadmap/STAKEHOLDER_OVERVIEW.md`](../roadmap/STAKEHOLDER_OVERVIEW.md) | — |
+| **Product owner + market/sales, aligning** | [`COMPETITIVE_LANDSCAPE.md`](COMPETITIVE_LANDSCAPE.md) — a living two-sided document: what ships (grounded) vs who we meet (verified, dated), with an open alignment table | [`../okf/capabilities/editions/editions.md`](../okf/capabilities/editions/editions.md) · [`../okf/backend/build-run/performance.md`](../okf/backend/build-run/performance.md) |
 
 **Keeping this set current:** these documents are snapshots over living sources. When status changes,
 update the source doc first (REQUIREMENTS, ADVANCED_GUIDE, OKF), then refresh the affected stakeholder
