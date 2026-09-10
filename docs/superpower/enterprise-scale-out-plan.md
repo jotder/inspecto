@@ -133,7 +133,12 @@ caveat stands. What the plan did **not** name matters more:
   (per-Space `shared()`, a `forgetSpace`, 5 tests, 3/3 mutants; no call site changed). 🔴 **The two progress
   registries could NOT be**: they live in `inspecto-etl`, and `inspecto-event` already depends on
   `inspecto-etl`, so reaching `EventLog.currentSpaceId()` from there would be a dependency **cycle** — that
-  half is now a design call (a cycle-free home in `inspecto-util`, or pass the space in), on the board.
+  half is **also fixed, 2026-09-10** — the operator chose the cycle-free home: `CurrentSpace` in
+  `inspecto-util` (which both modules already depend on), with `EventLog.currentSpaceId()` delegating to it
+  so the key keeps one definition. Passing the space in was refused on measurement: it is **not in scope** at
+  the call sites. ⚠ The fix also exposed that `inspecto-etl` had **no slf4j binding on its test classpath**,
+  so its MDC was a no-op and no test in that module could ever have observed space keying — closed with a
+  test-scoped binding that leaves the runtime dependency lock unchanged.
 - 🔴 **`IntakeGovernor`'s fleet policy is process-wide by design, and `setGlobalPolicy` calls `caps.clear()`**
   — so one simulated pod would wipe *every* Space's learned admission caps, not just its own.
 - ⚠ **`AcquisitionLedgers` has three MORE process-wide maps** (pending checksums, listings, DB watermarks)

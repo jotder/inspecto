@@ -75,6 +75,28 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
+        <!--
+          TEST-SCOPED slf4j binding, added 2026-09-10 (SPACE-UNKEYED-STATICS-1).
+
+          Why: this module's code now reads the owning space from the logging MDC (CurrentSpace, in
+          inspecto-util). With slf4j-api and NO binding on the test classpath, slf4j installs its NOP
+          provider, whose MDC adapter DISCARDS every put — so MDC.get always returned null and every
+          thread resolved to the default space. That made space isolation UNTESTABLE here: a two-space
+          test saw one space and failed, and, worse, no pre-existing test in this module could ever have
+          caught a space-keying bug. inspecto-acquire's equivalent tests pass only because it receives
+          logback transitively through inspecto-event.
+
+          It is TEST scope on purpose: tools/dependencies.lock covers RUNTIME scope, so this adds nothing
+          to the product, and logback-classic/-core are already in that lock at compile scope (declared by
+          inspecto-event) — no new artifact enters the tree.
+        -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.5.18</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Apache Commons Compress — gz stream handling in etl.Compression (parent-managed since WS-D). -->
         <dependency>
             <groupId>org.apache.commons</groupId>

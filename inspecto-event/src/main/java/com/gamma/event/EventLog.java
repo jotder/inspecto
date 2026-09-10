@@ -1,6 +1,7 @@
 package com.gamma.event;
 
 import com.gamma.metrics.MetricRegistry;
+import com.gamma.util.CurrentSpace;
 import org.slf4j.MDC;
 
 import java.util.List;
@@ -42,11 +43,15 @@ public final class EventLog {
     private static final EventLog GLOBAL = new EventLog();
 
     /** MDC key carrying the owning space id; lets the capture appender and {@link #current()} route a
-     *  log/event to the right per-space log when one server hosts many spaces. */
-    public static final String SPACE_MDC_KEY = "space";
+     *  log/event to the right per-space log when one server hosts many spaces.
+     *  ⛔ Declared BY REFERENCE to {@link CurrentSpace#SPACE_MDC_KEY} — that is the one definition, because
+     *  modules below {@code inspecto-event} need the same key and cannot depend on this one (see
+     *  {@link #currentSpaceId()}). Do not re-inline the literal here. */
+    public static final String SPACE_MDC_KEY = CurrentSpace.SPACE_MDC_KEY;
 
-    /** Id of the default space — the {@linkplain #global() global log}'s space, and {@code SpaceRoot.legacy().id()}. */
-    public static final String DEFAULT_SPACE_ID = "default";
+    /** Id of the default space — the {@linkplain #global() global log}'s space, and {@code SpaceRoot.legacy().id()}.
+     *  By reference to {@link CurrentSpace#DEFAULT_SPACE_ID} for the same reason. */
+    public static final String DEFAULT_SPACE_ID = CurrentSpace.DEFAULT_SPACE_ID;
 
     /** The space id the calling thread is in (its {@link #SPACE_MDC_KEY} MDC), or {@link #DEFAULT_SPACE_ID} when
      *  none is set. The single source of truth for routing the per-space {@code MetricRegistry} label,
@@ -56,10 +61,15 @@ public final class EventLog {
      *  <p>⚠ This list is load-bearing, so keep it current: the last two joined on 2026-09-10
      *  (SPACE-UNKEYED-STATICS-1) after shipping as process-wide singletons whose own javadocs already
      *  claimed they used this routing. A registry that holds cross-cycle state and is NOT in this list is
-     *  the bug to look for. */
+     *  the bug to look for.
+     *
+     *  <p>⛔ <b>The implementation moved to {@link CurrentSpace#id()} on 2026-09-10 and this method is now a
+     *  delegate.</b> It stays the entry point every existing caller uses, but the key, the default and the
+     *  lookup are stated once, in {@code inspecto-util} — because {@code inspecto-event} <b>depends on</b>
+     *  {@code inspecto-etl}, so the ETL-side registries that needed this value could not reach it here
+     *  without a dependency cycle. */
     public static String currentSpaceId() {
-        String s = MDC.get(SPACE_MDC_KEY);
-        return (s == null || s.isEmpty()) ? DEFAULT_SPACE_ID : s;
+        return CurrentSpace.id();
     }
 
     /** Per-space logs, keyed by space id. A hosted space {@linkplain #register registers} its own log here

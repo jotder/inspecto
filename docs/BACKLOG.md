@@ -216,6 +216,24 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `ConnectionRegistry` and `DecisionRules` are released on space **deletion** only, so a space that is
   stopped without being deleted leaks their state for the process lifetime. The new `forgetSpace` calls sit
   in the same block, matching the sibling rather than silently exceeding it.
+  ✅ **FULLY CLOSED 2026-09-10 — operator chose option (a).** The space id now has one cycle-free home,
+  `CurrentSpace` in `inspecto-util`, which `inspecto-etl` and `inspecto-event` both already depend on;
+  `EventLog.currentSpaceId()` **delegates** to it and `EventLog.SPACE_MDC_KEY` / `DEFAULT_SPACE_ID` are
+  declared **by reference**, so the key has one definition and every existing caller is untouched.
+  `IngestProgress` / `StepProgress` compose a `(space, pipeline)` key internally — again **zero call-site
+  changes** — and both gained `forgetSpace`, wired into `SpaceManager.delete` beside the breakers.
+  ⛔ Option (b) was refused on measurement, not taste: the space is **not in scope** at the call sites —
+  `PipelineConfig.Identity` is `(name, pipelineName, runTimestamp)` with no space field, and
+  `PipelineExecutor:208` tracks by graph name with no config at hand — so (b) needed a space field on a
+  published config record or a new parameter threaded through the ingest strategies and the graph executor.
+  🔴 **A test-classpath discovery that matters more than the fix:** `inspecto-etl` had `slf4j-api` and **no
+  binding**, so slf4j installed its NOP provider whose MDC adapter **discards every put**. Every thread read
+  the default space, the first two-space test failed for that reason alone — and, worse, **no pre-existing
+  test in this module could ever have caught a space-keying bug.** `inspecto-acquire`'s equivalent tests only
+  pass because it receives logback transitively via `inspecto-event`. Fixed with a **test-scoped**
+  `logback-classic` in `inspecto-etl`: `tools/dependencies.lock` covers **runtime** scope and logback is
+  already in it at compile scope, so nothing enters the product — the dependency guard stays at 95 artifacts,
+  unchanged. 5 tests, **5 of 5 mutants killed**.
 - **P3** · **`DUCKLAKE-COMMIT-COUNT-1` — nothing would catch a double catalog registration** (filed
   2026-09-10 by scale-out spike S2). `DuckLakeRegistrar.register` has exactly **one** call site, on the flat
   ingest lane, once per batch, after every file's reveal; the graph lane registers nothing.
@@ -301,7 +319,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `RequirementRoutes:51` switches on the **resource's own lifecycle status** (`submitted`/`accepted` →
   triage applies; `rejected`/`delivered` are terminal → **empty set**). ⇒ Requirements is the single pane
   today where a session-only gate offers a Triage action the server will refuse. Smallest correct adoption
-  is that one pane, with absent `permissions` falling back to the session capability. Every affordance gate in the SPA
+  is that one pane, with absent `permissions` falling back to the session capability.
+  🔴 **(2b) THAT RECOMMENDATION IS REFUTED — 2026-09-10, before anything was built. (b) is now RESERVED, not
+  scheduled.** Three further facts, each measured, remove the last of the value:
+  **(i) The only `GET` does not stamp.** `stamped()` is applied to exactly three **mutating** routes
+  (`POST /requirements`, `…/decision`, `…/deliver`); `GET /requirements` — the sole read, and there is no
+  single-requirement GET at all — carries no per-resource set. So the field can never gate a list's
+  affordances; it arrives only in the response to a write you have already made.
+  **(ii) The client already holds the input the server derives from.** `view()` copies the whole stored
+  record and only renames `name`→`id`, so **`status` is on every list row**, and the server's rule is
+  literally `switch (status)`. **(iii) The pane already implements that exact rule**:
+  `requirement-decision.dialog.ts:59,69` gate on `lens.canTriageRequirements() && data.status ===
+  'submitted'` (and `'accepted'`) — which *is* `grants ∩ applicable`, computed locally and correctly. My
+  earlier claim that this pane "offers a Triage action the server will refuse" was **wrong**.
+  ⇒ **Adopting `permissions[]` would duplicate a correct local derivation over the network and change no
+  behaviour anywhere.** ⛔ Do not build it as a consistency exercise.
+  ⚠ **A structural limit worth knowing before anyone revisits:** the envelope carries **ONE** `permissions`
+  array per response, so it cannot express per-row permissions for a collection — "per-resource" only ever
+  works for a single-resource response.
+  ✅ **What would change the answer, i.e. the trigger to reopen:** a route that stamps a set the client
+  **cannot compute from the payload it already has** — per-record ownership or an ABAC data scope, say —
+  *and* is reachable on a **read**. Until then the field stays emitted and unread, documented as reserved. Every affordance gate in the SPA
   today is a `LensService.can*` signal fed from `SessionService.capabilities()`, a **single session-wide array
   populated once from `GET /bootstrap`**. The envelope's `permissions[]` is **per response**, so adopting it is
   net-new plumbing at a *narrower scope*, not wiring up a field the panes already expect — and **no pane
