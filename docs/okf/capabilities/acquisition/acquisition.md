@@ -415,6 +415,24 @@ parsed with two fail-closed refusals: `connector: dataset` without `collector.da
 `collector.dataset` without `connector: dataset` is refused rather than silently ignored
 (`PipelineConfigParser.java:397-403`); a `datasets/<id>` ref is normalised to the bare id.
 
+🔴 **Its `post` action is FORCED to `RETAIN`, whatever the config says** — `post()` passes
+`PostAction.RETAIN` to the delegate unconditionally
+(`DatasetCollectorConnectorFactory.java:105-108`, whose own comment reads *"Retain is the only honest
+post-action here, whatever the config says"*). ⛔ **A consumer can never delete, move or rename a
+producer's snapshots.** A safety property that overrides authored config must be documented, or an operator
+authoring `post: delete` will believe it took effect. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+
+**Why this needs no watermark, and why an earlier watermark-runner design was superseded.** Snapshots are
+**timestamp-named**, and the poll inbox is the pipeline's own `dirs.poll`, so the **existing marker dedup
+already gives correct re-ingest-on-refresh semantics** — parquet was only ever missing an *ingest* lane, not
+a new consumption mechanism, and no parser fence was needed. ⛔ Do not build a watermark here on the
+assumption that one is missing.
+
+⚠ **There is no "split acquire/ingest timers" scheduler, and a docs simplification once implied one.** The
+closest primitives are the collector poll loop, the stability gate and the high-watermark filter — all of
+which gate **discovery**, not mid-graph Steps. The durable inbox is `dirs.poll` itself, and a drain is
+simply the next poll.
+
 **Object storage is deliberately SDK-free (ACQ-4).** All three hand-roll their cloud's auth on plain JDK
 crypto (`javax.crypto.Mac`, `MessageDigest`, `java.security.Signature`) over `java.net.http.HttpClient` —
 no cloud SDK jar anywhere, keeping the SBOM small and the build air-gappable. Each maps a profile the same

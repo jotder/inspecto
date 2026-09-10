@@ -12,7 +12,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ELT final amendment Phase 1 slice 1 ({@code docs/superpower/elt-final-amendment-plan.md} §8): a
+ * ELT final amendment Phase 1 slice 1 ({@code docs/archived-documents/plans-archive/elt-final-amendment-plan.md} §8): a
  * sibling {@code <name>_mapping.csv} beside a schema file <b>overrides</b> the schema's inline
  * {@code mapping.rules} at the {@code resolveSchemaRef} merge point. Additive — no sibling file,
  * no behaviour change (the whole pre-existing fixture corpus stays untouched by design).

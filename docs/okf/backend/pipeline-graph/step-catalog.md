@@ -571,7 +571,7 @@ edition cells and the two Enterprise-only rows live in `tools/render-processor-b
 
 | Processor | Id | What exists today · what is missing |
 |---|---|---|
-| Derived view (no bytes, registered SQL) | `sink.view` | `sink.view` — grandfathered node type; the Dataset/View surface replaced it |
+| Derived view (no bytes, registered SQL) | `sink.view` | `sink.view` — grandfathered node type; the Dataset/View surface replaced it. **Both halves of D-7 leave the user surface:** `sink.materialized` is `summarize`'s internal **compile target** and `sink.view` is Dataset-registration sugar — neither is something an author picks. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)* |
 | Email & report dispatcher | `sink.notify.email` | `mail.send` — the `mail.send` JOB + mail channels; not a chain sink |
 | Outbound webhook dispatcher | `sink.api.webhook` | `channel` — webhook notification channel exists; not a chain sink |
 

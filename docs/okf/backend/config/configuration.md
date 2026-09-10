@@ -100,6 +100,10 @@ one part of it:
 |---|---|---|
 | `*_gen.toon` (Generation) | how to *read the sample* — delimiter, junk/tail trimming, which columns are dates/timestamps | by hand |
 | `*_schema.toon` (Schema) | **the transform itself** — `raw.fields[]` (bind output field → source column by zero-based `selector` + declare its type), `mapping.rules[]` (how each target column is produced), `partitions[]` (derive the Hive partition columns) | generated, then tuned |
+
+🔴 **The rule that decides the format of a NEW config kind: flat tables are CSV, and anything nested or
+secret-bearing is TOON.** The CSV kinds are deliberately Excel-editable, for the operators who onboard
+vendor feeds by hand. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 | `*_pipeline.toon` (Pipeline) | runtime — directories, output format, threads, dedup, and the `date_formats`/`timestamp_formats` lists the casts use | generated, then tuned |
 
 The path every row takes:

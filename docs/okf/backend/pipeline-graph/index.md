@@ -5,9 +5,11 @@ validator, the editable round-trip, and the execution model — layered on top o
 [engine](../engine).
 
 **The as-built truth is this bundle** (2026-09-01 consolidation, layer split): the model here, the
-editor UI in [pipeline-editor.md](../../frontend/features/pipeline-editor.md). The ACTIVE redesign
-plan is [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) — a plan, not a
-parallel truth; it distills into these concepts as its waves drain.
+editor UI in [pipeline-editor.md](../../frontend/features/pipeline-editor.md). The redesign plan
+[`archived-documents/plans-archive/pipeline-spec.md`](../../../archived-documents/plans-archive/pipeline-spec.md)
+was **archived 2026-09-10** and is provenance only — its token model now lives in
+[`node-types.md`](../engine/node-types.md) § *The token model*, and its decisions in
+[`pipeline-authoring.md`](../../capabilities/pipeline-authoring/pipeline-authoring.md).
 
 # Concepts
 

@@ -650,7 +650,7 @@ current citations name classes the 2026-08-31 rename removed (§5.3 item 7).
 | The ingest fork | [`branch-aware-ingest.md`](../../backend/engine/branch-aware-ingest.md) | ✅ Accurate |
 | The post-sync lane | [`post-sync-step-chains.md`](../../backend/engine/post-sync-step-chains.md) | ⚠ Misspells the job type id |
 | Resource caps | [`duckdb.md`](../../backend/engine/duckdb.md) | 🔴 Its bolded headline still states the absent default |
-| The active plans | `superpower/pipeline-spec.md`, `pipeline-waves-drain-plan.md`, `elt-final-amendment-plan.md`, `completeness-kpi-plan.md` | ⚠ Hold decisions of record; the first's "what actually runs" is the most stale current text in the area |
+| ~~The active plans~~ | **ALL FOUR ARCHIVED** — the first three 2026-09-10, `completeness-kpi-plan.md` 2026-09-09 | ✅ Their decisions of record are distilled into the current tier (`INDEX.md` names each target). The "what actually runs" staleness this row flagged was **corrected before the move** (Sprint 7.5): four dead class names and a "you cannot add a new Step type" claim that a shipped pack overlay had refuted |
 
 Exactly **one** practice-typed page exists here, and it is the smallest file in the set; the operator-facing
 procedure lives in a 71 KB *reference*.

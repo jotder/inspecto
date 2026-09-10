@@ -121,6 +121,40 @@ and holds both sets against the Java ones, so the mirror cannot drift silently a
 
 ## 3. Specification
 
+### 3.0 The authoring shape, and the Pipeline Document
+
+*(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)* Three principles decide what the authored shape can express, and they are
+easy to violate by adding a feature that looks harmless.
+
+1. ⛔ **Only `route` creates a user-visible branch.** A filter's dropped rows, a validation's invalid rows, a
+   parse's unmatched rows and a dedup's duplicates are **reject streams routed by the Guarantee** — the
+   author never wires a reject; they tune where rejects rest.
+2. **A recipe is a TREE, and what it deliberately cannot express is a DAG.** The trunk stays linear and
+   branches nest; fan-in fights the batch model and stays canvas-authored.
+3. 🔴 **Sending the same data to many destinations is not routing.** The `sinks:` list covers it as **one**
+   Step. `mode: clone` is only for branches that **diverge in processing** after the split — reaching for it
+   to write two copies is the mistake this principle exists to prevent.
+
+**The Pipeline Document** (defined in `GLOSSARY.md`) is a generated review artifact, and its contract is what
+keeps it honest:
+
+- **Per-Step sections** — collect, parse, map, dedup, transform, route, summarize, sink — each with its own
+  stated contents.
+- **Worked examples are produced by the shipped dry-run machinery running the PRODUCTION Step logic** over a
+  bounded sample, so the document cannot demonstrate behaviour the engine does not have.
+- **Sign-off binds to a fingerprint** over the recipe *and* every `use:`-referenced component, so an approval
+  that predates the current config is detectable.
+- **The review round trip is export → edit → upload → validate → dry-run preview diff old-vs-new on the same
+  sample → apply**, which is what stops the review artifact and the runtime artifact diverging.
+- ⛔ **Never stored as truth.** It is a projection of config, always.
+- ⚠ **Its real risk is being mistaken FOR the truth** — a signed-off document reads like a contract while the
+  config keeps moving. The fingerprint is the whole mitigation: it makes staleness cheap to surface.
+
+⚠ **`parse` and `map` serve `attributes: []` deliberately** — each has a richer editor of its own, so a
+generic attribute spec there would be a worse second way to author the same thing. And the palette publishes
+**one entry per SHAPE, not per verb** (which is why `transform` appears more than once). Both rules lived
+only in a contract test's comment until they were written down.
+
 ### 3.1 The artifact and its projection
 
 One flat file per pipeline is the truth. Three transformations read it, and **they are not the same
@@ -344,6 +378,7 @@ migration to reach semantics that composition already provides.
 | 2026-08-29 | ⛔ **`authorable` and `lowerable` stay two flags** — collapsing them forces a choice between offering a node nothing should create and refusing to save a graph that legitimately still carries one | engineering |
 | 2026-08-29 | **Providers layer last so an edition may override a built-in** without forking core | engineering |
 | 2026-08-31 (**D2**) | **A Step passes a token, not data** — adopt the vocabulary now, the runtime model later. *"This is not a new direction. It is what the engine already does, and what the type system contradicts."* Overturned only by evidence some Step needs rows in flight — none found | operator |
+| 2026-08-31 (**D1**) | **Finish the approved amendment, then extend — ⛔ do NOT replace it.** The meta-decision that legitimised every amendment phase; without it a future reader re-opens "redesign or finish?" from scratch. Overturned only by *a requirement the `trigger` / `steps` / `guarantees` shape provably cannot express* | operator |
 | 2026-08-31 | **The `data` edge is a fiction** — it expresses a reference, not a flow | engineering |
 | 2026-08-31 (**D3**) | **A new pipeline asks for the parser format** — a parser is always format-specific, and defaulting guesses for the author | engineering |
 | 2026-08-31 (**D6**) | **Fan-in stays canvas-only for now** — a token model makes fan-in expressible, and that is not a reason to overturn a standing decision speculatively | engineering |
@@ -530,7 +565,7 @@ of those citations is wrong (§5.2 item 9).
 | The backend graph model | [`pipeline-graph-design.md`](../../backend/pipeline-graph/pipeline-graph-design.md) | ⚠ Says the deleted type is never executed as a node |
 | The Step catalog | [`step-catalog.md`](../../backend/pipeline-graph/step-catalog.md) | ✅ Counts agree with code |
 | The config contract | [`pipeline-config-keys.md`](../../backend/pipeline-graph/pipeline-config-keys.md) | 🔴 The `fields[]` contradiction |
-| The active plans | `superpower/pipeline-spec.md`, `superpower/pipeline-waves-drain-plan.md` | Hold D1–D10; **not** OKF concepts. Archive together when the last wave closes |
+| ~~The active plans~~ | **ARCHIVED 2026-09-10** — `plans-archive/pipeline-spec.md`, `plans-archive/pipeline-waves-drain-plan.md` | D1–D10 are now §3.0/§ *Decisions* of this spec and `okf/backend/engine/node-types.md`; the plans are provenance |
 
 There is **no `Practice`-typed document in this area at all** — six concepts, five features, three
 references, one architecture, one seam, one pointer, four untyped indexes and two plans.

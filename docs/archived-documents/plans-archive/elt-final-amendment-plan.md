@@ -1,5 +1,30 @@
 # ELT Final Amendment — one model, one vocabulary, one authoring surface
 
+> ⛔ **ARCHIVED 2026-09-10 — provenance only, never maintained. Do NOT read this for current behaviour.**
+> *(Operator decision 2026-09-10: archive after a distillation diff; row 15 stays on `BACKLOG.md`.)*
+>
+> **Where its truth went:** the **Pipeline Document contract** — worked examples run the *production* Step
+> logic over a bounded sample, sign-off binds to a fingerprint over the recipe *and* every `use:`-referenced
+> component, the review round trip is export → edit → upload → validate → dry-run diff → apply, and the
+> document is **never stored as truth** (with its real risk: being mistaken *for* the truth) — is now
+> `docs/okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0, together with the **three
+> authoring-shape principles** · the `dataset` connector's **post action forced to retain whatever the config
+> says**, why timestamp-named snapshots need **no watermark**, and the absence of any split acquire/ingest
+> scheduler are `docs/okf/capabilities/acquisition/acquisition.md` · the **two refused schema-registry
+> alternatives** are `docs/okf/capabilities/metamodel/metamodel.md` · the **BACKWARD gate's one escape
+> hatch** is `docs/okf/frontend/features/schema-mapping-authoring.md` · the **file-format rule** (flat tables
+> are CSV; nested or secret-bearing is TOON) is `docs/okf/backend/config/configuration.md` · **D-7's other
+> half** is `docs/okf/backend/pipeline-graph/step-catalog.md` · the **frozen `consignment.process`
+> contract** is `docs/okf/backend/control-plane/api-stability.md` · and its standing lesson — **a
+> fixture-corpus parity gate proves nothing about a shape no fixture uses** — is `docs/PROJECT_NOTES.md` §4.
+>
+> ⛔ **Archived does not mean finished.** Still open on `BACKLOG.md`: **row 15** (Phase 6's deletion half,
+> release-gated, and its §6 steps 1 and 2 — step 1's converter is **unbuilt**, despite this plan's §6
+> reading otherwise), **D-8** XLSX export, **D-11** the hand-authored relations component, and
+> `TYPEFLOW-CONSUMERS-1` — the three declared consumers of the type-flow description that were never built
+> and that this plan's own P2 S2 deferred to "S3+" without anything recording that they landed.
+
+
 **Status: APPROVED v1.1 (2026-08-05) — all thirteen §9 decisions resolved. Phase 0 DONE; Phase 1
 grounded, slice 1 of record set. v1.1 adds D-12 (Batch→Consignment = Phase 7, in-window, sequenced
 last) and D-13 (per-Step `enabled:` pause with park/drain, Phase 4) plus the §2.7 Step-lifecycle

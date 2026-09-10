@@ -1,5 +1,31 @@
 # The Pipeline — one consolidated specification
 
+> ⛔ **ARCHIVED 2026-09-10 — provenance only, never maintained. Do NOT read this for current behaviour.**
+> *(Operator decision 2026-09-10: archive after a distillation diff. 16 of 17 waves are done; row 15 stays on
+> `BACKLOG.md`.)*
+>
+> **Where its truth went:** the **token model** (§11/§12 — the token record shape, the three outlets, the
+> four-way conflation the ten relations hid, and what the model does **not** fix) is now
+> `docs/okf/backend/engine/node-types.md` § *The token model* · **decisions D1–D10** are
+> `docs/okf/capabilities/pipeline-authoring/pipeline-authoring.md` § *Decisions*, where **D1 was added on
+> archival — it was the only one of the ten with no current-tier row** · the **authoring-shape principles**
+> and the **Pipeline Document contract** are §3.0 of that same spec · **`ILLEGAL_PAIRING` and its deliberate
+> handler exemption** are `docs/okf/backend/pipeline-graph/pipeline-graph-design.md` · **D4's projection
+> refresh hook** (and the two homes that are wrong on purpose) is
+> `docs/okf/backend/build-run/operations-reference.md` § *Status backend* · **absent ≠ `false`** for three
+> parse options is `docs/okf/backend/config/parsing-options-reference.md`.
+>
+> 🔴 **What was CORRECTED in this file before it moved** (Sprint 7.5), so the archived copy is not a lie:
+> §7.2/§7.3 named **four classes that no longer exist** (`BatchProcessor`→`ConsignmentIngestor`,
+> `BatchIngestStrategy`→`ConsignmentIngestStrategy`, `CsvBatchStrategy`→`CsvIngestStrategy`,
+> `StreamingPluginBatchStrategy`→`StreamingPluginIngestStrategy`) for ten days, in the same document whose
+> §12 records the rename that killed them; and §8's *"you cannot add a new Step type today"* was wrong in
+> every clause — a hot-deployed pack can add one, which is this spec's own gap 7, shipped.
+>
+> ⚠ It had the **widest inbound surface of any plan here**: seven documents and two source files delegated
+> authority to it. All now carry local text.
+
+
 **Status:** working document for a redesign (2026-08-30). **This is the single place the Pipeline is
 described *as a plan*.** It is written to be changed: the intent is to rewrite the subsystem from here.
 

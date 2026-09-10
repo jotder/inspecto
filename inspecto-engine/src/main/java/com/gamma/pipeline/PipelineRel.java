@@ -30,9 +30,10 @@ import com.gamma.api.PublicApi;
  * is only ever READ (the executor and validator skip it as a cross-pipeline trigger), and the other two
  * are declared vocabulary with no producer at all. D2 moves that outcome set to Signals.
  *
- * <p>See {@code docs/superpower/pipeline-spec.md} §11 (the token model) and
+ * <p>See {@code docs/okf/backend/engine/node-types.md} (the token model — the design of record) and
  * {@code docs/okf/backend/pipeline-graph/pipeline-graph-design.md} §3.2 (edges) and §15 (the inventory that
- * fixed the split-relationship set).
+ * fixed the split-relationship set). Provenance only, not maintained:
+ * {@code docs/archived-documents/plans-archive/pipeline-spec.md} §11.
  */
 @PublicApi(since = "4.0.0")
 public final class PipelineRel {

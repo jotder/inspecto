@@ -10,7 +10,7 @@
  *
  * ⚠ Written 2026-08-31 because the authoring session's sandbox refused `git mv` (both batched and
  * single) and an unbounded source rewrite. Every DECISION below is already made and grounded — see
- * `docs/superpower/pipeline-waves-drain-plan.md` §2.3. This file exists so the sweep is one command for
+ * `docs/archived-documents/plans-archive/pipeline-waves-drain-plan.md` §2.3. This file exists so the sweep is one command for
  * whoever has the permissions, not a re-derivation.
  *
  * ── Why the mapping looks like this ────────────────────────────────────────────────────────────────

@@ -104,13 +104,39 @@ This is the table to consult before proposing that any of them merge. The second
 story: **a plain `SELECT` emits one relation.**
 
 ⚠ **`accepts`/`emits` is the pre-token DATA vocabulary, and the facts below are still real** — each row
-names the DuckDB relations the lift wires and `RowShaper` produces. What changed is what an edge
-*relation* means: under the committed token voice
-([`pipeline-spec.md`](../../../superpower/pipeline-spec.md) §13 D2) a Step receives a **Consignment
-token** and resolves the data by reference — an edge carries **no records**, it names the *outlet* a
-token continues on (`DATA` = the token continues; `DROPPED`/`INVALID`/`DUPLICATE`/`route:*` = a token
-whose `dataRefs` point at that side-relation). The constants keep their spelling deliberately (renaming
-breaks two committed contracts); the full runtime edge model converges at **Phase 7**.
+names the DuckDB relations the lift wires and `RowShaper` produces.
+
+### The token model — the design of record
+
+*(Distilled here 2026-09-10 from `pipeline-spec.md` §11/§12 when that plan was archived; five current-tier
+pages used to delegate this to the plan. Decision **D2**, 2026-08-31, is recorded in
+[`pipeline-authoring.md`](../../capabilities/pipeline-authoring/pipeline-authoring.md) § Decisions.)*
+
+**A Step receives a Consignment token and resolves data by reference. An edge carries no records — it names
+the outlet a token continues on.** The token is
+`{ consignmentId, runId, attributes{…}, dataRefs[{ store, table, partition, path, rows }] }`, and ⛔
+**`dataRefs` is a reference, never a payload.**
+
+**Three outlets replace ten relations:** `main` (the token continues) · `reject:<reason>` (one reject kind
+carrying its reason — `unmatched` · `dropped` · `invalid` · `duplicate`) · `route:<key>` (content demux).
+
+🔴 **Why: the ten relations were doing four unrelated jobs, and were never the same kind of thing.** One
+was the edge itself (`data`); one was content demux (`route:*`); four were a single reject kind differing only
+in *reason*; and four were **Signals, not edges at all** (`success` · `failure` · `on_commit` · `gap`).
+Reading that list as one vocabulary is what made the type system contradict the engine.
+
+⛔ **What the token model does NOT fix**, so nobody scopes it wrongly: it does **not** make the config
+non-flat (lift/lower stays); fan-in still needs its own decision; and it **breaks two committed contracts**
+plus `BuiltinNodeType`'s declared sets. ⚠ **`ConservationCheck` must keep working across the change** — loss
+accounting moves from "these four relations are loss" to "a `reject:` outlet is loss, and its reason names
+which kind". That migration is real work, tracked as X5 on [`BACKLOG.md`](../../../BACKLOG.md).
+
+⚠ **Today the constants keep their pre-token spelling deliberately** (renaming breaks the two committed
+contracts): `DATA` = the token continues; `DROPPED`/`INVALID`/`DUPLICATE`/`route:*` = a token whose
+`dataRefs` point at that side-relation. The runtime converges at **Phase 7** — the vocabulary is adopted now,
+the runtime later. Steps 2 and 3 of that sequence (delete the five non-edges in favour of Signals; collapse
+the rejects to `reject:<reason>`) are **documentation and vocabulary, and can land before any redesign is
+agreed**; steps 4 and 5 need the runtime decision.
 
 | Type | emits | Authorable? |
 |---|---|---|

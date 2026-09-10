@@ -11,7 +11,7 @@ timestamp: 2026-06-28T00:00:00Z
 
 > Vocabulary: a Consignment is the unit a Step's token references (data resolved by reference; edges
 > carry no records) — the full runtime edge model converges at Phase 7
-> ([`pipeline-spec.md`](../../../superpower/pipeline-spec.md) §13 D2).
+> ([`node-types.md`](node-types.md) § *The token model*).
 
 ## The SPI
 

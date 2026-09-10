@@ -658,6 +658,12 @@ without a restart — and persisting from the UI would create a **second declara
 beside `-D`, the split-brain the enrichment companion already refused (D7). Decided 2026-08-15: the
 operator applies flags through their own deployment tooling; this screen tells them what is in force.
 
+- ⛔ **Two ledger homes were rejected for the keyed dedup window, and the reasons still bind.** The
+  file-grained output ledger keys on `(consignmentId, runId, tableName, partitionKey, path, generation)` and
+  has **no column for a business key**, so carrying key hashes there would be a new table shape, not a new
+  column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+- ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
+  default, a `Mode`, url/user/password properties and a root supplier. Budget it.
 - **`OperationalDb.Family` is now the roster** — the **twelve** families' property names live there and nowhere
   else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.

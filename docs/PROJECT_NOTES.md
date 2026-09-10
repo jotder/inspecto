@@ -69,7 +69,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 | Production investigation (process/events/metrics/state/`-D` flags/Control API/troubleshooting) | [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **living doc** |
 | Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) |
 | Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md) |
-| Pipeline spec of record + decisions D1–D10 (**active plan**) | [`pipeline-spec.md`](superpower/pipeline-spec.md) |
+| The token model + decisions D1–D10 | [`okf/backend/engine/node-types.md`](okf/backend/engine/node-types.md) § *The token model* · [`okf/capabilities/pipeline-authoring/pipeline-authoring.md`](okf/capabilities/pipeline-authoring/pipeline-authoring.md) § *Decisions* *(the plan was archived 2026-09-10)* |
 | Execution residuals — X3 park detail · X2 cross-lane provenance · X1 bounded COMMIT retry (**SHIPPED + archived 2026-09-02**; X4/X5 sketches in BACKLOG §4) | [`execution-residuals-plan.md`](archived-documents/plans-archive/execution-residuals-plan.md) |
 | Pipeline editor UI (Recipe/graph views, drawer, attribute forms) | [`pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) |
 | Authoring redesign for business users — the sectioned Parse pane (Delimited first: compact property rows, plain-language labels, grounded defaults, ONE "Columns that come out" table) + the **SQL-first** `transform.sql` Step (the 2026-09-03 Simple fields grid was superseded and deleted the same day the operator reviewed it live) (**SHIPPED + archived 2026-09-04**: `98ffc90b` · `7e13dd82` · `d012f721` · `c119a6af` (steps: home) · `1d557bbd` (one property-row idiom, no Description) · `24171333` (SQL-first); follow-ons in BACKLOG §4 AUTHORING-REDESIGN-1) | as-built: [`grammar-config.md`](okf/frontend/features/grammar-config.md) (Parse pane) · [`schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md) §0 (Transform pane) · [`pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) · [`catalog-vs-executors.md`](okf/backend/engine/catalog-vs-executors.md) (engine) · decisions + R1–R12 review: [`parse-pane-redesign-plan.md`](archived-documents/plans-archive/parse-pane-redesign-plan.md), [`sql-transform-v1-plan.md`](archived-documents/plans-archive/sql-transform-v1-plan.md); mockup source `archived-documents/plans-archive/assets/authoring-redesign-mockup/` |
@@ -139,6 +139,11 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 ---
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
+
+- 🔴 **A fixture-corpus parity gate proves nothing about a shape no fixture uses.** A round-trip gate ran
+  green over every committed fixture while a whole authored spelling was unreadable — for **13 days** —
+  because no fixture used that spelling. So a corpus gate's coverage is the corpus, not the format: when a
+  new spelling is added, add a fixture that uses it in the same change. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 
 - 🔴 **`grep -r` on this sandbox returns ZERO hits for strings `git grep` finds** (2026-09-10, three times in one shift:
   `source_timezone` in four UI files; two UI callers and a Java test of `/config/suggest/schema`). Each time the

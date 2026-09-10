@@ -140,7 +140,14 @@ As built:
 * **Recipe view:** since 2026-09-04 `transform.sql` IS a recipe verb — `sql`, ordered between `transform`
   and `summarize` in `PipelineProjection.RECIPE_VERBS` and in the UI's `RECIPE_VERBS` and generated
   `step-types.contract.json` (regenerate with `mvn -o test -Dstep.types.write=true`, pinned by
-  `StepTypesContractTest`). `RecipeCompiler` compiles `sql: {sql, fields}` on the trunk and inside a
+  `StepTypesContractTest`).
+- 🔴 **Neither committed contract can be drifted by a plugin, which is why hot node types were not gated on
+  them.** `NodeAttributesContractTest` compares a **static Java table** (`NodeAttributes.wireMap()`), and a
+  plugin type is simply not in it. `StepTypesContractTest` does read the served step catalogue, but its own
+  comment records that it runs with no plugins loaded, so what it compares there is exactly the verb table.
+  The authors had already accounted for plugin types being **additive at runtime** — so “the contracts would
+  drift” is not a reason to defer pack work. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+- `RecipeCompiler` compiles `sql: {sql, fields}` on the trunk and inside a
   `route:` branch; `RecipeConverter.sqlStep` converts it back, so a config carrying a sql step round-trips
   through the Recipe view instead of failing with `UNSUPPORTED_STEP`. ⚠ **Mid-branch, `sql` compiles but
   does not ARM:** `RouteArming.BRANCH_STEP_KINDS` is `{FILTER, DEDUP, SUMMARIZE}`, so a route branch

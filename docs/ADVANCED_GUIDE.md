@@ -187,7 +187,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   emit/accept); authoring is the **graph round-trip** — `GET /pipelines/{name}/graph/raw` →
   `PUT /pipelines/{name}/graph` — over that same file. Runtime voice: a Step receives a
   **Consignment token** and resolves the data by reference — edges carry no records (the full runtime
-  edge model converges at Phase 7; `docs/superpower/pipeline-spec.md` §13 D2).
+  edge model converges at Phase 7; `docs/archived-documents/plans-archive/pipeline-spec.md` §13 D2).
 - **Execution:** in-motion Consignments run through `ConsignmentGraphRunner`/`RowShaper` inside the
   poll cycle (§3); an authored pipeline also runs at rest as a `JobType.PIPELINE` job
   (`PipelineJobRunner`) — sinks via `PartitionSinkWriter`, `sink.view` as a durable `ViewDefinition`

@@ -181,6 +181,29 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **Pipeline graph** — flip the intake cap on by default (needs a soak); a pre-materialise cap to save remote-fetch bandwidth (cap applies post-dedup); 🔴 **THREE** kinds still last-one-wins, deliberately out of A2 scope: `acquisition`, `gap`, `dedup.marker` — *corrected 2026-09-09: `parser` was in this list and does NOT belong; a second parser is REFUSED by name (`MULTI_PARSER`, `PipelineEditable.java:65,696`), which is the opposite of last-one-wins. `pipeline-editor.md` §Multiplicity states it correctly.*; 🔴 ~~`BatchGraphRunner` has zero production callers~~ **WRONG ON BOTH COUNTS — corrected 2026-09-09.** (a) **There is no class of that name** — it was renamed in the 2026-08-31 Consignment commit. (b) The class that DOES exist, `ConsignmentGraphRunner`, has **production callers**: `engages()` drives the live lane admission (`ConsignmentIngestStrategy.admittedLift`) and **`run(...)` executes on the ingest path** (`ConsignmentIngestStrategy:355`). ⛔ This row was cited as Row 15's parity blocker, so re-derive that gate before using it. What IS still owed is §6 step 2, the parity gate through the compiled-recipe path. Owner: `okf/capabilities/pipeline-execution/pipeline-execution.md` §2.3; → `okf/backend/pipeline-graph/pipeline-graph-design.md` §14
 - **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed; and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations; `run_id` is `null` everywhere; §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
 - **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built, needs `SeqScope`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (⚠ do not grow the `EventType` enum; a constants class should land before ~10 string literals do), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
+- **P3** · **`PROCESSOR-CATALOG-ROUTE-1` — nothing serves `ConsignmentProcessor` ids to the UI** (filed
+  2026-09-10 by Sprint 7.6; a deliberate deferral that had no board row). The post-sync chain editor takes
+  processor ids as **free text**, the way `on_signal` takes signal types, because no catalog route exists. A
+  route plus a picker is the natural follow-on. ⛔ It was deliberately not invented alongside the editor —
+  this row records the deferral, not a defect. → `okf/backend/engine/post-sync-step-chains.md`
+- **P3** · **`PACK-UNLOAD-EXPOSURE-1` — unloading a pack makes a stored pipeline unloadable** (filed
+  2026-09-10 by Sprint 7.6). A pipeline naming a pack-contributed node type stops loading once that pack is
+  unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally
+  *replaced* rather than removed. **Stated, not fixed**, in the plan that shipped the overlay; decide whether
+  this is accepted posture or work. → `okf/backend/control-plane/job-vs-step.md`
+- **P2** · **`TYPEFLOW-CONSUMERS-1` — three declared consumers of the type-flow description were never
+  built** (filed 2026-09-10 by Sprint 7.6; the amendment's own P2 S2 deferred the wiring to "S3+" and
+  nothing recorded it landing). `TypeFlow.describe` exists; what does not: **(a) save-time cell-level
+  validation** — a Mapping over a nonexistent field, **a route predicate over a dropped column**, a
+  summarize over a non-numeric measure; **(b) Dataset auto-registration**, where the sink's derived schema
+  becomes the Dataset's `columns{name,type,role}` instead of a hand-authored column list; **(c) the plugin
+  contract** — a plugin Step cannot be SQL-described, so the SPI must declare its output schema. →
+  `okf/backend/engine/catalog-vs-executors.md`
+- **P3** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY** (filed
+  2026-09-10 by Sprint 7.6). Delete the five non-edges in favour of Signals, and collapse the four reject
+  relations to `reject:<reason>`. ⚠ **These two are documentation and vocabulary and need no runtime
+  decision** — unlike steps 4 and 5, which need D2's runtime half (X5, next MAJOR). ⛔ Do not bundle them
+  with the runtime work; that is what has kept them unstarted. → `okf/backend/engine/node-types.md`
 - **P3** · **`GLOSSARY-CASE-1` — split the two `Case`s in code** (filed 2026-09-10 by Sprint 7.3, `SPEC-GLOSSARY-1`). The
   glossary now defines both senses and says which keeps the word: `ObjectType.CASE` (groups Incidents — the pane, the
   user guide and the controls matrix all use it) stays `Case`; the Assistant's `com.gamma.intelligence.investigation.Case`
@@ -190,8 +213,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   alias or a deprecation window, not a silent flip — that is why 7.3 filed it instead of applying it. Touchpoint list in
   `GLOSSARY.md` §13. ⛔ Do **not** also rename `mode: case` (route branching) or `caseType` (line of business): different
   words that merely look alike, and `caseType` feeds RBAC data scopes.
-- **P3** · **D-8 XLSX export** — zero groundwork (no spreadsheet library in any pom); gated only by a bare label — state the operator question before answering it. → `superpower/elt-final-amendment-plan.md` §9 D-8
-- **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `superpower/elt-final-amendment-plan.md` §3.4
+- **P3** · **D-8 XLSX export** — zero groundwork (no spreadsheet library in any pom); gated only by a bare label — state the operator question before answering it. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
+- **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
 ### Control plane, jobs, notifications, queries
 
@@ -450,7 +473,10 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   - ~~`compliance-certifications-plan.md`~~ — **NOT a violation.** Only C2 of six workstreams is delivered; C1/C3/C5/C6
     are open and org-gated (§2). It stays live; `INDEX.md` already records the C2 half correctly.
   - ~~`step-workbench-design.md`~~ — **was already archived 2026-09-06.** Row was doubly stale (file moved; decision made).
-  - `pipeline-spec.md` + `pipeline-waves-drain-plan.md` — correctly live; archive together when Row 15 closes (§2).
+  - ✅ `pipeline-spec.md` + `pipeline-waves-drain-plan.md` + `elt-final-amendment-plan.md` — **ARCHIVED
+    2026-09-10** (operator: archive now, after a distillation diff; row 15 stays on this board). ⚠ The
+    earlier rule here — *archive together when Row 15 closes* — was superseded: a plan is archived when its
+    durable content is distilled, not when the last release gate clears.
   - ✅ `gate-register.md` — **ARCHIVED 2026-09-07.** Its own retirement trigger had fired and it had become
     actively misleading (§3.5 and §3.3 still framed items resolved weeks earlier as open calls). Its one durable
     note is now `okf/index.md` §*How to read this tier*.

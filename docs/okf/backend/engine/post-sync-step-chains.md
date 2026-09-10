@@ -107,6 +107,25 @@ pre-existing third-party implementers).
 - Save-time half: a hand-authored job whose `chain_config` does not align with its `processor` chain is
   refused at save (`ConsignmentProcessJobType`, CHAIN-CONFIG-1). Only the `params:` block is examined —
   a chain reached through `args:`/`bind:` is checked at run.
+- 🔴 **The engine half of CHAIN-CONFIG-1: a `chain_config` value must be a SCALAR, and the engine
+  accepts-then-CORRUPTS anything else.** `chainConfigsOf` reads each entry into a `Map<String, String>`, so
+  `{"columns": ["a","b"]}` **saves, runs, and arrives at the processor as the string `"[a, b]"`** — no
+  refusal anywhere. That is why the authoring surface refuses a non-scalar rather than trusting the engine.
+  *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+- ⚠ **A null value used to NPE instead of naming the key** (`Map.copyOf` rejects nulls), so it is refused by
+  name at authoring with *"omit the key instead"*.
+- ⛔ **A surplus `chain_config` entry is never dropped to line the two sides up.** It becomes a row with a
+  blank id and the save refuses — discarding an authored config to tidy an off-by-one is the exact failure
+  this surface exists to prevent, so the lossless path is the tested one.
+- 🔴 **The refusal is marked touched at seed time**, because a `mat-error` on an untouched control renders
+  nothing: without that, Save would refuse **with nothing on screen**.
+- **It fails open, deliberately.** If the parameter is absent from the descriptor, or the `chain_config`
+  cannot be represented by the structural editor, both raw fields are left exactly as they were — *a
+  structural editor that cannot read a value must not be the thing that rewrites it*. Unmodelled element keys
+  travel verbatim; only `config` is rewritten.
+- ⚠ **There is no processor-id picker: nothing serves `ConsignmentProcessor` ids to the UI**, so ids stay
+  free text (as `on_signal` does for signal types). A catalog route is the natural follow-on and was
+  deliberately not invented — now a `BACKLOG.md` row.
 
 ## 5. Retention, merge and reprocess — "connect, don't invent"
 

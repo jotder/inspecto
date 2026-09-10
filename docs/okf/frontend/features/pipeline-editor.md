@@ -19,7 +19,7 @@ timestamp: 2026-09-01T00:00:00Z
 >   `transform.map` rule grid, `EXPR` free-text, and `transform.join` lookup config, plus the confirmed UX
 >   gaps against a complete authoring experience;
 > - [`okf/backend/pipeline-graph/`](../../backend/pipeline-graph/index.md) — the backend Pipeline model (lift/lower/validator/executor);
-> - [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) — the ACTIVE redesign plan (distills here when it drains).
+> - [`archived-documents/plans-archive/pipeline-spec.md`](../../../archived-documents/plans-archive/pipeline-spec.md) — **archived 2026-09-10**, provenance only; the token model it held is [`okf/backend/engine/node-types.md`](../../backend/engine/node-types.md) § *The token model*.
 >
 > This file replaced `pipelines.md` (2026-09-01 consolidation); the dated change-log form lives in
 > git history and the archived plans it cites. **Current truth only** — superseded states are kept

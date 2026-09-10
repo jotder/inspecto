@@ -375,6 +375,10 @@ The Parse pane settles **what a column is**: that it exists, its name, its type,
 job, so an author hunting a missing field has exactly one place to look.
 
 ⚠ **The reason is cost, not tidiness.** The two affordances looked identical and were not: excluding in
+⚠ **The BACKWARD gate has ONE documented escape hatch: a breaking overwrite is refused 422 unless the
+write carries `compatibility: "none"`.** Without that spelling an operator meets a 422 with no stated way
+forward. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+
 Parse edits the **schema**, which `SchemaCompatibility` gates on a BACKWARD contract (§1) — so undoing it
 can be *refused*, or force a re-test. Excluding in Transform is a clause in the SELECT: reversible for
 free. The expensive one is simply not offered.

@@ -11,8 +11,8 @@ timestamp: 2026-08-28T00:00:00Z
 
 **Status:** DISCUSSED 2026-08-28, not scheduled — the operator asked for the analysis to be kept
 for later work. The schedulable row is **EXPORT-1** in [`BACKLOG.md`](../../../BACKLOG.md) §4.
-**Related:** [dataset consumption / the `dataset` connector](../../../superpower/elt-final-amendment-plan.md)
-(S3c, the inbound mirror of this question) · [connectors](../acquisition/connectors.md) ·
+**Related:** [dataset consumption / the `dataset` connector](../../capabilities/acquisition/acquisition.md)
+(the inbound mirror of this question) · [connectors](../acquisition/connectors.md) ·
 [operations reference](../build-run/operations-reference.md).
 
 ## The grounded facts (2026-08-28)

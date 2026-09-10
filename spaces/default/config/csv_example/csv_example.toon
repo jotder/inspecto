@@ -1,0 +1,23 @@
+partitionKey: ORDER_DATE
+raw:
+  name: csv_example
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    ORDER_ID,"0",VARCHAR,Order identifier,"",""
+    ORDER_DATE,"1",DATE,Date the order was placed,"",""
+    CUSTOMER,"2",VARCHAR,Customer name,"",PII
+    AMOUNT,"3",DOUBLE,Order total,USD,""
+    NOTE,"4",VARCHAR,Free-text note; blank when the source wrote a null token,"",""
+mapping:
+  canonicalName: csv_example
+  rawName: csv_example
+  fields[5]{name,from,fn}:
+    ORDER_ID,ORDER_ID,keep
+    ORDER_DATE,ORDER_DATE,keep
+    CUSTOMER,CUSTOMER,keep
+    AMOUNT,AMOUNT,keep
+    NOTE,NOTE,keep
+partitions[3]{column,source,type}:
+  year,ORDER_DATE,DATE_YEAR
+  month,ORDER_DATE,DATE_MONTH
+  day,ORDER_DATE,DATE_DAY

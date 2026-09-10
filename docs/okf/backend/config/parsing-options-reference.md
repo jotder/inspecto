@@ -169,6 +169,10 @@ Supersedes the PDF's §1–§5 tables. Verified against DuckDB 1.x (the engine b
 | `strict_mode` | BOOL, default `true`; `false` tolerates quote/column drift. |
 | `nullstr` / `null` | LIST → SQL NULL, e.g. `['','NULL','NaN','N/A','-']`. |
 | `store_rejects` | BOOL — **the engine's real error channel.** Rejected rows land in `reject_errors`/`reject_scans`, drained to `errors/<base>_errors.csv`. **Missing from the PDF; document it.** |
+
+🔴 **For `ignore_errors`, `null_padding` and `store_rejects`, ABSENT is not `false`.** A blank means *the
+engine's historical default*, which is explicitly a different thing from an authored `false` — so writing
+`false` to "make it explicit" can change behaviour. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 | `rejects_table`, `rejects_scan`, `rejects_limit` | Tune the reject tables. |
 
 ### 3.4 Format (read-time typing — mostly redundant in this engine, see §2 note)

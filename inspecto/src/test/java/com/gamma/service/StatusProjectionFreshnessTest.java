@@ -15,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Freshness of the DB-backed status projection — the blocker that gated serving the ledgers from a
- * database (pipeline-spec §13 D4).
+ * database (decision D4). Where the refresh is hooked, and the two homes that are wrong on purpose, is
+ * {@code docs/okf/backend/build-run/operations-reference.md} § "Status backend".
  *
  * <p>🔴 A {@link DbStatusStore} is a PROJECTION of the on-disk audit, not a second writer, so it is only
  * as fresh as its last {@code syncStatus()}. The poll cycle refreshes itself once its last run finishes

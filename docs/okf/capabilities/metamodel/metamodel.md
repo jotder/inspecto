@@ -353,6 +353,13 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `SPEC-STALEREF-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
+
+⛔ **Two schema-registry alternatives were considered and REFUSED, and the reasons still bind** *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*:
+an **external schema-registry service** adds a running server and a second source of truth, against the
+file-based, no-catalog, offline, single-node doctrines; and **a separate schema IDL** would be a third type
+system needing lossy mapping both ways, when the data plane is already Parquet plus DuckDB. What was
+borrowed instead is the *vocabulary and guarantees* — subjects, versions, compatibility classes — laid over
+seams that already exist, the first of which is that **the store IS the registry**.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —

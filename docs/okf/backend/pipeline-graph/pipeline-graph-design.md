@@ -17,7 +17,7 @@ timestamp: 2026-08-15T00:00:00Z
 > [pipeline-config-keys.md](pipeline-config-keys.md) (the config-key census),
 > [`engine/node-types.md`](../engine/node-types.md) (the type registry + execution SPI),
 > [pipeline-editor.md](../../frontend/features/pipeline-editor.md) (the UI). The active plan is
-> [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md). The 2026-06 design-era
+> [`archived-documents/plans-archive/pipeline-spec.md`](../../../archived-documents/plans-archive/pipeline-spec.md). The 2026-06 design-era
 > prose (motivation, roadmap, T-checklist, capability gate) is archived verbatim at
 > [`plans-archive/pipeline-graph-design-era-2026-06.md`](../../../archived-documents/plans-archive/pipeline-graph-design-era-2026-06.md).
 
@@ -33,10 +33,9 @@ consume. Saving reverses it (`PipelineEditable.lower`, [editable-round-trip.md](
 **Consignment token** and resolves data **by reference** (`ProcessorContext.outputs()`/`read()`);
 no rows travel an edge, `transform.map` is never executed as a node at all, and six of the ten
 declared `PipelineRel` relations never appear in a lifted graph. Documentation is written in this
-token vocabulary now; the remaining runtime pieces converge with the amendment plan's Phase 7 —
-the corrected model and migration are
-[`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) §11. Everything else here —
-IR, lift, validator, registry, commit model — stands as built.
+token vocabulary now; the remaining runtime pieces converge with the amendment plan's Phase 7 — the
+corrected model and its migration are [`node-types.md`](../engine/node-types.md) § *The token model*.
+Everything else here — IR, lift, validator, registry, commit model — stands as built.
 
 `PipelineRel` constants: `data` (default), the control set `success`/`failure`/`unmatched`/`gap`/
 `on_commit` (cross-flow ONLY — a same-graph `on_commit` is rejected, since the data-edge-only DAG
@@ -105,7 +104,10 @@ default and must not retype deployed files on a read) — full rules in
 (`CYCLE`, names the path; control/`route:*` edges excluded, matching the walk), dangling endpoints
 (`on_commit` `to` exempt — cross-flow), duplicate ids, no-entry-node, `ON_COMMIT_SAME_GRAPH`,
 emit/accept wiring against the type contract (`ILLEGAL_EMIT`/`ILLEGAL_ACCEPT` — handlers needn't
-list every inbound outcome; the emitter governs), and `UNKNOWN_TYPE` as a **warning** (nothing
+list every inbound outcome; the emitter governs), **pairing** (`ILLEGAL_PAIRING` — an outcome or route
+edge's target must accept that relation **or** accept `data`, deliberately so that anything consuming rows
+may also consume a reject or a route stream; an unregistered plugin type is *warned*, not blocked), *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+and `UNKNOWN_TYPE` as a **warning** (nothing
 rejects an unknown type harder than that — which is why an invented palette once survived unnoticed;
 the UI contract tests now pin the served vocabulary).
 
@@ -204,7 +206,9 @@ at-least-once) · entry-node triggers · admission back-pressure on cycle overru
 commit · in-file component identity, no version pinning · DAG over `data` edges · test = bounded
 scratch dry-run · legacy auto-lift with parity gate) all stand; the full statements with rationale
 are in the [archived design text](../../../archived-documents/plans-archive/pipeline-graph-design-era-2026-06.md)
-§9. Newer decisions of record live in [`superpower/pipeline-spec.md`](../../../superpower/pipeline-spec.md) §13 (D1–D10, taken 2026-08-31).
+§9. The decisions of record taken 2026-08-31 (D1–D10) are in
+[`pipeline-authoring.md`](../../capabilities/pipeline-authoring/pipeline-authoring.md) § *Decisions*, and the
+token model itself is [`node-types.md`](../engine/node-types.md) § *The token model*.
 
 Boundaries still true (v1 non-goals, archived §12 for the full table): no decoupled per-node
 scheduling or inter-node queues; no live × live keyed join; adapter ingestion is at-least-once; no

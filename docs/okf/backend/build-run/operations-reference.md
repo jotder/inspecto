@@ -663,6 +663,15 @@ writing the file audit unchanged (it stays the write-time source of truth and su
 outage). Set `-Dstatus.backend=file` to read the on-disk audit artifacts directly
 (`FileStatusStore`) instead.
 
+🔴 **Where the projection refresh is hooked matters, and two obvious homes are wrong on purpose.** It runs
+in `CollectorService.runPipeline` — **once per run, after the run, outside the run guard** — and is pinned by
+`StatusProjectionFreshnessTest` (three cases; commenting out the one call fails two of them). ⛔ **Not on the
+batch event bus**, which delivers *synchronously on the ingest thread* once per batch and would put repeated
+database work on the ingest path. ⛔ **Not inside the scheduler's single-run entry point**, which batches the
+cycle's refresh deliberately and does not route through `runPipeline`, so the two never double up. ⚠ The
+first diagnosis of this — *"it projects exactly once, at boot"* — was **false**, which is why the behaviour is
+written down rather than re-derived. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+
 The DB engine is **DuckDB by default** — already bundled for ingest/enrichment, so the DB
 backend adds **no new dependency** and the same engine serves tests and production. With no
 URL given it opens a local file `inspecto-status.db`:

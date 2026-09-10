@@ -1,5 +1,25 @@
 # Pipeline Waves — the drain to completion
 
+> ⛔ **ARCHIVED 2026-09-10 — provenance only, never maintained. Do NOT read this for current behaviour.**
+>
+> **Where its truth went:** the **engine half of CHAIN-CONFIG-1** — a non-scalar `chain_config` value
+> **saves, runs and arrives at the processor stringified**, plus the null-value, surplus-entry, seed-touch
+> and fail-open rules — is now `docs/okf/backend/engine/post-sync-step-chains.md` · the **pack/classpath
+> asymmetry** (a pack may **not** redefine a built-in; a classpath provider may) and the **pack-unload
+> exposure** are `docs/okf/backend/control-plane/job-vs-step.md` · **why neither committed contract could be
+> drifted by a plugin** is `docs/okf/backend/engine/catalog-vs-executors.md` · the **two rejected ledger
+> homes** and the **cost of adding an `OperationalDb.Family`** are `docs/okf/backend/engine/db-layer.md` ·
+> the **naming-governance rule** (this vocabulary governs concepts, not every class name) is
+> `docs/GLOSSARY.md` §0 rule 5. Its deliberate deferral of a processor-id catalog route is
+> `PROCESSOR-CATALOG-ROUTE-1` on `BACKLOG.md`.
+>
+> 🔴 **What was CORRECTED in this file before it moved** (Sprint 7.5): §6 step 1 carried a **false ✅** —
+> *"the converter exists (`inspecto migrate-configs`)"*. That command appears in **no source file**, and the
+> commit it cited was a `RecipeConverter` projection fix. Step 2's gate was also clarified: what is green is
+> **round-trip parity of the projection**, not the suite **executing** through the compiled-recipe path.
+> Both steps are now on row 15. ⛔ Nobody re-checks a tick, so a false ✅ is worse than a blank.
+
+
 **Status:** IN FLIGHT, opened 2026-08-31. Objective: *complete all Pipeline Waves* (operator directive).
 Companion to [`pipeline-spec.md`](pipeline-spec.md) §12 (the wave tables) and §13 (the decisions).
 ⚠ This plan does **not** restate the spec — it records what grounding found that the spec's own wave

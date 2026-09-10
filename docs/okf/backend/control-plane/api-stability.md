@@ -100,7 +100,11 @@ above the generated commit list.
 - The event store prunes by whole day partitions once an `event_prune` maintenance job exists (COMPLY-3);
   releases are SBOM'd and signed in CI only (COMPLY-1/2).
 
-**Deferred to this same release by decision:** the §11 token *runtime* model (pipeline-spec D2), the ELT
+⛔ **The `consignment.process` contract stays FROZEN, including its correlation identifier** — plugins
+already depend on it, so the token work must not change that shape as a side effect. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
+
+**Deferred to this same release by decision:** the token *runtime* model (D2 —
+[`node-types.md`](../engine/node-types.md) § *The token model*), the ELT
 Phase 6 deletion of the flat read path (Row 15; the `-Dingest.lane` flag ships, the deletion waits for the
 verification minor), and X5's cross-lane StepInfo envelope.
 

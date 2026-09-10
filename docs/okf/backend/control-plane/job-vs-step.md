@@ -20,9 +20,9 @@ that rule, verified against source 2026-08-07; extensibility and naming re-groun
 **A Step is not an *Executable*** — the Pipeline is; a Step is a node inside it. A Job is imperative
 Java — you implement `Job.run(ctx)` and ship a class. A Step is *today* declarative config lowered into
 DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by `ConsignmentGraphRunner`. In the committed
-vocabulary ([`pipeline-spec.md`](../../../superpower/pipeline-spec.md) §13 D2) a Step receives a
-**Consignment token** and resolves the data by reference — edges carry no records; the full runtime edge
-model converges at Phase 7. Since 2026-08-29 a plugin *can* supply a Step's execution
+vocabulary (D2) a Step receives a **Consignment token** and resolves the data by reference — edges carry no
+records; the full runtime edge model converges at Phase 7
+([`node-types.md`](../engine/node-types.md) § *The token model*). Since 2026-08-29 a plugin *can* supply a Step's execution
 (`PipelineNodeExecutor`, §3) — that changes who writes the SQL-shaping code, not what a Step **is**, and
 it still gets no service façade. [Platform Services](platform-services.md) stage 2 (still unbuilt) is
 the different, richer thing: a pack-hosted Step *program* (`EXECUTED` mode) — again without changing what
@@ -64,7 +64,7 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 | **Data state** | **In motion** — the Step's Consignment token references rows in flight | **At rest** — data already landed |
 | **Implementation** | Config → DuckDB SQL | Java class in a jar |
 | **Extensibility** | **Open, in two independent halves** (both `ServiceLoader` seams): `PipelineNodeType` (descriptor) + `PipelineNodeExecutor` (execution, SHIPPED 2026-08-29) — a third party CAN ship a Step type today; a plugin needs **both** registrations. See [node-types.md §"The execution half"](../engine/node-types.md) | **Open registry**: `JobTypeProvider` via `ServiceLoader` *and* hot-deployable Job Packs |
-| **Hot deploy / unload** | via a **pack**: `JobPackManager` also registers pack-contributed node types + executors into the owner-keyed overlay (`PipelineNodeTypes.register` / `PipelineNodeExecutors.register`, first pack wins per type, deregistered on unload — `JobPackManager.java:247-248`, 2026-08-31). Classpath (`META-INF/services`) providers still require a build | `JobPackManager`: watched dir, isolated `URLClassLoader`, atomic load-or-reject, in-flight-Run quiesce before unload |
+| **Hot deploy / unload** | via a **pack**: `JobPackManager` also registers pack-contributed node types + executors into the owner-keyed overlay (`PipelineNodeTypes.register` / `PipelineNodeExecutors.register`, first pack wins per type, deregistered on unload — `JobPackManager.java:247-248`, 2026-08-31). Classpath (`META-INF/services`) providers still require a build. 🔴 **The two routes are deliberately ASYMMETRIC: a pack may NOT redefine a built-in** — the registration is refused and, pack loading being atomic, the whole pack is rejected, because a jar dropped in a directory silently redefining `sink.persistent` would change what every existing pipeline means — **while a classpath provider MAY**, that being an edition specialising the core at build time, reviewed and shipped together. ⚠ And **unloading a pack makes its types unknown again, so a stored pipeline naming one stops loading** — the same exposure a Job typed on an unloaded pack has, and the reason a pack is normally *replaced* rather than removed. Stated, not fixed. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)* | `JobPackManager`: watched dir, isolated `URLClassLoader`, atomic load-or-reject, in-flight-Run quiesce before unload |
 | **Code trust** | classpath providers: none needed (compiled/deployed with the engine); pack-contributed ones inherit the pack jar's signature check | `-Djobs.packs.requireSignature` verifies every class entry of a pack jar |
 | **Runtime context** | ⛔ none — config plus a SQL relation | `JobContext`: `runId`, `spaceId`, `trigger`, `config`, `params`, `log()`, `signals()`, `artifacts()`, `dryRun()` |
 | **Unit of work** | one **Consignment**, over one input relation | one **Run** |

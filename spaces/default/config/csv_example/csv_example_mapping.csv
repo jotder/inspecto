@@ -1,0 +1,6 @@
+targetColumn,sourceExpression,transformType
+ORDER_ID,ORDER_ID,
+ORDER_DATE,ORDER_DATE,
+CUSTOMER,CUSTOMER,
+AMOUNT,AMOUNT,
+NOTE,NOTE,
