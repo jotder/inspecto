@@ -129,7 +129,11 @@ caveat stands. What the plan did **not** name matters more:
 - 🔴 **Four statics have NO Space dimension at all**: `CircuitBreaker.SHARED` and `GapTracker.SHARED` keyed
   on a bare collector id, and `IngestProgress.CURRENT` and `StepProgress.CURRENT` keyed on a bare pipeline
   name. These collide across **any** two Spaces that share a collector or pipeline name — a **pre-existing
-  defect independent of this plan**, filed on `BACKLOG.md`, not fixed here.
+  defect independent of this plan**, filed on `BACKLOG.md`. ✅ **The two breakers were fixed 2026-09-10**
+  (per-Space `shared()`, a `forgetSpace`, 5 tests, 3/3 mutants; no call site changed). 🔴 **The two progress
+  registries could NOT be**: they live in `inspecto-etl`, and `inspecto-event` already depends on
+  `inspecto-etl`, so reaching `EventLog.currentSpaceId()` from there would be a dependency **cycle** — that
+  half is now a design call (a cycle-free home in `inspecto-util`, or pass the space in), on the board.
 - 🔴 **`IntakeGovernor`'s fleet policy is process-wide by design, and `setGlobalPolicy` calls `caps.clear()`**
   — so one simulated pod would wipe *every* Space's learned admission caps, not just its own.
 - ⚠ **`AcquisitionLedgers` has three MORE process-wide maps** (pending checksums, listings, DB watermarks)

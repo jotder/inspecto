@@ -40,6 +40,14 @@ Compare against the current baseline, report regressions verbatim before fixing 
 **Never stage `inspecto/pom.xml`.** Prefer the `verify-runner` agent so build logs stay out of the
 main context.
 
+🔴 **Reading the reactor total: FOUR module summaries are logged at `[WARNING]`, not `[INFO]`** — Maven does
+that for any module with a skipped test. A grep of `^\[INFO\] Tests run:` therefore finds **22 modules and
+sums to ~3443** against a real **26 / 4199**, and the shortfall reads like a regression rather than a
+log-parsing bug. ⚠ The mirror image is real too: told to include WARNING lines, a reader then
+**double-counts**. ⇒ Match **both** levels, count only lines **without** `-- in` (those are per-class), and
+**assert the module count is 26** before trusting the total. Baselines as of 2026-09-10:
+**reactor 4199 / 0 / 0 / 16 over 26 modules**, **UI 2889 passed / 5 skipped over 335 files, exit 0**.
+
 ### ⚠ Narrowing to specific tests — commas, never `+`
 
 ```powershell

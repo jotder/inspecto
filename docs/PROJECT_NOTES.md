@@ -140,6 +140,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **Four reactor modules log their `Tests run:` SUMMARY at `[WARNING]`, not `[INFO]`** — Maven does that
+  whenever a module has any skipped test. So a verify run that greps `^\[INFO\] Tests run:` finds **22
+  modules and sums to ~3443** against a real **26 / 4199**, and the shortfall reads like a regression rather
+  than a log-parsing bug, sending the reader hunting a build break that does not exist. ⚠ It has a **mirror
+  image**: told to count WARNING lines as well, a reader then double-counts. ⇒ Match **both** levels, count
+  only lines WITHOUT `-- in` (those are per-class, not per-module), and **assert the module count** — 26
+  today — before trusting the total. Re-confirmed 2026-09-10, when a verify agent caught itself mid-report.
+
 - 🔴 **`| grep -v spec` to "skip the tests" silently discards 77 % OF THIS REPOSITORY**, because the product
   name **`inspecto` contains the substring `spec`** (i-n-**s-p-e-c**-t-o). Measured 2026-09-10: **3,015 of
   3,923** tracked files have `inspecto` in their path, and **every one** is dropped by that filter — the whole

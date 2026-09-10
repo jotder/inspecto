@@ -50,7 +50,13 @@ public final class EventLog {
 
     /** The space id the calling thread is in (its {@link #SPACE_MDC_KEY} MDC), or {@link #DEFAULT_SPACE_ID} when
      *  none is set. The single source of truth for routing the per-space {@code MetricRegistry} label,
-     *  {@code ConnectionRegistry}, {@code StabilityGate}, and {@code AcquisitionLedgers} to a space. */
+     *  {@code ConnectionRegistry}, {@code StabilityGate}, {@code AcquisitionLedgers}, {@code CircuitBreaker}
+     *  and {@code GapTracker} to a space.
+     *
+     *  <p>⚠ This list is load-bearing, so keep it current: the last two joined on 2026-09-10
+     *  (SPACE-UNKEYED-STATICS-1) after shipping as process-wide singletons whose own javadocs already
+     *  claimed they used this routing. A registry that holds cross-cycle state and is NOT in this list is
+     *  the bug to look for. */
     public static String currentSpaceId() {
         String s = MDC.get(SPACE_MDC_KEY);
         return (s == null || s.isEmpty()) ? DEFAULT_SPACE_ID : s;

@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
+import com.gamma.event.EventLog;
+
 /**
  * A per-source circuit breaker for acquisition connectivity (Data Acquisition roadmap Phase F). When a source's
  * connector repeatedly fails to reach/list its endpoint, the breaker trips {@link State#OPEN} and the engine
@@ -11,23 +13,44 @@ import java.util.function.LongSupplier;
  * the cooldown a single {@link State#HALF_OPEN} trial is allowed; success closes the breaker, another failure
  * re-opens it.
  *
- * <p>State is process-wide and keyed by {@code source.id} on the {@link #shared()} singleton — the same
- * cross-cycle-state idiom as {@link StabilityGate#shared()} / {@link AcquisitionLedgers#shared()}, since each
- * static poll cycle is a fresh run. The clock is injectable so tests can advance cooldowns deterministically.
+ * <p>State is <b>per space</b>, keyed by {@code source.id} within the space's own {@link #shared()} instance —
+ * the same cross-cycle-state idiom as {@link StabilityGate#shared()} / {@link AcquisitionLedgers#shared()},
+ * since each static poll cycle is a fresh run. The clock is injectable so tests can advance cooldowns
+ * deterministically.
  *
- * <p>Thresholds/cooldowns are passed per call (from {@code source.circuit_breaker:}) rather than stored, so one
- * shared instance serves every pipeline without per-source configuration coupling.
+ * <p>🔴 <b>The space dimension was added 2026-09-10 (SPACE-UNKEYED-STATICS-1) and this javadoc previously
+ * claimed it.</b> The paragraph above said "process-wide … the same idiom as {@code StabilityGate#shared()}"
+ * while those siblings key on {@link EventLog#currentSpaceId()} and this class held a single instance keyed on
+ * a bare {@code source.id}. Two spaces using the same collector id — which is what applying one Space template
+ * twice produces — shared a breaker, so one space's dead endpoint tripped acquisition in the other. The
+ * comment asserted the parity that did not exist, which is why it survived review.
+ *
+ * <p>Thresholds/cooldowns are passed per call (from {@code source.circuit_breaker:}) rather than stored, so a
+ * space's single instance serves every pipeline in it without per-source configuration coupling.
  */
 public final class CircuitBreaker {
 
     /** Breaker state for one source. */
     public enum State { CLOSED, OPEN, HALF_OPEN }
 
-    private static final CircuitBreaker SHARED = new CircuitBreaker(System::currentTimeMillis);
+    /** Per-space breakers, keyed by space id — see the class javadoc on why this is not one instance. */
+    private static final Map<String, CircuitBreaker> SHARED = new ConcurrentHashMap<>();
 
-    /** The process-wide breaker shared by the static poll path. */
+    /** The breaker the static poll path shares <em>for the calling thread's space</em>. */
     public static CircuitBreaker shared() {
-        return SHARED;
+        return SHARED.computeIfAbsent(EventLog.currentSpaceId(), k -> new CircuitBreaker(System::currentTimeMillis));
+    }
+
+    /**
+     * Drop the breaker for {@code spaceId} (on space deletion), releasing its retained per-source state.
+     *
+     * ⚠ Named {@code forgetSpace} rather than {@code forget} on purpose: this class already has an
+     * <em>instance</em> {@link #forget(String)} that drops ONE collector's entry (called on pipeline
+     * deletion), and two same-arity {@code forget(String)} overloads one static and one instance apart is
+     * exactly the ambiguity a reader resolves wrongly.
+     */
+    public static void forgetSpace(String spaceId) {
+        if (spaceId != null) SHARED.remove(spaceId);
     }
 
     private final LongSupplier clock;

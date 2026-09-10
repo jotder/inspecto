@@ -1,6 +1,8 @@
 package com.gamma.acquire;
 
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -60,5 +62,62 @@ class CircuitBreakerTest {
         assertEquals(CircuitBreaker.State.OPEN, cb.state("a"));
         assertEquals(CircuitBreaker.State.CLOSED, cb.state("b"));
         assertTrue(cb.allow("b", 1000));
+    }
+
+    /** Run {@code body} as a thread of Space {@code space} — the binding CollectorService.underSpace and ControlApi make. */
+    private static void inSpace(String space, Runnable body) {
+        String prev = MDC.get(EventLog.SPACE_MDC_KEY);
+        MDC.put(EventLog.SPACE_MDC_KEY, space);
+        try { body.run(); }
+        finally { if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY); else MDC.put(EventLog.SPACE_MDC_KEY, prev); }
+    }
+
+    // ── SPACE-UNKEYED-STATICS-1: shared() is per Space, never one process-wide instance ───────────────
+
+    /**
+     * The defect: two Spaces polling a same-named collector shared ONE breaker, so one tenant's dead
+     * endpoint OPENED the circuit for the other and skipped its acquisition. Applying one Space template
+     * twice is enough to collide, because the shipped template names its pipeline.
+     */
+    @Test
+    void aTrippedBreakerInOneSpaceDoesNotOpenAnotherSpacesSameNamedCollector() {
+        inSpace("tenant-a", () -> {
+            assertTrue(CircuitBreaker.shared().recordFailure("orders", 1), "one failure at threshold 1 trips it");
+            assertEquals(CircuitBreaker.State.OPEN, CircuitBreaker.shared().state("orders"), "tenant-a is open");
+        });
+        inSpace("tenant-b", () -> assertEquals(CircuitBreaker.State.CLOSED,
+                CircuitBreaker.shared().state("orders"),
+                "tenant-b never failed — its breaker for the same collector id must still be closed"));
+        assertEquals(CircuitBreaker.State.CLOSED, CircuitBreaker.shared().state("orders"),
+                "the default Space (no MDC) is a third, untouched key");
+        CircuitBreaker.forgetSpace("tenant-a");
+        CircuitBreaker.forgetSpace("tenant-b");
+    }
+
+    /** An OPEN breaker skips its own Space's source only — the other Space still gets to poll. */
+    @Test
+    void anOpenBreakerDoesNotSuppressAnotherSpacesPoll() {
+        inSpace("tenant-a", () -> {
+            CircuitBreaker.shared().recordFailure("sftp", 1);
+            assertFalse(CircuitBreaker.shared().allow("sftp", 60_000), "tenant-a is in cooldown");
+        });
+        inSpace("tenant-b", () -> assertTrue(CircuitBreaker.shared().allow("sftp", 60_000),
+                "tenant-b must be allowed to poll — it has no failures of its own"));
+        CircuitBreaker.forgetSpace("tenant-a");
+        CircuitBreaker.forgetSpace("tenant-b");
+    }
+
+    /** forgetSpace releases exactly one Space's state, so a deleted Space cannot leak or take a sibling with it. */
+    @Test
+    void forgetSpaceDropsOnlyThatSpacesBreaker() {
+        inSpace("gone", () -> CircuitBreaker.shared().recordFailure("c", 1));
+        inSpace("stays", () -> CircuitBreaker.shared().recordFailure("c", 1));
+        CircuitBreaker.forgetSpace("gone");
+        inSpace("gone", () -> assertEquals(CircuitBreaker.State.CLOSED, CircuitBreaker.shared().state("c"),
+                "a forgotten Space starts clean"));
+        inSpace("stays", () -> assertEquals(CircuitBreaker.State.OPEN, CircuitBreaker.shared().state("c"),
+                "the surviving Space keeps its own breaker"));
+        CircuitBreaker.forgetSpace("gone");
+        CircuitBreaker.forgetSpace("stays");
     }
 }

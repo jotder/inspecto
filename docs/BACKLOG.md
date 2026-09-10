@@ -192,6 +192,30 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   (`CollectorProcessor`, `PipelineExecutor`, `UnionModeIngester`, `NativeCsvStreamingEngine`,
   `CsvIngestStrategy`, `GenerationModeIngester`, `PipelineTestRun`, `ConsignmentIngestor`). ⛔ Do not fold
   this into the scale-out work — it is wrong today, on one node. → `superpower/enterprise-scale-out-plan.md` §3.2
+  ✅ **HALF FIXED 2026-09-10: `CircuitBreaker` and `GapTracker` are now per-Space.** Both were reachable only
+  through `shared()`, so the dimension went **inside** and **no call site changed** — the row's "~15 call
+  sites" over-estimated this half to zero. 🔴 **Both javadocs already CLAIMED the fix**: each said "the same
+  cross-cycle-state idiom as `StabilityGate#shared()` / `AcquisitionLedgers#shared()`" while those siblings
+  key on `EventLog.currentSpaceId()` and these held one instance keyed on a bare collector id — the comment
+  asserted the parity that did not exist, which is how it survived review. Both gained a `forgetSpace(spaceId)`
+  and joined `SpaceManager.delete`'s release block beside `StabilityGate.forget`. 5 new tests, **3 of 3
+  mutants killed**. ⚠ **The collision is reachable by the product's own primary workflow, not just in
+  theory:** nothing makes collector or pipeline names unique across Spaces, and the one shipped Space
+  template is named `orders` — applying it to two Spaces produces the collision by design.
+  🔴 **RE-SCOPED, remaining half — `IngestProgress` and `StepProgress` cannot be fixed the same way.** They
+  live in `inspecto-etl`, which has **no access to the space id**: `EventLog` is in `inspecto-event`, and
+  **`inspecto-event` already depends on `inspecto-etl`**, so an `etl → event` edge would be a dependency
+  **CYCLE**. So this half is a design call, not a mechanical change, with two options: (a) give the space id a
+  cycle-free home in `inspecto-util` (a near-leaf that `EventLog` could then delegate to — one statement of
+  the rule, no duplicated MDC key), or (b) pass the space in from the ~15 call sites. ⚠ Also note the
+  **severity differs** and the original row lumped all four together: the breakers were **behavioural** (a
+  dead endpoint in one Space skipped another's acquisition; a reported gap suppressed another's
+  `SEQUENCE_GAP`), while these two hold a **progress display snapshot** — two Spaces would overwrite each
+  other's "which file is in flight", which is wrong but not data-affecting. → decide (a) or (b) first.
+  ⚠ Found while doing this and NOT fixed (a pre-existing sibling gap, deliberately left): `StabilityGate`,
+  `ConnectionRegistry` and `DecisionRules` are released on space **deletion** only, so a space that is
+  stopped without being deleted leaks their state for the process lifetime. The new `forgetSpace` calls sit
+  in the same block, matching the sibling rather than silently exceeding it.
 - **P3** · **`DUCKLAKE-COMMIT-COUNT-1` — nothing would catch a double catalog registration** (filed
   2026-09-10 by scale-out spike S2). `DuckLakeRegistrar.register` has exactly **one** call site, on the flat
   ingest lane, once per batch, after every file's reveal; the graph lane registers nothing.
