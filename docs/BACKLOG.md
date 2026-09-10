@@ -282,6 +282,17 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   server descriptor change would not have reached it. Tests: 6 (`ProcessorCatalogTest`, **7 of 7 mutants
   killed**) + 4 real-HTTP (`ControlApiJobProcessorsTest`) + 8 UI.
   → `okf/backend/engine/post-sync-step-chains.md`, `okf/backend/control-plane/jobs.md`
+- **P3** · **`SCHEMA-DIALOG-IFMATCH-1` — the shared Schema editor dialog still last-write-wins** (filed
+  2026-09-11 by `CLIENT-HALVES-1` (a); **stated, not a regression** — it was always so). `schema-editor.dialog.ts:250`
+  does the same whole-file overwrite as the panes that now precondition their saves ("preserve non-fields
+  raw keys … and non-raw content sections verbatim"), so a concurrent edit to any carried key is still
+  destroyed silently. ⛔ **It cannot simply send `If-Match`**: unlike the panes it never calls
+  `ConfigService.read()` — its content arrives from the opener as `data.def.content`, sourced from the
+  **Components** API, whose `ETag` is computed over a *different* body. Sending that handle would risk the
+  read/write hash mismatch that `ConfigFileSupport.storedContent` exists to prevent, and a mismatched
+  precondition refuses every save. ⇒ Decide between (a) having the opener read the config (and its ETag)
+  before opening the dialog, or (b) accepting last-write-wins for this surface.
+  → `okf/capabilities/control-api/control-api.md` §3.5
 - **P3** · **`PACK-UNLOAD-EXPOSURE-1` — unloading a pack makes a stored pipeline unloadable** (filed
   2026-09-10 by Sprint 7.6). A pipeline naming a pack-contributed node type stops loading once that pack is
   unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally
@@ -331,6 +342,99 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `event.clone({ body: event.body.data })`. Sprint 8 identified this as step one and did **not** build it;
   a hand-off note briefly claimed (a) was "unblocked", which was false. Nothing about (a) can start until
   the interceptor preserves what a caller needs.
+  🔴 **(1c) AND THAT DIAGNOSIS IS ITSELF WRONG — re-grounded 2026-09-11, every claim below verified by
+  `git grep`. (a) IS NOT A CLIENT-ONLY CHANGE, so the row's "no server change" premise is REFUTED.** Three
+  measured facts, in the order that matters:
+  **(i) The interceptor is NOT the blocker for the ETag.** It clones the **body** only
+  (`event.clone({ body: … })`); HTTP **headers pass through untouched**, and the ETag is a bare `ETag`
+  response header set by `ETags.java`, never an envelope field. `Envelope.java` **never sets an `etag` key
+  in `metadata` for any route** (`git grep etag -- Envelope.java` → nothing), so `V1EnvelopeMetadata.etag`
+  in `v1.ts:27` is a client-side **fiction the server has never populated**. ⇒ There is no `metadata.etag`
+  being discarded, and a caller could already read a real ETag today via `observe: 'response'` — the idiom
+  `pipelines.service.ts:431-440` already uses for `X-Config-Fingerprint`. My (1b) note was wrong.
+  **(ii) The real blocker: the panes' own routes have NO If-Match support.** `ETags.requireMatch` has
+  exactly **ONE** production call site in the whole tree — `ComponentRoutes.java:263`
+  (`PUT /components/{type}/{id}`). The config-writing panes post to `POST /config/write` and
+  `/config/patch` (`ConfigWriteRoutes.java:44,48`), and that file contains **no `ETags`, no `If-Match`, no
+  `ContentHash`** at all. So "send `If-Match`" from those panes would be sending a header nothing reads.
+  Making it real is a **server** change — which is precisely what the row says the work does not need.
+  **(iii) The row's "surface a 412" is factually wrong.** There is **no HTTP 412 anywhere in the tree**
+  (`git grep -E 'PRECONDITION_FAILED|\b412\b' -- '*.java'` → zero non-test hits). The stale-precondition
+  answer is **`409 CONFLICT_STALE_VERSION`** (`ETags.java:37`). `control-api.md` §3.5 already said "there is
+  no `412` and no `428` anywhere"; the board row simply never absorbed it.
+  ⚠ **`X-Config-Fingerprint` is NOT an existing concurrency mechanism**, in case it looks like one: it is
+  set on the read-only `GET /pipelines/{name}/document` sign-off route (`PipelineGraphRoutes.java:115`) and
+  **no write route validates it** — it is a human sign-off hash, not a precondition.
+  ⚠ **And `/config/patch` may not WANT If-Match**: it deliberately merges server-side against the file as
+  it is *now* rather than against what the client last read, documented at `ConfigWriteRoutes.java:264-269`
+  as the mechanism chosen *instead of* a client-held-version check. So the stale-clobber exposure is
+  specifically `POST /config/write` with `overwrite: true`, not the whole family.
+  🔴 **The row's "both config-writing panes" undercounts — `ConfigService.write()` has SIX callers**
+  (`config.service.ts:58-64`): three pipeline-authoring panes (`pipeline-editor.component.ts:1440`,
+  `pipeline-parse-definition.component.ts:1463`, `pipeline-config-definition.component.ts:588,789`), two
+  dialogs (`schema-editor.dialog.ts:250`, `onboarding-create.dialog.ts:348`) and one service
+  (`stream-transfer.service.ts:100-114`). ⇒ "**Both** panes" names no unique pair. Same
+  undercount-in-one-direction shape as every Sprint 7 cell (§4 of `PROJECT_NOTES.md`).
+  ⚠ **Blast radius, if anyone still proposes "stop unwrapping the envelope":** **50** API service files and
+  **266** typed call sites take the unwrapped body as the bare DTO. It is an app-wide typing change, not a
+  local one — and per (i) it is not needed for an ETag anyway.
+  🔴 **The exposure is REAL and it is UNIVERSAL among these callers, measured 2026-09-11: every one of
+  them passes `overwrite: true`.** `pipeline-parse-definition.component.ts:1464` and `:1556`,
+  `pipeline-config-definition.component.ts:588` and `:789`, `schema-editor.dialog.ts:251` — and
+  `pipeline-parse-definition.component.ts:616` states the consequence itself: *"The write is a whole-file
+  overwrite, so any key not re-emitted is"* lost. ⇒ These panes are **last-write-wins today**, and a
+  concurrent editor's change is silently destroyed with no signal to either party.
+  ✅ **(a) SHIPPED 2026-09-11 — operator chose option (A), reopening the "no server change" premise on the
+  evidence above.** `POST /config/write` now honours an `If-Match` precondition (`ConfigWriteRoutes`, at the
+  point `target` is final — after the legacy-name fallback, since a precondition checked against the wrong
+  file is a false verdict either way), and `GET /config/{type}/{name}` publishes the matching `ETag`.
+  Honoured, **not required**: a caller that sends nothing writes exactly as before, so no existing client
+  broke. The two config-writing surfaces with a genuine read→edit→write pair now send it —
+  `pipeline-config-definition` (partitions schema + enrichment) and `pipeline-parse-definition` (the Apply
+  write) — and report a refusal as `STALE_WRITE_MESSAGE` rather than a validation failure.
+  🔴 **Four findings the design would have shipped broken without.**
+  **(i) A precondition must hash the SAME BYTES as the ETag, and a `schema` is SPLIT STORAGE.** Its TOON
+  holds neither fields nor rules; the read merges the sibling `_structure.csv`/`_mapping.csv` back in. A
+  write side that hashed the bare TOON would disagree with the read on **every schema in the product**, and
+  silently — refusing every save that carried a freshly-read handle. Both sides therefore go through **one**
+  new helper, `ConfigFileSupport.storedContent`. ⚠ The mutation "storedContent drops the sibling merge"
+  **SURVIVED** a suite that only wrote `pipeline` configs; the split-storage test exists because of it.
+  **(ii) A successful write invalidates the handle the caller is holding**, so without the write publishing
+  a fresh `ETag` the editor's **second** save is refused as stale. A precondition that breaks consecutive
+  saves is worse than none, so `/config/write` sets the post-save ETag (recomputed from disk, not from the
+  draft) and `ConfigWriteResult.etag` carries it back.
+  **(iii) `ETag` was NOT in `Access-Control-Expose-Headers`.** The SPA is cross-origin (:4204 → :8080), so a
+  browser could not read the header it must send back. ETags have been served since W3 and nothing ever
+  sent `If-Match`, so the gap was invisible; the feature would have looked correct server-side and done
+  nothing in a browser.
+  **(iv) `ifMatch` must never reach the request BODY.** The rest of `write()`'s options are spread into the
+  JSON payload and the server sweeps an unrecognised top-level key **into the config** rather than
+  rejecting it — so a leak would have written a bogus `ifMatch` key into the operator's file. Pinned by a
+  test.
+  ⚠ **Deliberately NOT preconditioned, and why** — each would send a handle that does not belong to the
+  config being written, which refuses a valid save: `pipeline-editor.component.ts:1440` (a **create**;
+  nothing was read), the **segments** write in `pipeline-parse-definition` (one schema per segment, against
+  a single-schema read — no per-segment handle exists), and `stream-transfer.service.ts` (a bundle
+  **import**, which intends to overwrite).
+  🔴 **One residual exposure, stated not fixed: `schema-editor.dialog.ts:250`.** It has the same
+  carry-everything-forward whole-file overwrite, but it never calls `ConfigService.read()` — its content
+  arrives from the opener as `data.def.content`, sourced from the **Components** API, whose ETag is over a
+  *different* body. Threading that handle through would risk exactly the mismatch (i) is about, so it needs
+  its own decision. → new row `SCHEMA-DIALOG-IFMATCH-1`.
+  ⛔ **Superseded: the operator decision below is ANSWERED (option A). Kept for the reasoning only.**
+  **(A) Add `If-Match` to `POST /config/write` server-side, then have the callers send it.** The honest
+  fix, and the machinery already exists — `ETags` + `ContentHash` are used by **seven** route files, so
+  `ConfigWriteRoutes` joining them is a small, idiomatic change. ⚠ But it IS a server change, which the
+  signed `CONSUMER-PAIRS-1` decision did not sanction (it said "no server change"), so it needs sign-off.
+  ⚠ Sizing caveat to settle first: the write goes to `/config/write` while the panes' **read** may come
+  from `/components/{type}/{id}`, whose ETag hashes the *component* body — not necessarily equal to
+  `ContentHash.of` the config file. A precondition is worthless if the two hashes are over different bytes.
+  ⛔ **(B) "Surface the existing `409 CONFLICT`" is REFUTED — do not choose it.** With `overwrite: true` on
+  every caller, `ConfigWriteRoutes`' existence-check 409 **can never fire**. It would ship a handler for an
+  unreachable status and change no behaviour — the same "duplicate a correct derivation / change nothing"
+  trap that retired (b).
+  **(C) Mark (a) RESERVED like (b).** Defensible only if last-write-wins is accepted posture for these
+  panes. ⚠ Note `/config/patch`'s server-side merge does **not** cover them: they call `write`, not `patch`.
   **(2) 🔴 (b)'s premise — that this finishes an existing gate — is REFUTED, and the "disagreement"
   framing was wrong too.** `permissions[]` is `grants ∩ applicable` (`Envelope.java:17-20`), where `grants`
   is the same `subject.capabilities()` that `/bootstrap` reports and `applicable` is a route-declared set;

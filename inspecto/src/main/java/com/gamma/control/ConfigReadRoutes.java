@@ -233,9 +233,16 @@ final class ConfigReadRoutes implements RouteModule {
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target)) throw new ApiException(404, "no such config: " + rel);
 
-        Map<String, Object> config = ConfigLoader.filesystem().decode(target.toString());
-        // Split storage (schema): serve the conflated view — sibling _structure.csv fields + _mapping.csv rules merged in.
-        if ("schema".equals(type)) ConfigFileSupport.mergeSiblings(target, config);
+        // Split storage (schema) is handled inside storedContent, which is ALSO what /config/write
+        // hashes for its If-Match precondition — one statement, so the two can never drift apart.
+        Map<String, Object> config = ConfigFileSupport.storedContent(target, type);
+        // The optimistic-concurrency handle for this config (`CLIENT-HALVES-1` (a)): an editor reads it
+        // here and sends it back as If-Match, so /config/write can refuse a stale whole-file overwrite.
+        // ⚠ Deliberately ETags.set and NOT ETags.respond: respond() also honours If-None-Match with a
+        // bodiless 304, and this route's callers (the onboarding resume path, the authoring panes) read
+        // the body unconditionally — a 304 would hand them an empty config. The header is additive; a
+        // 304 would not be.
+        ETags.set(ex, ETags.of(ContentHash.of(config)));
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", type);
         r.put("name", fileName);

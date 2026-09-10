@@ -882,7 +882,10 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // X-Config-Fingerprint rides GET /pipelines/{name}/document (§5.1): the body is a Markdown
         // blob, so the sign-off fingerprint has nowhere else to go and the browser cannot read a
         // response header cross-origin unless it is exposed here.
-        h.set("Access-Control-Expose-Headers", "Correlation-ID, X-Config-Fingerprint");
+        // 🔴 ETag belongs here too, and its absence was silent: the SPA runs on :4204 against the API on
+        // :8080, so every header it needs is cross-origin. ETags have been served since W3, but nothing
+        // sent If-Match, so no one noticed the browser could not read them back (`CLIENT-HALVES-1` (a)).
+        h.set("Access-Control-Expose-Headers", "Correlation-ID, X-Config-Fingerprint, ETag");
         h.set("Access-Control-Max-Age", "600");
         if (!"*".equals(corsOrigin)) h.set("Vary", "Origin");
     }

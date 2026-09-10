@@ -209,6 +209,26 @@ is bounded with a `truncated` flag that reports the *true* total.
 - **`If-Match`** is **honoured, not required**: `ETags.requireMatch` rejects a present, non-matching
   precondition with `409 CONFLICT_STALE_VERSION`; no header ⇒ the write proceeds. There is no `412` and no
   `428` anywhere. ⚠ The SPA never sends it (§3.15).
+  🔴 **And it is honoured on ONE route only — re-measured 2026-09-11.** `ETags.requireMatch` has exactly
+  **one** production call site in the tree: `ComponentRoutes.java:263` (`PUT /components/{type}/{id}`).
+  ⛔ **The config write family does not participate**: `ConfigWriteRoutes.java` (`POST /config/write`,
+  `POST /config/patch`) contains no `ETags`, no `If-Match` and no `ContentHash`. Its concurrency story is a
+  different one by design — `write` gates on an existence check plus an `overwrite` flag, and `patch`
+  merges **server-side against the file as it is now** (`:264-269`), chosen explicitly *instead of* a
+  client-held-version check. ⇒ **`API-3`'s signed "the SPA adopts `If-Match` in both writing panes" is not
+  achievable without a server change**, because the routes those panes call could not read the header.
+  ✅ **RESOLVED 2026-09-11 — the operator granted the server change (option A).** `POST /config/write` now
+  calls `ETags.requireMatch`, and `GET /config/{type}/{name}` publishes the matching `ETag`; both hash
+  **`ConfigFileSupport.storedContent`**, the one statement of "the stored content", because a `schema` is
+  split storage and a write hashing the bare TOON would disagree with the read on every schema.
+  ⚠ `/config/write` also publishes the **post-save** ETag: without it a caller's second consecutive save
+  is refused as stale. ⚠ And `ETag` had to be added to `Access-Control-Expose-Headers` — the SPA is
+  cross-origin, so it could not read the header it must echo. `ETags.requireMatch` now has **two**
+  production call sites. Full write-up: `BACKLOG.md` §3 `CLIENT-HALVES-1` (a).
+  ⚠ Also: `Envelope.java` **never sets an `etag` key in `metadata`** for any route, so the SPA's
+  `V1EnvelopeMetadata.etag` (`v1.ts:27`) is a field the server has never populated. The ETag travels only
+  as an HTTP header — which means `v1.interceptor.ts` is **not** what withholds it: that interceptor clones
+  the **body** only and leaves headers intact.
 - **`Idempotency-Key`** (`Idempotency.java`): on any `POST`/`PUT`/`DELETE`, the first JSON response is cached
   **per `ControlApi` instance** — TTL 10 min, LRU cap 1000 (`:27-28`) — and a replay skips the handler and
   answers with `Idempotency-Replayed: true`. Per-instance by design (no cross-instance store; no test

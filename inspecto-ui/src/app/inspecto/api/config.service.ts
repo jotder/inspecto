@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { apiUrl, toParams } from './api-base';
 import {
     ConfigDeleteResult,
@@ -53,14 +54,42 @@ export class ConfigService {
     validateDraft(type: ConfigType, config: Record<string, unknown>, safety = false): Observable<ValidateResult> {
         return this.http.post<ValidateResult>(apiUrl('/validate'), { type, config, safety });
     }
-    /** Persist a validated draft under the write root; `overwrite: true` replaces (stage save).
-     *  `compatibility: 'none'` is the schema BACKWARD-gate override — the deliberate escape hatch. */
+    /**
+     * Persist a validated draft under the write root; `overwrite: true` replaces (stage save).
+     * `compatibility: 'none'` is the schema BACKWARD-gate override — the deliberate escape hatch.
+     *
+     * `ifMatch` is the optimistic-concurrency precondition (`CLIENT-HALVES-1` (a)): pass the `etag` the
+     * matching {@link read} returned and the server refuses the save with `CONFLICT_STALE_VERSION` if the
+     * file changed underneath. ⚠ **Only ever pass an etag from a read of THIS SAME config.** A stale or
+     * foreign handle refuses a perfectly good save, which is worse than not sending one — and omitting it
+     * is always safe, because the server honours the precondition without requiring it.
+     */
     write(
         type: ConfigType,
         config: Record<string, unknown>,
-        opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none' },
+        opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none'; ifMatch?: string },
     ): Observable<ConfigWriteResult> {
-        return this.http.post<ConfigWriteResult>(apiUrl('/config/write'), { type, config, ...opts });
+        // ⚠ ifMatch is a HEADER and must not reach the body: the rest of `opts` is spread into the JSON
+        // payload, and the server sweeps an unrecognised top-level key into the config rather than
+        // rejecting it — so leaving it in would silently write a bogus `ifMatch` key into the file.
+        const { ifMatch, ...bodyOpts } = opts ?? {};
+        return this.http
+            .post<ConfigWriteResult>(
+                apiUrl('/config/write'),
+                { type, config, ...bodyOpts },
+                {
+                    observe: 'response',
+                    ...(ifMatch ? { headers: { 'If-Match': ifMatch } } : {}),
+                },
+            )
+            .pipe(
+                // The response carries the POST-save ETag; hand it back so a caller can save again
+                // without re-reading. Dropping it would make every second save fail as stale.
+                map((res) => ({
+                    ...(res.body as ConfigWriteResult),
+                    etag: res.headers.get('ETag') ?? undefined,
+                })),
+            );
     }
     /**
      * Block-level save: deep-merge `patch` over the file's CURRENT on-disk content, server-side
@@ -81,12 +110,25 @@ export class ConfigService {
             ...(subdir ? { subdir } : {}),
         });
     }
-    /** Read a config back as its decoded map — the onboarding resume path. */
+    /**
+     * Read a config back as its decoded map — the onboarding resume path.
+     *
+     * Observes the full response so the `ETag` travels on {@link ConfigReadResult.etag}: it is a response
+     * *header*, which no body-shaped envelope carries. The body is still the plain DTO (`v1Interceptor`
+     * unwraps it before this sees it), so every existing caller is unaffected.
+     */
     read(type: ConfigType, name: string, subdir?: string): Observable<ConfigReadResult> {
-        return this.http.get<ConfigReadResult>(
-            apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
-            { params: toParams({ subdir }) },
-        );
+        return this.http
+            .get<ConfigReadResult>(apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`), {
+                params: toParams({ subdir }),
+                observe: 'response',
+            })
+            .pipe(
+                map((res) => ({
+                    ...(res.body as ConfigReadResult),
+                    etag: res.headers.get('ETag') ?? undefined,
+                })),
+            );
     }
     /**
      * Discard a config file. The server refuses an `active: true` pipeline (409) — deactivate first —

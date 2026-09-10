@@ -395,6 +395,13 @@ export interface ConfigWriteResult {
     bytes: number;
     overwritten: boolean;
     findings: Finding[];
+    /**
+     * The `ETag` of the config AS JUST SAVED — the handle for the NEXT save (`CLIENT-HALVES-1` (a)).
+     *
+     * ⚠ A caller that keeps sending the pre-save etag has its second save refused as stale, so store
+     * this one after every successful write. Absent on an older server; absent ⇒ send nothing next time.
+     */
+    etag?: string;
 }
 
 /** GET /config/{type}/{name} result — a config read back as its decoded map (onboarding resume). */
@@ -403,6 +410,16 @@ export interface ConfigReadResult {
     name: string;
     path: string;
     config: Record<string, unknown>;
+    /**
+     * The `ETag` the read served — this config's optimistic-concurrency handle (`CLIENT-HALVES-1` (a)).
+     * Pass it back as `ConfigService.write({ ifMatch })` and a save that would clobber someone else's
+     * edit is refused with `CONFLICT_STALE_VERSION` instead of silently winning.
+     *
+     * ⚠ Optional, and absent is normal: an older server does not send one, and a browser cannot read it
+     * cross-origin unless the server exposes it. Absent ⇒ send nothing and behave exactly as before —
+     * never block a save because the handle is missing.
+     */
+    etag?: string;
 }
 
 /** DELETE /config/{type}/{name} result (draft discard). */

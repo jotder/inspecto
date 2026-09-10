@@ -20,7 +20,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { map } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import {
+    STALE_WRITE_MESSAGE,
     apiErrorMessage,
+    isStaleVersionError,
     AuthoredNode,
     CatalogService,
     ComponentsService,
@@ -401,6 +403,24 @@ export class PipelineConfigDefinitionComponent {
      *  partitions[]-drop lesson generalised: a save here must not clobber `raw`/`mapping`. */
     private partitionsSchemaConfig: Record<string, unknown> | null = null;
     private partitionsSchemaName = '';
+    /**
+     * The partitions schema's optimistic-concurrency handle (`CLIENT-HALVES-1` (a)) — the `ETag` of the
+     * content {@link partitionsSchemaConfig} was read from.
+     *
+     * ⚠ It is what makes {@link savePartitioning}'s carry-everything-forward rule safe: that save rewrites
+     * `raw` and `mapping` verbatim FROM THE LAST READ, so without a precondition a concurrent edit to
+     * either is silently destroyed. Refreshed from every successful save, because a stale handle would
+     * refuse the next one.
+     */
+    private partitionsSchemaEtag: string | undefined;
+    /**
+     * The bound enrichment's handle, paired with the name it was read from.
+     *
+     * ⛔ The name matters: the author may RENAME the enrichment before saving, and the save then targets a
+     * different config. Sending this handle for a different name is a foreign precondition, which refuses
+     * a perfectly good save — strictly worse than sending none.
+     */
+    private enrichRead: { name: string; etag?: string } | null = null;
     private partitionsLoadedFor: string | null = null;
 
     // ── enrichment nodes (W4b): the pane authors the REAL companion `*_enrich.toon` ──
@@ -511,9 +531,13 @@ export class PipelineConfigDefinitionComponent {
         if (bound) {
             this.enrichSource.set('loading');
             this.configApi.read('enrichment', bound, this.satelliteSubdir()).subscribe({
-                next: (r) => this.enrichSource.set(r.config),
+                next: (r) => {
+                    this.enrichSource.set(r.config);
+                    this.enrichRead = { name: bound, etag: r.etag };
+                },
                 error: () => {
                     this.enrichSource.set(null);
+                    this.enrichRead = null;
                     this.toastr.warning(`Could not read "${bound}" — authoring a fresh enrichment.`);
                 },
             });
@@ -548,6 +572,7 @@ export class PipelineConfigDefinitionComponent {
             next: (r) => {
                 const cfg = r.config ?? {};
                 this.partitionsSchemaConfig = cfg;
+                this.partitionsSchemaEtag = r.etag;
                 const raw = (cfg['raw'] ?? {}) as Record<string, unknown>;
                 const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
                 this.schemaFieldNames.set(fields.map((f) => String(f['name'] ?? '')).filter((n) => n !== ''));
@@ -585,18 +610,32 @@ export class PipelineConfigDefinitionComponent {
         if (!partitions.length) delete (draft as Record<string, unknown>)['partitions'];
         this.partitionsSaving.set(true);
         this.partitionsError.set(null);
-        this.configApi.write('schema', draft, { overwrite: true, subdir: this.satelliteSubdir() }).subscribe({
-            next: () => {
-                this.partitionsSaving.set(false);
-                this.partitionsSchemaConfig = draft;
-                editor.markPristine();
-                this.toastr.success('Partitioning saved.');
-            },
-            error: (e) => {
-                this.partitionsSaving.set(false);
-                this.partitionsError.set(apiErrorMessage(e, 'Could not save partitioning.'));
-            },
-        });
+        this.configApi
+            .write('schema', draft, {
+                overwrite: true,
+                subdir: this.satelliteSubdir(),
+                ifMatch: this.partitionsSchemaEtag,
+            })
+            .subscribe({
+                next: (written) => {
+                    this.partitionsSaving.set(false);
+                    this.partitionsSchemaConfig = draft;
+                    // The handle moved with the content; keep it or the NEXT save is refused as stale.
+                    this.partitionsSchemaEtag = written.etag;
+                    editor.markPristine();
+                    this.toastr.success('Partitioning saved.');
+                },
+                error: (e) => {
+                    this.partitionsSaving.set(false);
+                    // A lost race is not a validation failure: say what happened and what to do, because
+                    // this save would otherwise have overwritten the other editor's `raw`/`mapping`.
+                    this.partitionsError.set(
+                        isStaleVersionError(e)
+                            ? STALE_WRITE_MESSAGE
+                            : apiErrorMessage(e, 'Could not save partitioning.'),
+                    );
+                },
+            });
     }
 
     /** Dirty is derived on interaction, not streamed — the Collection/Parse pane contract. */
@@ -786,30 +825,41 @@ export class PipelineConfigDefinitionComponent {
         if (Object.keys(parts.references).length > 0) draft['references'] = parts.references;
 
         this.savingEnrichment.set(true);
-        this.configApi.write('enrichment', draft, { overwrite: true, subdir: this.satelliteSubdir() }).subscribe({
-            next: (written) => {
-                // Register every save: enrichments do NOT hot-reload by mtime.
-                this.configApi.registerEnrichment(written.path).subscribe({
-                    next: () => {
-                        this.toastr.success('Enrichment saved — runs after every committed batch');
-                        this.emitBinding(name);
-                    },
-                    error: (e) => {
-                        this.toastr.warning(
-                            apiErrorMessage(
-                                e,
-                                'Saved, but registering failed — it will load on the next service restart.',
-                            ),
-                        );
-                        this.emitBinding(name);
-                    },
-                });
-            },
-            error: (e) => {
-                this.savingEnrichment.set(false);
-                this.toastr.error(apiErrorMessage(e, 'Could not save the enrichment.'));
-            },
-        });
+        // ⛔ Only precondition a save that targets the SAME config the handle came from: the author may
+        // have renamed the enrichment, and a foreign handle refuses a valid save (`CLIENT-HALVES-1` (a)).
+        const ifMatch = this.enrichRead?.name === name ? this.enrichRead.etag : undefined;
+        this.configApi
+            .write('enrichment', draft, { overwrite: true, subdir: this.satelliteSubdir(), ifMatch })
+            .subscribe({
+                next: (written) => {
+                    this.enrichRead = { name, etag: written.etag }; // the handle for the next save
+                    // Register every save: enrichments do NOT hot-reload by mtime.
+                    this.configApi.registerEnrichment(written.path).subscribe({
+                        next: () => {
+                            this.toastr.success('Enrichment saved — runs after every committed batch');
+                            this.emitBinding(name);
+                        },
+                        error: (e) => {
+                            this.toastr.warning(
+                                apiErrorMessage(
+                                    e,
+                                    'Saved, but registering failed — it will load on the next service restart.',
+                                ),
+                            );
+                            this.emitBinding(name);
+                        },
+                    });
+                },
+                error: (e) => {
+                    this.savingEnrichment.set(false);
+                    // A lost race, not a bad draft — the author must reload before saving over someone else.
+                    this.toastr.error(
+                        isStaleVersionError(e)
+                            ? STALE_WRITE_MESSAGE
+                            : apiErrorMessage(e, 'Could not save the enrichment.'),
+                    );
+                },
+            });
     }
 
     /** Emit the node bound to the companion by reference (plus any legacy extra keys, typed). */

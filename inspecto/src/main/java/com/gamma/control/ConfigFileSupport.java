@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigLoader;
 import com.gamma.util.MappingCsv;
 import com.gamma.util.StructureCsv;
 
@@ -135,6 +136,25 @@ final class ConfigFileSupport {
             config.put("raw", raw);
         }
         raw.put("fields", fields);
+    }
+
+    /**
+     * The stored content of a config, exactly as {@code GET /config/{type}/{name}} serves it — the
+     * <b>ONE</b> input both that read's {@code ETag} and {@code /config/write}'s {@code If-Match}
+     * precondition hash (`CLIENT-HALVES-1` (a), 2026-09-11).
+     *
+     * <p>⛔ <b>Both sides MUST call this, never decode for themselves.</b> A precondition computed over
+     * different bytes than the ETag the client was given is worse than none: it either rejects every
+     * write or accepts every stale one, and it does so silently. The trap here is concrete — a
+     * {@code schema} is <b>split storage</b>, so its served view merges the sibling
+     * {@code _structure.csv} / {@code _mapping.csv} back in ({@link #mergeSiblings}); a write side that
+     * hashed the bare {@code .toon} would disagree with the read on every schema in the product. This
+     * repository has already paid for one concept living in three drifting sites.
+     */
+    static Map<String, Object> storedContent(Path target, String type) throws IOException {
+        Map<String, Object> config = ConfigLoader.filesystem().decode(target.toString());
+        if ("schema".equals(type)) mergeSiblings(target, config);
+        return config;
     }
 
     /** Both halves of the split, read back over the TOON: structure first, then mapping (STRUCTURE-CSV-1). */

@@ -150,6 +150,20 @@ final class ConfigWriteRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.schemaFileFindings(type, draft, Severity.WARNING, target.getParent()));
 
         boolean exists = Files.exists(target);
+        // Optimistic concurrency (`CLIENT-HALVES-1` (a), 2026-09-11). HERE and not earlier: `target` is
+        // only final after the legacy-name fallback above, and a precondition checked against the wrong
+        // file is a false verdict either way.
+        //
+        // ⚠ This is the gate that matters, because `overwrite: true` bypasses the conflict check below —
+        // and EVERY authoring caller passes it (the write is a whole-file replace). Without a
+        // precondition those panes are last-write-wins: a concurrent editor's change is destroyed with
+        // no signal to either party.
+        //
+        // Honoured, not required (the house rule ETags.requireMatch already encodes): a caller that
+        // sends no If-Match writes as before, so no existing client breaks. Hashing goes through
+        // ConfigFileSupport.storedContent so it is byte-for-byte what GET /config/{type}/{name} served.
+        if (exists)
+            ETags.requireMatch(ex, ETags.of(ContentHash.of(ConfigFileSupport.storedContent(target, type))));
         boolean overwrite = "true".equalsIgnoreCase(String.valueOf(body.get("overwrite")));
         WriteGates.conflictIf(exists && !overwrite,
                 "file exists: " + writeRoot.relativize(target).toString().replace('\\', '/')
@@ -196,6 +210,13 @@ final class ConfigWriteRoutes implements RouteModule {
         AtomicFiles.write(target, bytes, ".cfg-");
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         log.info("[CONFIG-WRITE] type={} wrote {} ({} bytes, overwrote={})", type, rel, bytes.length, exists);
+
+        // The NEW concurrency handle, so an editor can save twice in a row (`CLIENT-HALVES-1` (a)).
+        // ⚠ Without this a successful save leaves the caller holding the PRE-save ETag, and its next
+        // write is refused as stale — a precondition that breaks the second save is worse than none.
+        // Recomputed from DISK, not from `draft`: for a schema the bytes on disk are the split form plus
+        // its siblings, and only storedContent reassembles exactly what a read would serve.
+        ETags.set(ex, ETags.of(ContentHash.of(ConfigFileSupport.storedContent(target, type))));
 
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", type);

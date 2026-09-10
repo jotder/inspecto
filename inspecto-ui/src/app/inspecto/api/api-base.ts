@@ -35,6 +35,27 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
     return fallback;
 }
 
+/**
+ * True when a failed write was refused because the resource changed since it was read — the
+ * `409 CONFLICT_STALE_VERSION` an `If-Match` precondition produces (`CLIENT-HALVES-1` (a)).
+ *
+ * ⚠ Matches on the **error code, not the status**: plain `409 CONFLICT` is a different refusal (the
+ * existence check on a non-overwrite write, or a delete blocked by dependents) and must not be reported
+ * as a concurrent edit. ⛔ There is no `412` in this product — do not test for one.
+ */
+export function isStaleVersionError(err: unknown): boolean {
+    return (
+        err instanceof HttpErrorResponse &&
+        err.status === 409 &&
+        err.error?.error?.errorCode === 'CONFLICT_STALE_VERSION'
+    );
+}
+
+/** What to tell an author whose save lost a race — one wording, so every pane says the same thing. */
+export const STALE_WRITE_MESSAGE =
+    'This config changed underneath you — someone else saved it while you were editing. ' +
+    'Reload to get their version before saving again.';
+
 /** Build HttpParams from a plain object, skipping null/undefined/'' values. */
 export function toParams(obj: Record<string, unknown>): HttpParams {
     let p = new HttpParams();

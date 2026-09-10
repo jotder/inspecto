@@ -30,7 +30,9 @@ import {
     ParserTreeNode,
     SchemaDrift,
     ParsersService,
+    STALE_WRITE_MESSAGE,
     apiErrorMessage,
+    isStaleVersionError,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
@@ -780,6 +782,18 @@ export class PipelineParseDefinitionComponent {
     readonly schemaDrift = signal<SchemaDrift | null>(null);
 
     readonly existingSchemaFile = computed(() => String(this.node().config?.['schema_file'] ?? '').trim());
+    /**
+     * The saved schema's optimistic-concurrency handle, paired with the name it was read from
+     * (`CLIENT-HALVES-1` (a)).
+     *
+     * ⚠ This is what makes {@link schemaExtras}' carry-everything-forward rule safe. That Apply write
+     * **replaces the whole file** and re-emits the unmodeled keys verbatim from the last read, so without
+     * a precondition a concurrent edit to any of them is silently destroyed. ⛔ The name is part of the
+     * handle on purpose: `schemaName()` can change between the read and the Apply, and a handle from a
+     * different config refuses a valid save — strictly worse than sending none.
+     */
+    private schemaRead: { name: string; etag?: string } | null = null;
+
     private schemaName(): string {
         return companionSchemaName(this.pipelineName() || this.node().id, 'schema');
     }
@@ -1130,11 +1144,14 @@ export class PipelineParseDefinitionComponent {
     private loadSavedSchema(): void {
         this.schemaExtras = {}; // a re-seed must not carry a previous node's stored keys
         this.schemaIdentity = {}; // …nor a previous node's declared names
+        this.schemaRead = null; // …nor a previous node's concurrency handle, for the same reason
         if (!this.authorsSchema() || !this.existingSchemaFile()) return;
         this.schemaLoading.set(true);
-        this.configApi.read('schema', this.schemaName(), this.satelliteSubdir()).subscribe({
+        const readName = this.schemaName();
+        this.configApi.read('schema', readName, this.satelliteSubdir()).subscribe({
             next: (r) => {
                 this.schemaLoading.set(false);
+                this.schemaRead = { name: readName, etag: r.etag };
                 const raw = (r.config?.['raw'] ?? {}) as Record<string, unknown>;
                 // Retain the unmodeled top-level keys BEFORE any early return, so a later Apply
                 // (whose write replaces the whole file) carries them verbatim. `partitionKey` is
@@ -1556,10 +1573,14 @@ export class PipelineParseDefinitionComponent {
                     overwrite: true,
                     subdir: this.satelliteSubdir(),
                     ...(replace ? { compatibility: 'none' as const } : {}),
+                    // Only when the handle belongs to THIS schema — see `schemaRead`.
+                    ...(this.schemaRead?.name === name ? { ifMatch: this.schemaRead.etag } : {}),
                 })
                 .subscribe({
-                    next: () => {
+                    next: (written) => {
                         this.writing.set(false);
+                        // The handle moved with the content; keep it or the next Apply is refused as stale.
+                        this.schemaRead = { name, etag: written.etag };
                         // ⚠ Clear the refusal this write just answered. Without it the BACKWARD message
                         // ("schema edit is not BACKWARD-compatible; not written") stayed on screen after
                         // the operator took the override and the write SUCCEEDED — the pane reporting a
@@ -1572,7 +1593,14 @@ export class PipelineParseDefinitionComponent {
                         this.writing.set(false);
                         // Nothing is applied: a node naming a schema that failed to write is the state this
                         // ordering exists to prevent, and the pane stays dirty so the edits survive.
-                        this.editor?.error.set(apiErrorMessage(e, 'Could not save the output schema.'));
+                        // A lost race is neither a bad draft nor a BACKWARD refusal: this write would have
+                        // replaced the whole file, including the unmodeled keys it carried from a now-stale
+                        // read, so the only safe advice is to reload first.
+                        this.editor?.error.set(
+                            isStaleVersionError(e)
+                                ? STALE_WRITE_MESSAGE
+                                : apiErrorMessage(e, 'Could not save the output schema.'),
+                        );
                         // …but a BACKWARD refusal is recoverable, so offer the override instead of a dead end.
                         if (isBackwardRefusal(e)) this.schemaReplaceNeeded.set(true);
                     },
