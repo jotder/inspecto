@@ -237,6 +237,12 @@ reserved for Incidents/Cases, §9). A Stream is *populated by* a **Connection** 
 **many Datasets derive from it**. It is the **data-plane view of an origin**, not the acquisition config.
 ⛔ never "Data Source".
 
+⛔ **Three other uses of the word are NOT this Stream** *(disambiguated 2026-09-10 — `SPEC-GLOSSARY-1`)*: the
+**Streaming Ingest Mode** (§5 — a decode strategy, not an origin); the `/…/stream` segment of a route path,
+which is the **server-sent-events transport** (`GET /signals/stream`, `/notifications/stream`); and the
+"stream" in `StreamWatermark`, which is **one output table** (§6-B). ⛔ A "reject stream" is prose, not an
+entity — the model's word is the **reject relation** (`DROPPED` / `INVALID` / `DUPLICATE` / `UNMATCHED`).
+
 **Reference** — A named external **dimension data origin**, the slow-changing counterpart to a **Stream**:
 lookup / master data (rate plans, cell sites, customer master). Its nature differs from a Stream — it is
 **mutable**, arriving **incrementally (updated rows) or as a full dump**, is **deduplicated**, and is
@@ -244,6 +250,25 @@ lookup / master data (rate plans, cell sites, customer master). Its nature diffe
 than being parsed and rolled up. A Reference materializes as a **Reference Dataset** (§6-B) that a
 **Transform / Enrichment joins into** a Stream's facts to produce **Datasets**. Also *populated by* a
 **Connection** + **Collector**. ⛔ not a "Stream" — its nature is lookup, not flow.
+
+**Segment** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — **One record kind a plugin ingester emits**, with its
+own flat output Schema. A single source file holding several record kinds (an XML tree, an ASN.1 stream, a
+multi-layout fixed-width file) is decomposed into one Segment per kind, and each Segment becomes **one output
+table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy `processing.segments`);
+`PipelineConfig.Schemas.segments` is `@PublicApi since 2.0.0`. As built:
+`okf/capabilities/ingestion/ingestion.md`, `okf/backend/engine/parser-plugins.md`. ⛔ Not a path token, not a
+time slice, and ⛔ unrelated to the *market* segment in `docs/stakeholders/` — an accidental homonym.
+
+**Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — A per-Schema-field **sensitivity label**
+(`PII`, `INTERNAL`, …) carried in the `fields[]` header of a schema TOON and in the Components CSV. 🔴 **It is
+free text and nothing enforces it.** There is no enum and no validating `FieldSpec` — `classification` appears
+in `ConfigSpecs` only inside a description string, two lines below a field that *does* use the enum mechanism —
+the UI renders a bare text input, and `SchemaProjection`'s own javadoc says the metadata columns are never read
+by the ETL. Its single consumer copies it to a Catalog node **display** attribute. The two steps that would
+enforce it (`quality.pii.mask`, `quality.compliance.redact`) are `PLANNED` with no implementation, and the
+classification-to-masking join is Enterprise unbuilt work (`EDITIONS.md` SEC-08). ⛔ So a label is a **statement
+of intent, never a control** — do not describe it as protection. ⛔ And `INTERNAL` here is not the API error code
+`INTERNAL` (`ErrorCodes`): one word, two concepts, one layer apart.
 
 ---
 
@@ -368,6 +393,13 @@ for business verification and sign-off. Stamped with a **config fingerprint** (s
 detectable); reviewer edits to the mapping tables re-import as proposed **Mapping** changes (validate →
 dry-run diff → apply). **Never hand-authored** — always a projection of config. *(Amendment v1.0 §5.1; lands
 its Phase 5.)*
+
+**Streaming Ingest Mode** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — A **decode and execution strategy**, not a
+data origin: records are decoded and pushed **one at a time** rather than materialized as a batch, and a plugin
+ingester picks one of two execution modes **per batch, by size** (*generation* or *union*). Authored as the
+`processing.streaming.*` block (`large_file_bytes`, `flush_records`) plus the ingester's own class name in
+`processing.ingester`. ⛔ **Never a Catalog Stream** (§2) — that is where the data comes from, this is how a file
+is read. ⛔ There is no `mode: streaming` value; it is a block, not an enum.
 
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
@@ -509,7 +541,7 @@ unknown is a possible match, never an exclusion. ⛔ Not a query planner, not a 
 deliberately unbuilt), and ⛔ never "generation pinning": it does not give a read a consistent snapshot.
 
 **Watermark** *(added 2026-08-10 — consignment addressing §3.6, `StreamWatermark.java`)* — **Event-time
-completeness for one stream**: `min over producers of max(event_time_max)` over the Consignment catalog's
+completeness for one output Dataset/table**: `min over producers of max(event_time_max)` over the Consignment catalog's
 non-superseded rows. It is the only thing that can answer *"has this window closed"* — a window `[lo, hi)` is
 complete when `Watermark ≥ hi + allowed lateness` — which non-monotonic, absence and gap rules all need and
 overlap pruning cannot give them. Derived on read, never stored. **Absent means unknown, never "closed"**.
@@ -641,6 +673,9 @@ created Incidents/Cases that match its criteria and can be **applied in bulk** t
 ⛔ never bare "Rule" (see §0 — Rule always qualified: Expectation / Alert Rule / Decision Rule / Tag Rule).
 
 **Case** — A group of related **Incidents** managed as one larger investigation with a shared resolution.
+⚠ **The word is claimed by a second concept one layer apart, and this is the sense that owns it** (the Case
+Manager pane, the user guide, the controls matrix, and `ObjectType.CASE`). For the other, see **Investigation
+Case** below.
 Managed in the **Case Manager** pane; lifecycle open → investigating → escalated → resolved → closed.
 Its **Contents** are the member Incidents it `CONTAINS` (correlation links); business-flavoured vs the
 operational Incident (provenance: `archived-documents/plans-archive/case-management-design.md`; decisions of record: `okf/capabilities/incidents/incidents.md` §4).
@@ -665,6 +700,21 @@ Incidents match its filter within a *window*, they are grouped under one Case (o
 to the rule's still-open Case). The mechanical tail of the **Alert → Incident → Case** chain.
 ⛔ never bare "Rule" (§0 — Rule is always qualified: Expectation / Alert Rule / Decision Rule /
 Tag Rule / Case Rule).
+
+**Investigation Case** *(disambiguated 2026-09-10 — `SPEC-GLOSSARY-1`)* — **One run of an RCA playbook against a
+single Incident**: trigger signal, timeline, hypotheses, outcome and any draft fixes. This is the **only** type in
+the repo actually named `Case` (`com.gamma.intelligence.investigation.Case`), stored in a durable 256-entry ring
+and served at `GET /agent/cases`. ⛔ It is **not** a **Case** (§9): that groups Incidents and is an
+`OperationalObject`; this is one investigation of one Incident and belongs to the Assistant. 🔴 **One word, two
+concepts — the collision is real and closing it is code, not documentation.** The code's own package already
+says *investigation*, so the resolution is to rename this sense (`Case` → `Investigation`, `/agent/cases` →
+`/agent/investigations`) behind an alias, which touches a published route — filed as `GLOSSARY-CASE-1`
+(`BACKLOG.md`) with a §13 touchpoint row, **not** applied inline.
+
+⛔ **Two further author-facing uses of the word, neither of them either Case above:** `mode: case` on a `route`
+Step means **exclusive first-match branching** (its sibling is `clone`), and `caseType` is a **line of business**
+(`fraud`, `billing`) that applies to every `ObjectType` including Alerts and Tasks — it is free text, it feeds
+RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Diagnosis** — An AI-assisted root-cause analysis of a failing Run or Collector that produces an **Incident** with
 a suggested fix.
@@ -794,6 +844,13 @@ non-map stacking concepts.
 **Assistant** — The AI helper that answers questions, drafts Pipeline/Config, validates Expectations and Alert
 Rules, and explains errors.
 
+**Tool Evidence** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — **A provenance-tagged value produced by one
+Assistant Tool**: the value plus a credibility tier, a source reference, a confidence and an observation time.
+The tier vocabulary is a closed six-value set — `AUTHORITATIVE` · `OFFICIAL` · `INDICATIVE` · `DERIVED` ·
+`USER_PROVIDED` · `ASSUMPTION` — and ⛔ **declaration order is not a trust ranking** (the enum says so itself).
+⛔ Not **Compliance Evidence** (§*Compliance*): that attests to a control for an auditor, this tags one value
+inside one agent turn.
+
 **Model Settings** — AI model selection, keys, and generation parameters used by the Assistant and Diagnosis.
 
 ---
@@ -878,7 +935,8 @@ under `okf/capabilities/` except through this table.
 | `AGT` · `EOI` | **Assistant** | `assistant/` | §12 Assistant · Model Settings | was "Assistant & embedded intelligence" + "Agentic framework as a product". ⛔ "embedded intelligence" is a *module* name (`inspecto-intelligence`), "Agentic" has no entry, and `EOI` names a separate repo (`eoiagent`) — its rows are the Assistant's runtime and fold in here, numbers kept |
 | `UI` | **Surfaces & Lenses** | `surfaces/` | §1-A Lens · Capability · Workbench · Studio · Ops | was "Operator console UX". ⛔ "console" is not canonical — `STAKEHOLDER_OVERVIEW.md` §11 still lists its name as an *open decision* — and a `ui/` directory would collide with `inspecto-ui/`. The rows are the SPA shell: Lens switching, the design system, accessibility, the responsive sweep |
 | `PKG` | **Editions & packaging** | `editions/` | *this section* — **Edition** · `EDITIONS.md` | was "Packaging & editions"; **Edition** had no glossary entry until now (only `EDITIONS.md`), so the concept leads and the mechanism follows |
-| `CMP` | **Compliance** | `compliance/` | *this section* — **Compliance** · `compliance/controls-matrix.md` | **new area.** Its rows were orphaned under `NFR-7` with no functional home; `EDITIONS.md` already numbers the shipped controls `CMP-01…03`, so the prefix is inherited, not invented |
+| `CMP` | **Compliance** | `compliance/` | *this section* — **Compliance** · `compliance/controls-matrix.md` | **new area.** Its rows were orphaned under `NFR-7` with no functional home; `EDITIONS.md` already numbers **eight** compliance *feature* rows `CMP-01…08`, so the prefix is inherited, not invented. ⛔ Those are board rows, **not Compliance Control ids** — the matrix is keyed on external framework identifiers and contains no `CMP-nn` (corrected 2026-09-10; this cell said "the shipped controls `CMP-01…03`", wrong on both the count and the kind) |
+| `Case` *(the Assistant's RCA run)* | **Investigation** | 🔲 **FILED 2026-09-10, not started** (`GLOSSARY-CASE-1`, `BACKLOG.md` §3). One word, two concepts one layer apart: `ObjectType.CASE` groups Incidents (the Case Manager pane, the user guide, the controls matrix) and keeps the word; `com.gamma.intelligence.investigation.Case` is one RCA playbook run against one Incident and must move. Touchpoints to audit: the record `Case` → `Investigation`, `CaseStore` → `InvestigationStore`, `cases.jsonl` on disk, the four routes `GET /agent/cases`, `/agent/cases/{id}`, `/agent/cases/{id}/similar`, `POST /agent/cases/{id}/feedback` (⚠ **published — needs an alias or a deprecation window, never a silent flip**), the UI's `CaseFeedback` + the Learning pane copy, and ⛔ the *"Investigations"* subtitle on the Case Manager route, which belongs to the other sense. |
 | `TOOL` | **Guards & repository tooling** | `tooling/` | *this section* — **Guard** | **new area.** The repo's own hygiene: the vocabulary, secret, link, dependency, coverage and board guards; the docs lifecycle; the `.claude/` setup. Four `BACKLOG.md` rows mapped to no area before this |
 
 **Terms this section introduces** (they had none, and each is now a directory name):
@@ -897,6 +955,24 @@ does not bundle. The per-feature table is `EDITIONS.md`.
 audit (SOC 2 / ISO 27001 / HIPAA / PCI scope): SBOM per bundle, signed releases, the dependency-review
 baseline, and the controls matrix. Distinct from **Audit Log** (§9), which is a *product feature*
 Compliance cites as evidence.
+
+**Compliance Control** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — **One row of the controls matrix**: an
+obligation stated by an external framework, mapped to what this product does about it, who is responsible
+(`product` / `org` / `customer` / `IdP`) and which evidence file attests to it. 🔴 **Its identifiers are
+externally owned and there is no product-side control id** — the matrix is keyed on SOC 2 TSC, ISO 27001:2022
+Annex A and NIST 800-53 identifiers, and `controlId` appears nowhere in the code. ⛔ **`CMP-01…08` are NOT
+control ids** — they are edition-board *feature* rows in `EDITIONS.md`, and the matrix contains no `CMP-nn`
+anywhere. ⛔ Also not the **Control API** (§14), not the **`CTL` Step family** (`control.*` processors — the
+`gap` / `alert` / `event` trio), and not a form **control type** (the `NodeAttribute` widget vocabulary:
+`string` · `identifier` · `number` · `boolean` · `select` · `autocomplete` · `multiline` · `list`). ⛔ Never
+the bare word "Control" — it is always qualified.
+
+**Compliance Evidence** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — A hand-written, git-tracked attestation
+under `compliance/evidence/` that a **Compliance Control** holds, each naming the matrix gap it closes; the
+SBOM is the one machine-generated member. ⚠ **An evidence file is an attestation *about* a source, never the
+source itself** — the **Audit Log** (§9) is the source. Nothing validates that an evidence claim is still
+true, and one of them is currently false where the product changed underneath it
+(`okf/capabilities/compliance/compliance.md` §3.4). ⛔ Not **Tool Evidence** (§12).
 
 **Guard** — A repo-level check that fails the build or the push when a stated invariant is broken: the
 vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards plus the processor-board
