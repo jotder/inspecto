@@ -7,7 +7,16 @@ import { environment } from '../../../environments/environment';
  */
 // '/public' (BI-6): share-token routes are anonymous and token-addressed — a space prefix would 404 them.
 // '/exchange' (§3 sharing): installation-scope like '/spaces' — owner/consumer travel in the payload.
-export const SERVER_GLOBAL = ['/health', '/ready', '/metrics', '/spaces', '/bootstrap', '/auth', '/public', '/exchange'];
+export const SERVER_GLOBAL = [
+    '/health',
+    '/ready',
+    '/metrics',
+    '/spaces',
+    '/bootstrap',
+    '/auth',
+    '/public',
+    '/exchange',
+];
 
 /**
  * Apply the active space's prefix to one already-built API URL: `/api/v1/<rest>` →

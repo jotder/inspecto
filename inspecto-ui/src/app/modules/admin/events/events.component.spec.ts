@@ -214,7 +214,10 @@ describe('EventsComponent', () => {
         c.fLevel = 'ERROR';
         c.toggleLive(true); // arm the tail first, or nothing is subscribed to the frames
         frames.next({ ...EVENT, eventId: 'evt-info', level: 'INFO' });
-        expect(c.events().map((r) => r.eventId), 'INFO is below the ERROR minimum').toEqual(['evt-1']);
+        expect(
+            c.events().map((r) => r.eventId),
+            'INFO is below the ERROR minimum',
+        ).toEqual(['evt-1']);
         frames.next({ ...EVENT, eventId: 'evt-err', level: 'ERROR' });
         expect(c.events().map((r) => r.eventId)).toEqual(['evt-err', 'evt-1']);
     });

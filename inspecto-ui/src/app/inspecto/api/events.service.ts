@@ -151,7 +151,9 @@ export class EventsService {
      * pass through `spaceInterceptor`. Without it a multi-space deployment subscribes to the default
      * space's stream while showing another space's rows.
      */
-    stream(filter: Pick<EventFilter, 'type' | 'correlationId'> & { severity?: string; source?: string } = {}): Observable<EventRow> {
+    stream(
+        filter: Pick<EventFilter, 'type' | 'correlationId'> & { severity?: string; source?: string } = {},
+    ): Observable<EventRow> {
         return new Observable<EventRow>((subscriber) => {
             if (typeof EventSource === 'undefined') {
                 subscriber.error(new Error('EventSource unavailable'));

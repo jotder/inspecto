@@ -209,7 +209,9 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
         try {
             // 🔴 EventSource does NOT pass through spaceInterceptor, so the space prefix is applied by
             // hand. Without this a multi-space deployment tails the default space's notifications.
-            const source = new EventSource(spaceScopedUrl(apiUrl('/notifications/stream'), this.spaces.currentSpaceId()));
+            const source = new EventSource(
+                spaceScopedUrl(apiUrl('/notifications/stream'), this.spaces.currentSpaceId()),
+            );
             source.onmessage = (e) => {
                 try {
                     this.svc.applyIncoming(JSON.parse(e.data));
