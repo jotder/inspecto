@@ -59,6 +59,8 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
+*(2026-09-10, later: `CONSUMER-PAIRS-1` decided **per row, in one sitting** — seven ADOPT, one KEEP-as-API, two RETIRE; verdicts in each owning spec's §2, work grouped into five §3 rows: `CLIENT-HALVES-1`, `EXPECTATIONS-UI-1`, `STUDIO-HALVES-1`, `AGT-ARTIFACT-1`, `RETIRE-HALVES-1`. **§1 is now EMPTY** — the first time since the board was consolidated.)*
+
 *(2026-09-10: six decisions closed in one sitting — `MAPPING-SPELLING-1` both halves → §3 `MAPPING-GEN-1` + §6; OpenAPI posture → §4 `OPENAPI-GEN-1`; Enterprise self-identification → §3 `STANDARD-BUNDLE-1`; `AGT-SEGMENT-1` keeps its caveat with a named trigger; drift refusal → §6; `CONTRACT-ORPHAN-1` was moot — its "no producer, no consumer" premise was a false negative, the producer test and consumer had existed since 2026-08-15.)*
 
 *(Previously:)* All 28 rows were decided on 2026-09-06 in one sitting; every answer is recorded in its owning doc (grep
@@ -66,29 +68,6 @@ code before filing, not just the board.
 decided and buildable, §2 where it became an org action, §6 where the answer was "keep as designed". Three rows
 turned out to be already answered by shipped code (`description`, `duplicate_check` owner, `engine: auto`) and one
 half of a fourth (the id slug). New decisions get a row here at handoff time.
-
-**One, filed 2026-09-09 (`CONSUMER-PAIRS-1`).** — **For each shipped server half with no client, does the
-client adopt it or does the half get retired?** The consolidation found **ten** of these across seven areas,
-and they are one decision, not ten defects — every instance is a Must whose other half was never built, so
-each is either unfinished product or dead surface, and only the operator can say which:
-
-| The shipped half | The missing half | Area |
-|---|---|---|
-| `If-Match` honoured on config writes | the SPA sends none (two panes) | `API`, `MET` |
-| cursor pagination (`metadata.pagination`) | no consumer of `nextCursor`; four endpoints page for curl only | `API` |
-| `permissions[]` in the v1 envelope | 🔴 **structurally unreachable** — the shell's interceptor unwraps to `event.body.data` and discards it | `SEC`, `UI` |
-| `GET /signals/stream` (SSE) | nothing opens an `EventSource`; the Events pane polls | `OPS` |
-| `POST /queries/{id}/run` | the Query Library never calls it | `DAT`, `BI` |
-| `GET /bi/datasets` | no caller | `BI` |
-| Expectations routes (`ING-6`, a Must) | no UI at all | `ING` |
-| materialization | no UI triggers it and no committed job schedules one | `DAT` |
-| queue / watcher / escalation-policy routes (`INC-4`) | no consumer | `INC` |
-| `AgentAskResult.artifact` — ⚠ **the inverse**: the client consumer is live and there is no producer | | `AGT` |
-
-**Recommended: decide per row, in one sitting, and record the verdict in the owning capability spec's §2.**
-⛔ Do not file ten separate build rows — that is what made them invisible for a month. The `permissions[]`
-case is the one with a forced answer: it cannot reach a consumer without an interceptor change, so "adopt"
-there means a client change first. → the ten owning specs' `UNTRACKED` sections, all now pointing here.
 
 ## 2. Externally gated
 
@@ -206,6 +185,29 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `superpower/elt-final-amendment-plan.md` §3.4
 
 ### Control plane, jobs, notifications, queries
+
+- **P2** · **`CLIENT-HALVES-1` — the SPA adopts three shipped server halves** (⛔ decided 2026-09-10 per row, `CONSUMER-PAIRS-1`):
+  (a) both config-writing panes send **`If-Match`** and surface a 412 as "changed underneath you" (`API-3`); (b) the shell
+  interceptor stops discarding the v1 envelope so **`permissions[]`** reaches the panes, then affordances gate on it — the
+  interceptor change comes FIRST, it is the reason the field has been unreachable; (c) the Events pane subscribes to
+  **`GET /signals/stream`** with polling as the fallback for buffering proxies. One row, three client changes, no server
+  change. → `okf/capabilities/control-api/control-api.md` §2 `API-3` · `security.md` · `observability.md` · `surfaces.md`
+- **P2** · **`EXPECTATIONS-UI-1` — the Expectations pane** (`ING-6` is a Must with NO UI — zero SPA files mention it; decided
+  2026-09-10: ADOPT, the Must stands): define `non_null | range | regex | referential | condition` checks per Dataset, run
+  evaluate, show `lastResult`; reuse `<inspecto-query-panel>`; results already open Incidents and `expectation.violated`
+  Signals, so triage needs nothing new. → `okf/capabilities/ingestion/ingestion.md` §3.7
+- **P2** · **`STUDIO-HALVES-1` — Run and Materialize** (decided 2026-09-10): a **Run** action per saved Query Library entry
+  calling `POST /queries/{id}/run` with results in the same panel; a **Materialize** action on the Dataset page plus ONE
+  committed example job that schedules a materialization, so the path is exercised by something shipped.
+  → `okf/capabilities/data-plane/data-plane.md` · `okf/capabilities/studio/studio.md`
+- **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
+  decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
+  `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
+  rather than prose. → `okf/capabilities/assistant/assistant.md` §3
+- **P2** · **`RETIRE-HALVES-1` — delete two server halves with no consumer** (decided 2026-09-10): **`GET /bi/datasets`**
+  (Studio keeps its own discovery) and the **`INC-4` queue / watcher / escalation-policy** route families — routes, TOON,
+  tests and OpenAPI entries; `INC-4` (a Should) is WITHDRAWN in its spec. ⚠ Pagination is NOT retired: kept as API surface,
+  the SPA adopts a cursor when a list outgrows a page. → `studio.md` · `okf/capabilities/incidents/incidents.md` §2 `INC-4`
 
 - **P2** · **API v1** — adopt the cursor-pagination seam on further list families as demanded (4 adopters live); adopt `ETags.respond` on further singleton reads as demanded; Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed). → `okf/backend/control-plane/api-v1.md`
 - **P2** · **Bundle / Exchange** — `requires` present-but-different classification; per-editor "load as draft" import — design first, likely multi-session (`BundleTransferService.write` commits straight through; no generic draft seam). ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/exchange-sharing.md`

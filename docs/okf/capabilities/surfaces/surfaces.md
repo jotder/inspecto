@@ -352,6 +352,7 @@ test suite, with one board row between them. Everything in §5.2 is consequently
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** the SPA **sends `If-Match`** from both config-writing panes and gates affordances on `permissions[]` once the interceptor exposes it → `BACKLOG.md` §3 `CLIENT-HALVES-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —

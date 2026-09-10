@@ -481,6 +481,7 @@ and a **zero baseline yields a null deviation** — undefined, not −100 %.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `GET /signals/stream` **ADOPT** — the Events pane subscribes, polling stays as the fallback → `BACKLOG.md` §3 `CLIENT-HALVES-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —

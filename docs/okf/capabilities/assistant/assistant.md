@@ -400,6 +400,7 @@ what it promises is absence.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-DEADSEAM-1`, `SPEC-GLOSSARY-1`, `SPEC-MOCKRESIDUE-1`, `SPEC-PLANSTALE-1`, `SPEC-ORPHANPAGE-1`, `SPEC-AGT-EDITIONS-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `AgentAskResult.artifact` — the inverse pair — **BUILD the producer**: the draft skills return their draft as the artifact the UI already renders → `BACKLOG.md` §3 `AGT-ARTIFACT-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —

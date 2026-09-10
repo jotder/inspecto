@@ -323,25 +323,21 @@ No exit criterion — this is the resumption of normal service, not a project.
 
 ## What needs the operator, not a shift
 
-**One decision is pending and its premise is half wrong.** `MAPPING-SPELLING-1` asks whether the schema
-generators should emit the new mapping spelling. Measured 2026-09-09:
+✅ **Nothing, as of 2026-09-10.** Every decision this section ever held is closed, by the operator, with the
+verdict recorded where the work lives:
 
-* **all 24 committed schemas are already on the new spelling** — zero carry the legacy one, and zero carry
-  `transformType`;
-* the disk-writing generator (`SchemaExtractor`, the `create-schema` CLI) writes the **legacy** shape and
-  **deliberately omits** the type field, with a code comment saying so;
-* 🔴 **but the two generators disagree, which this note originally got wrong**: `ConfigPreviewRoutes.java:330`
-  *does* emit `transformType: "DIRECT"`. ⚠ It only **returns** a suggestion for the UI and never writes, so
-  it does not shape the corpus — which is exactly why the two must be decided together rather than described
-  as one "the generators".
+| Decision | Closed | Where |
+|---|---|---|
+| `MAPPING-SPELLING-1` — should `create-schema` emit `mapping.fields[]`? | 2026-09-10 — yes; **shipped the same day** (`b77b0826`, all THREE generators) | `configuration.md` §2 |
+| its sidecar half | 2026-09-10 — no, inline is the norm | `BACKLOG.md` §6 |
+| Enterprise bundle self-identifying as Enterprise for a Standard customer | 2026-09-10 — a distinct Standard bundle; **shipped** (`3f0d3a93`) | `editions.md` §3.5/§3.7 |
+| `CONSUMER-PAIRS-1` — the ten server halves with no client | 2026-09-10 — **per row, one sitting**: 7 adopt · 1 keep-as-API · 2 retire | each owning spec's §2; `BACKLOG.md` §3 five grouped rows |
+| the three release-gated `superpower/` plans | 2026-09-10 — archive now, after a distillation diff | `docs-consolidation-plan.md` step 7 |
+| archive residue (step 10) | 2026-09-10 — keep as provenance, no deletion | `docs-consolidation-plan.md` step 10 |
+| the doc-hygiene remainder (steps 1/1b, `SPEC-GLOSSARY-1`, `SPEC-MOCKRESIDUE-1`, `SPEC-PLANSTALE-1`) | 2026-09-10 — **one bounded docs sprint now, then pure coding** | the sprint plan update that follows this section |
 
-So the row conflates two migrations: the **spelling** change (already complete in the committed corpus) and
-the **external sidecar** extraction (not started — all 24 schemas still carry the mapping inline and there
-are zero committed `*_mapping.csv`). ⛔ Correct the row before answering it, or the answer authorises work
-that is partly done and partly a different task. ✅ **Corrected on the board 2026-09-09** with the measured
-counts and the generator disagreement; the question is now narrowed to *"should `create-schema` emit
-`mapping.fields[]`?"* plus a separate call on the sidecar.
-
-**Two more calls that are product, not engineering:** whether an Enterprise bundle may keep
-self-identifying as Enterprise when handed to a Standard customer (§editions), and whether the seven
-"no client consumer" server halves get clients or get retired.
+🔴 **What this section taught.** Three of its entries were resolved by *measurement* before they could be decided
+(`MAPPING-SPELLING-1`'s premise was half wrong; `CONTRACT-ORPHAN-1`'s premise was a false negative; the register's
+`PATH-2` refusal was not a refusal). A decision put to the operator on a wrong premise is worse than an undecided one.
+Ground first, ask second — and read a free-text answer against the QUESTION before recording it (an operator's
+answer to "lease mechanism" turned out to be a query-surface idea, and became its own decision, D13).

@@ -459,6 +459,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-GREENCELL-1`, `SPEC-MOCKRESIDUE-1`, `SPEC-PLANSTALE-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `GET /bi/datasets` **RETIRE** (Studio keeps its own discovery) → `RETIRE-HALVES-1`; `POST /queries/{id}/run` **ADOPT** (Run action) → `STUDIO-HALVES-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
