@@ -253,6 +253,17 @@ policy detail is `SEC` §3.10; the tenancy fact is here: **Personal and Standard
 any authenticated subject can address any Space by URL. That is the deliberate edition placement of
 2026-07-23, not a gap; it is stated because `SPC-1` reads "isolated" for `All`.
 
+**Admission control is part of the layout since 2026-09-10** (`SPACES-GOVERNOR-1`). `IntakeGovernor` — the T15 per-cycle
+file cap and its overrun controller — keyed its state by pipeline id alone while every sibling singleton was per Space, so
+two Spaces running a same-named pipeline shared one cap and one tenant's surge throttled the other's. It now keys learned
+caps and per-pipeline overrides by **(Space, pipeline)**, the Space being the calling thread's MDC exactly as
+`EventLog.current()` routes (bound by `CollectorService.underSpace` around every poll and by `ControlApi` around every
+request; the default Space runs with none and resolves to `default`, byte-identical to before). The fleet-wide policy
+stays process-wide on purpose: `PUT /system/scheduler` is system scope. Pinned by
+`IntakeGovernorTest.aSaturatedSpaceDoesNotThrottleAnotherSpacesSameNamedPipeline`. This was the one non-Space-scoped
+singleton the scale-out grounding found — a single-node isolation defect, and a prerequisite for putting several
+Spaces on one pod.
+
 ### 3.10 The SPA
 
 `SpacesService` holds the active id (restored from `localStorage`), probes `GET /spaces/_meta` and lists

@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.event.EventLog;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -8,9 +10,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * files one cycle may admit, and an adaptive controller that lowers that cap while cycles are overrunning
  * the poll interval.
  *
- * <p>State is process-wide and keyed by pipeline id on the {@link #shared()} singleton — the same
- * cross-cycle-state idiom as {@link CircuitBreaker#shared()} / {@link StabilityGate#shared()}, since each
- * static poll cycle is a fresh run. {@code CollectorProcessor.collect} reads {@link #capFor} on the run
+ * <p>State lives on the {@link #shared()} singleton — the same cross-cycle-state idiom as
+ * {@link CircuitBreaker#shared()} / {@link StabilityGate#shared()}, since each static poll cycle is a fresh
+ * run — and is keyed by <b>(Space, pipeline id)</b>: the Space is the calling thread's, exactly as
+ * {@link EventLog#current()} routes ({@code SPACE_MDC_KEY}; {@code CollectorService.underSpace} binds it
+ * around every poll, {@code ControlApi} around every request, and the default Space runs with none set
+ * and resolves to {@code default}). ⚠ SPACES-GOVERNOR-1 (2026-09-10): until then the key was the
+ * pipeline id alone, so two Spaces running a same-named pipeline SHARED admission state — one tenant's
+ * surge throttled another's. Only the learned caps and the per-pipeline overrides are Space-keyed; the
+ * fleet-wide {@link #policy()} is deliberately process-wide ({@code PUT /system/scheduler} is system scope). {@code CollectorProcessor.collect} reads {@link #capFor} on the run
  * path; the scheduler calls {@link #observeCycle} once per <em>pipeline run</em> to feed the controller —
  * since the cap is per-pipeline, the duration is attributed to the pipeline that spent it rather than to
  * every pipeline that shared a tick with it (see {@code PipelineScheduler.governRun}).
@@ -139,17 +147,24 @@ public final class IntakeGovernor {
      * one is a no-op, so the per-cycle call does not disturb adaptation.
      */
     public void configure(String pipelineId, Policy override) {
+        String k = key(pipelineId);
         if (override == null) {
-            if (overrides.remove(pipelineId) != null) caps.remove(pipelineId);
+            if (overrides.remove(k) != null) caps.remove(k);
             return;
         }
-        Policy previous = overrides.put(pipelineId, override);
-        if (!override.equals(previous)) caps.remove(pipelineId);
+        Policy previous = overrides.put(k, override);
+        if (!override.equals(previous)) caps.remove(k);
     }
 
-    /** The thresholds in force for {@code pipelineId} — its override when configured, else the globals. */
+    /** The thresholds in force for {@code pipelineId} in the calling thread's Space — its override when
+     *  configured, else the globals. */
     public Policy policyFor(String pipelineId) {
-        return overrides.getOrDefault(pipelineId, policy);
+        return overrides.getOrDefault(key(pipelineId), policy);
+    }
+
+    /** The map key: {@code <space>/<pipeline>}, the Space being the calling thread's ({@link EventLog#currentSpaceId()}). */
+    private static String key(String pipelineId) {
+        return EventLog.currentSpaceId() + '/' + pipelineId;
     }
 
     /**
@@ -159,7 +174,7 @@ public final class IntakeGovernor {
     public int capFor(String pipelineId) {
         Policy p = policyFor(pipelineId);
         if (!p.active()) return UNBOUNDED;
-        return caps.getOrDefault(pipelineId, p.baseCap());
+        return caps.getOrDefault(key(pipelineId), p.baseCap());
     }
 
     /**
@@ -185,7 +200,7 @@ public final class IntakeGovernor {
             Policy p = policyFor(id);                              // per-pipeline thresholds (T15 follow-up)
             if (!p.active() || !p.adaptive()) continue;
             int min = p.effectiveMinCap();
-            caps.compute(id, (k, current) -> {
+            caps.compute(key(id), (k, current) -> {
                 int cap = (current == null) ? p.baseCap() : current;
                 int next = overran ? Math.max(min, cap / 2)
                                    : Math.min(p.baseCap(), cap * 2);
@@ -197,8 +212,8 @@ public final class IntakeGovernor {
     /** Drop {@code pipelineId}'s cap + override state when it is unregistered, so the maps cannot leak
      *  under churn. */
     public void forget(String pipelineId) {
-        caps.remove(pipelineId);
-        overrides.remove(pipelineId);
+        caps.remove(key(pipelineId));
+        overrides.remove(key(pipelineId));
     }
 
     /** Forget all cap + override state — for test isolation. */

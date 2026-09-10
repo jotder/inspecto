@@ -1,6 +1,8 @@
 package com.gamma.acquire;
 
+import com.gamma.event.EventLog;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 
 import java.util.List;
 
@@ -13,6 +15,50 @@ class IntakeGovernorTest {
 
     private static IntakeGovernor capped(int baseCap, int minCap) {
         return new IntakeGovernor(new IntakeGovernor.Policy(baseCap, minCap, true));
+    }
+
+    /** Run {@code body} as a thread of Space {@code space} — the binding CollectorService.underSpace and ControlApi make. */
+    private static void inSpace(String space, Runnable body) {
+        String prev = MDC.get(EventLog.SPACE_MDC_KEY);
+        MDC.put(EventLog.SPACE_MDC_KEY, space);
+        try { body.run(); }
+        finally { if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY); else MDC.put(EventLog.SPACE_MDC_KEY, prev); }
+    }
+
+    // ── SPACES-GOVERNOR-1: the key is (Space, pipeline), never the pipeline alone ─────────────────────
+
+    /** The defect: two Spaces running a same-named pipeline shared one cap, so one tenant's surge throttled
+     *  the other. Saturate Space A; Space B's admission must be untouched. */
+    @Test
+    void aSaturatedSpaceDoesNotThrottleAnotherSpacesSameNamedPipeline() {
+        IntakeGovernor gov = capped(100, 1);
+        inSpace("tenant-a", () -> {
+            gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS);
+            gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS);
+            assertEquals(25, gov.capFor("p"), "tenant-a overran twice: halved twice");
+        });
+        inSpace("tenant-b", () ->
+                assertEquals(100, gov.capFor("p"), "tenant-b never overran — its cap is the base, not tenant-a's"));
+        assertEquals(100, gov.capFor("p"), "the default Space (no MDC) is a third, untouched key");
+    }
+
+    @Test
+    void aPerPipelineOverrideBelongsToItsSpaceOnly() {
+        IntakeGovernor gov = capped(100, 1);
+        inSpace("tenant-a", () -> gov.configure("p", new IntakeGovernor.Policy(0, 1, true)));   // exempt in A
+        inSpace("tenant-a", () -> assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("p")));
+        inSpace("tenant-b", () -> assertEquals(100, gov.capFor("p"), "B still capped by the globals"));
+        assertEquals(100, gov.capFor("p"), "default Space still capped by the globals");
+    }
+
+    @Test
+    void forgetDropsOnlyTheCallingSpacesState() {
+        IntakeGovernor gov = capped(100, 1);
+        inSpace("tenant-a", () -> gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS));
+        inSpace("tenant-b", () -> gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS));
+        inSpace("tenant-a", () -> gov.forget("p"));
+        inSpace("tenant-a", () -> assertEquals(100, gov.capFor("p"), "forgotten: back to base"));
+        inSpace("tenant-b", () -> assertEquals(50, gov.capFor("p"), "B's learned cap survives A's forget"));
     }
 
     @Test

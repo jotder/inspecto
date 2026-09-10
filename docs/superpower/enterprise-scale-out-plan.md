@@ -184,10 +184,10 @@ a claim protocol this plan does not propose.
 `SpaceRoot` (`inspecto/src/main/java/com/gamma/service/SpaceRoot.java:25-227`) namespaces every store
 URL and directory under `<space>/{config,data,audit,duckdb}`; `ConfigRegistry` is instantiated per
 `CollectorService` (`CollectorService.java:448`), i.e. per Space. Almost everything is already
-Space-scoped. ⚠ **`IntakeGovernor` is not** (`inspecto-acquire/src/main/java/com/gamma/acquire/IntakeGovernor.java:11-16, :39,
-:83-88`): documented *"process-wide and keyed by pipeline id"*, no Space key — two Spaces with a
-same-named pipeline share admission-control state. A Spaces-isolation defect independent of this plan;
-filed §12. `MetricRegistry.global()` is process-global but labels carry pipeline and space, so it is
+Space-scoped. ✅ **`IntakeGovernor` now is too (fixed 2026-09-10, `SPACES-GOVERNOR-1`)**: it was documented *"process-wide
+and keyed by pipeline id"* with no Space key — two Spaces with a same-named pipeline shared admission-control state.
+It keys by (Space, pipeline) from the calling thread's MDC, which `CollectorService.underSpace` already binds around
+every poll; the fleet policy stays process-wide. See `spaces.md` §3.9. `MetricRegistry.global()` is process-global but labels carry pipeline and space, so it is
 additive, not colliding.
 
 ### 3.9 Write gates pass a shared mount unchanged
@@ -440,9 +440,8 @@ caveat of §4 said aloud.
 
 ## 12. Defects found while grounding — filed, not fixed here
 
-- **`IntakeGovernor` has no Space key** (§3.8) — process-wide, keyed by pipeline id, unlike its stated
-  sibling idioms. Two Spaces with a same-named pipeline share admission state **today**, single node.
-  → `BACKLOG.md` §3 `SPACES-GOVERNOR-1`.
+- ✅ **`IntakeGovernor` has no Space key** (§3.8) — **FIXED 2026-09-10** (`SPACES-GOVERNOR-1`, pinned by a two-Space
+  isolation test); the row is closed. Kept here as the record that the grounding found it.
 - **`DbDeliveryReceiptStore` and `DbDedupLedger` are the two stores `PostgresStateStoreTest` does not
   cover** (§3.3). Not a scale-out item — a gap in DAT-6's own claim of coverage. → phase A, or a
   board row if phase A does not start.
