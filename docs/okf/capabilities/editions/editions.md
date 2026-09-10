@@ -824,6 +824,20 @@ citations elsewhere in this spec still resolve.
 | **The profiles varying the shaded fat JAR** | **NEVER TRUE** — corrected in this commit | One unconditional shade configuration, no child profiles; optional modules ship as sidecars (§3.2) |
 | **"Framework-free core, network dependencies isolated"** as a shipped property | **PARTLY SUPERSEDED** 2026-09-07 | The connector sidecar now ships in every edition. The isolation is real in the reactor and absent in the bundle (§2, `PKG-2`) |
 
+### 6.1 The modularization COULDs (landed here 2026-09-10 — Sprint 7.2)
+
+Three items from the 2026-07-21 modularization pass had **no current-tier home at all** — they survived only
+in `archived-documents/plans-archive/modularization-optimization-plan.md` and a `BACKLOG.md` §6 row that
+pointed at it. Anchor them on their *text*, never on the letter: that plan uses `C2` for two different items
+and `okf/backend/modules/reactor.md` uses `C2`/`C4` for unrelated things.
+
+| Item | Verdict | Why / measured |
+|---|---|---|
+| **A generic base for the `InMemory*` / `Db*` store pairs** *(the plan's COULD `C2`)* | 🟡 **HALF SHIPPED — reopen only for the `InMemory*` half** | 🔴 The Db side **was built** as `AbstractJdbcStore` on 2026-08-18 (`JAVA-5`), **20 days before** the recount that still called this untouched; five stores extend it (`DbObjectStore`, `DbLinkStore`, `DbNoteStore`, `DbTagAssignmentStore`, `DbDeliveryReceiptStore`), and it was relocated to `inspecto-util` on 2026-09-08 so an optional edition module cannot hold a core store hostage. What is left: **all ten `InMemory*` stores implement their interface directly with no shared base**. The pair count is **5**, not the 4 the board row recorded (`DeliveryReceiptStore` became a true pair on 2026-09-07 — the recount's own date), or 6 counting `DbStatusStore` by shape |
+| **A BOM for external consumers** *(the plan's `C4`)* | 🔭 **DEFERRED, demand-gated — still true** | Reopen on an external consumer; there is none, and **nothing here is publishable**: no `distributionManagement` and no `maven-deploy-plugin` anywhere in the tree, releases ship zip bundles, and the upstream agent library is a dependency this repo *consumes*, not a consumer. ⛔ Not the **SBOM** (§3.3) — a software bill of materials is a different artifact that happens to share three letters |
+| **DuckDB connection reuse for the per-run opens** *(the plan's `C6`)* | 🔭 **DEFERRED on measurement — still true** | A warm open is **24 ms** (min 23 / max 27, n=20), so the open cost is not worth pooling; `PipelineJobRunner` and `EnrichmentEngine` still open per run and delete their temp database after. ⛔ **Never pool the `SqlSandbox` HTTP path** — ephemeral-per-request *is* its security boundary (`close()` drops the connection, the temp database and its WAL) |
+| **Rewriting the store pairs onto an ORM or repository framework** *(the plan's non-goal `W3`)* | ⛔ **BANNED**, standing | Working, consistent and tested; churn without payoff — and it contradicts the framework refusal above |
+
 ## 7. As-built pointers
 
 Paths and identifiers, with the gap named where one exists. ⚠ **Cite the identifier, not the line number** —

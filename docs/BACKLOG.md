@@ -567,10 +567,15 @@ One line each; the reasoning is in the pointer. Reopen only on the stated trigge
   (Object, Link, Note, TagAssignment), 5 counting `DbStatusStore` by shape. Not close. · **C4** BOM — reopen on
   an external consumer; there is none and **nothing is published as a Maven artifact** (releases ship zip
   bundles; eoiagent is an upstream dependency, not a consumer). · **C6** connection reuse — warm open **24 ms**
-  (min 23 / max 27, n=20), no contradicting measurement exists. 🔴 These three are **not** in `reactor.md`,
-  which this page pointed at — they survive only in
-  `archived-documents/plans-archive/modularization-optimization-plan.md` and the 2026-09-06 snapshot. They were
-  archived without being distilled into an OKF concept; that is the real residual here.
+  (min 23 / max 27, n=20), no contradicting measurement exists. ✅ **HOMED 2026-09-10 (Sprint 7.2)** in
+  [`okf/capabilities/editions/editions.md`](okf/capabilities/editions/editions.md) §6.1 — they were archived
+  without being distilled, and `reactor.md`, which this row pointed at, never held them. 🔴 **Two counts here
+  were wrong and are corrected at the new home:** `C2` is **half shipped** — the `Db*` side landed 2026-08-18
+  as `AbstractJdbcStore` (`JAVA-5`), *20 days before* the recount that called it untouched, with **five**
+  subclasses; and the true-pair count is **5**, not 4 (`DeliveryReceiptStore` became a pair on 2026-09-07, the
+  recount's own date). What is actually left is the **`InMemory*` half** — all ten implement their interface
+  with no shared base. ⛔ Anchor any future reading on the item's TEXT: that plan uses `C2` for two different
+  items and `reactor.md` uses `C2`/`C4` for unrelated things.
 - **PATH-2 residual** (moved from §4 2026-09-07 — it is a LEAVE, not work) — the `BackupTask.restore` zip-slip
   jail is PINNED by `MaintenanceLibraryTest.restoreRefusesAnArchiveEntryThatEscapesTheTargetBeforeWritingAnything`
   (the page cited a `…ASidecarEntry…` variant that does not exist — a tampered sidecar is refused a layer

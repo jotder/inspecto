@@ -98,6 +98,17 @@ src/app/
   `<feature>.routes.ts` (`export default [...] as Routes`).
 - **No cross-feature dependencies.** Share via `inspecto/`. A pane may be reused across routes via
   `ActivatedRoute.snapshot.data` (Cases/Issues = one `ObjectsComponent`).
+- **No business logic in a component.** A `.component.ts` is template + signals + calls into `inspecto/`;
+  validation, data shaping and business rules live in a shared library. This is the W3 rule from the
+  2026-07-02 frontend review, landed here 2026-09-10 (Sprint 7.2) because the review plan was its only home.
+  ⚠ **It is enforced in review only — the boundary lint was never built.** There is no ESLint config tracked
+  in this repo and no `lint` script; `lint:tokens` is the design-token guard, not a linter. So do not cite a
+  boundary check as a gate. And the libraries are **not** uniformly framework-free: `component-model/` and
+  `graph/` are, while `query/`, `viz/`, `rule/` and `format/` all import `@angular/*` — treat purity as the
+  target for new code, not as a property you can assume.
+- ⛔ **The R1–R8 per-pane review protocol is RETIRED** ("no pane is shipped again without a sheet"). Its 37
+  sheets are in `docs/archived-documents/superpower-reviews/` and `docs/superpower/reviews/` is empty; its R6
+  step was mock parity, which no longer exists. The Definition of Done in §12 is the live gate.
 - **Vendored** gamma/Fuse code (`src/@gamma/**`, `modules/auth/**`) is out of scope — don't restyle, audit, or guard it.
 
 ## 4. Component design
@@ -526,7 +537,8 @@ src/app/
 - Reactive forms surface errors inline via `<mat-error>`. Respect `prefers-reduced-motion`.
 - Async / degraded states announce via `role="alert"` + `aria-live` (see the connectivity banner).
 - **Automated gate:** add `await expectNoA11yViolations(fixture.nativeElement)` (`inspecto/testing/a11y.ts`)
-  to new component specs. Runs in CI via `npm run test:ci`. `color-contrast` + page-level rules are
+  to new component specs. Runs in CI via `npm run test:coverage` (⚠ **not** `test:ci` — CI switched on
+  2026-09-08 so the coverage floors are measured; `ui.yml` records why). `color-contrast` + page-level rules are
   excluded in jsdom — contrast is covered by the token guard + the manual audit.
 - Known/deferred findings: `docs/ui/accessibility-audit.md` (e.g. F1 chart `<canvas>` text alternative).
 

@@ -166,6 +166,19 @@ validator so an unchanged file revalidates to a bodiless 304 and a redeployed on
 `no-cache` rather than `no-store` deliberately, after a stale-chunk failure. Absent the directory,
 nothing is served and the answer stays a JSON 404.
 
+🔴 **Static files are public by CALL ORDER, not by the public-path allowlist** *(landed 2026-09-10 — Sprint
+7.2, from the console's genesis plan, which was its only home)*. The static branch runs **before**
+authentication, which only executes inside the route-match loop — so assets answer without a token even
+though they appear in no `PUBLIC_PATHS` entry. ⚠ Anyone reading that allowlist to decide what is
+unauthenticated will get the wrong answer, and anyone moving the static branch below authentication will
+lock the shell out.
+
+**Cross-origin serving exists for a dev topology nobody uses.** The CORS stage is off unless its property is
+set, and it answers preflight only when on; it was added when a separately hosted development SPA was
+contemplated. The dev server proxying to the control plane made it unnecessary, so ⛔ treat CORS as a legacy
+escape hatch rather than a supported deployment shape (`okf/capabilities/control-api/control-api.md` for the
+stage itself).
+
 **Branding and the saved menu tree** are per-space documents under the write root: logo, caption and
 footer for branding; the operator's customised navigation for the Menu Builder, version-checked on write
 so a stale client gets a 422 rather than clobbering it.
