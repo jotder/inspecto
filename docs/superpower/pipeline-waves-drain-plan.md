@@ -149,8 +149,14 @@ release*, not the commit. That makes the vague gate the wrong reason for both ro
 **D-2 is a three-step sequence, not a bump:** *"Converter + **one flagged verification minor**, then the
 legacy readers are deleted. No permanent dual-format."*
 
-1. ✅ **The converter exists** (`inspecto migrate-configs`, amended `f72f7fc8` 2026-08-18 after its corpus
-   gate caught the `steps:`-spelling blindness).
+1. 🔴 **THE CONVERTER DOES NOT EXIST — corrected 2026-09-10 (Sprint 7.5).** This row read *"✅ the converter
+   exists (`inspecto migrate-configs`)"*. Measured: `migrate-configs` and `migrateConfigs` appear in **zero**
+   Java, TypeScript, PowerShell, shell or Node files, and the cited `f72f7fc8` (*"the recipe projection reads
+   the authored `steps:` chain"*) touched only `PipelineEditable`, `RecipeConverter` and its test — a
+   projection fix, not a command. What exists is `RecipeConverter`, and `post-sync-step-chains.md` already
+   said `RecipeCompiler` *"has no production caller (a converter/parity artifact)"*. ⛔ **§6 step 1 is
+   unbuilt, and row 15's release gate depends on it** — a false ✅ on a gate's precondition is worse than a
+   blank, because nobody re-checks a tick.
 2. ⛔ **The flagged verification minor has not shipped** — *nothing after `3.x` has shipped at all*
    (newest tag `v3.12.0`; `v4.0.0` was deleted with the `4.x` branch on 2026-08-17).
 3. Therefore deleting the legacy readers now **skips the verification window D-2 exists to provide**. It
@@ -321,8 +327,8 @@ sequence out in four steps, and **two of them are unmet**:
 
 | §6 step | State |
 |---|---|
-| 1. one-shot converter (`inspecto migrate-configs`) | ✅ exists (amended **2026-08-18**, `f72f7fc8`) |
-| 2. parity gate — the full suite green **through the compiled-recipe path** before any legacy path goes | ⚠ unverified here |
+| 1. one-shot converter | 🔴 **UNBUILT** — corrected 2026-09-10; `inspecto migrate-configs` exists in no source file (the cited commit was a `RecipeConverter` projection fix) |
+| 2. parity gate — the full suite green **through the compiled-recipe path** before any legacy path goes | ⚠ **unverified, and do not mistake what IS green for it.** `RecipeConverterTest` proves **round-trip parity of the projection** (`compile(toRecipe(cfg)) == cfg`) over every committed fixture; step 2 asks for the full suite **EXECUTING** through the compiled-recipe path. Different claims, only the first evidenced |
 | 3. legacy read path **kept behind a flag** for one verification minor | ✅ **BUILT 2026-09-02** — `-Dingest.lane=auto\|graph\|flat` (`ConsignmentIngestStrategy.LANE_PROPERTY`, default `auto`; `graph` disables the flat lane), pinned by `IngestLaneFlagTest`. (Until then this cell read "THE FLAG DOES NOT EXIST" — true when written 2026-08-31.) |
 | 4. the release | 🔴 newest tag **`v3.12.0` shipped 2026-06-05** — ten weeks BEFORE the converter — and is **not an ancestor of `master`** |
 

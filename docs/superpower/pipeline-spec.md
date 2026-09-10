@@ -378,10 +378,16 @@ Record `dedup` was moved out on 2026-08-11 for failing exactly this test.
 ### 7.2 The ingest path
 
 `CollectorProcessor.acquire/ingest` (polls, plans Consignments via `ConsignmentPlanner`, bounded by
-`batch.max_files`/`max_bytes`, default order `mtime`) → `BatchProcessor.process` (picks a
-`BatchIngestStrategy`) → `CsvBatchStrategy` / `StreamingPluginBatchStrategy` → ingester →
+`batch.max_files`/`max_bytes`, default order `mtime`) → `ConsignmentIngestor.process` (picks a
+`ConsignmentIngestStrategy`) → `CsvIngestStrategy` / `StreamingPluginIngestStrategy` → ingester →
 `DataTransformer` (one `CREATE TABLE AS SELECT`) → `PartitionWriter` (`COPY … PARTITION_BY`) →
-`BatchProcessor.commit`.
+`ConsignmentIngestor.commit`.
+
+🔴 **Corrected 2026-09-10 (Sprint 7.5).** This paragraph named **four classes that do not exist** —
+`BatchProcessor`, `BatchIngestStrategy`, `CsvBatchStrategy`, `StreamingPluginBatchStrategy` — for **ten days**
+after row 1 renamed them on 2026-08-31, in the same document whose §12 records that rename as shipped. ⛔
+`BatchProcessor` became **`ConsignmentIngestor`**, not `ConsignmentProcessor` (which is the unrelated
+at-rest SPI).
 
 Consignment id: `<ts>_<slug>_<seq4>` — e.g. `20260830_095732_default_0001`.
 
@@ -394,7 +400,7 @@ mid-commit never leaves a stale "already processed" marker. `PartitionWriter` co
 
 A pipeline takes the **graph lane** only if: a scratch dir is configured · every lifted sink maps 1:1
 to `cfg.sinks()` · the seed feeding the write is `transform.map` · **every sink hangs directly off that
-seed** by a `data` edge (`BatchIngestStrategy.graphLaneCarries`). Otherwise it takes the flat lane.
+seed** by a `data` edge (`ConsignmentIngestStrategy.graphLaneCarries`). Otherwise it takes the flat lane.
 
 🔴 **`transform.map` is never executed as a graph node.** It is the schema projection already
 materialised by the ingest, folded into the write — the graph lane performs only the *write*, and never
@@ -430,11 +436,24 @@ event / manual. **Absent ⇒ the pipeline stays on the global poll cycle.** Jobs
 
 ## 8. Extension points — what a plugin can and cannot add
 
-🔴 **You cannot add a new Step type today.** The vocabulary is the closed `BuiltinNodeType` enum. A
-two-part SPI exists — `PipelineNodeType` (descriptor) + `PipelineNodeExecutor` (execution), each
-`ServiceLoader`-discovered and layered *after* the built-ins so an edition can override one — but **no
-external provider exists; every shipped type is a `BuiltinNodeType`.** The pack-hosted scaffold path
-for new steps is gated behind unshipped platform-services work.
+🔴 **CORRECTED 2026-09-10 (Sprint 7.5) — this section said "you cannot add a new Step type today" and every
+clause of that had been overtaken.** A **hot-deployed pack jar can add one**: `JobPackManager` calls
+`PipelineNodeTypes.register(type, owner)` for each `PipelineNodeType` a pack declares, keyed by the owning
+jar so an unload takes back exactly that pack's types, over a copy-on-write snapshot (this is the spec's own
+**gap 7**, shipped — see §12 row 7, in this same document). The claim that the pack path "is gated behind
+unshipped platform-services work" is false.
+
+What remains true: the **built-in** vocabulary is the closed `BuiltinNodeType` enum, and every type shipped
+*in the product* is one. The two-part SPI is `PipelineNodeType` (descriptor) + `PipelineNodeExecutor`
+(execution), `ServiceLoader`-discovered and layered after the built-ins.
+
+⛔ **The two registration routes are deliberately asymmetric.** A **pack may NOT redefine a built-in** — the
+registration is refused and, pack loading being atomic, the whole pack is rejected, because a jar dropped in
+a directory silently redefining `sink.persistent` would change what every existing pipeline means. A
+**classpath provider still may**, which is an edition specialising the core at build time, reviewed and
+shipped together. ⚠ And **unloading a pack makes its types unknown again, so a stored pipeline naming one
+stops loading** — the same exposure a Job typed on an unloaded pack has, and the reason a pack is normally
+*replaced* rather than removed. Stated, not fixed.
 
 | SPI | Adds | New Step type? |
 |---|---|---|
@@ -444,8 +463,8 @@ for new steps is gated behind unshipped platform-services work.
 | `JobTypeProvider` | a new **Job** type in the open `JobTypeRegistry` | ❌ |
 | `enrichment` | custom SQL as a partition-scoped recompute at rest | ❌ |
 
-⚠ **Deployment is classpath-only** (`-cp "inspecto.jar:your-jar.jar"`). The one drop-in directory that
-exists (`-Djobs.packs.dir`) is for **Job packs**.
+⚠ **Deployment is classpath (`-cp "inspecto.jar:your-jar.jar"`) for an SPI provider, or the pack directory
+(`-Djobs.packs.dir`) for a pack** — which carries Job types *and*, since gap 7, node types.
 
 ⚠ **If the node vocabulary changes, two committed contracts must be regenerated together** —
 `node-attributes.contract.json` (`-Dnode.attributes.write=true`) and `step-types.contract.json`
