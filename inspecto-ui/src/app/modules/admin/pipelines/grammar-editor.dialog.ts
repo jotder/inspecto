@@ -58,7 +58,9 @@ export interface GrammarEditorDialogData {
  * authored: opening a bound node and saving MIGRATES it to an independent inline copy rather than
  * writing back to the shared component. **No pipeline-editor surface updates a `grammar` component in
  * place any more** — only the Components registry page does, which is what editing a template in the
- * library means. See `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
+ * library means. As built: `docs/okf/backend/pipeline-graph/editable-round-trip.md` and
+ * `docs/okf/frontend/features/grammar-config.md`. Provenance only, not maintained:
+ * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
  *
  * <p>**Plugin Grammars are preview-only here.** A plugin parser also needs per-segment schema files,
  * which only the Onboarding Parsing stage can author; rather than write a config the engine would

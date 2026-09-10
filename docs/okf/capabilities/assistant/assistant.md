@@ -369,7 +369,7 @@ what it promises is absence.
 | 2026-07-21 | AGT-5 **P1–P5 complete**, plus P4 polish (a second pilot class and a periodic state watch) | `embedded-intelligence.md` |
 | 2026-07-22 | `kpi_report_builder` shipped, completing the P2 authoring tier | `embedded-intelligence.md` |
 | 2026-07-25 | The parent embedded-intelligence plan **archived**; remaining items declared **deliberate deferrals, not gaps** | `embedded-intelligence.md` §Still open |
-| 2026-07-25 | **AGT-6a scoped** — inline authoring must reuse the shipped draft tools and add **no new backend capability** | live plan `archived-documents/plans-archive/agt-6-plan.md` §3 |
+| 2026-07-25 | **AGT-6a scoped** — inline authoring must reuse the shipped draft tools and add **no new backend capability** | `okf/frontend/features/inline-ai-authoring.md`; provenance `archived-documents/plans-archive/agt-6-plan.md` §3 |
 | 2026-07-26 | **A1 shipped — deterministic single-tool dispatch (`runTool`)**: a named tool is invoked directly rather than composed by the model | `embedded-intelligence.md` §AGT-6a A1 |
 | 2026-07-28 | The `projection_author` "stale `columns.items`" half fixed, retiring that clause of the AGT-6a host row | `BACKLOG.md` §3 |
 | 2026-08-01 | The run-claim hand-off seam moved to `PipelineRunGuard`; **never investigate inline** | `embedded-intelligence.md`; `OPS` §3.1 |

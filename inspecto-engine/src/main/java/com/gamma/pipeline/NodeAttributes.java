@@ -8,9 +8,10 @@ import java.util.stream.Stream;
 
 /**
  * The per-node-type config attribute tables, published on {@code GET /pipelines/node-types}. This is the
- * SERVER half of the same vocabulary {@code inspecto-ui/.../pipelines/node-attributes.ts} declares, and the
- * served copy is the source while the client table is its offline/mock fallback. Current knowledge:
- * {@code docs/okf/frontend/features/pipelines.md}; decision record: §3.1 of the archived
+ * SERVER half of the same vocabulary {@code inspecto-ui/.../pipelines/node-attributes.ts} declares. The
+ * served copy is the source; the client table is the fallback the drawer uses when the route has not
+ * answered yet. Current knowledge: {@code docs/okf/backend/pipeline-graph/pipeline-config-keys.md} and
+ * {@code docs/okf/frontend/features/pipeline-editor.md}. Provenance only, not maintained: §3.1 of
  * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}.
  *
  * <p>⚠ <b>These two tables must stay identical, and a test enforces it rather than a comment.</b>

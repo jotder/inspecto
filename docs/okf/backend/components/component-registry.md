@@ -62,8 +62,8 @@ its wiring). The relationship graph is **derived, never stored**: composition (`
 edges, with a single `deriveRefs` lineage derivation (R1) feeding the reuse-graph, delete protection, and
 [bundle](../control-plane/metadata-bundle.md) closure alike. Persistence stays federated per kind —
 `WRITABLE_TYPES` is widened only when a kind needs real storage; it is deliberately **not** a single generic
-wiring editor nor a storage unification. Adoption (D0→P4) completed 2026-06-28; design of record:
-`docs/archived-documents/plans-archive/component-model.md` (+ its adoption plan).
+wiring editor nor a storage unification. Adoption (D0→P4) completed 2026-06-28; **this page is the design of record**. *(Provenance:
+`docs/archived-documents/plans-archive/component-model.md` and its adoption plan, not maintained.)*
 
 The UI counterparts are the [components](../../frontend/features/components.md) and
 [Pipelines](../../frontend/features/pipeline-editor.md) features in the frontend bundle.

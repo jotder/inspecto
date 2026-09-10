@@ -21,9 +21,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Geo Map Phase 4 backend: the real <b>server-side projection</b> the Geo Map studio's mock-first
+ * Geo Map Phase 4 backend: the real <b>server-side projection</b> the Geo Map studio's client-side
  * {@code geo-projection} GeoSources were designed against ({@code docs/okf/frontend/features/geo-map.md};
- * plan {@code docs/archived-documents/plans-archive/geo-map-analysis-plan.md} Phase 4). The DuckDB-side
+ * provenance only: {@code docs/archived-documents/plans-archive/geo-map-analysis-plan.md} Phase 4). The DuckDB-side
  * fold of {@code projectPoints}/{@code projectRoutes}, so a projection scales past the ~5k-point browser cap.
  *
  * <p>{@code POST /geo/projection} — body {@code {dataset, latCol, lonCol, entityCol?, kindCol?, timeCol?,

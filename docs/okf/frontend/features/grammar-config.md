@@ -129,9 +129,10 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
 - Fixed in passing: `schema-form.validate()` treated a `dependsOn`-disabled sole control as invalid
   (`form.valid || form.disabled`).
 
-The mockup that drove this (editable `.dc.html` source) is archived beside the plan:
-`docs/archived-documents/plans-archive/assets/authoring-redesign-mockup/`. Where the build diverges from
-the artboards, the plan's review rows R1–R12 say why.
+The mockup that drove this (editable `.dc.html` source) is archived beside the plan as a design **asset**:
+`docs/archived-documents/plans-archive/assets/authoring-redesign-mockup/`. Where the build diverges from the
+artboards, **this page is the authority** for what shipped; the plan's review rows R1–R12 are provenance for
+why a divergence was accepted, and are not maintained.
 
 ## History — the 4-tab delimited surface (U1–U5, delimited-grammar-properties plan, 2026-08-19; replaced 2026-09-04)
 

@@ -27,5 +27,5 @@ lazy file-browser).
 * **Hosts**: reconciliation detail + [Reconciliation Board](../features/reconciliation.md), the
   Settings ▸ Access lens matrix, and the `/design` gallery demo.
 
-As-built design (archived):
-[`tree-table-design.md`](../../../archived-documents/plans-archive/tree-table-design.md).
+**This page is the as-built design.** *(Provenance:
+[`tree-table-design.md`](../../../archived-documents/plans-archive/tree-table-design.md), not maintained.)*

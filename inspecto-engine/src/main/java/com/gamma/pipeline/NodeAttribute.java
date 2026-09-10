@@ -10,8 +10,9 @@ import java.util.Set;
  * One config attribute of a pipeline node type — the server-side half of the UI's {@code AttributeSpec}
  * ({@code inspecto-ui/src/app/inspecto/component-model/attribute-spec.ts}), published on
  * {@code GET /pipelines/node-types} so the node cfg vocabulary has ONE definition instead of living only
- * client-side. Current knowledge: {@code docs/okf/frontend/features/pipelines.md}; the decision record is
- * §3.1 of the archived
+ * client-side. Current knowledge: {@code docs/okf/backend/pipeline-graph/pipeline-config-keys.md} (the block
+ * census) and {@code docs/okf/frontend/features/pipeline-editor.md} (how the drawer consumes the served
+ * spec). Provenance only, not maintained: §3.1 of
  * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}.
  *
  * <p>Why this exists: that plan traced every config-key defect (D1–D9) to the same root cause —

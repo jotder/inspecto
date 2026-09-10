@@ -64,5 +64,5 @@ author a freshness Expectation / Alert Rule per landed store.
 
 - [`live-execution.md`](live-execution.md) — T32 flow jobs, multi-source seeding, incremental mode.
 - [`pipeline-graph-design.md`](pipeline-graph-design.md) — graph model, `transform.merge`.
-- `docs/archived-documents/plans-archive/pipeline-multiplicity-plan.md` Part B — the grounded refutation
-  (provenance only; the plan shipped and was archived 2026-08-11).
+- `docs/archived-documents/plans-archive/pipeline-multiplicity-plan.md` Part B — provenance only; the
+  refutation it recorded is restated in full at the top of this page (the plan shipped and was archived 2026-08-11).

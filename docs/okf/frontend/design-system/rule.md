@@ -21,6 +21,7 @@ parameterized **rule template**.
 A condition `tariff = 'premium'` saves as `WHERE "tariff" = :tariffValue` with a `:tariffValue` param
 defaulting to `premium`.
 
-The north-star design (phasing, locked decisions, the unbuilt aggregation builder — measures/dimensions —
-and backend rule save/templates) is archived at
-[`rule-builder-design.md`](../../../archived-documents/plans-archive/rule-builder-design.md).
+What is still unbuilt — the **aggregation builder** (measures/dimensions) and backend rule save/templates — is
+tracked in [`BACKLOG.md`](../../../BACKLOG.md), not here. *(Provenance: the north-star design, its phasing and
+its locked decisions are archived at
+[`rule-builder-design.md`](../../../archived-documents/plans-archive/rule-builder-design.md), not maintained.)*

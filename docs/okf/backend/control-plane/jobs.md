@@ -169,8 +169,9 @@ Design of record (all phases + resolved decisions + TOON config gallery):
 
 ## The parameter contract & runtime Expressions (shipped 2026-08-07/10)
 
-Design of record (all 17 steps, with the wrong premises each one corrected):
-[`job-parameter-contract-plan.md`](../../../archived-documents/plans-archive/job-parameter-contract-plan.md).
+**This section is the design of record.** *(Provenance: the plan's 17 steps, each with the wrong premise it
+corrected, are in [`job-parameter-contract-plan.md`](../../../archived-documents/plans-archive/job-parameter-contract-plan.md)
+— read for why, never for what is built; not maintained.)*
 It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet above. Guiding principle:
 **versatility over built-ins** — capability arrives by *registration*, never by editing a `switch`.
 

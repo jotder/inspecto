@@ -2,8 +2,17 @@
 
 > **This is the single source of truth for what every concept is called in Inspecto.** UI labels, model/field
 > names, API paths, docs, and conversation must all use the **canonical term** below. The rename rolls out
-> **UI → model → backend** (see §6). Companion docs: relationships in [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md),
-> rationale in [`archived-documents/plans-archive/VOCABULARY_RECOMMENDATIONS.md`](archived-documents/plans-archive/VOCABULARY_RECOMMENDATIONS.md).
+> **UI → model → backend** (the migration map is §13). The rules that make this file binding are §0; how the
+> concepts relate to one another is §10 (Component metamodel) and §11 (Graphs & Relationships), with the
+> platform-wide shape in [`okf/living-operational-system.md`](okf/living-operational-system.md) and the
+> per-area spine in §14.
+>
+> *Provenance, not authority (2026-09-10):* the two pre-lock analyses this vocabulary was derived from —
+> `COMPONENT_GRAPH.md` (a model-level concept graph) and `VOCABULARY_RECOMMENDATIONS.md` (the industry-term
+> reconciliation whose §7 recommendations were decided with the product owner on 2026-06-29 and now live in
+> §0 and §13) — are in `archived-documents/plans-archive/` and listed in [`INDEX.md`](INDEX.md). ⛔ Both
+> predate the rename and still use retired words; read them for *why* a term was chosen, never for what a
+> thing is called today.
 >
 > Decisions locked 2026-06-29 with the product owner.
 
@@ -68,7 +77,9 @@ still import. *(Added 2026-07-06 R6; provenance `docs/archived-documents/plans-a
 
 ## 1-A. Personas & Surfaces
 
-> Added Wave 0 (2026-07-02) per `archived-documents/plans-archive/frontend-review-and-completion-plan.md`.
+> Added Wave 0 (2026-07-02). The persona/Lens model as built is
+> [`okf/capabilities/surfaces/surfaces.md`](okf/capabilities/surfaces/surfaces.md). *(Provenance: the Wave-0
+> review `archived-documents/plans-archive/frontend-review-and-completion-plan.md`, not maintained.)*
 
 **Lens** — A persona-scoped view of the one operator console: **Business** (consume data, investigate
 provenance/lineage, raise Requirements) · **Builder** (author in Workbench + Studio) · **Ops** (built-in
@@ -323,8 +334,11 @@ Grammar inline and untouched, and later edits to the template reach nothing that
 ⚠ This REVERSES the 2026-08-04 store contract, where extracting a Grammar MOVED the block into the
 component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
 engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
-editor migrates it to an independent inline copy on save. See
-`archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
+editor migrates it to an independent inline copy on save. As built:
+[`okf/backend/pipeline-graph/editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md)
+(the read path that must not be tidied away as dead code) and
+[`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md). *(Provenance:
+`archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`, not maintained.)*
 ⛔ not "parser config" / "parse options" in UI copy — one concept, one word. ✅ **UI DONE** (2026-08-04):
 the shared `<inspecto-grammar-editor>` (`inspecto/grammar/`) is the one authoring surface for both the
 Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserConfigDialog` →
@@ -357,7 +371,10 @@ its Phase 5.)*
 
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
-**Load** *(added 2026-08-13 — operator decision, `archived-documents/plans-archive/definition-surface-unification-plan.md` §4b)* —
+**Load** *(added 2026-08-13 — operator decision; as built:
+[`okf/frontend/features/pipeline-editor.md`](okf/frontend/features/pipeline-editor.md) ·
+[`okf/frontend/features/schema-mapping-authoring.md`](okf/frontend/features/schema-mapping-authoring.md).
+Provenance: `archived-documents/plans-archive/definition-surface-unification-plan.md` §4b)* —
 The third **definition stage/drawer** in the unified pipeline editor (**Collector → Parse → Load**): create
 the **Schema** (derive from the parsed sample or import), author the **Mapping** (per-field rules incl.
 verbatim DuckDB scalar `EXPR` transforms), and set the **Table** write (Sink properties; format
@@ -387,8 +404,9 @@ of what a Pipeline landed. Its kinds are an **open registry** keyed by string id
 (2026-08-05) retirement of user-facing "Job" is superseded — its replacement path hung on the amendment's
 Phase 3 S3 (table-entry `collect`), deferred by its own design spike as genuine new design. **Job is again the
 canonical user-facing term** for any scheduled Executable over data at rest (maintenance, periodic
-report/enrich, dataset operations); the authoring contract completes in
-`archived-documents/plans-archive/job-parameter-contract-plan.md`. Table-entry Pipelines remain an *additive complement* (S3 design
+report/enrich, dataset operations); the authoring contract **shipped 2026-08-07/10** and is described in
+[`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) § *The parameter contract & runtime
+Expressions*. Table-entry Pipelines remain an *additive complement* (S3 design
 of record), never the Job's replacement; §13 row.
 
 **Scheduler** — The Operations engine that owns **Triggers** and starts **Executables** (Pipelines or Jobs). It
@@ -680,7 +698,9 @@ strategy, and config schema. (A *Visualization Type* is a Component Type whose i
 
 > Relationships are becoming load-bearing (a future **Link Analysis Studio**). The words *graph · node · edge ·
 > link · relationship · lineage* are the most overloaded in the system — this section keeps them distinct.
-> Relationship analysis: [`archived-documents/plans-archive/COMPONENT_GRAPH.md`](archived-documents/plans-archive/COMPONENT_GRAPH.md).
+> Relationships as built: [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md) ·
+> [`okf/capabilities/metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md). *(Provenance: the
+> pre-lock concept graph `archived-documents/plans-archive/COMPONENT_GRAPH.md`, not maintained.)*
 
 **Graph** — A queryable relationship object: **Nodes** + typed **Edges** that can be traversed, analyzed (paths,
 centrality, communities), and rendered. The subject of Link Analysis.
@@ -718,15 +738,16 @@ Never use Entity/Link for artifacts (Component/Part) or assets (Asset/Lineage).
 **Entity Projection** *(P3)* — The **mapping** (not a store) that folds a **Dataset**'s rows into an
 Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
 Built **frontend-mock-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
-relationships remain open. Design: [`archived-documents/plans-archive/link-analysis-and-graphsource.md`](archived-documents/plans-archive/link-analysis-and-graphsource.md);
-plan: [`archived-documents/plans-archive/link-analysis-studio-plan.md`](archived-documents/plans-archive/link-analysis-studio-plan.md).
+relationships shipped later — V1 is complete, V2+ is open backlog. As built:
+[`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md). *(Provenance:
+`archived-documents/plans-archive/link-analysis-and-graphsource.md` and the two studio plans, not maintained.)*
 
 **Link Analysis Studio** — The Builder-lens Studio pane (`/studio/link-analysis`) for graph investigation:
 pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, neighborhood, centrality,
 communities). A saved investigation is a **Link-Analysis View** (Component kind `link-analysis-view`); when
 its source is `entity-projection` it is a **Widget** (a Graph Visualization Type bound to a Dataset).
 
-### Geo (Geo Map Analysis) *(added 2026-07-05 — plan: [`archived-documents/plans-archive/geo-map-analysis-plan.md`](archived-documents/plans-archive/geo-map-analysis-plan.md))*
+### Geo (Geo Map Analysis) *(added 2026-07-05; as built: [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md))*
 
 **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic
 investigation: pick a **GeoSource** + **GeoQuery**, render on the offline MapLibre host, investigate (search,
@@ -806,7 +827,7 @@ routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** —
 | `EVENT_TABLE` / `TRANSFORMED_TABLE` / `REFERENCE_TABLE` | **`TABLE`** / **`DERIVED_TABLE`** / **`REFERENCE_DATASET`** | ✅ **DONE** (breaking → 5.0): `NodeKind` enum + all usages (`IdScheme`, `CatalogOverlay`, `MetadataGraphService`, `KpiToSqlSkill`, `SuggestConfigSkill`) + 5 test files; FE `models.ts` union + `node-detail.dialog.ts` `isStore()` + `catalog-graph.ts` shape/glyph. Id tokens (`event`/`xform`/`ref`) unchanged. ⚠️ `/catalog/graph` emits the new enum values (no alias). |
 | `LineageRow` *(file→partition rows)* | **Provenance** *(concept)* | `inspecto-etl/src/main/java/com/gamma/etl/LineageRow.java`, `ConsignmentAuditWriter`; the asset graph keeps the name *Lineage* |
 | Node *(user-facing, pipeline canvas)* | **Step** | ✅ **DONE — verified against source 2026-09-08** (amendment Phase 5). ⚠ This row read "NOT STARTED" long after it shipped; its own cited plan already said so at `elt-final-amendment-plan.md:411-414` ("`step-types` endpoint + UI slices S1–S4 SHIPPED 2026-08-06 … **Phase 5's verify gate is now met**"). **UI copy:** ~20 user-visible strings in the editor say **Step** — `aria-label="Step palette"` and `<h2>Steps</h2>` (`pipeline-editor.component.html:500,507`), `"Rename Step"` (`pipeline-inspector.component.ts:185`), `"Pipeline Steps"` (`pipeline-step-cards.component.ts:44`), `"Test this Step"` (`pipeline-config-definition.component.ts:254`). **Route:** `GET /pipelines/step-types` is served **and read** (`PipelineListRoutes.java:29,31`; `pipelines.service.ts:414`), with `/pipelines/node-types` still served and read as the palette's config-vocabulary source — i.e. this row's own "serve both during rollout", so **dual-read is the intended state, not debt**. **`NodeConfigDialog` copy:** target **obsolete** — the class was retired in `17accbef` when configuration moved into the non-modal definition drawer, so there was nothing to rename (⚠ `pipeline-step-cards.component.ts:326` still *names* it in a comment; do not reintroduce it). Internal `PipelineNode`/`BuiltinNodeType`/`NodeAttributes` KEPT as documented. ⚠ **One live residual:** `pipeline-inspector.component.ts:58` renders `<h3>Node · {id}</h3>` whenever `[compact]` is unset — which the read-only properties tab does (`pipeline-editor.component.html:801`). ⛔ The "node" strings in `pipelines.component.html` are the **topology** mode (the cross-pipeline STORE graph, "genuinely a different question" — `pipelines.component.ts:34-36`): a different concept, not this row's debt. |
-| Job *(user-facing, at-rest data work)* | **Job** *(kept — un-banned)* | **REVERSED 2026-08-06** (operator decision; same posture as the Source→Collector row's 2026-07-14 reversal). The planned migration to table-entry Pipelines (amendment Phases 3/6) is superseded: its enabling slice S3 was deferred as genuine new design, while Jobs are the shipped at-rest surface (9 registered types; cron/on_pipeline/on_signal/manual triggers). Jobs panes/routes and `*_job.toon` stay canonical; the authoring contract completes in `archived-documents/plans-archive/job-parameter-contract-plan.md` (§0-A). Engine internals unchanged; table-entry Pipelines proceed as an *additive* thread (S3a–d design of record), not a replacement. |
+| Job *(user-facing, at-rest data work)* | **Job** *(kept — un-banned)* | **REVERSED 2026-08-06** (operator decision; same posture as the Source→Collector row's 2026-07-14 reversal). The planned migration to table-entry Pipelines (amendment Phases 3/6) is superseded: its enabling slice S3 was deferred as genuine new design, while Jobs are the shipped at-rest surface (9 registered types; cron/on_pipeline/on_signal/manual triggers). Jobs panes/routes and `*_job.toon` stay canonical; the authoring contract **shipped 2026-08-07/10** (`okf/backend/control-plane/jobs.md`). Engine internals unchanged; table-entry Pipelines proceed as an *additive* thread (S3a–d design of record), not a replacement. |
 | Enrichment *(file kind + Step name)* | **table-entry Pipeline** / `transform: {join:}` | **NARROWED to nothing — 2026-09-06 operator decision after grounding** (same posture as the `Job` row's 2026-08-06 reversal; as-built verified 2026-09-08). The plan's own words: "**re-decided 2026-09-06 (operator, after grounding): KEEP `enrichment` first-class and NARROW D-4** — `enrichment` is not deprecated and not read-only; only single-join enrichments expressible as one at-rest chain migrate, join+aggregate over a landed store stays on `enrichment`. The one committed fixture (`orders_daily_enrich.toon`) is join+aggregate, so NOTHING migrates" (`superpower/elt-final-amendment-plan.md:997`). As-built confirms it: `ENRICHMENT` is a first-class TRANSFORM (`BuiltinNodeType.java:167`), present in `ConfigSpecs.TYPES` (`:31-33`), with the full `/enrichment` surface incl. `POST` (`EnrichmentRoutes.java:38-49`); `EnrichmentEngine` is live with four production callers (`EnrichmentService.java:205`, `EnrichJob.java:41`, `EnrichmentProcessor.java:53`, `EnrichmentRoutes.java:148`); no converter exists in `tools/`. The *target* spelling shipped separately and **additively** as `transform.join` (`BuiltinNodeType.java:148`, `RowShaper.java:166`, `NodeAttributes.java:382`). ⛔ **Not a pending rename — do not re-file it as one.** ⚠ The plan calls `D4-ENRICH-1` closed, but that ID appears nowhere in `BACKLOG.md`: the closure is recorded only there. |
 | `materialize` *(maintenance task as Matrix authoring)* | **`summarize` Step** | **DROPPED as done-by-absence — D-7, 2026-09-06.** `BACKLOG.md` §6: "Decided 2026-09-06, keep as designed: … D-7 `materialized` is done-by-absence"; the plan: "**D-7 DROPPED as done-by-absence** (no authored config spells `materialized`; `MaterializeTask` is a Job, not authoring)" (`elt-final-amendment-plan.md:997`). Verified 2026-09-08: **zero** occurrences of `materialized` in any `*.toon` under `spaces/` or `inspecto/`. The `summarize` Step shipped **independently** — `TRANSFORM_SUMMARIZE` (`BuiltinNodeType.java:156`), executing `RowShaper.java:173` → `:462`, contract `step-types.contract.json:520-521` — while `MaterializeTask` remains a maintenance **Job** (`MaterializeTask.java:28-33`, dispatched at `MaintenanceJob.java:179` `case "materialize"`). The two share only the **measure grammar**: "one measure grammar across the summarize node, materialize jobs and BI queries" (`BuiltinNodeType.java:152-154`) — never the compile-target coupling this row described. The **Matrix** noun (summary Derived Table, Cube row above) is unaffected. |
 | `mapping:` *(block inside `*_schema.toon`)* | **Mapping** *(own CSV component kind)* | 🟡 **PARTIAL — Phase 1 slice 3 shipped, two touchpoints open** (verified against source 2026-09-08; the row read "NOT STARTED"). ✅ Mapping **is** a registered CSV component kind (`ComponentRegistry.java:51` `CSV_KINDS = Set.of("mapping")`, `:58` the `mappings`→`mapping` entry). ✅ The schema TOON codec splits and re-merges: `ConfigWriteRoutes.java:236-246` `splitMapping` writes the sibling CSV and strips `rules`, `ConfigFileSupport.java:146-158` `mergeSiblingMapping` reads it back (`ComponentStore.java:212`). ✅ Editor UI shipped — `'mapping'` in the `ComponentType` union and `COMPONENT_TYPES`, `POST /components/mapping/validate` (`components.service.ts:16,32,248`), `mapping-editor.dialog.ts`. ⛔ **OPEN (a):** `ConfigSpecs` has **no `mapping()` spec at all** — `mapping.canonicalName` is still declared as a *schema* field (`ConfigSpecs.java:697-712`), `TYPES` (`:31-33`) omits `"mapping"`, and `forType` (`:40-51`) has no `mapping` case. ⛔ **OPEN (b):** the one-shot fixture conversion never ran — **24 committed `*_schema.toon` still carry an inline `mapping:` block**, and the single `*_mapping.csv` in the tree is **untracked**, so **zero committed fixtures are migrated**. |

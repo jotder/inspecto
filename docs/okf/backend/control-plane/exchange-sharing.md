@@ -161,5 +161,6 @@ whole Dataset or offers a pre-filtered derived one). No wholesale/public scope.
 
 ## Design-of-record
 
-`docs/archived-documents/plans-archive/storage-layout-and-sharing-plan.md` — the full phasing (L0–S3 +
-UI track), now entirely shipped; kept for provenance/rationale, not maintained.
+**This page is the design of record.** *(Provenance:
+`docs/archived-documents/plans-archive/storage-layout-and-sharing-plan.md` carries the original L0–S3 + UI-track
+phasing, entirely shipped; kept for rationale, never maintained — do not read it for what is built.)*
