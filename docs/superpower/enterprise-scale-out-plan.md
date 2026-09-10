@@ -1,14 +1,14 @@
 # Enterprise Scale-Out on Kubernetes — Design Plan
 
-> **Status: DRAFT for operator sign-off — 2026-09-10. Nothing here is built; nothing here is decided
-> until §9 is signed.**
+> **Status: SIGNED 2026-09-10 (operator) — D1′–D13, all recommendations accepted, D9 refined by D8, D13 added by the
+> operator. Nothing here is built yet; phase A may start once spikes S1–S5 report.** The §2 amendments are applied.
 >
 > ✅ **Two directions taken by the operator on 2026-09-10, ahead of the full signature:** *fault-tolerant DR
 > is a **Standard** capability; the Kubernetes cluster is **Enterprise**.* Recorded in `editions.md` §4 and
 > applied to its §3.9 topology table (T4 → Standard; T5 added as Enterprise). 🔴 **This reshapes the
 > sequencing more than it reshapes the design**: phases A and B are no longer "valuable on a single node" —
-> they ARE the Standard DR deliverable and must ship in the Standard bundle. D8 is thereby decided; D1′–D7
-> and D9–D12 remain owed.
+> they ARE the Standard DR deliverable and must ship in the Standard bundle. D8 was decided first; D1′–D7
+> and D9–D13 were signed later the same day (§9).
 >
 > **What this plan does.** Turns the operator's 2026-09-10 direction — *"on Enterprise I plan K8s
 > scaling"* — into a design the code can actually carry, sequenced so that the first two of its three
@@ -64,7 +64,7 @@ follows from that.
 
 ---
 
-## 2. What this plan amends — exact text, applied on sign-off
+## 2. What this plan amends — exact text, APPLIED 2026-09-10 with the signature
 
 | Recording document | Today (verbatim) | Proposed on sign-off |
 |---|---|---|
@@ -340,6 +340,12 @@ Work under (ii):
 - **Reads attach the shared catalog.** Any pod's dashboards and Query Library can read every slice's
   Parquet through one `ATTACH`. This is what makes model A a platform rather than N isolated islands —
   and it is the property that lets one pod serve BI over data another pod ingested.
+- **An external query surface on Postgres (D13, operator 2026-09-10).** Postgres views over the same
+  Hive-partitioned Parquet, executed by Postgres's DuckDB extension, give BI tools and SQL clients one
+  standard Postgres endpoint over every slice — without going through a pod. It is a READ surface only:
+  visibility stays the catalog commit above, because a Hive glob exposes a half-written file the moment
+  it appears. Gated on spike S5 (extension availability on the customer's Postgres); if S5 fails on managed
+  Postgres, the surface is documented as self-managed-only, not dropped.
 - `dirs.database` becomes a URI (`s3://…`) in partitioned mode; `PathJail` and the write-root gate
   (§3.9) need an object-store-aware containment rule, since prefix containment is not path
   containment.
@@ -401,18 +407,19 @@ pass because two "pods" secretly shared a heap.**
 
 | # | Question | Recommendation |
 |---|---|---|
-| **D1′** | Revise the signed container decision so the image is the Enterprise unit of deployment and orchestration is in scope for Enterprise? | **Yes.** Personal/Standard stay orchestrator-free; §2 amendments applied on signature |
-| **D2** | Scaling model | **A — shared-nothing partitioning.** B refused, not deferred |
-| **D3** | Partition unit | **Space**, not pipeline — it is already the namespace for every store and directory |
-| **D4** | Shared lakehouse | **(ii) object store + DuckLake catalog on Postgres**, catalog commit as visibility; (i) shared POSIX volume kept as a documented fallback for sites without object storage |
-| **D5** | Lease mechanism | **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator) |
-| **D6** | Events across pods | **Add `events.backend=db`** on the existing `EventStore` seam |
-| **D7** | Connection pool | **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work |
+| **D1′** | Revise the signed container decision so the image is the Enterprise unit of deployment and orchestration is in scope for Enterprise? | ✅ **SIGNED 2026-09-10 (operator)** — **Yes.** Personal/Standard stay orchestrator-free; §2 amendments APPLIED with this signature |
+| **D2** | Scaling model | ✅ **SIGNED 2026-09-10 (operator)** — **A — shared-nothing partitioning.** B refused, not deferred |
+| **D3** | Partition unit | ✅ **SIGNED 2026-09-10 (operator)** — **Space**, not pipeline — it is already the namespace for every store and directory (and, since `SPACES-GOVERNOR-1`, for admission state) |
+| **D4** | Shared lakehouse | ✅ **SIGNED 2026-09-10 (operator)** — **(ii) object store + DuckLake catalog on Postgres**, catalog commit as visibility; (i) shared POSIX volume kept as a documented fallback for sites without object storage |
+| **D5** | Lease mechanism | ✅ **SIGNED 2026-09-10 (operator)** — **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator). Per D8 this lease is also Standard's T4 standby |
+| **D6** | Events across pods | ✅ **SIGNED 2026-09-10 (operator)** — **Add `events.backend=db`** on the existing `EventStore` seam |
+| **D7** | Connection pool | ✅ **SIGNED 2026-09-10 (operator)** — **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work (spike S3 first) |
 | **D8** | Tier naming | ✅ **DECIDED 2026-09-10 (operator):** **T5 — partitioned scale-out on Kubernetes** = **Enterprise**, added to §3.9; **T4 active/passive DR moves to Standard**. Applied |
-| **D9** | The "zero external runtime services" claim | **Keep it for Personal/Standard; Enterprise states its two dependencies** (Postgres, S3-compatible object store) |
-| **D10** | `DuckLakeRegistrar` failure in partitioned mode | **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see |
-| **D11** | Dynamic rebalancing | **Deferred to phase C+1**; static Space→pod assignment first |
-| **D12** | The partitioned-mode switch's name | Open — `-Dinspecto.topology=partitioned` proposed |
+| **D9** | The "zero external runtime services" claim | ✅ **SIGNED 2026-09-10 (operator)** — refined by D8: **Personal — zero. Standard — zero unless DR (T4) is enabled, then Postgres. Enterprise — Postgres + S3-compatible object store.** The 90 MB artifact claim stays true: same artifact, plus YOUR services |
+| **D10** | `DuckLakeRegistrar` failure in partitioned mode | ✅ **SIGNED 2026-09-10 (operator)** — **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see; single-node mode keeps today's opt-in, warn-only behaviour |
+| **D11** | Dynamic rebalancing | ✅ **SIGNED 2026-09-10 (operator)** — **Deferred to phase C+1**; static Space→pod assignment first |
+| **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Standard's two-pod T4 standby is partitioned without being a cluster |
+| **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4 |
 
 ---
 
@@ -428,6 +435,9 @@ pass because two "pods" secretly shared a heap.**
   dependency sign-off per the repo's no-heavy-transitive rule.
 - **S4** — Two `ControlApi` instances in one JVM: which `static` registries collide (§7's caveat),
   and whether per-instance scoping is a small change.
+- **S5** *(D13)* — Install the DuckDB extension on a Postgres, create a view over a Hive-partitioned
+  Parquet prefix on MinIO, query it from `psql`; then record which managed Postgres services permit the
+  extension. Decides whether the external query surface is general or self-managed-only.
 
 ---
 
@@ -436,6 +446,8 @@ pass because two "pods" secretly shared a heap.**
 A **three-message product** since the 2026-09-10 tier decision, and each message holds:
 
 - **Personal** — *the 90 MB artifact: zero external services, runs on a laptop or an air-gapped server.*
+  *(D9: **Standard** is zero too unless T4 DR is enabled, which needs a Postgres; **Enterprise** states Postgres +
+  an S3-compatible object store — the same artifact, plus your services.)*
   Unchanged.
 - **Standard** — *the same artifact, and if the node dies the standby takes over inside the signed RTO.*
   **Fault-tolerant DR** (T4) is the Standard headline beside the Ops workflow and the audit pack. Its

@@ -6,7 +6,7 @@
 
 **Inspecto** is a lean, configuration-driven **data acquisition + management + BI + investigation
 platform**: one ~90 MB self-contained artifact that runs on a laptop, an air-gapped server, or a
-container — with **zero external runtime services**. One declarative config file onboards a data feed;
+container — with **zero external runtime services** in Personal (Standard adds a Postgres only for fault-tolerant DR; the Enterprise cluster adds Postgres and object storage). One declarative config file onboards a data feed;
 no pipeline project, no cluster, no glue scripts.
 
 **It replaces four tool categories at once:** a NiFi-style collection/pipeline layer, a

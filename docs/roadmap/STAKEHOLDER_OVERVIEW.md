@@ -35,7 +35,7 @@ This is a high-level overview written for a mixed audience. It opens with the bu
 The platform is built around three convictions that differentiate it from heavyweight data stacks:
 
 - **One config file, not a pipeline project.** A new feed is onboarded by authoring (or generating) one declarative file — no code deploy, no DAG framework, no cluster.
-- **Lean and self-contained.** The entire engine — including the embedded analytical database — is a single ~90 MB artifact. It runs on a laptop, an air-gapped server, or a container with equal ease, and has zero external runtime dependencies in its core.
+- **Lean and self-contained.** The entire engine — including the embedded analytical database — is a single ~90 MB artifact. It runs on a laptop, an air-gapped server, or a container with equal ease, and has zero external runtime dependencies in its core. *(Per edition, decided 2026-09-10: Personal — zero; Standard — zero unless fault-tolerant DR is enabled, which needs a Postgres; Enterprise — Postgres and an S3-compatible object store, for the partitioned cluster. Same artifact in every case.)*
 - **Operable by design.** Every run is crash-isolated and idempotent; everything that happens is captured as metrics, structured events, three-layer audit, and managed operational objects (alerts, issues, cases) — surfaced through a REST API and an operator web console.
 
 Over the last several release lines the platform has matured from a single-purpose file multiplexer into a layered platform: a **two-stage ETL engine**, a **data-acquisition framework** for remote/secure file collection, a **NiFi-style flow-graph** authoring and execution model, an **operational-intelligence** layer (events → alerts → managed cases), and an **embedded AI assist agent** that turns config authoring, scheduling, and querying into natural-language interactions.
@@ -320,7 +320,7 @@ The edition model is also the monetization model. **Personal** is the zero-frict
 The architecture choices translate directly into cost-of-ownership advantages that resonate with budget owners:
 
 - **No cluster to run.** A single process with an embedded engine means no cluster sizing, no node fleet, no broker/coordinator services to patch and monitor. The operational headcount to run Inspecto is a fraction of a distributed stack's.
-- **No external runtime services in the core.** The fat JAR bundles its database and parsers; there is no separate warehouse, message bus, or orchestration server to license, host, and secure for the base product.
+- **No external runtime services in the core.** The fat JAR bundles its database and parsers; there is no separate warehouse, message bus, or orchestration server to license, host, and secure for the base product. Standard adds a Postgres only when fault-tolerant DR is enabled; Enterprise's partitioned cluster adds Postgres and an S3-compatible object store (decided 2026-09-10).
 - **Cheap marginal feeds.** Because a feed is config (or a generated draft), onboarding the *n*-th feed is hours, not a project — the cost curve flattens instead of compounding.
 - **Small SBOM, small patch surface.** Fewer dependencies means fewer CVEs to track, fewer emergency patch cycles, and a smaller compliance-attestation effort — a recurring, often-underestimated cost.
 - **Predictable scaling.** Vertical scale (a bigger node) covers a wide band before the optional distributed tier is needed, and that tier is adopted only when a real workload requires it — capacity is bought when used, not speculatively.
