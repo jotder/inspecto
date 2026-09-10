@@ -140,6 +140,25 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **`grep -r` on this sandbox returns ZERO hits for strings `git grep` finds** (2026-09-10, three times in one shift:
+  `source_timezone` in four UI files; two UI callers and a Java test of `/config/suggest/schema`). Each time the
+  false negative was one step from filing a shipped surface as missing or a live route as an orphan. **Absence is
+  concluded only from `git grep`**; `grep -r` may locate, never negate.
+- 🔴 **A verify agent's reactor total is a claim, not a measurement.** Two reports in one shift under-summed
+  (3430 for a 4178 run) by skipping modules; the third was right only because it was told how to sum. Re-sum the
+  per-module `Tests run:` lines — the ones WITHOUT `-- in` — from the log before writing any number down.
+- 🔴 **Python's default text read converts CRLF→LF, so a "restored" file shows `M` with an empty diff** (2026-09-10).
+  Open with `newline=''`, match on the file's own EOL, and `git checkout --` a stat-only ghost. Related: the Bash tool
+  collapses backslashes inside heredocs AND `python -c`, so a `
+` in an `old` string matches nothing and a regex's
+  `\b` reaches the file as `` — author scripts with the Write tool and assert `count == 1` on every replace; that
+  assert is what caught every instance.
+- 🔴 **Ground a decision before asking it, and read a free-text answer against the QUESTION.** Of the decisions
+  "owed to the operator" on 2026-09-10, three dissolved on measurement (`CONTRACT-ORPHAN-1`'s premise was a `grep`
+  false negative; `MAPPING-SPELLING-1` conflated a finished migration with an unstarted one; the register's `PATH-2`
+  "refusal" was unbuilt work). And one answer to "lease mechanism" was a query-surface idea — recorded against the
+  wrong question it would have become a signed decision nobody made; read against the question it became D13.
+
 - 🔴 **A guard whose scope is mostly EXEMPTION is measuring the wrong thing — so measure the obvious
   design before building it.** Three of Sprint 3's five guard designs died on measurement, and each would
   have shipped green while proving little. The sharpest example: a guard that scans prose for a stated
