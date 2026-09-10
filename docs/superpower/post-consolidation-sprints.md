@@ -1,6 +1,11 @@
-# Post-consolidation plan — six sprints
+# Post-consolidation plan — eight sprints
 
-> **Status: Sprints 1 and 2 DONE 2026-09-09; Sprints 3–6 proposed.** Written the shift the seventeenth capability spec landed
+> **Status 2026-09-10: Sprints 1–5 DONE; Sprint 6 is steady state; Sprints 7–8 ADDED by operator decision
+> (2026-09-10) — one bounded documentation closeout, then pure implementation from a ranked queue. Every
+> operator decision this plan ever carried is closed (see the last section). This plan archives when Sprint 7
+> closes; Sprint 8 is owned by `BACKLOG.md` §0 and the signed scale-out plan, not by this document.**
+>
+> *(Original status: Sprints 1 and 2 DONE 2026-09-09; Sprints 3–6 proposed.)* Written the shift the seventeenth capability spec landed
 > (`35cc8579`). It sequences what the consolidation left behind: the remaining steps of
 > [`docs-consolidation-plan.md`](docs-consolidation-plan.md) (steps 5–9, whose exit criteria are already
 > written there and are **reused verbatim** below, never re-invented), plus the ~215 findings the seventeen
@@ -317,7 +322,51 @@ durable facts are distilled loses design, which is precisely the trap the deploy
 partial** step processors (each a named product decision), the deployment phases 0–5, and the authoring
 letters whose preconditions are discharged.
 
-No exit criterion — this is the resumption of normal service, not a project.
+No exit criterion — this is the resumption of normal service, not a project. ⚠ In practice Sprint 6's first two
+picks (`quality.schema.drift`, then `MAPPING-GEN-1`, `STANDARD-BUNDLE-1`, `SPACES-GOVERNOR-1`) shipped on 2026-09-10,
+and the same day's decision round changed what comes next — hence Sprints 7 and 8 below.
+
+---
+
+## Sprint 7 — Documentation closeout (one shift; decided 2026-09-10)
+
+**Goal:** end the documentation programme so that nothing after it is documentation work. The operator chose this
+over interleaving and over deferral: *one bounded docs sprint now, then pure coding.*
+
+| # | Work | Its stated exit |
+|---|---|---|
+| 7.1 | [`docs-consolidation-plan.md`](docs-consolidation-plan.md) **step 1** — the ~16 remaining authority citations into archive files (`GLOSSARY.md`'s four rationales, `grammar-config.md:126`, the okf "full phasing" / "grounded refutation" delegations, the completeness-kpi pointer) | *no current-tier doc cites an archive file as its authority; link guard green* |
+| 7.2 | **step 1b** — the remaining 5 of 7 ORPHAN archive docs land in their area specs (`modularization-optimization` C2/C4/C6 → `editions/` §6 · `snazzy-painting-platypus` → `surfaces/` §6 · `system-maintenance-plan` COULD list → `observability/` §5 · `frontend-review-and-completion-plan` → the `angular-ui` skill · `claude-usage-audit` → none, meta) | *each ORPHAN has a destination; `BACKLOG.md` §6 no longer cites an archive file as the sole home of C2/C4/C6* |
+| 7.3 | `SPEC-GLOSSARY-1` — `Segment`, `Control`, `Evidence` defined; the two `Case`s and the two `Stream`s split; the PII/INTERNAL classification vocabulary owned | *`GLOSSARY.md` is binding; one word → one concept; vocabulary guard green* |
+| 7.4 | `SPEC-MOCKRESIDUE-1` — the 20 current-tier docs that still describe the deleted mock backend, incl. the two that tell a contributor to edit a file that does not exist | *`git grep` for the mock layer's names returns only the archive tier and the removal record — the count is the acceptance test* |
+| 7.5 | `SPEC-PLANSTALE-1` remainder — the pipeline spec's "what actually runs" (five dead classes, "a new Step type cannot be added") corrected before it moves | *a plan's header agrees with its own later rows* |
+| 7.6 | **Archive the three release-gated plans** (`pipeline-spec.md`, `pipeline-waves-drain-plan.md`, `elt-final-amendment-plan.md`) — operator 2026-09-10: after a **distillation diff** against `pipeline-execution.md` / `pipeline-authoring.md`, repointing the 7 inbound citations; the board keeps row 15 | *`superpower/` holds the signed scale-out plan and nothing else once 7.7 runs* |
+| 7.7 | **Close this plan and [`docs-consolidation-plan.md`](docs-consolidation-plan.md)** — distil their durable lessons into `PROJECT_NOTES.md` §4 / `tooling.md`, then `git mv` both to the archive with an INDEX row each | *the in-flight tier is exactly one plan; `INDEX.md` matches* |
+
+⛔ **Not in Sprint 7:** `SPEC-ORPHANPAGE-1` stays P3 (an undocumented pane is a smaller problem than a wrongly
+documented one); consolidation step 10 is CLOSED as *no deletion* — the archive is provenance. `STREAM-CONSUMER-1`'s
+design pass is engineering, not documentation, and belongs in Sprint 8.
+
+**First command:** `node tools/check-doc-links.mjs` then `git grep -n 'archived-documents' -- 'docs/okf/**/*.md' docs/GLOSSARY.md | grep -v 'ARCHIVED\|provenance'` — the step-1 citations are the ones that remain.
+
+---
+
+## Sprint 8+ — Pure implementation (decided 2026-09-10; owned by the board and the signed plan)
+
+**Goal:** code only. The operator ranked the queue; each item names its proof before it starts.
+
+| Rank | Work | Owner of record | Proof it is done |
+|---|---|---|---|
+| 1 | **Scale-out spikes S1–S5** ([`enterprise-scale-out-plan.md`](enterprise-scale-out-plan.md) §10, each ≤ half a day). Order by what runs here: **S2** (`PartitionSinkWriter` reveal seam) and **S4** (two `ControlApi` in one JVM — which statics collide) are code-reading, runnable offline; **S3** (HikariCP in the `-o` cache) is a one-command check; **S1** (two DuckDB processes, one MinIO bucket, one `ducklake:postgres:` catalog) and **S5** (pg_duckdb on a Postgres) need MinIO + Postgres | plan §10 | each spike's result written into the plan's §3 seam it tests; a failed S1 reopens D4 |
+| 2 | **Phase A — shared state** (plan §5.1/§5.2): `-Dinspecto.topology=partitioned` profile; every `*.backend` on Postgres with fallback a boot failure; `events.backend=db`; the pool (P1+P2); **the lease** — `RunLeaseContractTest` first (§7), then `PostgresRunLease`, `lastRunAtMs` on the lease row, `JobService` cron arming through it. ⚠ **This is Standard's T4 DR deliverable (D8)** — ships in the Standard bundle, never behind `inspecto-policy` | plan §5, `editions.md` §3.9 T4 | the §7 contract test green on two JVMs sharing one Postgres; T4's promote runbook needs no manual step |
+| 3 | **Phase B — Space→pod assignment** (plan §5.3): static partition map; no pod polls an inbox it does not own; `SPACES-GOVERNOR-1` already Space-keyed the admission state | plan §5.3 | two pods, disjoint Spaces, one Postgres: every batch committed exactly once |
+| 4 | **Phase C — the shared lakehouse** (plan §5.4): `dirs.database` as `s3://…`, `CatalogCommit` as visibility, `RenameReveal` only on local paths, `DuckLakeRegistrar` fatal (D10), object-store-aware containment; then **D13's external query surface** if S5 passed | plan §5.4 | a file written by pod 1 is queryable from pod 2 exactly at commit; a half-written file never is |
+| 5 | **The five `CONSUMER-PAIRS-1` rows** — `CLIENT-HALVES-1` (If-Match · permissions[] via the interceptor · SSE) · `EXPECTATIONS-UI-1` (a Must) · `STUDIO-HALVES-1` · `AGT-ARTIFACT-1` · `RETIRE-HALVES-1`. Single-node, mostly UI; **the filler whenever a spike is blocked on infrastructure** | `BACKLOG.md` §3 | each spec's §2 row flips from "no client" to shipped, or the route is gone |
+| 6 | Sprint 6's product partials by name (`sink.api.webhook` → `sink.notify.email` → `transform.diff.compare`), `OPENAPI-GEN-1`, `STREAM-CONSUMER-1`'s design pass | `BACKLOG.md` §3/§4 | the processor catalog flips; the route table generates the OpenAPI skeleton |
+
+⛔ **Two rules carried forward from Sprints 1–5, because they were the shift's most expensive lessons:** a change ships
+with a **falsified** proof (the mutant that compiles and fails on the intended assertion — `-pl X -am`, never `-pl X`),
+and a reactor total is **re-summed from the log** by the shift, never taken from a verify agent's report.
 
 ---
 
