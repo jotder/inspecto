@@ -55,7 +55,7 @@ design; routes answer 503 in every bundle."* Built and tested; blocked on the Ja
 
 ### 1.3 Measured capacity — the only numbers we may quote
 
-Source: `docs/okf/backend/build-run/performance.md` (JDK 26 / DuckDB 1.5.2, `PipelineBenchmark`,
+Measured in `docs/okf/backend/build-run/performance.md` (JDK 26 / DuckDB 1.5.2, `PipelineBenchmark`,
 2M-row files, re-measured at v3.9.0 with no regression). Ingest cost is linear in **cells** (rows ×
 columns), so capacity is a cells-per-second figure divided by width.
 
@@ -246,7 +246,7 @@ counts; SSO as a feature (table stakes).
 
 ---
 
-## 7. Sources
+## 7. References
 
 Verified 2026-09-10: [Harris acquires i2 from IBM](https://i2group.com/articles/harris-acquires-i2-product-portfolio-from-ibm) ·
 [Mobileum acquires WeDo](https://www.mobileum.com/about/news-press-releases/mobileum-inc-acquires-wedo-technologies/) ·
