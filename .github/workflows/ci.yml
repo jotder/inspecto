@@ -129,6 +129,20 @@ jobs:
       - name: Guard — every stated product count is derived from its contract
         run: node tools/check-doc-counts.mjs
 
+      # NUL-byte guard (2026-09-10). Found while running scale-out spike S4: an agent reported one file
+      # "drops out of a naive content grep"; measured, a recursive `rg -l --glob '*.java' 'SHARED'` over
+      # the module listed three files and NOT the fourth, although that fourth declares `SHARED`. ripgrep
+      # treats a file containing a NUL byte as binary and skips it when recursing — but still searches it
+      # when the path is named, which is why spot-checking one file passes and the hole stays invisible.
+      # Five tracked source files were affected (three Java, two TypeScript), six occurrences, every one a
+      # separator character in a composite map key written as a raw 0x00 rather than the escape. This
+      # repository reviews itself with grep, so this is a search-integrity guard, not a formatting one.
+      # Falsified four ways: a NUL back into a tracked .java failed with file+line; a NUL in an UNTRACKED
+      # file passed (the scope claim); a NUL appended to a tracked .png passed (the extension exemption);
+      # the clean tree passed over 3,693 files.
+      - name: Guard — no tracked text file contains a NUL byte
+        run: node tools/check-nul-bytes.mjs
+
       # SBOM module-set guard (2026-09-09). tools/sbom.mjs built its first-party table from FOUR artifacts
       # under a comment claiming it was "the SAME table package.ps1 stages from". It was not, and had not
       # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Enterprise, so every shipped

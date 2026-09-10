@@ -207,6 +207,23 @@ if ! run_guard tools/check-doc-counts.mjs "doc-count guard" \
   exit 1
 fi
 
+# NUL-byte guard (2026-09-10, found by scale-out spike S4). One NUL byte makes a whole tracked text
+# file INVISIBLE to every recursive ripgrep, so it silently drops out of every sweep and census while
+# still matching when its path is named explicitly — which is precisely what hides the hole. Five
+# source files were affected, six occurrences, each a separator in a composite map key written as a
+# raw 0x00 instead of the escape. This repository reviews itself with grep, so a silent false negative
+# in grep is worse than a wrong answer. Falsified four ways before wiring: a NUL put back into a
+# tracked .java failed WITH its file and line; a NUL in an UNTRACKED file passed (the scope claim);
+# a NUL appended to a tracked .png passed (the extension exemption); and the clean tree passed.
+if ! run_guard tools/check-nul-bytes.mjs "NUL-byte guard" \
+     "CI runs it too — a NUL byte there makes a file unsearchable for everyone."; then
+  echo "pre-push: refusing to push — a tracked text file contains a NUL byte (above)." >&2
+  echo "          Fix the FILE. If the byte is a separator in a composite key, write the two-character" >&2
+  echo "          escape instead: it compiles to the same character in Java, TypeScript and JavaScript," >&2
+  echo "          and it leaves the file searchable." >&2
+  exit 1
+fi
+
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
 echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2

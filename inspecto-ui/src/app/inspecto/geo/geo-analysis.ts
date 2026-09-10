@@ -335,7 +335,7 @@ export function coLocations(points: readonly GeoPoint[], radiusM: number, window
             if (Math.abs(p.time! - q.time!) > windowMs) continue;
             if (haversineMeters(p.lat, p.lon, q.lat, q.lon) > radiusM) continue;
             const [a, b] = [p.label!, q.label!].sort();
-            const key = `${a} ${b}`;
+            const key = `${a}\0${b}`;
             const at = Math.min(p.time!, q.time!);
             const hit = byPair.get(key);
             if (hit) {

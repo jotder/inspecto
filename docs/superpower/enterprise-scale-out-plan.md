@@ -1,7 +1,14 @@
 # Enterprise Scale-Out on Kubernetes — Design Plan
 
 > **Status: SIGNED 2026-09-10 (operator) — D1′–D13, all recommendations accepted, D9 refined by D8, D13 added by the
-> operator. Nothing here is built yet; phase A may start once spikes S1–S5 report.** The §2 amendments are applied.
+> operator. Nothing here is built yet.** The §2 amendments are applied.
+>
+> ✅ **SPIKES RUN 2026-09-10 — S2, S3 and S4 are CLOSED; S1 and S5 are answered in part and their live
+> halves are still owed** (they need a reachable Postgres and an S3-compatible endpoint, which the sandbox
+> that ran them has not got). Each result is written into the §3 seam it tests, and §10 carries the
+> summary table. 🔴 **Phase A must NOT start on the strength of S1**: the concurrent-registration
+> assumption is still unverified on Postgres, and a failed S1 reopens D4. S3 and S4 clear their own
+> preconditions outright, and S4 changes how §7's test must be built.
 >
 > ✅ **Two directions taken by the operator on 2026-09-10, ahead of the full signature:** *fault-tolerant DR
 > is a **Standard** capability; the Kubernetes cluster is **Enterprise**.* Recorded in `editions.md` §4 and
@@ -110,6 +117,33 @@ pipeline id in a `ConcurrentHashMap` (`:58, :80-82`), deliberately non-reentrant
 It guards **ingest exclusion per pipeline**, not acquisition (that is the separate `acquireGuard`,
 `PipelineScheduler.java:141`). It is the single most important seam in this plan and it is small.
 
+✅ **S4 ANSWERED 2026-09-10 — and the answer changes §7's approach.** `PipelineRunGuard` is **not** static:
+each instance owns its own, which is precisely why a lease is needed — two instances' guards do not
+coordinate, so both can "win" their own local exclusion at the same time.
+
+On the collisions, the plan's four named suspects are real but **already Space-keyed** (`EventLog.SPACES`,
+`StabilityGate.SHARED`, `AcquisitionLedgers.LEDGERS`, and the `IntakeGovernor` admission maps), so they
+collide only when two simulated pods host the **same Space id** — which is exactly §7's setup, so the
+caveat stands. What the plan did **not** name matters more:
+
+- 🔴 **Four statics have NO Space dimension at all**: `CircuitBreaker.SHARED` and `GapTracker.SHARED` keyed
+  on a bare collector id, and `IngestProgress.CURRENT` and `StepProgress.CURRENT` keyed on a bare pipeline
+  name. These collide across **any** two Spaces that share a collector or pipeline name — a **pre-existing
+  defect independent of this plan**, filed on `BACKLOG.md`, not fixed here.
+- 🔴 **`IntakeGovernor`'s fleet policy is process-wide by design, and `setGlobalPolicy` calls `caps.clear()`**
+  — so one simulated pod would wipe *every* Space's learned admission caps, not just its own.
+- ⚠ **`AcquisitionLedgers` has three MORE process-wide maps** (pending checksums, listings, DB watermarks)
+  keyed on an **absolute file path** and documented as deliberately not per-Space. Two pods sharing one
+  `dirs.poll` collide there directly. The plan's "transient maps" citation undercounted them.
+
+**Sizing:** genuine per-*instance* scoping is **not spike-sized** — no instance-id concept exists anywhere
+today, and adding one touches **12+ classes and 60–90+ sites** (8 registries already share one Space-keyed
+idiom; the 4 unkeyed classes need a dimension added from scratch, across ~15 call sites). ⇒ **Take the
+plan's own escape hatch for §7: give each simulated pod its own classloader.** That needs **zero**
+production changes and the technique is **already proven in this repo** for pack-jar isolation. ⛔ No
+existing test boots two control planes in one JVM — `ControlApiMultiSpaceTest` puts several Spaces inside
+**one** instance, which is the trap §7 warns about.
+
 ### 3.3 Twelve operational store families — ten verified on Postgres, two code-capable
 
 ⚠ Premise corrected: this plan's author had "9 of 12". The roster of record is
@@ -150,6 +184,17 @@ replacement for `browseConnection()`, **P3** schema-per-Space URL wiring (not da
 **P4** a `CaseStore` seam for the JSONL ring. Its reopen trigger was *"the first multi-operator
 install"*. **This plan is that trigger.**
 
+✅ **S3 ANSWERED 2026-09-10 — HikariCP is available offline and needs NO dependency sign-off.** Measured, not
+read off a pom: `HikariCP 6.3.0` is in the local Maven cache with clean checksums, and `dependency:list`
+under this repo's own parent resolves **offline, BUILD SUCCESS**, with exactly **one** transitive
+dependency — `org.slf4j:slf4j-api`, pinned by the parent's `dependencyManagement` to **2.0.17** rather than
+Hikari's requested 1.7.36. slf4j is already first-class here: parent-managed, declared by **11** modules,
+used by **179** Java files, and already in `tools/dependencies.lock` (twice). ⇒ **The lock delta is a single
+line**, `com.zaxxer:HikariCP:jar:6.3.0:compile`, so the no-heavy-transitive rule is satisfied without a
+sign-off. It is also a proper JPMS module (`com.zaxxer.hikari`), which matters because the bundle jlinks.
+⚠ The cache also holds `2.6.1` from 2017, with `.lastUpdated` markers from a failed resolution — do not pick
+it up by accident.
+
 ### 3.5 `DuckLakeRegistrar` — the shared-lakehouse enabler already exists
 
 `inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java:40-63` reads
@@ -159,7 +204,30 @@ install"*. **This plan is that trigger.**
 DuckLake's own documentation: *"If you would like to operate a multi-user lakehouse with potentially
 remote clients, use PostgreSQL as the catalog database"*, with concurrent writers coordinated by
 Postgres transactions. A Postgres-backed shared catalog is therefore **a configuration change, not a
-code change** — verified 2026-09-10, spike S1 confirms it end-to-end.
+code change** in the sense that the catalog URL is interpolated raw and accepts a `postgres:` spec.
+
+🔴 **This paragraph claimed "verified 2026-09-10, spike S1 confirms it end-to-end" BEFORE S1 had been run.**
+It has now been run (§10) and **the end-to-end claim is still not established** — the Postgres-catalog and
+object-store halves need a Postgres and a MinIO, neither of which the sandbox has. What S1 *did* establish,
+by measurement against the pinned DuckDB 1.5.2.1:
+
+- ✅ **The `ducklake` extension loads**, and the three catalog spellings all parse at `ATTACH`: a DuckDB
+  file, `ducklake:sqlite:…`, and `ducklake:postgres:…`. The Postgres path is **compiled in and reaches a
+  real connection attempt**, failing only for want of a listening server.
+- ✅ **Cross-process visibility holds.** Three separate OS processes against one catalog: writer A commits
+  25 rows, writer B commits 25 after A exits, and a **fourth, fresh process sees all 50** (52 snapshots).
+  A commit does cross a process boundary.
+- 🔴 **Concurrent registration FAILS on a SQLite catalog, so SQLite is not a stand-in for Postgres.** Two
+  writer processes at once: one could not even `ATTACH` (*"database is locked"*), the other committed **0 of
+  40** over 210 seconds. ⇒ The catalog backend is **load-bearing, not incidental** — which is the plan's own
+  reason for specifying Postgres, now measured rather than assumed. ⛔ **A failed S1 on Postgres reopens D4**,
+  and S1 on Postgres is still owed.
+- 🔴 **NEW — DuckLake INLINES small writes into the catalog, and the plan does not account for it.** Those 50
+  committed rows produced **zero Parquet files**: `ducklake_data_file` was empty and one table was inlined.
+  Setting `DATA_INLINING_ROW_LIMIT 0` at `ATTACH` forces every write to Parquet (verified: 3 inserts → 3 data
+  files → 3 files on disk). **Consequences:** (a) under §5.4(ii) the catalog Postgres becomes a *data* path
+  for small batches, not only a metadata path; (b) **D13's external reader over the Hive Parquet prefix would
+  silently MISS inlined rows** — see §5.4 and D13.
 
 ⚠ Two caveats. It registers files **after** the Parquet write rather than making the write visible
 through the catalog (§3.6). And it is **non-fatal on any failure** (`:83-85`) — correct for an opt-in
@@ -333,8 +401,22 @@ The fork (D4):
 
 Work under (ii):
 - `PartitionWriter` gains a **visibility strategy**: `RenameReveal` (today, local paths) and
-  `CatalogCommit` (object-store paths, partitioned mode). Spike S2 confirms `PartitionSinkWriter`
-  shares the seam.
+  `CatalogCommit` (object-store paths, partitioned mode). ✅ **S2 CONFIRMS the shared seam by reading the
+  code, not the javadoc** (2026-09-10): `PartitionSinkWriter` makes **no filesystem call of its own** — it
+  has no `java.nio.file` import — and delegates the whole write to `PartitionWriter.write`, and there is
+  exactly **one** `reveal()` in the repo. The two lanes cannot drift on reveal semantics.
+- ⚠ **S2 also found the spike's own question is ill-posed today: `CatalogCommit` does not exist in code.**
+  It is this plan's proposed name. What exists is `DuckLakeRegistrar.register`, with **one call site in the
+  whole repo** (`ConsignmentIngestor.finalizeSource`), on the **flat ingest lane only**, once per batch,
+  **after** every file's reveal. The graph lane registers **nothing** today. So per logical write it is 1
+  registration on the flat lane and 0 on the graph lane, and *"lands twice"* is not a present defect.
+  🔴 **It becomes one on a specific implementation order:** wiring `CatalogCommit` *inside* `reveal()` (per
+  file, both lanes) while leaving that batch-level `register` call in place would double-register the flat
+  lane. ⛔ Do the two in one change, and note **no test would catch it** — `DuckLakeRegistrarTest` covers only
+  the no-op, disabled and no-flag branches with `assertDoesNotThrow`, and asserts no call count.
+- 🔴 **Disable DuckLake's data inlining in partitioned mode** (`DATA_INLINING_ROW_LIMIT 0` at `ATTACH`, S1).
+  Otherwise a small batch never reaches the object store at all: it lands in the catalog database, which
+  makes the catalog Postgres a data path and makes any external Parquet reader (D13) incomplete.
 - `DuckLakeRegistrar` moves from *opt-in sidecar* to *the write path's commit step* in partitioned
   mode; its catalog URL is `ducklake:postgres:…`; failure is fatal (D10).
 - **Reads attach the shared catalog.** Any pod's dashboards and Query Library can read every slice's
@@ -386,6 +468,19 @@ instances run (fails); shorten TTL to zero → the live owner's lease is stolen 
 scope those registries per instance — the second is a §5.3 deliverable anyway. **Do not let the test
 pass because two "pods" secretly shared a heap.**
 
+✅ **S4 SETTLES WHICH (2026-09-10): use a classloader per simulated pod.** The alternative — genuine
+per-*instance* scoping — is **not** a §5.3 by-product and not spike-sized: **no instance-id concept exists
+anywhere in the codebase**, and introducing one touches **12+ classes and 60–90+ sites** (eight registries
+already share one Space-keyed idiom and would need their key widened; four more have no Space dimension at
+all and need one added from scratch, across ~15 call sites). A classloader per pod needs **zero production
+changes**, and the technique is **already proven in this repo** for pack-jar isolation. Since this test's
+actual assertion is about the Postgres-backed lease and not about in-heap registries, classloader
+isolation sidesteps the question rather than pretending to solve it.
+
+⛔ **And no existing harness gives you this for free.** `ControlApiMultiSpaceTest` puts several Spaces
+inside **one** `ControlApi` — it is not two instances, and mistaking it for one is exactly the trap the
+paragraph above warns about. Nothing in the repo boots two control planes in one JVM today.
+
 ---
 
 ## 8. Risks
@@ -419,11 +514,32 @@ pass because two "pods" secretly shared a heap.**
 | **D10** | `DuckLakeRegistrar` failure in partitioned mode | ✅ **SIGNED 2026-09-10 (operator)** — **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see; single-node mode keeps today's opt-in, warn-only behaviour |
 | **D11** | Dynamic rebalancing | ✅ **SIGNED 2026-09-10 (operator)** — **Deferred to phase C+1**; static Space→pod assignment first |
 | **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Standard's two-pod T4 standby is partitioned without being a cluster |
-| **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4 |
+| **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4. 🔴 **S5 ANSWERED 2026-09-10 — SELF-MANAGED POSTGRES ONLY.** `pg_duckdb` is installed by **building from source** (`make install`), and it appears on **none** of the curated extension lists of Amazon RDS/Aurora, Google Cloud SQL or Azure Database for PostgreSQL Flexible Server — all three publish a fixed set, so a customer cannot add one that is not on it. ⚠ **Evidence strength, stated so it can be re-checked:** Azure's list was read in full from the primary source (Microsoft Learn, *List of Extensions and Modules by Name*, dated 2026-07-10) and contains **no** extension whose name contains "duck"; RDS/Aurora and Cloud SQL rest on their published lists as surfaced by search rather than a full read. ⇒ Treat Azure as settled and the other two as very likely; **the live half of S5 is what confirms all three.** It supports Postgres 14–18 and reads Parquet/CSV/JSON/Iceberg/Delta from S3, GCS, Azure and R2. ⇒ **The external query surface is NOT general.** It is available to a self-managed Postgres and unavailable to the managed services an Enterprise customer is most likely to already run — so D13 must be sold as an option with a deployment precondition, never as a default. 🔴 **And it needs one more thing to be correct at all:** DuckLake **inlines** small writes into the catalog (S1), so a view over the Hive Parquet prefix would silently omit them unless inlining is disabled — see §3.5. ⚠ The live half of S5 (install it, build the view, query it from `psql`) is still owed; this sandbox has no Postgres and no container daemon. |
 
 ---
 
 ## 10. Spikes before phase A starts (each ≤ half a day)
+
+### Outcome (2026-09-10) — 3 of 5 CLOSED, 2 partially answered and still owed
+
+| Spike | Verdict |
+|---|---|
+| **S1** | 🟡 **PARTIAL — the Postgres/object-store half is still owed** (no Postgres, no container daemon here). Established: the extension loads on the pinned DuckDB 1.5.2.1; all three catalog spellings parse and the `postgres:` path reaches a real connection attempt; **cross-process visibility holds** across three separate OS processes. 🔴 **Concurrent registration FAILS on a SQLite catalog** (one process could not `ATTACH`, the other committed 0 of 40), so SQLite is **not** a valid stand-in and the catalog backend is load-bearing. 🔴 **New finding: DuckLake inlines small writes into the catalog** — 50 rows produced **zero** Parquet files, and `DATA_INLINING_ROW_LIMIT 0` is the knob. → §3.5 |
+| **S2** | ✅ **CLOSED — shared seam confirmed by reading the code.** `PartitionSinkWriter` has no filesystem call of its own. ⚠ But `CatalogCommit` **does not exist in code** — it is this plan's own name — so *"lands once, not twice"* is not a present defect: the flat lane registers once per batch and the graph lane not at all. The double-emit is a **specific implementation-order hazard**, and no test would catch it. → §5.4 |
+| **S3** | ✅ **CLOSED — no sign-off needed.** HikariCP resolves offline with one transitive dependency that is already first-class here; the lock delta is one line. → §3.4 |
+| **S4** | ✅ **CLOSED — and it redirects §7.** Per-instance scoping is 12+ classes and 60–90+ sites, so use a classloader per simulated pod instead. Four statics the plan never named have no Space dimension at all. → §3.2 |
+| **S5** | 🟡 **PARTIAL, but the DECISION half is answered: self-managed Postgres only.** `pg_duckdb` builds from source and is on none of the curated extension lists of RDS/Aurora, Cloud SQL or Azure Flexible Server. The live install-and-query half is still owed. → D13 |
+
+🔴 **Two spike results were asserted in this plan BEFORE the spikes ran.** §3.5 said *"verified 2026-09-10,
+spike S1 confirms it end-to-end"* and §5.4 said *"Spike S2 confirms…"*, while §10 still listed both as
+work to do. S2's assertion turned out to be true; **S1's was not, and still is not.** ⛔ This is the same
+class Sprint 7.5 closed elsewhere — *a false ✅ is worse than a blank, because nobody re-checks a tick* —
+and it appeared inside a **signed** plan, in the two places a reader would most trust.
+
+⚠ **What the two owed halves need**, so the next environment can run them unattended: a reachable Postgres
+(any 14–18) and an S3-compatible endpoint (MinIO). This sandbox has the Docker CLI but **no running
+daemon**, and starting one is outside a spike's remit.
+
 
 - **S1** — `ATTACH 'ducklake:postgres:…'` from two DuckDB processes writing to one MinIO bucket:
   confirm concurrent registration and cross-process visibility with DuckDB 1.5.2's `ducklake`
@@ -474,3 +590,21 @@ caveat of §4 said aloud.
   board row if phase A does not start.
 - **`events.backend` has no database option** (§3.3). Single-node consequence: a Postgres-backed T2
   deployment still loses its Signal ledger on restart unless `parquet` is chosen. → phase A.
+- 🔴 **Four registries have no Space dimension at all** (§3.2, found by S1–S5's spike round on 2026-09-10):
+  `CircuitBreaker.SHARED` and `GapTracker.SHARED` keyed on a bare collector id, `IngestProgress.CURRENT` and
+  `StepProgress.CURRENT` on a bare pipeline name. **Wrong today, on one node** — two Spaces sharing a name
+  already share a breaker, a gap set and a progress snapshot. Filed `SPACE-UNKEYED-STATICS-1`. ⛔ Not a
+  scale-out item; do not fold it into this plan's phases.
+- **No test would catch a double catalog registration** (§5.4). Filed `DUCKLAKE-COMMIT-COUNT-1`; it is the
+  precondition for the visibility-strategy work, because the double-emit hazard is an implementation-order
+  one and would otherwise ship green.
+- ✅ **Six raw NUL bytes in five tracked source files made those files invisible to every recursive
+  ripgrep** — found while running S4, when an agent's report of "drops out of a naive grep" turned out to
+  understate it: a recursive search over the module listed three files and silently omitted a fourth that
+  plainly matched. **FIXED 2026-09-10** (each was a separator in a composite map key written as a raw byte
+  instead of the escape) with a guard wired into both the hook and the pipeline, falsified four ways. ⛔ Not
+  a formatting nicety: this repository reviews itself with grep, so a silent false negative there is worse
+  than a wrong answer. ⚠ **The same byte had a second, quieter effect:** because git also classified the
+  file as binary, it was silently exempt from the repository's own `text=auto eol=lf` policy and was
+  stored with CRLF — so one stray byte bought an exemption from two separate repo-wide rules at once,
+  and neither rule reported it.

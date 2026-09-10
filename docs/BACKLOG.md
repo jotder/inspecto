@@ -181,6 +181,25 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **Pipeline graph** — flip the intake cap on by default (needs a soak); a pre-materialise cap to save remote-fetch bandwidth (cap applies post-dedup); 🔴 **THREE** kinds still last-one-wins, deliberately out of A2 scope: `acquisition`, `gap`, `dedup.marker` — *corrected 2026-09-09: `parser` was in this list and does NOT belong; a second parser is REFUSED by name (`MULTI_PARSER`, `PipelineEditable.java:65,696`), which is the opposite of last-one-wins. `pipeline-editor.md` §Multiplicity states it correctly.*; 🔴 ~~`BatchGraphRunner` has zero production callers~~ **WRONG ON BOTH COUNTS — corrected 2026-09-09.** (a) **There is no class of that name** — it was renamed in the 2026-08-31 Consignment commit. (b) The class that DOES exist, `ConsignmentGraphRunner`, has **production callers**: `engages()` drives the live lane admission (`ConsignmentIngestStrategy.admittedLift`) and **`run(...)` executes on the ingest path** (`ConsignmentIngestStrategy:355`). ⛔ This row was cited as Row 15's parity blocker, so re-derive that gate before using it. What IS still owed is §6 step 2, the parity gate through the compiled-recipe path. Owner: `okf/capabilities/pipeline-execution/pipeline-execution.md` §2.3; → `okf/backend/pipeline-graph/pipeline-graph-design.md` §14
 - **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed; and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations; `run_id` is `null` everywhere; §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
 - **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built, needs `SeqScope`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (⚠ do not grow the `EventType` enum; a constants class should land before ~10 string literals do), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
+- **P2** · **`SPACE-UNKEYED-STATICS-1` — four process-wide registries have NO Space dimension** (filed
+  2026-09-10 by scale-out spike S4). `CircuitBreaker.SHARED` and `GapTracker.SHARED` are keyed on a bare
+  **collector id**; `IngestProgress.CURRENT` and `StepProgress.CURRENT` on a bare **pipeline name**. 🔴 **This
+  is a PRESENT defect, not a Kubernetes one:** two Spaces in one process that happen to use the same
+  collector or pipeline name already share a circuit breaker, a gap set and a progress snapshot — so one
+  Space can trip another's breaker or overwrite its progress. Eight sibling registries in the same codebase
+  are correctly keyed by `EventLog.currentSpaceId()`, so the idiom to copy already exists; these four simply
+  never got it. ⚠ Adding the dimension touches their own methods plus ~15 call sites
+  (`CollectorProcessor`, `PipelineExecutor`, `UnionModeIngester`, `NativeCsvStreamingEngine`,
+  `CsvIngestStrategy`, `GenerationModeIngester`, `PipelineTestRun`, `ConsignmentIngestor`). ⛔ Do not fold
+  this into the scale-out work — it is wrong today, on one node. → `superpower/enterprise-scale-out-plan.md` §3.2
+- **P3** · **`DUCKLAKE-COMMIT-COUNT-1` — nothing would catch a double catalog registration** (filed
+  2026-09-10 by scale-out spike S2). `DuckLakeRegistrar.register` has exactly **one** call site, on the flat
+  ingest lane, once per batch, after every file's reveal; the graph lane registers nothing.
+  `DuckLakeRegistrarTest` covers only the no-op, disabled and no-flag branches with `assertDoesNotThrow` and
+  **asserts no call count at all**. ⚠ So the specific hazard in §5.4 — wiring a per-file catalog commit
+  inside `reveal()` while leaving the batch-level call in place, which would register the flat lane's files
+  twice — would ship green. A test that pins *one registration per batch* is cheap now and is the
+  precondition for the §5.4 visibility-strategy work. → `superpower/enterprise-scale-out-plan.md` §5.4
 - **P3** · **`PROCESSOR-CATALOG-ROUTE-1` — nothing serves `ConsignmentProcessor` ids to the UI** (filed
   2026-09-10 by Sprint 7.6; a deliberate deferral that had no board row). The post-sync chain editor takes
   processor ids as **free text**, the way `on_signal` takes signal types, because no catalog route exists. A
@@ -224,6 +243,32 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   interceptor change comes FIRST, it is the reason the field has been unreachable; (c) the Events pane subscribes to
   **`GET /signals/stream`** with polling as the fallback for buffering proxies. One row, three client changes, no server
   change. → `okf/capabilities/control-api/control-api.md` §2 `API-3` · `security.md` · `observability.md` · `surfaces.md`
+  🔴 **GROUNDED 2026-09-10 (Sprint 8) and the row is wrong in two ways — read this before scoping the diff.**
+  **(1) (a) and (b) are ONE root fix, not two items.** `v1.interceptor.ts` unwraps every `/api/v1` response by
+  cloning the body down to `data` alone, which discards `metadata` (**including `metadata.etag`**),
+  `permissions`, `links` and `diagnostics` in the same statement. So there is **no path today by which a
+  client could hold an ETag to send back** — the ETag and `permissions[]` die at the identical line. Widening
+  what that interceptor preserves is the precondition for both halves, and the row's "interceptor change comes
+  FIRST" instinct is right for a reason it does not state.
+  **(2) 🔴 (b)'s premise — that this finishes an existing gate — is REFUTED.** Every affordance gate in the SPA
+  today is a `LensService.can*` signal fed from `SessionService.capabilities()`, a **single session-wide array
+  populated once from `GET /bootstrap`**. The envelope's `permissions[]` is **per response**, so adopting it is
+  net-new plumbing at a *narrower scope*, not wiring up a field the panes already expect — and **no pane
+  consumes it or has a slot for it**. ⛔ That makes (b) a **design question before it is code**: what is
+  `permissions[]` scoped to, which affordances should prefer it over the session capability, and what happens
+  when the two disagree? → ⚠ **needs an operator call; (a) and (c) do not.**
+  **(3) ⚠ "both config-writing panes" does not resolve to a unique pair.** Three panes call `ConfigService.write()`
+  directly — the Components-library schema editor and **two different drawer sections of the pipeline editor,
+  which write the same pipeline's schema satellite** (the more natural "changed underneath you" race). A
+  fourth, likely-looking candidate does **not** use `ConfigService` at all: the mapping editor writes through
+  `ComponentsService` on a different route. Name the pair before diffing.
+  **(4) ✅ (c) is buildable as-is and has a pattern to copy.** `GET /signals/stream` exists, emits
+  `text/event-stream` with a `: connected` frame and a 15-second heartbeat, and carries **no historical
+  replay** — so the pane does an initial fetch and then opens the stream. The notifications component is the
+  template: it guards `typeof EventSource === 'undefined'` (which is what keeps it working under jsdom), falls
+  back to the visibility-aware poll on `onerror`, and closes the source on destroy. ⛔ An SSE `onerror` must
+  **not** route to the connectivity banner — only a status-0 failure does that, and a dropped stream is not
+  backend-down.
 - **P2** · **`EXPECTATIONS-UI-1` — the Expectations pane** (`ING-6` is a Must with NO UI — zero SPA files mention it; decided
   2026-09-10: ADOPT, the Must stands): define `non_null | range | regex | referential | condition` checks per Dataset, run
   evaluate, show `lastResult`; reuse `<inspecto-query-panel>`; results already open Incidents and `expectation.violated`

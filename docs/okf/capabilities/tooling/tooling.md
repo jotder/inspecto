@@ -105,7 +105,17 @@ sentence this whole area turns on: **a clean run says nothing about what it decl
 
 ### 3.2 The guard roster
 
-This is the inventory that existed nowhere. Nine scripts, plus two inline pipeline checks.
+This is the inventory that existed nowhere. **Twelve guard scripts, plus two inline pipeline checks** —
+ten under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
+`check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-coverage` · `check-dependencies` ·
+`check-sbom-modules`), one under the client tree (`inspecto-ui/tools/check-design-tokens.mjs`), and the
+processor board's `--check` mode (`tools/render-processor-board.mjs`).
+
+🔴 **This count read "nine scripts" until 2026-09-10 and the roster was already missing two of them** —
+the **citation** and **doc-count** guards, both wired in *both* pipelines and both absent from the table
+below. An inventory whose own purpose is to end "the roster existed nowhere" had drifted within a day of
+being written, which is the reason the count is now spelled out artifact by artifact rather than
+summarised.
 
 | Guard | Reads | Deliberately does not read | Waivers | Exit discipline | Wired |
 |---|---|---|---|---|---|
@@ -118,6 +128,9 @@ This is the inventory that existed nowhere. Nine scripts, plus two inline pipeli
 | **Processor board** | Two files: a served contract and one table | Everything else in that file | Three sets of identifiers holding **operator product decisions**, with **no reason field and no stale detection** | 0 / 1 / 2 | pipeline only |
 | **Bill of materials** | One resolution per packaged bundle | The wider reactor; test scope; the client tree; **what the shade step actually embedded** | None. The gate is a rule, not a count: nothing unhashed, and only first-party components unlicensed | 0 / 1 / 2 | packaging only |
 | **Design tokens** | Two client roots | 🔴 A third root of real authored components, and the core directory | A file allowlist plus a per-line hatch | 0 / 1 | client pipeline |
+| **Citations** | Every path and renamed type named in current markdown | The archive tier and the in-flight plan tier **as sources**; 🔴 **all source files** — a javadoc may cite a moved path freely (§3.3) | Absence stated on the citing line; a rename recorded with its replacement on the same line | 0 / 1 | pipeline + hook |
+| **Doc counts** | Marked count statements against the contract that derives each number | Anything unmarked | **None by construction** | 0 / 1, with a per-id floor | pipeline + hook |
+| **NUL bytes** | Every tracked file whose extension is text (3,693 of them) | Tracked non-text extensions; untracked files | None | 0 / 1, naming file and line | pipeline + hook |
 | Lean-core boundary | Source grep **and** the resolved dependency tree | — | None | fails on either | pipeline | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
 | Retired branches + commit subjects | The event payload; the push or request range | — | None | fails per offending subject | branch policy |
 

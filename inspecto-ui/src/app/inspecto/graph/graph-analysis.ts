@@ -1114,10 +1114,10 @@ export function maxFlow(g: G6GraphData, sourceId: string, sinkId: string): MaxFl
     if (sourceId === sinkId) return empty;
     const nodeIds = new Set(g.nodes.map((n) => n.id));
     if (!nodeIds.has(sourceId) || !nodeIds.has(sinkId)) return empty;
-    // Residual capacities keyed "a b"; forward edges seed capacity, back edges start at 0.
+    // Residual capacities keyed "a\0b"; forward edges seed capacity, back edges start at 0.
     const cap = new Map<string, number>();
     const adj = new Map<string, Set<string>>(g.nodes.map((n) => [n.id, new Set<string>()]));
-    const key = (a: string, b: string): string => `${a} ${b}`;
+    const key = (a: string, b: string): string => `${a}\0${b}`;
     for (const e of g.edges) {
         if (e.source === e.target) continue;
         cap.set(key(e.source, e.target), (cap.get(key(e.source, e.target)) ?? 0) + edgeWeight(e));
