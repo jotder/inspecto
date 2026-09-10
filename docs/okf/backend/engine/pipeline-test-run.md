@@ -101,8 +101,9 @@ production caller passes.
 ⚠ **The bound is the ancestor closure of the target, not a prefix of `topoOrder`.** Topological order is
 arbitrary between sibling branches, so truncating it runs whichever branch happens to sort first and reports
 counts for nodes the operator never asked about — which the canvas then marks ✓. `ancestorsOf` walks edges
-backwards instead (skipping `on_commit`, which is a cross-flow trigger rather than a data dependency). This
-matches the offline mock's `subgraphTo`, so mock and server agree on what a run-to-here covers.
+backwards instead (skipping `on_commit`, which is a cross-flow trigger rather than a data dependency). *(Until 2026-09-10 this
+added that the offline mock's `subgraphTo` matched, "so mock and server agree" — that mock was deleted
+2026-08-31, so the server's walk is the only definition of what a run-to-here covers.)*
 
 ⚠ **`execute` was not touched.** The plan expected the cutoff to thread through a walk shared with the
 production executor; in fact `execute` and `dryRun` are separate loop bodies sharing only the private

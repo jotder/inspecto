@@ -495,6 +495,23 @@ fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidatio
   it, the Surfaces spec filed the ripple as unfinished, the Assistant spec found its own instance. Two of
   those documents tell a contributor to **edit a file that does not exist** — one of them as the definition of
   done for adding a page. → one sweep, one owner; the count is the acceptance test.
+  ✅ **CLOSED 2026-09-10 (Sprint 7.4).** 🔴 **The count was 27, not twenty** — the row undercounted by seven,
+  and the residue reached three places a doc sweep would have missed: two buyer-facing `stakeholders/` pages
+  (one asserting the UI "is developable and demoable with no backend"), the `frontend-explorer` **agent
+  definition** in `.claude/`, and `REQUIREMENTS.md`'s `MOCK-FIRST` **status value**, still legal in the
+  legend and cited by no row (retired). 🔴 **The row's own "two documents" clause was STALE** — the pair it
+  meant (the architecture page and the routing convention, both naming a deleted nav data file) was repaired
+  on 2026-09-08 in `82cbed96`. Two *different* instruct-to-edit-a-missing-file cases were live and are now
+  fixed: `tags.md` told a contributor to widen `TAG_TARGET_KINDS` alongside `AnnotationKinds.KINDS`, a
+  constant that exists nowhere (widening is a one-site change now), and `inline-ai-authoring.md` made
+  "add the term to `agent.handler.ts`" the definition of done for declaring a glossary term — **120 lines
+  below that same page's own "Offline — GONE" banner**. ⚠ **The stated acceptance test cannot be met
+  literally and was refined**: `git grep mock` must return only (a) the archive tier, (b) an explicit
+  removal or history record, (c) the capability specs' own gap rows — which *are* the finding — and (d)
+  `okf/frontend/log.md`, a dated journal whose entries are true as of their heading; that file now says so
+  in a tier banner, because an unstated tier is an unaudited one. Every lesson learned on the mock was kept
+  and re-pointed at its general form (*a stand-in more lenient than the server is worse than no stand-in*),
+  rather than deleted with the subsystem.
 - **P2** · **`SPEC-PLANSTALE-1` — active plans stale against their own content.** ✅ **The compliance plan's clause is DISCHARGED 2026-09-09 by archiving it** — which is the resolution this row itself named ("before step 7 of the consolidation moves it"). Its three defects (three closed gaps called open, one "confirmed still a gap"; a pipeline accessibility step that does not exist; four declared
   subdirectories of which three are absent) are now frozen as provenance behind an ARCHIVED banner that
   enumerates them, and its durable content is in `okf/capabilities/compliance/compliance.md` §3.10.

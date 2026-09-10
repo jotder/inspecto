@@ -223,10 +223,6 @@ there without migrating would have put two unrelated tag systems on one card. Op
 * **The backfill runs from `TagRoutes.register`** (once per `ApiContext`, i.e. once per Space) rather than
   from `CollectorService` beside the object-CSV backfill — the engine has no write root, so it cannot see
   widgets. Idempotent twice over, so a second boot adopts nothing.
-* **Offline:** the mock mirrors the same split — it reads a widget's array as the projection, adopts config
-  tags lazily (on `GET /tags` and on any assignment read, so a seeded store migrates itself with **no
-  `MOCK_STORE_KEY` bump**) and registers the names, since the four seed packs write widget tags directly.
-
 Two shapes worth preserving:
 
 - **It is not `TagDialog`.** The mail pane's dialog is bulk + tri-state over a selection and writes the
@@ -262,9 +258,9 @@ no write at all — re-tagging must not rewrite an edge's provenance.
   to and object hard-delete is not reachable through the API at all. A stale edge is invisible, not wrong.
   Re-creating an id resurrects its tags — the same documented residual notes have.
 - **Tag names are compared exactly** — no case folding. `Q3` and `q3` are two tags.
-- **The offline mock mirrors the CSV/store split deliberately.** `mock/handlers/ops.handler.ts` reads
-  *object* edges out of `attributes.tags` and keeps only non-object edges in its own collection, so the
-  mock cannot drift into having two answers for one object the way a second edge collection would. Its
-  `TAG_TARGET_KINDS` is the client-side copy of `AnnotationKinds.KINDS` — widen both together. Route-order
+- **Widening `AnnotationKinds.KINDS` is now a ONE-SITE change.** *(Until 2026-09-10 this page said the
+  offline mock held a client-side copy called `TAG_TARGET_KINDS` and told a contributor to "widen both
+  together" — that file was deleted 2026-08-31 and the constant exists nowhere, so the instruction sent
+  the reader to a file that does not exist.)* Route-order
   trap: `/tags/{name}` is a catch-all, so every more specific `/tags/…` pattern must be matched before it
   or `DELETE /tags/rules` deletes a tag named `rules`.

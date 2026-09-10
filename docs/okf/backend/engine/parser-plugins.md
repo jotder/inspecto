@@ -139,8 +139,9 @@ them.
   the old mock-only `/components/grammar/preview`, the 9-type hardcoded `parser-types.ts` catalog
   and the ASN.1 module picker are **gone**; grammar components persist as
   `{parser_type, <nested grammar>}` (old prototype flat-key contents simply render empty forms).
-- Mock parity: `parsers.handler` mirrors the catalog and every refusal (pinned in its spec — a
-  mock must never be more lenient than the server).
+- ⛔ **A stand-in must never be more lenient than the server.** *(This was `parsers.handler`'s parity rule,
+  pinned in its own spec, until the offline mock was deleted 2026-08-31; the rule outlives the mock and
+  applies to any fake, stub or fixture that answers for this catalog.)*
 
 ## ASN.1 (the operator's target format) — status
 

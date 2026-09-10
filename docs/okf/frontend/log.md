@@ -1,5 +1,10 @@
 # Log
 
+> **Tier: dated journal.** Each entry records what shipped **on its heading's date** and is not revised
+> afterwards, so an entry's present tense means "true that day", not "true now". ⚠ Entries before
+> 2026-08-31 describe the **offline mock backend**, which was deleted that day; read them as history. For
+> current state follow the concept pages under [`okf/frontend/`](index.md).
+
 ## 2026-07-23
 * **Menu Builder favorites SHIPPED** (menu-builder-plan M5, BACKLOG §3 Menu builder — "favorites … still
   open"): a personal quick-access layer over the per-Space custom menu tree. Favorites are a **client-local

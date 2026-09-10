@@ -70,7 +70,8 @@ list (left, resizable via `InspectoSplitDirective`) + column schema, paginated/s
 `<inspecto-data-table>`, and an ad-hoc read-only SQL console — over both the business Parquet stores and
 (when DB-backed) the operational tables via the backend's `/db/catalog|table|query` routes. Ops-table
 reads go through each store's own live connection (`BrowsableStore` — DuckDB files are single-writer);
-SQL is `SqlGuard`-checked server-side. Offline via the `db-browser` mock handler.
+SQL is `SqlGuard`-checked server-side. ⛔ There is no offline path — the `db-browser` mock handler that
+served one was deleted 2026-08-31.
 
 ## Decision 2026-09-06 — a blank `output_table` batch still gets a Catalog link, resolved by pipeline
 

@@ -118,7 +118,7 @@ tests alone — reading the written files off disk is what surfaced them.
 exist yet (the same ordering rule the Schema stage and segments editor follow), and uses **no
 `overwrite`** on the pipeline so an import can never silently replace an existing stream. Kind comes
 from the file and the toggle is locked — a Reference imported as a Stream would change its load
-semantics. Every rewrite is stated in the dialog BEFORE the write. No new mock handler is needed: both
+semantics. Every rewrite is stated in the dialog BEFORE the write. No new route is needed: both
 sides replay existing `ConfigService` reads/writes.
 
 ## Sample-as-thread (now a strip in the editor's parse drawer, one per tab)
@@ -302,13 +302,14 @@ Backend seams: [onboarding-authoring](../../backend/control-plane/onboarding-aut
 (2026-08-04): it deep-merges server-side instead of replacing the file after a client-side merge, which
 had been a stale-read clobber, and one route fixed it for every stage. The editor does not need it — it
 holds a graph and saves it whole (`PUT`), so that window is not one it has. ⛔ The route and
-`ConfigService.patch` stay: the contract is server-side API, the mock handler pins it, and any future
-block-at-a-time surface wants it rather than a second client-side merge. Its rule, if it is used again:
+`ConfigService.patch` stay: the contract is server-side API and any future block-at-a-time surface wants it
+rather than a second client-side merge. *(A third reason — "the mock handler pins it" — was removed
+2026-09-10 with the deleted mock; the retain rests on the other two, and the route has no client-side pin.)* Its rule, if it is used again:
 a cleared key must travel as `null`, not `undefined` (`nullifyDeletes`), or JSON drops it and the merge
 keeps the old value. The
 create dialog silently derives the full dir convention (`status_dir` et al — without it the Runs
 history stays empty) and `processing.duplicate_check` (the collector-level `duplicate:` block is a
 no-op on the legacy local poll path — without markers the same file re-ingests every cycle).
 Catalog list rows show Draft/Live from `attrs.active` (References included, via the produced-origin
-graph attrs); readiness itself is the editor's guided checklist. Offline via the `onboarding.handler`
-mock (config write/read/delete, both previews, register pair).
+graph attrs); readiness itself is the editor's guided checklist. ⛔ There is no offline path — the
+`onboarding.handler` mock that served one was deleted 2026-08-31.

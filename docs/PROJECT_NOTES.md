@@ -748,9 +748,10 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   hard failure into a passing rehearsal. The Pipelines `pipeline_author` adoption shipped **broken through
   two slices** (flat args where the tool requires `flow`; a name string where `adaptToolResult` requires the
   graph, so a successful call rendered as *"no suggestion"* with no error) and looked correct offline
-  throughout. When touching `inspecto/mock/handlers/`, diff the handler's accepted args **and** its result
-  keys against the real route, and pin the strictness in a `*.handler.spec.ts` — the preview cannot catch
-  what the mock permits.
+  throughout. 🔴 **The transferable lesson: a test double that is more PERMISSIVE than the real route turns a
+  hard failure into a passing rehearsal** — so a double must be diffed against the route's accepted args
+  *and* its result keys, and the strictness pinned by a test. *(The mock backend this was learned on was
+  deleted 2026-08-31; the lesson applies to any stub or fake that stands in for a route.)*
   ⚠ **It was not one bad branch — a deliberate audit (2026-07-27, `feb6f6e7`) found the same class live in
   two more branches of the same file**, and a lenient mock hides *server* defects too: tightening
   `component_draft` immediately exposed that its `schema` kind validates the wrong `schema` entirely.
@@ -789,12 +790,11 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 - **Connectivity** — `ConnectivityService` (status 0 ⇒ unreachable) + `<inspecto-connectivity-banner>` owns the
   "backend down" UX (don't add per-screen toasts; **503 ≠ backend-down**). Banner host needs
   `:host{display:contents}` so it doesn't steal layout width.
-- **Mocking** — ONE mock backend: `inspecto/mock/` (framework-free `MockStore`: per-Space, localStorage
-  `inspecto.mock.vN` = `MOCK_STORE_KEY`, RefRule 409s, seed packs) behind the single `mockApiInterceptor` — ALL six feature mocks
-  absorbed (demo → connections → components → pipelines → ops → jobs handler order = old chain precedence).
-  New mock endpoints = new handler there, **never** a new per-feature mock interceptor. 4xx replies must be
-  `HttpErrorResponse`s. `simulator.ts` ticks Runs/Events/Alerts lazily per intercepted request (no timers);
-  bump `MOCK_STORE_KEY` whenever a seed pack's SHAPE changes or stale localStorage masks the new seeds.
+- **Mocking** — ⛔ **there is none, and adding one back is a decision, not a convenience.** The single
+  offline mock backend (`inspecto/mock/`, one interceptor over a localStorage store with seed packs) was
+  **deleted 2026-08-31**: the SPA needs a running control plane, and a failed call must surface as an error
+  rather than as sample data. In unit tests, mock at the service boundary; ⛔ never mock the HTTP layer
+  (`.claude/skills/test-author/SKILL.md`).
 - **Config-attribute forms are schema-driven** — declare `AttributeSpec[]` (tier `required|optional|advanced`,
   `dependsOn`) in `inspecto/component-model` and render with `<inspecto-schema-form>` (demo at `/design`;
   pilot: jobs `job-form.dialog`). Hand-build only bespoke sections (canvases, key/value arrays). `tier`

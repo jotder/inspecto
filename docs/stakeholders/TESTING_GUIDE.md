@@ -47,7 +47,9 @@ Recipe (agents: `SMOKE` invokes `.claude/skills/smoke/`):
   widgets/dashboards) plus `seed-inbox` / `seed-ops` scripts that push data and operational
   activity through the REAL routes. Catalog + hand-authored-TOON rules: `spaces/demo/config/README.md`.
 - **Dev servers** — `.claude/launch.json` defines the backend (`:8080`) and UI dev serve (`:4204`).
-  The default UI now targets the real backend; mock flags are opt-in (`environment.ts`).
+  The UI targets the real backend and has no alternative — the ten `environment.mock*` flags were deleted
+  2026-08-31 with the mock backend. *(`environment.oidc.mock` survives and is unrelated: it is the
+  sign-in stub, not a data mock.)*
 
 ## What deserves the most attention
 

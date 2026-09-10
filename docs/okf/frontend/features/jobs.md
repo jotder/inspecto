@@ -52,10 +52,10 @@ runtime Expressions*. Design of record:
 * **A job's write body is FLAT snake_case**, and the server absorbs unknown keys as *parameters* rather than
   rejecting them — so every UI-authored event trigger and declared parameter was silently dropped from the
   day the endpoint landed. Fixed at the `jobToWire`/`jobFromWire` seam; pinned by `ControlApiJobCrudTest`
-  server-side and mirrored in the mock independently. A camelCase key is not a validation error, it is an
+  server-side. A camelCase key is not a validation error, it is an
   untriggered job.
-* **`JobView` must carry `onSignal`**, or a signal job reads as "manual" against a real backend while
-  looking right offline — the same mock-is-nicer-than-the-server shape as the write-body bug.
+* **`JobView` must carry `onSignal`**, or a signal job reads as "manual" against the backend — the same
+  shape as the write-body bug, and one the deleted offline mock used to hide by being more permissive.
 * **Subscribe to the type picker on the FormGroup, never the `type` control** — reassigning the schema
   form's `specs` rebuilds every control, so a subscription on the old control instance goes silent and
   switching type stops reloading parameters. Re-seed live values after the swap.

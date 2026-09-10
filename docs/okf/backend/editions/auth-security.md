@@ -196,7 +196,7 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   As built: `Roles.java` constant + seed grant to **admin/power/super** (curation is a space-owner activity;
   `power` is the seeded role closest to "owns this space's presentation") · `CapabilityManifest.java`
   `/nav/menus` entry · `NavRoutes.java` gate · `LensService.canCurateMenus` · the `menus.curate`
-  `ACCESS_ACTION_NODES.settings` node · the mock `access.handler.ts` vocabulary + seed table.
+  `ACCESS_ACTION_NODES.settings` node.
   ⚠ **The manifest entry and the route gate must land in the same commit** — `CapabilityManifestTest`
   enforces manifest↔registration congruence in *both* directions, matching on the capability **string
   literal** at the registration site.

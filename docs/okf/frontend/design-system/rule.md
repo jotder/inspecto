@@ -1,7 +1,7 @@
 ---
 type: Module
 title: Rule (Pro Max templates)
-description: Parameterized rule templates saved from the data-table; mock-backed via the `rule` component type.
+description: Parameterized rule templates saved from the data-table, persisted server-side as the `rule` component type.
 resource: inspecto-ui/src/app/inspecto/rule/index.ts
 tags: [design-system, rule, template, params, pro-max]
 timestamp: 2026-06-28T00:00:00Z

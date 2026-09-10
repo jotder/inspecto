@@ -180,7 +180,7 @@ processing:
   migrating all three onto it) stays its own `BACKLOG` item.
 
 *Verified: 6 cases in `PipelineEditableTest` (incl. the rich fixture's verbatim round-trip now carrying a
-`processing.map`), 3 in `MapNodeKeyContractTest`, 6 in the mock's `pipeline-editable.spec.ts`, and
+`processing.map`), 3 in `MapNodeKeyContractTest`, 6 in `modules/admin/pipelines/pipeline-editable.spec.ts` (promoted out of the deleted mock tree 2026-08-31), and
 `PipelineExecutorTest#anAuthoredProcessingMapProjectsThroughTheRealExecutor` — which runs config →
 `PipelineLift` → `PipelineExecutor` over real DuckDB, because a config-format slice is not verified by a
 `fromMap` test. Both new guards were falsified before being trusted (a bogus `node.cfg` read and a
@@ -303,7 +303,7 @@ first implementation warned when no relation anywhere carried rows; a filter tha
 rows produces `data`=0 **and `dropped`=3**, so the warning was both false and noise. That run *is*
 informative. What the operator cannot see from row counts alone is that **nothing would be written**.
 
-The warning is rendered by `pipeline-dry-run-panel.component.html` and mirrored in the mock handler —
+The warning is rendered by `pipeline-dry-run-panel.component.html` —
 DRYRUN-2's complaint was explicitly "indistinguishable from success **in the UI**", so a server-only field
 would not have closed it. The panel spec asserts the rendered text, not the signal.
 

@@ -65,7 +65,8 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   *inside* the pattern, because a bound that does not travel with the served grammar lets the form accept
   a `500%` the PUT refuses. The value is a pass-through to `SET memory_limit='…'` — nothing parses it into
   bytes, so a non-byte value breaks no arithmetic. 🔴 The offline mock had **no resource-pair gate at all**
-  (it accepted `"lots"` where the server 422s and served neither value); it now mirrors both gates.
+  (it accepted `"lots"` where the server 422s and served neither value) — a divergence worth remembering as a
+  failure class, though the mock itself was deleted 2026-08-31, so the server's gate is now the only gate.
 * **Defaults DECIDED 2026-07-25 (BACKLOG D11 + D12).** D12 shipped that day; **D11 was declined that day**
   and stayed unimplemented until 2026-08-26 (history below).
   * **D12 — chunking is ON by default** (SHIPPED): `processing.chunking.max_file_bytes` now defaults to
@@ -194,8 +195,8 @@ time, so a value stops depending on which box processed it.
 * **Surfaces** (`inspecto-ui`): a `source_timezone` select on the Grammar editor's **Types** tab across
   all **5**<!--count:ui-specced-frontends--> UI-specced frontends — parsing-level (no `delimited__` prefix, matching `encoding`/`compression`) and
   with **no default** — plus a **Source zone** column in the columns table, rendered only on rows whose <!-- vocab-allow: "Source zone" is the shipped UI column label for a temporal ORIGIN zone, not the acquisition entity -->
-  type carries an instant. One shared vocabulary in `inspecto/schema/time-zones.ts`; the offline mock
-  mirrors the server's refusals on both the schema and the pipeline write.
+  type carries an instant. One shared vocabulary in `inspecto/schema/time-zones.ts`. The server's
+  refusals on the schema and the pipeline write are the only ones *(the offline mock backend was deleted 2026-08-31)*.
   * ⚠ **`ConfigSpecs` needed nothing.** Parsing-block keys are frontend `AttributeSpec`s, and no backend
     allow-list gates an unknown config key (`ConfigSafetyValidator` is path-jail + output formats only),
     so the key saves through the control plane untouched. `date_formats` / `timestamp_formats` are not

@@ -33,7 +33,7 @@ the real ControlApi.
   after opening — empty/absent `links` → 400, an unknown target → 404, `relationship` defaults to
   `RELATED_TO` (`ObjectRoutes.createObject`). The create dialog collects them via a required "Linked
   entities" multi-select + relationship select (`object-create.dialog`; a case defaults to `CONTAINS`, an
-  incident to `RELATED_TO`), and the `mockOps` handler mirrors the contract. **Unaffected:** the
+  incident to `RELATED_TO`). **Unaffected:** the
   auto-creation paths (`AlertService`/`DecisionRoutes`/`ExpectationRoutes`/`ReconRunJob`/`EventObjectBridge`)
   open objects directly via `ObjectService.open`, bypassing the route. **Bootstrap consequence:** the first
   object in an empty space must come from an auto-creation path — there is nothing to link to yet, so the
@@ -121,7 +121,7 @@ the real ControlApi.
     `impactAmount`/`recordsAffected` copies the C4 analytics roll-up sums are written **only while those
     sections are configured**, and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
-    ladder now lives in the backend default and the offline mock's mirror of it.
+    ladder now lives in the backend default, which is its only home *(the offline mock backend was deleted 2026-08-31)*.
 
 As-built designs (archived):
 [`incidents-mail-ui-design.md`](../../../archived-documents/plans-archive/incidents-mail-ui-design.md) ·

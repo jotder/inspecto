@@ -33,7 +33,8 @@ Your job is to locate components/services/routes and explain relationships, then
   `schema`, `rule`, `decision`, `enrichment`, `signal`, `investigation`, `query`, `grid`,
   `data-table`, `tree-table`, `graph`, `geo`, `viz`, `reconciliation`, `requirement`, `transfer`,
   `tags`, `segments`, `access`, `ai-assist`, `commands`, `component-model`, `components`,
-  `definition`, `format`, `grammar`, `menu`, `mock`, `testing`, `theme`.
+  `definition`, `format`, `grammar`, `menu`, `testing`, `theme`. *(⛔ no `mock` — that tree was deleted
+  2026-08-31; a failed server call must surface as an error, never as sample data.)*
 - `modules/admin/` — admin module incl. the `/design` design-system gallery
   (`design-system/`).
 - Shared UI primitives live in `inspecto/components/`; grid theming/virtualization patterns in

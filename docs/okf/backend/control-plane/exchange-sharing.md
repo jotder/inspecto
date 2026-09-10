@@ -49,8 +49,8 @@ below for the generalized rule (`Exchange.DERIVED_KINDS`) — a widget is just t
 `spaces/_shared/exchange/<owner>/<item>/v<epochMillis>/snapshot.parquet`, then atomically flips a
 sibling `current.toon` pointer (`ExchangeSnapshots`) — a reader never observes a half-written version.
 Freshness (`version`, `rows`, `refreshedAt`, Result Set columns) travels in `current.toon`, merged into
-every offer/metadata response as `freshness`. Versions are **monotonic**: real backend mints
-`v<System.currentTimeMillis()>`; the UI mock mints `v1/v2/v3` — both match `/^v(\d+)$/`, comparable by
+every offer/metadata response as `freshness`. Versions are **monotonic**: the server mints
+`v<System.currentTimeMillis()>`, and any producer must match `/^v(\d+)$/` so versions stay comparable by
 the trailing integer.
 
 **Live delivery (S3, opt-in).** `ExchangeRefResolver` routes a `shared/<owner>/<item>` ref straight to
@@ -93,10 +93,6 @@ triggers a false "Behind". `myGrantRows` (a `computed`) joins each view's grants
 optional `label` param (`statusBadgeHtml('warning', 'Behind')`) so the string cellRenderer can show
 custom text under a chosen tone, mirroring the `<inspecto-status-badge>` component's `value`+`label`
 split — no new color owner, still passes `lint:tokens`.
-
-**Mock parity**: `exchange.handler.ts` mirrors the backend lifecycle in the unified mock store
-(`_server` pseudo-space ledgers), gated on `mockExchange`; its seed pins the demo "Shared with me" grant
-at `v2` against a `v3` snapshot so drift is visible with no backend.
 
 ## Saved views on the kind axis (BACKLOG D9) — SHIPPED end-to-end 2026-07-26
 

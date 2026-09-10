@@ -19,7 +19,8 @@ timestamp: 2026-06-28T00:00:00Z
   Roles on the same catalog/profile/matrix, server-enforced.
 * **Custom Menus**: a user-curated per-Space **Menu** tree (Settings ▸ Menus) renders as extra sidebar
   groups; each leaf opens one dynamic parameterized host route that renders the bound artifact
-  (Dashboard / Widget / saved Link or Geo view). Mock-first persistence over the navigation API.
+  (Dashboard / Widget / saved Link or Geo view). Persisted server-side through the navigation API.
+  *(This read "mock-first persistence" until 2026-09-10; the mock backend was deleted 2026-08-31.)*
 * **Detail pages carry a breadcrumb** — the shared `<inspecto-breadcrumb>`
   (`inspecto/components/breadcrumb.component.ts`), e.g. [run-detail](../features/run-detail.md).
 * **Global search** (`layout/common/search`) is a client-side jump-to-page palette over the nav — **not**

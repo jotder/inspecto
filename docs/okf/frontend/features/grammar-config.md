@@ -175,8 +175,7 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
   `auto_detect` sniff (B2, delimited only); Auto (the default for new steps, D2) seeds the icons
   read-only and the save snapshots the inferred set — declared = inferred by construction; Declared
   offers an "Apply suggested types" chip. The mode persists as `raw.types` on the schema companion;
-  a markerless schema loads Declared. The offline mock serves a deterministic inferrer, never more
-  lenient.
+  a markerless schema loads Declared.
 - **Grammar CSV round-trip** (§4.5, `inspecto/grammar/grammar-csv.ts`) — replaced *Save as
   template…* on BOTH adopters: export/import of the whole property set (engine-named option keys +
   columns + the types marker) as `<pipeline>_parser.csv`. Import refuses a format mismatch, lists
@@ -218,8 +217,7 @@ records* · *Record layout*); `text_regex` stays flat. Load-bearing facts:
   in either shell (tabbed panel or flat flow), never two copies.
 - **A workbook sample is BYTES**: the sample thread and the editor's own file box capture `.xlsx`
   as base64 (`sample.b64`; refused whole when oversized — a sliced zip is unreadable), the preview
-  transport sends `sample_b64`, and typing a text sample clears the captured bytes. The offline
-  mock REFUSES the xlsx preview honestly (the ASN.1 precedent).
+  transport sends `sample_b64`, and typing a text sample clears the captured bytes.
 - **Grammar CSV keys are bare engine names for every frontend** (`engineKeyOf` strips any
   `<frontend>__` prefix — `meta.format` scopes them), with back-compat for files exported under
   the raw spec-key spelling.
@@ -282,7 +280,7 @@ The plan's icon table always listed **six** formats while B6 named only four nod
 one each. The slice is deliberately unremarkable: both are ordinary `ParsingFrontend` members the shared
 editor already rendered, `normalizeFrontend` already read and `clearMissingRoots` already cleared, so the
 whole UI half was two `PARSE_NODE_FRONTENDS` entries. Everything else was the engine's five touchpoints
-(`BuiltinNodeType`, `LOWERABLE`, `isParserType`, `SUBTYPE_FRONTENDS`, `USE_HOME`) plus the mock mirrors.
+(`BuiltinNodeType`, `LOWERABLE`, `isParserType`, `SUBTYPE_FRONTENDS`, `USE_HOME`).
 
 * Neither is implicit — **delimited alone is the parser's default** — so every such file retypes on a lift,
   and P3a's delicate "explicit only, don't reshape what's deployed" caveat costs nothing here (the same
@@ -312,10 +310,11 @@ the pane owns directly.
   `use = "ingester/" + fqcn` unconditionally whenever `s.ingesterClass() != null`, regardless of subtype,
   so the LIFT presents that ref on *every* plugin-backed node before it is retyped — `DERIVED_USE` maps
   `parser.plugin → ingester/` for the same reason P3c needed it for ASN.1.
-* **Cannot be proven end-to-end offline.** The mock catalog is a verbatim transcription of the real
-  server's `Parsers.catalog()`, and the real server has no second ingestable plugin besides `asn1` — so
-  only the node type, drawer routing, and the empty-catalog refusal message are preview-verifiable here;
-  the actual pick → apply → save flow needs a real deployed third-party plugin.
+* **Cannot be proven end-to-end here.** The server has no second ingestable plugin besides `asn1`, so only
+  the node type, drawer routing and the empty-catalog refusal message are preview-verifiable; the actual
+  pick → apply → save flow needs a real deployed third-party plugin. *(Until 2026-09-10 this measured the
+  limit against a mock catalog transcribed from `Parsers.catalog()`; that mock was deleted 2026-08-31, and
+  with it the only offline path.)*
 * **Found, not fixed**: the plain `parser` type's `ingester/` use-home has no `DERIVED_USE` counterpart,
   so a legacy `processing.ingester`-configured pipeline that was never retyped to `parser.plugin` would
   hit `UNKNOWN_USE_KIND` on validate. Pre-existing, unrelated to this slice, flagged as a follow-up.

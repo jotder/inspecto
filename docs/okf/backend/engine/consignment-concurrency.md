@@ -131,9 +131,9 @@ not beside it: the percentage form is bounded `1..100` within the grammar, becau
 range check would let the form accept a `500%` the PUT refuses — reintroducing the very drift this
 replaces. An absent or uncompilable pattern degrades to
 blank-only validation and lets the 422 speak; a client-side fallback guess would just be the mirroring
-again. ⚠ The offline mock keeps the one legitimate copy (it *stands in for* the server, so it must gate
-identically) — and it had **no resource-pair gate at all** until this landed, accepting `"lots"` where
-the server 422s.
+again. ⚠ The offline mock was the one legitimate place to copy the gate — it *stood in for* the server, so it had
+to gate identically — and it had **no resource-pair gate at all** until this landed, accepting `"lots"`
+where the server 422s. *(That mock was deleted 2026-08-31, so the server's gate is now the only gate; what is worth keeping is the divergence as a failure class, not the mirroring.)*
 
 **A PUT merges per key**: absent = preserve stored, explicit `null` = clear and revert live to the
 `-D` default. ⚠ A cap-only PUT that rewrote the whole document would silently destroy a stored

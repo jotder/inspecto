@@ -41,8 +41,7 @@ component/config/pipeline dry-run) and returns real `{matched, total, checkedAt}
 `lastSimulation`.
 
 **Why a sample, not live records:** a decision rule's `target` is a *pipeline/job*, not a queryable
-dataset, so there is no ambient row source to evaluate against (the mock says as much — "there are no
-real records to route"). The sample *is* the row source — the natural "test your rule against example
+dataset, so there is no ambient row source to evaluate against. The sample *is* the row source — the natural "test your rule against example
 records" contract. A request with no `sampleRows` yields `0/0` (backward-compatible with the prior
 0-matched stub). The stamp is written non-authoring (`store.write(…, false)`) so simulate cadence
 never churns config versions (MET-5 parity).

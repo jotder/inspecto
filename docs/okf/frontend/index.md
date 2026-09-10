@@ -15,7 +15,7 @@ the shared design system, the feature screens, or the API services.
 ## Start here
 
 * [Overview](overview.md) - what inspecto-ui is, the tech stack, and how the app boots (against
-  `/api/v1`, offline-first).
+  `/api/v1`, which must be live — there is no offline path).
 * [Architecture](architecture.md) - feature-based layout, standalone components, signals, the app shell,
   the shared `inspecto/` libraries.
 
@@ -24,7 +24,7 @@ the shared design system, the feature screens, or the API services.
 The binding rules every change must follow (the "definition of done" lives here).
 
 * [Conventions](conventions/) - design tokens, a11y, forms, state, API (`/api/v1` envelope), errors,
-  routing, multi-space, mocks, testing/build.
+  routing, multi-space, testing/build.
 
 ## Shared design system
 

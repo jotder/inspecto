@@ -769,7 +769,7 @@ plane's words for another.
 | **P1 — Artifact graph** | authored **Components** | Component / Part — `part-of`, `uses` | Registry (derived) |
 | **P2 — Lineage graph** | **data assets** (Source→Table→View→KPI) | Asset — `EMITS·DECLARES·DESCRIBES·MATERIALIZES·FEEDS·JOINS_INTO·COMPUTED_FROM·CONSUMES` | `MetadataGraphService` |
 | **P2′ — Provenance** | a **Consignment**'s records through **Steps** | Step — `flowed-through` (+ row counts) | `DbProvenanceStore` + Provenance rows |
-| **P3 — Entity / Link graph** | **records as business entities** | **Entity** / **Link** (+ attributes) | Entity Projection over a Dataset (mock-first — see below) |
+| **P3 — Entity / Link graph** | **records as business entities** | **Entity** / **Link** (+ attributes) | Entity Projection over a Dataset (see below) |
 
 **Lineage vs Provenance** — **Lineage** = the *derived asset graph* (which asset feeds which); design-time,
 structural. **Provenance** = the *recorded fact* of where data actually came from (which file's records flowed
@@ -787,7 +787,7 @@ Never use Entity/Link for artifacts (Component/Part) or assets (Asset/Lineage).
 
 **Entity Projection** *(P3)* — The **mapping** (not a store) that folds a **Dataset**'s rows into an
 Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
-Built **frontend-mock-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
+Built **frontend-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
 relationships shipped later — V1 is complete, V2+ is open backlog. As built:
 [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md). *(Provenance:
 `archived-documents/plans-archive/link-analysis-and-graphsource.md` and the two studio plans, not maintained.)*

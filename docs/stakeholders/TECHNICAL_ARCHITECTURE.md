@@ -11,7 +11,7 @@ Three cooperating applications, one product:
 
 ```
 ┌─ inspecto-ui (Angular 21) ──────────────────────────────────────────────┐
-│  One operator console · Lens-filtered nav · offline-first (mock store)  │
+│  One operator console · Lens-filtered nav · needs a live control plane  │
 │  → talks /api/v1 (envelope-unwrapping interceptor chain)                │
 └──────────────────────────────┬───────────────────────────────────────────┘
                                │ HTTPS (Standard) / HTTP (Personal)
@@ -63,9 +63,10 @@ reaches the browser; SameSite + Origin CSRF). Write routes are separately fail-c
 Angular 21 standalone components + signals, Material/Tailwind, ag-Grid, Chart.js, AntV G6 (graphs),
 MapLibre GL + PMTiles (fully-offline geo). Interceptor chain: `v1Interceptor` (envelope unwrap) →
 `spaceInterceptor` → error/connectivity → auth (no-op on Personal, OIDC when
-`bootstrap.features.authMode` says so). **Offline-first**: one mock store serves the entire app with
-v1-envelope parity — the UI is developable and demoable with no backend. Design system + a11y (WCAG
-2.2 AA) + no-hardcoded-colors gates in CI. [Frontend section](../okf/frontend/index.md).
+`bootstrap.features.authMode` says so). **The UI requires a running control plane** — the offline mock store
+that once served the whole app with v1-envelope parity was deleted 2026-08-31, so there is no
+no-backend demo path; a failed call surfaces as an error, never as sample data. Design system + a11y
+(WCAG 2.2 AA) + no-hardcoded-colors gates in CI. [Frontend section](../okf/frontend/index.md).
 
 ## Agentic layer
 

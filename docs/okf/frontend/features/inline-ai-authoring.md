@@ -152,12 +152,10 @@ a real id, so it belongs only where the pane has one. Reference adoption: the **
 grid (`firedActions`) — a fired Alert *is* the red thing, and it carries the `pipeline` to focus on.
 `FiredAlert` has **no `correlationId`**, hence the focused-window path there.
 
-⚠ **Offline it reflects the mock store's own ledger, and nothing more.** `agent.handler.ts` answers these
-three from `SIGNALS_COLL` + `PIPELINES_COLL` rather than a canned shape — unlike every other tool mocked
-there — because the affordance's entire value is reporting real state. An empty ledger honestly answers
-"nothing was recorded". `paused` is always `false` offline: the mock pipeline record has no such flag, and
-inventing one is exactly the lie this avoids. **The handler now takes `(req, store)`** — it previously
-ignored the store.
+⛔ **The affordance's entire value is reporting real state, so it must never be fed invented state.** An
+empty ledger honestly answers "nothing was recorded". *(Until 2026-09-10 this paragraph described how the
+offline mock answered these three tools from its own ledger rather than a canned shape, and why `paused`
+stayed `false` there; that mock was deleted 2026-08-31 and the rule is what survives it.)*
 
 ⚠ **Not gated on `canAuthorWorkbench()`**, same reasoning as its sibling: no write path, and asking why an
 alert fired is not an authoring act. Don't "make it consistent" with the row-actions next to it.
@@ -185,10 +183,10 @@ Two shapes worth keeping:
 ⚠ **Both grid adoptions needed `[pinActions]="true"`** — same horizontal-virtualization trap as Alerts.
 Processing Status already had a `rowActions` column and still needed it once a second button widened it.
 
-⚠ **Offline the chain path cannot be exercised from the Events pane**: no mock producer sets a
-`correlationId` on an event row (the same flatness noted for `GET /signals/tree`), so every row there falls
-back to the pipeline window. The chain path is verifiable from **Incidents**, whose seeded objects carry
-`corr-N`. Don't "fix" the mock by inventing correlation ids on events — the unit test covers the branch.
+⚠ **An event row without a `correlationId` falls back to the pipeline window** — the same flatness noted
+for `GET /signals/tree`. ⛔ Do not synthesise correlation ids to make the chain path demonstrable; the unit
+test covers that branch. *(Until 2026-09-10 this was written about the offline mock's event producer,
+deleted 2026-08-31.)*
 
 ## Explain this screen (`<inspecto-ai-explain>`, A4 — shipped 2026-07-26)
 
@@ -227,10 +225,12 @@ Library · Runs · Scheduler · Tags · Incidents/Case Manager · **Link Analysi
 link-analysis V2 (d)'s vocabulary half — the pane with the most specialised vocabulary in the app, since
 Entity/Link mean something here that the glossary explicitly bans using for artifacts or assets).
 
-⚠ **The offline `GLOSSARY` map in `agent.handler.ts` is a subset** of the real file (the SPA cannot read
-`docs/`), so a term a new pane declares must be added there too or it falls through to a `docs_search`
-that has nothing real to cite offline. Definitions are copied **verbatim** — a paraphrase would put a
-second, drifting definition of the binding vocabulary in the codebase.
+⚠ **Declaring a term in a pane needs no client-side glossary edit.** *(Until 2026-09-10 this said a
+subset `GLOSSARY` map lived in `agent.handler.ts` and that "a term a new pane declares must be added
+there too" — a definition of done pointing at a file deleted 2026-08-31, stated 120 lines below this
+page's own "Offline — GONE" banner.)* The rule that survives: if a definition is ever copied into the
+client, copy it **verbatim** — a paraphrase puts a second, drifting definition of the binding vocabulary
+in the codebase.
 
 ## Natural-language authoring (A5.1 — shipped 2026-07-27)
 
@@ -281,12 +281,6 @@ Load-bearing details, each of which is a way this could have gone wrong:
   configured)`. A test injects a stub that *does* answer with tool calls, and that is a configured model
   for this purpose.
 
-**Offline:** the mock's `/derive` branch derives a condition from `<field> over|under <number>` and
-otherwise returns the same retryable 422 a real local model produces when it narrates. It then
-**re-enters the same handler** on the deterministic URL rather than reimplementing the tool body, so the
-two offline paths cannot drift. The mock's `query_author` now renders the *actual* derived predicate —
-its old fixed `cost_usd > 100` would contradict the `derivedArgs` echo directly above it.
-
 **Still open:** A5.3 (`pipeline_author`). `suggest_expectations` is excluded on purpose.
 
 ## The bounded repair loop (A5.2 — shipped 2026-07-27)
@@ -327,10 +321,11 @@ every use. The backend repair loop is untouched and still generic: to bring the 
 dialog kind a structural `ConfigSpec` first. The rest of this section describes the mechanism, which is
 still accurate for the surfaces that do have specs.
 
-⚠ Offline, the mock's derived field types **must come from the schema form's own vocabulary**
+⚠ **A derived field type must come from the schema form's own vocabulary**
 (`string|integer|bigint|double|boolean|date|timestamp`). An early cut emitted `number`, which applied
-silently and left the row's type dropdown **blank** — it looked like the draft had worked. Caught only in
-the preview, not by any unit test.
+silently and left the row's type dropdown **blank** — it looked like the draft had worked, and it was
+caught only in the preview, by no unit test. *(Learned on the offline mock, deleted 2026-08-31; the
+vocabulary constraint is the durable half.)*
 
 ## Natural-language topologies (A5.3 — shipped 2026-07-27)
 
@@ -367,6 +362,11 @@ not a mode switch: describing a topology and checking the one on screen are diff
 must keep working on a backend with no model.
 
 ### ⚠ Two shipped A2 bugs this slice uncovered — both hidden by the mock
+
+> ⚠ **Historical (2026-07/08), kept for its failure class.** Every present-tense sentence below about "the
+> mock" describes the offline mock backend, **deleted 2026-08-31**. The durable finding is the one stated in
+> bold below — *a stand-in more lenient than the server is worse than no stand-in* — and it applies to any
+> fake, stub or fixture that answers for a route.
 
 The Pipelines pane's deterministic adoption had **never worked against a real backend**:
 
@@ -432,8 +432,8 @@ blanket "registry kinds have no `ConfigSpec`" reroute would have broken two work
 
 ⚠ A fieldless draft is still an ERROR, via the `at-least-one-field` cross-field rule as well as the required
 field. The present-but-empty case is the one that matters: `applySchemaDraft` discards a fieldless draft, so a
-`clean` verdict there would show an Apply button that does nothing. The mock mirrors both halves (`nonEmpty`),
-which also closed the same latent leniency on `dashboard.tiles`.
+`clean` verdict there would show an Apply button that does nothing. The same latent leniency existed on
+`dashboard.tiles` and was closed with it.
 
 ✅ **`projection_author`'s `columns.items` is fixed** (2026-07-28) — `{"type":["object","string"]}`, the two
 spellings `columnNames()` has always read. The pane's `string[]` was right all along.

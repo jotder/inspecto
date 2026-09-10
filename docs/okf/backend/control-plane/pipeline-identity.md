@@ -196,8 +196,7 @@ incomplete migration, and resume re-runs its remaining steps. Design points wort
 - A 422 findings-refusal now journals a `refused:` line but leaves the bracket **open** — honest, because
   ledger/audit state moved in steps 2–4 before the refusal; fixing the config and resuming (or re-running
   rename, whose `completed` closes every open bracket for the pair) completes the half-moved state.
-- No UI or mock surface: resume is an operator/API recovery action; the offline mock has no
-  partial-failure model and must not pretend to (mock never claims work it didn't do).
+- No UI surface: resume is an operator/API recovery action.
 
 ## UI wiring (shipped 2026-08-13)
 
@@ -220,9 +219,10 @@ As-built notes worth keeping:
   `newName = newId` when the pipeline has no custom label; an explicit label survives untouched.
 - After success the editor rewrites the flow row + open-tab id and re-`select()`s the new id — the old id
   is gone from the registry, so anything still addressing it would 404.
-- The mock (`pipelines.handler.ts` `rename()`) mirrors the server's gate order (404 unknown → 400 missing
-  → 422 shape → 409 active → 409 taken) and reports **real zero** counts for ledger/audit/dependents —
-  the mock has no model for those artifacts and must not claim work it didn't do.
+- **The server's gate order is 404 unknown → 400 missing → 422 shape → 409 active → 409 taken.**
+  *(Until 2026-09-10 this row described the offline mock reproducing that order and reporting real-zero
+  ledger/audit/dependent counts; that mock was deleted 2026-08-31. The rule it embodied is worth keeping:
+  a stand-in must never claim work it did not do.)*
 
 ## Backlog (not built)
 
