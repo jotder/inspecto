@@ -262,7 +262,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   which write the same pipeline's schema satellite** (the more natural "changed underneath you" race). A
   fourth, likely-looking candidate does **not** use `ConfigService` at all: the mapping editor writes through
   `ComponentsService` on a different route. Name the pair before diffing.
-  **(4) ✅ (c) is buildable as-is and has a pattern to copy.** `GET /signals/stream` exists, emits
+  ✅ **(c) SHIPPED 2026-09-10 (Sprint 8).** The Events pane now prefers `GET /signals/stream` and falls back
+  to its visibility-aware poll; each frame is projected through the **already-existing** `signalToEvent`,
+  because the `/events` surface is a projection of the same unified Signal ledger — so no second shape was
+  invented. A chip tells the operator which transport is live, and the cadence select now shows only when
+  polling, since it never governed the stream. 19 tests, **12 of 12 mutants killed** across two probes.
+  🔴 **It uncovered a live defect in shipped code: an `EventSource` URL is never space-scoped.**
+  `spaceInterceptor` is an `HttpInterceptorFn`, so it rewrites `HttpClient` requests only — the
+  **notifications stream had been subscribing to the unscoped path since it shipped**, which in a
+  multi-space deployment tails the default space while the screen shows another. The rule is now one shared
+  function (`inspecto/api/space-scope.ts`) used by the interceptor and both streams, so the two transports
+  cannot drift. Fixed for notifications in the same change. ⚠ **Confirmed against the running backend:**
+  its `/bootstrap` reports `multiSpace: true`, so that deployment is exactly the shape where the
+  unscoped stream URL is wrong — and `GET /signals/stream` answers there with `text/event-stream` and a
+  `: connected` frame, while `GET /events/search` returns **503** because the events module is absent.
+  ⚠ **Two of my own tests initially passed for the wrong reason**, and only mutation testing showed it: one
+  asserted "errors when `EventSource` is unavailable" but was satisfied by the constructor's own
+  `ReferenceError` rather than the guard (it now pins the guard's message), and two pushed frames into a
+  subject **without arming the tail**, so they asserted over the initial fetch alone. A third mutant found a
+  real ordering bug in the implementation: the "streaming" flag was set *after* `subscribe()`, so a
+  synchronously-failing stream left the pane claiming to stream while it was really polling.
+  **(4) ✅ (c) was buildable as-is and had a pattern to copy.** `GET /signals/stream` exists, emits
   `text/event-stream` with a `: connected` frame and a 15-second heartbeat, and carries **no historical
   replay** — so the pane does an initial fetch and then opens the stream. The notifications component is the
   template: it guards `typeof EventSource === 'undefined'` (which is what keeps it working under jsdom), falls

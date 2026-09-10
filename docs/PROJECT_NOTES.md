@@ -140,6 +140,16 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **`| grep -v spec` to "skip the tests" silently discards 77 % OF THIS REPOSITORY**, because the product
+  name **`inspecto` contains the substring `spec`** (i-n-**s-p-e-c**-t-o). Measured 2026-09-10: **3,015 of
+  3,923** tracked files have `inspecto` in their path, and **every one** is dropped by that filter — the whole
+  client and every Java module. What survives is `docs/`, `asn-parser/`, `compliance/` and `.github/`, so the
+  sweep looks like it ran and reports a plausible, tiny answer. ⇒ Exclude test files by a **path-anchored**
+  pattern (`grep -v '\.spec\.ts$'`, `grep -v '/src/test/'`) or with ripgrep's `--glob '!*.spec.ts'`, never by
+  the bare word. ⚠ This one produced a confident "no `EventSource` anywhere in the client" while the client
+  had seven occurrences of it, and it is a *worse* trap than the NUL-byte one because nothing about the output
+  looks truncated.
+
 - 🔴 **A written-down finding records the INSTANCE, not the class — so its number is a lower bound.** Every
   one of Sprint 7's seven cells (2026-09-10) was scoped from a board row, and **every row undercounted, in
   the same direction**: "~16 authority citations" was 19 documents plus 5 source files · "twenty documents"

@@ -11,26 +11,48 @@
             </div>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
+            <!-- ⛔ No live-tail controls when the events module is absent: neither transport can run,
+                 and an affordance that can only answer "nothing" is worse than none. The pane already
+                 explains the absence where the grid would be. -->
+            @if (eventsEnabled()) {
             <mat-slide-toggle
                 [checked]="live()"
                 (change)="toggleLive($event.checked)"
-                [matTooltip]="'Auto-refresh the newest events() every ' + liveSeconds + 's'"
+                [matTooltip]="
+                    streaming()
+                        ? 'Streaming new events as the server emits them'
+                        : 'Polling for the newest events every ' + liveSeconds + 's'
+                "
             >
                 Live tail
             </mat-slide-toggle>
             @if (live()) {
-                <mat-form-field class="gamma-mat-dense w-24" subscriptSizing="dynamic">
-                    <mat-label>Every</mat-label>
-                    <mat-select
-                        [(ngModel)]="liveSeconds"
-                        (ngModelChange)="restartLiveTail()"
-                        aria-label="Live-tail refresh cadence"
-                    >
-                        @for (s of liveSecondsOptions; track s) {
-                            <mat-option [value]="s">{{ s }}s</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-chip
+                    variant="soft"
+                    [tone]="streaming() ? 'primary' : 'neutral'"
+                    [matTooltip]="
+                        streaming()
+                            ? 'Server-sent events — new rows arrive as they are emitted'
+                            : 'The stream was unavailable, so the tail is polling instead'
+                    "
+                >
+                    {{ streaming() ? 'streaming' : 'polling' }}
+                </inspecto-chip>
+                @if (!streaming()) {
+                    <mat-form-field class="gamma-mat-dense w-24" subscriptSizing="dynamic">
+                        <mat-label>Every</mat-label>
+                        <mat-select
+                            [(ngModel)]="liveSeconds"
+                            (ngModelChange)="restartLiveTail()"
+                            aria-label="Live-tail poll cadence"
+                        >
+                            @for (s of liveSecondsOptions; track s) {
+                                <mat-option [value]="s">{{ s }}s</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                }
+            }
             }
             <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>

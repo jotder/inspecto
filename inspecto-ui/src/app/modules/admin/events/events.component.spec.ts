@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { EventFilter, EventRow, EventsService, SavedEventView, SessionService } from 'app/inspecto/api';
@@ -31,7 +31,11 @@ const VIEW: SavedEventView = {
     createdAt: 1,
 };
 
-async function create(overrides: Partial<Record<keyof EventsService, unknown>> = {}, dialog: unknown = {}) {
+async function create(
+    overrides: Partial<Record<keyof EventsService, unknown>> = {},
+    dialog: unknown = {},
+    eventsEnabled = true,
+) {
     const search = vi.fn((_f: EventFilter) => of([EVENT]));
     const api = {
         search,
@@ -39,6 +43,9 @@ async function create(overrides: Partial<Record<keyof EventsService, unknown>> =
         saveView: vi.fn(() => of(VIEW)),
         deleteView: vi.fn(() => of({})),
         exportCsv: () => of('timestamp,level\n'),
+        // Default: the stream is unavailable — which is exactly what the real service reports under jsdom —
+        // so the live tail falls back to polling. Tests of the streaming path override this.
+        stream: vi.fn(() => throwError(() => new Error('EventSource unavailable'))),
         ...overrides,
     } as unknown as EventsService;
     TestBed.configureTestingModule({
@@ -62,7 +69,7 @@ async function create(overrides: Partial<Record<keyof EventsService, unknown>> =
     // ⚠ AFTER overrideProvider, never before: TestBed.inject() INSTANTIATES the test module, and Angular
     // then refuses any further overrideProvider ("Cannot override provider when the test module has
     // already been instantiated") — which failed all 9 tests in this file, not just the events ones.
-    TestBed.inject(SessionService).eventsEnabled.set(true);
+    TestBed.inject(SessionService).eventsEnabled.set(eventsEnabled);
     const fixture = TestBed.createComponent(EventsComponent);
     fixture.detectChanges(); // ngOnInit → load() + loadViews()
     return { fixture, api };
@@ -136,7 +143,7 @@ describe('EventsComponent', () => {
         expect(c.loading()).toBe(false);
     });
 
-    it('live-tail polls at the selected cadence and re-arms when the cadence changes', async () => {
+    it('falls back to polling at the selected cadence when the stream is unavailable, and re-arms on a cadence change', async () => {
         const { fixture, api } = await create();
         const c = fixture.componentInstance;
         vi.useFakeTimers();
@@ -145,20 +152,111 @@ describe('EventsComponent', () => {
 
             c.liveSeconds = 2;
             c.toggleLive(true);
+            // The stream carries no replay, so arming re-runs the query once before tailing forward.
+            expect(api.search).toHaveBeenCalledTimes(1);
+            expect(c.streaming(), 'the stream errored, so the tail is polling').toBe(false);
             vi.advanceTimersByTime(2000);
-            expect(api.search).toHaveBeenCalledTimes(1); // first tick at 2s
+            expect(api.search).toHaveBeenCalledTimes(2); // first poll tick at 2s
 
             // slow it down — the old 2s timer is torn down, no poll until the new 10s elapses
             c.liveSeconds = 10;
             c.restartLiveTail();
+            expect(api.search).toHaveBeenCalledTimes(3); // the re-arm's own initial fetch
             vi.advanceTimersByTime(2000);
-            expect(api.search).toHaveBeenCalledTimes(1);
+            expect(api.search).toHaveBeenCalledTimes(3);
             vi.advanceTimersByTime(8000);
-            expect(api.search).toHaveBeenCalledTimes(2);
+            expect(api.search).toHaveBeenCalledTimes(4);
 
             c.toggleLive(false); // off → no further polling
             vi.advanceTimersByTime(30000);
-            expect(api.search).toHaveBeenCalledTimes(2);
+            expect(api.search).toHaveBeenCalledTimes(4);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('prefers the signals stream, prepends each frame newest-first, and arms NO poll', async () => {
+        const frames = new Subject<EventRow>();
+        const { fixture, api } = await create({ stream: vi.fn(() => frames.asObservable()) });
+        const c = fixture.componentInstance;
+        vi.useFakeTimers();
+        try {
+            (api.search as ReturnType<typeof vi.fn>).mockClear();
+            c.liveSeconds = 2;
+            c.toggleLive(true);
+            expect(c.streaming(), 'the stream connected').toBe(true);
+            expect(api.search).toHaveBeenCalledTimes(1); // the no-replay initial fetch, once
+
+            frames.next({ ...EVENT, eventId: 'evt-2', message: 'newer' });
+            expect(c.events().map((r) => r.eventId)).toEqual(['evt-2', 'evt-1']);
+
+            // ⚠ No poll may be armed while streaming, or the pane would fetch on top of the stream.
+            vi.advanceTimersByTime(30000);
+            expect(api.search).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('ignores a streamed row it already holds, so a re-run overlapping the tail cannot double a row', async () => {
+        const frames = new Subject<EventRow>();
+        const { fixture } = await create({ stream: vi.fn(() => frames.asObservable()) });
+        const c = fixture.componentInstance;
+        c.toggleLive(true); // arm the tail — without this the frame goes nowhere and the test proves nothing
+        frames.next({ ...EVENT }); // same eventId as the row the initial fetch loaded
+        expect(c.events()).toHaveLength(1);
+    });
+
+    it('drops a streamed row below the toolbar minimum level', async () => {
+        const frames = new Subject<EventRow>();
+        const { fixture } = await create({ stream: vi.fn(() => frames.asObservable()) });
+        const c = fixture.componentInstance;
+        c.fLevel = 'ERROR';
+        c.toggleLive(true); // arm the tail first, or nothing is subscribed to the frames
+        frames.next({ ...EVENT, eventId: 'evt-info', level: 'INFO' });
+        expect(c.events().map((r) => r.eventId), 'INFO is below the ERROR minimum').toEqual(['evt-1']);
+        frames.next({ ...EVENT, eventId: 'evt-err', level: 'ERROR' });
+        expect(c.events().map((r) => r.eventId)).toEqual(['evt-err', 'evt-1']);
+    });
+
+    it('calls NOTHING when the events module is absent — no views fetch, no stream, no poll', async () => {
+        const stream = vi.fn(() => new Subject<EventRow>().asObservable());
+        const views = vi.fn(() => of([VIEW]));
+        const { fixture, api } = await create({ stream, views }, {}, false);
+        const c = fixture.componentInstance;
+        // The pane explains the absence where the grid would be; every call it could make is a guaranteed
+        // 503, so the rule in this file is "never call, never toast".
+        expect(views, 'saved views are part of the same absent module').not.toHaveBeenCalled();
+        vi.useFakeTimers();
+        try {
+            (api.search as ReturnType<typeof vi.fn>).mockClear();
+            c.liveSeconds = 2;
+            c.toggleLive(true);
+            expect(stream, 'never call when the module is absent').not.toHaveBeenCalled();
+            expect(c.streaming()).toBe(false);
+            vi.advanceTimersByTime(30000);
+            expect(api.search).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('falls back to polling when the stream errors mid-tail', async () => {
+        const frames = new Subject<EventRow>();
+        const { fixture, api } = await create({ stream: vi.fn(() => frames.asObservable()) });
+        const c = fixture.componentInstance;
+        vi.useFakeTimers();
+        try {
+            c.liveSeconds = 2;
+            c.toggleLive(true);
+            expect(c.streaming()).toBe(true);
+            (api.search as ReturnType<typeof vi.fn>).mockClear();
+
+            frames.error(new Error('signal stream closed'));
+            expect(c.streaming(), 'a dropped stream must not look live').toBe(false);
+
+            vi.advanceTimersByTime(2000);
+            expect(api.search, 'the poll took over').toHaveBeenCalledTimes(1);
         } finally {
             vi.useRealTimers();
         }

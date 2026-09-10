@@ -166,6 +166,14 @@ validator so an unchanged file revalidates to a bodiless 304 and a redeployed on
 `no-cache` rather than `no-store` deliberately, after a stale-chunk failure. Absent the directory,
 nothing is served and the answer stays a JSON 404.
 
+🔴 **A server-sent-events URL is NOT space-scoped by the interceptor** *(found and fixed 2026-09-10)*. The
+space prefix is applied by an `HttpInterceptorFn`, which rewrites `HttpClient` requests only, so every
+`EventSource` bypasses it and reaches the unscoped path — in a multi-space deployment that tails the default
+space while the screen shows another. The rule now lives in one shared function that the interceptor and
+every stream call, and both live streams (notifications, and the Events pane's new signals tail) go through
+it. ⚠ It is invisible in a single-space deployment, because there the rule is a no-op — which is why the
+notifications stream carried it from the day it shipped.
+
 🔴 **Static files are public by CALL ORDER, not by the public-path allowlist** *(landed 2026-09-10 — Sprint
 7.2, from the console's genesis plan, which was its only home)*. The static branch runs **before**
 authentication, which only executes inside the route-match loop — so assets answer without a token even

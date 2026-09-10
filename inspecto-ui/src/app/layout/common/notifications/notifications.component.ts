@@ -16,7 +16,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subscription } from 'rxjs';
-import { apiUrl, DEFAULT_REFRESH_MS, NotificationsService, visibleInterval } from 'app/inspecto/api';
+import {
+    apiUrl,
+    DEFAULT_REFRESH_MS,
+    NotificationsService,
+    spaceScopedUrl,
+    SpacesService,
+    visibleInterval,
+} from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -153,6 +160,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 })
 export class NotificationBellComponent implements OnInit, OnDestroy {
     readonly svc = inject(NotificationsService);
+    private spaces = inject(SpacesService);
     private destroyRef = inject(DestroyRef);
 
     readonly open = signal(false);
@@ -199,7 +207,9 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
             return;
         }
         try {
-            const source = new EventSource(apiUrl('/notifications/stream'));
+            // 🔴 EventSource does NOT pass through spaceInterceptor, so the space prefix is applied by
+            // hand. Without this a multi-space deployment tails the default space's notifications.
+            const source = new EventSource(spaceScopedUrl(apiUrl('/notifications/stream'), this.spaces.currentSpaceId()));
             source.onmessage = (e) => {
                 try {
                     this.svc.applyIncoming(JSON.parse(e.data));

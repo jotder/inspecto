@@ -4,6 +4,7 @@ export * from './v1';
 export * from './v1.interceptor';
 export * from './auto-refresh';
 export * from './error.interceptor';
+export * from './space-scope';
 export * from './space.interceptor';
 export * from './session.service';
 export * from './auth.interceptor';

@@ -2,8 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
+import { spaceScopedUrl } from './space-scope';
+import { SpacesService } from './spaces.service';
 import type { Ref } from '../component-model/component-types';
-import type { SignalSeverity } from '../signal/signal';
+import { signalToEvent, type Signal, type SignalSeverity } from '../signal/signal';
 
 /**
  * One immutable operational fact from the Operational Intelligence event engine (GET /events*). Mirrors
@@ -91,6 +93,7 @@ export const EVENT_TYPES: string[] = [
 @Injectable({ providedIn: 'root' })
 export class EventsService {
     private http = inject(HttpClient);
+    private spaces = inject(SpacesService);
 
     /** Filtered events, newest-first (GET /events/search). An empty filter returns the newest `limit` events. */
     search(filter: EventFilter = {}): Observable<EventRow[]> {
@@ -125,5 +128,56 @@ export class EventsService {
     /** Delete a saved view (POST /events/views/{name}/delete). */
     deleteView(name: string): Observable<unknown> {
         return this.http.post(apiUrl(`/events/views/${encodeURIComponent(name)}/delete`), {});
+    }
+
+    /**
+     * Live signals as `EventRow`s (`GET /signals/stream`, server-sent events). The `/events` surface is a
+     * projection of the same unified Signal ledger, so each frame is mapped through
+     * {@link signalToEvent} — the sanctioned projection — rather than a second shape.
+     *
+     * The route supports the same filters as `GET /signals` (`type`, `severity`, `source`,
+     * `correlationId`) and carries **no historical replay**: a caller does its initial `search()` and then
+     * opens this, exactly as the route's own contract states.
+     *
+     * ⚠ **Three things a caller must know.**
+     * 1. It **errors immediately when `EventSource` is unavailable** (jsdom, and any environment without
+     *    it) so the caller falls back to polling rather than silently going quiet.
+     * 2. A transport error errors the observable **once**; it does not retry. A dropped stream is not
+     *    "backend down", so it must NOT be routed to the connectivity banner — the caller falls back to
+     *    its visibility-aware poll, the same posture the notifications stream takes.
+     * 3. Malformed frames are **ignored**, not surfaced: one bad frame must not tear down a live tail.
+     *
+     * 🔴 The URL is space-scoped **by hand** through {@link spaceScopedUrl}, because `EventSource` does not
+     * pass through `spaceInterceptor`. Without it a multi-space deployment subscribes to the default
+     * space's stream while showing another space's rows.
+     */
+    stream(filter: Pick<EventFilter, 'type' | 'correlationId'> & { severity?: string; source?: string } = {}): Observable<EventRow> {
+        return new Observable<EventRow>((subscriber) => {
+            if (typeof EventSource === 'undefined') {
+                subscriber.error(new Error('EventSource unavailable'));
+                return;
+            }
+            const params = toParams(filter as Record<string, unknown>).toString();
+            const base = spaceScopedUrl(apiUrl('/signals/stream'), this.spaces.currentSpaceId());
+            let source: EventSource;
+            try {
+                source = new EventSource(params ? `${base}?${params}` : base);
+            } catch (err) {
+                subscriber.error(err);
+                return;
+            }
+            source.onmessage = (e: MessageEvent<string>) => {
+                try {
+                    subscriber.next(signalToEvent(JSON.parse(e.data) as Signal));
+                } catch {
+                    /* ignore a malformed frame — one must not end the tail */
+                }
+            };
+            source.onerror = () => {
+                source.close();
+                subscriber.error(new Error('signal stream closed'));
+            };
+            return () => source.close();
+        });
     }
 }

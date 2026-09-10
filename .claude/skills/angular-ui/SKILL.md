@@ -565,6 +565,25 @@ src/app/
   URL — a plain `<a href>` to the API skips the token and 401s.
 - **Live tail / polling** uses `visibleInterval(ms)` (pauses when the tab is hidden); unsubscribe in
   `ngOnDestroy`/`takeUntilDestroyed`.
+- 🔴 **A server-sent-events URL must be space-scoped BY HAND — `EventSource` never passes through an
+  interceptor.** `spaceInterceptor` is an `HttpInterceptorFn`, so it only rewrites `HttpClient` requests;
+  an `EventSource` built from `apiUrl(...)` alone hits the **unscoped** path, and a multi-space deployment
+  then tails the default space while displaying another one's rows. Wrap every stream URL in
+  `spaceScopedUrl(apiUrl('/…'), spaces.currentSpaceId())` (`inspecto/api/space-scope.ts` — the ONE statement
+  of the rule, shared with the interceptor so the two transports cannot drift). Found 2026-09-10 wiring the
+  Events pane to `/signals/stream`; the notifications stream had carried the same latent defect since it
+  shipped, invisible in single-space deployments because there the rule is a no-op.
+- **The SSE-with-poll-fallback shape** (reference: `EventsService.stream` + the Events pane, and the older
+  notifications component): guard `typeof EventSource === 'undefined'` so jsdom and any environment without
+  it fall back rather than going quiet; ignore a malformed frame instead of tearing the stream down; close
+  the source on both error and unsubscribe; and ⛔ **never route a stream error to the connectivity
+  banner** — only a status-0 HTTP failure means "backend down", and a dropped stream does not. Two traps
+  worth knowing: **set any "streaming" flag BEFORE `subscribe()`**, because a synchronously-failing stream
+  runs its error handler during the subscribe call and a flag set afterwards overwrites the handler's value
+  (the pane then reports streaming while it is really polling); and a stream with **no historical replay**
+  means the pane must re-run its query when arming, then tail forward. ⚠ A spec that pushes frames into a
+  subject **without arming the tail first** asserts over the initial fetch alone and passes for the wrong
+  reason — mutation-test the append path, don't trust a green.
 - **Secrets:** references only (`${ENV:…}`); never echo a raw secret back to the server (`***` sentinel
   means "keep stored value").
 - **Multi-space scoping (do NOT re-roll per feature):** the server hosts many isolated spaces. `SpacesService`

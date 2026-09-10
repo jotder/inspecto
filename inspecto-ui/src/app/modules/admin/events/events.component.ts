@@ -97,7 +97,10 @@ export class EventsComponent implements OnInit, OnDestroy {
     /** Live-tail cadence in seconds (operator-selectable); the toggle uses whatever is chosen here. */
     readonly liveSecondsOptions = LIVE_TAIL_SECONDS;
     liveSeconds: number = 5;
+    /** True while the live tail is served by the SSE stream rather than the poll fallback. */
+    readonly streaming = signal(false);
     private liveSub?: Subscription;
+    private streamSub?: Subscription;
 
     // ── filter toolbar ─────────────────────────────────────────────────────────
     fLevel = '';
@@ -179,7 +182,7 @@ export class EventsComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy(): void {
-        this.liveSub?.unsubscribe();
+        this.stopLiveTail();
     }
 
     private buildFilter(): EventFilter {
@@ -258,11 +261,81 @@ export class EventsComponent implements OnInit, OnDestroy {
         this.restartLiveTail();
     }
 
-    /** Re-arm the poll at the current cadence — called on toggle and when the cadence select changes. */
+    /**
+     * Re-arm the live tail — called on toggle and when the cadence select changes.
+     *
+     * Prefers the **server-sent signals stream** (`GET /signals/stream`) and falls back to the
+     * visibility-aware poll. The stream has no historical replay, so the current query is re-run first and
+     * each frame is then prepended, keeping the newest-first order the grid already assumes.
+     *
+     * ⚠ **A stream error falls back to polling and must NOT reach the connectivity banner** — only a
+     * status-0 HTTP failure means "backend down", and a dropped SSE connection does not. The fallback is
+     * why a buffering proxy, or any environment without `EventSource`, still gets a live tail.
+     */
     restartLiveTail(): void {
+        this.stopLiveTail();
+        if (!this.live()) return;
+        // ⚠ An absent events module is an expected deployment state, and this pane's rule is "never call".
+        // The toggle is in the header, OUTSIDE the region the explained alert replaces, so an operator can
+        // still flip it — without this gate the pane would open a stream whose rows it cannot display.
+        // Measured against a running backend whose `/bootstrap` reports `features.events: false` while
+        // `GET /signals/stream` answers 200.
+        if (!this.eventsEnabled()) return;
+        // No replay on the stream: re-run the query, then tail forward from now.
+        this.load(true);
+        // ⚠ Set the flag BEFORE subscribing: a stream that fails synchronously — which is exactly what
+        // an environment without `EventSource` does — runs the error handler during `subscribe()`, so
+        // setting it afterwards would overwrite the handler's `false` and the pane would report
+        // "streaming" while it was really polling.
+        this.streaming.set(true);
+        this.streamSub = this.api.stream({ correlationId: this.fCorrelation() || undefined }).subscribe({
+            next: (row) => this.appendStreamed(row),
+            error: () => {
+                this.streamSub = undefined;
+                this.streaming.set(false);
+                this.startPolling();
+            },
+        });
+    }
+
+    /** Tear down whichever live-tail transport is armed. */
+    private stopLiveTail(): void {
+        this.streamSub?.unsubscribe();
+        this.streamSub = undefined;
         this.liveSub?.unsubscribe();
         this.liveSub = undefined;
-        if (this.live()) this.liveSub = visibleInterval(this.liveSeconds * 1000).subscribe(() => this.load(true));
+        this.streaming.set(false);
+    }
+
+    /** The fallback transport: the pre-existing visibility-aware poll at the selected cadence. */
+    private startPolling(): void {
+        this.liveSub?.unsubscribe();
+        this.liveSub = visibleInterval(this.liveSeconds * 1000).subscribe(() => this.load(true));
+    }
+
+    /**
+     * Prepend one streamed row, newest-first, and hold the grid at the operator's page size so a busy
+     * stream cannot grow the table without bound.
+     *
+     * ⚠ It respects the **minimum-level** filter client-side, because the stream filters on `severity`
+     * server-side and the toolbar's control is `level` — projecting the frame and then dropping it here
+     * keeps one definition of the ladder (`EVENT_LEVELS` order) instead of mirroring it into a second
+     * severity mapping. A row already present is ignored, so a re-run overlapping the tail cannot double.
+     */
+    private appendStreamed(row: EventRow): void {
+        if (!this.matchesLevel(row)) return;
+        const rows = this.events();
+        if (rows.some((r) => r.eventId === row.eventId)) return;
+        this.events.set([row, ...rows].slice(0, this.fLimit));
+    }
+
+    /** True when the row is at or above the toolbar's minimum level (blank = no minimum). */
+    private matchesLevel(row: EventRow): boolean {
+        if (!this.fLevel) return true;
+        const order = EVENT_LEVELS as readonly string[];
+        const min = order.indexOf(this.fLevel);
+        const at = order.indexOf(row.level);
+        return min < 0 || at < 0 || at >= min;
     }
 
     openDetail(row: EventRow): void {
@@ -295,6 +368,11 @@ export class EventsComponent implements OnInit, OnDestroy {
     // ── saved views ────────────────────────────────────────────────────────────
 
     private loadViews(): void {
+        // ⚠ Same rule as `load()`: an absent events module is an expected deployment state, so never call.
+        // Found 2026-09-10 while verifying the live tail in the preview — this was the ONE call in the pane
+        // that still fired with the module absent, producing two 503 console errors on every visit while
+        // the screen itself was correctly explaining the absence.
+        if (!this.eventsEnabled()) return;
         this.api.views().subscribe({
             next: (v) => this.views.set(v),
             error: () => this.views.set([]),
