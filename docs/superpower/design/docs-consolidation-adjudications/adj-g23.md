@@ -271,7 +271,7 @@ DuckLake or pg_duckdb. Clean cut.
 | `docs/okf/backend/architecture-layers.md:197` — "(`pg_duckdb`) queries it externally — see `integrations.md`" | warehouse half | plain text, no anchor. Survives a retitle; **breaks on a file rename.** |
 | `docs/stakeholders/TECHNICAL_ARCHITECTURE.md:84` → whole file | warehouse half ("query the lakehouse via the warehouse layer (pg_duckdb)") | survives a retitle; breaks on a rename. Root-canon tier. |
 | `docs/okf/backend/index.md:41` — "Integrations … acquisition connectors + DuckLake/warehouse touchpoints" | **both** | must be rewritten either way: the description will be half-false after the split. |
-| `docs/superpower/docs-consolidation-plan.md:166`, `:526-543` | the plan itself | in-flight; update with the work. |
+| `docs/archived-documents/plans-archive/docs-consolidation-plan.md:166`, `:526-543` | the plan itself | in-flight; update with the work. |
 | `inspecto/README.md:393`, `:435` → `../docs/integrations.md` | warehouse half (both describe DuckLake/pg_duckdb) | **already dead** — `docs/integrations.md` has not existed since 2026-07-16. Pre-existing breakage; cheap to fix in the same pass. |
 | `.claude/ARCHITECTURE_MAP.md:41` → `docs/integrations.md` | — | **already dead**, same cause. |
 

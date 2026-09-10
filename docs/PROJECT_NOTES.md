@@ -65,7 +65,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 | Topic | Doc |
 |---|---|
-| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | [`okf/capabilities/`](okf/capabilities/index.md) — one doc per area ID; **9 of 17 slots written** as of 2026-09-08 (`ACQ` pilot, then `SEC` · `INC` · `API` · `SPC` · `MET` · `DAT` · `ING` · `OPS`). Each one's §2 is the requirement-of-record and **overrides `REQUIREMENTS.md` §3 and `EDITIONS.md` where they differ**; §5 lists what is not built. The remaining 8 slots are named in [`GLOSSARY.md`](GLOSSARY.md) §14 and sized in [`docs-consolidation-plan.md`](superpower/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
+| **What a capability REQUIRED / has BUILT / has LEFT / REFUSED** (new tier 2026-09-08) | [`okf/capabilities/`](okf/capabilities/index.md) — one doc per area ID; **9 of 17 slots written** as of 2026-09-08 (`ACQ` pilot, then `SEC` · `INC` · `API` · `SPC` · `MET` · `DAT` · `ING` · `OPS`). Each one's §2 is the requirement-of-record and **overrides `REQUIREMENTS.md` §3 and `EDITIONS.md` where they differ**; §5 lists what is not built. The remaining 8 slots are named in [`GLOSSARY.md`](GLOSSARY.md) §14 and sized in [`docs-consolidation-plan.md`](archived-documents/plans-archive/docs-consolidation-plan.md) §5.1. ⚠ The `okf/` sections answer only "what is built", and answer it by CODE LAYER |
 | Production investigation (process/events/metrics/state/`-D` flags/Control API/troubleshooting) | [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **living doc** |
 | Pipeline-graph design (IR, lift, validator, executor, registry, T-checklist §14) | [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md) |
 | Live execution of authored Pipelines (`JobType.PIPELINE`, T32) | [`live-execution.md`](okf/backend/pipeline-graph/live-execution.md) |
@@ -139,6 +139,25 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 ---
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
+
+- 🔴 **A written-down finding records the INSTANCE, not the class — so its number is a lower bound.** Every
+  one of Sprint 7's seven cells (2026-09-10) was scoped from a board row, and **every row undercounted, in
+  the same direction**: "~16 authority citations" was 19 documents plus 5 source files · "twenty documents"
+  was 27 · "five undefined words" was five, but three of them had **more senses than the row claimed** ·
+  "five dead classes" was four, plus a worse third defect the row never mentioned · "five orphan documents"
+  was five, but four contained an item that was **refuted or already shipped**. Whoever writes a finding sees
+  one example and writes that down. ⇒ **Plan the sweep, not the row**: re-derive the set from the repo before
+  estimating, and expect the true count to be larger and the shape different.
+- ⚠ **A row goes stale in BOTH directions, because nobody re-reads it when they fix the thing it
+  describes.** Twice in the same sweep a row still demanded work that had been done: one pointer had been
+  resolved the previous day, and one "two documents tell a contributor to edit a file that does not exist"
+  clause had been repaired two days earlier — while two *different* documents had the same defect, live. ⇒
+  Re-ground a row against the repo before working it **and** before believing it is still open.
+- ⛔ **A false ✅ is worse than a blank, because nobody re-checks a tick.** Two plans recorded a migration
+  command as existing; it was in no source file, and a release gate's precondition rested on it. When a step
+  is marked done, the evidence goes on the same line — and when what is green is *narrower* than what the
+  step asks (round-trip parity of a projection versus the suite executing through the new path), say which
+  claim the evidence supports.
 
 - 🔴 **A fixture-corpus parity gate proves nothing about a shape no fixture uses.** A round-trip gate ran
   green over every committed fixture while a whole authored spelling was unreadable — for **13 days** —

@@ -93,7 +93,7 @@ AI-driven autonomy without redesign.
 > than carried over.
 >
 > ⛔ **Do not re-add status text here.** A second home for a requirement is how the seventeen
-> contradictions in `superpower/docs-consolidation-plan.md` §5.5 were created. State it once, in the
+> contradictions in `archived-documents/plans-archive/docs-consolidation-plan.md` §5.5 were created. State it once, in the
 > owning spec.
 
 | Area | IDs | Requirement of record |

@@ -1,5 +1,18 @@
 # Docs consolidation — one functional spine, one capability spec per area
 
+> ⛔ **ARCHIVED 2026-09-10 — provenance only, never maintained.** **All ten steps are closed** (steps 1 and
+> 1b in Sprint 7.1/7.2; step 7 with the last three plans in Sprint 7.6; step 10 as *no deletion* — the
+> archive is provenance by policy).
+>
+> **Where its truth went:** the tier it produced is `docs/okf/capabilities/`, keyed on `docs/GLOSSARY.md`
+> §14's areas; the doc lifecycle it fixed is stated in `CLAUDE.md` and mapped in `docs/INDEX.md`; and its
+> guard lessons are `docs/okf/capabilities/tooling/tooling.md` §3.3 — now **seven** instances of a guard's
+> scope being a silent exemption, the seventh being that **neither documentation guard reads source files**.
+>
+> ⚠ Its diagnosis is the part worth re-reading: **taxonomy collision, of which the file count was only the
+> symptom.** ⚠ This plan had **no index row of its own** until 2026-09-09, while driving the whole programme.
+
+
 **Status:** PROPOSAL — taxonomy and tier placement need an operator decision (§5) before any file moves.
 **Opened:** 2026-09-08.
 **Goal (operator's words):** *"consolidate spec and plan docs into an organized set... create a little more

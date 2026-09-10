@@ -22,7 +22,7 @@ timestamp: 2026-07-16T00:00:00Z
 > [reactor.md](modules/reactor.md) (whose own module list is also stale — see architecture.md).
 > **Still sound and unique to this page:** §5's two-event-buses distinction and §7's DuckDB
 > open-per-use / `SqlSandbox` boundary. *(Assessed 2026-09-08; this page is a retirement candidate —
-> `docs/superpower/docs-consolidation-plan.md` §5.8.1 group 7.)* *(Moved from the retired root-level `architecture-layers.md` (docs consolidation, 2026-07-16).)*
+> `docs/archived-documents/plans-archive/docs-consolidation-plan.md` §5.8.1 group 7.)* *(Moved from the retired root-level `architecture-layers.md` (docs consolidation, 2026-07-16).)*
 
 > Part of the [Inspecto](../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
 >

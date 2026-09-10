@@ -487,7 +487,7 @@ and a **zero baseline yields a null deviation** — undefined, not −100 %.
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
 > copying it onto the board would give it two homes and one of them would go stale. The board holds what
 > **crosses** areas; a spec holds what belongs to **one**. See
-> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+> [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
 1. **`GET /signals/stream` (SSE) has no client.** The Events pane polls; nothing in `inspecto-ui/src/app`
    opens an `EventSource`. The sixth instance of *server half shipped, no consumer* — not a Must this time

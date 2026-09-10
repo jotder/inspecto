@@ -13,7 +13,7 @@ timestamp: 2026-09-08T00:00:00Z
 > *built*, what is *left*, and what was *refused*. It is the front door to the mechanism, not a copy of it —
 > §7 points at the `okf/` concepts that own the detail, and §5 points at `BACKLOG.md` rows rather than
 > restating them. Third of the capability specs; the template is
-> [`docs-consolidation-plan.md` §5.2](../../../superpower/docs-consolidation-plan.md); the area name and
+> [`docs-consolidation-plan.md` §5.2](../../../archived-documents/plans-archive/docs-consolidation-plan.md); the area name and
 > directory are fixed by [`GLOSSARY.md` §14](../../../GLOSSARY.md#14-capability-areas-the-functional-spine).
 >
 > **Canonical vocabulary** (`GLOSSARY.md` §4, §8, §9 — binding). The chain is **Alert → Incident → Case**.
@@ -418,7 +418,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
 > copying it onto the board would give it two homes and one of them would go stale. The board holds what
 > **crosses** areas; a spec holds what belongs to **one**. See
-> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+> [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
 | Item | Evidence | Why it matters |
 |---|---|---|

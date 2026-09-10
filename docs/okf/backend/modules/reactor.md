@@ -26,7 +26,7 @@ timestamp: 2026-07-22T00:00:00Z
 > **Still sound and unique to this page:** the *reasoning* behind the split, the shared-helper homes in
 > `inspecto-util` (as-built 2026-08-27), version management (M1), and the rules for extracting a further
 > module. Read it for why, not for what. *(Assessed 2026-09-08 —
-> `docs/superpower/docs-consolidation-plan.md` §5.8.1 group 7, row 7.3.)*
+> `docs/archived-documents/plans-archive/docs-consolidation-plan.md` §5.8.1 group 7, row 7.3.)*
 
 How the reactor is shaped, why, and the rules for extracting further modules. Distilled from
 `modularization-optimization-plan.md` (completed 2026-07-21, archived in

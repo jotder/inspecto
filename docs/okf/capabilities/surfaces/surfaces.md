@@ -371,7 +371,7 @@ test suite, with one board row between them. Everything in §5.2 is consequently
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
 > copying it onto the board would give it two homes and one of them would go stale. The board holds what
 > **crosses** areas; a spec holds what belongs to **one**. See
-> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+> [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
 1. 🔴 **No capability guard and no structural directive exist.** Gating is per-pane and by convention, so
    a new authoring surface that forgets its check is caught by nothing. A route guard, a directive, or a

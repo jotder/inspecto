@@ -148,6 +148,21 @@ The doctrine page records five instances. This spec adds a sixth, and it is the 
 | The vocabulary guard, four times over | Each addition closed a tree a clean run had been declining to read. The fourth was hiding thirteen violations in the documents an executive reads, one of which instructed the reader to configure a job type that does not exist |
 | 🔴 **The vocabulary guard, a fifth time — the instruction files** | **The root instruction file, which defines the bans, and the whole instruction tree of nine skills, three agent definitions and four reference maps, are in no pass.** The root file carries five banned words with no allowance markers while the guard reports green, which is only possible because it is unscanned. **220 of 503 tracked markdown files are in scope** |
 
+🔴 **A SEVENTH instance, found 2026-09-10 (Sprint 7.1/7.6): neither documentation guard reads SOURCE
+FILES.** The citation guard and the link guard both scope to markdown, so a javadoc or a TypeScript comment
+could cite a moved path, name a renamed type, or delegate its authority to the never-maintained archive tier
+and no run would ever say so. Measured: **five source files** did exactly that, and three of them pointed
+"current knowledge" at a documentation page containing **zero** mentions of their subject — which made an
+archived plan the only authority a reader could actually reach. Two more delegated to a plan that was about
+to move. ⚠ The vocabulary guard *does* scan 1,546 Java and TypeScript files, so the asymmetry is per-guard,
+not repo-wide, and that asymmetry is exactly what made it invisible: a green run of "the guards" says
+nothing about a class only one of them looks for.
+
+⚠ **A second lesson from the same sweep: the citation guard exempts `docs/superpower/` as a source**, which
+is correct for an in-flight tier but means it could not see one active plan's links into a sibling plan. The
+link guard has no such exemption and caught those. **Two guards with different scopes each caught half of
+one move, and neither could have caught the other's half.**
+
 Two things make the sixth instance worth a row rather than a shrug. The guard's own comment supplies the
 argument: past a certain age a banned synonym stops being wrong vocabulary and becomes **wrong
 instructions** — and instruction files are where that lands hardest. And the guard's own scripts are
@@ -315,7 +330,7 @@ name claims every edition is signed when **two of three** are, with no artifact 
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
 > copying it onto the board would give it two homes and one of them would go stale. The board holds what
 > **crosses** areas; a spec holds what belongs to **one**. See
-> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+> [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
 1. ✅ ~~**Capability specs cite a pointer-check tool that is not in the repository.**~~ **FIXED 2026-09-09
    as `tools/check-doc-citations.mjs`**, wired into `ci.yml` and `.githooks/pre-push`. It was **nine**

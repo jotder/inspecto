@@ -918,7 +918,7 @@ When a rename lands, mark its row ✅ and record the commit.
 The **fifteen capability areas** are the one subject axis every other view keys to: `REQUIREMENTS.md` §3's
 requirement IDs, `BACKLOG.md` rows, `EDITIONS.md` gating debt and commit messages all cite them, and each
 area owns exactly one **capability spec** under `docs/okf/capabilities/<directory>/` (template:
-`superpower/docs-consolidation-plan.md` §5.2). The **ID prefixes are stable traceability handles and never
+`archived-documents/plans-archive/docs-consolidation-plan.md` §5.2). The **ID prefixes are stable traceability handles and never
 change**; the *names* below are the canonical ones and replace the headings `REQUIREMENTS.md` §3 used
 before this pass. A directory name is the most expensive name to change later, so nothing may be created
 under `okf/capabilities/` except through this table.

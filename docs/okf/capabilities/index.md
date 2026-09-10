@@ -10,7 +10,7 @@ questions a shift actually asks about a subject, in one place:
 tiers, TOON config shapes, code layer, and screen layout — so no subject had an entry point. "consignment"
 appeared in 48 of 192 current-tier docs and none of them answered those four questions. The file count was
 the symptom; the taxonomy collision was the disease. See
-[`docs-consolidation-plan.md`](../../superpower/docs-consolidation-plan.md) §2.
+[`docs-consolidation-plan.md`](../../archived-documents/plans-archive/docs-consolidation-plan.md) §2.
 
 **What a capability doc owns, and what it must not.** It owns §2 requirements-of-record, §3 the
 specification, §4 the decisions and §6 the refusals. It owns **nothing else**: §5 points at `BACKLOG.md`
@@ -44,5 +44,5 @@ were missing). ⛔ Create a directory here only with the name that table gives i
 | `TOOL` | [Guards & repository tooling](tooling/tooling.md) | `tooling/` | ✅ **area #14 — 2026-09-09**; new area |
 
 Measured load per area is in
-[`docs-consolidation-plan.md`](../../superpower/docs-consolidation-plan.md) §5.1. Replication order is
+[`docs-consolidation-plan.md`](../../archived-documents/plans-archive/docs-consolidation-plan.md) §5.1. Replication order is
 one area per commit (plan §6 step 4); each commit must leave the link guard and the vocabulary guard green.

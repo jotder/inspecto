@@ -380,7 +380,7 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
 ### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
 
 These four are the **classes** behind roughly half of the consolidation's findings. Each is one guard, not N
-fixes — that is the point, and it is Sprint 3 of `superpower/post-consolidation-sprints.md`.
+fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-archive/post-consolidation-sprints.md`.
 
 - ✅ **`SPEC-STALEREF-1` — the class is CLOSED 2026-09-09; the guard is `tools/check-doc-citations.mjs`.**
   Committed and wired into `ci.yml` and `.githooks/pre-push`, falsified in both directions (a seeded dead

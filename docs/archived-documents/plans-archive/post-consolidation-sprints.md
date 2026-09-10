@@ -1,5 +1,15 @@
 # Post-consolidation plan — eight sprints
 
+> ⛔ **ARCHIVED 2026-09-10 — provenance only, never maintained.** Sprints 1–7 all closed; **Sprint 8+ is
+> owned by `docs/BACKLOG.md` §0 and `docs/superpower/enterprise-scale-out-plan.md`, not by any plan
+> document.** Read the sprint outcomes below for what each one actually found; read the board for what is
+> open.
+>
+> **Its durable lessons are `docs/PROJECT_NOTES.md` §4:** 🔴 a written-down finding records the **instance,
+> not the class**, so its number is a lower bound — all seven of Sprint 7's cells were scoped from a board
+> row and **every one undercounted, in the same direction**; and ⚠ a row goes **stale in both directions**,
+> because nobody re-reads it when they fix the thing it describes.
+
 > **Status 2026-09-10: Sprints 1–5 DONE; Sprint 6 is steady state; Sprints 7–8 ADDED by operator decision
 > (2026-09-10) — one bounded documentation closeout, then pure implementation from a ranked queue. Every
 > operator decision this plan ever carried is closed (see the last section). This plan archives when Sprint 7
@@ -341,11 +351,30 @@ over interleaving and over deferral: *one bounded docs sprint now, then pure cod
 | 7.4 | `SPEC-MOCKRESIDUE-1` — the 20 current-tier docs that still describe the deleted mock backend, incl. the two that tell a contributor to edit a file that does not exist | *`git grep` for the mock layer's names returns only the archive tier and the removal record — the count is the acceptance test* |
 | 7.5 | `SPEC-PLANSTALE-1` remainder — the pipeline spec's "what actually runs" (five dead classes, "a new Step type cannot be added") corrected before it moves | *a plan's header agrees with its own later rows* |
 | 7.6 | **Archive the three release-gated plans** (`pipeline-spec.md`, `pipeline-waves-drain-plan.md`, `elt-final-amendment-plan.md`) — operator 2026-09-10: after a **distillation diff** against `pipeline-execution.md` / `pipeline-authoring.md`, repointing the 7 inbound citations; the board keeps row 15 | *`superpower/` holds the signed scale-out plan and nothing else once 7.7 runs* |
-| 7.7 | **Close this plan and [`docs-consolidation-plan.md`](docs-consolidation-plan.md)** — distil their durable lessons into `PROJECT_NOTES.md` §4 / `tooling.md`, then `git mv` both to the archive with an INDEX row each | *the in-flight tier is exactly one plan; `INDEX.md` matches* |
+| 7.7 | ✅ **DONE 2026-09-10** — both plans closed, lessons distilled into `PROJECT_NOTES.md` §4 and `okf/capabilities/tooling/tooling.md`, both `git mv`'d with an `INDEX.md` row each | *the in-flight tier is exactly one plan; `INDEX.md` matches* |
 
 ⛔ **Not in Sprint 7:** `SPEC-ORPHANPAGE-1` stays P3 (an undocumented pane is a smaller problem than a wrongly
 documented one); consolidation step 10 is CLOSED as *no deletion* — the archive is provenance. `STREAM-CONSUMER-1`'s
 design pass is engineering, not documentation, and belongs in Sprint 8.
+
+### Sprint 7 — outcome (2026-09-10): ALL SEVEN CELLS DONE
+
+| # | Shipped | What the grounding changed |
+|---|---|---|
+| 7.1 | `ecb6e929` | The "~16 authority citations" were **19 doc sites + 5 SOURCE files**. `GLOSSARY.md`'s "four rationales" were **eight**; the completeness-KPI pointer had been **resolved the day before** (this plan's own row was stale); and six `design of record` delegations were never named, one of them a **section heading**. 🔴 **A fifth instance of a guard's scope being a silent exemption:** the citation guard reads markdown only, so three javadocs pointed "current knowledge" at a page containing **zero** mentions of their subject — making the archived plan the only authority a reader could reach |
+| 7.2 | `747c8ab2` | **Four of the five ORPHANs had an item that was refuted or half-shipped.** `C2` was **half shipped 20 days before the recount that called it untouched**; the maintenance list's first COULD had **already shipped and was documented twice at the destination**, so landing it as deferred would have made one file contradict itself; the console plan was ~80 % absorbed already; and the frontend review's **boundary lint was never built** — no ESLint config is tracked at all |
+| 7.3 | `84fe8e42` | **Three of the five words had MORE senses than the row claimed** (`Control` five, `Stream` five, `Case` four): a two-way collision is the floor, not the finding. Two factual errors fell out — `CMP-01…03` "shipped controls" are **eight edition FEATURE rows**, and the Watermark entry claimed completeness of a Catalog Stream when the code keys it on the **output table**. The `Case` rename is code over four published routes, so it was **filed, not applied** |
+| 7.4 | `cd15d4e7` | **27 documents, not twenty** — and the residue reached two buyer-facing pages, an **agent definition**, and a **status VALUE** in the requirements legend. 🔴 The row's own "two documents" clause was **stale**; two *different* instruct-to-edit-a-missing-file cases were live, one of them **120 lines below its own page's correction banner**. The acceptance test as stated was unmeetable and is refined in the row |
+| 7.5 | `04262b3d` | Four dead classes, not five — dead for **ten days** inside the document whose own §12 records the rename. The "new Step type" claim was wrong in **every** clause. 🔴 And the worst defect the row never named: **a false ✅ on a release gate's precondition** |
+| 7.6 | `83c39a3c` | **31 items lived only in the three plans**; four became board rows and two missing steps joined row 15. The diff caught the false converter tick, **D1 having no current-tier row at all**, and the **Pipeline Document having no concept home**. Three `GLOSSARY` citations were pinned to plan **line numbers**, which a `git mv` does not fix |
+| 7.7 | this commit | Both driving plans closed and archived; the in-flight tier is **one** plan |
+
+🔴 **The one pattern behind all seven.** Every cell's stated scope was an **undercount**, and in the same
+direction: 16→19+5 · 20→27 · 5 words→3 with extra senses · 5 classes→4 but a worse third defect · 5
+ORPHANs→4 with refuted items. A finding written down when it is noticed records **the instance**, not the
+class — so a row's number is a lower bound, and the sweep is what finds the size. ⚠ Twice the row was also
+**stale in the other direction** (7.1's completeness pointer, 7.4's two-documents clause), because nobody
+re-reads a row when they fix the thing it describes.
 
 **First command:** `node tools/check-doc-links.mjs` then `git grep -n 'archived-documents' -- 'docs/okf/**/*.md' docs/GLOSSARY.md | grep -v 'ARCHIVED\|provenance'` — the step-1 citations are the ones that remain.
 

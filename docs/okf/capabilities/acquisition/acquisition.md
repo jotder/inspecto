@@ -13,7 +13,7 @@ timestamp: 2026-09-08T00:00:00Z
 > *built*, what is *left*, and what was *refused*. It is the front door to the mechanism, not a copy of
 > it — §7 points at the `okf/` concepts that own the detail, and §5 points at `BACKLOG.md` rows rather
 > than restating them. First of the capability specs; the template is
-> [`docs-consolidation-plan.md` §5.2](../../../superpower/docs-consolidation-plan.md).
+> [`docs-consolidation-plan.md` §5.2](../../../archived-documents/plans-archive/docs-consolidation-plan.md).
 >
 > **Canonical vocabulary.** The two authored nouns are **Connection** (a named endpoint + credential
 > definition) and **Collector** (a configured collection task bound to one Connection). ⛔ The
@@ -736,7 +736,7 @@ so they are not re-proposed as new ideas; none is scheduled.
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
 > copying it onto the board would give it two homes and one of them would go stale. The board holds what
 > **crosses** areas; a spec holds what belongs to **one**. See
-> [`superpower/post-consolidation-sprints.md`](../../../superpower/post-consolidation-sprints.md) §Sprint 2.
+> [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
 | Item | Where its design lives | Why it matters |
 |---|---|---|

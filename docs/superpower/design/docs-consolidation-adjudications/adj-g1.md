@@ -1,4 +1,4 @@
-# Adjudication — `docs/superpower/docs-consolidation-plan.md` §5.8.1 Group 1 (Parse pane / SQL-first)
+# Adjudication — `docs/archived-documents/plans-archive/docs-consolidation-plan.md` §5.8.1 Group 1 (Parse pane / SQL-first)
 
 Read-only pass, 2026-09-08. Rows 1.1–1.7, 1.9, 1.10 (1.8 already settled).
 Docs under adjudication:
