@@ -394,7 +394,8 @@ deployment plan; the plan itself remains the build plan for what is unbuilt.
 | **T1** | Single workstation, unzip and run | Personal | none — the core is authentication-free | Local tree; the embedded runtime means no host Java is needed |
 | **T2** | Single server, behind a proxy or with in-process transport security | Standard | Delegated to the customer's identity provider; the product is a resource server | Local tree, optionally database-backed |
 | **T3** | Gateway-fronted, multi-team or multi-tenant | Enterprise | Same, plus gateway assertion trust as a second anchor | Database-backed; per-tenant spaces |
-| **T4** | Active/passive warm standby | Enterprise | As T3 | As T3, replicated |
+| **T4** | Active/passive warm standby — **fault-tolerant DR** | **Standard** *(was Enterprise until 2026-09-10 — operator decision, §4)* | As T2/T3 | Database-backed and replicated; ⚠ DR **requires** the Postgres-backed state, so "optionally database-backed" (T2) becomes "database-backed" here |
+| **T5** | Partitioned scale-out on Kubernetes — **the cluster** | **Enterprise** *(operator decision 2026-09-10; design pending signature: `superpower/enterprise-scale-out-plan.md`)* | As T3, plus gateway assertion trust | Postgres + object store; N pods, each owning Spaces; one DuckLake catalog |
 
 Three properties of this ladder are worth stating because they are decisions, not consequences:
 
@@ -655,6 +656,7 @@ root, `EnvironmentFile=`).
 | 2026-09-08 | **The grantable capability vocabulary stays static across editions** — ⛔ not derived from registered routes, because a role file authored on Standard would then fail validation on Personal. Dead vocabulary has no route behind it and is harmless | engineering |
 | 2026-09-08 | **The area is named "Editions & packaging"**, concept first and mechanism second, because *Edition* had no glossary entry until then | engineering |
 | 2026-09-08 | **The board's matrix is authoritative for the Edition column**; the requirements register mirrors it and is the one to correct on disagreement | engineering |
+| 2026-09-10 | **Fault-tolerant DR is a STANDARD capability; the Kubernetes cluster is ENTERPRISE.** T4 (active/passive warm standby) moves from Enterprise to **Standard**; T5 (partitioned scale-out on Kubernetes) is added as **Enterprise**. ⚠ Consequence: the run lease and the fully-Postgres-backed state that make standby automatic (`superpower/enterprise-scale-out-plan.md` phases A–B) must ship in the **Standard** bundle, not behind `inspecto-policy`. T4 needs Postgres, so Standard DR is "database-backed", not "optionally". The scale-out DESIGN itself is still pending signature (plan §9) | operator |
 
 ## 5. Not built
 

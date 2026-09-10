@@ -3,6 +3,13 @@
 > **Status: DRAFT for operator sign-off — 2026-09-10. Nothing here is built; nothing here is decided
 > until §9 is signed.**
 >
+> ✅ **Two directions taken by the operator on 2026-09-10, ahead of the full signature:** *fault-tolerant DR
+> is a **Standard** capability; the Kubernetes cluster is **Enterprise**.* Recorded in `editions.md` §4 and
+> applied to its §3.9 topology table (T4 → Standard; T5 added as Enterprise). 🔴 **This reshapes the
+> sequencing more than it reshapes the design**: phases A and B are no longer "valuable on a single node" —
+> they ARE the Standard DR deliverable and must ship in the Standard bundle. D8 is thereby decided; D1′–D7
+> and D9–D12 remain owed.
+>
 > **What this plan does.** Turns the operator's 2026-09-10 direction — *"on Enterprise I plan K8s
 > scaling"* — into a design the code can actually carry, sequenced so that the first two of its three
 > phases pay for themselves on a **single node** before a pod exists. It proposes **shared-nothing
@@ -66,9 +73,11 @@ follows from that.
 | `editions.md` §6 *Active/active deployment* | *"⛔ NOT OFFERED — both schedulers are in-process; the single-node ceiling is an accepted constraint (`NFR-8`). The escape hatch is a priced roadmap conversation, not a configuration"* | *"⚠ **SUPERSEDED 2026-09-10** for Enterprise: active/active becomes **partitioned scale-out** (shared-nothing by Space), not replicated active/active. Personal/Standard: still not offered. → plan §4"* |
 | `editions.md` §6 *Orchestration platform support* | *"⛔ OUT OF SCOPE per the signed container decision … not on the roadmap until that decision changes"* | *"⚠ **That decision changed 2026-09-10.** Kubernetes is the Enterprise orchestrator; Personal/Standard remain orchestrator-free. → plan §5.4"* |
 | `ROADMAP.md` L1 | *"Enterprise distributed tier … \| XL \| A deployment whose scale or multi-tenancy actually exceeds the single-node design"* | Trigger cell: *"Operator direction 2026-09-10; sized as three M phases in the plan, each independently shippable"* |
-| `editions.md` §3.9 topology table | T1–T4 | Add **T5 — partitioned scale-out on Kubernetes** (Enterprise; identity as T3; state on Postgres + object store) — *pending D8 below* |
+| `editions.md` §3.9 topology table | T1–T4, T4 = Enterprise | ✅ **APPLIED 2026-09-10 (operator direction, not a signature of this plan):** T4 → **Standard** (fault-tolerant DR); **T5 — partitioned scale-out on Kubernetes** added as **Enterprise**. The one row in this table already amended |
 
-⛔ None of these edits is made by this draft. They are the operator's to sign.
+⛔ None of these edits is made by this draft **except the last row**, which records a decision the operator
+took directly on 2026-09-10 ("fault-tolerant DR Standard, K8s cluster Enterprise") and is therefore already
+applied. The other five are the operator's to sign.
 
 ---
 
@@ -344,8 +353,8 @@ and is worth having if the next phase never happens. Stop between any two.
 
 | Phase | Delivers | Value before any pod exists | Verify gate |
 |---|---|---|---|
-| **A — shared state** (§5.1) | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
-| **B — the lease** (§5.2) | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Standard |
+| **A — shared state** (§5.1) | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling. **Since 2026-09-10: the foundation of Standard's DR tier — ships in the Standard bundle** | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
+| **B — the lease** (§5.2) | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step. **Since 2026-09-10 this IS the Standard fault-tolerant-DR deliverable**, so `RunLease` and `PostgresRunLease` live in core or `inspecto-security`-tier modules, ⛔ never behind `inspecto-policy` | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Standard |
 | **C — partition + lakehouse** (§5.3, §5.4) | Space→pod map, inbox ownership, `CatalogCommit` visibility, Helm chart, per-tenant ABAC | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed |
 
 ⚠ **The Helm chart is the last artefact of phase C, not the first of phase A.** By then Kubernetes is
@@ -399,7 +408,7 @@ pass because two "pods" secretly shared a heap.**
 | **D5** | Lease mechanism | **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator) |
 | **D6** | Events across pods | **Add `events.backend=db`** on the existing `EventStore` seam |
 | **D7** | Connection pool | **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work |
-| **D8** | Tier naming | **T5 — partitioned scale-out on Kubernetes**, added to §3.9's table; T4 stays as the single-node standby shape |
+| **D8** | Tier naming | ✅ **DECIDED 2026-09-10 (operator):** **T5 — partitioned scale-out on Kubernetes** = **Enterprise**, added to §3.9; **T4 active/passive DR moves to Standard**. Applied |
 | **D9** | The "zero external runtime services" claim | **Keep it for Personal/Standard; Enterprise states its two dependencies** (Postgres, S3-compatible object store) |
 | **D10** | `DuckLakeRegistrar` failure in partitioned mode | **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see |
 | **D11** | Dynamic rebalancing | **Deferred to phase C+1**; static Space→pod assignment first |
@@ -424,13 +433,19 @@ pass because two "pods" secretly shared a heap.**
 
 ## 11. What it does to the positioning
 
-A genuinely **two-message product**, and both messages hold:
+A **three-message product** since the 2026-09-10 tier decision, and each message holds:
 
-- **Personal / Standard** — *the 90 MB artifact: zero external services, runs on a laptop or an
-  air-gapped server.* Unchanged.
+- **Personal** — *the 90 MB artifact: zero external services, runs on a laptop or an air-gapped server.*
+  Unchanged.
+- **Standard** — *the same artifact, and if the node dies the standby takes over inside the signed RTO.*
+  **Fault-tolerant DR** (T4) is the Standard headline beside the Ops workflow and the audit pack. Its
+  honest dependency: Postgres — Standard DR is database-backed, not optionally so.
 - **Enterprise** — *the same artifact as a pod, scaled by partition: one binary, one config, N pods,
-  your Postgres, your S3.* A cleaner scale story than the closest competitor's Helm chart, because there
-  is no second architecture to learn.
+  your Postgres, your S3.* The **cluster** (T5) and policy-level tenant isolation. A cleaner scale story
+  than the closest competitor's Helm chart, because there is no second architecture to learn.
+
+⚠ The ladder now reads as *survive a node* (Standard) → *outgrow a node* (Enterprise), which is the
+distinction a buyer already understands.
 
 It does not break the air-gap wedge — regulated on-prem estates already run Kubernetes (OpenShift is
 standard in banks and telecoms). It **does** put tier-1 telecom back in reach, with the per-feed
