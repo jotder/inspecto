@@ -140,6 +140,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- ⚠ **`npm run format:check` (prettier) is DECLARED BUT NOT GATED** — it is in `inspecto-ui/package.json`
+  and in neither `.github/workflows/ci.yml` nor `.githooks/pre-push`. Measured 2026-09-11: it was red on
+  **five** files from an already-pushed commit and nothing anywhere failed, so the drift was invisible at
+  commit time. ⇒ Run it in `inspecto-ui` before committing UI work. Prettier only re-wraps here (long
+  signatures split, arrays exploded with a trailing comma), so `git diff -w` shows no semantic change and
+  the fix is safe to take in one pass. ⚠ It is also a reminder that **a green build does not mean a clean
+  tree**: this repo has more declared checks than gated ones.
 - 🔴 **`tools/rename-batch-to-consignment.mjs` is a MUTATING CODEMOD sitting among the guards, and it
   APPLIES BY DEFAULT** (`--dry-run` is the opt-in safe mode). Run 2026-09-10 in a "run all the guards" sweep,
   it silently renamed `Batch`→`Consignment` inside an unrelated test and **rewrote the file with CRLF**, then
