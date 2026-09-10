@@ -224,6 +224,19 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   inside `reveal()` while leaving the batch-level call in place, which would register the flat lane's files
   twice — would ship green. A test that pins *one registration per batch* is cheap now and is the
   precondition for the §5.4 visibility-strategy work. → `superpower/enterprise-scale-out-plan.md` §5.4
+  ✅ **CLOSED 2026-09-10** by `DuckLakeRegistrationSiteContractTest` (inspecto-etl): the registration must
+  have **exactly one production call site**, and the failure message names the hazard so a future reader
+  knows what tripped. 2 tests, **2 of 2 mutants killed** — a second call site injected on the reveal path
+  fails it, and so does breaking its own anchor.
+  🔴 **Deliberately a SOURCE invariant, not a behavioural test.** The behavioural version (write Parquet,
+  register, assert the catalog holds N rows and not 2N) needs the `ducklake` DuckDB extension, which
+  downloads on first use — so it would have to be **opt-in** behind a system property like this repo's other
+  opt-in suites, and an opt-in test gives **no CI protection**, which is precisely what an
+  implementation-order hazard needs. ⚠ Two limits, stated on the class itself: it does not prove the one
+  call fires once per batch **at runtime**, and it matches raw **text**, so the same string in a comment
+  trips it too — the loud direction, chosen over the silent one. ⛔ If §5.4 adds a legitimate second commit
+  site, update the expected list **deliberately, in the same change that removes the old one**; do not relax
+  the test.
 - **P3** · **`PROCESSOR-CATALOG-ROUTE-1` — nothing serves `ConsignmentProcessor` ids to the UI** (filed
   2026-09-10 by Sprint 7.6; a deliberate deferral that had no board row). The post-sync chain editor takes
   processor ids as **free text**, the way `on_signal` takes signal types, because no catalog route exists. A
