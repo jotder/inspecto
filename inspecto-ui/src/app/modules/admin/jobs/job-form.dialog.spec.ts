@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { JobExpressionDecl, JobsService, JobTypeDescriptor } from 'app/inspecto/api';
+import { JobExpressionDecl, JobProcessorCatalog, JobsService, JobTypeDescriptor } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobFormData, JobFormDialog } from './job-form.dialog';
@@ -26,6 +26,9 @@ function create(
     describeType = vi.fn(noParams),
     types: () => Observable<JobTypeDescriptor[]> = () => of([]),
     expressions: () => Observable<JobExpressionDecl[]> = () => of([]),
+    // The chain editor's processor picker. Empty is the stock-install answer, so it is the default here too.
+    processors: () => Observable<JobProcessorCatalog> = () =>
+        of({ processors: [], total: 0, truncated: false, unusable: 0 }),
 ) {
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
@@ -43,6 +46,7 @@ function create(
                     describeType,
                     types,
                     expressions,
+                    processors,
                 },
             },
             { provide: ToastrService, useValue: { error: vi.fn() } },

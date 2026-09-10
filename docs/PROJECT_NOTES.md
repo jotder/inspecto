@@ -140,6 +140,35 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **`tools/rename-batch-to-consignment.mjs` is a MUTATING CODEMOD sitting among the guards, and it
+  APPLIES BY DEFAULT** (`--dry-run` is the opt-in safe mode). Run 2026-09-10 in a "run all the guards" sweep,
+  it silently renamed `Batch`→`Consignment` inside an unrelated test and **rewrote the file with CRLF**, then
+  **exited 0** — indistinguishable from a guard passing. ⚠ **It is NOT in the pre-push set.** The sweep
+  included it because `grep -oE 'tools/[a-z0-9-]+\.mjs' .githooks/pre-push` matched **its name inside a
+  COMMENT** ("Its old-name set is PARSED from …"), not an invocation. ⇒ The pre-push guard set is the **seven**
+  `check-*.mjs`; derive it from the `run_guard` lines, never from a name-grep of the whole hook, and never
+  assume a `tools/*.mjs` is read-only because it lives beside the guards.
+- 🔴 **AN OPEN IDE SILENTLY CORRUPTS YOUR REACTOR RUN — 36 phantom failures, measured 2026-09-10.** A full
+  `mvn -o clean test` failed with **36 errors in `inspecto-engine`**: `NoClassDefFoundError` on *production*
+  classes (`com.gamma.pipeline.MappingRules`) and `javac` unable to compile the scaffold templates. Nothing
+  in the change under test touched any of it, and **a re-run of the same module minutes later was
+  2487/0/0/4 BUILD SUCCESS with zero edits in between.** ⚠ **The tell: the "missing" class file is present
+  in `target/classes` AFTER the run.** The cause is an IDE background build writing the same output tree —
+  `Get-Process java` showed **IntelliJ's Maven embedder** (`-Didea.maven.embedder.version`) and a **Redhat
+  JDT language server**, both live on this checkout; IntelliJ compiles a Maven project straight into
+  `target/classes`, so it races surefire. ⛔ Do not report a reactor failure that implicates code you did
+  not touch until you have listed the live JVMs and **re-run the failing module**. A red module in this
+  checkout is a hypothesis, not a result.
+- 🔴 **Uncommitted work here is volatile — a peer can DISCARD it, and `git status` then reads exactly like
+  "you did nothing".** Measured 2026-09-10: a peer staged this shift's in-progress tree, aborted the commit
+  on an empty message, then reset/cleaned it. **HEAD never moved, so there was no reflog entry and no
+  stash**, and four new files were simply gone. ✅ It was fully recoverable because **`git add` writes each
+  staged file into the object database as a loose blob that an aborted commit leaves behind**: select loose
+  objects by mtime (`find .git/objects -type f -newermt '<HH:MM>' | grep -v /pack/`) and `git cat-file -p`
+  them out. ⚠ **`git fsck --lost-found` listed none of the eight** — mtime selection is what worked, and
+  `.git/COMMIT_EDITMSG` still named the peer's staged file set, which is how the staging was known at all.
+  ⛔ Only *staged* content is recoverable this way. ⇒ Snapshot to the scratchpad (`git diff > …patch` plus
+  the untracked files) at every milestone; a `git clean` cannot reach it.
 - 🔴 **Four reactor modules log their `Tests run:` SUMMARY at `[WARNING]`, not `[INFO]`** — Maven does that
   whenever a module has any skipped test. So a verify run that greps `^\[INFO\] Tests run:` finds **22
   modules and sums to ~3443** against a real **26 / 4199**, and the shortfall reads like a regression rather

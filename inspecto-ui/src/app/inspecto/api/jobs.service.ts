@@ -280,6 +280,32 @@ export interface JobFailureDay {
     failed: number;
 }
 
+/** One deployed `ConsignmentProcessor` a `consignment.process` chain step may name (GET /jobs/processors). */
+export interface JobProcessor {
+    id: string;
+    /** The class providing it — how an operator tells two jars claiming one id apart. */
+    className: string;
+    /** True when an earlier class already claimed this id, so this one can never be selected. */
+    shadowed: boolean;
+}
+
+/**
+ * The processor vocabulary behind the chain editor's picker (GET /jobs/processors).
+ *
+ * ⚠ **`processors` is EMPTY on a stock install and that is not an error** — the product ships no
+ * `ConsignmentProcessor`, only a scaffold template, so entries appear only where a third party deployed one
+ * on the classpath. Consumers must keep accepting a typed id: suggestions assist, they never constrain, and
+ * a processor may be deployed after the Job config is authored.
+ */
+export interface JobProcessorCatalog {
+    processors: JobProcessor[];
+    /** The TRUE count, which exceeds `processors.length` when `truncated`. */
+    total: number;
+    truncated: boolean;
+    /** Providers on the classpath that cannot be selected at all (unloadable, or an unnameable id). */
+    unusable: number;
+}
+
 /** Config-driven jobs: cron / event / manual (CONTROL scope). 404 when no jobs are registered. */
 @Injectable({ providedIn: 'root' })
 export class JobsService {
@@ -299,6 +325,10 @@ export class JobsService {
     /** The runtime Expression vocabulary (§4.3) — the token picker's source, previews included. */
     expressions(): Observable<JobExpressionDecl[]> {
         return this.http.get<JobExpressionDecl[]>(apiUrl('/jobs/expressions'));
+    }
+    /** Deployed `ConsignmentProcessor` ids for the chain editor's picker — empty on a stock install. */
+    processors(): Observable<JobProcessorCatalog> {
+        return this.http.get<JobProcessorCatalog>(apiUrl('/jobs/processors'));
     }
     runs(name: string): Observable<JobRun[]> {
         return this.http.get<JobRun[]>(apiUrl(`/jobs/${encodeURIComponent(name)}/runs`));

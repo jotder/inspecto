@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,6 +24,13 @@ import { ChainRow, chainToParams, parseChain, rowConfigError } from './job-chain
  * `menu-tree-node.component` already uses. A chain's order is its meaning, so it must be reachable by
  * keyboard, and a two-item list does not justify a drag dependency.
  *
+ * <p><b>The id field SUGGESTS, it does not constrain</b> (`PROCESSOR-CATALOG-ROUTE-1`). {@link processorIds}
+ * comes from `GET /jobs/processors`, but free text stays valid and no validator consults it: the product
+ * ships no processor, so the list is <b>empty on a stock install</b>, and a processor jar can be deployed
+ * after its Job config is authored. ⚠ An empty catalog must never read as a broken field — hence the
+ * explicit hint rather than a silently inert autocomplete. A catalog the host could not load degrades to
+ * the same place: typing still works.
+ *
  * <p>🔴 A row recovered from a <b>surplus</b> `chain_config` entry arrives with a blank id and is marked
  * <b>touched at seed time</b>. Without that the required-error is suppressed until the field is visited,
  * so save would refuse with nothing on screen to correct — the failure mode the schema-form's
@@ -33,6 +41,7 @@ import { ChainRow, chainToParams, parseChain, rowConfigError } from './job-chain
     standalone: true,
     imports: [
         ReactiveFormsModule,
+        MatAutocompleteModule,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
@@ -67,6 +76,13 @@ import { ChainRow, chainToParams, parseChain, rowConfigError } from './job-chain
                 <p class="text-secondary text-sm">No steps yet — add one to build the chain.</p>
             }
 
+            @if (catalogEmpty()) {
+                <p class="text-secondary text-xs">
+                    No processors are deployed on this server, so there is nothing to suggest — type the id the
+                    processor registers. It does not have to be installed yet.
+                </p>
+            }
+
             <ol class="flex flex-col gap-2" [formGroup]="form">
                 @for (row of rows.controls; track row; let i = $index; let first = $first; let last = $last) {
                     <li
@@ -78,7 +94,17 @@ import { ChainRow, chainToParams, parseChain, rowConfigError } from './job-chain
                             <span class="text-secondary text-xs font-semibold">Step {{ i + 1 }}</span>
                             <mat-form-field class="flex-auto" subscriptSizing="dynamic">
                                 <mat-label>Processor id</mat-label>
-                                <input matInput formControlName="id" autocomplete="off" />
+                                <input
+                                    matInput
+                                    formControlName="id"
+                                    autocomplete="off"
+                                    [matAutocomplete]="processorIdOptions"
+                                />
+                                <mat-autocomplete #processorIdOptions="matAutocomplete">
+                                    @for (id of suggestionsFor(asGroup(row).controls.id.value); track id) {
+                                        <mat-option [value]="id">{{ id }}</mat-option>
+                                    }
+                                </mat-autocomplete>
                                 @if (asGroup(row).controls.id.hasError('required')) {
                                     <mat-error>A step needs the id of a ConsignmentProcessor.</mat-error>
                                 }
@@ -134,9 +160,35 @@ export class JobChainEditorComponent {
 
     readonly form = this.fb.group({ rows: this.fb.array<RowGroup>([]) });
 
+    /**
+     * Deployed processor ids to offer, `null` while the host has not answered.
+     *
+     * ⚠ An <b>input</b> rather than a fetch of its own: this component's contract is that the host seeds it
+     * and reads it back (see the class doc), and giving a shared authoring surface an HTTP dependency for a
+     * picker's suggestions would make it unusable wherever the catalog is not reachable. `null` and `[]`
+     * differ — not-yet-known versus known-empty — and only the latter earns the hint.
+     */
+    readonly processorIds = input<string[] | null>(null);
+
     /** How many rows came from a `chain_config` entry with no processor of its own. */
     private readonly recoveredCount = signal(0);
     readonly recovered = computed(() => this.recoveredCount());
+
+    /** True once the host answered with nothing, which on a stock install is the ordinary case. */
+    readonly catalogEmpty = computed(() => this.processorIds()?.length === 0);
+
+    /**
+     * Ids to offer for what the author has typed so far — a plain case-insensitive substring match.
+     *
+     * ⚠ Called from the template rather than derived in a computed signal: the value filtered on lives in a
+     * `FormArray` row, and there is no per-row signal to derive from. The list is tiny (usually empty), so
+     * the per-change-detection cost is not worth a per-row subscription to buy back.
+     */
+    suggestionsFor(typed: string | null | undefined): string[] {
+        const all = this.processorIds() ?? [];
+        const q = (typed ?? '').trim().toLowerCase();
+        return q ? all.filter((id) => id.toLowerCase().includes(q)) : all;
+    }
 
     get rows(): FormArray<RowGroup> {
         return this.form.controls.rows;

@@ -255,11 +255,33 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   trips it too — the loud direction, chosen over the silent one. ⛔ If §5.4 adds a legitimate second commit
   site, update the expected list **deliberately, in the same change that removes the old one**; do not relax
   the test.
-- **P3** · **`PROCESSOR-CATALOG-ROUTE-1` — nothing serves `ConsignmentProcessor` ids to the UI** (filed
-  2026-09-10 by Sprint 7.6; a deliberate deferral that had no board row). The post-sync chain editor takes
-  processor ids as **free text**, the way `on_signal` takes signal types, because no catalog route exists. A
-  route plus a picker is the natural follow-on. ⛔ It was deliberately not invented alongside the editor —
-  this row records the deferral, not a defect. → `okf/backend/engine/post-sync-step-chains.md`
+- ✅ **CLOSED 2026-09-10** · **`PROCESSOR-CATALOG-ROUTE-1` — nothing serves `ConsignmentProcessor` ids to
+  the UI** (filed 2026-09-10 by Sprint 7.6; a deliberate deferral that had no board row). The post-sync chain
+  editor took processor ids as **free text**, the way `on_signal` takes signal types, because no catalog route
+  existed. **Shipped: `GET /jobs/processors`** (`JobRoutes`, beside `/jobs/types` and `/jobs/expressions`) →
+  `JobService.processorCatalog()`, plus an autocomplete on the chain editor's *Processor id* field. A read
+  route: no write-root gate, bounded by a hard cap with the TRUE `total` reported when it bites.
+  ⚠ **The honest caveat: the catalog is EMPTY on a stock install, so the value accrues only to deployments
+  with a classpath-deployed third-party processor.** The product ships **zero** `ConsignmentProcessor`
+  implementations — only the `tools/templates/processor` scaffold, whose services file carries an unexpanded
+  `{{packageName}}` placeholder. That is pinned by `ProcessorCatalogTest`, and it is why the picker
+  **suggests without constraining**: no validator consults the catalog, the field stays free text, and the
+  empty state renders an explicit *"nothing to suggest — type the id"* hint instead of an inert dropdown. A
+  processor jar can be deployed *after* its Job config is authored.
+  ⛔ **No pack overlay to merge**: `JobPackManager` registers exactly four SPIs (`JobTypeProvider`,
+  `ExpressionProvider`, `PipelineNodeType`, `PipelineNodeExecutor`) and **not** `ConsignmentProcessor`, so the
+  `ServiceLoader` set is the whole set.
+  🔴 **Three findings the row did not predict.** (a) A stale services entry naming a deleted class throws
+  from `hasNext()`, **not** `next()` — ServiceLoader resolves the class while looking ahead — so a scan that
+  stops on the error silently drops every provider listed *after* the bad one; the catalog counts it and
+  carries on. (b) An id containing a **comma** can never be selected, because `chainOf` *splits* the
+  `processor` param on commas — so it is excluded from the vocabulary alongside a blank id (the UI's
+  `noComma` validator existed for the same reason). ⚠ Not to be confused with a **repeated** id in an
+  authored chain, which is deliberately legal. (c) The field is **not** schema-form/`AttributeSpec`-driven as
+  the sibling `DATASET_REF` autocompletes are — `JobChainEditorComponent` renders a hand-written input, so a
+  server descriptor change would not have reached it. Tests: 6 (`ProcessorCatalogTest`, **7 of 7 mutants
+  killed**) + 4 real-HTTP (`ControlApiJobProcessorsTest`) + 8 UI.
+  → `okf/backend/engine/post-sync-step-chains.md`, `okf/backend/control-plane/jobs.md`
 - **P3** · **`PACK-UNLOAD-EXPOSURE-1` — unloading a pack makes a stored pipeline unloadable** (filed
   2026-09-10 by Sprint 7.6). A pipeline naming a pack-contributed node type stops loading once that pack is
   unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally

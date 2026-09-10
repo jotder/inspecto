@@ -1,0 +1,4 @@
+# PROCESSOR-CATALOG-ROUTE-1: a processor deployed the way a third party deploys one, so
+# ControlApiJobProcessorsTest can prove GET /jobs/processors serves a real classpath provider.
+# The product itself ships NO ConsignmentProcessor — see ProcessorCatalogTest.
+com.gamma.control.CatalogProbeProcessor

@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import { JobExpressionDecl, JobUpsert, jobFromWire, jobToWire, typeableForm } from './jobs.service';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import {
+    JobExpressionDecl,
+    JobProcessorCatalog,
+    JobUpsert,
+    JobsService,
+    jobFromWire,
+    jobToWire,
+    typeableForm,
+} from './jobs.service';
+import { environment } from '../../../environments/environment';
 
 /**
  * The job write/read wire contract. The body a job endpoint accepts is the `job:` TOON section in JSON —
@@ -121,5 +133,51 @@ describe('typeableForm', () => {
         expect(typeableForm(decl({ token: '$signal.', form: 'PREFIX', example: '$signal.dataset' }))).toBe(
             '$signal.dataset',
         );
+    });
+});
+
+/**
+ * `GET /jobs/processors` (`PROCESSOR-CATALOG-ROUTE-1`). The one thing a client-side test can prove about a
+ * read route is that it asks for the path the server actually registered — the halves are written in
+ * different languages and nothing else compares them. Server-side twin: `ControlApiJobProcessorsTest`.
+ */
+describe('JobsService.processors', () => {
+    let svc: JobsService;
+    let httpMock: HttpTestingController;
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            providers: [JobsService, provideHttpClient(withXhr()), provideHttpClientTesting()],
+        });
+        svc = TestBed.inject(JobsService);
+        httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => httpMock.verify());
+
+    it('asks for the catalog at the path JobRoutes registers', () => {
+        let got: JobProcessorCatalog | undefined;
+        svc.processors().subscribe((c) => (got = c));
+        const req = httpMock.expectOne(
+            (r) => r.method === 'GET' && r.url === `${environment.apiBaseUrl}/v1/jobs/processors`,
+        );
+        req.flush({
+            processors: [{ id: 'mask', className: 'x.Mask', shadowed: false }],
+            total: 1,
+            truncated: false,
+            unusable: 0,
+        });
+        expect(got?.processors.map((p) => p.id)).toEqual(['mask']);
+    });
+
+    it('⚠ an EMPTY catalog is a normal answer, not an error — the product ships no processor', () => {
+        let got: JobProcessorCatalog | undefined;
+        let failed = false;
+        svc.processors().subscribe({ next: (c) => (got = c), error: () => (failed = true) });
+        httpMock
+            .expectOne((r) => r.url === `${environment.apiBaseUrl}/v1/jobs/processors`)
+            .flush({ processors: [], total: 0, truncated: false, unusable: 0 });
+        expect(failed).toBe(false);
+        expect(got?.processors).toEqual([]);
     });
 });

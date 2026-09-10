@@ -123,9 +123,31 @@ pre-existing third-party implementers).
   cannot be represented by the structural editor, both raw fields are left exactly as they were — *a
   structural editor that cannot read a value must not be the thing that rewrites it*. Unmodelled element keys
   travel verbatim; only `config` is rewritten.
-- ⚠ **There is no processor-id picker: nothing serves `ConsignmentProcessor` ids to the UI**, so ids stay
-  free text (as `on_signal` does for signal types). A catalog route is the natural follow-on and was
-  deliberately not invented — now a `BACKLOG.md` row.
+- ✅ **The processor-id picker SHIPPED 2026-09-10 (`PROCESSOR-CATALOG-ROUTE-1`).** `GET /jobs/processors`
+  (`JobRoutes`, beside `/jobs/types` and `/jobs/expressions`) serves the registered `ConsignmentProcessor`
+  ids from `JobService.processorCatalog()`, and the chain editor's *Processor id* field is an autocomplete
+  over them. It **suggests without constraining** — no validator consults the catalog, because a processor
+  jar can be deployed *after* its Job config is authored, so a catalog-backed refusal would lock an author
+  out of a valid chain.
+  ⚠ **The catalog is EMPTY on a stock install and that is correct, not a defect.** The product ships **zero**
+  `ConsignmentProcessor` implementations — only the `tools/templates/processor` scaffold, whose services file
+  still carries an unexpanded `{{packageName}}` placeholder — so entries appear only where a third party has
+  put one on the classpath. That is why the empty state renders an explicit *"nothing to suggest — type the
+  id"* hint rather than an inert dropdown, and why the value accrues to deployments with a deployed
+  processor rather than to the stock product. `ProcessorCatalogTest` pins the zero-implementations fact so a
+  future change to it is visible.
+  ⛔ **Job Packs cannot contribute a processor**, so there is no pack overlay to merge into the catalog:
+  `JobPackManager` registers exactly four SPIs (`JobTypeProvider`, `ExpressionProvider`, `PipelineNodeType`,
+  `PipelineNodeExecutor`) and not this one. The `ServiceLoader` set is the whole set. ✅ The scaffold's own
+  `tools/templates/processor/README.md` §"Deployment differs from a Job Pack" already states the operator
+  half of this — **the jar goes on the engine classpath, not into `-Djobs.packs.dir`**, with no hot deploy
+  and no isolated classloader — so the two halves agree. (`packs-dev/<id>/` is only the scaffold's gitignored
+  *generation* directory, not a deployment target.)
+  🔴 **Two ids that can never be selected are excluded from the vocabulary, not served**: a blank one (the
+  lookup matches only a non-blank id) and — less obvious — **one containing a comma**, because `chainOf`
+  *splits* the `processor` param on commas. ⚠ Do not confuse that with a **repeated** id inside an authored
+  chain, which is deliberately legal (one processor run twice); the catalog's `shadowed` flag is the
+  different case of two *classes* claiming one id, where only the first is reachable.
 
 ## 5. Retention, merge and reprocess — "connect, don't invent"
 

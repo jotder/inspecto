@@ -214,6 +214,18 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   entries fall back to their declared sample: there is no firing Run at request time, and inventing one
   would show an author a value their Job will never see. ⚠ The route registers as a **fixed sub-path before
   the single-segment `/jobs/{name}` regex**; registration order is load-bearing.
+* **`GET /jobs/processors`** (2026-09-10, `PROCESSOR-CATALOG-ROUTE-1`) serves the registered
+  `ConsignmentProcessor` ids a `consignment.process` chain step may name — `{processors: [{id, className,
+  shadowed}], total, truncated, unusable}`. A **read**, so no write-root gate; **bounded** by a hard cap
+  with `total` still reporting the true count. Same fixed-sub-path-before-`/jobs/{name}` ordering rule as
+  `/jobs/expressions`. ⚠ **Empty on a stock install** — the product ships no processor implementation — so a
+  client must treat an empty catalog as normal and keep accepting a typed id. ⛔ A Job Pack cannot contribute
+  a processor (`JobPackManager` registers four other SPIs), so the `ServiceLoader` set is authoritative and
+  there is no overlay to merge. 🔴 It loads through the *same* `ServiceLoader.load` call as
+  `ConsignmentProcessJobType.fromServiceLoader`, so the catalog cannot disagree with the lookup that
+  resolves an id at run time; a provider the classpath cannot produce is **counted and skipped, and the scan
+  continues past it** — a stale services entry throws from `hasNext()`, so stopping there would silently drop
+  every provider listed after it. → [post-sync-step-chains](../engine/post-sync-step-chains.md)
 * **`mail.send` + the `mail` Platform Service** are the reference generic Job Type (§9 verbatim): it
   reuses the `NotificationChannel` seam rather than opening a second SMTP client, and declares
   `requires: [mail]` because a Job that mails outward must declare that reach. ⚠ A built-in with an

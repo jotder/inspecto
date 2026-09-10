@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.api.PublicApi;
+import com.gamma.consignment.ConsignmentProcessor;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineStore;
@@ -28,10 +29,13 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1381,6 +1385,93 @@ public final class JobService implements AutoCloseable {
     public List<Map<String, Object>> expressionCatalog() {
         return expressions.catalog(new ExpressionContext("preview", Instant.now(), "preview", zone,
                 Optional::empty, (job, artifact) -> Optional.empty(), Map.of()));
+    }
+
+    /** Hard cap on {@link #processorCatalog()}: this is a picker's vocabulary, not an export, and a classpath
+     *  carrying more processors than this is a deployment fault worth seeing as {@code truncated}. */
+    static final int PROCESSOR_CATALOG_CAP = 200;
+
+    /** The registered {@link ConsignmentProcessor} ids a {@code consignment.process} Job config may select
+     *  ({@code GET /jobs/processors}, consignment-chain §14.2) — read by the post-sync chain editor so an
+     *  author can pick an id that exists instead of typing one that does not.
+     *
+     *  <p>⚠ <b>Empty on a stock install, and that is correct.</b> The product ships <em>no</em>
+     *  {@code ConsignmentProcessor} implementation — only the {@code tools/templates/processor} scaffold — so
+     *  this list has entries only where a third party has put one on the classpath. An empty catalog must
+     *  therefore never be read as "this field is unusable": the editor still accepts a typed id, because the
+     *  processor jar may well be deployed after the Job config is authored.
+     *
+     *  <p>⛔ <b>Job Packs cannot contribute a processor.</b> {@code JobPackManager} registers exactly four SPIs
+     *  ({@code JobTypeProvider}, {@code ExpressionProvider}, {@code PipelineNodeType},
+     *  {@code PipelineNodeExecutor}) and not this one, so there is no pack-scoped overlay to merge — the
+     *  ServiceLoader set is the whole set. If a pack ever registers processors, this method is the site that
+     *  has to learn about it.
+     *
+     *  <p>Loading goes through the same {@link ServiceLoader#load(Class)} call as
+     *  {@code ConsignmentProcessJobType.fromServiceLoader}, so the catalog cannot disagree with the lookup
+     *  that actually resolves the id at run time — including its <em>first match wins</em> rule, which is
+     *  why a second class claiming an id already taken is served as {@code shadowed} rather than quietly
+     *  dropped: it is unreachable, and an operator who deployed two jars needs to see that. ⚠ Do not confuse
+     *  this with {@code ConsignmentProcessJobType.chainOf}, where a <em>repeated id in the authored chain</em>
+     *  is deliberately legal and kept — that is one processor run twice, not two classes colliding.
+     *
+     *  <p>A provider the classpath cannot produce is counted in {@code unusable} and skipped, never allowed
+     *  to fail the read; the scan continues past it, because a catalog silently cut short at the first stale
+     *  services entry is worse than one that reports the casualty.
+     *
+     *  @return {@code {processors: [{id, className, shadowed}], total, truncated, unusable}}; {@code total} is
+     *          the true count of usable processors even when the list is truncated
+     */
+    public Map<String, Object> processorCatalog() {
+        return processorCatalog(PROCESSOR_CATALOG_CAP);
+    }
+
+    /** {@link #processorCatalog()} with the cap injected, so truncation is provable without deploying two
+     *  hundred processors. Static because it reads only the classpath — the public method stays an instance
+     *  method to match its sibling catalogs and to leave room for a pack-scoped overlay if one ever exists. */
+    static Map<String, Object> processorCatalog(int cap) {
+        List<Map<String, Object>> found = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        int total = 0;
+        int unusable = 0;
+        // ⚠ A stale services file naming a deleted class throws from hasNext(), not next() — ServiceLoader
+        // resolves the class while looking ahead. So the two are caught TOGETHER and the scan CONTINUES:
+        // stopping at the first bad entry would silently drop every processor listed after it, which is the
+        // failure a partial catalog hides worst. ServiceLoader consumes the offending entry before it throws,
+        // so continuing advances; the budget guarantees termination anyway if some loader cannot advance.
+        int errorBudget = cap + 25;
+        Iterator<ConsignmentProcessor> it = ServiceLoader.load(ConsignmentProcessor.class).iterator();
+        while (true) {
+            ConsignmentProcessor p;
+            try {
+                if (!it.hasNext()) break;
+                p = it.next();
+            } catch (ServiceConfigurationError e) {
+                unusable++;
+                log.warn("a ConsignmentProcessor provider could not be loaded, omitted from the catalog: {}", e.getMessage());
+                if (unusable > errorBudget) {
+                    log.warn("giving up on the ConsignmentProcessor scan after {} failures; the catalog is partial", unusable);
+                    break;
+                }
+                continue;
+            }
+            String id = p.id();
+            if (id == null || id.isBlank() || id.contains(",")) {
+                // Unselectable, so not part of the vocabulary: fromServiceLoader matches on a non-blank id,
+                // and a comma cannot survive chainOf, which SPLITS the processor parameter on commas — an id
+                // carrying one can never be named by any chain, which is why the editor refuses one too.
+                unusable++;
+                log.warn("ConsignmentProcessor {} reports the unselectable id '{}' and is omitted from the catalog",
+                        p.getClass().getName(), id);
+                continue;
+            }
+            total++;
+            if (found.size() < cap) {
+                found.add(Map.of("id", id, "className", p.getClass().getName(), "shadowed", !seen.add(id)));
+            }
+        }
+        return Map.of("processors", List.copyOf(found), "total", total,
+                "truncated", total > found.size(), "unusable", unusable);
     }
 
     /** The one type catalog spanning every registered Job Type's declared {@code emits} (§4.3, S1) — the

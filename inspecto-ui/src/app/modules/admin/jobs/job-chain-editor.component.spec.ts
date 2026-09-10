@@ -138,4 +138,62 @@ describe('JobChainEditorComponent', () => {
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    /**
+     * `PROCESSOR-CATALOG-ROUTE-1` — the id field offers what `GET /jobs/processors` found, and offering is
+     * ALL it does. ⚠ The empty catalog is the case that matters: the product ships no `ConsignmentProcessor`,
+     * so on a stock install there is nothing to suggest, and the field still has to be fully usable.
+     */
+    describe('processor id suggestions', () => {
+        const suggest = (c: JobChainEditorComponent, typed: string) => c.suggestionsFor(typed);
+
+        it('offers every deployed id before the author has typed anything', () => {
+            const { fixture, c } = make();
+            fixture.componentRef.setInput('processorIds', ['mask', 'rollup']);
+            fixture.detectChanges();
+            expect(suggest(c, '')).toEqual(['mask', 'rollup']);
+        });
+
+        it('narrows on what is typed, case-insensitively and anywhere in the id', () => {
+            const { fixture, c } = make();
+            fixture.componentRef.setInput('processorIds', ['mask', 'rollup', 'Remask']);
+            fixture.detectChanges();
+            expect(suggest(c, 'MASK')).toEqual(['mask', 'Remask']);
+            expect(suggest(c, 'zzz')).toEqual([]);
+        });
+
+        it('🔴 SUGGESTS without CONSTRAINING — an id absent from the catalog still saves', () => {
+            const { fixture, c } = make();
+            fixture.componentRef.setInput('processorIds', ['mask']);
+            expect(c.seed('not.in.the.catalog', [{ config: {} }])).toBe(true);
+            fixture.detectChanges();
+            // The whole point: a processor jar can be deployed AFTER its Job config is authored, so no
+            // validator may consult the catalog. A refusal here would lock the author out of a valid chain.
+            expect(c.validate()).toBe(true);
+            expect(c.value().processor).toBe('not.in.the.catalog');
+        });
+
+        it('⚠ says WHY there is nothing to suggest when the catalog answered empty', () => {
+            const { fixture } = make();
+            fixture.componentRef.setInput('processorIds', []);
+            fixture.detectChanges();
+            expect(fixture.nativeElement.textContent).toContain('No processors are deployed');
+        });
+
+        it('stays quiet while the catalog is unknown — not-yet-asked is not known-empty', () => {
+            const { fixture } = make();
+            fixture.detectChanges();
+            expect(fixture.nativeElement.textContent).not.toContain('No processors are deployed');
+            // A host that never answers, or whose call failed, leaves the field exactly as it always was.
+            expect(fixture.componentInstance.suggestionsFor('mask')).toEqual([]);
+        });
+
+        it('has no a11y violations with the picker attached to a seeded chain', async () => {
+            const { fixture, c } = make();
+            fixture.componentRef.setInput('processorIds', ['mask', 'rollup']);
+            c.seed('mask', [{ config: {} }]);
+            fixture.detectChanges();
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+    });
 });

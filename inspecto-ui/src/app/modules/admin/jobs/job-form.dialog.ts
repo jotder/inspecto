@@ -292,6 +292,9 @@ export class JobFormDialog implements AfterViewInit {
 
     /** The runtime Expression vocabulary (`GET /jobs/expressions`, §4.3) — the token picker's source. */
     readonly expressions = signal<JobExpressionDecl[]>([]);
+
+    /** Deployed processor ids for the chain editor's picker; `null` until the catalog answers. */
+    readonly processorIds = signal<string[] | null>(null);
     /** The selected trigger, in `availableIn`'s spelling. The picker follows it, because switching to cron
      *  must WITHDRAW the `$signal.*` tokens rather than leave them offerable. */
     readonly triggerKind = signal<string>(TRIGGER_KIND.cron);
@@ -337,6 +340,7 @@ export class JobFormDialog implements AfterViewInit {
         });
         this.loadTypeCatalog();
         this.loadExpressions();
+        this.loadProcessorCatalog();
     }
 
     /** Mirror the trigger control into the picker's filter. Read from the control rather than tracked
@@ -354,6 +358,22 @@ export class JobFormDialog implements AfterViewInit {
     private loadExpressions(): void {
         this.api.expressions().subscribe({
             next: (list) => this.expressions.set(list ?? []),
+            error: () => undefined,
+        });
+    }
+
+    /**
+     * Fetch the deployed `ConsignmentProcessor` ids once, for the chain editor's picker
+     * (`PROCESSOR-CATALOG-ROUTE-1`). Duplicated ids collapse: where two classes claim one id only the
+     * first is reachable, so offering it twice would be noise.
+     *
+     * <p>⚠ An <b>empty</b> answer is the ordinary case — the product ships no processor — and is passed on
+     * as such, because the editor renders "nothing to suggest" differently from "not asked yet". A failure
+     * leaves it `null` and costs the suggestions only: the field is free text either way.
+     */
+    private loadProcessorCatalog(): void {
+        this.api.processors().subscribe({
+            next: (c) => this.processorIds.set([...new Set((c?.processors ?? []).map((p) => p.id))].sort()),
             error: () => undefined,
         });
     }
