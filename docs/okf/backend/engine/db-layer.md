@@ -79,7 +79,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=memory\|db` | `memory` |
 | Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | `memory` |
 | Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | `memory` |
-| Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* | `events.backend=memory\|parquet` | `memory` |
+| Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* · [`DbEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/DbEventStore.java) *(JDBC, since 2026-09-12)* | `events.backend=memory\|parquet\|db\|postgres\|jdbc:…` | `memory` |
 | Ingest status / audit projection | `etl/StatusStore` | [`DbStatusStore`](../../../../inspecto/src/main/java/com/gamma/service/DbStatusStore.java) | `status.backend=file\|db` | **`db`** (flipped 2026-08-31; this row said `file` until 2026-09-08) |
 | Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
 | Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
@@ -176,6 +176,22 @@ CREATE TABLE IF NOT EXISTS inspecto_ops_notes (
 File: `inspecto-status.db` (legacy `ucc-status.db` auto-renamed on open)
 
 Five append-only projection tables. `payload` is the JSON record; `seq` orders events within a pipeline.
+
+#### `inspecto_events` — the shared event store (`DbEventStore`, D6, 2026-09-12)
+
+```sql
+CREATE TABLE IF NOT EXISTS inspecto_events (
+  event_id VARCHAR, ts_ms BIGINT, level VARCHAR, type VARCHAR, source VARCHAR,
+  pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR,
+  attributes VARCHAR, payload VARCHAR)
+CREATE INDEX IF NOT EXISTS inspecto_events_ts ON inspecto_events (ts_ms)
+```
+
+⚠ Column names mirror `ParquetEventStore`'s exactly, so an operator reading one backend's raw table reads
+the other's unchanged. `attributes` and `payload` are JSON strings (`JsonAttributes`), as in Parquet.
+⛔ Append-only, like every `EventStore`: no update, no row delete. `prune(before, dryRun)` deletes whole
+UTC days and returns the number of **days** — not rows — so both durable backends report the same unit
+(Parquet deletes day partitions). The boundary is exclusive: an event ON the cutoff day is retained.
 
 ```sql
 CREATE TABLE IF NOT EXISTS inspecto_status_commits    (pipeline VARCHAR, batch_id VARCHAR);
@@ -299,7 +315,10 @@ message, attributes (JSON), payload (JSON), level  -- + partition cols year, mon
 ```
 
 `level` ∈ [`EventLevel`](../../../../inspecto-event/src/main/java/com/gamma/event/EventLevel.java). There is **no
-JDBC/Postgres event table** — events are Parquet-only.
+JDBC/Postgres event table** — events were Parquet-only. ⚠ **That changed 2026-09-12 (D6 / phase A3):**
+`DbEventStore` adds `events.backend=db`. The Parquet layout below is unchanged and remains the default
+durable backend for a single node; the database backend exists because Parquet is written by exactly one
+process, so on N pods each replica sees a different Signal ledger.
 
 ### 3.9 `consignment_outputs` — per-output-file registry  · **M**
 File: `inspecto-consignment-outputs.db`
@@ -501,7 +520,7 @@ the ledger armed against the real `DbDedupLedger` while writing nothing. It is s
 value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class source that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all twelve families (it fails that test). Tests needing durable dedup
+`OperationalDbTest` pins across all thirteen families (it fails that test). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
@@ -664,7 +683,7 @@ operator applies flags through their own deployment tooling; this screen tells t
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
   default, a `Mode`, url/user/password properties and a root supplier. Budget it.
-- **`OperationalDb.Family` is now the roster** — the **twelve** families' property names live there and nowhere
+- **`OperationalDb.Family` is now the roster** — the **thirteen** families' property names live there and nowhere
   else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
 - ⚠ **Three irregularities the report models rather than flattens:** three different "is it on" spellings
@@ -705,7 +724,7 @@ operator applies flags through their own deployment tooling; this screen tells t
 | File stages | `-Dfile.stages.backend=postgres` | `-Dfile.stages.db.url` | (in URL) |
 | Delivery receipts | `-Ddelivery.receipts.backend=postgres` | `-Ddelivery.receipts.db.url` | (in URL) |
 | Delivery receipts | `notify/DeliveryReceiptStore` | [`DbDeliveryReceiptStore`](../../../../inspecto-engine/src/main/java/com/gamma/notify/DbDeliveryReceiptStore.java) | `delivery.receipts.backend=duckdb\|postgres\|jdbc:…` | `none` (in-memory) |
-| Events | `-Devents.backend=parquet` | — | **No Postgres path** |
+| Events | `-Devents.backend=db` (or `postgres`, or a raw `jdbc:`) | `-Devents.db.url` | (in URL) — `-Devents.db.user` / `.password` |
 
 Point each URL at `jdbc:postgresql://…`; the three ops URLs may share one database/schema (table names
 don't collide). ⚠ Since 2026-08-14 you normally set **none** of these — §5.0's single `-Dinspecto.db`
@@ -759,7 +778,8 @@ supplies them all; the per-family flags remain as overrides and for back-compat.
    repopulate going forward.
 4. Before relying on it: confirm the `CHECKPOINT` no-op is fine. (Nine store classes have a Postgres round-trip in `PostgresStateStoreTest`; `DbAcquisitionLedger`, `DbDedupLedger`
    and `DbDeliveryReceiptStore` do **not** — this parenthesis said "all seven … including `DbAcquisitionLedger`" until 2026-09-08.)
-5. Events cannot move — `ParquetEventStore` has no DB sibling; moving events off Parquet needs new code.
+5. ~~Events cannot move — `ParquetEventStore` has no DB sibling~~ ✅ **It has one since 2026-09-12**:
+   `DbEventStore` (`events.backend=db`). Events move like every other family now.
 
 For the 9 covered stores this is essentially a **configuration change** — flags + URLs + driver + a
 Postgres instance — not a code change.
@@ -796,7 +816,13 @@ evaluations can therefore open duplicates. Treat the dedup as best-effort and do
 
 ## Proving the JDBC stores on real PostgreSQL (DAT-6)
 
-`PostgresStateStoreTest` opens **nine** JDBC-backed store classes against a real server and round-trips each one (not "all ten" — the roster is twelve families, three are uncovered; corrected 2026-09-08).
+`PostgresStateStoreTest` opens **twelve** JDBC-backed store classes against a real server and round-trips
+each one (nine until 2026-09-12, when A3 added the event store, delivery receipts and the dedup ledger —
+the last two being the gap DAT-6's own coverage claim had). The roster is **thirteen** families; the one
+still uncovered is the **acquisition ledger**.
+⛔ **"Covered" is not "verified".** Every method in that class `assumeTrue`s on a configured server, so with
+no `INSPECTO_TEST_PG_URL` the whole class SKIPS — the three added in A3 have never executed anywhere. Read
+the skip count, not the test count.
 Its load-bearing case is `DbJobRunStore.metrics`: p50/p95 are the one piece of non-portable SQL — DuckDB's
 `quantile_cont` versus Postgres's `percentile_cont(..) WITHIN GROUP` — so only a real engine pins the
 dialect fix.

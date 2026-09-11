@@ -265,8 +265,15 @@ final class ServiceStores {
      * the service.
      */
     static EventStore openEventStore(SpaceRoot root) {
-        String backend = System.getProperty("events.backend", "memory");
-        if (!"parquet".equalsIgnoreCase(backend)) {
+        // ⛔ Compare lowercased, keep the RAW value for the URL — a jdbc: value carries a path, a database
+        // name and credentials, all case-sensitive on Postgres (the trap fixed across six openers
+        // 2026-09-11). `events` never had it; do not introduce it here.
+        String raw = System.getProperty("events.backend", "memory").trim();
+        String backend = raw.toLowerCase();
+        boolean db = "db".equals(backend) || "postgres".equals(backend) || "postgresql".equals(backend)
+                || backend.startsWith("jdbc:");
+        if (db) return openDbEventStore(root, raw, backend);
+        if (!"parquet".equals(backend)) {
             StoreHealth.record(root.id(), "events", StoreHealth.Status.NOT_CONFIGURED, backend,
                     "-Devents.backend=" + backend + " — bounded in-memory ring, nothing survives a restart");
             return new InMemoryEventStore();
@@ -286,6 +293,34 @@ final class ServiceStores {
             // Degrading it to a bounded ring loses the trail on restart, which is exactly EVENTS-DURABLE-1.
             StoreHealth.degraded(root.id(), "events", dir.toAbsolutePath().toString(),
                     "audit trail fell back to the in-memory ring — nothing survives a restart: " + e.getMessage());
+            return new InMemoryEventStore();
+        }
+    }
+
+    /**
+     * {@code -Devents.backend=db|postgres|jdbc:…} — the shared event store (D6). The one backend two
+     * processes can both read, which is the whole point: Parquet survives a restart but is written by
+     * exactly one pod, so on N pods the Signal ledger shows a different world per replica.
+     *
+     * <p>⚠ Degrading to the in-memory ring here is the SAME loss the parquet path warns about, and worse
+     * in a partitioned deployment — which is precisely why {@code StoreHealth.degraded} is fatal under
+     * {@code -Dinspecto.topology=partitioned} (A1). On a single node it stays a warning.
+     */
+    private static EventStore openDbEventStore(SpaceRoot root, String raw, String backend) {
+        String url = backend.startsWith("jdbc:")
+                ? raw
+                : OperationalDb.urlFor(OperationalDb.Family.EVENTS, root.eventsDbUrl());
+        try {
+            EventStore store = com.gamma.event.DbEventStore.open(url,
+                    System.getProperty("events.db.user"), System.getProperty("events.db.password"));
+            log.info("Event backend: database ({})", url);
+            StoreHealth.record(root.id(), "events", StoreHealth.Status.UP, url, "shared event database");
+            return store;
+        } catch (Exception e) {
+            log.warn("Could not open event DB ({}) — falling back to in-memory: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "events", url,
+                    "audit trail fell back to the in-memory ring — nothing survives a restart, and no other "
+                            + "pod can see it: " + e.getMessage());
             return new InMemoryEventStore();
         }
     }

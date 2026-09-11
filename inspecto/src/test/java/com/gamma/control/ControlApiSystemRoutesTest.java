@@ -88,7 +88,9 @@ class ControlApiSystemRoutesTest {
             // ⚠ The count is a RATCHET, not decoration — it is what makes adding an operational-store
             // family a conscious act rather than a silent one, so move it deliberately and never to make
             // a red build green.
-            assertEquals(12, families.size(), "the roster is twelve families — " + families);
+            // 12 → 13 on 2026-09-12: EVENTS (D6). This count is a tripwire, not decoration — it is how
+            // a family added without its report row gets caught.
+            assertEquals(13, families.size(), "the roster is thirteen families — " + families);
             for (JsonNode f : families) {
                 assertNotNull(f.get("source"), "every family reports where its value came from");
                 assertTrue(f.has("backendProperty") && f.has("urlProperty"),

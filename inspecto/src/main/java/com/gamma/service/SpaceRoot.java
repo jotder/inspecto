@@ -71,6 +71,13 @@ public interface SpaceRoot {
     /** Default JDBC URL for the status projection store. */
     String statusDbUrl();
 
+    /**
+     * JDBC URL for the shared event store ({@code -Devents.backend=db}, D6). ⚠ Distinct from
+     * {@link #eventsDir()}, which is the Parquet backend's directory — the two backends are alternatives,
+     * never both, so a deployment uses one of these accessors and ignores the other.
+     */
+    String eventsDbUrl();
+
     /** Default JDBC URL for the acquisition (dedup) ledger, when {@code -Dacquire.ledger.backend=db}. */
     String acquisitionLedgerDbUrl();
 
@@ -148,6 +155,8 @@ final class LegacySpaceRoot implements SpaceRoot {
                 : "jdbc:duckdb:inspecto-status.db";
     }
 
+    public String eventsDbUrl() { return "jdbc:duckdb:inspecto-events.db"; }
+
     public String acquisitionLedgerDbUrl() { return "jdbc:duckdb:inspecto-acquisition.db"; }
 
     public String consignmentOutputsDbUrl() { return "jdbc:duckdb:inspecto-consignment-outputs.db"; }
@@ -211,6 +220,8 @@ final class DirSpaceRoot implements SpaceRoot {
     public String tagAssignmentsDbUrl() { return duckdb("inspecto-ops-tags.db"); }
 
     public String statusDbUrl() { return duckdb("inspecto-status.db"); }
+
+    public String eventsDbUrl() { return duckdb("inspecto-events.db"); }
 
     public String acquisitionLedgerDbUrl() { return duckdb("inspecto-acquisition.db"); }
 

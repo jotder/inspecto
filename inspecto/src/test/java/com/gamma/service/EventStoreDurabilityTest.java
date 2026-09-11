@@ -7,6 +7,7 @@ import com.gamma.event.EventType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -24,10 +25,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>⚠ The memory case below asserts the <b>drop</b>. It is not a wish — it pins the documented behaviour
  * ({@code observability.md} §3.1) so that a future change to the default has to come here and say so.
  *
- * <p>⛔ Not covered here, deliberately: a parquet backend that <em>cannot open</em> degrades to memory
- * rather than failing the boot ({@link ServiceStores#openEventStore}). Making that fatal is phase A of the
- * signed scale-out plan (§5.1), which hangs it on {@code -Dinspecto.topology=partitioned} — a switch that
- * does not exist in the tree yet. Asserting a boot failure here would pin behaviour nothing implements.
+ * <p>⚠ <b>Updated 2026-09-12 (phase A).</b> The note that used to sit here said a degraded backend could
+ * not be made fatal because {@code -Dinspecto.topology=partitioned} did not exist. It does now (A1), and
+ * {@code StoreHealth.record} throws on a DEGRADED outcome while partitioned — so the degrade-to-memory
+ * path below is the <b>single-node</b> behaviour, which remains deliberate. The partitioned refusal is
+ * covered where the switch lives, not here.
  */
 class EventStoreDurabilityTest {
 
@@ -123,15 +125,72 @@ class EventStoreDurabilityTest {
         });
     }
 
-    /** An unrecognised value is the default, not an error — the same three-value contract the other toggles use. */
+    /**
+     * An unrecognised value is the default, not an error — the same three-value contract the other toggles use.
+     *
+     * <p>⚠ This test used to use {@code postgres} and assert the fallback, on the stated grounds that it
+     * "is D6 of the scale-out plan, unbuilt". **D6 shipped (A3, 2026-09-12)**, so {@code postgres} is now a
+     * RECOGNISED database backend and asserting a fallback for it would pin the opposite of the truth. The
+     * probe therefore has to be a value that is genuinely not a backend — and it must stay that way.
+     */
     @Test
     void anUnrecognisedBackendFallsBackToTheInMemoryDefault(@TempDir Path dir) {
         SpaceRoot root = SpaceRoot.under(dir);
-        withBackend("postgres", () -> {
+        withBackend("mysql", () -> {
             runAndStop(root, "voucher");
             assertEquals(List.of(), auditsAfterRestart(root),
-                    "-Devents.backend=postgres is not a backend that exists (it is D6 of the scale-out plan, "
-                            + "unbuilt); it must read as the in-memory default rather than half-opening something");
+                    "-Devents.backend=mysql is not a backend that exists; it must read as the in-memory "
+                            + "default rather than half-opening something");
         });
     }
+
+    // ── D6: -Devents.backend=db, the shared backend ───────────────────────────────────
+
+    /**
+     * The wiring proof for A3. A database-backed event store survives a restart exactly as parquet does —
+     * but unlike parquet it is a backend two PROCESSES can share, which is the whole of D6: an event
+     * ledger written to one pod's Parquet directory is invisible to every other pod.
+     */
+    @Test
+    void theDatabaseBackendKeepsAuditedMutationsAcrossARestart(@TempDir Path dir) {
+        SpaceRoot root = SpaceRoot.under(dir);
+        withBackend("db", () -> {
+            runAndStop(root, "voucher");
+            List<Event> survived = auditsAfterRestart(root);
+            assertEquals(1, survived.size(),
+                    "a restart under -Devents.backend=db must not lose an audited mutation");
+            assertEquals("alice", survived.get(0).attributes().get("actor"));
+        });
+    }
+
+    /** The backend is selected case-insensitively, like every other opener's toggle. */
+    @Test
+    void theDatabaseBackendIsSelectedCaseInsensitively(@TempDir Path dir) {
+        SpaceRoot root = SpaceRoot.under(dir);
+        withBackend("DB", () -> {
+            runAndStop(root, "voucher");
+            assertEquals(1, auditsAfterRestart(root).size());
+        });
+    }
+
+    /**
+     * ⛔ A raw {@code jdbc:} value must reach the driver UNCHANGED. Six openers lowercased it before use
+     * (fixed 2026-09-11) — Postgres database names, roles and passwords are all case-sensitive, and on a
+     * case-sensitive filesystem a lowercased DuckDB path opens a different file. `events` never had the
+     * bug; this pins that the {@code db} branch did not introduce it.
+     */
+    @Test
+    void aRawJdbcUrlKeepsItsCaseAndIsUsedVerbatim(@TempDir Path dir) throws Exception {
+        Path mixed = dir.resolve("MixedCase");
+        Files.createDirectories(mixed);
+        String url = "jdbc:duckdb:" + mixed.resolve("Events.db").toString().replace('\\', '/');
+        SpaceRoot root = SpaceRoot.under(dir);
+        withBackend(url, () -> {
+            runAndStop(root, "voucher");
+            assertEquals(1, auditsAfterRestart(root).size());
+        });
+        assertTrue(Files.exists(mixed.resolve("Events.db")),
+                "the file must land at the CASED path the operator wrote, not a lowercased one");
+    }
+
 }

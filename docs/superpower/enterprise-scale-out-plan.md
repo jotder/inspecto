@@ -153,16 +153,24 @@ production changes and the technique is **already proven in this repo** for pack
 existing test boots two control planes in one JVM — `ControlApiMultiSpaceTest` puts several Spaces inside
 **one** instance, which is the trap §7 warns about.
 
-### 3.3 Twelve operational store families — ten verified on Postgres, two code-capable
+### 3.3 Thirteen operational store families — twelve with a Postgres round-trip, one without
 
 ⚠ Premise corrected: this plan's author had "9 of 12". The roster of record is
 `OperationalDb.Family` (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`),
-**twelve** entries: `JOB_RUNS, PROVENANCE, CONSIGNMENT_OUTPUTS, FILE_STAGES, DELIVERY_RECEIPTS,
-DEDUP_LEDGER, OBJECTS, LINKS, NOTES, TAGS, STATUS, ACQUISITION_LEDGER`. All twelve route through
-`JdbcDrivers.connect` (`inspecto-util/src/main/java/com/gamma/util/JdbcDrivers.java:24-40`), which
-handles `jdbc:postgresql:` uniformly. `PostgresStateStoreTest` (`inspecto-ops/src/test/java/com/gamma/service/PostgresStateStoreTest.java:50-51`)
-round-trips **ten** against real Postgres; **`DbDeliveryReceiptStore` and `DbDedupLedger` are not
-exercised** — same factory, portable SQL, simply untested.
+**thirteen** entries since 2026-09-12: `JOB_RUNS, EVENTS, PROVENANCE, CONSIGNMENT_OUTPUTS, FILE_STAGES,
+DELIVERY_RECEIPTS, DEDUP_LEDGER, OBJECTS, LINKS, NOTES, TAGS, STATUS, ACQUISITION_LEDGER`. All thirteen
+route through `JdbcDrivers.connect` (`inspecto-util/src/main/java/com/gamma/util/JdbcDrivers.java:24-40`),
+which handles `jdbc:postgresql:` uniformly.
+
+✅ **A3 (2026-09-12) closed the coverage gap this section recorded.** `PostgresStateStoreTest` now
+round-trips **twelve** store classes — it gained `DbEventStore` (new with D6) plus `DbDeliveryReceiptStore`
+and `DbDedupLedger`, the two this section called out as *"same factory, portable SQL, simply untested"*.
+Only the **acquisition ledger** is still uncovered.
+
+⛔ **But read that as COVERAGE, not evidence.** Every method in the class `assumeTrue`s on a configured
+server, so with no `INSPECTO_TEST_PG_URL` the whole class SKIPS — **the three added in A3 have never
+executed anywhere**, and neither have the original nine on this machine. The number to read is the SKIP
+count. This is the same trap as a guard that reports nothing because it was never armed.
 
 The defaults that a second pod turns into split-brain (`ServiceStores.java`):
 
@@ -360,7 +368,7 @@ local staging tree "so the rest of the engine … treats them exactly like local
 🔴 **§3.7's "an inbox must have exactly one owning pod" does not apply to a remote origin.** A local
 inbox needs a single owner because `MarkerManager` does a bare `Files.exists` with no claim. A remote
 origin is *already shared by definition*, listing it is idempotent, and a pre-fetch dedup ledger already
-exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the twelve families** (§3.3), so
+exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the thirteen families** (§3.3), so
 both are already Postgres-capable and phase A puts them on shared state as a side effect.
 
 ⇒ N pods can pull from one remote origin safely, claiming per file, **with no new mechanism and no
@@ -571,7 +579,8 @@ Work:
   can perform locally (§5.3).
 - **Route only what must be routed.** After phase A most reads come from shared Postgres and any pod can
   serve them. The owner is required only for: config reads/writes (the write root is on its PVC), run and
-  trigger calls, anything touching the Space's filesystem, and — **until D6 — SSE streams**, since
+  trigger calls, anything touching the Space's filesystem, and — **SSE streams, which D6 does NOT fix**
+  (corrected 2026-09-12: the original text said "until D6"; D6 shipped and the stream is unchanged) — since
   `EventLog` is a per-process, per-Space static registry (§3.3), so a stream served by a non-owner is empty.
 - **Ingress path-routing, with the rules GENERATED from the partition map.** ⛔ Never hand-maintain them:
   that makes the ingress a second copy of the map and the two drift. An in-app forward was considered and
@@ -670,7 +679,7 @@ paragraph above warns about. Nothing in the repo boots two control planes in one
 | **D3** | Partition unit | ✅ **SIGNED 2026-09-10 (operator)** — **Space**, not pipeline — it is already the namespace for every store and directory (and, since `SPACES-GOVERNOR-1`, for admission state) |
 | **D4** | Shared lakehouse | ✅ **SIGNED 2026-09-10 (operator)** — **(ii) object store + DuckLake catalog on Postgres**, catalog commit as visibility; (i) shared POSIX volume kept as a documented fallback for sites without object storage |
 | **D5** | Lease mechanism | ✅ **SIGNED 2026-09-10 (operator)** — **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator). Per D8 this lease is also Standard's T4 standby |
-| **D6** | Events across pods | ✅ **SIGNED 2026-09-10 (operator)** — **Add `events.backend=db`** on the existing `EventStore` seam |
+| **D6** | Events across pods | ✅ **SIGNED 2026-09-10 (operator)** — **Add `events.backend=db`** on the existing `EventStore` seam. ✅ **BUILT 2026-09-12 (phase A3)**: `DbEventStore` + `OperationalDb.Family.EVENTS` + the `db` branch in `ServiceStores.openEventStore`, covered by `DbEventStoreTest` (10, over DuckDB so it runs everywhere) and a Postgres round-trip in `PostgresStateStoreTest`. 🔴 **It closes the QUERY half only** — see §5.5's corrected note: `/signals/stream` and `EventObjectBridge` both read `EventLog`'s **in-heap** subscriber list and never consult a store, so a `SEQUENCE_GAP` on pod B still never becomes an ALERT if the bridge runs on pod A. ⛔ Do not record D6 as making the live tail cross-pod |
 | **D7** | Connection pool | ✅ **SIGNED 2026-09-10 (operator)** — **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work (spike S3 first) |
 | **D8** | Tier naming | ✅ **DECIDED 2026-09-10 (operator):** **T5 — partitioned scale-out on Kubernetes** = **Enterprise**, added to §3.9; **T4 active/passive DR moves to Standard**. Applied |
 | **D9** | The "zero external runtime services" claim | ✅ **SIGNED 2026-09-10 (operator)** — refined by D8: **Personal — zero. Standard — zero unless DR (T4) is enabled, then Postgres. Enterprise — Postgres + S3-compatible object store.** The 90 MB artifact claim stays true: same artifact, plus YOUR services |

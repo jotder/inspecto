@@ -77,6 +77,14 @@ public final class OperationalDb {
     public enum Family {
         JOB_RUNS("Job runs", "jobs.backend", "none", Mode.URL_OR_ENGINE,
                 "jobs.db.url", null, null, SpaceRoot::jobRunDbUrl),
+        // D6 (enterprise scale-out §9). ⛔ Default "memory", NOT "duckdb" — and the asymmetry with
+        // DEDUP_LEDGER/CONSIGNMENT_OUTPUTS below is deliberate. `events.backend` predates this family with
+        // a memory|parquet contract that Personal relies on (zero files, zero configuration); defaulting to
+        // a database here would create one in the working directory for every Personal install under
+        // SpaceRoot.legacy(). The Standard/Enterprise launchers opt in explicitly — parquet today
+        // (EVENTS-DURABLE-1), db once a deployment has shared state to point it at.
+        EVENTS("Operational events", "events.backend", "memory", Mode.URL_OR_ENGINE,
+                "events.db.url", null, null, SpaceRoot::eventsDbUrl),
         PROVENANCE("Provenance", "provenance.backend", "none", Mode.URL_OR_ENGINE,
                 "provenance.db.url", null, null, SpaceRoot::provenanceDbUrl),
         CONSIGNMENT_OUTPUTS("Consignment outputs", "consignment.outputs.backend", "duckdb", Mode.URL_OR_ENGINE,

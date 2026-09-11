@@ -91,9 +91,11 @@ was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provena
   `scheduler.toon` → `-Dprocessing.duckdb.memory_limit` → **DuckDB's own default** with no numeric fallback,
   and no `scheduler.toon` ships. The board is right. Both pages corrected with this spec.
 - **The Postgres store count was stated as 6, 7, 10 and 11 across one page.** Measured: `OperationalDb.Family`
-  is **twelve** families; `PostgresStateStoreTest` (`inspecto-ops/src/test/java/com/gamma/service/`) round-trips
-  **nine** store classes — note, tag assignment, job run, file stage, consignment output, status, provenance,
-  object, link — and does not cover the dedup ledger, the acquisition ledger or delivery receipts. The page
+  is **thirteen** families (twelve until 2026-09-12, when D6 added `EVENTS`);
+  `PostgresStateStoreTest` (`inspecto-ops/src/test/java/com/gamma/service/`) round-trips
+  **twelve** store classes — note, tag assignment, job run, file stage, consignment output, status, provenance,
+  object, link, and since 2026-09-12 event, delivery receipt and dedup ledger — leaving only the acquisition
+  ledger uncovered. ⛔ All of them SKIP without a configured server, so this is coverage, not evidence. The page
   is corrected to those numbers.
 - **`status.backend` defaults to `db`**, not `file` (`OperationalDb.java:132`, flipped 2026-08-31); `db-layer.md`
   §2 still said `file` and its "exactly one store defaults on" paragraph predates two more defaults.
@@ -268,7 +270,7 @@ decided representation for non-additive measures. ⛔ Do not re-litigate from Du
 ### 3.8 The operational stores and Postgres
 
 **`OperationalDb.Family`** (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`) is **the
-roster — twelve families**, each with its own `-D<family>.backend` toggle and default:
+roster — thirteen families**, each with its own `-D<family>.backend` toggle and default:
 
 | Family | Default | Family | Default |
 |---|---|---|---|
@@ -565,7 +567,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 
 `ControlApiQueryRunV1Test` (the route, `422` on structured, limits), `ControlApiBiQueryTest` (spec compile,
 `422` grain, TEXT buckets), `ControlApiDbBrowserTest` (`/db/*`, limits, guard), `OperationalDbTest` (the
-twelve-family roster, `verifySelectable`, the `-Dinspecto.db` selection pinned across families),
+thirteen-family roster, `verifySelectable`, the `-Dinspecto.db` selection pinned across families),
 `PostgresStateStoreTest` (`inspecto-ops`; **opt-in**, 11 methods, 9 store classes; 11 SKIPPED without a
 server), `PipelineJobRunnerTest` (`sinkNestedInsideAnotherStoreFailsClosed`, `slashedSinkStoreNameFailsClosed`,
 `externalDataDirStaysAllowed`, `seedReadsAPipelineShapedStoresMappedOutputOnly`).

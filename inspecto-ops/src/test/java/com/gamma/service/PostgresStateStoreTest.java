@@ -34,7 +34,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import com.gamma.consignment.DbDedupLedger;
+import com.gamma.event.DbEventStore;
+import com.gamma.event.Event;
+import com.gamma.event.EventLevel;
+import com.gamma.event.EventQuery;
+import com.gamma.event.EventType;
+import com.gamma.notify.DbDeliveryReceiptStore;
+import com.gamma.notify.DeliveryReceipt;
+import com.gamma.notify.DeliveryStatus;
+
 import java.sql.Connection;
+import java.time.LocalDate;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.List;
@@ -356,4 +367,82 @@ class PostgresStateStoreTest {
             assertTrue(store.stages("sftp-src", "nope.csv").isEmpty(), "an unknown file has no stages");
         }
     }
+
+    // ── The three families DAT-6 never covered (A3, 2026-09-12) ──────────────────────
+    //
+    // ⚠ `DbDeliveryReceiptStore` and `DbDedupLedger` were named in the scale-out plan §3.3 as "same
+    // factory, portable SQL, simply untested" — the gap in DAT-6's own claim of coverage. `DbEventStore`
+    // is new with D6. Ten of twelve becomes twelve of twelve, plus events.
+
+    /**
+     * {@code DbEventStore} on Postgres (D6) — the backend that makes the Signal ledger visible across
+     * pods. Exercises the filter and the keyset page, not just an insert, because the SQL there is the
+     * part that can diverge from {@code EventQuery.matches} on a different dialect.
+     */
+    @Test
+    void eventStore_appendQueryAndPageRoundTrip() throws Exception {
+        try (DbEventStore store = DbEventStore.open(url, null, null)) {
+            store.append(new Event("PG-EVT-1", 1_000L, EventLevel.INFO, EventType.AUDIT,
+                    "com.gamma.Src", "orders", "corr-pg", "first", Map.of("actor", "alice"), Map.of()));
+            store.append(new Event("PG-EVT-2", 2_000L, EventLevel.ERROR, "BATCH_FAILED",
+                    "com.gamma.Src", "payments", "corr-pg", "second", Map.of(), Map.of()));
+
+            assertEquals(2, store.recent(10).size(), "both events read back from Postgres");
+            assertEquals("alice", store.recent(10).get(1).attributes().get("actor"),
+                    "the attributes bag survives the JSON round trip on Postgres too");
+
+            assertEquals(1, store.query(EventQuery.builder().type(EventType.AUDIT).build()).size());
+            assertEquals(1, store.query(EventQuery.builder().minLevel(EventLevel.ERROR).build()).size(),
+                    "minLevel is an enum ladder — a string comparison would put ERROR below INFO");
+            assertEquals(2, store.query(EventQuery.builder().correlationId("corr-pg").build()).size());
+            assertEquals(1, store.query(EventQuery.builder().pipeline("ORDERS").build()).size(),
+                    "pipeline matches case-insensitively, as EventQuery.matches does");
+
+            assertEquals(2L, store.count());
+            List<Event> firstPage = store.page(1, null, null);
+            assertEquals("PG-EVT-2", firstPage.get(0).eventId(), "newest first");
+            assertEquals("PG-EVT-1",
+                    store.page(1, firstPage.get(0).ts(), firstPage.get(0).eventId()).get(0).eventId(),
+                    "the cursor resumes at the next older event");
+        }
+    }
+
+    /** {@code DbDeliveryReceiptStore} — D8's durable receipt trail, untested against Postgres until now. */
+    @Test
+    void deliveryReceiptStore_appendAndReadRoundTrip() throws Exception {
+        try (DbDeliveryReceiptStore store = DbDeliveryReceiptStore.open(url, null, null)) {
+            store.add(new DeliveryReceipt("PG-DLV-1", "NOTIF-1", "email-prod", "ops@example.com",
+                    1_000L, Map.of(DeliveryStatus.DELIVERED, 1_000L), null, false));
+            store.add(new DeliveryReceipt("PG-DLV-2", "NOTIF-1", "email-prod", "ops@example.com",
+                    2_000L, Map.of(DeliveryStatus.BOUNCED_HARD, 2_000L), "smtp 550", false));
+
+            assertEquals(2, store.forNotification("NOTIF-1").size(), "both receipts read back from Postgres");
+            assertTrue(store.recent(10).size() >= 2);
+            assertTrue(store.targetsWithStatus(DeliveryStatus.BOUNCED_HARD).contains("ops@example.com"),
+                    "the status index is what SuppressionList consults — it must work on Postgres");
+        }
+    }
+
+    /**
+     * {@code DbDedupLedger} — and this one is load-bearing beyond coverage. Its {@code ON CONFLICT DO
+     * NOTHING} claim is the ONE genuinely idempotent write in the tree (measured 2026-09-11 while
+     * refuting D15), so the split-brain posture leans on it. An untested claim on the engine that would
+     * actually run it is the gap worth closing first.
+     */
+    @Test
+    void dedupLedger_claimIsIdempotentOnPostgres() throws Exception {
+        try (DbDedupLedger ledger = new DbDedupLedger(java.sql.DriverManager.getConnection(url))) {
+            LocalDate window = LocalDate.of(2026, 9, 12);
+            List<String> hashes = List.of(DbDedupLedger.hash(List.of("a", "1")),
+                    DbDedupLedger.hash(List.of("b", "2")));
+
+            assertEquals(2, ledger.claim("orders", window, "CONSIGNMENT-1", hashes).size(),
+                    "a first claim wins every key");
+            assertEquals(0, ledger.claim("orders", window, "CONSIGNMENT-2", hashes).size(),
+                    "a second claim of the same keys wins NOTHING — this is the idempotency the "
+                            + "split-brain posture depends on, resolved in the database, not in a read race");
+            assertEquals(2L, ledger.size(), "and no duplicate rows were written");
+        }
+    }
+
 }

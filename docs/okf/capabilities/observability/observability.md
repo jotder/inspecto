@@ -111,7 +111,7 @@ runs before anything is persisted.
 `EventStore` (`inspecto-event/src/main/java/com/gamma/event/EventStore.java`) is the append-only store
 contract — `append`, `query`, `recent`, keyset `page(limit, afterTs, afterId)` ordered `ts DESC, eventId
 DESC`, `count()`, and `prune(LocalDate before, dryRun)` which deletes **whole UTC day-partitions** and
-returns `-1` when the backend keeps nothing durable. Two backends, chosen by `-Devents.backend`
+returns `-1` when the backend keeps nothing durable. **Three** backends, chosen by `-Devents.backend`
 (`ServiceStores.java`): **`memory`** (default) — `InMemoryEventStore`, a bounded ring of 8,192 that drops
 oldest and forgets on restart; **`parquet`** — `ParquetEventStore`, rolling Hive-partitioned Parquet under
 `-Devents.dir` (`level/year/month/day`) read through DuckDB `read_parquet`. A startup store-swap drains the
@@ -392,7 +392,8 @@ host's — the rules are `DAT`'s.
 
 | Flag | Default | Reader |
 |---|---|---|
-| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Standard+) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
+| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Standard+; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
+| `-Devents.db.url` / `.user` / `.password` | `SpaceRoot.eventsDbUrl()` — `<space>/duckdb/inspecto-events.db` | `OperationalDb.Family.EVENTS`, `DbEventStore` |
 | `-Dstatus.backend` | `db` | `OperationalDb.java`, `ServiceStores.java` |
 | `-Djobs.backend` | `none` | `ServiceStores.java`, `DbJobRunStore.java`, `HealthDetails.java` |
 | `-Dprovenance.backend` | `none` | `ServiceStores.java`, `DbProvenanceStore.java` |

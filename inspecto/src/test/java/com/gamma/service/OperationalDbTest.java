@@ -50,10 +50,10 @@ class OperationalDbTest {
                     // Named once, honoured by every family — the space's DuckDB default is not consulted.
                     // ⚠ Iterates the ROSTER rather than a hand-listed copy (2026-08-15): a family added
                     // to Family without honouring the shared URL now fails here instead of going unnoticed.
-                    // 11 → 12 on 2026-09-07: DELIVERY_RECEIPTS. The loop below is the assertion that
-                    // matters — it proves the NEW family honours the one shared URL too, which is the
-                    // half-migration this test exists to prevent.
-                    assertEquals(12, OperationalDb.Family.values().length, "the roster is twelve families");
+                    // 11 → 12 on 2026-09-07: DELIVERY_RECEIPTS. 12 → 13 on 2026-09-12: EVENTS (D6).
+                    // The loop below is the assertion that matters — it proves the NEW family honours the
+                    // one shared URL too, which is the half-migration this test exists to prevent.
+                    assertEquals(13, OperationalDb.Family.values().length, "the roster is thirteen families");
                     for (OperationalDb.Family family : OperationalDb.Family.values()) {
                         assertEquals("jdbc:postgresql://db:5432/inspecto",
                                 OperationalDb.urlFor(family, "jdbc:duckdb:/spaces/a/duckdb/x.db"),
