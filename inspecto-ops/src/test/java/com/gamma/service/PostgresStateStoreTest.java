@@ -45,6 +45,7 @@ import com.gamma.notify.DeliveryReceipt;
 import com.gamma.notify.DeliveryStatus;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.time.LocalDate;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -442,6 +443,53 @@ class PostgresStateStoreTest {
                     "a second claim of the same keys wins NOTHING — this is the idempotency the "
                             + "split-brain posture depends on, resolved in the database, not in a read race");
             assertEquals(2L, ledger.size(), "and no duplicate rows were written");
+        }
+    }
+
+
+    /**
+     * {@code DbRunLease} on Postgres (phase B) — the lease that makes "one run per pipeline" true across
+     * processes. Two instances over one server ARE two processes as far as the lease is concerned.
+     *
+     * <p>⚠ Asserts the fencing predicate specifically, with a SHARED owner id: the owner check alone
+     * cannot separate those two, so only the epoch can refuse the stale release. A mutation run on
+     * 2026-09-12 confirmed this is the discriminating case (`DbRunLeaseTest`).
+     */
+    @Test
+    void runLease_exclusionAndFencingRoundTrip() throws Exception {
+        java.time.Duration ttl = java.time.Duration.ofSeconds(30);
+        try (DbRunLease first = DbRunLease.open(url, null, null, "s1", "pod-1", ttl);
+             DbRunLease second = DbRunLease.open(url, null, null, "s1", "pod-2", ttl)) {
+
+            RunLease.Claim held = first.tryAcquire("orders");
+            assertNotNull(held, "the first process takes the lease on Postgres");
+            assertNull(second.tryAcquire("orders"), "the second is refused");
+            held.close();
+
+            RunLease.Claim now = second.tryAcquire("orders");
+            assertNotNull(now, "and gets it after the release");
+            now.close();
+        }
+
+        // Fencing, same owner on both — see the note above.
+        try (DbRunLease a = DbRunLease.open(url, null, null, "s1", "pod-same", ttl);
+             DbRunLease b = DbRunLease.open(url, null, null, "s1", "pod-same", ttl);
+             Connection c = DriverManager.getConnection(url);
+             Statement st = c.createStatement()) {
+
+            RunLease.Claim stale = a.tryAcquire("fenced");
+            assertNotNull(stale);
+            st.executeUpdate("UPDATE " + DbRunLease.TABLE
+                    + " SET expires_at = 1 WHERE space = 's1' AND pipeline = 'fenced'");
+
+            RunLease.Claim live = b.tryAcquire("fenced");
+            assertNotNull(live, "an expired lease is reclaimable");
+
+            stale.close();
+            assertTrue(b.isRunning("fenced"),
+                    "the stale epoch's release must be refused on Postgres too — the owner matches, so "
+                            + "only the fencing token can save the live lease");
+            live.close();
         }
     }
 

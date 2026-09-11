@@ -177,6 +177,27 @@ File: `inspecto-status.db` (legacy `ucc-status.db` auto-renamed on open)
 
 Five append-only projection tables. `payload` is the JSON record; `seq` orders events within a pipeline.
 
+#### `inspecto_run_lease` — cross-process run exclusion (`DbRunLease`, phase B, 2026-09-12)
+
+```sql
+CREATE TABLE IF NOT EXISTS inspecto_run_lease (
+  space VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT,
+  acquired_at BIGINT, expires_at BIGINT,
+  PRIMARY KEY (space, pipeline))
+```
+
+🔴 **`PRIMARY KEY (space, pipeline)` — never `pipeline` alone.** A pipeline id is unique only within a
+Space; the in-heap guards key on the bare id only because there is one guard instance per Space. A shared
+table has no such boundary, so two Spaces with an `orders` pipeline would share one lease row.
+
+⚠ `epoch` is a **fencing token**, bumped on every acquisition. Release and heartbeat are both conditional
+on `owner = ? AND epoch = ?`, so a process paused past its TTL can neither free nor extend a lease
+another process has taken over. ⛔ Not a Postgres advisory lock (D5): those die with the connection, and
+the connection pool recycles connections.
+
+⚠ Nothing selects this store yet — `PipelineRunGuard` (heap) remains the default and single-node
+behaviour is unchanged. Wiring the selector is the next slice.
+
 #### `inspecto_events` — the shared event store (`DbEventStore`, D6, 2026-09-12)
 
 ```sql

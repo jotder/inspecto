@@ -465,12 +465,35 @@ T4 active/passive standby.
 trigger, and a lease abandoned by a dead pod is reclaimable within a bounded time.*
 
 Work:
-- Extract **`RunLease`** as an interface at the `PipelineRunGuard` seam (§3.2). Two implementations:
-  `HeapRunLease` (today's `Semaphore` map, the default — Personal/Standard change nothing) and
-  `PostgresRunLease` — a lease row per pipeline with owner id, acquired-at and a TTL heartbeat;
-  `tryAcquire` is a conditional `UPDATE … WHERE owner IS NULL OR expires < now()`. ⛔ Postgres
-  **advisory locks** are the tempting alternative and are rejected: they die with the connection, and
-  a pool (§5.1) recycles connections — a lease must survive its connection.
+- ✅ **SHIPPED 2026-09-12 (slice B0).** `RunLease` extracted at the `PipelineRunGuard` seam (§3.2),
+  with `PipelineRunGuard` itself as the heap implementation — the default, so **Personal and single-node
+  Standard are byte-identical** — and **`DbRunLease`** as the shared one: a row per pipeline with owner,
+  epoch, acquired-at and expiry; `tryAcquire` is the conditional
+  `UPDATE … WHERE owner IS NULL OR expires_at < now()`. ⛔ Advisory locks stay rejected (D5): they die
+  with the connection and the §5.1 pool recycles connections — a lease must outlive its connection.
+  ⚠ **The extraction touched NO call site.** `Claim` is declared on `RunLease` and inherited, and Java
+  resolves a nested type through the implementing class, so every `PipelineRunGuard.Claim` reference
+  still compiles.
+
+  🔴 **The Space is bound at CONSTRUCTION, not passed per call — and that is the load-bearing decision.**
+  A pipeline id is unique only *within* a Space; today's guards get away with a bare id purely because
+  there is one guard instance per `CollectorService` and therefore per Space. A shared table has no such
+  boundary, so keyed on the id alone two Spaces running an `orders` pipeline would share one row and each
+  would block the other — the `IntakeGovernor` bug at cluster scale. `PRIMARY KEY (space, pipeline)`,
+  pinned by a test.
+
+  🔴 **Fenced, not merely TTL'd.** A TTL alone does not prevent split-brain: a pod paused past its TTL
+  wakes up still believing it holds the lease. Every write is conditional on `owner = me AND epoch = mine`,
+  so a stale owner can neither release nor extend a lease someone else now holds. ⚠ **This is the half of
+  D15 that survives its refutation** — fencing works here precisely because `(space, pipeline)` is a
+  *stable* id, which `batchId` is not (`CONSIGNMENT-ID-DETERMINISTIC-1`). ⛔ It fences the lease, not the
+  writes a run performs; do not read B0 as discharging D15.
+
+  ⚠ **The fencing test was wrong on the first attempt and a mutation run caught it.** The obvious
+  scenario — pod A paused, pod B takes over, pod A releases — is blocked by the `owner` predicate alone,
+  so it left a fencing-defeating mutant alive. The discriminating case needs the **same owner id** on
+  both (one pod reconnecting, or any deployment that sets a stable owner such as a StatefulSet pod name).
+  ⛔ Do not "simplify" that test back.
 - **`lastRunAtMs` moves to the lease row.** Today it is a local map (§3.1); an interval trigger on a
   pod that has never run the pipeline would otherwise fire immediately after a failover.
 - **`JobService` cron arming goes through the same lease** — the per-instance `Scheduler` keeps

@@ -52,15 +52,18 @@ import java.util.concurrent.Semaphore;
  * <p>Permits are created on demand and retained per pipeline id. {@link #forget} drops one so the map
  * cannot leak under pipeline churn (the same reason {@code IntakeGovernor.forget} exists).
  */
-final class PipelineRunGuard {
+final class PipelineRunGuard implements RunLease {
 
     /** One binary semaphore per pipeline id, created on first use. */
     private final Map<String, Semaphore> permits = new ConcurrentHashMap<>();
 
-    /** A held claim. Released exactly once, in a {@code finally} — by whichever thread ran the work. */
-    interface Claim extends AutoCloseable {
-        @Override void close();
-    }
+    // ⚠ `Claim` is INHERITED from RunLease, not declared here. Java resolves a nested type through the
+    // implementing class, so every existing `PipelineRunGuard.Claim` reference still compiles — which is
+    // why extracting the seam touched no call site.
+    //
+    // ⚠ This implementation takes no Space: it does not need one, because there is one instance per
+    // CollectorService and therefore per Space. That implicit boundary is exactly what DbRunLease cannot
+    // rely on — see RunLease's class note.
 
     private Claim claimOf(String pipeline, Semaphore permit) {
         return new Claim() {
@@ -86,26 +89,26 @@ final class PipelineRunGuard {
      *
      * @return the claim, or {@code null} when this pipeline is already running (caller must skip it)
      */
-    Claim tryAcquire(String pipeline) {
+    @Override public Claim tryAcquire(String pipeline) {
         Semaphore permit = permitFor(pipeline);
         return permit.tryAcquire() ? claimOf(pipeline, permit) : null;
     }
 
     /** Claim {@code pipeline}, blocking until it is free. */
-    Claim acquire(String pipeline) {
+    @Override public Claim acquire(String pipeline) {
         Semaphore permit = permitFor(pipeline);
         permit.acquireUninterruptibly();
         return claimOf(pipeline, permit);
     }
 
     /** True when {@code pipeline} is currently claimed (diagnostics / tests — never a gate). */
-    boolean isRunning(String pipeline) {
+    @Override public boolean isRunning(String pipeline) {
         Semaphore permit = permits.get(pipeline);
         return permit != null && permit.availablePermits() == 0;
     }
 
     /** Drop {@code pipeline}'s permit so the map cannot grow without bound as pipelines are unregistered. */
-    void forget(String pipeline) {
+    @Override public void forget(String pipeline) {
         Semaphore permit = permits.get(pipeline);
         if (permit != null && permit.availablePermits() > 0) permits.remove(pipeline, permit);
     }
