@@ -126,3 +126,6 @@ inspecto-dedup-ledger.db*
 
 # Office lock files (a sheet open in Excel while a shift commits)
 ~$*
+
+# Generated deliverables: regenerate with scripts/generate_whitepaper_docx.py, never commit the binary
+docs/stakeholders/*.docx
