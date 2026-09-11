@@ -140,6 +140,25 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **A raw `jdbc:` value in a `*.backend` property is a URL, not a keyword — never lowercase it.**
+  Six `ServiceStores` openers read `System.getProperty(…).trim().toLowerCase()` and then passed that same
+  string on as the connection URL, so `-Djobs.backend=jdbc:postgresql://db/MyDb?user=Alice&password=Secret`
+  silently connected as `mydb`/`alice`/`secret` — Postgres database names, roles **and** passwords are all
+  case-sensitive — and on a case-sensitive filesystem `jdbc:duckdb:/srv/Inspecto/x.duckdb` opened a
+  different file. Fixed 2026-09-11. ✅ **The rule: compare on a lowercased COPY, pass on the raw value** —
+  which `OperationalDb.resolve` already did, twenty lines away. ⚠ The two openers that never lowercased
+  (`status`, `events`) were the only correct ones, so "the majority does X" was the wrong signal here.
+- 🔴 **A build-running subagent may return BEFORE the build finishes, and its "standing by" reads exactly
+  like a result.** Happened twice on 2026-09-11, once after 11 minutes. ⇒ **Block on the terminal marker
+  yourself** — `until grep -qE "BUILD SUCCESS|BUILD FAILURE" <log>; do sleep 15; done` — and confirm the
+  log's mtime has stopped advancing before trusting it. ⚠ A partial Maven log is indistinguishable from a
+  passing run with fewer tests: the first red run here stopped at `inspecto-processor` and **13 modules
+  never executed at all**, including the one carrying a third of the change.
+- 🔴 **Re-sum the reactor's module lines yourself; do not relay a subagent's arithmetic.** One reported a
+  phantom "−5 test drift" by treating a handed-over baseline as *passed* when it was *Tests run*. The real
+  delta was exactly the tests added. ⚠ Handoff tallies in this repo are written `run / fail / err / skip` —
+  the first number is **Tests run, including skips**, and reading it as "passed" manufactures a regression.
+
 - 🔴 **cmd.exe expands `%VAR%` inside a parenthesised block ONCE, at PARSE time — so N
   `set "X=%X% …"` lines in one `if ( … )` collapse to the LAST one executed.** Measured 2026-09-11:
   `set "OPTS=BASE"` then a block doing `-Dfirst` and `-Dsecond` yields `BASE -Dsecond`; `-Dfirst` is gone.
