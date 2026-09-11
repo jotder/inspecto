@@ -684,17 +684,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (DuckDB `spatial` extension itself: zero demand re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (outbound mirror of the connector SPI reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
-- **P2** · **`EVENTS-DURABLE-1` residual — the silent degrade, and only that.** ✅ **The launcher half SHIPPED
-  2026-09-11**: Standard/Enterprise `serve.sh`/`serve.bat` pass `-Devents.backend=parquet` off the same
-  `inspecto-security.jar` check that turns on OIDC, `-Devents.dir` stays unset so each space keeps its own
-  trail, and `EventStoreDurabilityTest` pins **both** halves — parquet survives a restart, memory drops, so
-  the default is a choice. **What remains:** a `parquet` backend that cannot open still degrades to memory
-  with a WARN instead of failing the boot. 🔴 **The row's own prescription for this could not be built as
-  written** — it said "in DR/partitioned mode", but `-Dinspecto.topology=partitioned` appears in **no source
-  file**; it is phase A of the signed scale-out plan (§5.1), as is `events.backend=db` (D6). ⇒ this residual
-  is **not independently buildable** and must be taken with phase A, not before it. ⛔ Say *tamper-evident,
-  append-only* — *immutable* is refused in writing. → `okf/capabilities/observability/observability.md` §3.1 ·
-  `superpower/enterprise-scale-out-plan.md` §5.1
 - **P2** · **`LAUNCHER-GUARD-1` — nothing executes an emitted launcher, and that is how `SERVEBAT-OPTS-1`
   shipped.** `serve.bat` spent its life dropping `-Dauth.mode=oidc` on every Windows Standard/Enterprise
   bundle (cmd.exe expands `%OPTS%` in a parenthesised block at PARSE time, so five of six `set` statements
@@ -814,6 +803,24 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
+- **P1** · **`CONSIGNMENT-ID-DETERMINISTIC-1` — a Consignment's identity is the wall clock, so two executors
+  can never agree on it.** `batchId` is `String.format("%s_%s_%04d", ts, slug, seq)`
+  (`ConsignmentPlanner.java:115`) where `ts` is `LocalDateTime.now()` at **second** granularity
+  (`PipelineConfig.java:1472-1475`); `slug` and `seq` are deterministic from the input files, so **only the
+  clock differs.** Two executors of the same work therefore either share a `batchId` (same second — the
+  manifest clobbers) or do not (one second apart — two manifests, two registry rows, and for a multi-file
+  batch **two differently-named output files that are both visible**, i.e. duplicate rows on read). 🔴 It
+  **flips between clobber and duplication on clock alignment**, and the clock is host-zone. Compounding it:
+  `DbFileStageStore` (`:59,:75`) and `DbConsignmentOutputStore` (`:81,:123`) have **no unique constraint and
+  no CAS** — both are bare `INSERT INTO` over `CREATE TABLE IF NOT EXISTS`. (`DbDedupLedger` is the one that
+  is genuinely safe: `PRIMARY KEY` + `ON CONFLICT DO NOTHING`.) **Work:** a deterministic, content-derived
+  Consignment identity, plus unique constraints on the registry and a CAS on the stage store. ⛔ **This is
+  the precondition for D15** — "idempotent writes keyed on Consignment id" is not implementable while there
+  is no stable id, and fencing tokens do not rescue it because a token is validated *at the resource* and
+  the resource key is the same unstable `batchId`. ⚠ **Standard, not only Enterprise**: a T4 standby taking
+  over from a *paused* owner double-executes. ⚠ Its only would-be regression test switches the relevant leg
+  off — `FinalizeSourceConcurrencyTest:291-294` passes empty outputs/lineage, *"the registry leg is
+  deliberately out of play"*. → `superpower/enterprise-scale-out-plan.md` §12, §4.2, D15
 - **P2** · **`OPENAPI-GEN-1` — generate the OpenAPI path/method skeleton from the route table** (⛔ decided 2026-09-10
   over "exemplar coverage, deliberately" and "document the rest by hand"). `openapi-v1.json` documents 24 operations
   against 266 live registrations (9.0 %, measured and ratcheted by `ApiContractTest`). Derive every path + method from

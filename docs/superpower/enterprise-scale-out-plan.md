@@ -391,11 +391,17 @@ session, so **changing coordinator does not fix it** — see D15.
 
 The defences that do, best-fit first for this system:
 
-- **Idempotent writes keyed on Consignment / file id — the strongest practical answer for a data plane.**
-  Stop trying to make double execution *impossible*; make it *harmless*. `DbDedupLedger` and `FileStages`
-  (one row per file per stage — "where is file X right now") already exist. If every write is a conditional
-  insert on that id, a second pod's work is wasted effort rather than corruption. This is what makes U1 and
-  U2 safe cheaply, and it degrades well under every partition scenario.
+- **Idempotent writes keyed on Consignment / file id — the right destination, but 🔴 NOT reachable from
+  where the code actually is.** The principle stands: stop trying to make double execution *impossible*;
+  make it *harmless*. ⛔ **What this bullet originally claimed — that `DbDedupLedger` and `FileStages`
+  "already exist", so a second pod's work is "wasted effort rather than corruption" — was measured on
+  2026-09-11 and is FALSE for three of its four surfaces.** `DbDedupLedger` is genuinely conditional
+  (`PRIMARY KEY` + `ON CONFLICT DO NOTHING`); `DbFileStageStore` and `DbConsignmentOutputStore` have **no
+  unique constraint and no CAS**; and the `batchId` every write keys on is **wall-clock derived at second
+  granularity**, so two executors cannot agree on it and the failure flips between clobber and duplication
+  depending on clock alignment. ⇒ **Prerequisite, not a detail: a deterministic, content-derived Consignment
+  identity, plus unique constraints on the registry and a CAS on the stage store.** Only then does this
+  bullet make `U1` and `U2` cheap. Full evidence and line refs in §12; D15 is re-posed accordingly.
 - **Fencing tokens.** A monotonic epoch issued with the claim, carried on every write, validated **at the
   resource** (`UPDATE … WHERE epoch <= :token`). The only thing that closes the paused-owner hole.
 - **Make the DuckLake catalog commit the fencing point.** §5.4 already makes it the *visibility* boundary;
@@ -428,7 +434,8 @@ degradation. On N pods it is **silent split-brain**: two pods each believing the
 
 Work:
 - An **edition-level profile** that sets every `*.backend` to Postgres and makes fallback a boot
-  failure. Not a new flag per store — one switch, `-Dinspecto.topology=partitioned` (name is D-open),
+  failure. Not a new flag per store — one switch, `-Dinspecto.topology=partitioned` (name SIGNED as D12,
+  2026-09-10; values `single` | `partitioned`, and what `/bootstrap` reports),
   that `ServiceStores` reads once. ⚠ Personal/Standard behaviour is unchanged.
 - **`events.backend=db`** — the one store with no shared backend (§3.3). A Postgres `EventStore`
   behind the same `EventStore` interface `InMemoryEventStore` and `ParquetEventStore` implement.
@@ -672,7 +679,7 @@ paragraph above warns about. Nothing in the repo boots two control planes in one
 | **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Standard's two-pod T4 standby is partitioned without being a cluster |
 | **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4. 🔴 **S5 ANSWERED 2026-09-10 — SELF-MANAGED POSTGRES ONLY.** `pg_duckdb` is installed by **building from source** (`make install`), and it appears on **none** of the curated extension lists of Amazon RDS/Aurora, Google Cloud SQL or Azure Database for PostgreSQL Flexible Server — all three publish a fixed set, so a customer cannot add one that is not on it. ⚠ **Evidence strength, stated so it can be re-checked:** Azure's list was read in full from the primary source (Microsoft Learn, *List of Extensions and Modules by Name*, dated 2026-07-10) and contains **no** extension whose name contains "duck"; RDS/Aurora and Cloud SQL rest on their published lists as surfaced by search rather than a full read. ⇒ Treat Azure as settled and the other two as very likely; **the live half of S5 is what confirms all three.** It supports Postgres 14–18 and reads Parquet/CSV/JSON/Iceberg/Delta from S3, GCS, Azure and R2. ⇒ **The external query surface is NOT general.** It is available to a self-managed Postgres and unavailable to the managed services an Enterprise customer is most likely to already run — so D13 must be sold as an option with a deployment precondition, never as a default. 🔴 **And it needs one more thing to be correct at all:** DuckLake **inlines** small writes into the catalog (S1), so a view over the Hive Parquet prefix would silently omit them unless inlining is disabled — see §3.5. ⚠ The live half of S5 (install it, build the view, query it from `psql`) is still owed; this sandbox has no Postgres and no container daemon. |
 | **D14** | *(new, 2026-09-11 — operator challenge to D3)* **Relax D3**: is the indivisible unit the **inbox-sharing group** (connected components of "names the same `dirs.poll`") rather than the Space, with the Space kept as the default grouping? | ⬜ **UNSIGNED — asked.** Recommend **yes.** Under D3 as written a single-Space customer gets **nothing** from N pods, and that is the likely tier-1 telecom shape, not an edge case (§4.1). Two of D3's three justifications do not survive grounding: ledgers and dedup move to shared Postgres **in phase A itself**, and the shared inbox is a per-Pipeline *config fact*, decidable at boot — not a property of a Space. ⛔ Preconditions if signed: phase A (stores on Postgres) **and** D6 (`events.backend=db`), because splitting a Space without D6 splits that Space's Signal ledger across two pods' memory and a Space is precisely the unit Ops looks at. Plus a boot check that **refuses** a map splitting a shared-inbox group |
-| **D15** | *(new, 2026-09-11)* Split-brain posture: **idempotent writes + fencing tokens** over the existing Postgres claim surfaces — and **refuse ZooKeeper/etcd**? | ⬜ **UNSIGNED — asked.** Recommend **yes, and refuse ZK.** ⚠ A TTL lease does not *prevent* split-brain, it makes it unlikely — and a ZK session expiring in a GC pause has the identical hole, so changing coordinator fixes nothing. Lead with **idempotent writes keyed on Consignment/file id** (`DbDedupLedger` + `FileStages` already exist) so double execution is *wasted effort, not corruption*; add **fencing tokens** validated at the resource for the paused-owner case. ZK refused: Postgres is already mandatory (D9) and already linearizable in the critical path; ZK is a **third** stateful system and **two coordinators is a new split-brain surface**; D5 already refused advisory locks and the Kubernetes Lease API, both lighter than ZK (§4.2) |
+| **D15** | *(new, 2026-09-11)* Split-brain posture: **idempotent writes + fencing tokens** over the existing Postgres claim surfaces — and **refuse ZooKeeper/etcd**? 🔴 **RE-POSED 2026-09-11 (same day) — its premise was measured and REFUTED; see §12.** The phrase "over the **existing** claim surfaces" is what failed: `DbFileStageStore` and `DbConsignmentOutputStore` have **no unique constraint and no CAS**, and the `batchId` every write keys on is **wall-clock derived at second granularity**, so two executors cannot agree on it. ⇒ **The question is no longer "which posture?" but "will you fund the precondition?":** a **deterministic, content-derived Consignment identity** plus **unique constraints on the registry and a CAS on the stage store**. Until those exist, neither idempotent writes nor fencing tokens are implementable — a fencing token is validated *at the resource*, and the resource key is the same unstable `batchId`. ⚠ **Standard is affected, not only Enterprise**: a T4 standby taking over from a *paused* owner double-executes. ⛔ Do not sign the recommendation below as written — it describes a destination reachable only after that precondition. | ⬜ **UNSIGNED — asked, and now re-posed (see the question cell).** The ZK half stands unchanged and can be signed on its own. The idempotency half is superseded by the precondition above. Original recommendation, kept for provenance: **yes, and refuse ZK.** ⚠ A TTL lease does not *prevent* split-brain, it makes it unlikely — and a ZK session expiring in a GC pause has the identical hole, so changing coordinator fixes nothing. Lead with **idempotent writes keyed on Consignment/file id** (`DbDedupLedger` + `FileStages` already exist) so double execution is *wasted effort, not corruption*; add **fencing tokens** validated at the resource for the paused-owner case. ZK refused: Postgres is already mandatory (D9) and already linearizable in the critical path; ZK is a **third** stateful system and **two coordinators is a new split-brain surface**; D5 already refused advisory locks and the Kubernetes Lease API, both lighter than ZK (§4.2) |
 | **D16** | *(new, 2026-09-11)* Request routing: **ingress path-routing on `/spaces/<id>/` with rules generated from the partition map**, `/spaces` answered **from the map**, and the **SPA served off the pods** (ingress/CDN)? | ⬜ **UNSIGNED — asked.** Recommend **yes, all three.** The routing key is already in the URL (`spaceScopedUrl`), so this needs **zero UI change**. ⛔ Generate the ingress rules from the map — hand-maintaining them makes the ingress a second copy that drifts. An in-app forward is the weaker option (new code, and it would have to proxy SSE); client-side routing is refused (leaks topology to the browser). Serving the SPA off the pods also removes the rolling-update chunk-skew defect (§12) and keeps `-Dui.dir` unchanged for single-node (§5.5) |
 
 ---
@@ -741,6 +748,60 @@ caveat of §4 said aloud.
 ---
 
 ## 12. Defects found while grounding — filed, not fixed here
+
+*(2026-09-11, later — found while answering "how do we resolve D15?", by measuring the premise D15 rests on
+rather than signing it. ⛔ **D15's premise is REFUTED; see its row in §9, which is re-posed rather than
+withdrawn.**)*
+
+- 🔴 **The data plane is NOT idempotent on re-execution of the same Consignment, and the identity everything
+  keys on cannot be agreed by two processes.** D15 argues that idempotent writes are the cheap answer
+  *"because `DbDedupLedger` and `FileStages` already exist"*. Measured, one of those two is what the row
+  claims and the other is not:
+  - ✅ **`DbDedupLedger` is genuinely idempotent** — `PRIMARY KEY (pipeline, key_hash, window_start)`
+    (`DbDedupLedger.java:78`) with `INSERT … ON CONFLICT DO NOTHING` (`:131`). The database arbitrates; a
+    concurrent claim of the same key converges. This half of the premise holds.
+  - ❌ **`DbFileStageStore` is an insert-only audit log, not a compare-and-swap** — `CREATE TABLE IF NOT
+    EXISTS` with **no primary key and no unique constraint** (`:59`), written by a bare `INSERT INTO …
+    VALUES (?,?,?,?,?)` (`:75`). There is no `UPDATE … WHERE stage = :expected` anywhere in it. It cannot
+    arbitrate anything, and its own class doc says so. ⛔ **D15 names it as a surface that makes idempotency
+    cheap. It is not one.**
+  - ❌ **`DbConsignmentOutputStore` likewise** — `CREATE TABLE IF NOT EXISTS` (`:81`) and a bare `INSERT
+    INTO` (`:123`), no unique constraint, no `ON CONFLICT`. Two executors both append.
+  - 🔴 **The root cause is the Consignment identity itself.** `batchId` is
+    `String.format("%s_%s_%04d", ts, slug, seq)` (`ConsignmentPlanner.java:115`) where `ts` comes from
+    `PipelineConfig.forNewRun()` — `LocalDateTime.now()` at **second** granularity
+    (`PipelineConfig.java:1472-1475`). `slug` and `seq` are deterministic from the input files; **only the
+    wall clock differs.** So two executors of the same work land in one of two regimes:
+    **same second** ⇒ identical `batchId` ⇒ the manifest (`<batchId>.json`) clobbers, last writer wins;
+    **one second apart** ⇒ two manifests, two registry rows, and — because `consolidatedBaseName` names a
+    multi-member batch by `batch.batchId()` — **two differently-named output files that are BOTH visible**,
+    i.e. duplicate rows on read. ⚠ The failure mode therefore **flips between clobber and duplication on
+    clock alignment**, and `LocalDateTime.now()` is host-zone, so skewed nodes diverge routinely.
+    Non-deterministic corruption is worse than either outcome on its own.
+  - ⚠ **Nothing lets a reader clean up afterwards**: ordinary partitioned output rows carry no per-row
+    `__batch_id`/`__consignment_id` (only versioned reference stores stamp one), so a duplicate-detecting
+    reader has no per-row key to fall back on — consistent with the standing note that the registry, not
+    the row, is the source. And a versioned reference store writes `…__v_<batchId>` *by design*, so two
+    executions always produce two versions of identical data.
+  - ⚠ **Not re-verified in this pass** (reported by the grounding sweep, worth confirming before it is
+    built on): `DbAcquisitionLedger`'s dedup gate is a `find()` at poll time separated from its `record()`
+    by the entire ingest run — a check-then-write window as wide as a pipeline execution.
+
+  ⇒ **Consequence for D15, and it is the whole answer:** "idempotent writes keyed on Consignment/file id"
+  is **not implementable today, because there is no stable Consignment id to key on.** Fencing tokens do
+  not rescue it either — a fencing token is validated *at the resource*, and the resource key is the same
+  unstable `batchId`. Resolving D15 therefore requires building **(1) a deterministic, content-derived
+  Consignment identity** to replace the wall-clock `batchId`, and **(2) unique constraints on the output
+  registry plus a CAS on the stage store**, before the question it poses can even be answered.
+  ⚠ **This bites Standard, not only Enterprise:** a T4 standby taking over from a *paused* — not dead —
+  owner double-executes, and the lease alone only narrows the window.
+
+- ⚠ **The only concurrency test that exists switches off the leg where the corruption lives.**
+  `FinalizeSourceConcurrencyTest` pins the marker race, but passes **empty outputs and lineage**
+  (`:291-294`, `finalizeSource(cfg, survivors, List.of(), List.of())`, commented *"the registry leg is
+  deliberately out of play"*). So the populated-outputs case — the one D15 actually asks about — is
+  **untested, not proven safe**. ⛔ Do not read that test as evidence of concurrent safety; it is the
+  guard-scope-is-a-silent-exemption pattern again.
 
 *(2026-09-11 — found while answering the operator's challenge to D3 and the routing question:)*
 
