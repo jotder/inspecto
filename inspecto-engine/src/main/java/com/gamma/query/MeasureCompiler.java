@@ -65,25 +65,34 @@ public final class MeasureCompiler {
      * {@code measures}, a report job's the same.
      *
      * <p>⚠ This is the grammar's split, and it belongs here beside {@link #AGGS} and {@link #parse}
-     * rather than at each caller. Three call sites still hand-roll a byte-identical copy
-     * ({@code MaterializeTask:131}, {@code ReportJob:168}, {@code RowShaper:472}); they are not
-     * migrated here because this change did not need to touch them, but a fourth copy is exactly how
-     * one grammar becomes several that drift. New callers use this.
+     * rather than at each caller. All three production call sites — {@code MaterializeTask},
+     * {@code ReportJob} and {@code RowShaper.summarize} — now go through it
+     * (`MEASURE-SHORTHAND-ONE-HOME-1`).
+     *
+     * <p>⛔ {@code RecipeVerbParityTest} deliberately still hand-rolls the split and <b>must keep doing
+     * so</b>: it exists to prove the recipe path produces byte-compatible measures, and a parity test
+     * that calls the thing it is checking proves nothing. That copy is independent verification, not
+     * duplication.
      *
      * @param shorthand the authored entries; each is {@code toString().trim()}ed, so a TOON list of
      *                  plain strings and a pre-split config value both work
-     * @param context   names the offending config in the exception (e.g. {@code "node 'roll'"})
+     * @param context   names the offending config in the exception (e.g. {@code "node 'roll'"}), or
+     *                  {@code null}/blank for an unprefixed message. ⚠ The prefix is optional ONLY so
+     *                  the three migrated call sites keep their messages byte-identical — a job says
+     *                  "measure must be…", a pipeline node says "node 'x': measure must be…". Prefer a
+     *                  context in new callers.
      * @throws IllegalArgumentException on an entry that is neither {@code count} nor {@code agg(field)}
      */
     public static List<Map<String, Object>> splitShorthand(List<?> shorthand, String context) {
+        String prefix = context == null || context.isBlank() ? "" : context + ": ";
         List<Map<String, Object>> out = new ArrayList<>();
         for (Object o : shorthand) {
             String m = String.valueOf(o).trim();
             if ("count".equals(m)) { out.add(Map.of("agg", "count")); continue; }
             int p = m.indexOf('(');
             if (p < 0 || !m.endsWith(")"))
-                throw new IllegalArgumentException(context
-                        + ": measure must be count or agg(field), got '" + m + "'");
+                throw new IllegalArgumentException(prefix
+                        + "measure must be count or agg(field), got '" + m + "'");
             out.add(Map.of("agg", m.substring(0, p), "field", m.substring(p + 1, m.length() - 1)));
         }
         return out;

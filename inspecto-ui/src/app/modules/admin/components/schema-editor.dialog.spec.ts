@@ -50,10 +50,14 @@ function create(
     config: Partial<ConfigService> = {},
     sampleRows?: Record<string, unknown>[],
     components: Partial<ComponentsService> = {},
+    home?: 'registry' | 'config',
 ) {
     const ref = { close: vi.fn(), disableClose: false };
     // An EDIT saves here (the registry component); only a CREATE goes to ConfigService.write.
     const comps = {
+        create: vi
+            .fn()
+            .mockReturnValue(of({ type: 'schema', name: 'fresh', ref: 'schema/fresh', content: {} } as ComponentDef)),
         update: vi.fn().mockReturnValue(
             of({
                 type: 'schema',
@@ -93,7 +97,7 @@ function create(
         imports: [SchemaEditorDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows } },
+            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows, home } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ConfigService, useValue: api },
             { provide: ComponentsService, useValue: comps },
@@ -226,6 +230,19 @@ describe('SchemaEditorDialog', () => {
         expect(confirm.confirmDestructive).toHaveBeenCalled();
         expect(api.suggestSchema).not.toHaveBeenCalled();
         expect(c.rows()).toEqual(before);
+    });
+
+    it('a CREATE from the Components pane makes a REGISTRY component, not a write-root config', () => {
+        // 🔴 SCHEMA-DIALOG-CREATE-HOME-1: the pane lists GET /components/schema, which scans
+        // registry/schemas/ only — a /config/write create lands at <write-root>/<name>.toon and can
+        // never appear in the pane that created it.
+        const { c, api, comps } = create(undefined, {}, undefined, {}, 'registry');
+        c.name.setValue('fresh');
+        c.onRows([{ name: 'A', selector: '0', type: 'VARCHAR', description: '', unit: '', classification: '' }]);
+        c.save();
+
+        expect(comps.create).toHaveBeenCalledWith('schema', expect.objectContaining({ id: 'fresh' }));
+        expect(api.write).not.toHaveBeenCalled();
     });
 
     it('create mode requires a name, refuses an empty field list, and drops rows with a blank name', () => {

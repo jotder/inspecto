@@ -1,8 +1,10 @@
 import { ColumnMeta, ColumnType, QueryModel } from 'app/inspecto/query';
+import { roleFor } from 'app/inspecto/viz/result-set';
 
 /**
  * Studio **Dataset** model — a data-source abstraction (not merely "a saved query"), the first Studio kind
- * built on the unified component metamodel. A dataset is stored as a `dataset` component (mock-served today);
+ * built on the unified component metamodel. A dataset is stored as a `dataset` component (really persisted server-side since W3 — `dataset` is in
+ * `ComponentStore.WRITABLE_TYPES`);
  * its component `config` is the {@link DatasetConfig} below (everything except the id/name, which live on the
  * Component itself). Mirrors the rule-builder's `rule-types.ts` — pure data, no Angular.
  *
@@ -73,27 +75,20 @@ export interface Dataset extends DatasetConfig {
     name: string;
 }
 
-/** True for identifier-ish columns (`id`, `*_id`) — excluded from measure inference (you don't sum an id). */
-function isIdColumn(name: string): boolean {
-    return /(^|_)id$/i.test(name);
-}
-
 /**
  * Seed each column's analytic role from its inferred type: temporal for dates, measure for non-id numerics,
  * dimension otherwise. The Studio columns tagger lets the user override these.
+ *
+ * ⚠ The rule itself is NOT here. It lived here and, byte-for-byte, in `inspecto/viz/result-set.ts` —
+ * two client copies of one rule, plus a third in Java, none of them pinned
+ * (`TYPEFLOW-DATASET-COLUMNS-1` step 1). The shared viz layer owns it now; this delegates.
  */
 export function inferRoles(columns: ColumnMeta[]): DatasetColumn[] {
     return columns.map((c) => ({
         name: c.name,
         type: c.type,
-        role: roleFor(c),
+        role: roleFor(c.name, c.type),
     }));
-}
-
-function roleFor(c: ColumnMeta): DatasetRole {
-    if (c.type === 'date') return 'temporal';
-    if (c.type === 'number' && !isIdColumn(c.name)) return 'measure';
-    return 'dimension';
 }
 
 /** Build a {@link Dataset} from a name/kind/source + optional body (mirrors `buildRuleTemplate`). */

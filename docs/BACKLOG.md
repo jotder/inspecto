@@ -312,13 +312,32 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   claimed the routes "write the SAME FILE" and that the UI avoided the component route "by convention".
   Both halves were wrong, and that claim is how this sat unnoticed.
   → `okf/capabilities/control-api/control-api.md` §3.5
-- **P3** · **`SCHEMA-DIALOG-CREATE-HOME-1` — the Components pane's schema CREATE still makes a
-  write-root config, not a registry component** (filed 2026-09-11 by `SCHEMA-DIALOG-IFMATCH-1`). Same
-  seam, other verb: "New Schema" in the pane writes `<write-root>/<name>.toon`, so the created schema
-  does not appear in the list it was created from. ⛔ **Not a copy of the edit fix** — the same dialog
-  in create mode is ALSO opened from the parse editor to author a pipeline's satellite schema, where
-  the write-root destination is correct. Needs a decision on whether the two create paths differ by
-  opener, not a blanket route swap. → `okf/capabilities/control-api/control-api.md` §3.5
+- **SHIPPED 2026-09-11** · **`SCHEMA-DIALOG-CREATE-HOME-1` — the Components pane's schema CREATE made a
+  write-root config, not a registry component** (filed 2026-09-11 by `SCHEMA-DIALOG-IFMATCH-1`, shipped
+  the same day). Same seam, other verb: "New Schema" wrote `<write-root>/<name>.toon`, which the pane's
+  own `GET /components/schema` — a scan of `registry/schemas/` alone — can never list.
+  ✅ **Settled from the code, no operator call needed**, because the two openers provably want different
+  homes: a `home: 'registry' | 'config'` on `SchemaEditorData`. The Components pane creates a registry
+  component; the parse editor keeps `/config/write`, because a parse node references its satellite by
+  bare `<name>.toon` and 🔴 **no shipped surface authors the `schema/<id>` registry spelling at all**
+  (`pipeline-parse-definition`, `stream-bundle.ts`, `PipelineSettingsRoutes` all write the bare form;
+  the registry spelling appears only in the recipe round-trip and bundle import).
+  ⛔ **`/config/write` with `subdir: 'registry/schemas'` was REFUTED as the fix** — it lands the right
+  file, and `ComponentRegistry.scan` is extension-filtered so the sibling CSVs would be inert, but
+  `/config/write` splits `raw.fields` into `_structure.csv` and the component READ does **no** sibling
+  merge (`ComponentRegistry.load` is a plain TOON load). The pane would list the schema with ZERO fields
+  while the engine read it correctly — the mirror image of the bug this family started with.
+  → `okf/capabilities/control-api/control-api.md` §3.5
+- **P3** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at the write ROOT,
+  not beside its pipeline** (filed 2026-09-11 by `SCHEMA-DIALOG-CREATE-HOME-1`'s grounding). `grammar-editor.dialog.ts`
+  `openSchemaEditor()` passes no `subdir`, so a satellite authored there lands at the write root — 🔴 the
+  exact shape of `SATELLITE-WRITE-1`, which the *real* parse surface already fixed: its own comment
+  (`pipeline-parse-definition.component.ts:525-533`) records that a root-level file then **WINS the read**
+  and orphans a duplicate. The opener has `configSubdir()` in hand (`pipeline-editor.component.ts:1377`)
+  and simply does not thread it through `GrammarEditorDialogData` → `SchemaEditorData`. ⚠ **Nothing pins
+  the destination today** (no test asserts where that draft lands), which is why it was filed rather than
+  changed alongside the create-home fix — it is a behaviour change on a shipped surface with no
+  regression net. Write the test first. → `okf/capabilities/control-api/control-api.md` §3.5
 - **P3** · **`PACK-UNLOAD-EXPOSURE-1` — unloading a pack makes a stored pipeline unloadable** (filed
   2026-09-10 by Sprint 7.6). A pipeline naming a pack-contributed node type stops loading once that pack is
   unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally
@@ -377,13 +396,21 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   is never built** — 🔴 `MaterializeTask`'s refresh replaces the whole document, so a human's authored
   roles/labels are destroyed on every run today, derivation or not.
   → `okf/backend/engine/catalog-vs-executors.md`
-- **P3** · **`MEASURE-SHORTHAND-ONE-HOME-1` — the measure shorthand is split in three hand-rolled copies**
-  (filed 2026-09-11 by `TYPEFLOW-CONSUMERS-1`). `MaterializeTask:131`, `ReportJob:168` and `RowShaper:472`
-  each re-implement `count | agg(field)` byte-identically. ✅ Verified identical before filing, so a merge
-  is behaviour-preserving today — the point is that it will not stay that way. `MeasureCompiler.splitShorthand`
-  now exists as the one home (the grammar's own class) and the new save-time check uses it; the three were
-  deliberately NOT migrated, because that change needed to touch the engine and nothing in the shipped work
-  required it. ⛔ Do not add a fourth copy. → `okf/backend/engine/catalog-vs-executors.md`
+- **SHIPPED 2026-09-11** · **`MEASURE-SHORTHAND-ONE-HOME-1` — the measure shorthand had FIVE statements,
+  not three** (filed 2026-09-11 by `TYPEFLOW-CONSUMERS-1`, shipped the same day). ⚠ **The row's count was
+  a lower bound, as they keep being.** Three production splitters (`MaterializeTask`, `ReportJob`,
+  `RowShaper.summarize`) — all now routed through `MeasureCompiler.splitShorthand`, messages preserved
+  byte-identically (the helper's context prefix is optional for exactly that reason). Plus two the row
+  never counted:
+  - 🔴 A **fifth statement as a REGEX**: `DatasetMeasureProbe.MEASURE` hardcoded the aggregation
+    alternation, so an aggregate added to `MeasureCompiler.AGGS` would have left alert validation
+    rejecting what the compiler accepts. Same package, so it now builds the alternation from `AGGS`; the
+    produced pattern is byte-identical to the literal it replaced.
+  - ⛔ A fourth copy in `RecipeVerbParityTest`, which **must stay hand-rolled**: it exists to prove the
+    recipe path produces byte-compatible measures, and a parity test that calls the thing it is checking
+    proves nothing. That copy is independent verification, not duplication — the distinction is recorded
+    on `splitShorthand` so nobody "finishes the job" by collapsing it.
+  → `okf/backend/engine/catalog-vs-executors.md`
 - **P3** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY** (filed
   2026-09-10 by Sprint 7.6). Delete the five non-edges in favour of Signals, and collapse the four reject
   relations to `reject:<reason>`. ⚠ **These two are documentation and vocabulary and need no runtime

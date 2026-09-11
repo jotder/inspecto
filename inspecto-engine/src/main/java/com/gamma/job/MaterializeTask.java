@@ -106,8 +106,22 @@ final class MaterializeTask {
             try { Files.delete(p); } catch (IOException e) { log.warn("materialize: could not drop {}: {}", p, e.getMessage()); }
         }
 
-        // Register/refresh the Matrix as a managed dataset asset (idempotent overwrite = the refresh).
-        Map<String, Object> content = new LinkedHashMap<>();
+        // Register/refresh the Matrix as a managed dataset asset. The refresh is idempotent, but it is a
+        // MERGE over the stored document, not a replace (`TYPEFLOW-DATASET-COLUMNS-1` step 2).
+        //
+        // 🔴 It used to build this map from scratch and hand it to `store.write`, which replaces the
+        // document wholesale — so every authored key on a materialized dataset (`columns` and their
+        // roles/labels/formats, `calculated`, anything a human set in the Studio editor) was DESTROYED on
+        // each run, silently, with the job reporting success. Nothing referenced the loss because the
+        // stale copy is overwritten atomically.
+        //
+        // The rule is keys-by-owner, not a field list: the four keys below are JOB-owned provenance and
+        // are always restated; everything else in the stored document belongs to whoever authored it and
+        // rides through untouched. Stated this way a new authored key is preserved automatically, where a
+        // copy-these-fields list would silently start dropping it.
+        Map<String, Object> content = new LinkedHashMap<>(
+                store.get("dataset", target).map(ComponentRegistry.Component::content)
+                        .orElseGet(java.util.LinkedHashMap::new));
         content.put("name", target);
         content.put("physicalRef", target);
         content.put("description", "Materialized from dataset '" + source + "' (job '" + cfg.name() + "')");
@@ -125,14 +139,10 @@ final class MaterializeTask {
         int limit = Integer.parseInt(cfg.opt("limit", "1000000"));
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("dataset", source);
-        List<Map<String, Object>> measures = new ArrayList<>();
-        for (String m : split(cfg.opt("measures", ""))) {
-            if ("count".equals(m)) { measures.add(Map.of("agg", "count")); continue; }
-            int p = m.indexOf('(');
-            if (p < 0 || !m.endsWith(")"))
-                throw new IllegalArgumentException("measure must be count or agg(field), got '" + m + "'");
-            measures.add(Map.of("agg", m.substring(0, p), "field", m.substring(p + 1, m.length() - 1)));
-        }
+        // The grammar's own split (MEASURE-SHORTHAND-ONE-HOME-1) — this was one of three byte-identical
+        // hand-rolled copies. No context prefix, so the message is unchanged.
+        List<Map<String, Object>> measures =
+                new ArrayList<>(MeasureCompiler.splitShorthand(split(cfg.opt("measures", "")), null));
         if (!measures.isEmpty()) body.put("measures", measures);
         List<String> groupBy = split(cfg.opt("group_by", ""));
         if (!groupBy.isEmpty()) body.put("groupBy", groupBy);

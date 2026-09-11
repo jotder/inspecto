@@ -27,8 +27,15 @@ import java.util.regex.Pattern;
 public final class DatasetMeasureProbe {
 
     private static final Logger log = LoggerFactory.getLogger(DatasetMeasureProbe.class);
+    /**
+     * ⚠ The aggregation alternation is BUILT FROM {@link MeasureCompiler#AGGS} rather than spelled out,
+     * so adding an aggregate cannot leave this validator rejecting what the compiler accepts
+     * (`MEASURE-SHORTHAND-ONE-HOME-1` — it was a fifth independent statement of the same grammar, and
+     * the only one expressed as a regex). Same package, so the package-private list is reachable; the
+     * produced pattern is byte-identical to the literal it replaced.
+     */
     private static final Pattern MEASURE = Pattern.compile(
-            "(count)|(count|countDistinct|sum|avg|min|max)\\(([A-Za-z_][A-Za-z0-9_]*)\\)");
+            "(count)|(" + String.join("|", MeasureCompiler.AGGS) + ")\\(([A-Za-z_][A-Za-z0-9_]*)\\)");
 
     private final Supplier<Path> writeRoot;
     private final Supplier<Path> dataRoot;

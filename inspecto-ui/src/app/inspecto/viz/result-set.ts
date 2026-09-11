@@ -36,7 +36,17 @@ function inferType(sample: unknown): ColumnType {
     return 'string';
 }
 
-function roleFor(name: string, type: ColumnType): FieldRole {
+/**
+ * The analytic role of a column from its name and coarse type: temporal for dates, measure for
+ * non-id numerics, dimension otherwise.
+ *
+ * ⚠ **The ONE client-side statement of this rule** (`TYPEFLOW-DATASET-COLUMNS-1` step 1). It lived
+ * here and, byte-for-byte again, in the Studio's `dataset-types.ts`, which now delegates to this.
+ * Its Java twin is `ResultSetDescriptor.roleFor`, and the two are pinned together by
+ * `column-role.contract.json` — a stored Dataset's roles and a live result set's roles must agree,
+ * because the widget builder buckets both through the same Show-Me scoring.
+ */
+export function roleFor(name: string, type: ColumnType): FieldRole {
     if (type === 'date') return 'temporal';
     if (type === 'number' && !isIdColumn(name)) return 'measure';
     return 'dimension';

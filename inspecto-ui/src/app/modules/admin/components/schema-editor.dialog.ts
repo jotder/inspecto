@@ -23,6 +23,17 @@ import { ComponentFormResult } from './component-form.dialog';
 export interface SchemaEditorData {
     def?: ComponentDef;
     sampleRows?: Record<string, unknown>[];
+    /**
+     * Where a CREATE lands — the two openers genuinely differ, which is why this is a parameter rather
+     * than a constant (`SCHEMA-DIALOG-CREATE-HOME-1`):
+     *
+     * - `'registry'` — the Components pane. Its list is `GET /components/schema`, which scans
+     *   `registry/schemas/` only, so a schema created anywhere else **can never appear in the pane that
+     *   created it**.
+     * - `'config'` (default, the prior behaviour) — the parse editor's onward link, drafting a
+     *   pipeline's satellite schema that a node references by bare `<name>.toon`.
+     */
+    home?: 'registry' | 'config';
 }
 
 /** One typed field row — `ConfigSpecs.schema()`'s `raw.fields[]` keys, verbatim. */
@@ -43,12 +54,15 @@ const COLUMNS: EditableGridColumn[] = [
  *
  * An EDIT saves through `PUT /components/schema/{id}` — the registry component this dialog was opened
  * over — carrying the list's `contentHash` as an `If-Match` precondition, so a concurrent edit is
- * refused (409) rather than silently clobbered. A CREATE still goes to `POST /config/write
- * type=schema`, which is what the parse editor's "author a schema for this pipeline" path wants.
+ * refused (409) rather than silently clobbered. A CREATE follows its opener's {@link
+ * SchemaEditorData.home}: the Components pane creates a registry component, the parse editor writes a
+ * pipeline satellite through `POST /config/write type=schema`.
  *
- * 🔴 These two routes write DIFFERENT FILES, which is why the edit case moved (SCHEMA-DIALOG-IFMATCH-1):
+ * 🔴 These two routes write DIFFERENT FILES, which is the whole reason `home` exists
+ * (SCHEMA-DIALOG-IFMATCH-1 for the edit case, SCHEMA-DIALOG-CREATE-HOME-1 for create):
  * `/config/write` with no subdir lands at `<write-root>/<name>.toon`, never at
- * `registry/schemas/<id>.toon`, so edits used to be written beside the component and lost.
+ * `registry/schemas/<id>.toon`. Edits used to be written beside the component and lost; a create from
+ * the pane landed where the pane could never list it.
  *
  * A 422 refusal carries cell-anchored findings (`raw.fields[NAME]` / `.type` / `.selector`) which this
  * dialog translates onto grid cells by field NAME, plus a `role="alert"` summary; the deliberate escape
@@ -271,10 +285,17 @@ export class SchemaEditorDialog {
         // parity with `/config/write`, on the right file, with a concurrency handle the list already
         // serves. Hence the precondition here costs no extra read.
         //
-        // CREATE is deliberately unchanged: this dialog is also opened with no `def` from the parse
-        // editor to author a pipeline's satellite schema, where a write-root config IS the intent.
-        // Whether the pane's own "create schema" should make a registry component instead is a
-        // separate question — filed, not silently widened into this fix.
+        // CREATE follows its OPENER (`SCHEMA-DIALOG-CREATE-HOME-1`). `home: 'registry'` — the Components
+        // pane — creates the registry component, because that pane lists `GET /components/schema`, which
+        // scans `registry/schemas/` alone: a write-root config created from "New Schema" could never
+        // show up in the pane that created it. `home: 'config'` (the parse editor) keeps `/config/write`,
+        // because a pipeline's satellite schema really does belong beside its pipeline and is referenced
+        // by bare `<name>.toon` — no shipped surface authors the `schema/<id>` registry spelling.
+        //
+        // ⛔ NOT solved by `/config/write` with `subdir: 'registry/schemas'`. That lands the right file
+        // but splits `raw.fields` into a sibling `_structure.csv`, and the component READ does no sibling
+        // merge (`ComponentRegistry.load` is a plain TOON load) — so the pane would list the schema with
+        // ZERO fields while the engine read it correctly. That is the mirror of the bug just fixed.
         // Both arms yield the saved doc plus any WARNING-level findings, so the two routes' different
         // response shapes are normalised once instead of forking the success handler.
         const save: Observable<{ def: ComponentDef; findings: Finding[] }> = this.isEdit
@@ -284,22 +305,24 @@ export class SchemaEditorDialog {
                       ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
                   })
                   .pipe(map((def) => ({ def, findings: [] })))
-            : this.config
-                  .write('schema', config, {
-                      overwrite: true,
-                      ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
-                  })
-                  .pipe(
-                      map((res) => ({
-                          def: {
-                              type: 'schema',
-                              name: res.name,
-                              ref: `schema/${res.name}`,
-                              content: config,
-                          } as ComponentDef,
-                          findings: res.findings ?? [],
-                      })),
-                  );
+            : this.data.home === 'registry'
+              ? this.components.create('schema', { id: name, ...config }).pipe(map((def) => ({ def, findings: [] })))
+              : this.config
+                    .write('schema', config, {
+                        overwrite: true,
+                        ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
+                    })
+                    .pipe(
+                        map((res) => ({
+                            def: {
+                                type: 'schema',
+                                name: res.name,
+                                ref: `schema/${res.name}`,
+                                content: config,
+                            } as ComponentDef,
+                            findings: res.findings ?? [],
+                        })),
+                    );
         save.subscribe({
             next: ({ def, findings }) => {
                 this.dirty = false;

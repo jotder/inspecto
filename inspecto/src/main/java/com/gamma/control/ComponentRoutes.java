@@ -570,10 +570,19 @@ final class ComponentRoutes implements RouteModule {
                         + "' must match the component id '" + id + "' (one spec per object type)");
             FindingsSpec.fromMap(stamped);
         }
-        // A `schema` component is the SAME FILE the engine parses as a pipeline's schema:
-        // `/components/schema/{id}` and `POST /config/write {type:"schema"}` both land on
+        // A `schema` component is a file the engine parses: `/components/schema/{id}` writes
         // `registry/schemas/<id>.toon`, which `PipelineConfigParser.resolveSchemaRef` loads for a
-        // `schema_file: schema/<id>` ref. Only the /config/write side ran the structural + safety gates,
+        // `schema_file: schema/<id>` ref.
+        //
+        // ⚠ CORRECTED 2026-09-11. This comment used to say `/components/schema/{id}` and `POST
+        // /config/write {type:"schema"}` "both land on" that path. They do NOT — /config/write with no
+        // subdir lands at `<write-root>/<name>.toon`. This was the SECOND site carrying that false
+        // claim (the first was on `ControlApiComponentsTest.schemaComponentIsGatedLikeItsConfigWriteSibling`),
+        // and between them they concealed `SCHEMA-DIALOG-IFMATCH-1` — the schema editor writing its
+        // edits to a different file than it listed. The gate parity below is real; the shared-file
+        // story around it was not.
+        //
+        // Only the /config/write side ran the structural + safety gates,
         // so this route was an ungated back door to a live, engine-executed artifact — the
         // gate-on-one-route-but-not-its-sibling shape. The gates below are exactly its sibling's.
         //

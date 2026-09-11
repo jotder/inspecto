@@ -1,8 +1,20 @@
 # Dataset column derivation — design (`TYPEFLOW-DATASET-COLUMNS-1`)
 
-> **Status:** design only, nothing built. Written 2026-09-11 as the split-out (b) of
-> `TYPEFLOW-CONSUMERS-1`, whose (a) and (c) shipped the same day.
-> **Decision owner:** operator. §6 is the list of calls this needs before code.
+> **Status (updated 2026-09-11): steps 1 and 2 SHIPPED; steps 3 and 4 — the derivation itself — are
+> still design only.** Written as the split-out (b) of `TYPEFLOW-CONSUMERS-1`, whose (a) and (c) shipped
+> the same day.
+>
+> - ✅ **Step 1 — the role heuristic is pinned.** `column-role.contract.json` + `ColumnRoleContractTest`
+>   (Java) + `column-role.spec.ts`. The **two client copies were collapsed into one**: `result-set.ts`
+>   owns `roleFor`, and the Studio's `dataset-types.ts` delegates. Three unpinned copies → one per
+>   language, pinned.
+> - ✅ **Step 2 — the materialize refresh is a MERGE.** `MaterializeTask` now reads the stored dataset
+>   and restates only its four job-owned provenance keys, so authored `columns`/roles/labels/formats
+>   survive a re-run. Answers §6-Q1 by building it.
+> - ⏳ Steps 3 and 4 (the DuckDB-type → coarse-type mapping, and deriving the columns) remain open,
+>   along with **§6-Q2/Q3** — the temporal tie-break and the dropped-column rule.
+>
+> **Decision owner:** operator, for what remains.
 
 ## 1. What the row asked for
 
@@ -140,8 +152,11 @@ exactly how the Studio editor already treats it.
 
 ## 6. Decisions this needs before code
 
-- **Q1 — Is step 2 (merge-not-replace) its own row, shipped first?** Recommendation: **yes**. It is a
-  real data-loss fix, it is small, and it is independently testable.
+- ~~**Q1 — Is step 2 (merge-not-replace) its own row, shipped first?**~~ ✅ **ANSWERED BY BUILDING IT,
+  2026-09-11.** Shipped ahead of the derivation, as recommended. The rule implemented is **keys-by-owner,
+  not a field list**: `MaterializeTask` restates only its four job-owned provenance keys (`name`,
+  `physicalRef`, `description`, `materialized`) over the stored document, so a newly authored key is
+  preserved automatically where a copy-these-fields list would silently start dropping it.
 - **Q2 — Temporal tie-break.** When the heuristic yields several date columns, derive `temporal` for:
   (a) none — leave every date a `dimension` and let a human elect one; (b) the first by ordinal; or
   (c) all, and relax `temporalColumn` to pick deterministically instead of throwing.

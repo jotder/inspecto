@@ -1,0 +1,19 @@
+{
+  "roles": [ "temporal", "measure", "dimension" ],
+  "coarseTypes": [ "number", "string", "date", "boolean" ],
+  "idColumn": "(^|_)id$",
+  "cases": [
+    { "name": "event_time",  "type": "date",    "role": "temporal"  },
+    { "name": "created_at",  "type": "date",    "role": "temporal"  },
+    { "name": "order_id",    "type": "date",    "role": "temporal"  },
+    { "name": "amount",      "type": "number",  "role": "measure"   },
+    { "name": "duration_s",  "type": "number",  "role": "measure"   },
+    { "name": "id",          "type": "number",  "role": "dimension" },
+    { "name": "ID",          "type": "number",  "role": "dimension" },
+    { "name": "customer_id", "type": "number",  "role": "dimension" },
+    { "name": "paid",        "type": "number",  "role": "measure"   },
+    { "name": "customer",    "type": "string",  "role": "dimension" },
+    { "name": "user_id",     "type": "string",  "role": "dimension" },
+    { "name": "is_active",   "type": "boolean", "role": "dimension" }
+  ]
+}

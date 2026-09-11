@@ -465,16 +465,10 @@ public final class RowShaper {
         if (!(measuresRaw instanceof List<?> measureList) || measureList.isEmpty())
             throw new IllegalArgumentException("transform.summarize node '" + node.id()
                     + "' needs a non-empty 'measures' list");
-        List<Map<String, Object>> measures = new ArrayList<>();
-        for (Object o : measureList) {
-            String m = o.toString().trim();
-            if ("count".equals(m)) { measures.add(Map.of("agg", "count")); continue; }
-            int p = m.indexOf('(');
-            if (p < 0 || !m.endsWith(")"))
-                throw new IllegalArgumentException("node '" + node.id()
-                        + "': measure must be count or agg(field), got '" + m + "'");
-            measures.add(Map.of("agg", m.substring(0, p), "field", m.substring(p + 1, m.length() - 1)));
-        }
+        // The grammar's own split (MEASURE-SHORTHAND-ONE-HOME-1); the node id rides as the context, so
+        // the message stays "node '<id>': measure must be count or agg(field), got '<m>'".
+        List<Map<String, Object>> measures =
+                MeasureCompiler.splitShorthand(measureList, "node '" + node.id() + "'");
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("dataset", input);
         body.put("measures", measures);

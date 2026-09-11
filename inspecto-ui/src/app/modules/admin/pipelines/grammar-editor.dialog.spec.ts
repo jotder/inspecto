@@ -204,9 +204,13 @@ describe('GrammarEditorDialog', () => {
         expect(c.previewRows()).toEqual([{ id: '1' }]);
 
         c.openSchemaEditor();
+        // `home: 'config'` is load-bearing, not incidental (SCHEMA-DIALOG-CREATE-HOME-1): this opener
+        // drafts a pipeline SATELLITE schema, which a parse node references by bare `<name>.toon`. The
+        // Components pane passes 'registry' instead, and a schema created under the wrong home lands in
+        // a file the opener can never read back.
         expect(open).toHaveBeenCalledWith(
             expect.anything(),
-            expect.objectContaining({ data: { sampleRows: [{ id: '1' }] } }),
+            expect.objectContaining({ data: { sampleRows: [{ id: '1' }], home: 'config' } }),
         );
 
         c.onPreviewed({ kind: 'tree', recordCount: 1, nodes: [] });

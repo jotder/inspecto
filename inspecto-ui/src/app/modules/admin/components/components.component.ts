@@ -14,7 +14,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/inspecto/grammar';
 import { ComponentFormDialog, ComponentFormResult } from './component-form.dialog';
 import { MappingEditorDialog } from './mapping-editor.dialog';
-import { SchemaEditorDialog } from './schema-editor.dialog';
+import { SchemaEditorData, SchemaEditorDialog } from './schema-editor.dialog';
 
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
@@ -107,8 +107,10 @@ export class ComponentsComponent implements OnInit {
     }
 
     private openForm(kind: ComponentType, def?: ComponentDef): void {
-        // The mapping/schema kinds are flat row tables — they get the S5 grid editors, not the
-        // generic form (schema also saves through the gated /config/write, not the component CRUD).
+        // The mapping/schema kinds are flat row tables — they get the S5 grid editors, not the generic
+        // form. ⚠ Both now save through the component CRUD like every other kind; the schema editor's
+        // old detour via /config/write wrote a DIFFERENT file than this pane lists
+        // (SCHEMA-DIALOG-IFMATCH-1 for edit, SCHEMA-DIALOG-CREATE-HOME-1 for create).
         const opened =
             kind === 'mapping'
                 ? this.dialog.open(MappingEditorDialog, {
@@ -118,7 +120,10 @@ export class ComponentsComponent implements OnInit {
                   })
                 : kind === 'schema'
                   ? this.dialog.open(SchemaEditorDialog, {
-                        data: { def },
+                        // home: 'registry' — this pane lists GET /components/schema, which scans
+                        // registry/schemas/ only, so a create landing anywhere else is invisible here
+                        // (SCHEMA-DIALOG-CREATE-HOME-1).
+                        data: { def, home: 'registry' } satisfies SchemaEditorData,
                         width: '1000px',
                         maxHeight: '88vh',
                     })

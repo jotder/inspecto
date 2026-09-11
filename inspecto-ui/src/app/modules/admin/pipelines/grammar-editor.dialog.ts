@@ -184,7 +184,13 @@ export class GrammarEditorDialog {
      *  "Suggest from sample" is armed. The editor saves itself; nothing here changes the node. */
     openSchemaEditor(): void {
         this.dialog.open(SchemaEditorDialog, {
-            data: { sampleRows: this.previewRows() } satisfies SchemaEditorData,
+            // home: 'config' — a pipeline's satellite schema, which a parse node references by bare
+            // `<name>.toon`; the registry spelling `schema/<id>` is authored by no shipped surface.
+            // ⚠ It still lands at the write ROOT rather than beside its pipeline: this opener passes no
+            // subdir, which is the SATELLITE-WRITE-1 shape the real parse surface already fixed. Filed
+            // as SCHEMA-SATELLITE-SUBDIR-1 — not fixed here, because it needs the pipeline's
+            // configSubdir threaded through this dialog's data and nothing pins the destination today.
+            data: { sampleRows: this.previewRows(), home: 'config' } satisfies SchemaEditorData,
             width: '1000px',
             maxHeight: '88vh',
         });

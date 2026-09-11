@@ -162,14 +162,9 @@ final class ReportJob implements Job {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("dataset", cfg.require("dataset"));
-        List<Map<String, Object>> measures = new ArrayList<>();
-        for (String m : split(cfg.opt("measures", ""))) {
-            if ("count".equals(m)) { measures.add(Map.of("agg", "count")); continue; }
-            int p = m.indexOf('(');
-            if (p < 0 || !m.endsWith(")"))
-                throw new IllegalArgumentException("measure must be count or agg(field), got '" + m + "'");
-            measures.add(Map.of("agg", m.substring(0, p), "field", m.substring(p + 1, m.length() - 1)));
-        }
+        // The grammar's own split (MEASURE-SHORTHAND-ONE-HOME-1); message unchanged (no context prefix).
+        List<Map<String, Object>> measures =
+                new ArrayList<>(MeasureCompiler.splitShorthand(split(cfg.opt("measures", "")), null));
         if (!measures.isEmpty()) body.put("measures", measures);
         List<String> groupBy = split(cfg.opt("group_by", ""));
         if (!groupBy.isEmpty()) body.put("groupBy", groupBy);
