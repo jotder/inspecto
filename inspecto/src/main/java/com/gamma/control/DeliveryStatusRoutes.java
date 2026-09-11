@@ -47,7 +47,7 @@ final class DeliveryStatusRoutes implements RouteModule {
 
     private static List<DeliveryStatusAdapter> discoverAdapters() {
         List<DeliveryStatusAdapter> found = new ArrayList<>();
-        for (DeliveryStatusAdapter a : ServiceLoader.load(DeliveryStatusAdapter.class)) {
+        for (DeliveryStatusAdapter a : com.gamma.service.OptionalSpi.all(DeliveryStatusAdapter.class)) {
             if (a.configured()) found.add(a);
         }
         return List.copyOf(found);

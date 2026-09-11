@@ -465,7 +465,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module
         // contributes an ObjectEngineProvider; absent it this is empty and every operational-object
         // surface answers 503, while events are still recorded and the audit trail is untouched.
-        this.objectEngine = java.util.ServiceLoader.load(ObjectEngineProvider.class).findFirst()
+        this.objectEngine = OptionalSpi.first(ObjectEngineProvider.class)
                 .map(provider -> provider.open(root, System.getProperty("data.dir", root.dataDir())));
         // D7 phase 2: adopt tags that exist only in the legacy attributes CSV into the assignment store, so
         // the two cannot disagree. Idempotent, and a no-op on a fresh Space; logged only when it does work.
@@ -979,12 +979,16 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // in before the bus gets its first event. No-op when the agent module is absent (no
         // ServiceLoader provider) or one was already registered explicitly.
         if (assistSlot.get().isEmpty()) {
-            ServiceLoader.load(AssistAgent.class).findFirst().ifPresent(this::registerAgent);
+            // Fail-soft (OptionalSpi): the assistant ships in every edition as an OPTIONAL component
+            // (operator decision 2026-09-12), and its upstream dependency is Java-25 bytecode while the
+            // product's floor is 24. On a host too old to load it the server starts normally and the
+            // assistant is simply absent. ⛔ A raw ServiceLoader here fails the whole boot.
+            OptionalSpi.first(AssistAgent.class).ifPresent(this::registerAgent);
         }
         // AGT-5 (P0): discover an optional embedded intelligence agent, same pattern as the
         // reflex-layer AssistAgent above; no-op when inspecto-intelligence is absent.
         if (intelligenceSlot.get().isEmpty()) {
-            ServiceLoader.load(IntelligenceAgent.class).findFirst().ifPresent(this::registerIntelligenceAgent);
+            OptionalSpi.first(IntelligenceAgent.class).ifPresent(this::registerIntelligenceAgent);
         }
         for (ConfigRegistry.Entry e : configRegistry.all()) {
             int committed = fileStatus.committedBatches(e.config()).size();   // on-disk truth

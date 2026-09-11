@@ -23,8 +23,9 @@ final class SpiSlot<T> {
     Optional<T> active() {
         Optional<T> c = cached;
         if (c != null) return c;
-        for (T t : ServiceLoader.load(spi)) return cached = Optional.of(t);
-        return cached = Optional.empty();
+        // Fail-soft: an optional module that is present but unloadable resolves to EMPTY, which is the
+        // absence contract, rather than throwing an Error out of whatever happened to ask first.
+        return cached = com.gamma.service.OptionalSpi.first(spi);
     }
 
     /** Test seam: force {@link #active()} for the rest of this JVM's tests, bypassing the classpath

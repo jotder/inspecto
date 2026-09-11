@@ -81,8 +81,64 @@
              formerly the kernel's agent-eval jar + test-jar. Test tree only; never ships. -->
     </dependencies>
 
-    <!-- Build config (compiler + surefire native-access flag) is inherited from the parent
-         POM's <pluginManagement>. No module-specific plugins here. -->
+    <!-- PKG-5 (operator decision 2026-09-12: the assistant ships in ALL THREE editions, as an
+         OPTIONAL component). Shading is what makes that possible: a THIN inspecto-agent.jar on the
+         bundle's classpath would be a jar that is present but cannot link, because eoiagent-* and
+         langchain4j would be missing — the assistant would be silently absent while appearing to be
+         installed. The `sidecar` classifier mirrors inspecto-connectors: the reactor's own thin
+         artifact stays the installed one, and only the bundle carries the fat copy.
+
+         ⚠ The eoiagent-* dependencies are compiled to JAVA 25 bytecode (class-file major 69, measured
+         2026-09-12) while this product's floor is 24. That is DELIBERATELY not a build-time problem:
+         the jar is staged in every bundle, and on a host too old to load it com.gamma.service.OptionalSpi
+         skips the provider with a warning and the assistant's routes answer 503 — the ordinary
+         absence contract. ⛔ Do not "fix" this by gating the module on a Java version; the whole point
+         is that the bundle's stated requirement stays 24. -->
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- Pinned: the offline reactor resolves no plugin version from a repository, and this
+                     is the version the core fat jar and the connector sidecar already use. -->
+                <version>3.5.2</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- The whole point: MERGE the ServiceLoader registrations, or the
+                                     com.gamma.assist.spi.AssistAgent entry is lost and the staged jar
+                                     lights up nothing. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- A retained signature throws SecurityException at run time.
+                                             Same filter as the core fat jar and the connector sidecar. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Never ship a second logging config; the core owns it. -->
+                                        <exclude>logback.xml</exclude>
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- Compiler + surefire native-access flag are inherited from the parent POM's
+         <pluginManagement>. -->
 
     <!-- Coverage: the 'coverage' profile moved to the parent POM (M5) so a normal 'mvn test' is
          unaffected and 'mvn -Pcoverage test' instruments every module (not just core+agent) in one

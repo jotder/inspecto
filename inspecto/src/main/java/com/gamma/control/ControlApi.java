@@ -463,7 +463,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // unspecified, so appending is the only placement that keeps every built-in route's winner fixed.
         // A discovered module that re-registers a built-in (method, pattern) trips the duplicate guard in
         // register() below and fails the boot, rather than silently never matching.
-        for (RouteModule module : java.util.ServiceLoader.load(RouteModule.class)) {
+        // Discovery is fail-soft (OptionalSpi): a staged jar that cannot LINK on this host — the
+        // assistant's Java-25 bytecode on a Java-24 host is the live case — is skipped with a warning
+        // and its paths fall through to the absent-module stubs below, exactly as if it were not
+        // installed. ⛔ Do not go back to a raw ServiceLoader loop: one unloadable module would take
+        // every other route module and the boot down with it.
+        for (RouteModule module : com.gamma.service.OptionalSpi.all(RouteModule.class)) {
             module.register(this);
             log.info("route module discovered: {}", module.getClass().getName());
         }
