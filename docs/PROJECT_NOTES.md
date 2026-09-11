@@ -140,6 +140,28 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **cmd.exe expands `%VAR%` inside a parenthesised block ONCE, at PARSE time — so N
+  `set "X=%X% …"` lines in one `if ( … )` collapse to the LAST one executed.** Measured 2026-09-11:
+  `set "OPTS=BASE"` then a block doing `-Dfirst` and `-Dsecond` yields `BASE -Dsecond`; `-Dfirst` is gone.
+  This shipped in the generated `serve.bat` (`SERVEBAT-OPTS-1`): six such lines in the
+  `if exist inspecto-security.jar (…)` branch meant **every Windows Standard/Enterprise bundle booted
+  AUTH-FREE** — `-Dauth.mode=oidc` and three of the four OIDC flags dropped — while printing
+  `edition: Enterprise`. ✅ Fix = **one statement per line**, chaining conditions
+  (`if exist X if not "%Y%"=="" set …`), the form the adjacent Postgres lines already used AND documented.
+  ⛔ **Not `setlocal EnableDelayedExpansion`**: these values carry client secrets and keystore passwords,
+  and delayed expansion eats `!` inside them. ⚠ `serve.sh` has no such hazard — bash expands at execution.
+- 🔴 **Verify a GENERATED launcher by RUNNING it, never by reading the generator — and run the OLD version
+  too.** Nothing in CI executes an emitted `serve.sh`/`serve.bat` (`LAUNCHER-GUARD-1`), which is precisely
+  why the bug above survived. The technique: extract the `$serve*Content` here-string from
+  `inspecto/package.ps1`, write it out, stub the jars, replace the launch line with an `echo`, run it under
+  `cmd.exe`/`bash`. Running only the NEW version shows it works; running HEAD's too is what shows the bug
+  was real. (`SCR-9` used the same extract-the-here-string technique for its own acceptance.)
+- ⚠ **A verification method can manufacture failures.**
+  `[System.Management.Automation.Language.Parser]::ParseFile` reads a file as **ANSI**, and
+  `inspecto/package.ps1` is UTF-8 with box-drawing characters — so it reports **40+ phantom syntax errors
+  on an UNMODIFIED file**. Use `ParseInput` with an explicit UTF-8 read. ⇒ Before believing a gate has gone
+  red on your change, run it on `git show HEAD:<file>`; a red on untouched content is a broken probe.
+
 - ⚠ **`npm run format:check` (prettier) is DECLARED BUT NOT GATED** — it is in `inspecto-ui/package.json`
   and in neither `.github/workflows/ci.yml` nor `.githooks/pre-push`. Measured 2026-09-11: it was red on
   **five** files from an already-pushed commit and nothing anywhere failed, so the drift was invisible at
