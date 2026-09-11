@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { describe, expect, it, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { ComponentDef, ConfigService } from 'app/inspecto/api';
+import { ComponentDef, ComponentsService, ConfigService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -14,6 +14,7 @@ const DEF: ComponentDef = {
     type: 'schema',
     name: 'ev',
     ref: 'schema/ev',
+    contentHash: 'abc123',
     content: {
         raw: {
             name: 'ev',
@@ -44,8 +45,26 @@ const REFUSAL = {
     },
 };
 
-function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleRows?: Record<string, unknown>[]) {
+function create(
+    def?: ComponentDef,
+    config: Partial<ConfigService> = {},
+    sampleRows?: Record<string, unknown>[],
+    components: Partial<ComponentsService> = {},
+) {
     const ref = { close: vi.fn(), disableClose: false };
+    // An EDIT saves here (the registry component); only a CREATE goes to ConfigService.write.
+    const comps = {
+        update: vi.fn().mockReturnValue(
+            of({
+                type: 'schema',
+                name: 'ev',
+                ref: 'schema/ev',
+                contentHash: 'def456',
+                content: DEF.content,
+            } as ComponentDef),
+        ),
+        ...components,
+    };
     const api = {
         write: vi.fn().mockReturnValue(
             of({
@@ -77,6 +96,7 @@ function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleR
             { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ConfigService, useValue: api },
+            { provide: ComponentsService, useValue: comps },
             {
                 provide: ToastrService,
                 useValue: { success: () => undefined, warning: () => undefined, error: () => undefined },
@@ -87,18 +107,21 @@ function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleR
     });
     const fixture = TestBed.createComponent(SchemaEditorDialog);
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, ref, api, confirm };
+    return { fixture, c: fixture.componentInstance, ref, api, comps, confirm };
 }
 
 describe('SchemaEditorDialog', () => {
-    it('loads raw.fields as rows and saves through the gated /config/write, sections preserved verbatim', async () => {
-        const { fixture, c, ref, api } = create(DEF);
+    it('loads raw.fields as rows and saves an EDIT to the registry component with If-Match, sections preserved verbatim', async () => {
+        const { fixture, c, ref, api, comps } = create(DEF);
         expect(c.rows()[0]).toMatchObject({ name: 'ID', selector: '0', type: 'VARCHAR' });
         expect(c.rows()[1]).toMatchObject({ name: 'QTY', type: 'INTEGER', description: 'count' });
 
         c.save();
-        expect(api.write).toHaveBeenCalledWith(
+        // 🔴 SCHEMA-DIALOG-IFMATCH-1: an edit must reach `registry/schemas/ev.toon` — the component the
+        // dialog was opened over — and NOT `/config/write`, which writes `<write-root>/ev.toon` instead.
+        expect(comps.update).toHaveBeenCalledWith(
             'schema',
+            'ev',
             expect.objectContaining({
                 // the mapping section and raw.format survive the save untouched
                 mapping: { canonicalName: 'events' },
@@ -111,14 +134,30 @@ describe('SchemaEditorDialog', () => {
                     ],
                 }),
             }),
-            { overwrite: true },
+            { ifMatch: 'abc123' },
         );
-        expect(ref.close).toHaveBeenCalledWith({ saved: expect.objectContaining({ name: 'ev', type: 'schema' }) });
+        expect(api.write).not.toHaveBeenCalled();
+        // closes with the SERVER's doc, so the post-save hash is the handle for the next edit
+        expect(ref.close).toHaveBeenCalledWith({
+            saved: expect.objectContaining({ name: 'ev', type: 'schema', contentHash: 'def456' }),
+        });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('refuses a stale edit (409) without closing, so the author is told to reopen rather than clobber', () => {
+        const { c, ref, comps } = create(DEF, {}, undefined, {
+            update: vi.fn().mockReturnValue(throwError(() => ({ status: 409 }))),
+        });
+        c.save();
+        expect(comps.update).toHaveBeenCalled();
+        expect(ref.close).not.toHaveBeenCalled();
+        expect(c.refused()).toBe(false); // a stale conflict is NOT a compatibility refusal
+    });
+
     it('translates a 422 refusal onto grid cells by field NAME and shows the role=alert summary', async () => {
-        const { fixture, c, ref } = create(DEF, { write: vi.fn().mockReturnValue(throwError(() => REFUSAL)) });
+        const { fixture, c, ref } = create(DEF, {}, undefined, {
+            update: vi.fn().mockReturnValue(throwError(() => REFUSAL)),
+        });
         c.save();
         fixture.detectChanges();
 
@@ -134,27 +173,22 @@ describe('SchemaEditorDialog', () => {
     });
 
     it('saveAnyway re-sends with compatibility "none" after a confirmed destructive prompt', async () => {
-        const write = vi
+        const update = vi
             .fn()
             .mockReturnValueOnce(throwError(() => REFUSAL))
-            .mockReturnValue(
-                of({
-                    type: 'schema',
-                    written: true,
-                    path: 'ev.toon',
-                    name: 'ev',
-                    bytes: 1,
-                    overwritten: true,
-                    findings: [],
-                }),
-            );
-        const { c, ref, confirm } = create(DEF, { write });
+            .mockReturnValue(of({ type: 'schema', name: 'ev', ref: 'schema/ev', content: DEF.content }));
+        const { c, ref, confirm } = create(DEF, {}, undefined, { update });
         c.save();
         expect(c.refused()).toBe(true);
 
         await c.saveAnyway();
         expect(confirm.confirmDestructive).toHaveBeenCalled();
-        expect(write).toHaveBeenLastCalledWith('schema', expect.anything(), { overwrite: true, compatibility: 'none' });
+        // the override travels alongside the precondition — the escape hatch is for the compatibility
+        // gate only, and must not also drop the concurrency check
+        expect(update).toHaveBeenLastCalledWith('schema', 'ev', expect.anything(), {
+            ifMatch: 'abc123',
+            compatibility: 'none',
+        });
         expect(ref.close).toHaveBeenCalledWith({ saved: expect.anything() });
     });
 
@@ -195,7 +229,7 @@ describe('SchemaEditorDialog', () => {
     });
 
     it('create mode requires a name, refuses an empty field list, and drops rows with a blank name', () => {
-        const { c, api } = create();
+        const { c, api, comps } = create();
         c.save();
         expect(api.write).not.toHaveBeenCalled(); // no name yet
 
@@ -218,5 +252,8 @@ describe('SchemaEditorDialog', () => {
             }),
             { overwrite: true },
         );
+        // A CREATE stays on /config/write on purpose: this dialog is also opened with no `def` from the
+        // parse editor, where authoring a pipeline's satellite schema at the write root IS the intent.
+        expect(comps.update).not.toHaveBeenCalled();
     });
 });

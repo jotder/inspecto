@@ -5,8 +5,9 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { map, Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ComponentDef, ConfigService, Finding } from 'app/inspecto/api';
+import { apiErrorMessage, ComponentDef, ComponentsService, ConfigService, Finding } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     CellFinding,
@@ -38,12 +39,21 @@ const COLUMNS: EditableGridColumn[] = [
 
 /**
  * The schema grid editor (ELT amendment UI plan §2.4, S5b): a `schema` component's `raw.fields[]`
- * edited as a flat grid over the shared `<inspecto-editable-grid>`. Saves through the GATED
- * `POST /config/write type=schema` (never the generic component CRUD, which bypasses the BACKWARD
- * compatibility gate — S5 grounding note). A 422 refusal carries cell-anchored findings
- * (`raw.fields[NAME]` / `.type` / `.selector`) which this dialog translates onto grid cells by
- * field NAME, plus a `role="alert"` summary; the deliberate escape hatch is a confirmed re-save
- * with `compatibility: "none"`.
+ * edited as a flat grid over the shared `<inspecto-editable-grid>`.
+ *
+ * An EDIT saves through `PUT /components/schema/{id}` — the registry component this dialog was opened
+ * over — carrying the list's `contentHash` as an `If-Match` precondition, so a concurrent edit is
+ * refused (409) rather than silently clobbered. A CREATE still goes to `POST /config/write
+ * type=schema`, which is what the parse editor's "author a schema for this pipeline" path wants.
+ *
+ * 🔴 These two routes write DIFFERENT FILES, which is why the edit case moved (SCHEMA-DIALOG-IFMATCH-1):
+ * `/config/write` with no subdir lands at `<write-root>/<name>.toon`, never at
+ * `registry/schemas/<id>.toon`, so edits used to be written beside the component and lost.
+ *
+ * A 422 refusal carries cell-anchored findings (`raw.fields[NAME]` / `.type` / `.selector`) which this
+ * dialog translates onto grid cells by field NAME, plus a `role="alert"` summary; the deliberate escape
+ * hatch is a confirmed re-save with `compatibility: "none"` (a query param on the component route, a
+ * body key on `/config/write` — the service hides that difference).
  */
 @Component({
     selector: 'app-schema-editor-dialog',
@@ -118,6 +128,7 @@ const COLUMNS: EditableGridColumn[] = [
 })
 export class SchemaEditorDialog {
     private readonly config = inject(ConfigService);
+    private readonly components = inject(ComponentsService);
     private readonly toast = inject(ToastrService);
     private readonly fb = inject(FormBuilder);
     private readonly confirm = inject(InspectoConfirmService);
@@ -246,45 +257,86 @@ export class SchemaEditorDialog {
         // preserve non-fields raw keys (format, …) and non-raw content sections (mapping) verbatim
         const config = { ...content, raw: { ...rawIn, name, fields } };
         this.saving.set(true);
-        this.config
-            .write('schema', config, {
-                overwrite: true,
-                ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
-            })
-            .subscribe({
-                next: (res) => {
-                    this.dirty = false;
-                    const warnings = (res.findings ?? []).length;
-                    if (warnings)
-                        this.toast.warning(
-                            `Saved schema '${res.name}' with ${warnings} warning(s): ${res.findings[0].message}`,
-                        );
-                    else this.toast.success(`Saved schema '${res.name}'`);
-                    this.ref.close({
-                        saved: {
-                            type: 'schema',
-                            name: res.name,
-                            ref: `schema/${res.name}`,
-                            content: config,
-                        } as ComponentDef,
-                    });
-                },
-                error: (err) => {
-                    this.saving.set(false);
-                    const status = (err as { status?: number })?.status;
-                    if (status === 503) {
-                        this.ref.close({ writesDisabled: true });
-                        return;
-                    }
-                    const findings = (err as { error?: { error?: { details?: { findings?: Finding[] } } } })?.error
-                        ?.error?.details?.findings;
-                    if (status === 422 && findings?.length) {
-                        this.findings.set(findings);
-                        this.refused.set(true);
-                        return;
-                    }
-                    this.toast.error(apiErrorMessage(err, 'Could not save the schema'));
-                },
-            });
+        // An EDIT goes to the registry component this dialog was opened OVER, not to /config/write.
+        // 🔴 SCHEMA-DIALOG-IFMATCH-1: those are different files. A registry schema is
+        // `registry/schemas/<id>.toon`; a `/config/write type=schema` with no subdir lands at
+        // `<write-root>/<name>.toon`, so every edit made here wrote a second, unrelated config beside
+        // the registry — the listed component was untouched, the pane's reload showed the PRE-edit
+        // content, and the engine (which resolves `schema/<id>` against the registry) never saw it.
+        // Proven by `ControlApiComponentsTest.configWriteSchemaDoesNotUpdateTheRegistryComponentOfTheSameName`.
+        //
+        // ⚠ The comment this replaces said the component CRUD "bypasses the BACKWARD compatibility
+        // gate". That WAS true and is no longer: `PUT /components/schema/{id}` now runs the structural
+        // + safety gate (JAVA-6), the mapping-drift and BACKWARD gates, and `If-Match` → 409 — full
+        // parity with `/config/write`, on the right file, with a concurrency handle the list already
+        // serves. Hence the precondition here costs no extra read.
+        //
+        // CREATE is deliberately unchanged: this dialog is also opened with no `def` from the parse
+        // editor to author a pipeline's satellite schema, where a write-root config IS the intent.
+        // Whether the pane's own "create schema" should make a registry component instead is a
+        // separate question — filed, not silently widened into this fix.
+        // Both arms yield the saved doc plus any WARNING-level findings, so the two routes' different
+        // response shapes are normalised once instead of forking the success handler.
+        const save: Observable<{ def: ComponentDef; findings: Finding[] }> = this.isEdit
+            ? this.components
+                  .update('schema', this.data.def!.name, config, {
+                      ...(this.data.def!.contentHash ? { ifMatch: this.data.def!.contentHash } : {}),
+                      ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
+                  })
+                  .pipe(map((def) => ({ def, findings: [] })))
+            : this.config
+                  .write('schema', config, {
+                      overwrite: true,
+                      ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
+                  })
+                  .pipe(
+                      map((res) => ({
+                          def: {
+                              type: 'schema',
+                              name: res.name,
+                              ref: `schema/${res.name}`,
+                              content: config,
+                          } as ComponentDef,
+                          findings: res.findings ?? [],
+                      })),
+                  );
+        save.subscribe({
+            next: ({ def, findings }) => {
+                this.dirty = false;
+                if (findings.length)
+                    this.toast.warning(
+                        `Saved schema '${def.name}' with ${findings.length} warning(s): ${findings[0].message}`,
+                    );
+                else this.toast.success(`Saved schema '${def.name}'`);
+                // Close with the SERVER's doc (it carries the post-save contentHash), falling back to
+                // the content just sent — so a caller reopening the dialog holds a fresh handle.
+                this.ref.close({ saved: { ...def, content: def.content ?? config } });
+            },
+            error: (err) => {
+                this.saving.set(false);
+                const status = (err as { status?: number })?.status;
+                if (status === 503) {
+                    this.ref.close({ writesDisabled: true });
+                    return;
+                }
+                if (status === 409) {
+                    // The precondition refused it: someone else saved this schema since it was opened.
+                    // Not recoverable in place — the grid holds rows built from the stale content.
+                    this.toast.error(
+                        'This schema changed since you opened it. Close and reopen the editor to ' +
+                            'see the current fields, then re-apply your edit.',
+                    );
+                    return;
+                }
+                const findings = (err as { error?: { error?: { details?: { findings?: Finding[] } } } })?.error?.error
+                    ?.details?.findings;
+                if (status === 422 && findings?.length) {
+                    this.findings.set(findings);
+                    this.refused.set(true);
+                    return;
+                }
+                this.toast.error(apiErrorMessage(err, 'Could not save the schema'));
+            },
+        });
     }
 }

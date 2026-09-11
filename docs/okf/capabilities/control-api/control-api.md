@@ -65,7 +65,7 @@ column**; this table mirrors it.
 |---|---|---|---|---|
 | `API-1` | Versioned **`/api/v1`** business contract: envelope, error-code catalog, `Correlation-ID`, gzip; the only business surface since `API-5` | Must | ✅ SHIPPED (W1, 2026-07-06) | All |
 | `API-2` | OpenAPI 3.1 contract (`docs/api/openapi-v1.json`) enforced by `ApiContractTest` | Must | ✅ SHIPPED (W2) — ⚠ **exemplar coverage, now MEASURED and ratcheted**: 19 paths / **24 operations against 266 live route registrations = 9.0 %** (+73 absent-module stubs), measured 2026-09-09 by `ApiContractTest.openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted`, which prints the figure on every run. 🔴 **The "~6 % of ~332" this row and §5 both carried was a UNIT ERROR** — it divided documented *paths* by *(method, pattern)* registrations. ⚠ **The 9.0 % is the CORE surface and is an UPPER BOUND.** Measured under `-Pedition-enterprise` the live count is **266, identical to the default reactor** — not because the profile does nothing, but because every optional module (`inspecto-ops`, `inspecto-notify-channels`, `inspecto-geo-link`) depends on `inspecto-processor` while the core declares none of them, so a test living IN the core can never have one on its classpath. The 73 stubs are exactly those modules answering 503. A shipped Enterprise bundle registers these 266 **plus** the optional modules' routes against the same 24 documented operations, so its real coverage is **lower**. ⛔ Do not quote 9.0 % as the Enterprise figure. ⛔ Whether exemplar coverage is the right posture is still an operator decision (§5) — the guard measures, it does not decide. The served document's own description claimed the retired legacy table until 2026-09-08 (§2 corrections) | All |
-| `API-3` | Optimistic concurrency: `ContentHash` + ETag / `If-None-Match` / `If-Match` on Components | Must | ✅ **server SHIPPED (W3) — no client consumer.** `If-Match` is *honoured* (stale ⇒ `409 CONFLICT_STALE_VERSION`), not *required*; the SPA never sends it, so the product's own client is last-write-wins (§3.5) | All ✅ **Decided 2026-09-10 (`CONSUMER-PAIRS-1`):** the SPA **ADOPTS** `If-Match` in both writing panes (`BACKLOG.md` §3 `CLIENT-HALVES-1`); cursor pagination is **KEPT as API surface** — the SPA adopts a cursor only when a list outgrows one page, no build row. |
+| `API-3` | Optimistic concurrency: `ContentHash` + ETag / `If-None-Match` / `If-Match` on Components | Must | ✅ **SHIPPED both halves — server W3, client 2026-09-11.** `If-Match` is *honoured* (stale ⇒ `409 CONFLICT_STALE_VERSION`), never *required*, so an old client still writes. The SPA now sends it from `/config/write` (`CLIENT-HALVES-1` (a)) and from the Schema editor's `PUT /components/schema/{id}` (`SCHEMA-DIALOG-IFMATCH-1`) — the Components half of this row finally has the consumer it names (§3.5) | All ✅ **Decided 2026-09-10 (`CONSUMER-PAIRS-1`):** the SPA **ADOPTS** `If-Match` in both writing panes (`BACKLOG.md` §3 `CLIENT-HALVES-1`); cursor pagination is **KEPT as API surface** — the SPA adopts a cursor only when a list outgrows one page, no build row. |
 | `API-4` | `GET /bootstrap` metadata-first boot (features, `authMode`, permissions) | Must | ✅ SHIPPED (W3/W6) | All |
 | `API-5` | Retire the unversioned route surface — business routes require `/api/v1` | Should | ✅ SHIPPED 2026-07-25 (BACKLOG D3); the sunset apparatus deleted with it | All |
 | `API-6` | Gateway / IAM drop-in: WSO2 gateway + Keycloak blueprints for Standard | Must (S) | 🟡 **PARTIAL by construction** — the seams are real (gateway trust mode, PKCE public client, D15 vendor neutrality) and the two blueprints exist; **nothing in the tree consumes or tests them, and no live gateway has ever verified them** (the README says so) | S |
@@ -225,6 +225,19 @@ is bounded with a `truncated` flag that reports the *true* total.
   is refused as stale. ⚠ And `ETag` had to be added to `Access-Control-Expose-Headers` — the SPA is
   cross-origin, so it could not read the header it must echo. `ETags.requireMatch` now has **two**
   production call sites. Full write-up: `BACKLOG.md` §3 `CLIENT-HALVES-1` (a).
+  ✅ **The Components route's `If-Match` gained its first client 2026-09-11** (`SCHEMA-DIALOG-IFMATCH-1`):
+  the Schema editor dialog sends the list's `contentHash` on `PUT /components/schema/{id}`.
+  🔴 **The handle is the BARE hash; the header is `"sha256:<hash>"`.** `componentDoc` publishes
+  `contentHash` as bare hex while `ETags.requireMatch` compares against the quoted, prefixed tag — echoing
+  the published value verbatim matches nothing and refuses **every** save. `ComponentsService.update`
+  builds the tag in one place. ⚠ There is no ETag *header* to echo for a list-opened editor: list routes
+  are deliberately excluded from ETags (above), so `contentHash` in the body **is** the only handle, and
+  that asymmetry is why the conversion cannot live at the call site.
+  ⛔ **A schema's two write routes address different files** — `registry/schemas/<id>.toon` for the
+  component vs `<write-root>/<name>.toon` for `/config/write` (no `subdir`). That is a seam, not a bug to
+  collapse: the parse editor authors a pipeline's satellite schema at the write root on purpose. It became
+  a silent data loss only because the *editor* chose the wrong one. Pinned by
+  `ControlApiComponentsTest.configWriteSchemaDoesNotUpdateTheRegistryComponentOfTheSameName`.
   ⚠ Also: `Envelope.java` **never sets an `etag` key in `metadata`** for any route, so the SPA's
   `V1EnvelopeMetadata.etag` (`v1.ts:27`) is a field the server has never populated. The ETag travels only
   as an HTTP header — which means `v1.interceptor.ts` is **not** what withholds it: that interceptor clones
@@ -372,10 +385,12 @@ it does it is the dependency-injection framework this codebase deliberately does
 fallback. `Correlation-ID` is **read** from `diagnostics` and shown on the Events, Notification and
 Incident-detail screens; it is never sent. DTOs are hand-written per service — **no OpenAPI-generated
 client and no drift check** between `openapi-v1.json` and TypeScript; wire vocabularies are pinned instead by
-eight `*.contract.json` files each compared by a Java `*ContractTest` and a TS `.spec.ts` (§8.4). ⚠ Three
-contract features have **zero client consumers**: `If-Match`/`If-None-Match` (never sent),
-`metadata.pagination` (never read — the data table's "Load more" is not cursor-driven), and
-`Idempotency-Key` (never sent). ⚠ `error.interceptor.ts:14-16` still says "the backend is fully open, no 401
+eight `*.contract.json` files each compared by a Java `*ContractTest` and a TS `.spec.ts` (§8.4). ⚠ Two
+contract features still have **zero client consumers**: `metadata.pagination` (never read — the data
+table's "Load more" is not cursor-driven) and `Idempotency-Key` (never sent). `If-None-Match` is also
+never sent. ⚠ **`If-Match` no longer belongs on this list** — as of 2026-09-11 two panes send it
+(`/config/write`, `CLIENT-HALVES-1` (a)) and the Schema editor sends it on `PUT /components/schema/{id}`
+(`SCHEMA-DIALOG-IFMATCH-1`). ⚠ `error.interceptor.ts:14-16` still says "the backend is fully open, no 401
 handling" — stale since W6d; the handling lives in `auth.interceptor.ts`.
 
 ## 4. Decisions
@@ -466,7 +481,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Evidence | Why it matters |
 |---|---|---|
 | 🟡 **OpenAPI covers a fraction of the live surface** — **assertion SHIPPED 2026-09-09; DECIDED 2026-09-10 — generate the path/method skeleton from the route table (`BACKLOG.md` §4 `OPENAPI-GEN-1`), the exemplars keep the schemas** | `openapi-v1.json`: 19 paths / 24 operations. Live: **266 registrations + 73 absent-module stubs**, measured by `ApiContractTest.openApiCoverageOfTheLiveSurfaceIsMeasuredAndRatcheted` — **9.0 %**, not the 6 % stated here before (that divided *paths* by *registrations*) | ✅ The owed *live → doc coverage assertion* now exists: it measures the gap, **prints it pass or fail**, ratchets the documented counts so an operation cannot quietly disappear, and floors the live count so the figure cannot be computed over nothing. Mutation-proven both ways (removing `/health` fails naming 18/23; raising the live floor above the real count fails naming 266). ⛔ **Still owed, and NOT a guard's call: whether to document the remaining surface or to adopt exemplar coverage deliberately.** ⚠ A per-route live → doc comparison is unavailable — the route table holds compiled patterns (`/config/pipeline/([^/]+)`), OpenAPI holds templates (`/config/pipeline/{name}`). ⚠ And the 266 is the **core** surface: it does not move with `-Pedition-*`, because optional modules depend on the core rather than the reverse |
-| **The SPA sends no `If-Match`** | zero hits in `inspecto-ui/src/app` | `API-3` is a Must whose client half is unbuilt: two operators editing one Component are last-write-wins in the product's own UI |
+| ~~**The SPA sends no `If-Match`**~~ **CLOSED 2026-09-11** | `config.service.ts` (`/config/write`) and `components.service.ts` (`PUT /components/{type}/{id}`) both send it | `API-3`'s client half is built. 🔴 The Components handle is the **bare** `contentHash`, not an ETag — the service wraps it as `"sha256:<hash>"`, since a list serves no ETag header to echo |
 | **The SPA reads no `metadata.pagination`** | zero consumers of `nextCursor` | Four paginated endpoints page for `curl` only; the data table's "Load more" is not cursor-driven |
 | **No `@PublicApi` surface guard** | no japicmp, no scanning test | `API-7` is policy in prose; a MINOR that removes a marked member passes the build |
 | **The gateway blueprints are untested documentation** | no reference in `src/`; README's own caveat | `API-6` is a Must (S); the WSO2 definition also omits the `503` stubs and the optional-module paths |

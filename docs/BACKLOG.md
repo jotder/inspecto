@@ -282,17 +282,43 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   server descriptor change would not have reached it. Tests: 6 (`ProcessorCatalogTest`, **7 of 7 mutants
   killed**) + 4 real-HTTP (`ControlApiJobProcessorsTest`) + 8 UI.
   → `okf/backend/engine/post-sync-step-chains.md`, `okf/backend/control-plane/jobs.md`
-- **P3** · **`SCHEMA-DIALOG-IFMATCH-1` — the shared Schema editor dialog still last-write-wins** (filed
-  2026-09-11 by `CLIENT-HALVES-1` (a); **stated, not a regression** — it was always so). `schema-editor.dialog.ts:250`
-  does the same whole-file overwrite as the panes that now precondition their saves ("preserve non-fields
-  raw keys … and non-raw content sections verbatim"), so a concurrent edit to any carried key is still
-  destroyed silently. ⛔ **It cannot simply send `If-Match`**: unlike the panes it never calls
-  `ConfigService.read()` — its content arrives from the opener as `data.def.content`, sourced from the
-  **Components** API, whose `ETag` is computed over a *different* body. Sending that handle would risk the
-  read/write hash mismatch that `ConfigFileSupport.storedContent` exists to prevent, and a mismatched
-  precondition refuses every save. ⇒ Decide between (a) having the opener read the config (and its ETag)
-  before opening the dialog, or (b) accepting last-write-wins for this surface.
+- **SHIPPED 2026-09-11** · **`SCHEMA-DIALOG-IFMATCH-1` — the Schema editor dialog saved to a different
+  file than it edited** (filed 2026-09-11 by `CLIENT-HALVES-1` (a) as a last-write-wins row; **the row's
+  own framing was refuted before anything was built**). The row asked whether to give the dialog an
+  `If-Match`, offering (a) have the opener read the config for an ETag or (b) accept last-write-wins.
+  🔴 **Both options assumed the dialog edits the file it saves to, and it did not.** The Components pane
+  lists `registry/schemas/<id>.toon`; `schema-editor.dialog.ts` saved through `POST /config/write
+  type=schema` with **no `subdir`**, which lands at `<write-root>/<name>.toon`. Every edit was written
+  BESIDE the component: the listed one was untouched, the post-save `load()` re-showed the PRE-edit
+  content with no error, and the engine — which resolves a `schema/<id>` ref against the registry —
+  never saw the edit. No sync exists between the two roots.
+  ⛔ **The dialog's stated reason for diverging was obsolete**: its comment said the component CRUD
+  "bypasses the BACKWARD compatibility gate". `ComponentRoutes.updateComponent` now runs the JAVA-6
+  structural + safety gate, mapping-drift, BACKWARD with a `?compatibility=none` escape hatch, **and**
+  `If-Match` → 409 — full parity, on the right file, with a handle (`contentHash`) the **list already
+  serves**. ⇒ Fixed by routing the EDIT case through `PUT /components/schema/{id}` with that handle;
+  the concurrency question the row was filed for closes as a side effect, with no extra read.
+  🔴 **Two traps the fix had to clear.** The server's tag is `"sha256:<hash>"` but `contentHash` is the
+  BARE hex, so echoing it raw would have refused **every** save — the tag is built inside
+  `ComponentsService.update`, once. And the compatibility override is a **query param** on the component
+  route vs a **body key** on `/config/write`; the override must travel *alongside* the precondition, not
+  replace it. ⚠ **CREATE deliberately unchanged** — the dialog is also opened with no `def` from the
+  parse editor, where a write-root satellite schema IS the intent. Whether the pane's own *create*
+  should make a registry component instead is the open residual → `SCHEMA-DIALOG-CREATE-HOME-1`.
+  Tests: 3 rewritten + 1 new UI spec (409 refuses without closing); `ControlApiComponentsTest`
+  `configWriteSchemaDoesNotUpdateTheRegistryComponentOfTheSameName` pins the two routes as distinct —
+  a **server** fact that survives the UI fix and is what made choosing wrong a silent loss.
+  ⚠ Also corrected a **falsified javadoc** on `schemaComponentIsGatedLikeItsConfigWriteSibling`, which
+  claimed the routes "write the SAME FILE" and that the UI avoided the component route "by convention".
+  Both halves were wrong, and that claim is how this sat unnoticed.
   → `okf/capabilities/control-api/control-api.md` §3.5
+- **P3** · **`SCHEMA-DIALOG-CREATE-HOME-1` — the Components pane's schema CREATE still makes a
+  write-root config, not a registry component** (filed 2026-09-11 by `SCHEMA-DIALOG-IFMATCH-1`). Same
+  seam, other verb: "New Schema" in the pane writes `<write-root>/<name>.toon`, so the created schema
+  does not appear in the list it was created from. ⛔ **Not a copy of the edit fix** — the same dialog
+  in create mode is ALSO opened from the parse editor to author a pipeline's satellite schema, where
+  the write-root destination is correct. Needs a decision on whether the two create paths differ by
+  opener, not a blanket route swap. → `okf/capabilities/control-api/control-api.md` §3.5
 - **P3** · **`PACK-UNLOAD-EXPOSURE-1` — unloading a pack makes a stored pipeline unloadable** (filed
   2026-09-10 by Sprint 7.6). A pipeline naming a pack-contributed node type stops loading once that pack is
   unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally

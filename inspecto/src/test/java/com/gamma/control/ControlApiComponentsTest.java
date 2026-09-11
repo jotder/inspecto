@@ -408,11 +408,19 @@ class ControlApiComponentsTest {
     }
 
     /**
-     * JAVA-6: `/components/schema/{id}` and `POST /config/write {type:"schema"}` write the SAME FILE —
-     * `registry/schemas/<id>.toon`, which the engine loads for a `schema_file: schema/<id>` ref — but only
-     * the /config/write side ran the structural + safety gates. This route was an ungated back door to a
-     * live, engine-executed artifact. The UI already avoided it by convention (the schema editor's own
-     * comment says so); `component_apply` did not, so the gate belongs on the server.
+     * JAVA-6: `/components/schema/{id}` and `POST /config/write {type:"schema"}` are both routes to a
+     * live, engine-executed schema, but only the /config/write side ran the structural + safety gates.
+     *
+     * {@code /components/schema/{id}} was an ungated back door to an artifact the engine parses, so the
+     * gate belongs on the server rather than on any one caller's good behaviour — {@code component_apply}
+     * did not observe it.
+     *
+     * <p>⚠ This javadoc used to claim the two routes "write the SAME FILE — registry/schemas/&lt;id&gt;.toon",
+     * and that the UI avoided the component route by convention. Both halves were wrong: they write
+     * different files (see
+     * {@link #configWriteSchemaDoesNotUpdateTheRegistryComponentOfTheSameName} below), and the schema
+     * editor's use of {@code /config/write} was the DEFECT that claim concealed, not a convention. The
+     * gate parity this test pins is real; the shared-file story around it was not.
      */
     @Test
     void schemaComponentIsGatedLikeItsConfigWriteSibling(@TempDir Path dir) throws Exception {
@@ -436,6 +444,53 @@ class ControlApiComponentsTest {
             HttpResponse<String> badUpdate = send(c.port, "PUT", "/components/schema/orders",
                     "{\"raw\":{\"format\":\"CSV\"}}");
             assertEquals(422, badUpdate.statusCode(), badUpdate.body());
+        }
+    }
+
+    /**
+     * The two schema write routes address DIFFERENT FILES, pinned here because a stale javadoc claiming
+     * otherwise (corrected above) let a UI defect sit: a registry component is
+     * {@code registry/schemas/<id>.toon}, while {@code POST /config/write {type:"schema"}} with no
+     * {@code subdir} lands at {@code <write-root>/<name>.toon}.
+     *
+     * <p>SCHEMA-DIALOG-IFMATCH-1 (2026-09-11): the Components pane's schema editor listed a registry
+     * component and saved through {@code /config/write}, so every edit was written BESIDE the component,
+     * the listed one was untouched, and the pane's post-save reload showed the PRE-edit content with no
+     * error anywhere. The engine, which resolves a {@code schema/<id>} ref against the registry, never
+     * saw the edit either. The dialog now sends an edit to {@code PUT /components/schema/{id}}.
+     *
+     * <p>⚠ This asserts a SERVER fact that remains true after that UI fix — the routes are still
+     * distinct, and this is what makes choosing the wrong one a silent data loss. Do not "fix" it by
+     * making them converge without deciding what a write-root schema config is FOR (the parse editor
+     * authors pipeline satellite schemas there).
+     */
+    @Test
+    void configWriteSchemaDoesNotUpdateTheRegistryComponentOfTheSameName(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            HttpResponse<String> created = send(c.port, "POST", "/components/schema",
+                    "{\"id\":\"orders\",\"raw\":{\"name\":\"orders\",\"format\":\"CSV\","
+                            + "\"fields\":[{\"name\":\"ID\",\"selector\":\"0\",\"type\":\"VARCHAR\"}]}}");
+            assertEquals(200, created.statusCode(), created.body());
+            assertTrue(Files.exists(wr.resolve("registry/schemas/orders.toon")));
+
+            // Exactly what SchemaEditorDialog.doSave sends for an EDIT: the whole content back, no subdir.
+            HttpResponse<String> saved = send(c.port, "POST", "/config/write",
+                    "{\"type\":\"schema\",\"overwrite\":true,\"config\":{\"raw\":{\"name\":\"orders\","
+                            + "\"format\":\"CSV\",\"fields\":["
+                            + "{\"name\":\"ID\",\"selector\":\"0\",\"type\":\"VARCHAR\"},"
+                            + "{\"name\":\"QTY\",\"selector\":\"1\",\"type\":\"INTEGER\"}]}}}");
+            assertEquals(200, saved.statusCode(), saved.body());
+
+            // The edit landed at the write root, NOT on the component the dialog was opened over.
+            assertTrue(Files.exists(wr.resolve("orders.toon")),
+                    "the dialog's save creates a second, unrelated config beside the registry");
+
+            JsonNode after = json(send(c.port, "GET", "/components/schema/orders", null));
+            JsonNode fields = after.get("content").get("raw").get("fields");
+            assertEquals(1, fields.size(),
+                    "🔴 the registry component the pane lists and reloads still has the PRE-edit fields — "
+                            + "the author's added column is silently absent from the surface they edited");
         }
     }
 

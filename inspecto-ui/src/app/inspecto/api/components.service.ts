@@ -28,7 +28,9 @@ export type ComponentType =
     | 'pattern-pack';
 
 /** The component kinds, in palette order, for the list/editor. `schema`/`mapping` open the S5 grid
- *  editors (schema saves through the gated `/config/write`, never this service's CRUD). */
+ *  editors. ⚠ A schema EDIT saves through this service's {@link ComponentsService.update} like every
+ *  other kind; only a schema CREATE goes to `/config/write` (SCHEMA-DIALOG-IFMATCH-1 — the two routes
+ *  write different files, and an edit belongs on the registry component the list serves). */
 export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'schema', 'mapping', 'transform', 'sink'];
 
 /**
@@ -41,6 +43,15 @@ export interface ComponentDef {
     name: string;
     ref: string;
     content: Record<string, unknown>;
+    /**
+     * The content hash the server stamps on every component doc — this component's optimistic-concurrency
+     * handle, and the value to pass back as {@link ComponentsService.update}'s `ifMatch`. The list route
+     * serves it too, so an editor opened from a list already holds one without a second read.
+     *
+     * ⚠ Optional because it is absent from a locally-constructed `ComponentDef` (a dialog closing with the
+     * content it just saved); a caller with no hash writes unconditionally, exactly as before.
+     */
+    contentHash?: string;
 }
 
 /** One archived prior copy of a component (MET-5): `GET /components/{type}/{id}/versions`. */
@@ -163,9 +174,33 @@ export class ComponentsService {
         return this.http.post<ComponentDef>(apiUrl(`/components/${type}`), content);
     }
 
-    /** Replace a component's content (write-root gated). 503/404/422 on failure. */
-    update(type: ComponentType, id: string, content: Record<string, unknown>): Observable<ComponentDef> {
-        return this.http.put<ComponentDef>(apiUrl(`/components/${type}/${encodeURIComponent(id)}`), content);
+    /**
+     * Replace a component's content (write-root gated). 503/404/422 on failure, and 409
+     * `CONFLICT_STALE_VERSION` when `ifMatch` no longer matches the stored content.
+     *
+     * `ifMatch` is the {@link ComponentDef.contentHash} the read served — pass it and a save that would
+     * clobber a concurrent edit is refused instead of silently winning. ⚠ The response carries the
+     * POST-save hash; a caller that keeps sending the original has its SECOND save refused as stale.
+     *
+     * 🔴 Pass the BARE hash, not an ETag: the server's tag is `"sha256:<hash>"` (quotes included) and it
+     * compares the header for exact equality, so a raw `contentHash` would match nothing and refuse EVERY
+     * save. The tag is built here, in one place, rather than at each call site — the list route serves
+     * only the bare hash, so there is no ETag header for a list-opened editor to echo back.
+     *
+     * `compatibility: 'none'` is the schema BACKWARD-gate escape hatch. ⚠ It is a QUERY parameter here,
+     * not a body key, and deliberately so: a component body *is* the content, so a `compatibility` key
+     * placed in it would be persisted into the schema itself.
+     */
+    update(
+        type: ComponentType,
+        id: string,
+        content: Record<string, unknown>,
+        opts?: { ifMatch?: string; compatibility?: 'none' },
+    ): Observable<ComponentDef> {
+        return this.http.put<ComponentDef>(apiUrl(`/components/${type}/${encodeURIComponent(id)}`), content, {
+            ...(opts?.compatibility ? { params: { compatibility: opts.compatibility } } : {}),
+            ...(opts?.ifMatch ? { headers: { 'If-Match': `"sha256:${opts.ifMatch}"` } } : {}),
+        });
     }
 
     /** Delete a component (write-root gated). 503/404/409 (in use) on failure. */
