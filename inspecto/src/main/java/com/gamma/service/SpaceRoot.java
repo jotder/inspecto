@@ -78,6 +78,15 @@ public interface SpaceRoot {
      */
     String eventsDbUrl();
 
+    /**
+     * JDBC URL for the cross-process run lease ({@code -Drun.lease.backend=db}, phase B).
+     *
+     * <p>⚠ A per-Space DuckDB file is the DEFAULT only so the flag has somewhere to point on one node;
+     * it is close to useless there, because a lease shared by nobody excludes nothing. The value of this
+     * store is a URL pointing at shared Postgres.
+     */
+    String runLeaseDbUrl();
+
     /** Default JDBC URL for the acquisition (dedup) ledger, when {@code -Dacquire.ledger.backend=db}. */
     String acquisitionLedgerDbUrl();
 
@@ -157,6 +166,8 @@ final class LegacySpaceRoot implements SpaceRoot {
 
     public String eventsDbUrl() { return "jdbc:duckdb:inspecto-events.db"; }
 
+    public String runLeaseDbUrl() { return "jdbc:duckdb:inspecto-run-lease.db"; }
+
     public String acquisitionLedgerDbUrl() { return "jdbc:duckdb:inspecto-acquisition.db"; }
 
     public String consignmentOutputsDbUrl() { return "jdbc:duckdb:inspecto-consignment-outputs.db"; }
@@ -222,6 +233,8 @@ final class DirSpaceRoot implements SpaceRoot {
     public String statusDbUrl() { return duckdb("inspecto-status.db"); }
 
     public String eventsDbUrl() { return duckdb("inspecto-events.db"); }
+
+    public String runLeaseDbUrl() { return duckdb("inspecto-run-lease.db"); }
 
     public String acquisitionLedgerDbUrl() { return duckdb("inspecto-acquisition.db"); }
 

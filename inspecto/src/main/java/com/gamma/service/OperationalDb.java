@@ -85,6 +85,11 @@ public final class OperationalDb {
         // (EVENTS-DURABLE-1), db once a deployment has shared state to point it at.
         EVENTS("Operational events", "events.backend", "memory", Mode.URL_OR_ENGINE,
                 "events.db.url", null, null, SpaceRoot::eventsDbUrl),
+        // Phase B. ⛔ Default "heap", never a database: a lease is exclusion ACROSS processes, and on one
+        // node the in-heap guard is both correct and free. Defaulting to a DB would create a file for
+        // every Personal install to coordinate a fleet of one.
+        RUN_LEASE("Run lease", "run.lease.backend", "heap", Mode.URL_OR_ENGINE,
+                "run.lease.db.url", null, null, SpaceRoot::runLeaseDbUrl),
         PROVENANCE("Provenance", "provenance.backend", "none", Mode.URL_OR_ENGINE,
                 "provenance.db.url", null, null, SpaceRoot::provenanceDbUrl),
         CONSIGNMENT_OUTPUTS("Consignment outputs", "consignment.outputs.backend", "duckdb", Mode.URL_OR_ENGINE,

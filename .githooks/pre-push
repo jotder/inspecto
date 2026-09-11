@@ -155,6 +155,15 @@ if ! run_guard tools/check-gate-tally.mjs "gate-tally guard"      "CI runs it to
   exit 1
 fi
 
+# Family-count guard (2026-09-12). Adding an OperationalDb.Family entry means updating NINE statements
+# outside the enum; it was missed by hand twice in two shifts, each time surfacing only after a full
+# reactor run. This turns a 14-minute discovery into an instant one.
+if ! run_guard tools/check-family-count.mjs "family-count guard"   "CI runs it too — a drifted count there is a red master."; then
+  echo "pre-push: refusing to push — a stated OperationalDb.Family count disagrees with the enum (above)." >&2
+  echo "          The ENUM is the source of truth; update the statements to match it, never the reverse." >&2
+  exit 1
+fi
+
 # Doc-link guard. Every relative markdown link in a current doc must resolve. Local as well as CI
 # because the thing it catches is created by ordinary, correct work: a class moves module, a plan gets
 # archived, a skill is copied to a new folder one level deeper — and the link that pointed at it is now

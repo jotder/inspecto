@@ -93,7 +93,7 @@ final class PipelineScheduler {
     private final Set<String> paused;
     private final Set<String> running;
     /** Per-pipeline ingest exclusion (shared instance — see class doc). */
-    private final PipelineRunGuard runGuard;
+    private final RunLease runGuard;
     /** Serialises registry mutation + {@code ConfigRegistry.rebuild} only — never held across a run. */
     private final ReentrantLock registryLock;
     private final ConsignmentEventBus bus;
@@ -138,7 +138,11 @@ final class PipelineScheduler {
     /** Per-pipeline acquisition exclusion — SEPARATE from {@link #runGuard} (B3b): acquisition and ingest of
      *  the <em>same</em> pipeline may overlap (fetch the next files while the last batch commits), while two
      *  acquisitions of it may not (a slow fetch is skipped, not queued). */
-    private final PipelineRunGuard acquireGuard = new PipelineRunGuard();
+    // ⚠ A SEPARATE lease from runGuard, and separate on purpose — acquisition and execution are
+    // independent activities (see this field's own doc above). When both are database-backed they carry
+    // DIFFERENT scopes in the lease key, so a remote fetch can never block a run of the same pipeline
+    // (operator decision 2026-09-12). ⛔ Do not collapse the two into one lease.
+    private final RunLease acquireGuard;
     /** Acquisition's own budget, held for the scheduler's lifetime — deliberately NOT {@link #runPermits}:
      *  network fetch and DuckDB ingest must not compete for one allowance (B3b). */
     private final Semaphore acquirePermits;
@@ -148,7 +152,8 @@ final class PipelineScheduler {
     private final int acquireHighWater;
 
     PipelineScheduler(List<Path> registry, ConfigRegistry configRegistry, Set<String> paused,
-                      Set<String> running, PipelineRunGuard runGuard, ReentrantLock registryLock,
+                      Set<String> running, RunLease runGuard, RunLease acquireGuard,
+                      ReentrantLock registryLock,
                       ConsignmentEventBus bus,
                       ExecutorService triggerWorkers, int maxConcurrentRuns, int maxConcurrentAcquisitions,
                       int acquireHighWater,
@@ -158,6 +163,7 @@ final class PipelineScheduler {
         this.paused            = paused;
         this.running           = running;
         this.runGuard          = runGuard;
+        this.acquireGuard      = acquireGuard;
         this.registryLock      = registryLock;
         this.bus               = bus;
         this.triggerWorkers    = triggerWorkers;
@@ -175,7 +181,7 @@ final class PipelineScheduler {
      * task that runs it — ownership transfers to {@link #runOne}, which must therefore always be reached or
      * the claim explicitly closed (see {@link #dispatch}).
      */
-    private record Due(PipelineConfig cfg, String id, PipelineRunGuard.Claim claim) {}
+    private record Due(PipelineConfig cfg, String id, RunLease.Claim claim) {}
 
     /**
      * Start every registered, due pipeline and <b>return without waiting</b> — the periodic driver's entry
@@ -247,7 +253,7 @@ final class PipelineScheduler {
                 // Per-pipeline exclusion: a pipeline still running from an earlier tick is SKIPPED, not
                 // queued — queueing would pile runs up behind a slow pipeline. Its cadence baseline is
                 // left alone so it becomes due again as soon as it is free.
-                PipelineRunGuard.Claim claim = runGuard.tryAcquire(id);
+                RunLease.Claim claim = runGuard.tryAcquire(id);
                 if (claim == null) continue;
                 due.add(new Due(cfg.forNewRun(), id, claim));                // fresh per-cycle timestamp
             }
@@ -299,7 +305,7 @@ final class PipelineScheduler {
     private int runOne(Due due, Map<String, String> mdc, AtomicInteger pending, boolean acquireFirst) {
         if (mdc != null) MDC.setContextMap(mdc);
         com.gamma.metrics.MetricRegistry reg = com.gamma.metrics.MetricRegistry.global();
-        try (PipelineRunGuard.Claim claim = due.claim()) {
+        try (RunLease.Claim claim = due.claim()) {
             runPermits.acquire();
             // Clock starts AFTER the permit: time spent queued for the budget is not this pipeline's run
             // duration, and admitting fewer of its files could not shorten it.
@@ -524,7 +530,7 @@ final class PipelineScheduler {
                             Map.of("pipeline", id));
                     continue;
                 }
-                PipelineRunGuard.Claim claim = acquireGuard.tryAcquire(id);
+                RunLease.Claim claim = acquireGuard.tryAcquire(id);
                 if (claim == null) continue;                        // still fetching from an earlier tick
                 due.add(new Due(cfg.forNewRun(), id, claim));
             }
@@ -553,7 +559,7 @@ final class PipelineScheduler {
      *  budget, then release both. Runs on a {@link #triggerWorkers} virtual thread. */
     private void acquireOne(Due due, Map<String, String> mdc) {
         if (mdc != null) MDC.setContextMap(mdc);
-        try (PipelineRunGuard.Claim claim = due.claim()) {
+        try (RunLease.Claim claim = due.claim()) {
             acquirePermits.acquire();
             try {
                 int landed = CollectorProcessor.acquire(due.cfg());

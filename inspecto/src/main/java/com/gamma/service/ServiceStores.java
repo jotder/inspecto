@@ -298,6 +298,53 @@ final class ServiceStores {
     }
 
     /**
+     * The run lease for one Space and one {@code scope} — phase B. {@code -Drun.lease.backend=heap}
+     * (default) gives the in-heap {@link PipelineRunGuard}, which is exclusion within THIS process;
+     * {@code db|postgres|jdbc:…} gives {@link DbRunLease}, which is exclusion across processes.
+     *
+     * <p>⚠ A {@code scope} is required, not optional. The engine holds TWO guards — pipeline runs and
+     * remote acquisition — and they are deliberately independent; sharing one lease key would make a
+     * remote fetch block a run of the same pipeline (operator decision 2026-09-12).
+     *
+     * <p>⛔ A failure to open degrades to the HEAP guard, and that is a genuine loss of the property the
+     * flag was set for: exclusion falls back to per-process. It is therefore recorded as DEGRADED, which
+     * {@code -Dinspecto.topology=partitioned} turns into a boot failure (A1) — on N pods, a per-process
+     * lease is not a weaker guarantee, it is no guarantee.
+     */
+    static RunLease openRunLease(SpaceRoot root, String scope) {
+        String raw = System.getProperty("run.lease.backend", "heap").trim();
+        String backend = raw.toLowerCase();
+        boolean db = "db".equals(backend) || "postgres".equals(backend) || "postgresql".equals(backend)
+                || backend.startsWith("jdbc:");
+        String subsystem = "runLease." + scope;
+        if (!db) {
+            StoreHealth.record(root.id(), subsystem, StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Drun.lease.backend=" + backend + " — exclusion is per process, not across pods");
+            return new PipelineRunGuard();
+        }
+        // ⛔ RAW value for the URL, lowercased only for the comparison — a jdbc: value carries a path, a
+        // database name and credentials, all case-sensitive on Postgres.
+        String url = backend.startsWith("jdbc:")
+                ? raw
+                : OperationalDb.urlFor(OperationalDb.Family.RUN_LEASE, root.runLeaseDbUrl());
+        try {
+            DbRunLease lease = DbRunLease.open(url, System.getProperty("run.lease.db.user"),
+                    System.getProperty("run.lease.db.password"), root.id(), scope,
+                    System.getProperty("run.lease.owner"), DbRunLease.DEFAULT_TTL);
+            log.info("Run lease ({}): database ({})", scope, url);
+            StoreHealth.record(root.id(), subsystem, StoreHealth.Status.UP, url, "shared run lease");
+            return lease;
+        } catch (Exception e) {
+            log.warn("Could not open the run lease ({}) at {} — falling back to the in-process guard: {}",
+                    scope, url, e.getMessage());
+            StoreHealth.degraded(root.id(), subsystem, url,
+                    "run exclusion fell back to per-process — another pod can run the same pipeline "
+                            + "concurrently: " + e.getMessage());
+            return new PipelineRunGuard();
+        }
+    }
+
+    /**
      * {@code -Devents.backend=db|postgres|jdbc:…} — the shared event store (D6). The one backend two
      * processes can both read, which is the whole point: Parquet survives a restart but is written by
      * exactly one pod, so on N pods the Signal ledger shows a different world per replica.

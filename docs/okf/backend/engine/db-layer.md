@@ -181,22 +181,35 @@ Five append-only projection tables. `payload` is the JSON record; `seq` orders e
 
 ```sql
 CREATE TABLE IF NOT EXISTS inspecto_run_lease (
-  space VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT,
+  space VARCHAR, scope VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT,
   acquired_at BIGINT, expires_at BIGINT,
-  PRIMARY KEY (space, pipeline))
+  PRIMARY KEY (space, scope, pipeline))
 ```
 
-🔴 **`PRIMARY KEY (space, pipeline)` — never `pipeline` alone.** A pipeline id is unique only within a
-Space; the in-heap guards key on the bare id only because there is one guard instance per Space. A shared
-table has no such boundary, so two Spaces with an `orders` pipeline would share one lease row.
+🔴 **All three key columns earn their place.**
+* **`space`** — a pipeline id is unique only within a Space; the in-heap guards key on the bare id only
+  because there is one guard instance per Space. A shared table has no such boundary, so two Spaces with
+  an `orders` pipeline would share one lease row.
+* **`scope`** (`run` | `acquire`) — the engine holds **two** guards, and they are deliberately
+  independent: `CollectorService.runGuard` gates pipeline runs, `PipelineScheduler.acquireGuard` gates
+  remote acquisition. Operator decision 2026-09-12: **keep them separate.** ⛔ Without this column a
+  remote fetch of `orders` would block a *run* of `orders`, so pipelines would mysteriously stall
+  whenever an upstream was slow.
+* **`pipeline`** — the exclusion is per pipeline, never global.
 
 ⚠ `epoch` is a **fencing token**, bumped on every acquisition. Release and heartbeat are both conditional
 on `owner = ? AND epoch = ?`, so a process paused past its TTL can neither free nor extend a lease
 another process has taken over. ⛔ Not a Postgres advisory lock (D5): those die with the connection, and
 the connection pool recycles connections.
 
-⚠ Nothing selects this store yet — `PipelineRunGuard` (heap) remains the default and single-node
-behaviour is unchanged. Wiring the selector is the next slice.
+**Selected by `-Drun.lease.backend`** (`heap` default · `db` · `postgres` · a raw `jdbc:` URL), with
+`-Drun.lease.db.url` / `.user` / `.password` and `-Drun.lease.owner`. ⛔ The default is `heap`, never a
+database: a lease is exclusion *across processes*, and on one node the in-heap guard is both correct and
+free — defaulting to a DB would create a file for every Personal install to coordinate a fleet of one.
+
+⚠ A failure to open **degrades to the heap guard and is recorded as DEGRADED**, which
+`-Dinspecto.topology=partitioned` turns into a boot failure (A1). On N pods a per-process lease is not a
+weaker guarantee, it is *no* guarantee.
 
 #### `inspecto_events` — the shared event store (`DbEventStore`, D6, 2026-09-12)
 
@@ -541,7 +554,7 @@ the ledger armed against the real `DbDedupLedger` while writing nothing. It is s
 value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class source that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all thirteen families (it fails that test). Tests needing durable dedup
+`OperationalDbTest` pins across all fourteen families (it fails that test). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`
@@ -704,7 +717,7 @@ operator applies flags through their own deployment tooling; this screen tells t
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
   default, a `Mode`, url/user/password properties and a root supplier. Budget it.
-- **`OperationalDb.Family` is now the roster** — the **thirteen** families' property names live there and nowhere
+- **`OperationalDb.Family` is now the roster** — the **fourteen** families' property names live there and nowhere
   else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
 - ⚠ **Three irregularities the report models rather than flattens:** three different "is it on" spellings
@@ -839,8 +852,13 @@ evaluations can therefore open duplicates. Treat the dedup as best-effort and do
 
 `PostgresStateStoreTest` opens **twelve** JDBC-backed store classes against a real server and round-trips
 each one (nine until 2026-09-12, when A3 added the event store, delivery receipts and the dedup ledger —
-the last two being the gap DAT-6's own coverage claim had). The roster is **thirteen** families; the one
-still uncovered is the **acquisition ledger**.
+the last two being the gap DAT-6's own coverage claim had), plus the run lease since B1 — **thirteen**
+store classes in all. The roster is **fourteen** families; the one still uncovered is the
+**acquisition ledger**.
+
+⚠ **That count is mirrored in nine places** and was missed by hand twice in two shifts, so
+`tools/check-family-count.mjs` now fails the build when any of them drifts from
+`OperationalDb.Family`.
 ⛔ **"Covered" is not "verified".** Every method in that class `assumeTrue`s on a configured server, so with
 no `INSPECTO_TEST_PG_URL` the whole class SKIPS — the three added in A3 have never executed anywhere. Read
 the skip count, not the test count.

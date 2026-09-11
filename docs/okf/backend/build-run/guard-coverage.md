@@ -156,6 +156,37 @@ caught its own section going stale within minutes of being written.
 matches the check's own pattern. **Anchor a stated check (`^| NFR-7 ·`) or it counts its own
 documentation.**
 
+## Instance, 2026-09-12: a number with NINE mirrors, missed by hand twice in two shifts
+
+`tools/check-family-count.mjs` is the third-shape guard (§"a NUMBER a human wrote") applied to a count
+that is **derived**, not authored: the size of `OperationalDb.Family`.
+
+The roster's size is restated in **nine** places outside the enum — two test tripwires plus seven
+sentences across `db-layer.md`, `data-plane.md` and the scale-out plan. Adding a family therefore means a
+nine-file sweep, and on **2026-09-12 it was missed twice in one day**: `EVENTS` (D6) took the roster
+12 → 13, `RUN_LEASE` (phase B1) took it 13 → 14, and each time the two test tripwires caught it — but
+only after a **~14-minute reactor run**, and neither says anything about the prose.
+
+**The lesson, and it generalises past this enum.** The tripwires were not missing and were not weak; they
+worked both times. What was wrong was the *cost of learning* and the *coverage*: a fact restated in nine
+places cannot be maintained by discipline, and a failure that takes fourteen minutes to surface will be
+discovered late by whoever is least expecting it. ⇒ **When a value is derived from code and restated in
+prose more than once or twice, the restatements need a guard, not a convention.**
+
+⚠ Two shape details worth copying:
+* The guard reads the **enum** and treats every statement as the thing that must agree — never the
+  reverse. Its failure message says so, because the tempting fix under time pressure is to edit the enum
+  count in a test.
+* It deliberately does **not** check that a new family is *correct* (honours the shared URL, has a
+  `SpaceRoot` accessor, is reported by `/system/db`). `OperationalDbTest`'s loop and
+  `ControlApiSystemRoutesTest` own those and must stay — a guard that appears to cover a neighbouring
+  invariant is how the real one gets deleted.
+* ⚠ It skips `inspecto-deploy/`, which is gitignored build output carrying stale copies of the same docs.
+  Failing on a generated artifact teaches the next shift to ignore the guard.
+
+Falsified in both directions before wiring: drifted prose and a drifted tripwire each fail with the file,
+line and both numbers named.
+
 ## Instance, 2026-09-07: a guard scoped to one directory
 
 `CapabilityManifestTest` finds `withCapability(` registration sites by regex-scanning **one directory**,

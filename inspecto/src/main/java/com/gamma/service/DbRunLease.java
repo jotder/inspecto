@@ -44,6 +44,17 @@ import java.util.concurrent.TimeUnit;
  * stable, so the token has something to be validated against. ⛔ Do not read this class as discharging
  * D15 — it fences the lease, not the writes a run performs.
  *
+ * <h3>⚠ The key is {@code (space, scope, pipeline)} — the scope is not decoration</h3>
+ * There are <b>two</b> guards in the engine and they are deliberately independent:
+ * {@code CollectorService.runGuard} gates pipeline <b>runs</b>, and {@code PipelineScheduler}'s private
+ * {@code acquireGuard} gates <b>remote acquisition</b> — the scheduler's own comment says acquisition
+ * runs independently of pipeline execution. They are separate instances today, so they cannot contend.
+ *
+ * <p>🔴 A shared lease table collapses that independence unless the key carries the scope: keyed on
+ * {@code (space, pipeline)} alone, pointing both guards at one lease would make a remote fetch
+ * <b>block a run</b> of the same pipeline — a behaviour change nobody asked for. Operator decision
+ * 2026-09-12: <b>keep them separate, via the scope key.</b> ⛔ Do not collapse the column away.
+ *
  * <h3>The heartbeat is not optional</h3>
  * The TTL is how long before another pod may steal the lease. A run longer than the TTL that did not
  * renew would be stolen mid-flight — a double run, the exact thing this prevents. One daemon thread
@@ -60,22 +71,30 @@ final class DbRunLease implements RunLease, AutoCloseable {
     /** Default TTL. Long enough that a renew failure is a real problem, short enough to free a dead pod. */
     static final Duration DEFAULT_TTL = Duration.ofSeconds(60);
 
+    /** Scope for pipeline <b>runs</b> — {@code CollectorService.runGuard}. */
+    static final String SCOPE_RUN = "run";
+    /** Scope for <b>remote acquisition</b> — {@code PipelineScheduler.acquireGuard}. */
+    static final String SCOPE_ACQUIRE = "acquire";
+
     private final Connection conn;
     private final String space;
+    /** Which activity this lease gates — see the class note on why it is part of the key. */
+    private final String scope;
     private final String owner;
     private final long ttlMs;
     /** Pipelines this process currently holds → the epoch it holds them at (its fencing token). */
     private final Map<String, Long> held = new ConcurrentHashMap<>();
     private final ScheduledExecutorService heartbeat;
 
-    DbRunLease(Connection conn, String space, String owner, Duration ttl) {
+    DbRunLease(Connection conn, String space, String scope, String owner, Duration ttl) {
         this.conn = conn;
         this.space = space;
+        this.scope = scope;
         this.owner = owner;
         this.ttlMs = Math.max(1_000L, ttl.toMillis());
         initSchema();
         this.heartbeat = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "run-lease-heartbeat-" + space);
+            Thread t = new Thread(r, "run-lease-heartbeat-" + space + '-' + scope);
             t.setDaemon(true);      // ⛔ daemon: a lease renewer must never hold the JVM open
             return t;
         });
@@ -84,9 +103,9 @@ final class DbRunLease implements RunLease, AutoCloseable {
     }
 
     /** Open a lease over {@code url}. {@code owner} defaults to a per-process id when null. */
-    static DbRunLease open(String url, String user, String pass, String space, String owner, Duration ttl)
-            throws SQLException {
-        return new DbRunLease(JdbcDrivers.connect(url, user, pass), space,
+    static DbRunLease open(String url, String user, String pass, String space, String scope,
+                          String owner, Duration ttl) throws SQLException {
+        return new DbRunLease(JdbcDrivers.connect(url, user, pass), space, scope,
                 owner == null || owner.isBlank() ? defaultOwner() : owner, ttl);
     }
 
@@ -108,15 +127,16 @@ final class DbRunLease implements RunLease, AutoCloseable {
             // The one statement that decides it. Wins only when the row is free or its lease has expired;
             // the epoch bump is what makes the previous holder's token stale the instant we take over.
             String sql = "UPDATE " + TABLE + " SET owner = ?, epoch = epoch + 1, acquired_at = ?, expires_at = ? "
-                    + "WHERE space = ? AND pipeline = ? AND (owner IS NULL OR expires_at < ?)";
+                    + "WHERE space = ? AND scope = ? AND pipeline = ? AND (owner IS NULL OR expires_at < ?)";
             int won;
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, owner);
                 ps.setLong(2, now);
                 ps.setLong(3, now + ttlMs);
                 ps.setString(4, space);
-                ps.setString(5, pipeline);
-                ps.setLong(6, now);
+                ps.setString(5, scope);
+                ps.setString(6, pipeline);
+                ps.setLong(7, now);
                 won = ps.executeUpdate();
             }
             if (won == 0) return null;
@@ -175,7 +195,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
 
             @Override
             public String toString() {
-                return "Claim[" + space + '/' + pipeline + "@" + epoch + ']';
+                return "Claim[" + space + '/' + scope + '/' + pipeline + "@" + epoch + ']';
             }
         };
     }
@@ -186,12 +206,13 @@ final class DbRunLease implements RunLease, AutoCloseable {
      */
     private void release(String pipeline, long epoch) {
         String sql = "UPDATE " + TABLE + " SET owner = NULL, expires_at = 0 "
-                + "WHERE space = ? AND pipeline = ? AND owner = ? AND epoch = ?";
+                + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
-            ps.setString(3, owner);
-            ps.setLong(4, epoch);
+            ps.setString(2, scope);
+            ps.setString(3, pipeline);
+            ps.setString(4, owner);
+            ps.setLong(5, epoch);
             if (ps.executeUpdate() == 0) {
                 // Not an error: it means we no longer held it. Worth a line, because it is the observable
                 // symptom of this process having been paused past its TTL.
@@ -210,14 +231,15 @@ final class DbRunLease implements RunLease, AutoCloseable {
         if (held.isEmpty()) return;
         long until = System.currentTimeMillis() + ttlMs;
         String sql = "UPDATE " + TABLE + " SET expires_at = ? "
-                + "WHERE space = ? AND pipeline = ? AND owner = ? AND epoch = ?";
+                + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
         for (Map.Entry<String, Long> e : held.entrySet()) {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setLong(1, until);
                 ps.setString(2, space);
-                ps.setString(3, e.getKey());
-                ps.setString(4, owner);
-                ps.setLong(5, e.getValue());
+                ps.setString(3, scope);
+                ps.setString(4, e.getKey());
+                ps.setString(5, owner);
+                ps.setLong(6, e.getValue());
                 if (ps.executeUpdate() == 0) {
                     log.warn("Run lease for '{}' was stolen while we still believed we held it (epoch {}) "
                             + "— this process was paused or partitioned for longer than the {}ms TTL",
@@ -233,10 +255,12 @@ final class DbRunLease implements RunLease, AutoCloseable {
 
     @Override
     public synchronized boolean isRunning(String pipeline) {
-        String sql = "SELECT owner, expires_at FROM " + TABLE + " WHERE space = ? AND pipeline = ?";
+        String sql = "SELECT owner, expires_at FROM " + TABLE
+                + " WHERE space = ? AND scope = ? AND pipeline = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
+            ps.setString(2, scope);
+            ps.setString(3, pipeline);
             try (ResultSet rs = ps.executeQuery()) {
                 // An EXPIRED lease is not running: the holder is gone and the row is merely stale.
                 return rs.next() && rs.getString("owner") != null
@@ -273,20 +297,23 @@ final class DbRunLease implements RunLease, AutoCloseable {
 
     private void insertIfAbsent(String pipeline) throws SQLException {
         // The DbDedupLedger idiom: let the database resolve the race rather than a read-then-write.
-        String sql = "INSERT INTO " + TABLE + " (space, pipeline, owner, epoch, acquired_at, expires_at) "
-                + "VALUES (?,?,NULL,0,0,0) ON CONFLICT DO NOTHING";
+        String sql = "INSERT INTO " + TABLE
+                + " (space, scope, pipeline, owner, epoch, acquired_at, expires_at) "
+                + "VALUES (?,?,?,NULL,0,0,0) ON CONFLICT DO NOTHING";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
+            ps.setString(2, scope);
+            ps.setString(3, pipeline);
             ps.executeUpdate();
         }
     }
 
     private long readEpoch(String pipeline) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT epoch FROM " + TABLE + " WHERE space = ? AND pipeline = ?")) {
+                "SELECT epoch FROM " + TABLE + " WHERE space = ? AND scope = ? AND pipeline = ?")) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
+            ps.setString(2, scope);
+            ps.setString(3, pipeline);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : 0L;
             }
@@ -295,13 +322,17 @@ final class DbRunLease implements RunLease, AutoCloseable {
 
     private void initSchema() {
         try (Statement st = conn.createStatement()) {
-            // ⚠ PRIMARY KEY (space, pipeline) — NOT pipeline alone. A pipeline id is unique only within
-            // a Space; keyed on the id alone, two Spaces running an `orders` pipeline would share one
-            // lease and each would block the other. See RunLease's class note.
+            // ⚠ PRIMARY KEY (space, scope, pipeline) — all three, and each earns its place:
+            //   space    — a pipeline id is unique only WITHIN a Space; keyed on the id alone two Spaces
+            //              running an `orders` pipeline share one lease and each blocks the other.
+            //   scope    — runs and remote acquisition are DELIBERATELY independent activities (operator
+            //              decision 2026-09-12). Without this column, pointing both guards at one lease
+            //              would make a remote fetch block a run of the same pipeline.
+            //   pipeline — the exclusion is per pipeline, never global.
             st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "space VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT, "
+                    + "space VARCHAR, scope VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT, "
                     + "acquired_at BIGINT, expires_at BIGINT, "
-                    + "PRIMARY KEY (space, pipeline))");
+                    + "PRIMARY KEY (space, scope, pipeline))");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise the run-lease schema", e);
         }

@@ -117,7 +117,10 @@ class PipelineSchedulerEventTriggerTest {
         Consumer<String> runPipeline = ran::add;
         PipelineScheduler scheduler = new PipelineScheduler(
                 configs, registry, paused, Collections.synchronizedSet(new HashSet<>()),
-                new PipelineRunGuard(), new ReentrantLock(), new ConsignmentEventBus(),
+                // Two guards, and they must be DISTINCT instances: runs and remote acquisition are
+                // independent activities (operator decision 2026-09-12). Passing one instance twice
+                // would make a fetch block a run — the very thing the scope key prevents.
+                new PipelineRunGuard(), new PipelineRunGuard(), new ReentrantLock(), new ConsignmentEventBus(),
                 workers, 2, 2, 1, 1000L, runPipeline, () -> {});
         return new Harness(scheduler, ran, paused, workers);
     }

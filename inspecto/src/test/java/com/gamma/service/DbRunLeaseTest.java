@@ -42,7 +42,11 @@ class DbRunLeaseTest {
     }
 
     private static DbRunLease lease(String url, String space, String owner) throws Exception {
-        return DbRunLease.open(url, null, null, space, owner, TTL);
+        return lease(url, space, DbRunLease.SCOPE_RUN, owner);
+    }
+
+    private static DbRunLease lease(String url, String space, String scope, String owner) throws Exception {
+        return DbRunLease.open(url, null, null, space, scope, owner, TTL);
     }
 
     /** The base claim: one holder wins, a second process is refused. */
@@ -77,6 +81,49 @@ class DbRunLeaseTest {
                     + "not be blocked by tenant-a — keyed on the id alone, this is the IntakeGovernor bug");
             a.close();
             b.close();
+        }
+    }
+
+    /**
+     * 🔴 <b>The operator's decision of 2026-09-12, made testable.</b> Runs and remote acquisition are
+     * deliberately independent activities — the scheduler holds two separate guards precisely so a slow
+     * remote fetch does not stall a run. Sharing one lease key would silently collapse that: a fetch of
+     * `orders` would block a run of `orders`.
+     *
+     * <p>⛔ If the {@code scope} column is ever removed from the key, THIS is the test that fails, and
+     * the symptom in production would be pipelines mysteriously not running while an upstream is slow.
+     */
+    @Test
+    void acquisitionAndExecutionDoNotBlockEachOther(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease runs = lease(url, "s1", DbRunLease.SCOPE_RUN, "pod-a");
+             DbRunLease acquires = lease(url, "s1", DbRunLease.SCOPE_ACQUIRE, "pod-a")) {
+
+            RunLease.Claim fetching = acquires.tryAcquire("orders");
+            assertNotNull(fetching, "a remote fetch of 'orders' starts");
+
+            RunLease.Claim running = runs.tryAcquire("orders");
+            assertNotNull(running,
+                    "a RUN of the same pipeline must still be able to start — the two activities are "
+                            + "independent, and collapsing the scope out of the key would block this");
+
+            assertTrue(acquires.isRunning("orders"));
+            assertTrue(runs.isRunning("orders"), "both are held at once, under different scopes");
+            fetching.close();
+            running.close();
+        }
+    }
+
+    /** ...and within one scope the exclusion still holds, so the scope did not simply disable it. */
+    @Test
+    void theScopeDoesNotWeakenExclusionWithinAScope(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease a = lease(url, "s1", DbRunLease.SCOPE_ACQUIRE, "pod-a");
+             DbRunLease b = lease(url, "s1", DbRunLease.SCOPE_ACQUIRE, "pod-b")) {
+            RunLease.Claim held = a.tryAcquire("orders");
+            assertNotNull(held);
+            assertNull(b.tryAcquire("orders"), "two acquisitions of one pipeline still exclude");
+            held.close();
         }
     }
 
@@ -281,9 +328,10 @@ class DbRunLeaseTest {
     private static void expire(String url, String space, String pipeline) throws Exception {
         try (Connection c = JdbcDrivers.connect(url, null, null);
              PreparedStatement ps = c.prepareStatement("UPDATE " + DbRunLease.TABLE
-                     + " SET expires_at = 1 WHERE space = ? AND pipeline = ?")) {
+                     + " SET expires_at = 1 WHERE space = ? AND scope = ? AND pipeline = ?")) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
+            ps.setString(2, DbRunLease.SCOPE_RUN);
+            ps.setString(3, pipeline);
             ps.executeUpdate();
         }
     }
@@ -291,9 +339,10 @@ class DbRunLeaseTest {
     private static long expiryOf(String url, String space, String pipeline) throws Exception {
         try (Connection c = JdbcDrivers.connect(url, null, null);
              PreparedStatement ps = c.prepareStatement("SELECT expires_at FROM " + DbRunLease.TABLE
-                     + " WHERE space = ? AND pipeline = ?")) {
+                     + " WHERE space = ? AND scope = ? AND pipeline = ?")) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
+            ps.setString(2, DbRunLease.SCOPE_RUN);
+            ps.setString(3, pipeline);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : -1L;
             }
@@ -303,9 +352,10 @@ class DbRunLeaseTest {
     private static long epochOf(String url, String space, String pipeline) throws Exception {
         try (Connection c = JdbcDrivers.connect(url, null, null);
              PreparedStatement ps = c.prepareStatement("SELECT epoch FROM " + DbRunLease.TABLE
-                     + " WHERE space = ? AND pipeline = ?")) {
+                     + " WHERE space = ? AND scope = ? AND pipeline = ?")) {
             ps.setString(1, space);
-            ps.setString(2, pipeline);
+            ps.setString(2, DbRunLease.SCOPE_RUN);
+            ps.setString(3, pipeline);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : -1L;
             }

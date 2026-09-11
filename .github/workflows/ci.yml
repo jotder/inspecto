@@ -74,6 +74,14 @@ jobs:
       - name: Guard — BACKLOG §2's gate tally matches its table
         run: node tools/check-gate-tally.mjs
 
+      # Family-count guard (2026-09-12). OperationalDb.Family's size is restated in NINE places outside
+      # the enum — two test tripwires and seven sentences across three docs — and the hand sweep was
+      # missed TWICE IN TWO SHIFTS (EVENTS took it 12->13, RUN_LEASE 13->14). The tripwires caught both,
+      # but only after a ~14-minute reactor run, and they say nothing about the prose. Instant here.
+      # Falsified in both directions (drifted prose, drifted tripwire) before it was wired in.
+      - name: Guard — every stated OperationalDb.Family count matches the enum
+        run: node tools/check-family-count.mjs
+
       # Doc-link guard (2026-09-08). ~1,380 relative links across the current doc tiers must resolve.
       # Added because nothing policed links at all: DOCS-LINKS-1 was a manual sweep, and the invariant had
       # rotted in four flavours by the time this ran — a module split (inspecto-engine -> inspecto-ops), a

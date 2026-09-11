@@ -183,7 +183,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      *  <p>This replaced a single global {@code ingestLock} held across an entire poll cycle, which serialised
      *  <em>unrelated</em> pipelines and let one slow pipeline delay the next tick for all of them. The
      *  invariant that lock protected was always per-pipeline; see {@link PipelineRunGuard}. */
-    private final PipelineRunGuard runGuard = new PipelineRunGuard();
+    // Phase B: the seam, not the class. Defaults to the in-heap PipelineRunGuard, so single-node
+    // behaviour is byte-identical; -Drun.lease.backend=db makes the exclusion cross-process.
+    private final RunLease runGuard;
     /** Serialises registry mutation ({@link #registry} + {@link ConfigRegistry#rebuild}) against a cycle's
      *  selection pass. Deliberately narrow — never held across a run. */
     private final ReentrantLock registryLock = new ReentrantLock();
@@ -361,6 +363,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                   long pollSeconds, int maxConcurrentRuns, StatusStore statusStore, SpaceRoot root) {
         requireDistinctPipelineIds(registry);   // fail fast before anything is allocated (see the method doc)
         this.root              = root;
+        // Phase B: heap by default (single-node behaviour byte-identical), database when selected.
+        this.runGuard          = ServiceStores.openRunLease(root, DbRunLease.SCOPE_RUN);
         this.spaceId           = root.id();
         // The default space reuses the process-wide log (so legacy single-tenant behaviour is unchanged and
         // the capture appender's global fallback still hits it); a hosted space gets its own instance.
@@ -577,8 +581,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // has reached this high-water mark, so a slow ingest cannot make acquisition fill local disk
         // unboundedly. The durable inbox is the spill queue (§3.5). 0 = off (default), like -Dingest.maxFilesPerCycle.
         int acquireHighWater = Integer.getInteger("acquire.backpressure.highWater", 0);
+        // Two leases, two scopes — runs and remote acquisition stay independent (operator, 2026-09-12).
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,
-                this.running, this.runGuard, this.registryLock, this.bus, this.triggerWorkers,
+                this.running, this.runGuard, ServiceStores.openRunLease(root, DbRunLease.SCOPE_ACQUIRE),
+                this.registryLock, this.bus, this.triggerWorkers,
                 this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
     }
@@ -1567,7 +1573,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
                 // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
                 // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
-                try (PipelineRunGuard.Claim claim = runGuard.acquire(pipelineName)) {
+                try (RunLease.Claim claim = runGuard.acquire(pipelineName)) {
                     running.add(pipelineName);
                     try {
                         pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence

@@ -458,8 +458,8 @@ class PostgresStateStoreTest {
     @Test
     void runLease_exclusionAndFencingRoundTrip() throws Exception {
         java.time.Duration ttl = java.time.Duration.ofSeconds(30);
-        try (DbRunLease first = DbRunLease.open(url, null, null, "s1", "pod-1", ttl);
-             DbRunLease second = DbRunLease.open(url, null, null, "s1", "pod-2", ttl)) {
+        try (DbRunLease first = DbRunLease.open(url, null, null, "s1", DbRunLease.SCOPE_RUN, "pod-1", ttl);
+             DbRunLease second = DbRunLease.open(url, null, null, "s1", DbRunLease.SCOPE_RUN, "pod-2", ttl)) {
 
             RunLease.Claim held = first.tryAcquire("orders");
             assertNotNull(held, "the first process takes the lease on Postgres");
@@ -472,15 +472,15 @@ class PostgresStateStoreTest {
         }
 
         // Fencing, same owner on both — see the note above.
-        try (DbRunLease a = DbRunLease.open(url, null, null, "s1", "pod-same", ttl);
-             DbRunLease b = DbRunLease.open(url, null, null, "s1", "pod-same", ttl);
+        try (DbRunLease a = DbRunLease.open(url, null, null, "s1", DbRunLease.SCOPE_RUN, "pod-same", ttl);
+             DbRunLease b = DbRunLease.open(url, null, null, "s1", DbRunLease.SCOPE_RUN, "pod-same", ttl);
              Connection c = DriverManager.getConnection(url);
              Statement st = c.createStatement()) {
 
             RunLease.Claim stale = a.tryAcquire("fenced");
             assertNotNull(stale);
             st.executeUpdate("UPDATE " + DbRunLease.TABLE
-                    + " SET expires_at = 1 WHERE space = 's1' AND pipeline = 'fenced'");
+                    + " SET expires_at = 1 WHERE space = 's1' AND scope = 'run' AND pipeline = 'fenced'");
 
             RunLease.Claim live = b.tryAcquire("fenced");
             assertNotNull(live, "an expired lease is reclaimable");

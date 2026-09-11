@@ -153,12 +153,13 @@ production changes and the technique is **already proven in this repo** for pack
 existing test boots two control planes in one JVM — `ControlApiMultiSpaceTest` puts several Spaces inside
 **one** instance, which is the trap §7 warns about.
 
-### 3.3 Thirteen operational store families — twelve with a Postgres round-trip, one without
+### 3.3 Fourteen operational store families — thirteen with a Postgres round-trip, one without
 
 ⚠ Premise corrected: this plan's author had "9 of 12". The roster of record is
 `OperationalDb.Family` (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`),
-**thirteen** entries since 2026-09-12: `JOB_RUNS, EVENTS, PROVENANCE, CONSIGNMENT_OUTPUTS, FILE_STAGES,
-DELIVERY_RECEIPTS, DEDUP_LEDGER, OBJECTS, LINKS, NOTES, TAGS, STATUS, ACQUISITION_LEDGER`. All thirteen
+**fourteen** entries since 2026-09-12: `JOB_RUNS, EVENTS, RUN_LEASE, PROVENANCE, CONSIGNMENT_OUTPUTS,
+FILE_STAGES, DELIVERY_RECEIPTS, DEDUP_LEDGER, OBJECTS, LINKS, NOTES, TAGS, STATUS, ACQUISITION_LEDGER`.
+All fourteen
 route through `JdbcDrivers.connect` (`inspecto-util/src/main/java/com/gamma/util/JdbcDrivers.java:24-40`),
 which handles `jdbc:postgresql:` uniformly.
 
@@ -368,7 +369,7 @@ local staging tree "so the rest of the engine … treats them exactly like local
 🔴 **§3.7's "an inbox must have exactly one owning pod" does not apply to a remote origin.** A local
 inbox needs a single owner because `MarkerManager` does a bare `Files.exists` with no claim. A remote
 origin is *already shared by definition*, listing it is idempotent, and a pre-fetch dedup ledger already
-exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the thirteen families** (§3.3), so
+exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the fourteen families** (§3.3), so
 both are already Postgres-capable and phase A puts them on shared state as a side effect.
 
 ⇒ N pods can pull from one remote origin safely, claiming per file, **with no new mechanism and no
@@ -494,18 +495,26 @@ Work:
   so it left a fencing-defeating mutant alive. The discriminating case needs the **same owner id** on
   both (one pod reconnecting, or any deployment that sets a stable owner such as a StatefulSet pod name).
   ⛔ Do not "simplify" that test back.
-- ⬜ **OPEN, and the next slice must DECIDE it rather than assume: there are TWO guards, and §5.2 only
-  ever described one.** `CollectorService.runGuard` gates pipeline **runs**; `PipelineScheduler`'s
-  private `acquireGuard` (`:141`) gates **remote acquisition**, and the scheduler's own comment says
-  acquisition "runs independently of pipeline execution". They are two separate `PipelineRunGuard`
-  instances today, so they cannot contend.
-  🔴 **A shared lease table collapses that independence unless the key carries a scope.** With
-  `PRIMARY KEY (space, pipeline)` as shipped in B0, pointing both guards at one `DbRunLease` would make
-  a remote fetch block a run of the same pipeline — a behaviour change nobody asked for.
-  **Recommendation: keep them separate**, either as two lease instances over a key that carries the
-  scope (`PRIMARY KEY (space, scope, pipeline)`) or by leaving acquisition on the heap guard. ⛔ Do not
-  wire both to one lease keyed on `(space, pipeline)`. ⚠ The B0 schema is **unwired**, so changing its
-  key is still free — it stops being free the moment a deployment selects it.
+- ✅ **DECIDED and SHIPPED 2026-09-12 (slice B1) — the two guards stay SEPARATE, via a scope key.**
+  §5.2 only ever described one guard; there are two. `CollectorService.runGuard` gates pipeline **runs**,
+  `PipelineScheduler.acquireGuard` (`:141`) gates **remote acquisition**, and the scheduler's own comment
+  says acquisition runs independently of pipeline execution.
+  🔴 A shared lease table would have collapsed that independence: keyed on `(space, pipeline)` alone,
+  pointing both at one lease makes a remote fetch **block a run** of the same pipeline — pipelines would
+  stall whenever an upstream was slow. **Operator decision: keep them separate.** The key is now
+  `PRIMARY KEY (space, scope, pipeline)` with scopes `run` and `acquire`, and
+  `CollectorService` opens **two** leases, one per scope.
+  ⛔ Do not collapse the `scope` column away — `DbRunLeaseTest.acquisitionAndExecutionDoNotBlockEachOther`
+  is the test that fails if it goes, and a companion test proves the scope did not merely disable
+  exclusion within a scope.
+- ✅ **WIRED (B1).** `ServiceStores.openRunLease(root, scope)` selects on **`-Drun.lease.backend`**
+  (`heap` default · `db` · `postgres` · raw `jdbc:`), mirroring `openEventStore`'s shape, with
+  `OperationalDb.Family.RUN_LEASE`, `SpaceRoot.runLeaseDbUrl()` and `StoreHealth` on both arms.
+  ⛔ Default `heap` — a lease is exclusion *across processes*; on one node the in-heap guard is correct
+  and free, and a DB default would create a file for every Personal install to coordinate a fleet of one.
+  ⚠ A failed open **degrades to the heap guard and records DEGRADED**, which
+  `-Dinspecto.topology=partitioned` turns into a boot failure (A1): on N pods a per-process lease is not
+  a weaker guarantee, it is none.
 - **`lastRunAtMs` moves to the lease row.** Today it is a local map (§3.1); an interval trigger on a
   pod that has never run the pipeline would otherwise fire immediately after a failover.
 - **`JobService` cron arming goes through the same lease** — the per-instance `Scheduler` keeps
