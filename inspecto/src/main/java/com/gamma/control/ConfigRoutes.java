@@ -1,10 +1,14 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RouteArming;
+import com.gamma.etl.TypeFlow;
+import com.gamma.query.MeasureCompiler;
+import com.gamma.sql.SqlGuard;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -270,14 +274,185 @@ final class ConfigRoutes {
     }
 
     /** Mirrors {@code PipelineConfigParser.resolveSchemaRef}: config-relative first, then the CWD. */
-    private static boolean resolves(String ref, Path configDir) {
+    /**
+     * The columns a pipeline draft's declared schema carries, for the save-time checks that need to know
+     * what a step may reference (`TYPEFLOW-CONSUMERS-1` (a)). Reads {@code processing.schema_file},
+     * resolved exactly as {@link #schemaFileFindings} resolves it.
+     *
+     * <p>🔴 <b>Returns EMPTY — never a finding — whenever the schema cannot be read.</b> An unresolvable
+     * reference is already a WARNING from {@link #schemaFileFindings} and is deliberately not fatal (the
+     * file may be created after the save, or belong to another host). A checker that treated "no columns"
+     * as "column missing" would refuse every save made before its schema file exists, which is the normal
+     * authoring order. Callers must therefore treat empty as <em>nothing to say</em>, not as an empty
+     * schema.
+     *
+     * <p>🔴 <b>Merges the structure sibling.</b> A split schema keeps {@code raw.fields[]} in
+     * {@code <name>_structure.csv} (STRUCTURE-CSV-1), so reading the TOON alone sees ZERO fields — the
+     * checks would then quietly pass everything, which is worse than not running. Same merge the
+     * compatibility gate does in {@link ConfigWriteRoutes}.
+     */
+    static List<TypeFlow.Column> declaredColumns(Map<String, Object> draft, Path configDir) {
+        if (!(draft.get("processing") instanceof Map<?, ?> proc)) return List.of();
+        if (!(proc.get("schema_file") instanceof String ref) || ref.isBlank()) return List.of();
+        Path file = resolvedPath(ref, configDir);
+        if (file == null) return List.of();
+        Map<String, Object> schema;
+        try {
+            schema = ConfigLoader.filesystem().decode(file.toString());
+            ConfigFileSupport.mergeSiblingStructure(file, schema);
+        } catch (Exception unreadable) {
+            return List.of();   // malformed or vanished mid-save: silence, per the contract above
+        }
+        if (!(schema.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields))
+            return List.of();
+        List<TypeFlow.Column> out = new ArrayList<>();
+        for (Object f : fields)
+            if (f instanceof Map<?, ?> m && m.get("name") != null) {
+                Object type = m.get("type");
+                out.add(new TypeFlow.Column(String.valueOf(m.get("name")),
+                        type == null || String.valueOf(type).isBlank() ? "VARCHAR" : String.valueOf(type)));
+            }
+        return out;
+    }
+
+    /**
+     * {@code route:} branch predicates that read a column the declared schema does not carry — the
+     * save-time half of a failure that otherwise throws on the first row of a live run
+     * (`TYPEFLOW-CONSUMERS-1` (a); the wiring `elt-final-amendment-plan.md` P2 S2 deferred to "S3+").
+     *
+     * <p>Binds rather than pattern-matches: {@code TypeFlow.describe} DESCRIBEs
+     * {@code SELECT * FROM input WHERE <predicate>} against an empty table shaped by the declared
+     * columns, so DuckDB's own binder decides — and its message names the offending column. A regex over
+     * the predicate would have to know SQL's literals, functions and keywords to avoid flagging them.
+     *
+     * <p>🔴 {@code SqlGuard.check} FIRST, exactly as {@code ComponentRoutes.describeTransform} does.
+     * {@code describe} opens a plain DuckDB connection with no guard of its own; {@code DESCRIBE} plans
+     * without executing, but an authored predicate is untrusted input and this runs on every save.
+     *
+     * <p>Severity follows the arming convention ({@link #routeArmingFindings}): ERROR when the pipeline
+     * is {@code active} and would really fail, WARNING on an inactive draft so mid-authoring saves work.
+     */
+    static List<Finding> routeColumnFindings(String type, Map<String, Object> draft, Path configDir) {
+        if (!"pipeline".equals(type)) return List.of();
+        if (!(draft.get("route") instanceof Map<?, ?> route)) return List.of();
+        if (!(route.get("branches") instanceof List<?> branches) || branches.isEmpty()) return List.of();
+        List<TypeFlow.Column> columns = declaredColumns(draft, configDir);
+        if (columns.isEmpty()) return List.of();   // unknown ≠ empty — see declaredColumns
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        Severity severity = active ? Severity.ERROR : Severity.WARNING;
+        List<Finding> out = new ArrayList<>();
+        for (Object b : branches) {
+            if (!(b instanceof Map<?, ?> m)) continue;
+            Object where = m.get("where");
+            // A blank/absent predicate is routeArmingFindings' refusal, not this one — do not double-report.
+            if (where == null || String.valueOf(where).isBlank()) continue;
+            String predicate = String.valueOf(where);
+            String probe = "SELECT * FROM \"input\" WHERE " + predicate;
+            String fieldPath = "route.branches[" + m.get("key") + "].where";
+            String code = active ? FindingCodes.ERR_ROUTE_PREDICATE_COLUMN
+                                 : FindingCodes.WARN_ROUTE_PREDICATE_COLUMN;
+            String guidance = active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE;
+            // 🔴 Guard the ASSEMBLED statement, never the bare predicate: SqlGuard requires SQL to BEGIN
+            // with SELECT/WITH, so checking the fragment rejected every predicate ever written and the
+            // bind below was skipped for all of them — the check silently passed everything it saw.
+            if (!SqlGuard.check(probe).isEmpty()) {
+                // Reported, not skipped. A predicate that is not a safe read-only expression (a second
+                // statement, a file-reading function) is an authoring fault in its own right, and
+                // staying quiet here would be the same silent hole in a different place.
+                out.add(new Finding(severity, fieldPath,
+                        "route: branch '" + m.get("key") + "' has a where: predicate that is not a safe "
+                                + "read-only expression — it cannot be analysed and would be refused",
+                        code, guidance));
+                continue;
+            }
+            try {
+                TypeFlow.describe(columns, probe);
+            } catch (IllegalArgumentException doesNotBind) {
+                out.add(new Finding(severity, fieldPath,
+                        "route: branch '" + m.get("key") + "' has a where: predicate that does not bind "
+                                + "against the declared schema — " + doesNotBind.getMessage(),
+                        code, guidance));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * {@code transform.summarize} measures aggregating a non-numeric declared field
+     * (`TYPEFLOW-CONSUMERS-1` (a)). Only {@code sum}/{@code avg} are checked
+     * ({@link MeasureCompiler#NUMERIC_AGGS}): {@code min}/{@code max} order dates and text perfectly
+     * well and {@code count}/{@code countDistinct} ignore the value, so flagging those would be taste,
+     * not a type error.
+     *
+     * <p>⚠ The shorthand is split by {@link MeasureCompiler#splitShorthand}, the grammar's own home —
+     * NOT re-implemented here. A malformed entry is the executor's refusal to raise, so it is swallowed:
+     * this check answers "is this field numeric", and reporting a second, differently-worded syntax error
+     * from a type checker would be noise.
+     */
+    static List<Finding> summarizeMeasureFindings(String type, Map<String, Object> draft, Path configDir) {
+        if (!"pipeline".equals(type)) return List.of();
+        if (!(draft.get("processing") instanceof Map<?, ?> proc)) return List.of();
+        if (!(proc.get("summarize") instanceof Map<?, ?> summarize)) return List.of();
+        if (!(summarize.get("measures") instanceof List<?> measures) || measures.isEmpty()) return List.of();
+        List<TypeFlow.Column> columns = declaredColumns(draft, configDir);
+        if (columns.isEmpty()) return List.of();   // unknown ≠ empty — see declaredColumns
+        List<Map<String, Object>> split;
+        try {
+            split = MeasureCompiler.splitShorthand(measures, "processing.summarize");
+        } catch (IllegalArgumentException malformed) {
+            return List.of();   // the executor's refusal, not this check's
+        }
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        Severity severity = active ? Severity.ERROR : Severity.WARNING;
+        List<Finding> out = new ArrayList<>();
+        for (Map<String, Object> m : split) {
+            String agg = String.valueOf(m.get("agg"));
+            Object fieldObj = m.get("field");
+            if (!MeasureCompiler.NUMERIC_AGGS.contains(agg) || fieldObj == null) continue;
+            String field = String.valueOf(fieldObj);
+            String declared = columns.stream()
+                    .filter(c -> c.name().equalsIgnoreCase(field)).map(TypeFlow.Column::type)
+                    .findFirst().orElse(null);
+            // A field the schema does not declare at all is a different fault; the run names it and
+            // this check has no type to judge. Only a DECLARED, non-numeric field is reported here.
+            if (declared == null || isNumeric(declared)) continue;
+            out.add(new Finding(severity, "processing.summarize.measures",
+                    "transform.summarize: measure '" + agg + "(" + field + ")' aggregates '" + field
+                            + "', declared " + declared + " — " + agg + " needs a numeric field and the "
+                            + "run fails when it is not",
+                    active ? FindingCodes.ERR_SUMMARIZE_MEASURE_TYPE
+                           : FindingCodes.WARN_SUMMARIZE_MEASURE_TYPE,
+                    active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
+        }
+        return out;
+    }
+
+    /** DuckDB's numeric family by declared name — width and DECIMAL(p,s) precision are irrelevant here. */
+    private static boolean isNumeric(String declaredType) {
+        String t = declaredType.trim().toUpperCase(java.util.Locale.ROOT);
+        int paren = t.indexOf('(');
+        if (paren > 0) t = t.substring(0, paren).trim();      // DECIMAL(18,2) → DECIMAL
+        return switch (t) {
+            case "TINYINT", "SMALLINT", "INTEGER", "INT", "INT2", "INT4", "INT8", "BIGINT", "HUGEINT",
+                 "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT",
+                 "FLOAT", "REAL", "FLOAT4", "FLOAT8", "DOUBLE", "DECIMAL", "NUMERIC" -> true;
+            default -> false;
+        };
+    }
+
+    /** {@link #resolves}' path half — the resolved file, or {@code null} when it resolves nowhere. */
+    private static Path resolvedPath(String ref, Path configDir) {
         Path asAuthored = Path.of(ref);
         if (configDir != null && !asAuthored.isAbsolute()) {
             Path base      = configDir.toAbsolutePath().normalize();
             Path candidate = base.resolve(asAuthored).normalize();
-            if (candidate.startsWith(base) && Files.isRegularFile(candidate)) return true;
+            if (candidate.startsWith(base) && Files.isRegularFile(candidate)) return candidate;
         }
-        return Files.isRegularFile(asAuthored);
+        return Files.isRegularFile(asAuthored) ? asAuthored : null;
+    }
+
+    private static boolean resolves(String ref, Path configDir) {
+        return resolvedPath(ref, configDir) != null;
     }
 
     private static String unresolvable(String schemaPath) {

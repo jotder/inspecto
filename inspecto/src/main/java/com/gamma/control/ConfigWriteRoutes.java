@@ -149,6 +149,22 @@ final class ConfigWriteRoutes implements RouteModule {
         // writes is only checkable against that parent; run earlier it warned on every single write.
         findings.addAll(ConfigRoutes.schemaFileFindings(type, draft, Severity.WARNING, target.getParent()));
 
+        // TYPEFLOW-CONSUMERS-1 (a): the two save-time checks that need the DECLARED COLUMNS, which is why
+        // they are here and not in the block above — resolving `processing.schema_file` needs the
+        // directory the config lands in, exactly as schemaFileFindings does.
+        findings.addAll(ConfigRoutes.routeColumnFindings(type, draft, target.getParent()));
+        findings.addAll(ConfigRoutes.summarizeMeasureFindings(type, draft, target.getParent()));
+        // 🔴 A SECOND error gate, and it is load-bearing. The gate above runs before `target` exists, so
+        // without this one an ERROR raised by the two checks would be reported in `findings` and the
+        // config written anyway — an ERROR that does not refuse is worse than no check at all.
+        // (schemaFileFindings needs no gate: it is pinned to WARNING by its own severity argument.)
+        // Before the conflict/If-Match checks below, so a 422 refusal precedes a 409 — the house gate
+        // order is spec/validation 422 → jail 403 → conflict 409 → act.
+        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
+            return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                    "error", "config has ERROR-level findings; not written", "findings", findings));
+        }
+
         boolean exists = Files.exists(target);
         // Optimistic concurrency (`CLIENT-HALVES-1` (a), 2026-09-11). HERE and not earlier: `target` is
         // only final after the legacy-name fallback above, and a precondition checked against the wrong
@@ -354,6 +370,11 @@ final class ConfigWriteRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.stepDisableFindings(type, merged));                // and can add disabled_steps too
         findings.addAll(ConfigRoutes.dedupWindowFindings(type, merged));               // and a windowed dedup (D-9)
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
+        // TYPEFLOW-CONSUMERS-1 (a): a patch can drop a column a route predicate reads, or retype a field a
+        // summarize measure sums — both of which the write path now refuses. ⚠ Unlike /config/write this
+        // needs no second gate: `target` is already resolved above, so these sit inside the existing one.
+        findings.addAll(ConfigRoutes.routeColumnFindings(type, merged, target.getParent()));
+        findings.addAll(ConfigRoutes.summarizeMeasureFindings(type, merged, target.getParent()));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "merged config has ERROR-level findings; not written", "findings", findings));

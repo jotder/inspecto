@@ -324,14 +324,66 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally
   *replaced* rather than removed. **Stated, not fixed**, in the plan that shipped the overlay; decide whether
   this is accepted posture or work. → `okf/backend/control-plane/job-vs-step.md`
-- **P2** · **`TYPEFLOW-CONSUMERS-1` — three declared consumers of the type-flow description were never
-  built** (filed 2026-09-10 by Sprint 7.6; the amendment's own P2 S2 deferred the wiring to "S3+" and
-  nothing recorded it landing). `TypeFlow.describe` exists; what does not: **(a) save-time cell-level
-  validation** — a Mapping over a nonexistent field, **a route predicate over a dropped column**, a
-  summarize over a non-numeric measure; **(b) Dataset auto-registration**, where the sink's derived schema
-  becomes the Dataset's `columns{name,type,role}` instead of a hand-authored column list; **(c) the plugin
-  contract** — a plugin Step cannot be SQL-described, so the SPI must declare its output schema. →
-  `okf/backend/engine/catalog-vs-executors.md`
+- **P2 · PARTLY SHIPPED 2026-09-11** · **`TYPEFLOW-CONSUMERS-1` — consumers of the type-flow description**
+  (filed 2026-09-10 by Sprint 7.6). ⚠ **Two of the row's own premises were wrong, found by grounding
+  before any build:**
+  - 🔴 **`TypeFlow.describe` was never unconsumed.** It backs `POST /components/transform/describe`
+    (`ComponentRoutes:145`), which the transform SQL pane calls, and `TypeFlow.sinkColumns` backs
+    `ConfigPreviewRoutes:110`. What was missing is a consumer **in a save-time path** — a narrower claim.
+  - 🔴 **(a) was a third already built.** "A Mapping over a nonexistent field" is `SchemaMappingDrift.check`,
+    wired into `/config/write` and `/config/patch` since AUTHORING-REDESIGN-1 (g). The row counted it as
+    missing. ⚠ The declaring plan (`elt-final-amendment-plan.md` P2 S2) is narrower still than the row: it
+    deferred exactly "save-time/dry-run wiring … into ConfigRoutes/PipelineDryRun", *because it needs the
+    recipe/pipeline context, not the schema component alone* — which is why these land on the PIPELINE
+    save paths and not on a schema save.
+  ✅ **(a)'s two genuinely-absent checks SHIPPED:** `ConfigRoutes.routeColumnFindings` (a `route:` branch
+  whose `where:` reads a column the declared schema does not carry) and `ConfigRoutes.summarizeMeasureFindings`
+  (a `sum`/`avg` over a non-numeric declared field — `min`/`max` order text and dates fine, `count` ignores
+  the value, so only those two are a type error). Both wired into `/config/write`, `/config/patch` and
+  `PipelineGraphRoutes`, with the house severity split (ERROR when `active`, WARNING on a draft).
+  🔴 **Three traps, each of which had shipped a silent hole.** (1) `SqlGuard` requires SQL to BEGIN with
+  SELECT/WITH, so guarding the bare predicate rejected **every** predicate and skipped the bind for all of
+  them — the check passed everything while looking like it worked; guard the *assembled* statement, and
+  report a violation rather than skipping. (2) `/config/write`'s only ERROR gate runs **before** `target`
+  is resolved, and these checks need it to resolve `processing.schema_file` — so an ERROR added at the
+  natural place was *reported and the config written anyway*; a second gate was added (before the
+  conflict/If-Match checks, so 422 still precedes 409). `schemaFileFindings` sits there safely only because
+  it is pinned to WARNING by an explicit argument. (3) A split schema keeps `raw.fields[]` in the sibling
+  `_structure.csv` (STRUCTURE-CSV-1), so reading the TOON alone sees ZERO columns and both checks fall
+  silent — `declaredColumns` merges the sibling, and a test pins it.
+  ⚠ **`declaredColumns` returns EMPTY, never a finding, when the schema cannot be read** — an unresolvable
+  reference is already a deliberate WARNING (the file may be created after the save). Treating unknown as
+  "declares nothing" would refuse every save made in the normal authoring order. Unknown ≠ empty.
+  ✅ **(c) SPI SHIPPED on the operator's explicit call**, over my recommendation to wait:
+  `PipelineNodeType.outputColumns(inputColumns, config)` returning `Optional.empty()` by default — a
+  plugin Step has no SQL for DuckDB to plan, so only the provider can state its output shape. ⚠ **Declared,
+  not enforced: nothing reads it, and no gate compares a provider's answer with what `shape` actually
+  produces.** Whoever wires the first consumer decides what happens when they disagree, and should expect
+  existing packs to be wrong. `default` ⇒ non-breaking (the interface has 6 defaults and one abstract);
+  blast radius is `BuiltinNodeType` + one sample pack outside the reactor.
+  **Still open — (b) Dataset auto-registration**, needing a design call, → `TYPEFLOW-DATASET-COLUMNS-1`.
+  Tests: 13 (`TypeFlowSaveTimeFindingsTest`). → `okf/backend/engine/catalog-vs-executors.md`
+- **P3** · **`TYPEFLOW-DATASET-COLUMNS-1` — a Dataset's columns are never derived from the pipeline that
+  fills it** (filed 2026-09-11, split out of `TYPEFLOW-CONSUMERS-1` (b)). A `DatasetColumn` is
+  `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic
+  (`inferRoles`, `dataset-types.ts:85-91`) lives **client-side** and is wired to live-query results, not to
+  a derived schema. 🔴 **`MaterializeTask:109-115` is the one place a dataset is registered by code rather
+  than a human, and it writes NO `columns` at all** — so auto-population is absent even where
+  auto-registration already happens; that is the natural first consumer. ⚠ `GET /config/schema/derived`
+  is wired end-to-end (`ConfigService.derivedSchema` → `DerivedSchemaPanelComponent:135`) but the panel
+  is **ORPHANED** — its selector is in no template or route, so nothing mounts it. Design:
+  `superpower/dataset-column-derivation-plan.md`, which recommends shipping its first two steps (pin the
+  role heuristic as a contract; make the materialize refresh a MERGE) **even if the headline derivation
+  is never built** — 🔴 `MaterializeTask`'s refresh replaces the whole document, so a human's authored
+  roles/labels are destroyed on every run today, derivation or not.
+  → `okf/backend/engine/catalog-vs-executors.md`
+- **P3** · **`MEASURE-SHORTHAND-ONE-HOME-1` — the measure shorthand is split in three hand-rolled copies**
+  (filed 2026-09-11 by `TYPEFLOW-CONSUMERS-1`). `MaterializeTask:131`, `ReportJob:168` and `RowShaper:472`
+  each re-implement `count | agg(field)` byte-identically. ✅ Verified identical before filing, so a merge
+  is behaviour-preserving today — the point is that it will not stay that way. `MeasureCompiler.splitShorthand`
+  now exists as the one home (the grammar's own class) and the new save-time check uses it; the three were
+  deliberately NOT migrated, because that change needed to touch the engine and nothing in the shipped work
+  required it. ⛔ Do not add a fourth copy. → `okf/backend/engine/catalog-vs-executors.md`
 - **P3** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY** (filed
   2026-09-10 by Sprint 7.6). Delete the five non-edges in favour of Signals, and collapse the four reject
   relations to `reject:<reason>`. ⚠ **These two are documentation and vocabulary and need no runtime

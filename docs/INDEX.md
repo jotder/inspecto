@@ -119,15 +119,16 @@ When the work ships: distil the durable as-built facts into the matching OKF con
 to [`BACKLOG.md`](BACKLOG.md), then `git mv` the plan to `archived-documents/plans-archive/` and add its row
 to the table below — all in the same change.
 
-✅ **2026-09-10: the in-flight tier is exactly ONE plan.** Sprint 7 closed the documentation programme and
+✅ **2026-09-11: the in-flight tier is TWO plans** (it was exactly one from 2026-09-10 until `dataset-column-derivation-plan.md` was written). Sprint 7 closed the documentation programme and
 archived its two driving plans (`post-consolidation-sprints.md`, `docs-consolidation-plan.md`) along with the
 three release-gated pipeline plans. ⛔ **A plan is archived when its durable content is distilled, not when
 its last release gate clears** — the earlier rule, stated in five places, is superseded. What remains under
-`superpower/` besides the one plan is **working assets**, listed below.
+`superpower/` besides those plans is **working assets**, listed below.
 
 | Plan | State | What is actually left |
 |---|---|---|
 | [`enterprise-scale-out-plan.md`](superpower/enterprise-scale-out-plan.md) | **SIGNED 2026-09-10** (§9 D1′–D13; §2 amendments applied; spikes S1–S5 next) | Enterprise scales out on **Kubernetes by shared-nothing partitioning** (N pods, each owning Spaces, one DuckLake catalog on Postgres over object storage) — ⛔ not a distributed engine. Three M phases, the first two valuable on a single node (durable shared state; a run lease that makes T4 standby automatic). ⚠ **Revises signed decisions** — container D1 and two `editions.md` §6 refusals — with the exact amendments in §2, applied on signature, not before. Written 2026-09-10. |
+| [`dataset-column-derivation-plan.md`](superpower/dataset-column-derivation-plan.md) | **DESIGN ONLY — nothing built** (2026-09-11; four decisions open in §6) | `TYPEFLOW-DATASET-COLUMNS-1`: should a Dataset's `columns{name,type,role}` be derived rather than hand-authored. 🔴 Grounding refuted the row's framing: the role heuristic ALREADY exists in **three** unpinned copies (one Java, two TS), and `MaterializeTask`'s refresh REPLACES the dataset document, so a human's authored roles are destroyed on every run today. ⇒ recommends shipping the **contract pin** and the **merge-not-replace fix** even if the headline derivation never is. ⛔ Option A needs no `TypeFlow` at all, despite the parent row naming it. |
 | [`design/record-transformer-review/`](superpower/design/record-transformer-review/) | WORKING FILES | Design-canvas sources for the Record Transformer review (2026-09-05). Re-seed from these; never edit the assembled `.html`. |
 | [`assets/`](superpower/assets/) | TOOLING | `pkggraph.py` / `edgeholders.py` / `fanmatrix2.py` — reproduce any reactor or package metric quoted in `okf/backend/modules/reactor.md`. |
 

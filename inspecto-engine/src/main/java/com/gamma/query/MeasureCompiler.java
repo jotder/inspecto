@@ -58,6 +58,42 @@ public final class MeasureCompiler {
                        Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {}
 
     /** Parse the {@code POST /bi/query} body into a validated {@link Spec}. */
+    /**
+     * Split the measure <b>shorthand</b> — {@code count} | {@code agg(field)} — into the
+     * {@code {agg, field}} maps {@link #parse} consumes. The shorthand is what a human authors: a
+     * {@code transform.summarize} node's {@code measures[]}, a materialize job's comma-separated
+     * {@code measures}, a report job's the same.
+     *
+     * <p>⚠ This is the grammar's split, and it belongs here beside {@link #AGGS} and {@link #parse}
+     * rather than at each caller. Three call sites still hand-roll a byte-identical copy
+     * ({@code MaterializeTask:131}, {@code ReportJob:168}, {@code RowShaper:472}); they are not
+     * migrated here because this change did not need to touch them, but a fourth copy is exactly how
+     * one grammar becomes several that drift. New callers use this.
+     *
+     * @param shorthand the authored entries; each is {@code toString().trim()}ed, so a TOON list of
+     *                  plain strings and a pre-split config value both work
+     * @param context   names the offending config in the exception (e.g. {@code "node 'roll'"})
+     * @throws IllegalArgumentException on an entry that is neither {@code count} nor {@code agg(field)}
+     */
+    public static List<Map<String, Object>> splitShorthand(List<?> shorthand, String context) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : shorthand) {
+            String m = String.valueOf(o).trim();
+            if ("count".equals(m)) { out.add(Map.of("agg", "count")); continue; }
+            int p = m.indexOf('(');
+            if (p < 0 || !m.endsWith(")"))
+                throw new IllegalArgumentException(context
+                        + ": measure must be count or agg(field), got '" + m + "'");
+            out.add(Map.of("agg", m.substring(0, p), "field", m.substring(p + 1, m.length() - 1)));
+        }
+        return out;
+    }
+
+    /** The aggregations that require a NUMERIC field. {@code min}/{@code max} order dates and text
+     *  perfectly well, and {@code count}/{@code countDistinct} ignore the value entirely — so only
+     *  these two are a type error rather than a taste question. */
+    public static final List<String> NUMERIC_AGGS = List.of("sum", "avg");
+
     public static Spec parse(Map<String, Object> body, int defaultLimit, int maxLimit) {
         String dataset = trimToNull(body.get("dataset"));
         if (dataset == null) throw new IllegalArgumentException("body must include 'dataset'");

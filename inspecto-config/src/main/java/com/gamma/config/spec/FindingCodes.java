@@ -49,6 +49,21 @@ public final class FindingCodes {
     /** The same windowed-dedup refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_DEDUP_WINDOW_UNARMABLE = "WARN_DEDUP_WINDOW_UNARMABLE";
 
+    /** An ACTIVE {@code route:} branch whose {@code where:} predicate reads a column the pipeline's
+     *  declared schema does not carry — the branch binds nowhere and throws on the first row
+     *  (`TYPEFLOW-CONSUMERS-1` (a)). */
+    public static final String ERR_ROUTE_PREDICATE_COLUMN = "ERR_ROUTE_PREDICATE_COLUMN";
+
+    /** The same predicate refusal on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_ROUTE_PREDICATE_COLUMN = "WARN_ROUTE_PREDICATE_COLUMN";
+
+    /** An ACTIVE {@code transform.summarize} measure aggregating a NON-NUMERIC declared field
+     *  ({@code sum}/{@code avg} only) — DuckDB refuses it at run time (`TYPEFLOW-CONSUMERS-1` (a)). */
+    public static final String ERR_SUMMARIZE_MEASURE_TYPE = "ERR_SUMMARIZE_MEASURE_TYPE";
+
+    /** The same measure-type refusal on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_SUMMARIZE_MEASURE_TYPE = "WARN_SUMMARIZE_MEASURE_TYPE";
+
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 

@@ -130,6 +130,33 @@ As built:
   describe and execute agreeing — SQL refused at run time is refused while it is being written
   (`ControlApiComponentsTest.describeRefusesFileReadingSqlTheExecutorWouldAlsoRefuse`, whose probe is a
   CSV that really exists, so an un-guarded route would answer 200).
+* **`describe`'s SECOND consumer — save-time validation (2026-09-11, `TYPEFLOW-CONSUMERS-1` (a)):**
+  `ConfigRoutes.routeColumnFindings` binds each `route:` branch's `where:` as
+  `SELECT * FROM "input" WHERE <predicate>` over the pipeline's declared columns, so DuckDB's binder —
+  not a regex — decides whether the predicate reads a column that exists, and its message names the
+  offending one. Wired into `/config/write`, `/config/patch` and `PipelineGraphRoutes`, which is the
+  "needs the recipe/pipeline context" the amendment's P2 S2 deferral meant. Its sibling
+  `summarizeMeasureFindings` is a plain type comparison (no DuckDB): `sum`/`avg` over a non-numeric
+  declared field.
+  🔴 **`SqlGuard.check` runs on the ASSEMBLED statement, never the bare predicate.** `SqlGuard` requires
+  SQL to begin with SELECT/WITH, so guarding the fragment rejects **every** predicate and silently skips
+  the bind for all of them — the check then passes everything while appearing to work (found by test, not
+  by reading). ⚠ Guarding is not optional here for the reason the bullet above gives: the binder OPENS a
+  `read_csv('…')` target to infer its schema, so an unguarded save-time bind would read arbitrary files
+  **on every save** — a worse exposure than the route's, because no one asked for it.
+  🔴 **Unknown ≠ empty.** `ConfigRoutes.declaredColumns` returns an empty list — and both checks then say
+  nothing — whenever the schema cannot be read. An unresolvable `schema_file` is a deliberate WARNING
+  (the file may be created after the save), so treating "no columns" as "column missing" would refuse
+  every save made in the normal authoring order. It also merges the `_structure.csv` sibling: a split
+  schema's TOON carries no `raw.fields[]`, and without the merge both checks fall permanently silent.
+* **The plugin half, declared but not enforced (`TYPEFLOW-CONSUMERS-1` (c)):**
+  `PipelineNodeType.outputColumns(inputColumns, config)` (`default` ⇒ `Optional.empty()`) lets a pack
+  state its Step's output shape, because a plugin Step has no SQL for the binder to plan and every
+  derived-schema consumer otherwise stops dead at one. ⚠ **Nothing reads it yet** — it was added ahead of
+  its consumers, on the operator's explicit call, so pack authors have a stable contract; that means no
+  gate compares a provider's answer against what `shape` actually produces. `Optional.empty()` means "not
+  statically knowable"; an empty LIST would mean "emits no columns", and a consumer cannot tell those
+  apart, so the distinction is load-bearing.
 * **Audit honesty at the boundary:** `transform.sql` is, by construction, outside the cast-failure audit
   (the same reason `EXPR` is). `PipelineValidator.validate` emits one WARNING `SQL_STEP_UNAUDITED`
   (`PipelineValidator.java:86, 263-267`) per `transform.sql` node, naming the node id and its `sql`
