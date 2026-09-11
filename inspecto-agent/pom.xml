@@ -39,6 +39,14 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
+            <!-- `provided`, exactly as inspecto-connectors scopes it (PKG-5, 2026-09-12). The core is
+                 ALWAYS on a bundle's classpath as inspecto.jar, so shading it into this sidecar would
+                 ship a second copy of every core class and service registration - 8660 entries and
+                 ~98 MB, against ~9 MB of actual agent. Duplicate ServiceLoader registrations on one
+                 classpath is not merely wasteful; it is a second, older copy of the product competing
+                 with the real one. Still on the compile AND test classpath, so nothing here changes
+                 for the module's own build. -->
+            <scope>provided</scope>
         </dependency>
 
         <!-- eoiagent model substrate: LlmGateway port (core) + Lc4jChatGateway transport (model).
@@ -127,6 +135,22 @@
                                         <!-- Never ship a second logging config; the core owns it. -->
                                         <exclude>logback.xml</exclude>
                                         <exclude>module-info.class</exclude>
+                                        <!-- 🔴 A SECOND SLF4J BINDING on one classpath is a real conflict:
+                                             SLF4J picks one non-deterministically and warns, so a bundle
+                                             with this sidecar could silently log through a different
+                                             backend than the core configured. The core owns the binding;
+                                             this sidecar must carry slf4j-api ONLY. Found 2026-09-12 when
+                                             the shaded jar turned out to register an SLF4JServiceProvider.
+                                             ⛔ Do not drop these excludes to "fix" a missing-logger
+                                             warning inside the agent - fix the dependency instead. -->
+                                        <exclude>META-INF/services/org.slf4j.spi.SLF4JServiceProvider</exclude>
+                                        <exclude>org/slf4j/impl/**</exclude>
+                                        <exclude>ch/qos/logback/**</exclude>
+                                        <!-- The core owns JDBC driver registration and the servlet
+                                             container; a sidecar re-declaring either changes what the
+                                             product boots with. Same reasoning as the binding above. -->
+                                        <exclude>META-INF/services/java.sql.Driver</exclude>
+                                        <exclude>META-INF/services/jakarta.servlet.ServletContainerInitializer</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

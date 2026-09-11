@@ -68,7 +68,8 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    **pipeline** anchor per the operator's call; residuals filed as `STALE-TILES-PRECISION-1` and
    `CATALOG-WIDGET-NODES-1`. **⇒ SPRINT 8 IS COMPLETE — all seven rows.** →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
-   the rest of the brochure: `PKG-5` (no assistant ships without it) and `RECON-CARDINALITY-1`.
+   the rest of the brochure: ~~`PKG-5`~~ ✅ **RESOLVED + SHIPPED 2026-09-12** and `RECON-CARDINALITY-1`
+   (now the only one left).
    ⛔ Do not start v1.2 of the whitepaper until 0–4 are green: it is the claims that move, not the prose.
 1. ~~**`SBOM-RESOLVE-1` (§4)**~~ ✅ **SHIPPED 2026-09-09** — `release.yml` now installs the reactor under `-Pedition-enterprise` before the packaging steps. Was the only queued P1. The bill of materials cannot generate on a clean
    runner, so the first tag fails at packaging; it names the file it changes (`release.yml`). Filed
@@ -94,8 +95,22 @@ code before filing, not just the board.
 
 | Decision | Why it is a decision, not a build | Unblocks |
 |---|---|---|
-| **`PKG-5` needs an OWNER** — resolve the JDK 25+ vs Java 24+ floor so the assistant can be bundled | the assistant is built and tested and ships in **no** edition (`CP-14`); the brochure's v1.1 headline is a feature no customer can download. The floor question has sat in §6 with no owner since it was filed | Page 6 of the whitepaper; `AGT-*` edition cells becoming `All` |
 | **`RECON-CARDINALITY-1`** — add one-to-many / many-to-many match modes to reconciliation, or drop the claim | `ReconService` supports `exact` / `absolute` / `percent` tolerance and key matching only; cardinality is not a recon option. The brochure asserts it. Building it is an M; dropping it is a sentence | whether §4 of the whitepaper keeps the phrase |
+
+*(2026-09-12: **`PKG-5` DECIDED and SHIPPED same day.** Operator: the assistant ships **Standard and
+Enterprise, as an optional component** — taken first as "all editions, optional" and narrowed once the
+sidecar's weight was measured. 🔴 **The row's stated blocker was the wrong one.** It read "resolve the
+JDK 25+ vs Java 24+ floor". The floor is real (every `eoiagent-*` jar is class-file major 69, measured)
+but was never the blocker: `CollectorService.start()` called `ServiceLoader.load(AssistAgent.class)`
+UNGUARDED, and `UnsupportedClassVersionError` is an `Error` that `ServiceLoader` propagates rather than
+wrapping — so staging the jar would have made the **entire server fail to boot** on a Java 24 host because
+an OPTIONAL component could not load. No `LinkageError` handling existed anywhere in `inspecto`'s main
+tree. `OptionalSpi` now makes unloadable an ABSENCE at all six discovery sites; the bundle's stated Java
+requirement stays **24**. `inspecto-agent` gained a shaded `sidecar` artifact (a thin jar would have been
+present-but-unlinkable, i.e. installed-looking and dead) with `inspecto-processor` scoped `provided` —
+without that the sidecar swallowed the whole core, 98 MB against 3.5 MB. Staging verified by BUILDING both
+bundles, not by reading the generator: Standard carries `inspecto-agent.jar`, Personal does not.
+⚠ The classpath list had **FIVE mirrors** in `package.ps1`, not one.)*
 
 *(2026-09-10, later: `CONSUMER-PAIRS-1` decided **per row, in one sitting** — seven ADOPT, one KEEP-as-API, two RETIRE; verdicts in each owning spec's §2, work grouped into five §3 rows: `CLIENT-HALVES-1`, `EXPECTATIONS-UI-1`, `STUDIO-HALVES-1`, `AGT-ARTIFACT-1`, `RETIRE-HALVES-1`. **§1 is now EMPTY** — the first time since the board was consolidated.)*
 

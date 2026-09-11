@@ -56,6 +56,10 @@ const MODULES = [
     { artifactId: 'inspecto-metrics', dir: 'inspecto-metrics', bundleFile: 'inspecto-metrics.jar', from: 'standard' },     // cell 5 (CP-13, /metrics)
     { artifactId: 'inspecto-events', dir: 'inspecto-events', bundleFile: 'inspecto-events.jar', from: 'standard' },        // cell 6 (CP-13, /events*)
     { artifactId: 'inspecto-ops', dir: 'inspecto-ops', bundleFile: 'inspecto-ops.jar', from: 'standard' },                 // cell 7 (CP-11)
+    // PKG-5 (2026-09-12): the assist agent ships Standard and above, as an OPTIONAL component. NB it is
+    // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
+    // that pass builds its shaded `sidecar` artifact. The staged file is the sidecar, never the thin jar.
+    { artifactId: 'inspecto-agent', dir: 'inspecto-agent', bundleFile: 'inspecto-agent.jar', from: 'standard' },             // CP-14
 
     // Enterprise only.
     { artifactId: 'inspecto-policy', dir: 'inspecto-policy', bundleFile: 'inspecto-policy.jar', from: 'enterprise' },

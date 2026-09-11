@@ -187,11 +187,27 @@ jars, the board's packaging row omits three modules and both sidecars, the board
 two, the build page's *table* omits everything the same page's *prose* gets right — and the eighth is
 **code that ships as a compliance artifact** (§3.7).
 
-**Three modules build on every run and ship in nothing** — the two assistant modules and the intelligence
-module. This is deliberate and documented: they are plain reactor modules, not gated ones, so they compile
-and test continuously and reach no bundle. Consequently the assistant routes answer 503 in **every**
-artifact the build produces. Bundling them is blocked on the Java floor (§3.6), tracked as `PKG-5`, and
-refused as scoped (§6).
+✅ **`PKG-5` RESOLVED 2026-09-12 — the assistant now ships.** `inspecto-agent` is staged as
+`inspecto-agent.jar` in **Standard and Enterprise** bundles and wired into all four launchers
+(`serve.sh`/`serve.bat`/`run.sh`/`run.bat`) by jar presence, like every other optional module. Operator
+decision, taken as "all editions, optional" and narrowed the same day to **Standard and above** once the
+sidecar's weight was measured — Personal already carries the ~32 MB connector sidecar and is not sold on
+the assistant. Verified by BUILDING both bundles: Standard carries the jar, Personal does not.
+
+⚠ **`inspecto-agent-hosted` and `inspecto-intelligence` still build on every run and ship in nothing.**
+That remains deliberate — plain reactor modules, not gated ones, compiled and tested continuously — but
+it is now two modules, not three, and the assistant routes answer 503 only where the jar is absent.
+
+🔴 **The row's stated blocker was the wrong one, for the seventh-odd time on this board.** `PKG-5` read
+"blocked on the Java floor". The floor is real — every `eoiagent-*` jar is class-file major **69**
+(Java 25), measured 2026-09-12, against a compile target of 24 — but it was never what made bundling
+refusable. The blocker was that `CollectorService.start()` called `ServiceLoader.load(AssistAgent.class)`
+**unguarded**: an unloadable jar raises `UnsupportedClassVersionError`, an `Error` that `ServiceLoader`
+propagates rather than wrapping, so staging the assistant would have made **the whole server fail to boot**
+on a Java 24 host because an *optional* component could not load. `com.gamma.service.OptionalSpi` now
+treats unloadable as an absence at all six discovery sites, and the floor question dissolves: the bundle's
+stated Java requirement stays **24**, and on an older host the product starts normally with the assistant
+simply absent. → §3.6
 
 ⚠ **One module is unreachable and undocumented.** A vendor-transform plugin under the decoder tree
 registers roughly forty legacy transform functions through a real provider seam, discovered by a registry
@@ -301,9 +317,15 @@ concept page says a "Java 26 toolchain". The cache holds 25. The *conclusion* su
 assistant modules' floor — but the number is wrong in both places, and one of them is the file that sets
 the floor.
 
-This is the whole of `PKG-5`: bundling the assistant modules would raise the bundle's floor from 24 to 25.
-Since every released bundle skips the runtime and therefore depends on the host's Java, that is a change to
-the stated system requirement, not a packaging convenience.
+🔴 **That framing was wrong, and it is what kept `PKG-5` refused for months.** "Bundling would raise the
+bundle's floor from 24 to 25" assumes the floor is a property of the BUNDLE. It is a property of the
+**module**, and it binds only a host that actually loads it. Since 2026-09-12 an optional module that
+cannot link is skipped with a warning (`com.gamma.service.OptionalSpi`) and its routes answer 503 — the
+ordinary absence contract. So the assistant ships in Standard and Enterprise, the bundle's **stated system
+requirement stays 24**, and a customer on 24 gets the product without the assistant instead of a product
+that will not start. ⛔ Do not re-refuse this on floor grounds.
+
+⚠ The two documents claiming 26 are still wrong, and that is a separate correction (§2 `PKG-4`).
 
 ### 3.7 Release integrity, the bill of materials, and the missing edition
 
@@ -707,7 +729,6 @@ definition of "done" for every unbuilt script. Board rows: `SPEC-DEPLOY-ROWS-1` 
 * **Multi-user relational deployment** — parked until a multi-operator install exists.
 * **Step-processor gaps** — eighteen partial and sixty-seven planned rows on the board.
 * **Policy-authoring experience** — hand-authored files only today.
-* **Bundling the assistant modules** (`PKG-5`) — filed as won't-do, blocked on the Java floor (§3.6).
 
 ### 5.3 `UNTRACKED` — found writing this spec, no board row exists
 
@@ -818,7 +839,7 @@ citations elsewhere in this spec still resolve.
 | **"Personal binds localhost only"** | **SUPERSEDED** 2026-08-29 | The code never enforced it. The claim was the defect, not the behaviour |
 | **A framework migration** | ⛔ **REFUSED** | At five to fifteen users a framework buys nothing the identity provider and a few small libraries do not, and a lean dependency tree is a compliance asset |
 | **In-app login, user management, directory or assertion integration** | ⛔ **REFUSED** | Identity is delegated to the customer's provider; the product only validates the resulting token (§3.9) |
-| **Bundling the assistant modules** (`PKG-5`) | ⛔ **REFUSED as scoped** | Agent-absent is the intended shipped default, and bundling would raise the bundle's Java floor (§3.6) |
+| **Bundling the assistant modules** (`PKG-5`) | ✅ **REVERSED and SHIPPED 2026-09-12** | The refusal rested on "bundling would raise the bundle's Java floor". It does not: the floor only binds a host that actually loads the module, and `OptionalSpi` now makes an unloadable optional module an ABSENCE rather than a boot failure. Staged in Standard and Enterprise; the stated requirement stays Java 24 (§2, §3.6) |
 | **Gating the connector module** | ⛔ **REFUSED** 2026-09-07 | Remote acquisition is a core capability, and the board marks it shipped in all three editions; gating it would mean correcting the acquisition rows |
 | **A per-edition capability-vocabulary validator** | ⛔ **REFUSED** | It would break role-file portability — a file authored on Standard would fail validation on Personal — and dead vocabulary has no route behind it |
 | **Active/active deployment** | ⚠ **SUPERSEDED 2026-09-10** for Enterprise | Active/active becomes **partitioned scale-out** (shared-nothing by Space — a pod owns Spaces; no replicated active/active), per the signed `superpower/enterprise-scale-out-plan.md` §4. Personal/Standard: still not offered; Standard gets the T4 active/**passive** standby instead (§3.9) |

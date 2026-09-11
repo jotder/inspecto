@@ -240,6 +240,7 @@ $exchangeJarSrc = $null
 $metricsJarSrc  = $null
 $eventsJarSrc   = $null
 $opsJarSrc      = $null
+$agentJarSrc    = $null
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
@@ -251,7 +252,12 @@ if ($Edition -ne 'Personal') {
     # EDG-01 cell 5: inspecto-metrics (CP-13, the /metrics exposition), Standard and above.
     # EDG-01 cell 6: inspecto-events (CP-13's other half, the /events* feed), Standard and above.
     # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Standard and above.
-    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops' }
+    # PKG-5 (operator decision 2026-09-12): the assistant is STANDARD AND ABOVE. Taken first as
+    # "all editions, optional" and narrowed the same day once the sidecar's weight was measured -
+    # Personal already carries the ~32 MB connector sidecar. NB inspecto-agent is in the DEFAULT
+    # reactor (not profile-scoped like the modules beside it); it is listed here only so this pass
+    # builds its `sidecar` artifact for the editions that stage it.
+    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -323,6 +329,14 @@ if ($Edition -ne 'Personal') {
     }
     # The operational-objects module (EDG-01 cell 7). NOT thin: the whole com.gamma.ops domain.
     $opsTargetDir = Join-Path $sandboxRoot 'inspecto-ops\target'
+    # PKG-5: the SHADED `sidecar` artifact, never the thin jar. A thin inspecto-agent.jar on the
+    # bundle classpath is present but cannot link (eoiagent-*/langchain4j missing), so the assistant
+    # would look installed and silently do nothing. The glob therefore pins '-sidecar'.
+    $agentTargetDir = Join-Path $sandboxRoot 'inspecto-agent\target'
+    $agentJarSrc = Get-ChildItem -Path $agentTargetDir -Filter 'inspecto-agent-*-sidecar.jar' -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty FullName
+    if (-not $agentJarSrc) { throw "Assistant sidecar not found matching $agentTargetDir\inspecto-agent-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl inspecto-agent -am -DskipTests" }
+
     $opsJarSrc = Get-ChildItem -Path $opsTargetDir -Filter 'inspecto-ops-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
                       Select-Object -First 1 -ExpandProperty FullName
@@ -490,6 +504,30 @@ if ($opsJarSrc) {
         if (-not $engineSpi) { throw "inspecto-ops.jar has no META-INF/services/com.gamma.service.ObjectEngineProvider - the routes would load but resolve no ObjectAccess." }
         Write-Host "  verified: RouteModule + ObjectEngineProvider registrations present in the ops module" -ForegroundColor DarkGray
     } finally { $opZip.Dispose() }
+}
+if ($agentJarSrc) {
+    Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"
+    Write-Host "Bundled Standard-edition assist agent -> inspecto-agent.jar" -ForegroundColor Green
+
+    # Verify the sidecar is USABLE, not merely present - the lesson CONNECTORS-BUNDLE-1 taught (a
+    # module's own tests can never fail for a packaging gap). This runs on the STAGED ARTIFACT.
+    $agentZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-agent.jar")
+    try {
+        $assistSpi = $agentZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.assist.spi.AssistAgent' }
+        if (-not $assistSpi) { throw "inspecto-agent.jar has no META-INF/services/com.gamma.assist.spi.AssistAgent - the shade lost the ServicesResourceTransformer, so CollectorService.start() would discover nothing and every assist path would 503." }
+        # A thin jar is what the -sidecar glob exists to prevent; prove the dependency is really inside.
+        $eoi = $agentZip.Entries | Where-Object { $_.FullName.StartsWith('com/eoiagent/') } | Select-Object -First 1
+        if (-not $eoi) { throw "inspecto-agent.jar carries no eoiagent classes - it is a THIN jar; the assistant would fail with NoClassDefFoundError at run time." }
+        # The core must NOT be inside: inspecto-processor is scoped `provided` precisely so this sidecar
+        # does not ship a second copy of the product beside inspecto.jar. Before that scope fix this jar
+        # was 98 MB and carried 137 duplicate etl classes; after it, 3.5 MB.
+        $leak = $agentZip.Entries | Where-Object { $_.FullName.StartsWith('com/gamma/etl/') } | Select-Object -First 1
+        if ($leak) { throw "inspecto-agent.jar contains core classes (com/gamma/etl/*) - inspecto-processor lost its provided scope, so the bundle would carry two copies of the product." }
+        # A second SLF4J binding makes backend selection non-deterministic; the core owns it.
+        $binding = $agentZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/org.slf4j.spi.SLF4JServiceProvider' }
+        if ($binding) { throw "inspecto-agent.jar registers a second SLF4J binding - the shade excludes were dropped." }
+        Write-Host "  verified: AssistAgent registration present, dependencies shaded in, core excluded, no duplicate SLF4J binding" -ForegroundColor DarkGray
+    } finally { $agentZip.Dispose() }
 }
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
@@ -707,6 +745,10 @@ CP="inspecto.jar"
 [ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
 [ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
+# PKG-5: the assistant, Standard and above. Absent in a Personal bundle, and absent-safe everywhere:
+# OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
+# floor of 24), so an older host boots normally and the assist paths answer 503.
+[ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
 [ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
@@ -787,6 +829,7 @@ rem Prometheus scrape endpoint (EDG-01 cell 5) - Standard/Enterprise only.
 if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
 if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
+if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
@@ -935,6 +978,10 @@ fi
 [ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
 [ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
+# PKG-5: the assistant, Standard and above. Absent in a Personal bundle, and absent-safe everywhere:
+# OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
+# floor of 24), so an older host boots normally and the assist paths answer 503.
+[ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -1031,6 +1078,7 @@ rem Prometheus scrape endpoint (EDG-01 cell 5) - Standard/Enterprise only.
 if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
 if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
+if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
@@ -1420,7 +1468,7 @@ if (-not $SkipBootCheck) {
             else { 'java' }
     # The same classpath the generated launchers build -- deliberately re-derived from the staged files
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
-    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','postgresql.jar' |
+    $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
