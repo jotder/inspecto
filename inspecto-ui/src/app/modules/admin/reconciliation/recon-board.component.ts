@@ -13,6 +13,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { FlatTreeRow, TreeNode, TreeTableComponent } from 'app/inspecto/tree-table';
 import {
+    ageBucketLabel,
     bandFor,
     bandGlyph,
     bandTone,
@@ -25,11 +26,13 @@ import {
     fmtMeasure,
     markBreachesExpanded,
     mergeBreaks,
+    openAgeBuckets,
     Reconciliation,
     ReconciliationsService,
     ReconRunResult,
     RECON_RECORDS,
 } from 'app/inspecto/reconciliation';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { ReconExecService } from './recon-exec.service';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
 
@@ -62,6 +65,7 @@ interface TotalLine {
         MatTooltipModule,
         TreeTableComponent,
         InspectoEmptyStateComponent,
+        ChipComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './recon-board.component.html',
@@ -83,6 +87,14 @@ export class ReconBoardComponent implements OnInit {
     readonly breachesOnly = signal(false);
 
     readonly bands = computed(() => this.recon()?.bands ?? DEFAULT_BANDS);
+
+    /**
+     * Open breaks by age across the WHOLE reconciliation (`BREAK-AGING-1`) — the Board is the landing
+     * page, so "how long has this been broken" belongs here as well as on the Breaks page. Same shared
+     * rollup as the Breaks page, so the two can never disagree.
+     */
+    readonly ageBuckets = computed(() => openAgeBuckets(this.recon()?.breaks ?? []));
+    readonly ageLabel = ageBucketLabel;
 
     readonly treeNodes = computed<TreeNode[]>(() => {
         const r = this.result();
@@ -157,10 +169,13 @@ export class ReconBoardComponent implements OnInit {
         try {
             const [result, sets] = await Promise.all([this.exec.run(r), this.exec.breaks(r)]);
             this.result.set(result);
+            // ONE instant for both: a break first seen on this run must carry exactly the run's own
+            // timestamp, not one a few milliseconds later (BREAK-AGING-1).
+            const runAt = new Date().toISOString();
             const updated: Reconciliation = {
                 ...r,
-                breaks: mergeBreaks(r.breaks, breaksFromSets(r, sets)),
-                lastRunAt: new Date().toISOString(),
+                breaks: mergeBreaks(r.breaks, breaksFromSets(r, sets), runAt),
+                lastRunAt: runAt,
             };
             this.reconApi.save(updated).subscribe({
                 next: () => this.recon.set(updated),

@@ -88,6 +88,21 @@
             </div>
         </div>
 
+        @if (ageBuckets().length) {
+            <!-- BREAK-AGING-1: open breaks by age. Counts OPEN only — settled work would make the
+                 backlog look older the more of it you cleared. -->
+            <div class="mt-6" aria-label="Open breaks by age">
+                <div class="text-secondary mb-2 text-sm font-medium">Open breaks by age</div>
+                <div class="flex flex-wrap gap-2">
+                    @for (b of ageBuckets(); track b.bucket) {
+                        <inspecto-chip variant="outline" tone="neutral">
+                            {{ ageLabel(b.bucket) }}: <span class="font-semibold">{{ b.count }}</span>
+                        </inspecto-chip>
+                    }
+                </div>
+            </div>
+        }
+
         @if (incidentsUnavailable()) {
             <!-- BREAK-INCIDENT-1: a 503 from /recon/promote means this bundle carries no inspecto-ops
                  module, so Incidents do not exist here. That is a deployment state, not a failure —

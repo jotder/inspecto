@@ -16,9 +16,12 @@ import { FlatTreeRow, TreeNode, TreeTableComponent, varianceCell } from 'app/ins
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import {
+    ageBucketLabel,
+    breakAgeDays,
     breakId,
     breaksFromSets,
     decodePath,
+    openAgeBuckets,
     Reconciliation,
     ReconciliationsService,
     ReconBreak,
@@ -116,6 +119,16 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly valueBreaks = computed(() => this.drillBreaks().filter((b) => b.type === 'value_break'));
     readonly resolvedCount = computed(() => this.drillBreaks().filter((b) => b.status === 'resolved').length);
 
+    /** Aging histogram over the open breaks in this scope (`BREAK-AGING-1`); the rollup is shared. */
+    readonly ageBuckets = computed(() => openAgeBuckets(this.drillBreaks()));
+    readonly ageLabel = ageBucketLabel;
+
+    /** Whole days a break has been open, or an em-dash when it carries no first-seen stamp. */
+    readonly ageText = (b: ReconBreak): string => {
+        const days = breakAgeDays(b);
+        return days === null ? '—' : `${days}d`;
+    };
+
     /** Key + status (+ actions) — the shape of the two missing-side tables. */
     readonly missingColumns: ColDef<ReconBreak>[] = [
         { field: 'key', headerName: 'Key', flex: 1 },
@@ -140,6 +153,14 @@ export class ReconciliationDetailComponent implements OnInit {
             },
             { field: 'rightValue', headerName: this.sideDataset(), width: 140, valueFormatter: (p) => fmtVal(p.value) },
             { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
+            {
+                colId: 'age',
+                headerName: 'Age',
+                width: 100,
+                // Sorted by the NUMBER, rendered as text: a string sort would put "9d" after "30d".
+                valueGetter: (p) => (p.data ? breakAgeDays(p.data) : null),
+                valueFormatter: (p) => (p.value === null || p.value === undefined ? '—' : `${p.value}d`),
+            },
             {
                 field: 'status',
                 headerName: 'Status',

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     buildReconciliation,
     CompareColumn,
+    ageBucketOf,
+    breakAgeDays,
     mergeBreaks,
     matchedKeyCount,
     ReconBreak,
@@ -87,6 +89,95 @@ describe('mergeBreaks (lifecycle)', () => {
     it('drops previously auto-closed breaks that are still gone (bounded history)', () => {
         const prev: ReconBreak[] = [{ key: '9', type: 'missing_left', status: 'auto_closed' }];
         expect(mergeBreaks(prev, [])).toHaveLength(0);
+    });
+});
+
+describe('break aging (BREAK-AGING-1)', () => {
+    const DAY = 86_400_000;
+    const at = (iso: string) => new Date(iso);
+
+    it('stamps a genuinely new break with the run instant', () => {
+        const merged = mergeBreaks(
+            [],
+            [{ key: '4', type: 'missing_right', status: 'open' }],
+            '2026-09-01T00:00:00.000Z',
+        );
+        expect(merged[0].firstSeenAt).toBe('2026-09-01T00:00:00.000Z');
+    });
+
+    /**
+     * The row's own acceptance, and the defect the implementation must avoid: a fresh break arrives from
+     * the engine with NO stamp on every run, so re-stamping a carried one would reset its age to zero
+     * every run and the aging view would permanently read "everything is new".
+     */
+    it('a break carried across three runs keeps its FIRST first-seen', () => {
+        const fresh: ReconBreak[] = [{ key: '3', type: 'value_break', column: 'cost_usd', status: 'open' }];
+        const run1 = mergeBreaks([], fresh, '2026-07-01T00:00:00.000Z');
+        const run2 = mergeBreaks(run1, fresh, '2026-08-01T00:00:00.000Z');
+        const run3 = mergeBreaks(run2, fresh, '2026-09-01T00:00:00.000Z');
+
+        expect(run3).toHaveLength(1);
+        expect(run3[0].firstSeenAt).toBe('2026-07-01T00:00:00.000Z');
+        expect(breakAgeDays(run3[0], at('2026-09-01T00:00:00.000Z'))).toBe(62);
+    });
+
+    it('keeps the stamp across a manual resolution, so aging survives triage', () => {
+        const fresh: ReconBreak[] = [{ key: '3', type: 'value_break', status: 'open' }];
+        const run1 = mergeBreaks([], fresh, '2026-07-01T00:00:00.000Z');
+        const resolved = resolveBreak(run1, run1[0], true, 'known FX gap');
+        const run2 = mergeBreaks(resolved, fresh, '2026-09-01T00:00:00.000Z');
+
+        expect(run2[0].status).toBe('resolved');
+        expect(run2[0].firstSeenAt).toBe('2026-07-01T00:00:00.000Z');
+    });
+
+    it('stamps a break persisted before the field existed, rather than leaving it ageless forever', () => {
+        const legacy: ReconBreak[] = [{ key: '3', type: 'value_break', status: 'open' }]; // no firstSeenAt
+        const merged = mergeBreaks(legacy, legacy, '2026-09-01T00:00:00.000Z');
+        expect(merged[0].firstSeenAt).toBe('2026-09-01T00:00:00.000Z');
+    });
+
+    it('reports no age at all for a break with no stamp — never zero', () => {
+        // ⛔ A missing stamp is "unknown", not "new". Reporting it as 0 days would be the opposite of
+        // what an aging view is for: the oldest untracked breaks would look freshest.
+        expect(breakAgeDays({ key: '3', type: 'value_break', status: 'open' })).toBeNull();
+        expect(ageBucketOf({ key: '3', type: 'value_break', status: 'open' })).toBe('unknown');
+        expect(breakAgeDays({ key: '3', type: 'value_break', status: 'open', firstSeenAt: 'not a date' })).toBeNull();
+    });
+
+    it('buckets on upper-exclusive boundaries so a day lands in exactly one', () => {
+        const now = at('2026-09-01T00:00:00.000Z');
+        const aged = (days: number): ReconBreak => ({
+            key: 'k',
+            type: 'value_break',
+            status: 'open',
+            firstSeenAt: new Date(now.getTime() - days * DAY).toISOString(),
+        });
+        expect(ageBucketOf(aged(0), now)).toBe('0-30');
+        expect(ageBucketOf(aged(29), now)).toBe('0-30');
+        expect(ageBucketOf(aged(30), now)).toBe('30-60');
+        expect(ageBucketOf(aged(59), now)).toBe('30-60');
+        expect(ageBucketOf(aged(60), now)).toBe('60-90');
+        expect(ageBucketOf(aged(89), now)).toBe('60-90');
+        expect(ageBucketOf(aged(90), now)).toBe('90+');
+        expect(ageBucketOf(aged(400), now)).toBe('90+');
+    });
+
+    it('summarize ages the OPEN breaks only', () => {
+        const now = at('2026-09-01T00:00:00.000Z');
+        const old = new Date(now.getTime() - 100 * DAY).toISOString();
+        const breaks: ReconBreak[] = [
+            { key: '1', type: 'value_break', status: 'open', firstSeenAt: old },
+            // settled work must not age the backlog — clearing breaks would otherwise make it look older
+            { key: '2', type: 'missing_right', status: 'resolved', firstSeenAt: old },
+            { key: '3', type: 'missing_left', status: 'auto_closed', firstSeenAt: old },
+            { key: '4', type: 'value_break', status: 'open' }, // no stamp
+        ];
+        const s = summarize(breaks, 4, 4, 3, now);
+        expect(s.byAge['90+']).toBe(1);
+        expect(s.byAge.unknown).toBe(1);
+        expect(s.byAge['0-30']).toBe(0);
+        expect(Object.values(s.byAge).reduce((a, b) => a + b, 0)).toBe(s.open);
     });
 });
 

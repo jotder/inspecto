@@ -50,6 +50,16 @@ export interface ReconBreak {
     status: BreakStatus;
     /** Manual-resolution note (preserved across re-runs). */
     note?: string;
+    /**
+     * ISO instant this break was FIRST observed, carried across every later run by {@link mergeBreaks}
+     * (`BREAK-AGING-1`, 2026-09-11). Age is derived from it — a break has a status but, before this,
+     * carried no time at all, so "how long has this been broken" was unanswerable.
+     *
+     * ⚠ Optional on purpose, and it must stay optional: reconciliations persisted before this field
+     * existed carry breaks without it. {@link breakAgeDays} returns `null` rather than guessing, and the
+     * UI shows an em-dash — an invented age would read exactly like a measured one.
+     */
+    firstSeenAt?: string;
 }
 
 /** The persisted body of a `reconciliation` component (everything except id/name). */
@@ -86,6 +96,63 @@ export interface ReconSummary {
     resolved: number;
     autoClosed: number;
     byType: Record<BreakType, number>;
+    /** Aging histogram over the **open** breaks only (`BREAK-AGING-1`) — see {@link AGE_BUCKETS}. */
+    byAge: Record<AgeBucket, number>;
+}
+
+/** Aging buckets, in days since a break was first seen (`BREAK-AGING-1`). */
+export const AGE_BUCKETS = ['0-30', '30-60', '60-90', '90+', 'unknown'] as const;
+export type AgeBucket = (typeof AGE_BUCKETS)[number];
+
+/**
+ * Whole days since {@link ReconBreak.firstSeenAt}, or `null` when the break carries no stamp — a break
+ * persisted before `BREAK-AGING-1`, or one that has never been through a run's merge.
+ *
+ * ⛔ Never substitute "0" for a missing stamp: a break with no recorded first sighting is not a new one,
+ * and reporting it as fresh is the opposite of what an aging view is for.
+ */
+export function breakAgeDays(b: ReconBreak, now: Date = new Date()): number | null {
+    if (!b.firstSeenAt) return null;
+    const seen = Date.parse(b.firstSeenAt);
+    if (Number.isNaN(seen)) return null;
+    return Math.max(0, Math.floor((now.getTime() - seen) / 86_400_000));
+}
+
+/**
+ * Open breaks rolled up by age bucket, empty buckets dropped — the shared aging strip behind BOTH the
+ * Board and the Breaks page.
+ *
+ * ⚠ It lives here rather than in either component on purpose: two components deriving the same histogram
+ * is exactly how one concept ends up with two drifting definitions, and the "open only" rule below is the
+ * kind of thing that drifts first.
+ *
+ * Counts **open** breaks only: resolved and auto-closed breaks are settled work, and including them would
+ * make the backlog look older the more of it you cleared.
+ */
+export function openAgeBuckets(breaks: ReconBreak[], now: Date = new Date()): { bucket: AgeBucket; count: number }[] {
+    const counts = new Map<AgeBucket, number>();
+    for (const b of breaks) {
+        if (b.status !== 'open') continue;
+        const bucket = ageBucketOf(b, now);
+        counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    }
+    return AGE_BUCKETS.filter((b) => counts.has(b)).map((bucket) => ({ bucket, count: counts.get(bucket)! }));
+}
+
+/** Display label for an age bucket — `unknown` is spelled out rather than shown as a range. */
+export function ageBucketLabel(b: AgeBucket): string {
+    return b === 'unknown' ? 'No first-seen date' : `${b} days`;
+}
+
+/** The bucket a break falls in; `unknown` when it carries no first-seen stamp. */
+export function ageBucketOf(b: ReconBreak, now: Date = new Date()): AgeBucket {
+    const days = breakAgeDays(b, now);
+    if (days === null) return 'unknown';
+    // Upper-exclusive so a boundary day lands in exactly one bucket: 30 days old is '30-60', not both.
+    if (days < 30) return '0-30';
+    if (days < 60) return '30-60';
+    if (days < 90) return '60-90';
+    return '90+';
 }
 
 const KEY_SEP = '';
@@ -160,14 +227,30 @@ export function runReconciliation(
  * - a previous open/resolved break that is **no longer present** (the key now matches within tolerance)
  *   becomes `auto_closed` for this run's report;
  * - previously `auto_closed` breaks that are still gone are dropped (bounded history).
+ *
+ * <p>Since `BREAK-AGING-1` it also carries {@link ReconBreak.firstSeenAt}: a break whose identity was
+ * present last run keeps the stamp it already had, and a genuinely new one is stamped `now`. That is the
+ * whole aging mechanism — ⛔ **a fresh break arrives from the engine with no stamp on every run**, so
+ * re-stamping a carried break here would reset its age to zero on every single run and the aging view
+ * would permanently read "everything is new".
+ *
+ * @param now injected so a test can pin it; a caller passes the run instant it also writes to `lastRunAt`
  */
-export function mergeBreaks(previous: ReconBreak[], fresh: ReconBreak[]): ReconBreak[] {
+export function mergeBreaks(
+    previous: ReconBreak[],
+    fresh: ReconBreak[],
+    now: string = new Date().toISOString(),
+): ReconBreak[] {
     const prevById = new Map(previous.map((b) => [breakId(b), b]));
     const freshIds = new Set(fresh.map(breakId));
 
     const carried = fresh.map((b) => {
         const p = prevById.get(breakId(b));
-        return p && p.status === 'resolved' ? { ...b, status: 'resolved' as const, note: p.note } : b;
+        // A previously-seen break keeps its original sighting; one the previous run never recorded a
+        // stamp for (persisted before this field existed) is stamped now — the best honest answer.
+        const firstSeenAt = p ? (p.firstSeenAt ?? now) : now;
+        const withAge = { ...b, firstSeenAt };
+        return p && p.status === 'resolved' ? { ...withAge, status: 'resolved' as const, note: p.note } : withAge;
     });
     const autoClosed = previous
         .filter((p) => (p.status === 'open' || p.status === 'resolved') && !freshIds.has(breakId(p)))
@@ -189,8 +272,10 @@ export function summarize(
     leftRows: number,
     rightRows: number,
     matchedKeys: number,
+    now: Date = new Date(),
 ): ReconSummary {
     const byType: Record<BreakType, number> = { missing_left: 0, missing_right: 0, value_break: 0 };
+    const byAge: Record<AgeBucket, number> = { '0-30': 0, '30-60': 0, '60-90': 0, '90+': 0, unknown: 0 };
     let open = 0,
         resolved = 0,
         autoClosed = 0;
@@ -199,10 +284,15 @@ export function summarize(
         else {
             byType[b.type]++;
             if (b.status === 'resolved') resolved++;
-            else open++;
+            else {
+                open++;
+                // Aging counts OPEN breaks only: a resolved or auto-closed break is settled work, and
+                // including it would make the backlog look older the more of it you cleared.
+                byAge[ageBucketOf(b, now)]++;
+            }
         }
     }
-    return { leftRows, rightRows, matchedKeys, open, resolved, autoClosed, byType };
+    return { leftRows, rightRows, matchedKeys, open, resolved, autoClosed, byType, byAge };
 }
 
 /** Count keys present on both sides (for the summary's matched count). */

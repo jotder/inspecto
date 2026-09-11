@@ -309,10 +309,12 @@ out-of-lifecycle transition a 409.
 
 **Reconciliation and Breaks.** Three stateless compute routes accept either a saved reconciliation or an
 inline draft. ⚠ **The Break lifecycle is client-side by contract**: after each run the browser merges the
-new breaks with the stored ones, carrying a manually resolved break's status and note forward and
+new breaks with the stored ones, carrying a manually resolved break's status and note forward — and since
+`BREAK-AGING-1` (2026-09-11) its **`firstSeenAt`** stamp, which is what makes age reportable at all — and
 marking a break that has disappeared as auto-closed, then writes the merged list back **inside the
 reconciliation component's own document** through the generic component route. There is **no Break store
-and no resolve route**. A scheduled job runs the same reconciliation on a cron and opens a deduplicated
+and no resolve route**. ⚠ Since `BREAK-INCIDENT-1` there IS one write route in this family,
+`POST /recon/promote`, but it does not break the contract: it stores an **Incident**, never a Break. A scheduled job runs the same reconciliation on a cron and opens a deduplicated
 incident when breaks appear.
 
 ## 4. Decisions (dated one-liners)

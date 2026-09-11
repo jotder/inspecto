@@ -15,6 +15,27 @@ with per-column tolerances; a **Break** is `missing_left | missing_right | value
 `open/resolved/auto_closed` lifecycle (auto-close on re-match within tolerance). Never a parallel
 "comparison" concept.
 
+**Aging** (`BREAK-AGING-1`, 2026-09-11). A Break carries `firstSeenAt`, stamped when it is first observed
+and **carried forward by `mergeBreaks` on every later run**. Age is derived from it and rolled up by
+`openAgeBuckets` into **0–30 / 30–60 / 60–90 / 90+** days, rendered as a chip strip on the Board and on the
+Breaks page, plus an `Age` column on the Breaks grid. Before this a Break had a status but no time at all,
+so "how long has this been broken" was unanswerable.
+
+Four rules that are easy to get wrong and are each pinned by a test:
+* 🔴 **A fresh break arrives from the engine with NO stamp on every run**, so `mergeBreaks` must carry the
+  previous one rather than re-stamp. Re-stamping resets every age to zero each run and the view then
+  permanently reads *"everything is new"* — a plausible-looking display that is always wrong.
+* ⛔ **A missing stamp is `unknown`, never 0.** A Break persisted before this field existed has no first
+  sighting; reporting it as fresh makes the oldest untracked breaks look newest. `breakAgeDays` returns
+  `null` and the UI shows an em-dash.
+* **Buckets are upper-exclusive**, so day 30 is `30-60` and lands in exactly one bucket.
+* **Aging counts OPEN breaks only.** Including resolved or auto-closed ones would make the backlog look
+  *older* the more of it you cleared.
+
+⚠ The rollup lives in `reconciliation-types.ts`, not in either component: two panes deriving the same
+histogram is how one concept ends up with two drifting definitions, and the "open only" rule is exactly
+what drifts first. ⚠ The Board writes ONE instant to both `mergeBreaks(…, runAt)` and `lastRunAt`.
+
 * **Board** (`:id` default view) — the aggregate dimension-order tree on
   [`inspecto-tree-table`](../design-system/tree-table.md): unified dimension/measure selection, parents
   carry rollups, Δ% columns **banded** ok/warn/breach (defaults 1/2 %; independent of record-level

@@ -55,7 +55,10 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    on `(reconciliation, key)`. 🔴 The row's premise was **half wrong**: `ReconRunJob` had always opened an
    Incident on a breach, so the gap was **granularity, not mechanism** (one aggregate Incident per run vs.
    one per Break) — the two now coexist. **Sprint 8's four P1s are DONE.** →
-   then the P2s **`BREAK-AGING-1`**, **`INCIDENT-KPI-MTTR-1`**, **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
+   then the P2s ~~**`BREAK-AGING-1`**~~ ✅ **SHIPPED 2026-09-11** (⚠ its "and the KPI report" half had no
+   target — `ReconSummary`/`summarize` have **no production consumer**, only their own spec; the buckets
+   render on the Board and the Breaks page instead), **`INCIDENT-KPI-MTTR-1`**,
+   **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
    the rest of the brochure: `PKG-5` (no assistant ships without it) and `RECON-CARDINALITY-1`.
    ⛔ Do not start v1.2 of the whitepaper until 0–4 are green: it is the claims that move, not the prose.
@@ -708,13 +711,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   correlation id = the reconciliation) and match on the `breakKey` attribute — read-only, no new SPI, and
   it survives a reload. Only worth doing if an operator asks; the promote itself is idempotent either way.
   → `okf/capabilities/incidents/incidents.md`
-- **P2** · **`BREAK-AGING-1` — Breaks have a status but no age.** `reconciliation-types.ts:50` carries
-  `open / resolved / auto_closed` (auto-close is real: a Break absent from the fresh set is carried as
-  `auto_closed`, `:172-175`) but **no timestamp**, so "aging" cannot be reported — the only aging in the tree
-  is file retention (`agingDir`). Fix: stamp `firstSeenAt` on first observation and carry it across runs in
-  the persisted reconciliation body; derive age; bucket **0–30 / 30–60 / 60–90 / 90+** days on the recon
-  board and the KPI report. Test: a Break carried across three runs keeps its first `firstSeenAt`.
-  Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `inspecto-ui/src/app/inspecto/reconciliation/reconciliation-types.ts`
 - **P2** · **`INCIDENT-KPI-MTTR-1` — MTTR / MTTD on the KPI report.** Neither exists; Incidents already carry
   `createdAt`, `resolvedAt` and `slaBreachedAt` (`ObjectService`). **MTTR** is a report over the objects store
   (`inspecto-ops`, Standard+). **MTTD needs a detection anchor first** — propose *first Signal at the
