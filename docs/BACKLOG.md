@@ -344,6 +344,17 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   merge (`ComponentRegistry.load` is a plain TOON load). The pane would list the schema with ZERO fields
   while the engine read it correctly — the mirror image of the bug this family started with.
   → `okf/capabilities/control-api/control-api.md` §3.5
+- **P2** · **`WHITEPAPER-DOCX-DRIFT-1` — the `.docx` generator re-authors the prose instead of reading the
+  `.md`** (filed 2026-09-11 at handoff, verified not merely suspected). `scripts/generate_whitepaper_docx.py`
+  (593 lines, tracked) names `INSPECTO_ENTERPRISE_WHITEPAPER.md`'s path **only as its OUTPUT `.docx`**
+  (`:592`) and never reads the markdown — the document body is built from ~12 hand-written
+  `add_paragraph`/`add_heading` blocks. 🔴 **So the v1.2 rewrite (`db11a412`) did not reach the `.docx` at
+  all: the generated file still carries v1.1 prose**, and the `.docx` is gitignored, so nothing flags the
+  divergence. A stakeholder handed the `.docx` gets a different document from the one the guards check —
+  and `check-doc-counts` only validates the `.md`. ⚠ Also hardcodes an absolute
+  `c:\sandbox\inspecto-clean\…` output path, so it cannot run on another checkout.
+  ⇒ Either make it render the committed `.md`, or delete it and produce the `.docx` by conversion. ⛔ Do not
+  hand the `.docx` to anyone until this is settled. → `docs/stakeholders/README.md`
 - **P3** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at the write ROOT,
   not beside its pipeline** (filed 2026-09-11 by `SCHEMA-DIALOG-CREATE-HOME-1`'s grounding). `grammar-editor.dialog.ts`
   `openSchemaEditor()` passes no `subdir`, so a satellite authored there lands at the write root — 🔴 the
