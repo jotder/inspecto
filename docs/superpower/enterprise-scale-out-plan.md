@@ -494,6 +494,18 @@ Work:
   so it left a fencing-defeating mutant alive. The discriminating case needs the **same owner id** on
   both (one pod reconnecting, or any deployment that sets a stable owner such as a StatefulSet pod name).
   ⛔ Do not "simplify" that test back.
+- ⬜ **OPEN, and the next slice must DECIDE it rather than assume: there are TWO guards, and §5.2 only
+  ever described one.** `CollectorService.runGuard` gates pipeline **runs**; `PipelineScheduler`'s
+  private `acquireGuard` (`:141`) gates **remote acquisition**, and the scheduler's own comment says
+  acquisition "runs independently of pipeline execution". They are two separate `PipelineRunGuard`
+  instances today, so they cannot contend.
+  🔴 **A shared lease table collapses that independence unless the key carries a scope.** With
+  `PRIMARY KEY (space, pipeline)` as shipped in B0, pointing both guards at one `DbRunLease` would make
+  a remote fetch block a run of the same pipeline — a behaviour change nobody asked for.
+  **Recommendation: keep them separate**, either as two lease instances over a key that carries the
+  scope (`PRIMARY KEY (space, scope, pipeline)`) or by leaving acquisition on the heap guard. ⛔ Do not
+  wire both to one lease keyed on `(space, pipeline)`. ⚠ The B0 schema is **unwired**, so changing its
+  key is still free — it stops being free the moment a deployment selects it.
 - **`lastRunAtMs` moves to the lease row.** Today it is a local map (§3.1); an interval trigger on a
   pod that has never run the pipeline would otherwise fire immediately after a failover.
 - **`JobService` cron arming goes through the same lease** — the per-instance `Scheduler` keeps
