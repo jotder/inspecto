@@ -14,6 +14,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { isSharedRef } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { StaleMark } from 'app/inspecto/signal/stale-tiles';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
 import { VizPlugin, VizProps, bucketSpecRows, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
@@ -45,7 +47,14 @@ export interface DrillEvent {
 @Component({
     selector: 'app-widget-host',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatTooltipModule, VizRenderComponent, InspectoEmptyStateComponent],
+    imports: [
+        MatButtonModule,
+        MatIconModule,
+        MatTooltipModule,
+        VizRenderComponent,
+        InspectoEmptyStateComponent,
+        StatusBadgeComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="bg-card flex h-full flex-col rounded-2xl p-4 shadow">
@@ -57,6 +66,17 @@ export interface DrillEvent {
                             <div class="text-secondary text-xs">{{ widget.options?.subtitle }}</div>
                         }
                     </div>
+                    @if (stale(); as mark) {
+                        <!-- SIGNAL-STALE-TILES-1: the tile's data source has an unresolved disruption. Text
+                             AND tone carry the meaning (never colour alone), and the reason is the tooltip
+                             rather than a toast — this is a property of the data, not an event. -->
+                        <inspecto-status-badge
+                            value="WARNING"
+                            label="Stale"
+                            class="shrink-0"
+                            [matTooltip]="mark.reason"
+                        />
+                    }
                     @if (canExport()) {
                         <button
                             mat-icon-button
@@ -135,6 +155,12 @@ export class WidgetHostComponent {
     readonly widget = input<Widget | undefined>(undefined);
     readonly dataset = input<Dataset | undefined>(undefined);
     readonly filter = input<ConditionGroup | null>(null);
+    /**
+     * Set when this widget's data source has an unresolved disruption (`SIGNAL-STALE-TILES-1`). The HOST
+     * resolves it — a tile must never fetch its own staleness, or a 20-tile dashboard makes 20 round trips
+     * for one answer.
+     */
+    readonly stale = input<StaleMark | null>(null);
     /** A category click, resolved to the field it should filter on (drill-down). */
     readonly drill = output<DrillEvent>();
 

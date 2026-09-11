@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { ConditionGroup } from 'app/inspecto/query';
 import { Widget } from '../widgets/widget-types';
 import { Dataset } from '../datasets/dataset-types';
+import { StaleMark } from 'app/inspecto/signal/stale-tiles';
 import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.component';
 
 /**
@@ -19,6 +20,7 @@ import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.componen
         [widget]="widget()"
         [dataset]="dataset()"
         [filter]="filter()"
+        [stale]="stale()"
         (drill)="drill.emit($event)"
     />`,
 })
@@ -27,5 +29,7 @@ export class DashboardTileComponent {
     /** Absent for view-bound widgets (geo-map / link-analysis) — their saved view is the binding. */
     readonly dataset = input<Dataset | undefined>(undefined);
     readonly filter = input<ConditionGroup | null>(null);
+    /** Resolved by the dashboard, not here — see WidgetHostComponent.stale. */
+    readonly stale = input<StaleMark | null>(null);
     readonly drill = output<DrillEvent>();
 }

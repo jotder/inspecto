@@ -27,7 +27,15 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage } from 'app/inspecto/api';
+import { apiErrorMessage, EventsService, PipelinesService } from 'app/inspecto/api';
+import {
+    CommitEvent,
+    DISRUPTION_TYPES,
+    DisruptionEvent,
+    ProducingPipeline,
+    StaleMark,
+    staleWidgets,
+} from 'app/inspecto/signal/stale-tiles';
 import { getViz } from 'app/inspecto/viz';
 import { Condition, ColumnMeta, ConditionGroup, QueryConditionGroupComponent, emptyGroup } from 'app/inspecto/query';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -59,6 +67,13 @@ import './dashboard.kind'; // register the dashboard kind
  * tile's width, and set a dashboard **cross-filter** (Query Core condition group over the union of the tiles'
  * dataset columns) that re-renders every tile live. Save persists a `dashboard` component. Mock-first.
  */
+/**
+ * How many of each event type the stale resolver reads. Bounded on purpose: the resolver compares only
+ * the NEWEST disruption against the NEWEST commit per pipeline, so a longer history cannot change the
+ * answer — it would only cost bandwidth.
+ */
+const STALE_EVENT_WINDOW = 200;
+
 @Component({
     selector: 'app-dashboard-editor',
     standalone: true,
@@ -91,6 +106,8 @@ export class DashboardEditorComponent implements OnInit {
     private widgetsApi = inject(WidgetsService);
     private datasetsApi = inject(DatasetsService);
     private datasetRows = inject(DatasetRowsService);
+    private events = inject(EventsService);
+    private pipelinesApi = inject(PipelinesService);
     private router = inject(Router);
     private elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
     private toastr = inject(ToastrService);
@@ -124,6 +141,10 @@ export class DashboardEditorComponent implements OnInit {
 
     readonly widgets = signal<Widget[]>([]);
     readonly datasets = signal<Dataset[]>([]);
+    /** Inputs to the stale resolver — see `staleByWidget`. Empty until the three reads land. */
+    private readonly disruptions = signal<DisruptionEvent[]>([]);
+    private readonly commits = signal<CommitEvent[]>([]);
+    private readonly pipelines = signal<ProducingPipeline[]>([]);
     readonly tiles = signal<DashboardTile[]>([]);
     readonly filter = signal<ConditionGroup>(emptyGroup('AND'));
     readonly exposedFields = signal<string[]>([]);
@@ -139,6 +160,24 @@ export class DashboardEditorComponent implements OnInit {
 
     private readonly widgetsById = computed(() => new Map(this.widgets().map((w) => [w.id, w])));
     private readonly datasetsById = computed(() => new Map(this.datasets().map((d) => [d.id, d])));
+
+    /**
+     * `SIGNAL-STALE-TILES-1` — widget id → why its data is stale, resolved ONCE for the whole dashboard.
+     *
+     * ⚠ Resolved here rather than per tile on purpose: a 20-tile dashboard would otherwise make 20 round
+     * trips to answer one question. The three feeds it needs are fetched once in `ngOnInit`; the chain
+     * itself is pure and lives in `inspecto/signal/stale-tiles`.
+     *
+     * ⚠ Degrades to "nothing is stale" when any feed fails. That is the right failure direction for an
+     * ADVISORY badge — an unreachable events feed must not paint a whole dashboard as suspect — and it is
+     * why the fetches below swallow their errors instead of toasting.
+     */
+    readonly staleByWidget = computed(() =>
+        staleWidgets(this.disruptions(), this.commits(), this.pipelines(), this.datasets(), this.widgets()),
+    );
+
+    /** The stale mark for one tile's widget, or null. */
+    readonly staleOf = (tile: DashboardTile): StaleMark | null => this.staleByWidget().get(tile.widgetId) ?? null;
 
     /** Union of column metadata across the tiled widgets' datasets — the cross-filter's field choices. */
     readonly filterColumns = computed<ColumnMeta[]>(() => {
@@ -234,6 +273,7 @@ export class DashboardEditorComponent implements OnInit {
             error: () => this.toastr.warning('Could not load widgets.'),
         });
         this.datasetsApi.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
+        this.loadStaleness();
         if (this.id) {
             this.editing.set(true);
             this.form.controls.name.setValue(this.id);
@@ -249,6 +289,27 @@ export class DashboardEditorComponent implements OnInit {
                 this.form.controls.name.updateValueAndValidity({ emitEvent: false });
             });
         }
+    }
+
+    /**
+     * Fetch the three feeds the stale badge derives from (`SIGNAL-STALE-TILES-1`). Errors are swallowed:
+     * the badge is advisory, and a dashboard whose events feed is briefly unreachable must render its
+     * numbers rather than paint every tile as suspect. A bounded window is deliberate — the resolver only
+     * ever compares the NEWEST disruption against the NEWEST commit per pipeline, so an unbounded history
+     * would cost bandwidth for an answer it cannot change.
+     */
+    private loadStaleness(): void {
+        for (const type of DISRUPTION_TYPES) {
+            this.events.search({ type, limit: STALE_EVENT_WINDOW }).subscribe({
+                next: (rows) => this.disruptions.update((all) => [...all, ...rows]),
+                error: () => undefined,
+            });
+        }
+        this.events.search({ type: 'BATCH_COMMITTED', limit: STALE_EVENT_WINDOW }).subscribe({
+            next: (rows) => this.commits.set(rows),
+            error: () => undefined,
+        });
+        this.pipelinesApi.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });
     }
 
     private seed(d: Dashboard): void {

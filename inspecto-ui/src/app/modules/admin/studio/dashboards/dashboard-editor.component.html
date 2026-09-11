@@ -210,11 +210,12 @@
                         @if (widgetOf(tile); as widget) {
                             @if (isViewBound(widget)) {
                                 <!-- View-bound tile: the saved view is the binding — the cross-filter doesn't apply. -->
-                                <app-dashboard-tile [widget]="widget" />
+                                <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)" />
                             } @else if (datasetOf(tile); as dataset) {
                                 <app-dashboard-tile
                                     [widget]="widget"
                                     [dataset]="dataset"
+                                    [stale]="staleOf(tile)"
                                     [filter]="filter()"
                                     (drill)="onDrill($event)"
                                 />

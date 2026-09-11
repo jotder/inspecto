@@ -131,6 +131,42 @@ with a WARN rather than failing the boot. Making that fatal is phase A of the si
 and hangs on `-Dinspecto.topology=partitioned`, a switch that **does not exist in the tree** — do not read
 this row as having closed it.
 
+### Stale dashboard tiles (`SIGNAL-STALE-TILES-1`, 2026-09-11)
+
+The positioning's central seam — *a gap at acquisition reaches the dashboard that went stale* — is now
+true end to end. A dashboard tile carries a **Stale** badge while its data source has an unresolved
+disruption, with the reason as its tooltip.
+
+🔴 **Four things the backlog row assumed that are not true**, all grounded before building:
+* **`SEQUENCE_GAP` is a raw `Event`, not a `Signal`** (`AcquisitionTelemetry`), and it carries the
+  **pipeline** plus the missing sequence key — no store, table or Dataset id.
+* **Quarantine emits no signal at all** — a quarantined file is a `FILE_QUARANTINED` event; rejected rows
+  are batch metrics.
+* **Widgets and Dashboards are not Catalog nodes.** A control grep over the `catalog` package returns zero
+  hits for either while the same grep returns dozens elsewhere ⇒ `/catalog/graph` **cannot** answer "which
+  widgets depend on Dataset X", so the traversal the row named does not exist.
+* Consequently the row's own test — *"a seeded gap Signal **on a Dataset**"* — describes something nothing
+  emits.
+
+**What is built instead** anchors on the identity that IS carried, the **pipeline**, chosen by the operator
+on 2026-09-11 over two larger alternatives (give the emitters a Dataset identity; or add Widget/Dashboard
+nodes to the Catalog graph — both still open, see `BACKLOG.md`). The chain is
+`pipeline → the store it produces (GET /pipelines `produces`) → Datasets on that store (`sourceName`) →
+widgets bound to them (`datasetId`) → tiles (`dashboard.tiles[].widgetId`)`, every hop over a field that
+already exists and that `ComponentIntegrity` already validates. It lives in
+`inspecto-ui/src/app/inspecto/signal/stale-tiles.ts`, framework-free and structurally typed.
+
+⚠ **The granularity that follows, stated rather than hidden:** a disruption marks **every** Dataset fed by
+that pipeline, not only the rows or column that gapped. A deliberate over-approximation — a tile wrongly
+marked stale costs a second look, a tile wrongly left clean is a number someone acts on.
+
+**Clearing is derived, not stored.** A pipeline is stale while its most recent disruption is *newer* than
+its most recent `BATCH_COMMITTED`. So "clear on the next successful run" is not a second mechanism that
+could be forgotten or leak — it falls out of the comparison, and there is **no stale flag anywhere**.
+⛔ Do not "improve" this by persisting one. ⚠ A tie counts as cleared, or a badge could survive every
+later run. ⚠ The badge is **advisory**: when any of its three feeds fails the dashboard renders nothing
+stale rather than painting every tile suspect.
+
 **The type catalog is the `EventType` enum** (`inspecto-event/src/main/java/com/gamma/event/EventType.java`)
 — quote the enum, never a page. Families: `LOG`, `AUDIT`, `ACCESS_DENIED`, service/pipeline lifecycle,
 `BATCH_*`, `FILE_*` (acquisition), `JOB_*`, `SIGNAL`, `PIPELINE_CONSERVATION_IMBALANCE` (legacy alias

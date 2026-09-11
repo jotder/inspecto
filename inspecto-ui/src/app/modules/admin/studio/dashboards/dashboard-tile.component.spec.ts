@@ -11,6 +11,8 @@ import { WidgetsService } from '../widgets/widgets.service';
 import { WidgetHostComponent } from '../widgets/widget-host.component';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
+import { MatTooltip } from '@angular/material/tooltip';
+import { StaleMark } from 'app/inspecto/signal/stale-tiles';
 import { DashboardTileComponent } from './dashboard-tile.component';
 
 const DS: Dataset = {
@@ -30,7 +32,7 @@ const WIDGET: Widget = {
     controls: { value: [{ field: 'duration_s', agg: 'sum' }] },
 };
 
-function create() {
+function create(stale: StaleMark | null = null) {
     TestBed.configureTestingModule({
         imports: [DashboardTileComponent],
         providers: [
@@ -46,9 +48,18 @@ function create() {
     fixture.componentRef.setInput('widget', WIDGET);
     fixture.componentRef.setInput('dataset', DS);
     fixture.componentRef.setInput('filter', null);
+    fixture.componentRef.setInput('stale', stale);
     fixture.detectChanges();
     return fixture;
 }
+
+const STALE: StaleMark = {
+    pipeline: 'cdr_ingest',
+    type: 'SEQUENCE_GAP',
+    at: 1_700_000_000_000,
+    store: 'cdr',
+    reason: 'cdr_ingest reported a sequence gap and has not completed a batch since.',
+};
 
 describe('DashboardTileComponent', () => {
     // The tile imports only the viz barrel (no plugin side-effect), so seed the (guarded) builtins
@@ -64,5 +75,31 @@ describe('DashboardTileComponent', () => {
 
     it('renders with no a11y violations', async () => {
         await expectNoA11yViolations(create().nativeElement);
+    });
+
+    // ── SIGNAL-STALE-TILES-1 ──────────────────────────────────────────────────────────
+
+    it('renders no stale badge when the tile’s data is healthy', () => {
+        const fixture = create(null);
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Stale');
+    });
+
+    it('badges the tile and carries the reason as its tooltip when the data is stale', () => {
+        const fixture = create(STALE);
+        const el = fixture.nativeElement as HTMLElement;
+        // Text AND tone, never colour alone — the badge must SAY stale.
+        expect(el.textContent).toContain('Stale');
+        expect(el.querySelector('inspecto-status-badge')).not.toBeNull();
+        // The REASON must reach the operator, not just the word "Stale" — assert the tooltip's actual
+        // message via the directive instance. (A `?? '' ... toBeDefined()` chain here would pass even
+        // with no tooltip at all.)
+        const tooltip = fixture.debugElement.query(By.directive(MatTooltip));
+        expect(tooltip).not.toBeNull();
+        expect(tooltip.injector.get(MatTooltip).message).toBe(STALE.reason);
+    });
+
+    it('has no accessibility violations while badged', async () => {
+        const fixture = create(STALE);
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

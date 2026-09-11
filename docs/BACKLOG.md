@@ -61,7 +61,11 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    "already carry `resolvedAt`" — they did **not**: there is no such field, and `closedAt` is stamped on the
    TERMINAL state, which for an Incident is `ARCHIVED`, so the existing `cycleTime` measured time-to-archive
    and its UI tile was even labelled "Resolved". MTTD is split out as `INCIDENT-KPI-MTTD-1`, still
-   anchorless), **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
+   anchorless), ~~**`SIGNAL-STALE-TILES-1`**~~ ✅ **SHIPPED 2026-09-11** — 🔴 **four of the row's
+   premises were false** (a gap is an Event not a Signal; quarantine emits no signal; neither names a
+   Dataset; Widgets are not Catalog nodes, so the lineage traversal it named does not exist). Built on a
+   **pipeline** anchor per the operator's call; residuals filed as `STALE-TILES-PRECISION-1` and
+   `CATALOG-WIDGET-NODES-1`. **⇒ SPRINT 8 IS COMPLETE — all seven rows.** →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
    the rest of the brochure: `PKG-5` (no assistant ships without it) and `RECON-CARDINALITY-1`.
    ⛔ Do not start v1.2 of the whitepaper until 0–4 are green: it is the claims that move, not the prose.
@@ -721,15 +725,23 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `ObjectService` does not have — it emits through `EventLog` but never queries. ⛔ Do **not** publish a
   placeholder meanwhile: an undefined KPI is indistinguishable from a measured one once it is on a
   dashboard, which is the failure the MTTR half was filed against. → `okf/capabilities/incidents/incidents.md`
-- **P2** · **`SIGNAL-STALE-TILES-1` — a Signal does not mark the dashboard tiles it invalidates.** The
-  positioning's central "seam" example — *a gap at acquisition becomes an Incident carrying lineage to the
-  dashboard that went stale* — is true up to the Dataset and stops there: lineage exists (Catalog graph,
-  threaded `causationId`), but **zero** files under `studio/dashboards` or the widget model know the word
-  *stale*. Fix: resolve Dataset → Widgets through the Catalog lineage graph when a `SEQUENCE_GAP` or
-  quarantine Signal lands; render a stale badge on the affected tiles with the Signal as its tooltip; clear it
-  on the next successful run of the owning pipeline. Size **M**. Test: a seeded gap Signal on a Dataset
-  badges exactly the widgets bound to it and no others. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. →
-  `okf/capabilities/surfaces/surfaces.md` · `okf/capabilities/observability/observability.md` §3.1
+- **P3** · **`STALE-TILES-PRECISION-1` — narrow the stale badge below pipeline granularity.** ✅ The badge
+  SHIPPED 2026-09-11 on a **pipeline** anchor (operator's call over two larger options). ⚠ The residual is
+  the granularity that follows: a disruption marks **every** Dataset fed by that pipeline, not only the
+  rows or column that gapped. Narrowing it is a BACKEND change, not a resolver change — the emitters must
+  carry a store/Dataset identity on the Signal's `subject` `Ref` (the `Ref` vocabulary already reserves a
+  `tiles` relation, unused). ⛔ Also unbuilt and deliberately so: **quarantine emits no Signal at all**, so
+  a quarantined file is only caught via the `FILE_QUARANTINED` event. Take this only if operators report
+  the over-approximation as noise — it is a correct-but-wide badge, not a wrong one.
+  → `okf/capabilities/observability/observability.md` §3.1
+- **P3** · **`CATALOG-WIDGET-NODES-1` — Widgets and Dashboards are not Catalog nodes.** Grounded
+  2026-09-11 with a control probe: zero hits for widget/dashboard across the `catalog` package while the
+  same grep returns dozens elsewhere. So `/catalog/graph` **cannot** answer "what depends on Dataset X"
+  for any BI consumer, and `SIGNAL-STALE-TILES-1` had to resolve that join client-side off
+  `widget.datasetId`. Adding `WIDGET`/`DASHBOARD` node kinds with a `CONSUMES` edge would serve every
+  consumer, not just the badge — impact analysis before a Dataset change being the obvious second one.
+  Sized larger than the badge itself: it changes `NodeKind`/`EdgeKind`, `MetadataGraphBuilder` and the
+  catalog contract. → `okf/capabilities/metamodel/metamodel.md`
 
 ### Deployment & packaging
 
