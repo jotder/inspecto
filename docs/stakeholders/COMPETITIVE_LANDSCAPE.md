@@ -193,7 +193,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | ~1 billion 100-column rows/day per 8-core node, sized to peak | §1.3 derivation |
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
-| Fault-tolerant DR at Standard; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so |
+| Fault-tolerant DR at Standard; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |
 | 19 extension points; the ASN.1 vendor functions ship through one | §1.4 |
 | A distinct Standard bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
 
@@ -201,12 +201,12 @@ at once. This is structural, not a failing — Palantir loses it too.
 
 | Claim | Why not | Unlocks when |
 |---|---|---|
-| Anything about the AI assistant or autonomy | ships in **no** bundle (`CP-14`, `PKG-5`) | `PKG-5` resolves and the assistant is in a downloadable artifact |
+| Anything about the AI assistant or autonomy | ships in **no** bundle (`CP-14`, `PKG-5`) | `PKG-5` resolves and the assistant is in a downloadable artifact — **filed as a §1 decision needing an owner, 2026-09-11** |
 | "1 trillion rows/day" for Standard | off by 10–250× on one node (§1.3) | never for Standard; an Enterprise cluster-design conversation |
 | "119 processors" | 67 are planned, inactive tiles | say **35**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above; one dead SPI | phrase as categories covered + named seams (§1.4) |
 | A production-grade Expectation engine | routes, no UI (`ING-6`) | the UI ships, or GX suites import |
-| "Low maintenance" | the install kit (preflight, service wrappers, upgrade/rollback) is unbuilt | deployment Phases 0–1 ship |
+| "Low maintenance" | the install kit (preflight, service wrappers, upgrade/rollback) is unbuilt | deployment Phases 0–1 ship — `DEPLOY-SERVICE-WRAPPER-1` (P1) is the first piece |
 | Air-gap parity claims about Definite | their blog says it; their product page does not | a vendor conversation |
 
 ---

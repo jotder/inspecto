@@ -38,7 +38,16 @@ evidence note), and four were re-ranked because the row hid a gate — a design 
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
 
-Do next, in order (refreshed 2026-09-10 — **no P1 is queued**: `MAPPING-GEN-1` shipped the day it was decided; `SBOM-RESOLVE-1`, GUARD-SWEEP-1 and DAT-6-CI-1 done):
+Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepaper review; each names the file it changes):
+0. **Sprint 8 — make the brochure true.** In this order, smallest first, each independently shippable:
+   **`EVENTS-DURABLE-1`** (the audit trail is in memory on every bundle — a live defect, not a doc problem) →
+   **`AIRGAP-EXTENSIONS-1`** (two run-time network fetches on an "air-gapped" install) →
+   **`DEPLOY-SERVICE-WRAPPER-1`** (`SCR-3`; nothing restarts a dead process) →
+   **`BREAK-INCIDENT-1`** (the recon page's headline arrow does not exist) →
+   then the P2s **`BREAK-AGING-1`**, **`INCIDENT-KPI-MTTR-1`**, **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
+   then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
+   the rest of the brochure: `PKG-5` (no assistant ships without it) and `RECON-CARDINALITY-1`.
+   ⛔ Do not start v1.2 of the whitepaper until 0–4 are green: it is the claims that move, not the prose.
 1. ~~**`SBOM-RESOLVE-1` (§4)**~~ ✅ **SHIPPED 2026-09-09** — `release.yml` now installs the reactor under `-Pedition-enterprise` before the packaging steps. Was the only queued P1. The bill of materials cannot generate on a clean
    runner, so the first tag fails at packaging; it names the file it changes (`release.yml`). Filed
    2026-09-09 while fixing the generator's module table, and it is **not** a regression from that fix —
@@ -58,6 +67,13 @@ missing, the *work* was not. ⛔ A decision that "unblocks" a row does not mean 
 code before filing, not just the board.
 
 ## 1. Operator decisions pending
+
+*(2026-09-11, from the whitepaper review — two decisions the brochure's claims depend on:)*
+
+| Decision | Why it is a decision, not a build | Unblocks |
+|---|---|---|
+| **`PKG-5` needs an OWNER** — resolve the JDK 25+ vs Java 24+ floor so the assistant can be bundled | the assistant is built and tested and ships in **no** edition (`CP-14`); the brochure's v1.1 headline is a feature no customer can download. The floor question has sat in §6 with no owner since it was filed | Page 6 of the whitepaper; `AGT-*` edition cells becoming `All` |
+| **`RECON-CARDINALITY-1`** — add one-to-many / many-to-many match modes to reconciliation, or drop the claim | `ReconService` supports `exact` / `absolute` / `percent` tolerance and key matching only; cardinality is not a recon option. The brochure asserts it. Building it is an M; dropping it is a sentence | whether §4 of the whitepaper keeps the phrase |
 
 *(2026-09-10, later: `CONSUMER-PAIRS-1` decided **per row, in one sitting** — seven ADOPT, one KEEP-as-API, two RETIRE; verdicts in each owning spec's §2, work grouped into five §3 rows: `CLIENT-HALVES-1`, `EXPECTATIONS-UI-1`, `STUDIO-HALVES-1`, `AGT-ARTIFACT-1`, `RETIRE-HALVES-1`. **§1 is now EMPTY** — the first time since the board was consolidated.)*
 
@@ -636,15 +652,78 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (DuckDB `spatial` extension itself: zero demand re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (outbound mirror of the connector SPI reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
+- **P1** · **`EVENTS-DURABLE-1` — the API audit trail is IN MEMORY on every stock bundle.** `AuditTrail`
+  emits `EventType.AUDIT` into `EventLog`; `ServiceStores.openEventStore` defaults `-Devents.backend` to
+  **`memory`** (a bounded ring of 8,192), and the generated launchers (`serve.sh`/`serve.bat`, `package.ps1`)
+  set **no override** — so a Standard customer who restarts the service loses every audited mutation, and the
+  `parquet` backend **degrades to memory** if its directory fails to open. `observability.md` §3.1 has
+  documented the drop since v4.2.0; **no row owned it**, and the compliance page's AU-9 story rests on it.
+  Fix, in the files it names: `package.ps1` — Standard/Enterprise launchers pass `-Devents.backend=parquet`
+  (dir = `SpaceRoot.eventsDir()`); `ServiceStores` — in DR/partitioned mode a backend that cannot open is a
+  **boot failure**, not a fallback (plan §5.1); `events.backend=db` is the plan's signed D6. Test: restart
+  under `parquet` → audit rows survive; under `memory` → assert the documented drop, so the default is a
+  choice and not an accident. ⛔ Say *tamper-evident, append-only* — *immutable* is refused in writing.
+  Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/observability/observability.md` §3.1 ·
+  `okf/capabilities/compliance/compliance.md` · `superpower/enterprise-scale-out-plan.md` §5.1
+- **P1** · **`BREAK-INCIDENT-1` — a reconciliation Break has no route to an Incident.** The only promotion
+  in the tree is `AlertService.promoteToIncident` (**Alert** → Incident); the recon board can mark a Break
+  `resolved` but cannot hand it to Ops. Fix: a *Promote to Incident* action on the recon board
+  (`recon-board.component.ts`) that opens an Incident through the existing `inspecto-ops` objects API with
+  the Break key, reconciliation id and run id as evidence, deduped on `(reconciliation, key)` so a Break
+  promoted twice does not open two Incidents. Standard+ (`inspecto-ops`); Personal shows the explained 503
+  panel, never a toast. Test: promote → exactly one Incident carrying the Break evidence; promote again →
+  the same Incident. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/incidents/incidents.md` ·
+  `inspecto-ui/src/app/inspecto/reconciliation/reconciliation-types.ts`
+- **P2** · **`BREAK-AGING-1` — Breaks have a status but no age.** `reconciliation-types.ts:50` carries
+  `open / resolved / auto_closed` (auto-close is real: a Break absent from the fresh set is carried as
+  `auto_closed`, `:172-175`) but **no timestamp**, so "aging" cannot be reported — the only aging in the tree
+  is file retention (`agingDir`). Fix: stamp `firstSeenAt` on first observation and carry it across runs in
+  the persisted reconciliation body; derive age; bucket **0–30 / 30–60 / 60–90 / 90+** days on the recon
+  board and the KPI report. Test: a Break carried across three runs keeps its first `firstSeenAt`.
+  Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `inspecto-ui/src/app/inspecto/reconciliation/reconciliation-types.ts`
+- **P2** · **`INCIDENT-KPI-MTTR-1` — MTTR / MTTD on the KPI report.** Neither exists; Incidents already carry
+  `createdAt`, `resolvedAt` and `slaBreachedAt` (`ObjectService`). **MTTR** is a report over the objects store
+  (`inspecto-ops`, Standard+). **MTTD needs a detection anchor first** — propose *first Signal at the
+  Incident's `causationId` root → Incident `createdAt`*; state it in the report's description so the number
+  is defined, not implied. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/incidents/incidents.md`
+- **P2** · **`SIGNAL-STALE-TILES-1` — a Signal does not mark the dashboard tiles it invalidates.** The
+  positioning's central "seam" example — *a gap at acquisition becomes an Incident carrying lineage to the
+  dashboard that went stale* — is true up to the Dataset and stops there: lineage exists (Catalog graph,
+  threaded `causationId`), but **zero** files under `studio/dashboards` or the widget model know the word
+  *stale*. Fix: resolve Dataset → Widgets through the Catalog lineage graph when a `SEQUENCE_GAP` or
+  quarantine Signal lands; render a stale badge on the affected tiles with the Signal as its tooltip; clear it
+  on the next successful run of the owning pipeline. Size **M**. Test: a seeded gap Signal on a Dataset
+  badges exactly the widgets bound to it and no others. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. →
+  `okf/capabilities/surfaces/surfaces.md` · `okf/capabilities/observability/observability.md` §3.1
+
 ### Deployment & packaging
 
 - **P2** · **D8-SUPPRESS-1** — per-recipient suppression list (TTL for hard bounces, permanent for complaints). ✅ **Its gate — a DB-backed `DeliveryReceiptStore` — was DISCHARGED 2026-09-07** (the same day it was verified still holding): `DbDeliveryReceiptStore` shipped in `inspecto-engine/.../notify/`, wired `SpaceRoot.deliveryReceiptsDbUrl` → `OperationalDb.Family.DELIVERY_RECEIPTS` → `ServiceStores.openDeliveryReceiptStore` → `CollectorService`, behind `-Ddelivery.receipts.backend`. ⛔ Default `none` — an absent receipt DB is the shipped behaviour, not degraded correctness, and a default-ON family creates a DB file in the CWD for every Personal install. Schema + rationale: `okf/backend/engine/db-layer.md` §3.12. ✅ **The suppression policy SHIPPED the same day** — `SuppressionList` (complaint ⇒ permanent · hard bounce ⇒ `-Dnotify.suppression.bounce.ttl`, default `P30D` · ⛔ soft bounce never · off via `-Dnotify.suppression=off`), consulted in `NotificationService`'s ChannelConfig delivery loop. 🔴 It **arms only over a durable store** (`DeliveryReceiptStore.durable()`) and WARNs when a TTL is set over one that cannot honour it — suppressing nothing while appearing configured is the `ConservationCheck` trap. ✅ **`GET/DELETE /notifications/suppressions` SHIPPED too** — the 2026-09-06 decision is fully discharged. `DELETE` records an **override** (operator call 2026-09-07) that forgives history up to its timestamp; a later bounce re-suppresses on its own, and the receipts survive as the audit trail. ⛔ Rejected: pruning the target's receipts — audit loss AND a permanent mask over a dead address. **What remains on D8: soft-bounce retry scheduling and the SES/SNS adapter** (the latter needs subscription confirmation + an outbound cert fetch from a callback path — its own review). Covers EDITIONS `CP-15` (Standard+). → `okf/backend/control-plane/events-metrics.md` §Decision
 
 - **P2** · **AGT-5 per-tool dry-run seam — GATE DISCHARGED 2026-09-08, now actionable.** This sat in §2 as externally gated on eoiagent shipping a per-tool `DryRunProvider`. **It has shipped**: `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunProvider.java`, `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunResult.java`, and four per-tool dry-run tools, under an **Accepted** ADR-0008 enforcing approval + dry-run in the runtime (upstream `jotder/inspect-agent`, verified via the git-tree API 2026-09-08). ⚠ The gate was not "waiting" — it was **held shut by a broken check**: the `gh search code` probe it named returns 0 for every term in that repo, control included. **What this unblocks:** inspecto can now drop its parallel `AgentApprovals` previewer and consume the upstream per-tool seam on `PlatformBuilder`. ⛔ Still separately gated: `incident_explain` waits on the eoiagent **host** seam, and the local-models-only scope cut stands. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
-- **P2** · **Deployment topology gaps** — GAP-3 service wrappers (SCR-3) · GAP-4 DuckDB `memory_limit` default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `archived-documents/plans-archive/deployment-topology-plan.md` §11
+- **P2** · **Deployment topology gaps** — ~~GAP-3 service wrappers (SCR-3)~~ → own P1 row `DEPLOY-SERVICE-WRAPPER-1` (2026-09-11) · GAP-4 DuckDB `memory_limit` default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `archived-documents/plans-archive/deployment-topology-plan.md` §11
 - **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
 
+- **P1** · **`AIRGAP-EXTENSIONS-1` — two DuckDB extensions are fetched from the network at run time.**
+  `DuckLakeRegistrar.java:58` executes `INSTALL ducklake FROM core`, and `ExcelExtension` falls through to
+  `INSTALL excel` unless a cached binary is present; `package.ps1` (`:33`, `:144`) stages **only** `excel`
+  into `duckdb-extensions/<platform>/`, and only when a local cache exists at package time. So "zero egress"
+  is false on a stock air-gapped install the moment a pipeline uses DuckLake or an `.xlsx` feed. Fix: stage
+  `ducklake` and `httpfs` beside `excel` through the same mechanism; `DuckLakeRegistrar` loads from
+  `-Dduckdb.extension.dir` before it ever calls `INSTALL`; extend `EgressGuardTest` (or a sibling in
+  `inspecto-etl`) to **fail** if any `INSTALL` can reach the network when the extension dir is set. Test:
+  with the dir set and the network unreachable, a DuckLake registration and an xlsx ingest both succeed.
+  Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/editions/editions.md` §3.11 · `inspecto/package.ps1`
+- **P1** · **`DEPLOY-SERVICE-WRAPPER-1` — `SCR-3`, promoted out of the gaps row.** No service wrapper ships,
+  so "restart-as-recovery" is a property of the engine that nothing exercises in production: a crashed
+  process stays down until a person notices. Fix, staged by `package.ps1` into the bundle: a systemd unit
+  (`Restart=on-failure`, `WorkingDirectory=` the bundle root, `EnvironmentFile=`) plus an install script;
+  on Windows an `sc.exe`-based service (⚠ WinSW vs `sc.exe` is the open vendor call from the deployment
+  plan — recommend `sc.exe`, zero dependencies, and document WinSW as the alternative). Test: `kill -9` the
+  process → it is back and answering `/health` inside the unit's restart delay. Was GAP-3 inside
+  *Deployment topology gaps* and item 1 of `SPEC-DEPLOY-ROWS-1`; both now point here. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true.
+  → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
 ### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
 
 - **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** Five instances,
