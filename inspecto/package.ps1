@@ -1089,7 +1089,211 @@ inspecto-deploy*.zip*
 '@
 Write-LfScript -Path "$bundleDir\.dockerignore" -Content $dockerignoreContent
 
-# ── step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained ──
+# -- step 6b-3: OS service wrappers (SCR-3 / DEPLOY-SERVICE-WRAPPER-1) -------------------------
+# Until now nothing restarted a dead process: editions.md 3.11 states that recovery from process
+# death IS restart, and the thing meant to perform it did not ship. A crashed service stayed down
+# until a person noticed.
+#
+# The backlog row recommended `sc.exe` for Windows on the grounds that it has zero dependencies.
+# That recommendation is REFUSED, because sc.exe cannot host a plain JVM at all: a Windows service
+# binary must connect to the service control dispatcher shortly after start, and java.exe never
+# does, so `sc create binPath= "...java..."` yields a service that fails every start with error
+# 1053 ("did not respond to the start or control request in a timely fashion"). Shipping that
+# installer would have produced a wrapper that LOOKS installed and has never once restarted
+# anything -- the inert-flag trap this codebase keeps paying for.
+# What ships instead, both meeting SCR-3's acceptance (survives reboot AND kill -9):
+#   * Linux   -- a real systemd unit, exactly as specified (Restart=on-failure, WorkingDirectory=
+#     the bundle root, EnvironmentFile=).
+#   * Windows -- a Scheduled Task registered at boot as SYSTEM with RestartCount/RestartInterval,
+#     via the built-in ScheduledTasks module. Still zero dependencies, and it actually restarts.
+#     WinSW is documented in the installer as the alternative for anyone who needs a genuine entry
+#     in services.msc; it is a third-party binary, which is why it is not the default.
+$serviceUnitContent = @'
+# systemd unit for the Inspecto control plane (SCR-3).
+# Installed by install-service.sh, which substitutes @BUNDLE_ROOT@ and @RUN_USER@.
+# Manual install: copy to /etc/systemd/system/inspecto.service, edit the two placeholders,
+# then `systemctl daemon-reload && systemctl enable --now inspecto`.
+[Unit]
+Description=Inspecto control plane
+Documentation=file://@BUNDLE_ROOT@/README.md
+# network-online is what it actually waits for: After=network.target alone does not mean an
+# address is configured yet.
+After=network-online.target
+Wants=network-online.target
+# The restart rate limit lives in [Unit], NOT [Service]: systemd moved StartLimitIntervalSec=/
+# StartLimitBurst= here in v229 and only WARNS about the old placement, so a copy left under
+# [Service] is silently ignored and the limit never applies. A config error that makes startup
+# fail must end in a visible `failed` state, not an endless respawn loop.
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+[Service]
+Type=simple
+User=@RUN_USER@
+WorkingDirectory=@BUNDLE_ROOT@
+# serve.sh reads PORT / SPACES_ROOT / CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS from the
+# environment -- the same contract as a shell launch, so this file is the ONLY configuration
+# surface the unit adds. The leading `-` means an absent file is not a startup error.
+EnvironmentFile=-@BUNDLE_ROOT@/inspecto.env
+ExecStart=@BUNDLE_ROOT@/serve.sh
+# Recovery from process death is RESTART, not failover (editions.md 3.11) -- this line IS that
+# mechanism. on-failure covers a kill -9 (systemd treats death by signal as failure) while still
+# honouring a clean `systemctl stop`; the rate limit that bounds it is in [Unit] above.
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=inspecto
+# Modest hardening only. Do NOT add ProtectSystem=strict or PrivateTmp=yes without testing: the
+# bundle writes DuckDB files, Parquet events and spaces/ UNDER ITS OWN ROOT, and DuckDB needs a
+# usable temp dir. ReadWritePaths keeps the bundle writable if an operator does tighten this.
+NoNewPrivileges=yes
+ReadWritePaths=@BUNDLE_ROOT@
+
+[Install]
+WantedBy=multi-user.target
+'@
+Write-LfScript -Path "$bundleDir\inspecto.service" -Content $serviceUnitContent
+
+$installServiceShContent = @'
+#!/usr/bin/env bash
+# Install the Inspecto control plane as a systemd service (SCR-3).
+#   sudo ./install-service.sh [--user <account>] [--name <service>] [--uninstall]
+# Re-runnable: it rewrites the unit and restarts the service.
+set -euo pipefail
+cd "$(dirname "$0")"
+BUNDLE_ROOT="$(pwd)"
+RUN_USER="${SUDO_USER:-$(id -un)}"
+SERVICE_NAME="inspecto"
+UNINSTALL=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --user)      RUN_USER="${2:?--user needs an account}"; shift 2 ;;
+        --name)      SERVICE_NAME="${2:?--name needs a service name}"; shift 2 ;;
+        --uninstall) UNINSTALL=1; shift ;;
+        -h|--help)   sed -n "2,4p" "$0"; exit 0 ;;
+        *)           echo "unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+UNIT_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "[install-service] must run as root (writes ${UNIT_PATH}) -- try: sudo $0" >&2
+    exit 1
+fi
+if ! command -v systemctl >/dev/null 2>&1; then
+    echo "[install-service] no systemctl on this host. This installer is systemd-only; on a" >&2
+    echo "                  non-systemd init, run serve.sh under that init with an equivalent" >&2
+    echo "                  restart-on-failure policy. See inspecto.service for the settings." >&2
+    exit 1
+fi
+
+if [ "$UNINSTALL" -eq 1 ]; then
+    systemctl disable --now "${SERVICE_NAME}" 2>/dev/null || true
+    rm -f "${UNIT_PATH}"
+    systemctl daemon-reload
+    echo "[install-service] removed ${UNIT_PATH}"
+    exit 0
+fi
+
+[ -x serve.sh ] || chmod +x serve.sh
+# Seed an env file rather than baking configuration into the unit: secrets belong in a
+# root-owned file, never on the process command line or in a world-readable unit.
+if [ ! -f inspecto.env ]; then
+    cat > inspecto.env <<ENV
+# Environment for the Inspecto service. Read by serve.sh; same contract as a shell launch.
+# PORT=8080
+# SPACES_ROOT=spaces
+# AUTH_OIDC_ISSUER=
+# AUTH_OIDC_JWKS_URI=
+# AUTH_OIDC_AUDIENCE=
+# AUTH_OIDC_CLIENT_ID=
+# INSPECTO_JAVA_OPTS=-Xmx4g
+ENV
+    chmod 600 inspecto.env
+    echo "[install-service] wrote ${BUNDLE_ROOT}/inspecto.env (mode 600) -- edit it, then restart"
+fi
+
+sed -e "s|@BUNDLE_ROOT@|${BUNDLE_ROOT}|g" -e "s|@RUN_USER@|${RUN_USER}|g" \
+    inspecto.service > "${UNIT_PATH}"
+chmod 644 "${UNIT_PATH}"
+systemctl daemon-reload
+systemctl enable "${SERVICE_NAME}"
+systemctl restart "${SERVICE_NAME}"
+echo "[install-service] ${SERVICE_NAME} installed at ${UNIT_PATH}"
+echo "[install-service]   user=${RUN_USER}  root=${BUNDLE_ROOT}"
+echo "[install-service] status:  systemctl status ${SERVICE_NAME}"
+echo "[install-service] logs:    journalctl -u ${SERVICE_NAME} -f"
+echo "[install-service] verify recovery (SCR-3 acceptance):"
+echo "[install-service]   sudo kill -9 \$(systemctl show -p MainPID --value ${SERVICE_NAME})"
+echo "[install-service]   sleep 10 && curl -fsS http://localhost:8080/health"
+'@
+Write-LfScript -Path "$bundleDir\install-service.sh" -Content $installServiceShContent
+
+$installServicePs1Content = @'
+# Install the Inspecto control plane as a Windows boot service (SCR-3).
+#   Run from an ELEVATED PowerShell, inside the bundle:
+#     .\install-service.ps1 [-Name Inspecto] [-Uninstall]
+#
+# Implemented as a Scheduled Task running as SYSTEM at boot, with restart-on-failure -- NOT as an
+# sc.exe service. sc.exe cannot host this process: a Windows service binary must connect to the
+# service control dispatcher shortly after starting, and java.exe never does, so an sc.exe-created
+# service fails every start with error 1053. A scheduled task has no such requirement, needs no
+# third-party binary, survives reboot, and restarts after a kill.
+# Alternative, if you specifically need an entry in services.msc (an operator runbook, or a
+# monitoring agent that enumerates services): WinSW (https://github.com/winsw/winsw) wraps any
+# executable as a real service. It is a third-party binary, which is why it is not the default.
+[CmdletBinding()]
+param(
+    [string]$Name = "Inspecto",
+    [switch]$Uninstall
+)
+$ErrorActionPreference = "Stop"
+$bundleRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+$identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object Security.Principal.WindowsPrincipal($identity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw "install-service.ps1 must run from an elevated PowerShell (it registers a boot task as SYSTEM)."
+}
+
+if ($Uninstall) {
+    Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction SilentlyContinue
+    Write-Host "[install-service] removed scheduled task $Name"
+    return
+}
+
+$serveBat = Join-Path $bundleRoot "serve.bat"
+if (-not (Test-Path $serveBat)) {
+    throw "serve.bat not found beside this script ($bundleRoot) -- run it from inside the bundle."
+}
+
+# cmd /c so the task hosts serve.bat itself; WorkingDirectory is the bundle root, matching the
+# systemd unit, because every path the launcher resolves is relative to it.
+$action  = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c ""$serveBat""" -WorkingDirectory $bundleRoot
+$trigger = New-ScheduledTaskTrigger -AtStartup
+$taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+# RestartInterval/RestartCount are the kill -9 half of SCR-3's acceptance. ExecutionTimeLimit is
+# zeroed because this is a long-running service and the default would stop it after three days.
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable -RestartInterval (New-TimeSpan -Minutes 1) -RestartCount 999 `
+    -ExecutionTimeLimit ([TimeSpan]::Zero)
+
+Register-ScheduledTask -TaskName $Name -Action $action -Trigger $trigger `
+    -Principal $taskPrincipal -Settings $settings -Force | Out-Null
+Start-ScheduledTask -TaskName $Name
+Write-Host "[install-service] $Name registered (at boot, as SYSTEM) and started"
+Write-Host "[install-service]   root=$bundleRoot"
+Write-Host "[install-service] status: Get-ScheduledTask -TaskName $Name | Get-ScheduledTaskInfo"
+Write-Host "[install-service] verify recovery (SCR-3 acceptance):"
+Write-Host "[install-service]   Stop-Process -Name java -Force; Start-Sleep 70"
+Write-Host "[install-service]   Invoke-WebRequest http://localhost:8080/health"
+Write-Host "[install-service] NOTE: a task restarts on the RestartInterval (1 min), so allow up to"
+Write-Host "[install-service]       ~70s before concluding that recovery failed."
+'@
+Write-CrlfScript -Path "$bundleDir\install-service.ps1" -Content $installServicePs1Content
+
+# -- step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained --
 # Produces bundle/runtime/ — the run/serve/ura scripts auto-prefer it over system java.
 # jlink is itself a JVM tool: the platform of the jlink *executable* need not match the platform
 # being targeted, because --module-path selects which jmods (which carry the platform-native code)
@@ -1384,6 +1588,10 @@ Write-Host "  4b. Control plane + operator UI (long-running service):"
 Write-Host "       serve.bat                (Windows)"
 Write-Host "       bash serve.sh            (Linux)"
 Write-Host "       then open http://localhost:8080/  (UI served from ./ui)"
+Write-Host "  4c. Run it as an OS service so a crashed process comes back (SCR-3):"
+Write-Host "       .\install-service.ps1    (Windows, ELEVATED PowerShell)"
+Write-Host "       sudo ./install-service.sh (Linux, systemd)"
+Write-Host "       verify recovery: kill the process, then curl /health -- do not assume it"
 Write-Host "  5. Pre-ETL utilities:"
 Write-Host "       ura.bat help            (Windows)"
 Write-Host "       bash ura.sh help        (Linux)"

@@ -48,7 +48,9 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    path as `excel` and is bundled beside it. 🔴 Two of the row's three prescriptions were **wrong on
    grounding**: `httpfs` is loaded by nothing and is REFUSED by both SQL guards, and `EgressGuardTest` is
    about the assistant's LLM classpath, not DuckDB. A third finding is filed as `AIRGAP-DUCKLAKE-PG-1`. →
-   **`DEPLOY-SERVICE-WRAPPER-1`** (`SCR-3`; nothing restarts a dead process) →
+   ~~**`DEPLOY-SERVICE-WRAPPER-1`**~~ ✅ **SHIPPED 2026-09-11** — systemd unit + both installers stage into
+   the bundle; the `sc.exe` recommendation was refused on grounding (error 1053) and Windows gets a boot
+   task instead. ⚠ Its live `kill -9` acceptance is **unrun** — see the §3 residual. →
    **`BREAK-INCIDENT-1`** (the recon page's headline arrow does not exist) →
    then the P2s **`BREAK-AGING-1`**, **`INCIDENT-KPI-MTTR-1`**, **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
@@ -743,15 +745,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   document the file catalog. ⚠ Then reconsider whether `postgres_scanner` must be staged — deliberately
   **not** bundled today precisely because no deployment can reach that path. Found while grounding
   `AIRGAP-EXTENSIONS-1`. → `okf/backend/integrations.md` · `okf/capabilities/data-plane/data-plane.md` §3.10
-- **P1** · **`DEPLOY-SERVICE-WRAPPER-1` — `SCR-3`, promoted out of the gaps row.** No service wrapper ships,
-  so "restart-as-recovery" is a property of the engine that nothing exercises in production: a crashed
-  process stays down until a person notices. Fix, staged by `package.ps1` into the bundle: a systemd unit
-  (`Restart=on-failure`, `WorkingDirectory=` the bundle root, `EnvironmentFile=`) plus an install script;
-  on Windows an `sc.exe`-based service (⚠ WinSW vs `sc.exe` is the open vendor call from the deployment
-  plan — recommend `sc.exe`, zero dependencies, and document WinSW as the alternative). Test: `kill -9` the
-  process → it is back and answering `/health` inside the unit's restart delay. Was GAP-3 inside
-  *Deployment topology gaps* and item 1 of `SPEC-DEPLOY-ROWS-1`; both now point here. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true.
-  → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
+- **P2** · **`DEPLOY-SERVICE-WRAPPER-1` residual — the live acceptance is UNRUN.** ✅ **The wrappers
+  SHIPPED 2026-09-11** (`SCR-3`): `package.ps1` stages `inspecto.service` + `install-service.sh` (systemd)
+  and `install-service.ps1` (Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). 🔴 The
+  row's **`sc.exe` recommendation was REFUSED on grounding** — a Windows service binary must reach the
+  service control dispatcher shortly after start and `java.exe` never does, so an `sc.exe` service fails
+  every start with error 1053; that installer would have looked installed and restarted nothing. WinSW is
+  documented as the alternative. **What remains is evidence, not code:** the unit renders with zero
+  placeholders and both installers parse, but the row's actual test — **`kill -9` → back on `/health`**,
+  plus the reboot leg — is **unrun**, because it needs a systemd host and an elevated Windows box and this
+  checkout is neither. ⛔ Do not mark `SCR-3`'s acceptance met until someone runs both; the installers
+  print the exact commands. → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
+- **P2** · **`DOC-DEADTOKEN-1` — the docs still teach an authentication that does nothing.**
+  `-Dcontrol.token` has **zero** Java readers, so `CONTROL_TOKEN=secret bash serve.sh` secures nothing
+  while reading exactly as though it does. `SCR-9` cleaned the generated launchers (2026-09-09) and
+  `operations-reference.md` names its own 3 launch examples + 27 `Authorization: Bearer secret` curls as
+  debt — but that note scoped itself to that one page, and 🔴 **`inspecto/README.md`, which SHIPS INSIDE
+  THE BUNDLE, still carried two such examples until 2026-09-11**, the worst instance of the set. That one
+  is fixed; the rest are not: `operations-reference.md` (3 + 27 + the `serve.sh` env-var line at `:997`
+  and `:1037`, the Docker `-e CONTROL_TOKEN` at `:1042`), `FEATURE_INVENTORY.md:247`,
+  `.claude/QUICK_START.md:38`. ⚠ This is the guard-scope lesson again: a cleanup that names its own scope
+  narrowly leaves the instances outside it reading as if they had been checked. → `okf/backend/build-run/operations-reference.md`
 ### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
 
 - **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** Five instances,

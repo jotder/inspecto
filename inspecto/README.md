@@ -29,6 +29,7 @@ heavy joins, lookups, or cross-record aggregation — those run in Stage-2, down
   - [8. Schedule jobs](#8-schedule-jobs)
   - [9. Operate via the Control API](#9-operate-via-the-control-api)
   - [9b. Operate via the Inspector web console](#9b-operate-via-the-inspector-web-console)
+  - [9c. Run it as an OS service](#9c-run-it-as-an-os-service)
   - [10. Explore the Metadata Catalog](#10-explore-the-metadata-catalog)
   - [11. The optional AI assist agent](#11-the-optional-ai-assist-agent)
   - [12. Output, audit & troubleshooting](#12-output-audit--troubleshooting)
@@ -324,16 +325,23 @@ AntV G6) that drives every Control API route
 and all 7 assist skills from a browser — no `curl` required. It lives in `inspecto-ui/` and is
 served same-origin by `ControlApi`, so one process hosts both the API and the UI.
 
+> 🔴 **`CONTROL_TOKEN` is a DEAD flag and these examples used to set it.** It has **zero** readers in
+> the Java tree, so `CONTROL_TOKEN=secret bash serve.sh` authenticated nothing while reading exactly like
+> it did — anyone following it would have believed they had secured an auth-free service. `SCR-9` removed
+> it from the generated launchers on 2026-09-09; **this README, which ships inside the bundle, still
+> carried it until 2026-09-11**. Real authentication is the `inspecto-security` module (Standard+, OIDC):
+> see [EDITIONS](../docs/EDITIONS.md). Remaining instances elsewhere in the docs: `DOC-DEADTOKEN-1`.
+
 ```bash
 # Prod: serve the bundled SPA from the deploy bundle (package.ps1 puts it in ./ui)
-CONTROL_TOKEN=secret bash serve.sh            # → http://localhost:8080/  (Linux)
-set CONTROL_TOKEN=secret && serve.bat         # Windows
+bash serve.sh            # → http://localhost:8080/  (Linux)
+serve.bat                # Windows
 
 # Extra JVM flags for a packaged bundle: INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS).
 # Whitespace-separated, appended AFTER the launcher's own flags, so the mandatory ones
 # (--enable-native-access=ALL-UNNAMED, -Dcontrol.port, -Dspaces.root, auth) can't be clobbered.
 # Do NOT use JAVA_OPTS: the launchers ASSIGN that name, so it is silently discarded.
-INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" CONTROL_TOKEN=secret bash serve.sh   # static-serving trace
+INSPECTO_JAVA_OPTS="-Xmx4g" bash serve.sh
 
 # Dev: run the SPA on :4204 with a live backend (CORS + proxy)
 java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4204 \
@@ -349,6 +357,46 @@ spec-driven config authoring, failure diagnoses, and a reusable AI-assist consol
 gracefully when the agent module is absent). Full screen-by-screen walkthrough:
 **[Operator Console (Inspector) guide](../docs/operator-console.md)**. Build/dev details:
 [`inspecto-ui/README.md`](../inspecto-ui/README.md).
+
+## 9c. Run it as an OS service
+
+`serve.sh` / `serve.bat` run in the foreground: close the shell and the service stops, and **nothing
+brings it back if the process dies**. Recovery from process death in this product is *restart*, not
+failover, so the service wrapper **is** the recovery mechanism. Every bundle carries one per platform
+(`SCR-3`).
+
+```bash
+# Linux (systemd) — installs /etc/systemd/system/inspecto.service, enables it, starts it
+sudo ./install-service.sh                 # --user <account>  --name <service>  --uninstall
+systemctl status inspecto
+journalctl -u inspecto -f
+```
+
+```powershell
+# Windows — from an ELEVATED PowerShell, inside the bundle
+.\install-service.ps1                     # -Name Inspecto   -Uninstall
+Get-ScheduledTask -TaskName Inspecto | Get-ScheduledTaskInfo
+```
+
+Configuration stays where it already was: the systemd unit reads `inspecto.env` beside the launcher
+(seeded on first install, mode 600), which carries the same `PORT` / `SPACES_ROOT` / `AUTH_OIDC_*` /
+`INSPECTO_JAVA_OPTS` variables a shell launch uses. The unit adds no configuration surface of its own.
+
+**Verify recovery rather than assuming it** — a wrapper that was never exercised is not a recovery
+mechanism:
+
+```bash
+sudo kill -9 $(systemctl show -p MainPID --value inspecto)
+sleep 10 && curl -fsS http://localhost:8080/health
+```
+
+⚠ **On Windows the wrapper is a Scheduled Task, not an `sc.exe` service**, and deliberately so: a
+Windows service binary must connect to the service control dispatcher shortly after starting, and
+`java.exe` never does — an `sc.exe`-created service fails every start with error 1053. A task needs no
+third-party binary, survives reboot, and restarts after a kill. Its restart interval is one minute, so
+allow ~70s before concluding recovery failed. If you specifically need an entry in `services.msc`,
+[WinSW](https://github.com/winsw/winsw) wraps any executable as a real service; it is third-party,
+which is why it is not the default.
 
 ## 10. Explore the Metadata Catalog
 
