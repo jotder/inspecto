@@ -164,6 +164,43 @@ Operator-created objects take the other door: `POST /objects` with **title + at 
 The auto-creation paths bypass the route and call `ObjectService.open` directly — which is why the first
 object in an empty Space must come from one of them (there is nothing to link to yet).
 
+### MTTR, and why `closedAt` could not supply it
+
+`GET /objects/analytics?type=INCIDENT` has always reported a **`cycleTime`** — `closedAt − createdAt` over
+terminal objects. 🔴 **That is not MTTR for an Incident, and reading it as such overstates every number.**
+`closedAt` is stamped on the **terminal** state, and for an Incident the only terminal state is
+`ARCHIVED` (`Workflow.defaultFor`: `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`). An Incident resolved
+in two hours and archived a month later has a `closedAt` a month out. The analytics tile that showed this
+count was even **labelled "Resolved"** until 2026-09-11 — it counts archived objects.
+
+`INCIDENT-KPI-MTTR-1` (2026-09-11) adds **`ObjectService.ATTR_RESOLVED_AT`** (`resolvedAt`, epoch millis),
+stamped in `commit()` — the single place every status change lands, so no transition path can bypass it —
+whenever the target state is `RESOLVED`. `analytics()` then reports an **`mttr`** block beside
+`cycleTime`, and the UI renders both with the server's own `definition` string underneath.
+
+| Number | Anchor pair | Reads as |
+|---|---|---|
+| `cycleTime` | `createdAt` → `closedAt` | time to **archive** (the tidy-up is included) |
+| `mttr` | `createdAt` → `resolvedAt` | time to **resolve** |
+
+Three rules, each pinned by `ObjectServiceTest`:
+* ⚠ **Most recent resolution wins.** A reopened Incident's first resolution did not hold, so measuring to
+  it would report a fix that was not one. (Contrast `firstSeenAt` on a reconciliation Break, where FIRST is
+  the meaningful end — there the question is *"how long has this been wrong"*, here *"how long until it was
+  right"*.)
+* ⛔ **An object with no recorded resolution is EXCLUDED from the mean, never counted as zero.** Everything
+  resolved before this shipped has no stamp, so a freshly upgraded deployment reports `count: 0` and the UI
+  shows an em-dash rather than a fabricated average.
+* **The definition travels with the number.** Both blocks carry a `definition` string and the KPI tiles
+  render it; a KPI whose meaning is implied is what this row exists to stop.
+
+⛔ **MTTD is NOT built** and no number is published for it — deliberately, because it has no anchor.
+Detection time needs a *first-signal* instant, and nothing records one on an Incident today. The proposed
+anchor is **the earliest Signal at the Incident's `causationId` root → the Incident's `createdAt`**;
+adopting it means reading the event store from the analytics path, which crosses a seam `ObjectService`
+does not have today. Tracked as `INCIDENT-KPI-MTTD-1`. Publishing a placeholder would be worse than the
+gap: an undefined KPI is indistinguishable from a measured one once it is on a dashboard.
+
 ### How a Break can be promoted when no Break is stored
 
 🔴 **Reconciliation is stateless compute.** `POST /recon/run` and `/recon/breaks` recompute from SQL on

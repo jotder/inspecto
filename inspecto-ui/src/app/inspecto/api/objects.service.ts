@@ -141,7 +141,14 @@ export interface ObjectAnalytics {
     byStatus: Record<string, number>;
     byCategory: Record<string, number>;
     byPriority: Record<string, number>;
-    cycleTime: { count: number; avgMs: number };
+    /**
+     * Time to the TERMINAL state. ⚠ Not MTTR: for an Incident the terminal state is `ARCHIVED`, so an
+     * Incident resolved in two hours and archived a month later counts as a month here. The server sends
+     * its own `definition` string — render that rather than restating it.
+     */
+    cycleTime: { count: number; avgMs: number; definition?: string };
+    /** MTTR (`INCIDENT-KPI-MTTR-1`) — created → most recent RESOLVED transition; see `definition`. */
+    mttr: { count: number; avgMs: number; definition?: string };
     impact: { impactAmount: number; recordsAffected: number };
 }
 

@@ -323,4 +323,83 @@ class ObjectServiceTest {
         assertTrue(svc.noteStore().forTarget("link-analysis-view", caseObj.id(), null).isEmpty(),
                 "an object note is not readable as a view note");
     }
+
+    // ── INCIDENT-KPI-MTTR-1: MTTR is a different number from cycle time ────────────────
+
+    /**
+     * The distinction the row exists for. For an INCIDENT the only TERMINAL state is {@code ARCHIVED}, so
+     * {@code closedAt} — and therefore the long-standing {@code cycleTime} — measures time to ARCHIVE. An
+     * Incident resolved promptly and archived much later would report a large "cycle time" that reads like
+     * a slow fix. MTTR is measured from the {@code resolvedAt} stamp instead.
+     */
+    @Test
+    void mttrMeasuresResolutionWhileCycleTimeMeasuresArchival() {
+        EventLog.global().installStore(new InMemoryEventStore());
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+
+        // The I1 gate blocks RESOLVED until the postmortem's four sections are present — reuse the
+        // existing complete blob rather than working around the gate.
+        OperationalObject inc = svc.open(ObjectType.INCIDENT, "late feed", "msg", "WARNING", "pipeA",
+                completePostmortemAttrs(System.currentTimeMillis() + 3_600_000L));
+        assertEquals(0L, inc.closedAt(), "a fresh Incident is not closed");
+        assertNull(inc.attributes().get(ObjectService.ATTR_RESOLVED_AT), "nor resolved");
+
+        svc.transition(inc.id(), "accept", "alice");          // IDENTIFIED -> DIAGNOSING
+        OperationalObject resolved = svc.transitionTo(inc.id(), "RESOLVED", "alice");
+        assertEquals("RESOLVED", resolved.status());
+        long stamp = Long.parseLong(resolved.attributes().get(ObjectService.ATTR_RESOLVED_AT));
+        assertTrue(stamp >= resolved.createdAt(), "the resolution cannot precede the opening");
+        assertEquals(0L, resolved.closedAt(),
+                "RESOLVED is NOT terminal for an Incident, so closedAt must still be unset — this is "
+                        + "exactly why closedAt cannot serve as the MTTR anchor");
+
+        Map<String, Object> before = svc.analytics(ObjectType.INCIDENT);
+        assertEquals(1, mapOf(before, "mttr").get("count"), "the resolved Incident counts toward MTTR");
+        assertEquals(0, mapOf(before, "cycleTime").get("count"), "but not toward cycle time — it is not closed");
+
+        svc.transition(inc.id(), "archive", "alice");         // RESOLVED -> ARCHIVED (terminal)
+        Map<String, Object> after = svc.analytics(ObjectType.INCIDENT);
+        assertEquals(1, mapOf(after, "cycleTime").get("count"), "archiving is what closes it");
+        assertEquals(1, mapOf(after, "mttr").get("count"), "and MTTR is unchanged by the tidy-up");
+    }
+
+    /** A reopened object measures to the resolution that stuck, not to the one that did not. */
+    @Test
+    void reopeningAndResolvingAgainMovesTheResolutionStamp() throws Exception {
+        EventLog.global().installStore(new InMemoryEventStore());
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        OperationalObject inc = svc.open(ObjectType.INCIDENT, "late feed", "msg", "WARNING", "pipeA",
+                completePostmortemAttrs(System.currentTimeMillis() + 3_600_000L));
+
+        long first = Long.parseLong(svc.transitionTo(inc.id(), "RESOLVED", "alice")
+                .attributes().get(ObjectService.ATTR_RESOLVED_AT));
+        svc.transition(inc.id(), "reopen", "alice");          // RESOLVED -> DIAGNOSING
+        Thread.sleep(2);                                      // so the second stamp is distinguishable
+        long second = Long.parseLong(svc.transitionTo(inc.id(), "RESOLVED", "alice")
+                .attributes().get(ObjectService.ATTR_RESOLVED_AT));
+
+        assertTrue(second > first,
+                "the first resolution did not hold, so measuring to it would report a fix that was not one");
+    }
+
+    /** An object with no recorded resolution is EXCLUDED from the mean, never counted as zero. */
+    @Test
+    void objectsWithNoRecordedResolutionDoNotDragTheMeanToZero() {
+        EventLog.global().installStore(new InMemoryEventStore());
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        svc.open(ObjectType.INCIDENT, "still open", "msg", "WARNING", "pipeA", Map.of());
+        OperationalObject done = svc.open(ObjectType.INCIDENT, "fixed", "msg", "WARNING", "pipeA",
+                completePostmortemAttrs(System.currentTimeMillis() + 3_600_000L));
+        svc.transitionTo(done.id(), "RESOLVED", "alice");
+
+        Map<String, Object> mttr = mapOf(svc.analytics(ObjectType.INCIDENT), "mttr");
+        assertEquals(1, mttr.get("count"), "only the resolved one is in the denominator");
+        assertNotNull(mttr.get("definition"), "a KPI must be published with its definition, never implied");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> mapOf(Map<String, Object> analytics, String key) {
+        return (Map<String, Object>) analytics.get(key);
+    }
+
 }

@@ -11,6 +11,11 @@ import { CHART_CATEGORICAL } from 'app/inspecto/theme/chart-tokens';
 interface Tile {
     label: string;
     value: string;
+    /**
+     * What the number MEANS, shown under it. A KPI without its definition is the thing
+     * `INCIDENT-KPI-MTTR-1` exists to stop: two tiles here look interchangeable and are not.
+     */
+    hint?: string;
 }
 
 /**
@@ -40,6 +45,9 @@ interface Tile {
                         <div class="bg-card rounded-2xl p-4 shadow">
                             <div class="text-secondary text-sm">{{ t.label }}</div>
                             <div class="mt-1 text-2xl font-bold">{{ t.value }}</div>
+                            @if (t.hint) {
+                                <div class="text-secondary mt-1 text-xs">{{ t.hint }}</div>
+                            }
                         </div>
                     }
                 </div>
@@ -101,10 +109,27 @@ export class CaseAnalyticsDialog {
         return [
             { label: 'Total', value: String(a.total) },
             { label: 'Backlog (open)', value: String(a.backlog) },
-            { label: 'Resolved', value: String(a.cycleTime.count) },
+            // ⚠ This tile used to read "Resolved" over cycleTime.count, which counts objects in their
+            // TERMINAL state — ARCHIVED for an Incident, not RESOLVED. It was naming the wrong thing.
             {
-                label: 'Avg cycle time',
+                label: 'Closed',
+                value: String(a.cycleTime.count),
+                hint: 'reached the terminal state',
+            },
+            {
+                label: 'Avg time to close',
                 value: a.cycleTime.count ? humanizeMs(a.cycleTime.avgMs) : '—',
+                hint: a.cycleTime.definition,
+            },
+            {
+                label: 'MTTR',
+                value: a.mttr?.count ? humanizeMs(a.mttr.avgMs) : '—',
+                hint: a.mttr?.definition,
+            },
+            {
+                label: 'Resolved',
+                value: String(a.mttr?.count ?? 0),
+                hint: 'objects with a recorded resolution — the MTTR denominator',
             },
             {
                 label: 'Impact total',

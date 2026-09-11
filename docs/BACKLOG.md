@@ -57,8 +57,11 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    one per Break) — the two now coexist. **Sprint 8's four P1s are DONE.** →
    then the P2s ~~**`BREAK-AGING-1`**~~ ✅ **SHIPPED 2026-09-11** (⚠ its "and the KPI report" half had no
    target — `ReconSummary`/`summarize` have **no production consumer**, only their own spec; the buckets
-   render on the Board and the Breaks page instead), **`INCIDENT-KPI-MTTR-1`**,
-   **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
+   render on the Board and the Breaks page instead), ~~**`INCIDENT-KPI-MTTR-1`**~~ ✅ **MTTR SHIPPED 2026-09-11** (🔴 the row said Incidents
+   "already carry `resolvedAt`" — they did **not**: there is no such field, and `closedAt` is stamped on the
+   TERMINAL state, which for an Incident is `ARCHIVED`, so the existing `cycleTime` measured time-to-archive
+   and its UI tile was even labelled "Resolved". MTTD is split out as `INCIDENT-KPI-MTTD-1`, still
+   anchorless), **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
    the rest of the brochure: `PKG-5` (no assistant ships without it) and `RECON-CARDINALITY-1`.
    ⛔ Do not start v1.2 of the whitepaper until 0–4 are green: it is the claims that move, not the prose.
@@ -711,11 +714,13 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   correlation id = the reconciliation) and match on the `breakKey` attribute — read-only, no new SPI, and
   it survives a reload. Only worth doing if an operator asks; the promote itself is idempotent either way.
   → `okf/capabilities/incidents/incidents.md`
-- **P2** · **`INCIDENT-KPI-MTTR-1` — MTTR / MTTD on the KPI report.** Neither exists; Incidents already carry
-  `createdAt`, `resolvedAt` and `slaBreachedAt` (`ObjectService`). **MTTR** is a report over the objects store
-  (`inspecto-ops`, Standard+). **MTTD needs a detection anchor first** — propose *first Signal at the
-  Incident's `causationId` root → Incident `createdAt`*; state it in the report's description so the number
-  is defined, not implied. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/incidents/incidents.md`
+- **P3** · **`INCIDENT-KPI-MTTD-1` — MTTD still has no anchor.** Split out of `INCIDENT-KPI-MTTR-1` when its
+  MTTR half shipped 2026-09-11. Detection time needs a *first-signal* instant and nothing records one on an
+  Incident. The proposed anchor stands: **earliest Signal at the Incident's `causationId` root → the
+  Incident's `createdAt`**. ⚠ Adopting it means reading the event store from the analytics path, a seam
+  `ObjectService` does not have — it emits through `EventLog` but never queries. ⛔ Do **not** publish a
+  placeholder meanwhile: an undefined KPI is indistinguishable from a measured one once it is on a
+  dashboard, which is the failure the MTTR half was filed against. → `okf/capabilities/incidents/incidents.md`
 - **P2** · **`SIGNAL-STALE-TILES-1` — a Signal does not mark the dashboard tiles it invalidates.** The
   positioning's central "seam" example — *a gap at acquisition becomes an Incident carrying lineage to the
   dashboard that went stale* — is true up to the Dataset and stops there: lineage exists (Catalog graph,

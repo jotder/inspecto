@@ -65,6 +65,25 @@ public final class ObjectService {
     public static final String ATTR_DUE_AT = "dueAt";
     /** Attribute key stamped (epoch millis) when an SLA breach has been emitted — makes {@link #sweepIncidentSla} idempotent. */
     public static final String ATTR_SLA_BREACHED_AT = "slaBreachedAt";
+    /**
+     * Epoch-millis of the most recent transition into {@code RESOLVED} ({@code INCIDENT-KPI-MTTR-1},
+     * 2026-09-11) — the only record of WHEN an object was resolved, and therefore the whole basis of MTTR.
+     *
+     * <p>🔴 It exists because {@link OperationalObject#closedAt()} does not answer this. {@code closedAt}
+     * is stamped on the TERMINAL state, and for an Incident the only terminal state is {@code ARCHIVED}
+     * ({@code Workflow.defaultFor}: {@code IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED}). So an Incident
+     * resolved in two hours and archived a month later has a {@code closedAt} a month out — the existing
+     * {@code cycleTime} over it is time-to-ARCHIVE, not time-to-resolve, and reporting it as MTTR would
+     * overstate the number by however long the operator took to tidy up.
+     *
+     * <p>⚠ <b>Most recent resolution wins</b>, deliberately. A reopened object's first resolution did not
+     * hold, so measuring to it would report a fix that was not a fix; the clock runs to the resolution
+     * that stuck. (Contrast {@code firstSeenAt} on a reconciliation Break, where FIRST is the meaningful
+     * end — there the question is "how long has this been wrong", here it is "how long until it was
+     * right".) Both choices are stated wherever the number is published, per this row's own rule that a
+     * KPI must be defined rather than implied.
+     */
+    public static final String ATTR_RESOLVED_AT = "resolvedAt";
     /** Attribute key holding an object's comma-separated watcher list (INC-4). */
     public static final String ATTR_WATCHERS = "watchers";
     /** Attribute key holding an object's comma-separated tag list (GLOSSARY §9 — Tag / Tag Rule). */
@@ -313,7 +332,9 @@ public final class ObjectService {
     /**
      * A rollup over all objects of {@code type} (C4 — the business-lens numbers): totals, backlog
      * (non-terminal count), breakdowns by status / L1-category / priority, cycle-time stats over the
-     * terminal objects ({@code closedAt − createdAt}), and impact totals summed from the flat
+     * terminal objects ({@code closedAt − createdAt}), <b>MTTR</b> over the resolved ones
+     * ({@link #ATTR_RESOLVED_AT}{@code  − createdAt} — a different number, see that constant), and impact
+     * totals summed from the flat
      * {@code impactAmount} / {@code recordsAffected} attributes (the queryable columns the Findings
      * form writes alongside its JSON blob). Shaped as a JSON-ready map so the UI renders it directly
      * and a later Studio-dataset binding can read the same surface.
@@ -328,6 +349,8 @@ public final class ObjectService {
         int backlog = 0;
         long cycleSum = 0;
         int cycleCount = 0;
+        long mttrSum = 0;
+        int mttrCount = 0;
         double impactAmount = 0;
         long recordsAffected = 0;
         for (OperationalObject o : all) {
@@ -339,12 +362,28 @@ public final class ObjectService {
                 cycleSum += o.closedAt() - o.createdAt();
                 cycleCount++;
             }
+            long resolvedAt = parseEpoch(o.attributes().get(ATTR_RESOLVED_AT));
+            if (resolvedAt > 0 && resolvedAt >= o.createdAt()) {
+                mttrSum += resolvedAt - o.createdAt();
+                mttrCount++;
+            }
             impactAmount += parseDoubleOr(o.attributes().get("impactAmount"), 0);
             recordsAffected += parseEpoch(o.attributes().get("recordsAffected")); // long-or-0 parse
         }
         Map<String, Object> cycle = new LinkedHashMap<>();
         cycle.put("count", cycleCount);
         cycle.put("avgMs", cycleCount == 0 ? 0 : cycleSum / cycleCount);
+        // ⚠ Named so nobody reads it as MTTR: this is time to the TERMINAL state, which for an Incident
+        // is ARCHIVED, not RESOLVED.
+        cycle.put("definition", "created \u2192 closed (the terminal state; for an Incident that is ARCHIVED, not RESOLVED)");
+        // INCIDENT-KPI-MTTR-1. `count` is the honest denominator: objects with no recorded resolution are
+        // EXCLUDED, never counted as zero. Every object resolved before 2026-09-11 has no stamp, so a
+        // freshly upgraded deployment reports count 0 rather than a number built from nothing.
+        Map<String, Object> mttr = new LinkedHashMap<>();
+        mttr.put("count", mttrCount);
+        mttr.put("avgMs", mttrCount == 0 ? 0 : mttrSum / mttrCount);
+        mttr.put("definition", "created \u2192 most recent RESOLVED transition; a reopened object measures "
+                + "to the resolution that stuck. Objects with no recorded resolution are excluded from the mean");
         Map<String, Object> impact = new LinkedHashMap<>();
         impact.put("impactAmount", impactAmount);
         impact.put("recordsAffected", recordsAffected);
@@ -356,6 +395,7 @@ public final class ObjectService {
         out.put("byCategory", byCategory);
         out.put("byPriority", byPriority);
         out.put("cycleTime", cycle);
+        out.put("mttr", mttr);
         out.put("impact", impact);
         return out;
     }
@@ -1316,6 +1356,10 @@ public final class ObjectService {
         }
         long now = System.currentTimeMillis();
         OperationalObject next = obj.withStatus(target, now, wf.isTerminal(target));
+        // INCIDENT-KPI-MTTR-1: commit() is the single place every status change lands, so stamping here
+        // cannot be bypassed by transition / transitionTo / resolve. Overwrites on a re-resolve on
+        // purpose — see ATTR_RESOLVED_AT.
+        if ("RESOLVED".equalsIgnoreCase(target)) next = next.withAttributes(Map.of(ATTR_RESOLVED_AT, Long.toString(now)), now);
         OperationalObject updated = store.update(next);
         EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
                 .level(EventLevel.INFO)
