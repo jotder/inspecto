@@ -126,10 +126,14 @@ selected off the same `inspecto-security.jar` presence check that turns on OIDC.
 deliberately left unset: it falls back to `SpaceRoot.eventsDir()`, so discover mode keeps **one trail per
 space** rather than pooling every space's audit into one directory. Both halves are pinned by
 `EventStoreDurabilityTest` — including the memory drop, so the default is a choice and not an accident.
-⛔ Still open, and deliberately not built here: a `parquet` backend that **cannot open** degrades to memory
-with a WARN rather than failing the boot. Making that fatal is phase A of the signed scale-out plan (§5.1)
-and hangs on `-Dinspecto.topology=partitioned`, a switch that **does not exist in the tree** — do not read
-this row as having closed it.
+✅ **CLOSED 2026-09-11 by scale-out phase A.** This row used to read *"still open, and deliberately not
+built here… hangs on `-Dinspecto.topology=partitioned`, a switch that does not exist in the tree."* The
+switch now exists (`com.gamma.util.Topology`, D12), so the residual is discharged: a `parquet` backend that
+**cannot open** still degrades to memory with a WARN under `single` — unchanged, and deliberate, because
+observability must never block a single node's service — but under `partitioned` it **fails the boot**.
+⚠ The enforcement is not in this opener. Every store opener records its outcome in
+`com.gamma.util.StoreHealth`, and the topology check lives in that one recording seam rather than in
+thirteen catch blocks, so a future store cannot forget it. → `okf/backend/engine/db-layer.md` §5.2
 
 ### Stale dashboard tiles (`SIGNAL-STALE-TILES-1`, 2026-09-11)
 

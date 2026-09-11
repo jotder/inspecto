@@ -731,6 +731,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return events;
     }
 
+    /**
+     * This service's space id — {@link SpaceRoot#id()}, {@code "default"} for the single-tenant root.
+     *
+     * <p>⛔ This is the ONE definition of the key operational state is filed under, and the read side must use
+     * it rather than the thread's MDC: stores open during per-space bootstrap, which runs with no space MDC
+     * bound, so the two would disagree exactly when a space degraded. See {@code StoreHealth}.
+     */
+    public String spaceId() {
+        return root.id();
+    }
+
     /** This space's live {@link EventLog} — for a route that needs {@link EventLog#addSubscriber} to
      *  push freshly-emitted events (e.g. {@code /signals/stream}, event-signal-backbone-plan §S3),
      *  distinct from {@link #events()} which is the append-only store for poll/history reads. */

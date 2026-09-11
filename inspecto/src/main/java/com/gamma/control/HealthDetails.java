@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.job.JobService;
+import com.gamma.util.StoreHealth;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,6 +66,25 @@ final class HealthDetails {
                 }
             }
         }
+
+        // Every operational store family, as the opener that built it resolved it (StoreHealth). Before this,
+        // thirteen openers could catch an open failure, log WARN and hand back an in-memory or null store with
+        // nothing above ever learning of it — so an operator who configured Postgres and silently got memory
+        // had no way to find out from the product. A family that was ASKED for a durable backend and could not
+        // open one reports DOWN, which is what VER-3 asserts ("every intended subsystem UP — not silently
+        // NOT_CONFIGURED or an in-memory fallback"). A family that was never asked for stays NOT_CONFIGURED and
+        // is not a failure, so Personal, which configures none of them, is unaffected.
+        StoreHealth.of(api.service().spaceId()).forEach((family, r) -> {
+            String status = switch (r.status()) {
+                case UP -> "UP";
+                case NOT_CONFIGURED -> "NOT_CONFIGURED";
+                case DEGRADED -> "DOWN";
+            };
+            String detail = (r.target() == null || r.target().isBlank())
+                    ? r.detail()
+                    : r.target() + " — " + r.detail();
+            subs.put("store." + family, sub(status, detail));
+        });
 
         boolean down = subs.values().stream()
                 .anyMatch(s -> "DOWN".equals(((Map<?, ?>) s).get("status")));

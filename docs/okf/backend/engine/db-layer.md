@@ -724,6 +724,30 @@ supplies them all; the per-family flags remain as overrides and for back-compat.
   the **business-data** path (out of scope here).
 - **No connection pooling anywhere** — every store uses one raw `DriverManager` connection. A real
   Postgres deployment should add a pool (e.g. HikariCP); it doesn't exist today.
+- 🔴 **A raw `jdbc:` backend value used to be LOWERCASED before it was used as the URL** (fixed
+  2026-09-11, scale-out phase A). Six openers read `System.getProperty(…).trim().toLowerCase()` and then
+  passed that same string on as the URL, so `-Djobs.backend=jdbc:postgresql://db/MyDb?user=Alice&password=Secret`
+  silently connected as `mydb`/`alice`/`secret` — Postgres database names, roles and passwords are all
+  case-sensitive — and on a case-sensitive filesystem `jdbc:duckdb:/srv/Inspecto/x.duckdb` opened a
+  different file. Affected: jobs, provenance, consignment outputs, dedup ledger, delivery receipts, file
+  stages. `status` and `events` never lowercased and were never affected. ⛔ The rule the fix restores,
+  already used by `OperationalDb.resolve`: **compare on a lowercased copy, pass on the raw value.**
+- ⚠ **A store that fails to open degrades and says so only at WARN** — thirteen openers across
+  `ServiceStores`, `OpsEngineProvider` and `AcquisitionLedgers` catch, log, and hand back an in-memory or
+  `null` store. Since 2026-09-11 each one also records its outcome in `com.gamma.util.StoreHealth`, and
+  `GET /health/details` reports one `store.<family>` subsystem per family: `UP`, `NOT_CONFIGURED` (the
+  toggle is off — not a failure), or `DOWN` (a durable backend was asked for and could not be opened).
+  That is what makes `VER-3` checkable. ⛔ A family with **no** entry was never opened at all — absence is
+  not health, and must never be read as `UP`.
+- 🔴 **`-Dinspecto.topology=partitioned` turns a degradation into a BOOT FAILURE** (`com.gamma.util.Topology`,
+  D12; values `single` — the default — and `partitioned`, and it is what `/bootstrap` reports). Graceful
+  degradation is right for one node and is **silent split-brain** across several sharing one database: two
+  nodes each holding their own in-memory truth, neither aware of the other. ⚠ The check lives in
+  `StoreHealth.record`, the one place every opener already reports through — **not** in the thirteen catch
+  blocks, because thirteen checks are thirteen places a fourteenth store can forget one. ⛔ An unrecognised
+  value refuses the boot rather than defaulting to `single`: defaulting would turn one typo into exactly the
+  degradation the flag exists to prevent. ⚠ `partitioned` means "more than one process shares this state", so
+  it covers Standard's two-node T4 standby as well as Enterprise's N pods.
 
 ### 5.3 Migration checklist
 

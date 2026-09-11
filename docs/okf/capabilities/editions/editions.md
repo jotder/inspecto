@@ -621,9 +621,13 @@ makes the phases sequential rather than a wish list.
 Postgres → start B → repoint LB/DNS → the full acceptance block. Replication is Postgres **PITR/WAL
 archiving** plus a scheduled post-CHECKPOINT `spaces/` sync (`robocopy`/`rsync`).
 
-⚠ **`SCR-3` carries an open vendor decision**: the Windows service wrapper is **WinSW or an `sc.exe`
-wrapper**, undecided. The systemd side is settled (`Restart=on-failure`, `WorkingDirectory=` the bundle
-root, `EnvironmentFile=`).
+⚠ **`SCR-3`'s vendor decision is CLOSED — this paragraph used to say it was open** (distilled from the
+archived deployment-topology plan and not refreshed when the row shipped, so the same file carried both
+states; see the `SCR-3` row in §3.14). The systemd side was always settled (`Restart=on-failure`,
+`WorkingDirectory=` the bundle root, `EnvironmentFile=`). The Windows half was decided **on grounding
+2026-09-11**: ⛔ **`sc.exe` cannot host a JVM** — it expects a service-control binary and a plain
+`java -jar` under it dies with error 1053 — so neither `sc.exe` nor WinSW was taken and Windows gets a
+**boot Scheduled Task** instead.
 
 ## 4. Decisions (dated one-liners)
 

@@ -18,6 +18,7 @@ import com.gamma.ops.workflow.Workflow;
 import com.gamma.service.ObjectEngineProvider;
 import com.gamma.service.OperationalDb;
 import com.gamma.service.SpaceRoot;
+import com.gamma.util.StoreHealth;
 import com.gamma.util.BrowsableStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,61 +92,86 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
     }
 
     private static ObjectStore openObjectStore(SpaceRoot root) {
-        if (!durable()) return new InMemoryObjectStore();
+        if (!durable()) {
+            StoreHealth.record(root.id(), "objects", StoreHealth.Status.NOT_CONFIGURED, "memory",
+                    "-Dobjects.backend is not 'db' — Incidents and Alerts are lost on restart");
+            return new InMemoryObjectStore();
+        }
         String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root.objectsDbUrl());
         try {
             ObjectStore db = DbObjectStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.OBJECTS),
                     OperationalDb.passwordFor(OperationalDb.Family.OBJECTS));
             log.info("Object backend: database ({})", url);
+            StoreHealth.record(root.id(), "objects", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
             log.warn("Could not open object DB at {} — falling back to in-memory: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "objects", url,
+                    "Incidents and Alerts fell back to in-memory and are lost on restart: " + e.getMessage());
             return new InMemoryObjectStore();
         }
     }
 
     private static LinkStore openLinkStore(SpaceRoot root) {
-        if (!durable()) return new InMemoryLinkStore();
+        if (!durable()) {
+            StoreHealth.record(root.id(), "links", StoreHealth.Status.NOT_CONFIGURED, "memory",
+                    "-Dobjects.backend is not 'db'");
+            return new InMemoryLinkStore();
+        }
         String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root.linksDbUrl());
         try {
             LinkStore db = DbLinkStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.LINKS),
                     OperationalDb.passwordFor(OperationalDb.Family.LINKS));
             log.info("Link backend: database ({})", url);
+            StoreHealth.record(root.id(), "links", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
             log.warn("Could not open link DB at {} — falling back to in-memory: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "links", url, "object links fell back to in-memory: " + e.getMessage());
             return new InMemoryLinkStore();
         }
     }
 
     private static NoteStore openNoteStore(SpaceRoot root) {
-        if (!durable()) return new InMemoryNoteStore();
+        if (!durable()) {
+            StoreHealth.record(root.id(), "notes", StoreHealth.Status.NOT_CONFIGURED, "memory",
+                    "-Dobjects.backend is not 'db'");
+            return new InMemoryNoteStore();
+        }
         String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root.notesDbUrl());
         try {
             NoteStore db = DbNoteStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.NOTES),
                     OperationalDb.passwordFor(OperationalDb.Family.NOTES));
             log.info("Note backend: database ({})", url);
+            StoreHealth.record(root.id(), "notes", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
             log.warn("Could not open note DB at {} — falling back to in-memory: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "notes", url, "operator notes fell back to in-memory: " + e.getMessage());
             return new InMemoryNoteStore();
         }
     }
 
     private static TagAssignmentStore openTagAssignmentStore(SpaceRoot root) {
-        if (!durable()) return new InMemoryTagAssignmentStore();
+        if (!durable()) {
+            StoreHealth.record(root.id(), "tags", StoreHealth.Status.NOT_CONFIGURED, "memory",
+                    "-Dobjects.backend is not 'db'");
+            return new InMemoryTagAssignmentStore();
+        }
         String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root.tagAssignmentsDbUrl());
         try {
             TagAssignmentStore db = DbTagAssignmentStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.TAGS),
                     OperationalDb.passwordFor(OperationalDb.Family.TAGS));
             log.info("Tag assignment backend: database ({})", url);
+            StoreHealth.record(root.id(), "tags", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
             log.warn("Could not open tag DB at {} — falling back to in-memory: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "tags", url, "tag assignments fell back to in-memory: " + e.getMessage());
             return new InMemoryTagAssignmentStore();
         }
     }

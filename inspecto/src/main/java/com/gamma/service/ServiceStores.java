@@ -6,6 +6,7 @@ import com.gamma.event.InMemoryEventStore;
 import com.gamma.event.ParquetEventStore;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.job.DbJobRunStore;
+import com.gamma.util.StoreHealth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,16 +58,26 @@ final class ServiceStores {
      * job reporting off and {@code /jobs/metrics} 404s. Percentile SQL is dialect-aware (see {@link DbJobRunStore}).
      */
     static DbJobRunStore openJobRunStore(SpaceRoot root) {
-        String backend = System.getProperty("jobs.backend", "none").trim().toLowerCase();
+        // ⛔ Compare lowercased, but keep the RAW value for the URL: a jdbc: value carries a path, a database
+        // name and credentials, and Postgres treats all three case-sensitively. Mirrors OperationalDb.resolve.
+        String raw = System.getProperty("jobs.backend", "none").trim();
+        String backend = raw.toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
-        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) {
+            StoreHealth.record(root.id(), "jobRuns", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Djobs.backend=" + backend + " — job reporting off");
+            return null;
+        }
         String url = backend.startsWith("jdbc:")
-                ? backend
+                ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.JOB_RUNS, root.jobRunDbUrl());
         try {
-            return DbJobRunStore.open(url);
+            DbJobRunStore db = DbJobRunStore.open(url);
+            StoreHealth.record(root.id(), "jobRuns", StoreHealth.Status.UP, url, "open");
+            return db;
         } catch (Exception e) {
             log.warn("Could not open job-run DB ({}) — job reporting disabled: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "jobRuns", url, "job reporting disabled: " + e.getMessage());
             return null;
         }
     }
@@ -79,16 +90,24 @@ final class ServiceStores {
      * Mirrors {@link #openJobRunStore(SpaceRoot)}.
      */
     static com.gamma.pipeline.exec.DbProvenanceStore openProvenanceStore(SpaceRoot root) {
-        String backend = System.getProperty("provenance.backend", "none").trim().toLowerCase();
+        String raw = System.getProperty("provenance.backend", "none").trim();   // raw: see openJobRunStore
+        String backend = raw.toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
-        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) {
+            StoreHealth.record(root.id(), "provenance", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Dprovenance.backend=" + backend + " — per-edge counts off");
+            return null;
+        }
         String url = backend.startsWith("jdbc:")
-                ? backend
+                ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.PROVENANCE, root.provenanceDbUrl());
         try {
-            return com.gamma.pipeline.exec.DbProvenanceStore.open(url);
+            com.gamma.pipeline.exec.DbProvenanceStore db = com.gamma.pipeline.exec.DbProvenanceStore.open(url);
+            StoreHealth.record(root.id(), "provenance", StoreHealth.Status.UP, url, "open");
+            return db;
         } catch (Exception e) {
             log.warn("Could not open provenance DB ({}) — data-plane provenance disabled: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "provenance", url, "data-plane provenance disabled: " + e.getMessage());
             return null;
         }
     }
@@ -116,16 +135,24 @@ final class ServiceStores {
      * {@link com.gamma.consignment.DbConsignmentOutputStore}.
      */
     static com.gamma.consignment.DbConsignmentOutputStore openConsignmentOutputStore(SpaceRoot root) {
-        String backend = System.getProperty("consignment.outputs.backend", "duckdb").trim().toLowerCase();
+        String raw = System.getProperty("consignment.outputs.backend", "duckdb").trim();   // raw: see openJobRunStore
+        String backend = raw.toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
-        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) {
+            StoreHealth.record(root.id(), "consignmentOutputs", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Dconsignment.outputs.backend=" + backend + " — no per-output-file registry");
+            return null;
+        }
         String url = backend.startsWith("jdbc:")
-                ? backend
+                ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.CONSIGNMENT_OUTPUTS, root.consignmentOutputsDbUrl());
         try {
-            return com.gamma.consignment.DbConsignmentOutputStore.open(url);
+            com.gamma.consignment.DbConsignmentOutputStore db = com.gamma.consignment.DbConsignmentOutputStore.open(url);
+            StoreHealth.record(root.id(), "consignmentOutputs", StoreHealth.Status.UP, url, "open");
+            return db;
         } catch (Exception e) {
             log.warn("Could not open consignment-outputs DB ({}) — output registry disabled: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "consignmentOutputs", url, "output registry disabled: " + e.getMessage());
             return null;
         }
     }
@@ -140,16 +167,24 @@ final class ServiceStores {
      * degrading — unlike the fail-open registries, absence here is not degraded correctness.
      */
     static com.gamma.consignment.DbDedupLedger openDedupLedger(SpaceRoot root) {
-        String backend = System.getProperty("dedup.ledger.backend", "duckdb").trim().toLowerCase();
+        String raw = System.getProperty("dedup.ledger.backend", "duckdb").trim();   // raw: see openJobRunStore
+        String backend = raw.toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
-        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) {
+            StoreHealth.record(root.id(), "dedupLedger", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Ddedup.ledger.backend=" + backend + " — a windowed transform.dedup REFUSES at run");
+            return null;
+        }
         String url = backend.startsWith("jdbc:")
-                ? backend
+                ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.DEDUP_LEDGER, root.dedupLedgerDbUrl());
         try {
-            return new com.gamma.consignment.DbDedupLedger(url);
+            com.gamma.consignment.DbDedupLedger db = new com.gamma.consignment.DbDedupLedger(url);
+            StoreHealth.record(root.id(), "dedupLedger", StoreHealth.Status.UP, url, "open");
+            return db;
         } catch (Exception e) {
             log.warn("Could not open dedup-ledger DB ({}) — windowed dedup will refuse: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "dedupLedger", url, "windowed dedup will REFUSE at run: " + e.getMessage());
             return null;
         }
     }
@@ -175,32 +210,48 @@ final class ServiceStores {
      * gone. That is why suppression is gated on this store rather than built over the map.
      */
     static com.gamma.notify.DbDeliveryReceiptStore openDeliveryReceiptStore(SpaceRoot root) {
-        String backend = System.getProperty("delivery.receipts.backend", "none").trim().toLowerCase();
+        String raw = System.getProperty("delivery.receipts.backend", "none").trim();   // raw: see openJobRunStore
+        String backend = raw.toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
-        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) {
+            StoreHealth.record(root.id(), "deliveryReceipts", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Ddelivery.receipts.backend=" + backend + " — receipts stay in the bounded in-memory map");
+            return null;
+        }
         String url = backend.startsWith("jdbc:")
-                ? backend
+                ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.DELIVERY_RECEIPTS, root.deliveryReceiptsDbUrl());
         try {
-            return com.gamma.notify.DbDeliveryReceiptStore.open(url, null, null);
+            com.gamma.notify.DbDeliveryReceiptStore db = com.gamma.notify.DbDeliveryReceiptStore.open(url, null, null);
+            StoreHealth.record(root.id(), "deliveryReceipts", StoreHealth.Status.UP, url, "open");
+            return db;
         } catch (Exception e) {
             log.warn("Could not open delivery-receipts DB ({}) — receipts stay in memory: {}",
                     url, e.getMessage());
+            StoreHealth.degraded(root.id(), "deliveryReceipts", url, "receipts stay in memory: " + e.getMessage());
             return null;
         }
     }
 
     static com.gamma.consignment.DbFileStageStore openFileStageStore(SpaceRoot root) {
-        String backend = System.getProperty("file.stages.backend", "none").trim().toLowerCase();
+        String raw = System.getProperty("file.stages.backend", "none").trim();   // raw: see openJobRunStore
+        String backend = raw.toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
-        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) {
+            StoreHealth.record(root.id(), "fileStages", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Dfile.stages.backend=" + backend + " — no per-file stage index");
+            return null;
+        }
         String url = backend.startsWith("jdbc:")
-                ? backend
+                ? raw
                 : OperationalDb.urlFor(OperationalDb.Family.FILE_STAGES, root.fileStagesDbUrl());
         try {
-            return com.gamma.consignment.DbFileStageStore.open(url);
+            com.gamma.consignment.DbFileStageStore db = com.gamma.consignment.DbFileStageStore.open(url);
+            StoreHealth.record(root.id(), "fileStages", StoreHealth.Status.UP, url, "open");
+            return db;
         } catch (Exception e) {
             log.warn("Could not open file-stages DB ({}) — stage registry disabled: {}", url, e.getMessage());
+            StoreHealth.degraded(root.id(), "fileStages", url, "stage registry disabled: " + e.getMessage());
             return null;
         }
     }
@@ -215,16 +266,26 @@ final class ServiceStores {
      */
     static EventStore openEventStore(SpaceRoot root) {
         String backend = System.getProperty("events.backend", "memory");
-        if (!"parquet".equalsIgnoreCase(backend)) return new InMemoryEventStore();
+        if (!"parquet".equalsIgnoreCase(backend)) {
+            StoreHealth.record(root.id(), "events", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Devents.backend=" + backend + " — bounded in-memory ring, nothing survives a restart");
+            return new InMemoryEventStore();
+        }
         String ev = System.getProperty("events.dir");
         Path dir = (ev == null) ? root.eventsDir() : Path.of(ev);
         try {
             EventStore store = ParquetEventStore.open(dir);
             log.info("Event backend: rolling Parquet ({})", dir.toAbsolutePath());
+            StoreHealth.record(root.id(), "events", StoreHealth.Status.UP, dir.toAbsolutePath().toString(),
+                    "rolling Parquet");
             return store;
         } catch (RuntimeException e) {
             log.warn("Could not open Parquet event store at {} — falling back to in-memory: {}",
                     dir, e.getMessage());
+            // 🔴 The audit trail the Standard/Enterprise launchers ask for by passing -Devents.backend=parquet.
+            // Degrading it to a bounded ring loses the trail on restart, which is exactly EVENTS-DURABLE-1.
+            StoreHealth.degraded(root.id(), "events", dir.toAbsolutePath().toString(),
+                    "audit trail fell back to the in-memory ring — nothing survives a restart: " + e.getMessage());
             return new InMemoryEventStore();
         }
     }
@@ -267,13 +328,18 @@ final class ServiceStores {
         // DuckDB (-Dstatus.backend=jdbc:duckdb:) without touching -Dstatus.db.url, which would break the
         // shared -Dinspecto.db roster OperationalDbTest pins; the `db` default is untouched.
         boolean rawUrl = backend.startsWith("jdbc:");
-        if (!rawUrl && !"db".equalsIgnoreCase(backend)) return new FileStatusStore();
+        if (!rawUrl && !"db".equalsIgnoreCase(backend)) {
+            StoreHealth.record(root.id(), "status", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-D" + OperationalDb.Family.STATUS.backendProperty + "=" + backend + " — on-disk audit only");
+            return new FileStatusStore();
+        }
 
         String url = rawUrl ? backend : OperationalDb.urlFor(OperationalDb.Family.STATUS, root.statusDbUrl());
         try {
             StatusStore db = DbStatusStore.open(url,
                     OperationalDb.userFor(OperationalDb.Family.STATUS), OperationalDb.passwordFor(OperationalDb.Family.STATUS));
             log.info("Status backend: database ({})", url);
+            StoreHealth.record(root.id(), "status", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
             // 🔴 An EXPLICIT request still fails loudly: the operator asked for this database, and
@@ -288,6 +354,9 @@ final class ServiceStores {
                     + "on-disk audit. The ledgers are intact; only the database projection is unavailable. "
                     + "Set -D{}=file to make this deliberate, or fix the database to restore it. Cause: {}",
                     url, OperationalDb.Family.STATUS.backendProperty, e.toString());
+            StoreHealth.degraded(root.id(), "status", url,
+                    "fell back to the on-disk audit — the ledgers are intact, only the database projection "
+                    + "is unavailable: " + e.getMessage());
             return new FileStatusStore();
         }
     }

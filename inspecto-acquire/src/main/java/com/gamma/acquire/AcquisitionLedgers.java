@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.gamma.event.EventLog;
+import com.gamma.util.StoreHealth;
 
 import java.nio.file.Path;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +37,8 @@ public final class AcquisitionLedgers {
 
     /** The ledger for the calling thread's space, lazily built from {@code -Dacquire.ledger.backend} on first use. */
     public static AcquisitionLedger shared() {
-        return LEDGERS.computeIfAbsent(EventLog.currentSpaceId(), k -> build());
+        return LEDGERS.computeIfAbsent(EventLog.currentSpaceId(),
+                k -> build(System.getProperty("acquire.ledger.db.url", DEFAULT_DB_URL), k));
     }
 
     /** Install a specific ledger for the calling thread's space (tests / embedders). */
@@ -128,26 +130,42 @@ public final class AcquisitionLedgers {
         return java.util.Optional.ofNullable(PENDING_DB_WATERMARKS.remove(key(dest)));
     }
 
-    /** The lazy default for a space with no explicitly {@linkplain #register registered} ledger: the JVM-wide URL. */
-    private static AcquisitionLedger build() {
-        return build(System.getProperty("acquire.ledger.db.url", DEFAULT_DB_URL));
-    }
-
     /**
      * Build a ledger at {@code url}. The backend toggle ({@code -Dacquire.ledger.backend}, memory default | db)
      * stays process-global — only the URL becomes per-space — mirroring {@link com.gamma.service.ServiceStores}.
      * A {@code db} URL that fails to open degrades to in-memory so acquisition is never blocked.
      */
     public static AcquisitionLedger build(String url) {
+        return build(url, EventLog.currentSpaceId());
+    }
+
+    /**
+     * As {@link #build(String)}, but files the resolved backend under an explicit {@code spaceId} for
+     * {@code GET /health/details}.
+     *
+     * <p>⛔ The id must be passed, not read from the thread: the per-space bootstrap that calls this runs with
+     * <b>no space MDC bound</b> — the same reason {@link #register} takes one. Resolving it from the thread here
+     * would file every boot-time degradation under the default space and report a clean bill of health for the
+     * space that actually degraded.
+     */
+    public static AcquisitionLedger build(String url, String spaceId) {
         String backend = System.getProperty("acquire.ledger.backend", "memory");
-        if (!"db".equalsIgnoreCase(backend)) return new InMemoryAcquisitionLedger();
+        if (!"db".equalsIgnoreCase(backend)) {
+            StoreHealth.record(spaceId, "acquisitionLedger", StoreHealth.Status.NOT_CONFIGURED, backend,
+                    "-Dacquire.ledger.backend=" + backend + " — pre-fetch dedup history is lost on restart");
+            return new InMemoryAcquisitionLedger();
+        }
         try {
             AcquisitionLedger db = DbAcquisitionLedger.open(url,
                     System.getProperty("acquire.ledger.db.user"), System.getProperty("acquire.ledger.db.password"));
             log.info("Acquisition ledger backend: database ({})", url);
+            StoreHealth.record(spaceId, "acquisitionLedger", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
             log.warn("Could not open acquisition ledger DB at {} — falling back to in-memory: {}", url, e.getMessage());
+            StoreHealth.degraded(spaceId, "acquisitionLedger", url,
+                    "pre-fetch dedup fell back to in-memory — already-fetched files can be re-fetched after a "
+                    + "restart: " + e.getMessage());
             return new InMemoryAcquisitionLedger();
         }
     }
