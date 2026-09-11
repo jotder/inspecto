@@ -319,9 +319,102 @@ raises the *aggregate* ceiling, not the *per-feed* one. For tier-1 telecom that 
 by switch, region or hour at source — an onboarding pattern, not a code change, and one to say aloud
 in the first sales conversation.
 
+### 4.1 The unit of distribution — four candidates *(added 2026-09-11, operator challenge)*
+
+🔴 **D3 ("partition by Space") was signed as an invariant, and it does not survive the single-tenant
+case.** An operator asked the obvious question — *what if there is only one Space, under huge load?* —
+and under D3 as written, N pods buy that customer **nothing**. For a tier-1 telecom that most likely has
+one Space with many feeds, that is the common case, not an edge case, and it is the flagship Enterprise
+story. This section records the grounding; the resulting choices are **D14–D16** in §9, unsigned.
+
+D3's stated justification is that pipelines in a Space share **inboxes**, **ledgers** and **dedup state**.
+Two of those three do not survive grounding:
+
+- **Ledgers and dedup state — phase A itself retires this.** All twelve `OperationalDb.Family` entries,
+  `DEDUP_LEDGER` included, route through `JdbcDrivers.connect`, which handles `jdbc:postgresql:`
+  uniformly (§3.3). Moving them to shared Postgres *is* phase A. The objection argues against splitting
+  **today**, not against splitting.
+- **Shared inbox — real, but not a property of a Space.** `dirs.poll` is a **required per-Pipeline**
+  field (`ConfigSpecs.java:92`). In the committed corpus `payments` and `shipments` have distinct
+  inboxes while `orders` and `orders_enriched_rollup` share one. Sharing is a *config fact about a set
+  of Pipelines*, and it is **decidable at boot**.
+
+⇒ The indivisible unit is not the Space. It is the **inbox-sharing group**: the connected components of
+*"names the same `dirs.poll`"*.
+
+**Four candidate units (`U1`–`U4`), independent of one another — a deployment can adopt one without the
+others. ⚠ Lettered `U*` on purpose: §6's phases are already A/B/C and the two must not be conflated.**
+
+| | Unit | Lifts the per-feed ceiling? | Needs shared file storage? | Cost |
+|---|---|---|---|---|
+| **U1** | **Remote acquisition** — one remote file | Yes, for the fetch | **No** | Low — the claim surfaces already exist |
+| **U2** | **Consignment execution** | **Yes** | Yes (volume or object store) | Medium — a claim table + an ordering decision |
+| **U3** | **Pipeline / inbox-group** | No | No | Low — a finer partition map |
+| **U4** | **Space** (today's D3) | No | No | None — already the model |
+
+**U1 — remote acquisition is the best first move, and §5.3 misses it entirely.**
+`RemoteAcquisitionHandler` already materialises bytes listed by a remote `CollectorConnector` into a
+local staging tree "so the rest of the engine … treats them exactly like local files", with rate-limited,
+**optionally parallel** fetch and pre-fetch dedup through `AcquisitionLedgers`.
+
+🔴 **§3.7's "an inbox must have exactly one owning pod" does not apply to a remote origin.** A local
+inbox needs a single owner because `MarkerManager` does a bare `Files.exists` with no claim. A remote
+origin is *already shared by definition*, listing it is idempotent, and a pre-fetch dedup ledger already
+exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the twelve families** (§3.3), so
+both are already Postgres-capable and phase A puts them on shared state as a side effect.
+
+⇒ N pods can pull from one remote origin safely, claiming per file, **with no new mechanism and no
+shared filesystem**. For telecom — thousands of small files over SFTP, I/O-bound — this is the cheapest
+horizontal scale in the system and the one that needs the least new design.
+
+**U2 — consignment execution is the only unit that lifts the per-feed ceiling**, which §4 above calls an
+unavoidable limit. It is unavoidable only while the unit is the Space or the Pipeline. The seam already
+exists in-process: `ConcurrencyBroker` is admission control for **Consignment execution slots** — at most
+`processing.threads` concurrent Consignments **per Pipeline**, plus per-space and per-server caps, with
+stride-scheduling fairness. The engine already runs N Consignments of one Pipeline at once; it is JVM-local.
+Distributing it = **single dispatcher, N workers**: the owning pod keeps the poll (§3.7 intact, because
+*discovery* stays single-process) and enqueues Consignments; any pod claims and executes one.
+⚠ Three costs, stated: workers must read the staged files (D4's object store, or (i)'s shared volume);
+the broker's three tiers become **approximate** per-pod unless the counters move to Postgres (take the
+approximation first — exact global fairness is not worth a round trip per admission); and **ordering needs
+a decision**, because the broker deliberately preserves FIFO per Pipeline and distribution breaks that.
+
+**What still does not scale, honestly:** a **single Pipeline with a single enormous feed** remains bounded
+by one pod's discovery rate even under U2. Only splitting at origin, or intra-Pipeline parallelism (a
+different design, not this plan), changes that.
+
+### 4.2 Combating split-brain — the lease is not enough *(added 2026-09-11)*
+
+⚠ **A TTL lease does not prevent split-brain; it makes it unlikely.** A GC pause or partition longer than
+the TTL leaves the old owner still believing it holds the lease. ⛔ This is equally true of a ZooKeeper
+session, so **changing coordinator does not fix it** — see D15.
+
+The defences that do, best-fit first for this system:
+
+- **Idempotent writes keyed on Consignment / file id — the strongest practical answer for a data plane.**
+  Stop trying to make double execution *impossible*; make it *harmless*. `DbDedupLedger` and `FileStages`
+  (one row per file per stage — "where is file X right now") already exist. If every write is a conditional
+  insert on that id, a second pod's work is wasted effort rather than corruption. This is what makes U1 and
+  U2 safe cheaply, and it degrades well under every partition scenario.
+- **Fencing tokens.** A monotonic epoch issued with the claim, carried on every write, validated **at the
+  resource** (`UPDATE … WHERE epoch <= :token`). The only thing that closes the paused-owner hole.
+- **Make the DuckLake catalog commit the fencing point.** §5.4 already makes it the *visibility* boundary;
+  making it the *serialization* boundary gives one place where correctness is decided.
+- **Reuse the `If-Match` optimistic-concurrency pattern already shipped** (`CLIENT-HALVES-1`, on
+  `/config/write`) rather than inventing a second concurrency story.
+- **Object-store conditional PUT** in place of §3.6's POSIX atomic-rename assumption, which this plan
+  already flags as a risk on shared storage.
+
+⛔ **ZooKeeper / etcd is refused** (D15), and not on taste: Postgres is already mandatory for Enterprise
+(D9) and is already a linearizable store in the critical path; ZK would be a **third** stateful system to
+run, back up and upgrade; **two coordinators is a new split-brain surface** (ZK says pod A owns it while a
+transaction from pod B commits to Postgres anyway); the coordination rate — polls per N seconds,
+Consignments per minute — does not justify it; D5 already refused both advisory locks and the Kubernetes
+Lease API, and ZK is heavier than either.
+
 ---
 
-## 5. The four workstreams
+## 5. The five workstreams
 
 These are `ROADMAP.md` L1's four, grounded and reshaped by §3. Each names its invariant — the thing
 a test must be able to falsify.
@@ -441,12 +534,66 @@ Work under (ii):
   (§3.9) need an object-store-aware containment rule, since prefix containment is not path
   containment.
 
+### 5.5 Request distribution — the UI and the API *(added 2026-09-11)*
+
+**Invariant:** *What an operator sees must not depend on which pod answered.*
+
+⚠ §5.3 distributes **work** and says nothing about distributing **requests**. Grounded 2026-09-11:
+
+- ✅ **The routing key is already in the URL.** `spaceScopedUrl` rewrites every non-global call to
+  `/api/v1/spaces/<id>/…`, so an ingress can dispatch on the path with **zero UI change**.
+- ✅ **A misrouted API call fails cleanly.** `ControlApi`'s static-SPA fallback applies only to an
+  extensionless GET matching *no* API route; "API paths that match a route keep returning JSON (incl.
+  JSON 404s)". Space-scoped routes exist on every pod, so a misroute is a JSON error, never HTML.
+- 🔴 **`GET /spaces` is server-global but its answer is pod-local** — it comes from
+  `SpaceManager.discover` scanning the local `-Dspaces.root`. With per-pod PVCs each pod sees only its
+  own slice, so behind a round-robin Service **the space switcher shows a different subset on every page
+  load**. This is the first screen an operator sees. Filed in §12.
+
+Which pod serves what:
+
+| Request | Pod | Why |
+|---|---|---|
+| SPA shell (`index.html`, hashed assets) | any | `-Dui.dir=./ui`; identical bundle on every pod |
+| `/bootstrap` `/spaces` `/auth` `/health` `/metrics` | any | `SERVER_GLOBAL` — never space-scoped |
+| `/api/v1/spaces/<id>/…` | **the owner** | ingress path-routes on `<id>` |
+
+Work:
+- **Answer `/spaces` from the partition map, not a disk scan.** The map declares every Space and its
+  owner, so this needs no fan-out — and it is the same change that gives the map a coverage check no pod
+  can perform locally (§5.3).
+- **Route only what must be routed.** After phase A most reads come from shared Postgres and any pod can
+  serve them. The owner is required only for: config reads/writes (the write root is on its PVC), run and
+  trigger calls, anything touching the Space's filesystem, and — **until D6 — SSE streams**, since
+  `EventLog` is a per-process, per-Space static registry (§3.3), so a stream served by a non-owner is empty.
+- **Ingress path-routing, with the rules GENERATED from the partition map.** ⛔ Never hand-maintain them:
+  that makes the ingress a second copy of the map and the two drift. An in-app forward was considered and
+  is the weaker option — it costs new code and would have to proxy long-lived SSE streams, which an
+  ingress already does well. ⛔ Client-side routing is refused outright: it leaks topology to the browser
+  and needs per-pod hostnames plus CORS.
+- **Serve the SPA from the ingress or a CDN, not from the pods** (D16). 🔴 Angular emits hashed chunk
+  filenames, so during a rolling update a browser that fetches `index.html` from a new pod and a chunk
+  from an old one gets a 404 — intermittently, because round-robin decides each asset independently. This
+  appears the first time a multi-pod deployment is **rolled**, with or without partitioning. Moving the
+  assets off the pods removes the skew *and* makes "which pod serves the UI" a non-question;
+  `-Dui.dir` stays exactly as-is for the single-node Personal/Standard deployment it was built for.
+- ⚠ **Verify `/auth/refresh` is stateless** before any multi-pod deployment. The BFF keeps the refresh
+  token in an httpOnly cookie; if it is validated from a shared signing key, round-robin is fine, but any
+  server-side session state breaks the moment a refresh lands on another pod. **Unverified** — §12.
+
 ---
 
 ## 6. Sequencing — three M's, not one XL
 
 `ROADMAP.md` L1 is sized XL as one project. Sequenced as below, each phase is an **M**, ships alone,
 and is worth having if the next phase never happens. Stop between any two.
+
+⚠ **This sequencing is UNCHANGED by the 2026-09-11 amendment and does not yet incorporate it.** §4.1's
+units `U1`–`U4` and §5.5's routing work hang on **D14–D16, which are unsigned**. If D14 is signed, the
+natural revision is to pull `U1` (distributed remote acquisition) into phase A — it needs only the claim
+surfaces phase A already moves to Postgres, and it is the cheapest horizontal scale in the system — and to
+place `U2` in phase B beside the lease. ⛔ Do not re-sequence before the decisions are signed; ⚠ and note
+the phases here are A/B/C while the units are `U1`–`U4` — they are different axes.
 
 | Phase | Delivers | Value before any pod exists | Verify gate |
 |---|---|---|---|
@@ -524,6 +671,9 @@ paragraph above warns about. Nothing in the repo boots two control planes in one
 | **D11** | Dynamic rebalancing | ✅ **SIGNED 2026-09-10 (operator)** — **Deferred to phase C+1**; static Space→pod assignment first |
 | **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Standard's two-pod T4 standby is partitioned without being a cluster |
 | **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4. 🔴 **S5 ANSWERED 2026-09-10 — SELF-MANAGED POSTGRES ONLY.** `pg_duckdb` is installed by **building from source** (`make install`), and it appears on **none** of the curated extension lists of Amazon RDS/Aurora, Google Cloud SQL or Azure Database for PostgreSQL Flexible Server — all three publish a fixed set, so a customer cannot add one that is not on it. ⚠ **Evidence strength, stated so it can be re-checked:** Azure's list was read in full from the primary source (Microsoft Learn, *List of Extensions and Modules by Name*, dated 2026-07-10) and contains **no** extension whose name contains "duck"; RDS/Aurora and Cloud SQL rest on their published lists as surfaced by search rather than a full read. ⇒ Treat Azure as settled and the other two as very likely; **the live half of S5 is what confirms all three.** It supports Postgres 14–18 and reads Parquet/CSV/JSON/Iceberg/Delta from S3, GCS, Azure and R2. ⇒ **The external query surface is NOT general.** It is available to a self-managed Postgres and unavailable to the managed services an Enterprise customer is most likely to already run — so D13 must be sold as an option with a deployment precondition, never as a default. 🔴 **And it needs one more thing to be correct at all:** DuckLake **inlines** small writes into the catalog (S1), so a view over the Hive Parquet prefix would silently omit them unless inlining is disabled — see §3.5. ⚠ The live half of S5 (install it, build the view, query it from `psql`) is still owed; this sandbox has no Postgres and no container daemon. |
+| **D14** | *(new, 2026-09-11 — operator challenge to D3)* **Relax D3**: is the indivisible unit the **inbox-sharing group** (connected components of "names the same `dirs.poll`") rather than the Space, with the Space kept as the default grouping? | ⬜ **UNSIGNED — asked.** Recommend **yes.** Under D3 as written a single-Space customer gets **nothing** from N pods, and that is the likely tier-1 telecom shape, not an edge case (§4.1). Two of D3's three justifications do not survive grounding: ledgers and dedup move to shared Postgres **in phase A itself**, and the shared inbox is a per-Pipeline *config fact*, decidable at boot — not a property of a Space. ⛔ Preconditions if signed: phase A (stores on Postgres) **and** D6 (`events.backend=db`), because splitting a Space without D6 splits that Space's Signal ledger across two pods' memory and a Space is precisely the unit Ops looks at. Plus a boot check that **refuses** a map splitting a shared-inbox group |
+| **D15** | *(new, 2026-09-11)* Split-brain posture: **idempotent writes + fencing tokens** over the existing Postgres claim surfaces — and **refuse ZooKeeper/etcd**? | ⬜ **UNSIGNED — asked.** Recommend **yes, and refuse ZK.** ⚠ A TTL lease does not *prevent* split-brain, it makes it unlikely — and a ZK session expiring in a GC pause has the identical hole, so changing coordinator fixes nothing. Lead with **idempotent writes keyed on Consignment/file id** (`DbDedupLedger` + `FileStages` already exist) so double execution is *wasted effort, not corruption*; add **fencing tokens** validated at the resource for the paused-owner case. ZK refused: Postgres is already mandatory (D9) and already linearizable in the critical path; ZK is a **third** stateful system and **two coordinators is a new split-brain surface**; D5 already refused advisory locks and the Kubernetes Lease API, both lighter than ZK (§4.2) |
+| **D16** | *(new, 2026-09-11)* Request routing: **ingress path-routing on `/spaces/<id>/` with rules generated from the partition map**, `/spaces` answered **from the map**, and the **SPA served off the pods** (ingress/CDN)? | ⬜ **UNSIGNED — asked.** Recommend **yes, all three.** The routing key is already in the URL (`spaceScopedUrl`), so this needs **zero UI change**. ⛔ Generate the ingress rules from the map — hand-maintaining them makes the ingress a second copy that drifts. An in-app forward is the weaker option (new code, and it would have to proxy SSE); client-side routing is refused (leaks topology to the browser). Serving the SPA off the pods also removes the rolling-update chunk-skew defect (§12) and keeps `-Dui.dir` unchanged for single-node (§5.5) |
 
 ---
 
@@ -591,6 +741,31 @@ caveat of §4 said aloud.
 ---
 
 ## 12. Defects found while grounding — filed, not fixed here
+
+*(2026-09-11 — found while answering the operator's challenge to D3 and the routing question:)*
+
+- 🔴 **`GET /spaces` returns a POD-LOCAL answer while being server-global** (§5.5). The listing comes from
+  `SpaceManager.discover` scanning the local `-Dspaces.root`; with per-pod PVCs each pod sees only its own
+  slice, and `/spaces` is in the UI's `SERVER_GLOBAL` set so it is never routed. Behind a round-robin
+  Service **the space switcher shows a different subset of Spaces on every page load** — the first screen
+  an operator sees. ⚠ Independent of which unit §4.1 partitions on; it breaks the moment there is a second
+  pod. Fix is the one the map needs anyway: **answer it from the partition map**, which also supplies the
+  coverage check no pod can perform locally.
+- 🔴 **The SPA bundle skews during a rolling update.** Angular emits hashed chunk filenames, so a browser
+  that fetches `index.html` from a new pod and a chunk from an old one gets a 404 — intermittently, since
+  round-robin decides each asset request independently. ⚠ **Not a partitioning defect**: it appears the
+  first time ANY multi-pod deployment is rolled. → D16 (serve the SPA off the pods).
+- ⚠ **`/auth/refresh`'s statelessness is UNVERIFIED.** The BFF keeps the refresh token in an httpOnly
+  cookie; if it is validated from a shared signing key a round-robin fleet is fine, but any server-side
+  session state breaks the moment a refresh lands on a different pod. ⛔ Check before **any** multi-pod
+  deployment — this is not gated on partitioning either.
+- ⚠ **Ordering under distributed Consignment execution is undecided** (§4.1 `U2`). `ConcurrencyBroker`
+  deliberately preserves FIFO **per Pipeline**; distributing execution breaks that. What actually depends
+  on it — sequence-gap detection, dedup semantics, late partitions — is **not established**, and is the
+  first thing to ground before `U2` is built.
+- ⚠ **`StabilityGate.SHARED` and `AcquisitionLedgers`' transient maps are in-heap and per-Space-keyed**
+  (§3.7) — "safe in one process, disagreeing across pods". Whether they are genuinely *inbox*-scoped in
+  practice (and therefore disjoint when inboxes are) is **not verified**, and it gates §4.1 `U1` and `U3`.
 
 - ✅ **`IntakeGovernor` has no Space key** (§3.8) — **FIXED 2026-09-10** (`SPACES-GOVERNOR-1`, pinned by a two-Space
   isolation test); the row is closed. Kept here as the record that the grounding found it.
