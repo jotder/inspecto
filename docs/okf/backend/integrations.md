@@ -30,6 +30,12 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
      compression: snappy
      ducklake:
        enabled: true
+       # 🔴 MEASURED BROKEN 2026-09-11 (AIRGAP-DUCKLAKE-PG-1) — DO NOT COPY THIS LINE.
+       # DuckLake reads catalog_url as a FILE PATH, so ATTACH 'ducklake:postgresql://…' fails
+       # trying to open a file of that name relative to the CWD, and DuckLakeRegistrar swallows
+       # it as a non-fatal warning — the catalog silently stays empty. A file catalog
+       # (catalog_url: "/opt/adj-lake/catalog.ducklake") was measured working end to end.
+       # The working Postgres-catalog spelling has not been established here; do not guess one.
        catalog_url: "postgresql://etl_user:password@localhost:5432/ducklake_db"
        data_path: "/opt/adj-lake"
        schema: <data_source>s
@@ -37,7 +43,9 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
    ```
 
 3. **Run the ETL.** After each file is written, `DuckLakeRegistrar.register` (called from `ConsignmentIngestor`) will:
-   - `INSTALL ducklake FROM core` (downloads on first run; cached thereafter)
+   - load the `ducklake` extension: cached `LOAD` → the file staged by `package.ps1` under
+     `-Dduckdb.extension.dir` → `INSTALL` (the only step that downloads, and the last one tried —
+     `AIRGAP-EXTENSIONS-1`, 2026-09-11; it used to be an unconditional `INSTALL ducklake FROM core`)
    - `ATTACH` the PostgreSQL catalog
    - Create the schema and table if they do not exist
    - `INSERT INTO` the DuckLake table by reading the just-written Parquet files

@@ -30,12 +30,13 @@
 #                                      GraalVM jmods cache is present under .graalvm-cache)
 #   (both in the sandbox root, alongside inbox/ and database/)
 #
-# Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/excel.duckdb_extension
-# when a local DuckDB extension cache is found (multiformat X1 — frontend: xlsx's `excel`
-# extension is NOT statically linked into duckdb_jdbc, so an air-gapped deployment needs the file
-# shipped; see ExcelExtension.ensureLoaded and -DuckdbExtensionCache below). Missing = a warning,
-# never a build failure — serve/run/ura auto-detect it and ExcelExtension falls back to a
-# networked INSTALL on first use if there's no cached binary and the deployment has network access.
+# Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/{excel,ducklake}.duckdb_extension
+# when a local DuckDB extension cache is found — neither is statically linked into duckdb_jdbc, so an
+# air-gapped deployment needs the files shipped (multiformat X1 for `excel`/frontend: xlsx;
+# AIRGAP-EXTENSIONS-1 for `ducklake`/output.ducklake.enabled). See DuckDbExtension.tryLoad and
+# -DuckdbExtensionCache below. Missing = a warning, never a build failure — serve/run/ura auto-detect
+# the directory and the loader falls back to a networked INSTALL on first use if there's no cached
+# binary and the deployment has network access.
 #
 # The zip is a self-contained deployment unit.  On the target server:
 #   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
@@ -1169,22 +1170,35 @@ if (-not $NoRuntime) {
 # ExcelExtension still covers a networked deployment.
 $duckdbExtOut = Join-Path $bundleDir 'duckdb-extensions'
 $bundledAnyExt = $false
+# AIRGAP-EXTENSIONS-1 (2026-09-11): every extension the product LOADs at run time, not just excel.
+# `ducklake` joined the list because DuckLakeRegistrar used to open with an unconditional
+# `INSTALL ducklake FROM core` -- a network fetch on an "air-gapped" install the moment a pipeline set
+# output.ducklake.enabled. ⛔ Do NOT add `httpfs` here on the strength of the old backlog row: nothing in
+# the product loads it, and both SQL guards REFUSE `INSTALL httpfs`/`LOAD httpfs` by name
+# (SqlGuardTest, ConsignmentReaderTest) -- staging it would ship a binary the engine is built to reject.
+# ⛔ Nor `postgres_scanner`: the Postgres DuckLake catalog documented in integrations.md does not
+# currently attach at all (see AIRGAP-DUCKLAKE-PG-1), so bundling for it would be provisioning a path
+# that no deployment can reach. Add a name here ONLY with a run-time LOAD to point at.
+$duckdbExtNames = @('excel', 'ducklake')
 if ($duckdbExtCacheDir) {
     foreach ($plat in @('windows_amd64', 'linux_amd64')) {
-        $found = Get-ChildItem -Path $duckdbExtCacheDir -Recurse -Filter 'excel.duckdb_extension' -ErrorAction SilentlyContinue |
-                 Where-Object { $_.FullName -match [regex]::Escape($plat) } | Select-Object -First 1
-        if ($found) {
-            $dest = Join-Path $duckdbExtOut $plat
-            New-Item -ItemType Directory -Path $dest -Force | Out-Null
-            Copy-Item $found.FullName -Destination (Join-Path $dest 'excel.duckdb_extension') -Force
-            Write-Host "Bundled DuckDB excel extension ($plat) -> duckdb-extensions/$plat/" -ForegroundColor Green
-            $bundledAnyExt = $true
-        } else {
-            Write-Host "  (no cached excel.duckdb_extension for $plat under $duckdbExtCacheDir — xlsx pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
+        foreach ($extName in $duckdbExtNames) {
+            $extFile = "$extName.duckdb_extension"
+            $found = Get-ChildItem -Path $duckdbExtCacheDir -Recurse -Filter $extFile -ErrorAction SilentlyContinue |
+                     Where-Object { $_.FullName -match [regex]::Escape($plat) } | Select-Object -First 1
+            if ($found) {
+                $dest = Join-Path $duckdbExtOut $plat
+                New-Item -ItemType Directory -Path $dest -Force | Out-Null
+                Copy-Item $found.FullName -Destination (Join-Path $dest $extFile) -Force
+                Write-Host "Bundled DuckDB $extName extension ($plat) -> duckdb-extensions/$plat/" -ForegroundColor Green
+                $bundledAnyExt = $true
+            } else {
+                Write-Host "  (no cached $extFile for $plat under $duckdbExtCacheDir — that feature needs network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
+            }
         }
     }
 } else {
-    Write-Host "  (skipping excel extension bundling — no cache resolved; xlsx pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
+    Write-Host "  (skipping DuckDB extension bundling — no cache resolved; xlsx and DuckLake pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
 }
 
 # -- step 6e: BOOT SMOKE -- does the FULLY ASSEMBLED bundle actually START? ----------------------

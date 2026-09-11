@@ -311,9 +311,20 @@ Query Library's execution path** (§2).
 ### 3.10 DuckLake, the warehouse runbook, object-storage export
 
 - **`DuckLakeRegistrar`** (`inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java`), gated by
-  `output.ducklake.enabled`: `INSTALL/LOAD ducklake`, `ATTACH 'ducklake:<catalog_url>' … DATA_PATH`, register
+  `output.ducklake.enabled`: load `ducklake`, `ATTACH 'ducklake:<catalog_url>' … DATA_PATH`, register
   the **already-written local** Parquet paths; **best-effort, non-fatal**; opens its own throwaway DuckDB, never
-  a sealed connection. It **registers, it does not relocate** — bytes stay put. No test class exists.
+  a sealed connection. It **registers, it does not relocate** — bytes stay put. *(⚠ "No test class exists" stood
+  here until 2026-09-11 and was wrong — `DuckLakeRegistrarTest` does.)*
+  🔴 **Two things this bullet used to describe wrongly, both measured 2026-09-11.** (1) It said
+  `INSTALL/LOAD ducklake`, and the code really did open with an unconditional **`INSTALL ducklake FROM
+  core`** — a network fetch on every registration, so an air-gapped install egressed the moment a pipeline
+  enabled DuckLake (`AIRGAP-EXTENSIONS-1`). It now goes through `DuckDbExtension`, which tries the cached
+  `LOAD`, then the file `package.ps1` stages under `-Dduckdb.extension.dir`, and reaches `INSTALL` only on a
+  networked host. (2) ⛔ **A `postgresql://` `catalog_url` does not attach at all** — DuckLake reads the value
+  as a *file path*, so `ATTACH 'ducklake:postgresql://…'` fails trying to open a file of that name relative to
+  the CWD. Because registration is non-fatal, the only symptom is one `DuckLake registration failed` warning
+  per batch and a catalog that stays empty. The documented example in `okf/backend/integrations.md` is that
+  exact shape ⇒ `AIRGAP-DUCKLAKE-PG-1`; a file catalog (`…/cat.ducklake`) was measured working end to end.
 - **The warehouse query layer** is an **operator runbook** against a customer's PostgreSQL: install
   `pg_duckdb`, run the bundled `warehouse_setup.sql` (repo root; not part of the Maven build), create roles
   and views. No `pg_duckdb` code in the repo; nothing tests it; `integrations.md` carries it without an

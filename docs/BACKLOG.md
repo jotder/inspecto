@@ -44,7 +44,10 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    trail across restarts; the residual (degrade-on-failure) is **not buildable before scale-out phase A**,
    see §3. That shift also found and fixed `SERVEBAT-OPTS-1`: Windows Standard/Enterprise bundles were
    booting **auth-free**. →
-   **`AIRGAP-EXTENSIONS-1`** (two run-time network fetches on an "air-gapped" install) →
+   ~~**`AIRGAP-EXTENSIONS-1`**~~ ✅ **SHIPPED 2026-09-11** — `ducklake` now loads through the same staged-file
+   path as `excel` and is bundled beside it. 🔴 Two of the row's three prescriptions were **wrong on
+   grounding**: `httpfs` is loaded by nothing and is REFUSED by both SQL guards, and `EgressGuardTest` is
+   about the assistant's LLM classpath, not DuckDB. A third finding is filed as `AIRGAP-DUCKLAKE-PG-1`. →
    **`DEPLOY-SERVICE-WRAPPER-1`** (`SCR-3`; nothing restarts a dead process) →
    **`BREAK-INCIDENT-1`** (the recon page's headline arrow does not exist) →
    then the P2s **`BREAK-AGING-1`**, **`INCIDENT-KPI-MTTR-1`**, **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
@@ -728,16 +731,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
 
-- **P1** · **`AIRGAP-EXTENSIONS-1` — two DuckDB extensions are fetched from the network at run time.**
-  `DuckLakeRegistrar.java:58` executes `INSTALL ducklake FROM core`, and `ExcelExtension` falls through to
-  `INSTALL excel` unless a cached binary is present; `package.ps1` (`:33`, `:144`) stages **only** `excel`
-  into `duckdb-extensions/<platform>/`, and only when a local cache exists at package time. So "zero egress"
-  is false on a stock air-gapped install the moment a pipeline uses DuckLake or an `.xlsx` feed. Fix: stage
-  `ducklake` and `httpfs` beside `excel` through the same mechanism; `DuckLakeRegistrar` loads from
-  `-Dduckdb.extension.dir` before it ever calls `INSTALL`; extend `EgressGuardTest` (or a sibling in
-  `inspecto-etl`) to **fail** if any `INSTALL` can reach the network when the extension dir is set. Test:
-  with the dir set and the network unreachable, a DuckLake registration and an xlsx ingest both succeed.
-  Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/editions/editions.md` §3.11 · `inspecto/package.ps1`
+- **P2** · **`AIRGAP-DUCKLAKE-PG-1` — the documented DuckLake Postgres catalog cannot attach.**
+  `okf/backend/integrations.md` has shipped `catalog_url: "postgresql://etl_user:…@localhost:5432/ducklake_db"`
+  as *the* DuckLake example. **Measured 2026-09-11** against duckdb_jdbc 1.5.2.1: DuckLake reads `catalog_url`
+  as a **file path**, so `ATTACH 'ducklake:postgresql://…'` fails trying to open a file of that name relative
+  to the CWD. A file catalog (`…/cat.ducklake`) was measured working end to end in the same probe, so the
+  feature is fine and the *documented shape* is not. 🔴 **It fails silently**: registration is best-effort, so
+  the only symptom is one `DuckLake registration failed (non-fatal)` warning per batch and a catalog that
+  never fills. Decide which: establish the working Postgres-catalog spelling (⛔ do not guess one — the
+  probe is `LOAD ducklake` then `ATTACH`, ~20 lines) and fix the doc, **or** drop the Postgres example and
+  document the file catalog. ⚠ Then reconsider whether `postgres_scanner` must be staged — deliberately
+  **not** bundled today precisely because no deployment can reach that path. Found while grounding
+  `AIRGAP-EXTENSIONS-1`. → `okf/backend/integrations.md` · `okf/capabilities/data-plane/data-plane.md` §3.10
 - **P1** · **`DEPLOY-SERVICE-WRAPPER-1` — `SCR-3`, promoted out of the gaps row.** No service wrapper ships,
   so "restart-as-recovery" is a property of the engine that nothing exercises in production: a crashed
   process stays down until a person notices. Fix, staged by `package.ps1` into the bundle: a systemd unit

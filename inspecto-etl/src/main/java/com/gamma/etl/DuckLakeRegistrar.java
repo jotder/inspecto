@@ -55,8 +55,13 @@ public final class DuckLakeRegistrar {
             try (Connection conn = DriverManager.getConnection(DuckDbUtil.jdbcUrl(lakeDb));
                  Statement  stmt = conn.createStatement()) {
 
-                stmt.execute("INSTALL ducklake FROM core");
-                stmt.execute("LOAD ducklake");
+                // AIRGAP-EXTENSIONS-1 (2026-09-11): this was an unconditional `INSTALL ducklake FROM
+                // core`, i.e. a network fetch on every DuckLake registration -- so an "air-gapped"
+                // install had egress the moment a pipeline enabled DuckLake, and the failure arrived
+                // only as the non-fatal warning below. The shared loader tries the cached LOAD, then
+                // the file staged by package.ps1 under -Dduckdb.extension.dir, and reaches INSTALL
+                // only on a deployment that actually has a network.
+                DuckDbExtension.ensureLoaded(conn, "ducklake", "output.ducklake.enabled");
                 stmt.execute(String.format(
                         "ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s')",
                         catalogUrl, dataPath.replace("\\", "/")));
