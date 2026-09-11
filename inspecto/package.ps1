@@ -893,6 +893,12 @@ if [ -f inspecto-security.jar ]; then
     CP="inspecto.jar:inspecto-security.jar"
     EDITION="Standard"
     JAVA_OPTS+=("-Dauth.mode=oidc")
+    # EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts. The engine
+    # default is the bounded in-memory ring (ServiceStores.openEventStore), which forgets every audited
+    # mutation on restart -- correct for Personal's zero-file promise, false for the tamper-evident,
+    # append-only audit story Standard+ sells. -Devents.dir is deliberately NOT set: it defaults to
+    # SpaceRoot.eventsDir(), so discover mode keeps one trail per space instead of one shared pile.
+    JAVA_OPTS+=("-Devents.backend=parquet")
     [ -n "${AUTH_OIDC_ISSUER:-}" ]    && JAVA_OPTS+=("-Dauth.oidc.issuer=${AUTH_OIDC_ISSUER}")
     [ -n "${AUTH_OIDC_JWKS_URI:-}" ]  && JAVA_OPTS+=("-Dauth.oidc.jwksUri=${AUTH_OIDC_JWKS_URI}")
     [ -n "${AUTH_OIDC_AUDIENCE:-}" ]  && JAVA_OPTS+=("-Dauth.oidc.audience=${AUTH_OIDC_AUDIENCE}")
@@ -983,23 +989,31 @@ rem + inspecto-policy.jar => Enterprise. Neither => Personal, byte-for-byte the 
 rem auth-free classpath/flags.
 set "CP=inspecto.jar"
 set "EDITION=Personal"
-if exist inspecto-security.jar (
-    set "CP=inspecto.jar;inspecto-security.jar"
-    set "EDITION=Standard"
-    set "OPTS=%OPTS% -Dauth.mode=oidc"
-    if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
-    if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
-    if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
-    if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
-    rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
-    if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
-    rem inspecto-policy.jar present => Enterprise (Standard + ABAC). No flag needed: the module
-    rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
-    if exist inspecto-policy.jar (
-        set "CP=inspecto.jar;inspecto-security.jar;inspecto-policy.jar"
-        set "EDITION=Enterprise"
-    )
-)
+rem 🔴 SERVEBAT-OPTS-1 (2026-09-11): these are single-line `if`s, NOT a parenthesized block, and that
+rem is load-bearing. cmd.exe expands every %OPTS% in a parenthesized block ONCE, when the block is
+rem PARSED, so N `set "OPTS=%OPTS% ..."` statements inside one block all expand to the value OPTS had
+rem BEFORE the block and only the last one executed survives. This branch used to be such a block, so
+rem a Standard/Enterprise Windows bundle dropped -Dauth.mode=oidc (and every OIDC flag but the last)
+rem and booted AUTH-FREE while printing "edition: Standard" -- the BUNDLE-1 inert-flag trap again.
+rem ⛔ Do NOT "tidy" these back into an if-block, and do NOT reach for `setlocal EnableDelayedExpansion`
+rem instead: these values carry operator secrets and keystore passwords, and delayed expansion eats `!`
+rem inside them. One statement per line is the only form that is correct for both. serve.sh has no
+rem such hazard -- bash expands at execution -- which is why only this half is written out flat.
+if exist inspecto-security.jar set "CP=inspecto.jar;inspecto-security.jar"
+if exist inspecto-security.jar set "EDITION=Standard"
+if exist inspecto-security.jar set "OPTS=%OPTS% -Dauth.mode=oidc"
+rem EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts; see serve.sh.
+if exist inspecto-security.jar set "OPTS=%OPTS% -Devents.backend=parquet"
+if exist inspecto-security.jar if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
+if exist inspecto-security.jar if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
+if exist inspecto-security.jar if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"
+if exist inspecto-security.jar if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
+rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
+if exist inspecto-security.jar if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
+rem inspecto-policy.jar present => Enterprise (Standard + ABAC). No flag needed: the module
+rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
+if exist inspecto-security.jar if exist inspecto-policy.jar set "CP=inspecto.jar;inspecto-security.jar;inspecto-policy.jar"
+if exist inspecto-security.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
 rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
 rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is unconditional.

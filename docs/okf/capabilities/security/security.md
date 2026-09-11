@@ -112,9 +112,21 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
    `/bootstrap.features.authMode` is `System.getProperty("auth.mode", "none")`
    (`BootstrapRoutes.java:83`), while enforcement is decided by whether an `Authenticator` registered. The
    bundle's `serve.sh`/`serve.bat` set `-Dauth.mode=oidc` when they detect the security sidecar
-   (`inspecto/package.ps1:892`), so the shipped bundle is consistent. A hand-launched jar with the sidecar
-   on the classpath and no flag leaves the SPA in no-login mode against a server answering 401 on every
-   route. `UNTRACKED` — filed in §5.
+   (`inspecto/package.ps1:895` / `:1004`), so the shipped bundle is consistent. A hand-launched jar with the
+   sidecar on the classpath and no flag leaves the SPA in no-login mode against a server answering 401 on
+   every route. `UNTRACKED` — filed in §5.
+   🔴 **`serve.bat` did NOT actually do this until 2026-09-11 (`SERVEBAT-OPTS-1`).** The Windows branch was a
+   parenthesised `if exist inspecto-security.jar ( … )` block containing six `set "OPTS=%OPTS% …"`
+   statements — and **cmd.exe expands every `%OPTS%` in a block once, when the block is PARSED**, so all six
+   expanded to the value `OPTS` held *before* the block and only the last one executed survived. Measured on
+   an Enterprise bundle with all four `AUTH_OIDC_*` env vars set, the emitted flags were exactly
+   `--enable-native-access=ALL-UNNAMED -Dcontrol.port=8080 -Dspaces.root=spaces -Dauth.oidc.clientId=abc`:
+   **`-Dauth.mode=oidc` and three of the four OIDC flags were gone**, while the script still printed
+   `edition: Enterprise`. So every Windows Standard/Enterprise bundle booted with the SPA in no-login mode —
+   the §5 hand-launch hazard above, shipped by default on one platform. Fixed by flattening the branch to
+   single-line `if`s (the form the adjacent Postgres lines already used and documented). ⛔ The fix must not
+   be "tidied" back into a block, and ⛔ `setlocal EnableDelayedExpansion` is **not** the alternative: these
+   values carry client secrets and keystore passwords, and delayed expansion eats `!` inside them.
 
 ## 3. Specification
 
@@ -697,6 +709,6 @@ and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (modul
 | **HTTPS is untested** | zero references to `keystore`, `HttpsServer` or `SSLContext` under `inspecto/src/test`. SEC-4 is a Must (S) |
 | **No test runs against a real IdP** | every OIDC test drives a fake JWKS / token endpoint; the incident plan's own lesson was "verified by compiler and jsdom, never by an IdP". The Keycloak / WSO2 blueprints in `docs/api/deployment/` are unexercised by CI |
 | **The Standard bundle's boot precondition has no test** | `SEC-SIDECAR-BOOT-1` was found by a packaging smoke, by hand |
-| **`authMode` ↔ enforcement coupling has no test** | nothing asserts that a bundle with the sidecar also sets `-Dauth.mode=oidc` |
+| **`authMode` ↔ enforcement coupling has no test** | nothing asserts that a bundle with the sidecar also sets `-Dauth.mode=oidc`. 🔴 **This gap stopped being hypothetical on 2026-09-11**: `serve.bat` had been dropping that exact flag on every Windows Standard/Enterprise bundle (`SERVEBAT-OPTS-1`, §2.2), and nothing caught it because nothing runs the emitted launcher. The defect is fixed; **the gap is not** — the only evidence is a by-hand cmd.exe run, so a regression would be just as silent. A guard has to execute an emitted `serve.bat`/`serve.sh` over stub jars and assert the flag set |
 | **`permissions[]` has no consumer, and 2026-09-10 measurement says it should stay that way** — the field is `grants ∩ applicable`, so it is always a SUBSET of the session capabilities and the two cannot disagree; only four routes narrow it, three to a single static capability the client derives from the session set, and the fourth (requirements) narrows by a `status` the client already has on every row and **already gates on correctly** (`requirement-decision.dialog.ts:59,69`). Its only `GET` does not stamp at all. ⚠ The envelope also carries ONE array per response, so it cannot express per-row permissions for a collection. ⇒ **reserved, not scheduled** — reopen only for a set the client cannot compute AND reachable on a read (`BACKLOG.md` `CLIENT-HALVES-1`) | §3.14 |
 | **Tamper-evidence of the audit log** | `EDITIONS.md` SEC-09 says "tamper-evident"; `AuditTrail.java` contains no hash, chain or signature. The ledger is append-only; that is the whole claim. Owned by `OPS`, recorded here because the row is `SEC-09` |

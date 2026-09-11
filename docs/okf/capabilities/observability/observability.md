@@ -117,6 +117,20 @@ oldest and forgets on restart; **`parquet`** — `ParquetEventStore`, rolling Hi
 `-Devents.dir` (`level/year/month/day`) read through DuckDB `read_parquet`. A startup store-swap drains the
 in-memory store oldest-first so nothing emitted before the configured backend attached is lost.
 
+🔴 **The default is a per-EDITION choice made in the launcher, not in the engine** (`EVENTS-DURABLE-1`,
+2026-09-11). The engine default stays `memory`, because Personal's promise is zero files and zero
+configuration — but a ring that empties on restart cannot carry the **tamper-evident, append-only** audit
+trail Standard+ sells, and `AuditTrail` emits `EventType.AUDIT` straight into `EventLog`. So the
+Standard/Enterprise launchers emitted by `inspecto/package.ps1` now pass **`-Devents.backend=parquet`**,
+selected off the same `inspecto-security.jar` presence check that turns on OIDC. `-Devents.dir` is
+deliberately left unset: it falls back to `SpaceRoot.eventsDir()`, so discover mode keeps **one trail per
+space** rather than pooling every space's audit into one directory. Both halves are pinned by
+`EventStoreDurabilityTest` — including the memory drop, so the default is a choice and not an accident.
+⛔ Still open, and deliberately not built here: a `parquet` backend that **cannot open** degrades to memory
+with a WARN rather than failing the boot. Making that fatal is phase A of the signed scale-out plan (§5.1)
+and hangs on `-Dinspecto.topology=partitioned`, a switch that **does not exist in the tree** — do not read
+this row as having closed it.
+
 **The type catalog is the `EventType` enum** (`inspecto-event/src/main/java/com/gamma/event/EventType.java`)
 — quote the enum, never a page. Families: `LOG`, `AUDIT`, `ACCESS_DENIED`, service/pipeline lifecycle,
 `BATCH_*`, `FILE_*` (acquisition), `JOB_*`, `SIGNAL`, `PIPELINE_CONSERVATION_IMBALANCE` (legacy alias
@@ -338,7 +352,7 @@ host's — the rules are `DAT`'s.
 
 | Flag | Default | Reader |
 |---|---|---|
-| `-Devents.backend` / `-Devents.dir` | `memory` / `inspecto-events` | `ServiceStores.java` |
+| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Standard+) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
 | `-Dstatus.backend` | `db` | `OperationalDb.java`, `ServiceStores.java` |
 | `-Djobs.backend` | `none` | `ServiceStores.java`, `DbJobRunStore.java`, `HealthDetails.java` |
 | `-Dprovenance.backend` | `none` | `ServiceStores.java`, `DbProvenanceStore.java` |

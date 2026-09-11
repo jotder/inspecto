@@ -40,7 +40,10 @@ cannot is a decision (§1) or a design (P2).
 
 Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepaper review; each names the file it changes):
 0. **Sprint 8 — make the brochure true.** In this order, smallest first, each independently shippable:
-   **`EVENTS-DURABLE-1`** (the audit trail is in memory on every bundle — a live defect, not a doc problem) →
+   ~~**`EVENTS-DURABLE-1`**~~ ✅ **the launcher half SHIPPED 2026-09-11** — Standard+ now keeps the audit
+   trail across restarts; the residual (degrade-on-failure) is **not buildable before scale-out phase A**,
+   see §3. That shift also found and fixed `SERVEBAT-OPTS-1`: Windows Standard/Enterprise bundles were
+   booting **auth-free**. →
    **`AIRGAP-EXTENSIONS-1`** (two run-time network fetches on an "air-gapped" install) →
    **`DEPLOY-SERVICE-WRAPPER-1`** (`SCR-3`; nothing restarts a dead process) →
    **`BREAK-INCIDENT-1`** (the recon page's headline arrow does not exist) →
@@ -663,19 +666,28 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (DuckDB `spatial` extension itself: zero demand re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (outbound mirror of the connector SPI reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
 - **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
-- **P1** · **`EVENTS-DURABLE-1` — the API audit trail is IN MEMORY on every stock bundle.** `AuditTrail`
-  emits `EventType.AUDIT` into `EventLog`; `ServiceStores.openEventStore` defaults `-Devents.backend` to
-  **`memory`** (a bounded ring of 8,192), and the generated launchers (`serve.sh`/`serve.bat`, `package.ps1`)
-  set **no override** — so a Standard customer who restarts the service loses every audited mutation, and the
-  `parquet` backend **degrades to memory** if its directory fails to open. `observability.md` §3.1 has
-  documented the drop since v4.2.0; **no row owned it**, and the compliance page's AU-9 story rests on it.
-  Fix, in the files it names: `package.ps1` — Standard/Enterprise launchers pass `-Devents.backend=parquet`
-  (dir = `SpaceRoot.eventsDir()`); `ServiceStores` — in DR/partitioned mode a backend that cannot open is a
-  **boot failure**, not a fallback (plan §5.1); `events.backend=db` is the plan's signed D6. Test: restart
-  under `parquet` → audit rows survive; under `memory` → assert the documented drop, so the default is a
-  choice and not an accident. ⛔ Say *tamper-evident, append-only* — *immutable* is refused in writing.
-  Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/observability/observability.md` §3.1 ·
-  `okf/capabilities/compliance/compliance.md` · `superpower/enterprise-scale-out-plan.md` §5.1
+- **P2** · **`EVENTS-DURABLE-1` residual — the silent degrade, and only that.** ✅ **The launcher half SHIPPED
+  2026-09-11**: Standard/Enterprise `serve.sh`/`serve.bat` pass `-Devents.backend=parquet` off the same
+  `inspecto-security.jar` check that turns on OIDC, `-Devents.dir` stays unset so each space keeps its own
+  trail, and `EventStoreDurabilityTest` pins **both** halves — parquet survives a restart, memory drops, so
+  the default is a choice. **What remains:** a `parquet` backend that cannot open still degrades to memory
+  with a WARN instead of failing the boot. 🔴 **The row's own prescription for this could not be built as
+  written** — it said "in DR/partitioned mode", but `-Dinspecto.topology=partitioned` appears in **no source
+  file**; it is phase A of the signed scale-out plan (§5.1), as is `events.backend=db` (D6). ⇒ this residual
+  is **not independently buildable** and must be taken with phase A, not before it. ⛔ Say *tamper-evident,
+  append-only* — *immutable* is refused in writing. → `okf/capabilities/observability/observability.md` §3.1 ·
+  `superpower/enterprise-scale-out-plan.md` §5.1
+- **P2** · **`LAUNCHER-GUARD-1` — nothing executes an emitted launcher, and that is how `SERVEBAT-OPTS-1`
+  shipped.** `serve.bat` spent its life dropping `-Dauth.mode=oidc` on every Windows Standard/Enterprise
+  bundle (cmd.exe expands `%OPTS%` in a parenthesised block at PARSE time, so five of six `set` statements
+  were discarded) — the service booted **auth-free** while printing `edition: Enterprise`. Fixed 2026-09-11;
+  the *gap* is not. `security.md` §8.7 has listed "`authMode` ↔ enforcement coupling has no test" for
+  months, and the only evidence today is a by-hand `cmd.exe` run, so an identical regression would be just
+  as silent — on the platform CI never exercises. Fix: a guard that extracts the `$serveShContent` /
+  `$serveBatContent` here-strings from `inspecto/package.ps1`, runs each over stub jars with the launch line
+  stubbed, and asserts the emitted flag set per edition (Personal: no `auth.mode`, no `events.backend`;
+  Standard+: both). ⚠ The `.bat` half only proves anything on a Windows runner. Filed 2026-09-11.
+  → `okf/capabilities/security/security.md` §2.2, §8.7
 - **P1** · **`BREAK-INCIDENT-1` — a reconciliation Break has no route to an Incident.** The only promotion
   in the tree is `AlertService.promoteToIncident` (**Alert** → Incident); the recon board can mark a Break
   `resolved` but cannot hand it to Ops. Fix: a *Promote to Incident* action on the recon board
