@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
+import { ReconApiService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
     breakId,
@@ -42,12 +43,16 @@ const recon = (breaks: ReconBreak[] = []): Reconciliation => ({
     lastRunAt: null,
 });
 
-async function create(opts: { path?: string; breaks?: ReconBreak[] } = {}) {
+async function create(opts: { path?: string; breaks?: ReconBreak[]; promote?: ReturnType<typeof vi.fn> } = {}) {
     let current = recon(opts.breaks ?? []);
     const save = vi.fn((r: Reconciliation) => ((current = r), of(r)));
     const breaks = vi.fn(async (r: Reconciliation, path?: Record<string, string> | null) =>
         reconBreakSets(r, LEFT, RIGHT, path),
     );
+    const promote =
+        opts.promote ??
+        vi.fn(() => of({ incidentId: 'inc-1', deduped: false, reconciliation: current.id, key: 'EU · data' }));
+    const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     TestBed.configureTestingModule({
         imports: [ReconciliationDetailComponent],
         providers: [
@@ -67,7 +72,8 @@ async function create(opts: { path?: string; breaks?: ReconBreak[] } = {}) {
             },
             { provide: ReconciliationsService, useValue: { get: () => of(current), save } },
             { provide: ReconExecService, useValue: { breaks } },
-            { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
+            { provide: ToastrService, useValue: toastr },
+            { provide: ReconApiService, useValue: { promote } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
@@ -76,7 +82,7 @@ async function create(opts: { path?: string; breaks?: ReconBreak[] } = {}) {
     fixture.detectChanges(); // ngOnInit — load + compute
     await fixture.whenStable();
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, save, breaks };
+    return { fixture, c: fixture.componentInstance, save, breaks, promote, toastr };
 }
 
 describe('ReconciliationDetailComponent (Breaks page)', () => {
@@ -114,6 +120,63 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
 
         await c.toggleResolve(c.valueBreaks()[0]); // re-open via resolveBreak on the persisted entry
         expect(c.valueBreaks()[0].status).toBe('open');
+    });
+
+    // ── BREAK-INCIDENT-1: promote a Break to an Incident ──────────────────────────────
+
+    it('promotes a break with the reconciliation, key and run as evidence', async () => {
+        const { c, promote, toastr } = await create();
+        const vb = c.valueBreaks()[0];
+
+        await c.promote(vb);
+
+        expect(promote).toHaveBeenCalledWith('med_vs_bill', 'EU · data', 'value_break', 'amount', null);
+        expect(toastr.success).toHaveBeenCalled();
+        expect(c.isPromoted(vb)).toBe(true);
+    });
+
+    it('reports a deduped promotion as information, never as an error', async () => {
+        // The server suppressed a second Incident because one is already open for this Break. Nothing
+        // went wrong, so an error toast here would teach the operator that a working feature is broken.
+        const promote = vi.fn(() =>
+            of({ incidentId: null, deduped: true, reconciliation: 'med_vs_bill', key: 'EU · data' }),
+        );
+        const { c, toastr } = await create({ promote });
+
+        await c.promote(c.valueBreaks()[0]);
+
+        expect(toastr.info).toHaveBeenCalled();
+        expect(toastr.error).not.toHaveBeenCalled();
+    });
+
+    it('explains a 503 in place and withdraws the action instead of toasting', async () => {
+        // A Personal bundle carries no inspecto-ops module, so Incidents do not exist. That is a
+        // deployment state, not a failure — the Approvals-inbox lesson.
+        const promote = vi.fn(() => throwError(() => ({ status: 503 })));
+        const { fixture, c, toastr } = await create({ promote });
+        const vb = c.valueBreaks()[0];
+        expect(c.rowActions.some((a) => a.visible?.(vb) === false)).toBe(false);
+
+        await c.promote(vb);
+        fixture.detectChanges();
+
+        expect(c.incidentsUnavailable()).toBe(true);
+        expect(toastr.error).not.toHaveBeenCalled();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Incidents are not installed');
+        // and the affordance is gone — one that can only explain itself is worse than none
+        const promoteAction = c.rowActions[c.rowActions.length - 1];
+        expect(promoteAction.visible?.(vb)).toBe(false);
+    });
+
+    it('still toasts a genuine failure', async () => {
+        const promote = vi.fn(() => throwError(() => ({ status: 500 })));
+        const { c, toastr } = await create({ promote });
+
+        await c.promote(c.valueBreaks()[0]);
+
+        expect(toastr.error).toHaveBeenCalled();
+        expect(c.incidentsUnavailable()).toBe(false);
     });
 
     it('shows a pre-persisted resolution without any interaction', async () => {

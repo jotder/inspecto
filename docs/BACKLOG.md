@@ -51,7 +51,10 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    ~~**`DEPLOY-SERVICE-WRAPPER-1`**~~ ✅ **SHIPPED 2026-09-11** — systemd unit + both installers stage into
    the bundle; the `sc.exe` recommendation was refused on grounding (error 1053) and Windows gets a boot
    task instead. ⚠ Its live `kill -9` acceptance is **unrun** — see the §3 residual. →
-   **`BREAK-INCIDENT-1`** (the recon page's headline arrow does not exist) →
+   ~~**`BREAK-INCIDENT-1`**~~ ✅ **SHIPPED 2026-09-11** — `POST /recon/promote` + a board row action, deduped
+   on `(reconciliation, key)`. 🔴 The row's premise was **half wrong**: `ReconRunJob` had always opened an
+   Incident on a breach, so the gap was **granularity, not mechanism** (one aggregate Incident per run vs.
+   one per Break) — the two now coexist. **Sprint 8's four P1s are DONE.** →
    then the P2s **`BREAK-AGING-1`**, **`INCIDENT-KPI-MTTR-1`**, **`SIGNAL-STALE-TILES-1`** (the seam example; M) →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
    the rest of the brochure: `PKG-5` (no assistant ships without it) and `RECON-CARDINALITY-1`.
@@ -693,15 +696,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   stubbed, and asserts the emitted flag set per edition (Personal: no `auth.mode`, no `events.backend`;
   Standard+: both). ⚠ The `.bat` half only proves anything on a Windows runner. Filed 2026-09-11.
   → `okf/capabilities/security/security.md` §2.2, §8.7
-- **P1** · **`BREAK-INCIDENT-1` — a reconciliation Break has no route to an Incident.** The only promotion
-  in the tree is `AlertService.promoteToIncident` (**Alert** → Incident); the recon board can mark a Break
-  `resolved` but cannot hand it to Ops. Fix: a *Promote to Incident* action on the recon board
-  (`recon-board.component.ts`) that opens an Incident through the existing `inspecto-ops` objects API with
-  the Break key, reconciliation id and run id as evidence, deduped on `(reconciliation, key)` so a Break
-  promoted twice does not open two Incidents. Standard+ (`inspecto-ops`); Personal shows the explained 503
-  panel, never a toast. Test: promote → exactly one Incident carrying the Break evidence; promote again →
-  the same Incident. Filed 2026-09-11 from the whitepaper review against `stakeholders/COMPETITIVE_LANDSCAPE.md` §4 — a brochure claim the tree does not yet make true, sized to make it true. → `okf/capabilities/incidents/incidents.md` ·
-  `inspecto-ui/src/app/inspecto/reconciliation/reconciliation-types.ts`
+- **P3** · **`BREAK-INCIDENT-RESOLVE-1` — a promoted Break carries no back-reference on the board.**
+  Filed 2026-09-11 while shipping `BREAK-INCIDENT-1`. The board marks a Break promoted **for the session
+  only** (an in-memory set), because a Break is not persisted server-side and the route's dedupe reply does
+  **not** name the surviving Incident: `IncidentAccess.openIncident` reports suppression as
+  `Optional.empty()`, so `{incidentId: null, deduped: true}` is all a repeat promotion can say. ⇒ after a
+  reload the operator cannot see which Breaks are already tracked, nor click through to the Incident.
+  Two ways out, and ⛔ **the cheap-looking one is wrong**: persisting a promoted flag onto the Break would
+  put Break lifecycle back on the server, which the C9 contract deliberately keeps client-side. The honest
+  fix is to have the board **list the reconciliation's Incidents** (`GET /objects?type=INCIDENT`,
+  correlation id = the reconciliation) and match on the `breakKey` attribute — read-only, no new SPI, and
+  it survives a reload. Only worth doing if an operator asks; the promote itself is idempotent either way.
+  → `okf/capabilities/incidents/incidents.md`
 - **P2** · **`BREAK-AGING-1` — Breaks have a status but no age.** `reconciliation-types.ts:50` carries
   `open / resolved / auto_closed` (auto-close is real: a Break absent from the fresh set is carried as
   `auto_closed`, `:172-175`) but **no timestamp**, so "aging" cannot be reported — the only aging in the tree

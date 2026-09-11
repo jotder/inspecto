@@ -26,6 +26,9 @@ import static com.gamma.util.Values.intOr;
  * {@code config} (the Board's draft mode). Authoring reuses the generic component CRUD
  * ({@code /components/reconciliation/{id}}); Break lifecycle (auto-close / preserved resolutions) stays
  * client-side per the C9 contract — these routes are stateless compute over {@link ReconService}.
+ * The one exception is {@code POST /recon/promote} ({@code BREAK-INCIDENT-1}), which writes: it hands a
+ * single Break to Ops as an {@code INCIDENT}, deduped on {@code (reconciliation, key)}. It is still not a
+ * Break store — nothing about the Break is persisted, only the Incident that references it.
  *
  * <p>Fail-closed: write root unset → 503; unknown reconciliation / dataset → 404; an unusable config
  * (dataset count, unsafe identifier, bad agg/tolerance, {@code ExpressionGuard}-rejected filter) or a
@@ -42,6 +45,7 @@ final class ReconRoutes implements RouteModule {
         api.post("/recon/columns", (e, m) -> columns(api, api.body(e)));
         api.post("/recon/run", (e, m) -> run(api, api.body(e)));
         api.post("/recon/breaks", (e, m) -> breaks(api, api.body(e)));
+        api.post("/recon/promote", (e, m) -> promote(api, api.body(e)));
     }
 
     // ── POST /recon/columns {datasets:[ids]} ────────────────────────────────────────
@@ -124,6 +128,87 @@ final class ReconRoutes implements RouteModule {
             data.put(e.getKey(), set);
         }
         return data;
+    }
+
+    // ── POST /recon/promote {reconciliation, key, type?, column?, runId?} ───────────
+
+    /**
+     * Promote one reconciliation Break to a managed {@link com.gamma.objects.ObjectType#INCIDENT} — {@code BREAK-INCIDENT-1}.
+     *
+     * <p>Until this route, a Break could be marked {@code resolved} on the board but could not be handed to
+     * Ops at all. ⚠ The backlog row said the tree's only promotion was {@code Alert → Incident}; that was
+     * <b>wrong</b>. {@link com.gamma.job.ReconRunJob} has always opened an Incident on a breach — but one
+     * <em>aggregate</em> Incident per reconciliation run, carrying only break counts. This route is the
+     * missing granularity, not the missing mechanism, and the two coexist on purpose: the Job says "this
+     * reconciliation is breaching", an operator promoting here says "<em>this</em> Break is being worked".
+     *
+     * <h3>Why a Break can be promoted at all, given it does not exist server-side</h3>
+     * 🔴 Reconciliation is <b>stateless compute</b> — {@code /recon/run} and {@code /recon/breaks} recompute
+     * from SQL on every call and persist nothing, so there is no stored Break row to carry a foreign key to.
+     * The identity is therefore reconstructed from the request: {@code (reconciliation, key)}, which is
+     * stable across runs because it is what the comparison itself keys on. That pair is the dedupe key, so
+     * promoting the same Break twice — from two operators, or after a re-run — suppresses the second rather
+     * than handing Ops a clone. ⛔ Do not "fix" this by persisting Breaks to make the reference real: the C9
+     * contract puts Break lifecycle on the client deliberately, and an Incident is the durable artifact.
+     *
+     * <p>The dedupe is on the KEY, not on {@code (key, type, column)}: one business key that breaks on three
+     * columns is one thing for an operator to investigate, and the specific type/column ride along as
+     * attributes. ⚠ A consequence worth knowing: when the same key later breaks a different way, the open
+     * Incident is reused and its attributes still describe the FIRST observation.
+     *
+     * <p>Gates, in order: write root unset → 503 · missing {@code reconciliation}/{@code key} → 422 ·
+     * unknown reconciliation → 404 · no operational-object engine (a Personal build has none) → 503.
+     * The last is why the UI must render an explained panel rather than a toast.
+     *
+     * @return {@code {incidentId, deduped, reconciliation, key}}; {@code deduped} means an active Incident
+     *         already covers this Break and {@code incidentId} is then {@code null} — the seam reports
+     *         suppression without naming the survivor, and widening it for that alone was not worth an
+     *         SPI change (the UI lists the reconciliation's Incidents instead).
+     */
+    private Object promote(ApiContext api, Map<String, Object> body) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
+        String reconId = ApiContext.str(body, "reconciliation");
+        if (reconId == null || reconId.isBlank())
+            throw new ApiException(422, "missing 'reconciliation' (the saved reconciliation this Break came from)");
+        String key = ApiContext.str(body, "key");
+        if (key == null || key.isBlank())
+            throw new ApiException(422, "missing 'key' (the Break's business key — the dedupe identity)");
+
+        // An inline draft config is accepted by every other recon route; NOT here. An Incident that
+        // outlives the session must reference a reconciliation someone can still open.
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        component(store, "reconciliation", reconId)
+                .orElseThrow(() -> new ApiException(404, "no reconciliation '" + reconId + "'"));
+
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503,
+                "operational objects are not installed — promoting a Break to an Incident needs the "
+                        + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
+
+        String type = orDefault(ApiContext.str(body, "type"), "break");
+        String column = ApiContext.str(body, "column");
+        String runId = ApiContext.str(body, "runId");
+
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put("reconciliation", reconId);
+        attrs.put("breakKey", key);                 // ⚠ the dedupe attribute — see the class note
+        attrs.put("breakType", type);
+        if (column != null && !column.isBlank()) attrs.put("column", column);
+        if (runId != null && !runId.isBlank()) attrs.put("runId", runId);
+        attrs.put("promotedFrom", "reconciliation");
+
+        String where = (column == null || column.isBlank()) ? "" : " on '" + column + "'";
+        Optional<String> incidentId = com.gamma.objects.IncidentAccess.over(() -> objects).openIncident(
+                "Reconciliation break: " + key,
+                "Break '" + key + "' (" + type + ")" + where + " promoted from reconciliation '" + reconId + "'"
+                        + (runId == null || runId.isBlank() ? "" : ", run " + runId) + ".",
+                "WARNING", reconId, attrs, "breakKey");
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("incidentId", incidentId.orElse(null));
+        out.put("deduped", incidentId.isEmpty());
+        out.put("reconciliation", reconId);
+        out.put("key", key);
+        return out;
     }
 
     // ── spec assembly ───────────────────────────────────────────────────────────────

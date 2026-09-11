@@ -7,9 +7,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage } from 'app/inspecto/api';
+import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { FlatTreeRow, TreeNode, TreeTableComponent, varianceCell } from 'app/inspecto/tree-table';
 import { InspectoRowAction } from 'app/inspecto/grid';
@@ -48,6 +49,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
         DataTableComponent,
         TreeTableComponent,
         InspectoEmptyStateComponent,
+        InspectoAlertComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './reconciliation-detail.component.html',
@@ -58,12 +60,25 @@ export class ReconciliationDetailComponent implements OnInit {
     private route = inject(ActivatedRoute);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
+    private reconApi = inject(ReconApiService);
 
     readonly recon = signal<Reconciliation | null>(null);
     readonly loading = signal(true);
     readonly computing = signal(false);
     /** Live breaks (all `open` from the engine) — persisted statuses overlay by identity below. */
     private readonly liveBreaks = signal<ReconBreak[] | null>(null);
+
+    /**
+     * Set once a promote attempt comes back 503 — the Personal edition has no `inspecto-ops` module, so
+     * Incidents do not exist in this bundle. ⚠ That is a deployment state, not a failure: it renders as an
+     * explained inline panel and the action hides itself, never a red toast (the Approvals-inbox lesson).
+     * It is latched rather than probed, because there is nothing cheap to probe — the first attempt IS the
+     * probe, and the operator has already been told what happened by the panel.
+     */
+    readonly incidentsUnavailable = signal(false);
+    /** Break ids promoted in this session — drives the row action's "already promoted" affordance. */
+    private readonly promoted = signal<ReadonlySet<string>>(new Set<string>());
+    readonly isPromoted = (b: ReconBreak): boolean => this.promoted().has(breakId(b));
 
     /** The Board dimension path this page is scoped to (from `?path=`), or null for the whole recon. */
     readonly path = signal<Record<string, string> | null>(null);
@@ -139,6 +154,14 @@ export class ReconciliationDetailComponent implements OnInit {
             icon: (b) => (b.status === 'resolved' ? 'heroicons_outline:arrow-uturn-left' : 'heroicons_outline:check'),
             hint: (b) => (b.status === 'resolved' ? 'Re-open' : 'Resolve'),
             onClick: (b) => this.toggleResolve(b),
+        },
+        {
+            icon: 'heroicons_outline:exclamation-triangle',
+            hint: (b) => (this.isPromoted(b) ? 'Already promoted to an Incident' : 'Promote to Incident'),
+            // Hidden outright once the bundle has told us Incidents do not exist here — an affordance that
+            // can only ever explain itself is worse than no affordance (the ai-status rule).
+            visible: () => !this.incidentsUnavailable(),
+            onClick: (b) => this.promote(b),
         },
     ];
 
@@ -220,6 +243,18 @@ export class ReconciliationDetailComponent implements OnInit {
                 if (b) void this.toggleResolve(b);
             },
         },
+        {
+            icon: 'heroicons_outline:exclamation-triangle',
+            hint: (row) => {
+                const b = this.breakOf(row);
+                return b && this.isPromoted(b) ? 'Already promoted to an Incident' : 'Promote to Incident';
+            },
+            visible: (row) => !!this.breakOf(row) && !this.incidentsUnavailable(),
+            onClick: (row) => {
+                const b = this.breakOf(row);
+                if (b) void this.promote(b);
+            },
+        },
     ];
 
     private breakOf(row: FlatTreeRow): ReconBreak | undefined {
@@ -264,6 +299,42 @@ export class ReconciliationDetailComponent implements OnInit {
         } finally {
             this.computing.set(false);
         }
+    }
+
+    /**
+     * Hand one Break to Ops as an Incident (`BREAK-INCIDENT-1`). Until this action a Break could be marked
+     * resolved here but could not be escalated at all — the board and Ops had no connection.
+     *
+     * <p>The server dedupes on `(reconciliation, key)`, so a second promotion of the same Break reports
+     * `deduped` rather than opening a clone; that is surfaced as an info toast, not an error, because
+     * nothing went wrong. A **503** means this bundle has no operational-objects module and latches
+     * {@link incidentsUnavailable}, which explains itself in place and removes the action.
+     */
+    async promote(b: ReconBreak): Promise<void> {
+        const r = this.recon();
+        if (!r || this.incidentsUnavailable()) return;
+        if (
+            !(await this.confirm.confirm(
+                `Open an Incident for this ${breakLabel(b.type)} on key "${b.key}"? ` +
+                    `Ops will see it with the reconciliation and run as evidence.`,
+                'Promote to Incident',
+            ))
+        )
+            return;
+        this.reconApi.promote(r.id, b.key, b.type, b.column ?? null, r.lastRunAt ?? null).subscribe({
+            next: (res) => {
+                this.promoted.set(new Set([...this.promoted(), breakId(b)]));
+                if (res.deduped) this.toastr.info(`An Incident for key "${b.key}" is already open.`);
+                else this.toastr.success(`Incident opened for key "${b.key}".`);
+            },
+            error: (e) => {
+                if (e?.status === 503) {
+                    this.incidentsUnavailable.set(true);
+                    return; // explained in place by the panel — never a toast for a missing module
+                }
+                this.toastr.error(apiErrorMessage(e, `Could not promote the break for key "${b.key}"`));
+            },
+        });
     }
 
     /** Resolve / re-open one break — persisted by identity (a fresh live break is appended on first touch). */

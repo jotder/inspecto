@@ -88,6 +88,19 @@
             </div>
         </div>
 
+        @if (incidentsUnavailable()) {
+            <!-- BREAK-INCIDENT-1: a 503 from /recon/promote means this bundle carries no inspecto-ops
+                 module, so Incidents do not exist here. That is a deployment state, not a failure —
+                 explain it in place and drop the action, never a red toast (the Approvals-inbox lesson). -->
+            <div class="mt-6">
+                <inspecto-alert variant="info" title="Incidents are not installed">
+                    Promoting a break to an Incident needs the operational-objects module, which ships in the Standard
+                    edition and above, so there is nothing to promote into in this bundle. Breaks can still be resolved
+                    and re-opened here, and the reconciliation itself is unaffected.
+                </inspecto-alert>
+            </div>
+        }
+
         @if (drillBreaks().length === 0 && !computing()) {
             <div class="mt-8">
                 <inspecto-empty-state

@@ -156,12 +156,45 @@ degrades to "no object".
 | **Severity promotion** | `AlertService.promoteToIncident` (`:304-334`) | a `CRITICAL` (or `error`) rule opens a deduped `INCIDENT` — one open Incident per rule + pipeline — beside the `ALERT`; lower severities stay alerts. Since 2026-08-10 the Incident carries an **`ESCALATED_FROM` link to the ALERT** (actor `alert-rule:<name>`). ⚠ A *suppressed* promotion adds no edge |
 | **Decision-Rule consequences** | `decision-rules.md` | `create-alert` records a signal **and** opens an object (2026-07-19); `create-incident` opens an Incident at any severity with no Alert Rule, deduped per rule (2026-07-24) |
 | **Expectation breach** | `ExpectationRoutes` | the original signal → Incident dedup + open pattern the others reuse |
-| **Reconciliation breach** | `ReconRunJob` (`jobs.md`) | same pattern |
+| **Reconciliation breach** | `ReconRunJob` (`jobs.md`) | same pattern, at **run** granularity — ONE aggregate Incident per reconciliation (scope = the reconciliation id), carrying only break counts |
+| **A single reconciliation Break** | `POST /recon/promote` (`ReconRoutes`) | 🆕 **2026-09-11 (`BREAK-INCIDENT-1`)** — an operator promotes ONE Break from the board; deduped on `(reconciliation, key)` with `breakKey` as the dedupe attribute, carrying the break type, column and run id as evidence. ⚠ It **coexists** with the row above rather than replacing it: the Job says *"this reconciliation is breaching"*, a promotion says *"**this** Break is being worked"*. 🔴 The backlog row that asked for it claimed the tree's only promotion was Alert→Incident — `ReconRunJob` had been opening Incidents since it shipped, so the gap was **granularity, not mechanism** |
 | **Ledger bridges** | `EventObjectBridge` (`inspecto-ops`) | `SEQUENCE_GAP` and `PIPELINE_CONSERVATION_IMBALANCE` (+ its legacy name) → an **ALERT object**, not an Incident |
 
 Operator-created objects take the other door: `POST /objects` with **title + at least one link** (§3.4).
 The auto-creation paths bypass the route and call `ObjectService.open` directly — which is why the first
 object in an empty Space must come from one of them (there is nothing to link to yet).
+
+### How a Break can be promoted when no Break is stored
+
+🔴 **Reconciliation is stateless compute.** `POST /recon/run` and `/recon/breaks` recompute from SQL on
+every call and persist nothing — a control probe for a domain `Break` type across the Java sources returns
+zero, and the only match is `ReconService.BreakSet`, a transient paged result with no id and no store. The
+C9 contract puts Break lifecycle on the **client** deliberately. So the Incident cannot hold a foreign key
+to a Break row; there is none.
+
+Instead the identity is **reconstructed from the request**: `(reconciliation, key)`, which is stable across
+runs because it is what the comparison itself keys on. That pair is the dedupe key, so promoting the same
+Break twice — by two operators, or after a nightly re-run — suppresses the second. ⛔ Do **not** "fix" this
+by persisting Breaks to make the reference real: the Incident is the durable artifact, and that is the
+design, not a shortcut.
+
+Two consequences worth knowing before changing anything here:
+
+- **The dedupe is on the KEY, not `(key, type, column)`.** One business key breaking on three columns is
+  one thing for an operator to investigate. ⚠ When the same key later breaks a *different* way, the open
+  Incident is reused and its attributes still describe the **first** observation.
+- **Suppression lasts until the Incident is ARCHIVED, not merely RESOLVED.** Dedupe is over non-terminal
+  objects, and for an Incident the only terminal state is `ARCHIVED`
+  (`Workflow.defaultFor`: `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`). So an operator who resolves a
+  promoted Break and sees it recur gets **no new Incident** until the old one is archived. That is the
+  existing workflow's rule rather than this route's choice, and it is pinned by
+  `ControlApiReconPromoteTest.suppressionLastsUntilTheIncidentIsArchivedNotMerelyResolved` — a change to
+  the Incident terminal set would silently change how recurring Breaks behave.
+
+⚠ The route reports a suppressed promotion as `{incidentId: null, deduped: true}` — it does **not** name
+the surviving Incident, because the `IncidentAccess` seam reports suppression without returning an id and
+widening the SPI for that alone was not worth it. A caller wanting the survivor lists the reconciliation's
+Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 
 ### 3.4 Incidents — the operational-objects domain
 

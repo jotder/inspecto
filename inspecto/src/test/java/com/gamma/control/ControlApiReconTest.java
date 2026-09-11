@@ -339,12 +339,64 @@ class ControlApiReconTest {
             api.start();
             try {
                 assertEquals(503, postJson(api.port(), "/recon/run", "{\"id\":\"x\"}").statusCode());
+                // BREAK-INCIDENT-1: promote is a WRITE route and takes the same first gate.
+                assertEquals(503, postJson(api.port(), "/recon/promote",
+                        "{\"reconciliation\":\"x\",\"key\":\"k\"}").statusCode());
             } finally {
                 api.close();
             }
         } finally {
             svc.close();
             if (prior != null) System.setProperty("assist.write.root", prior);
+        }
+    }
+
+    // ── POST /recon/promote — the gates core owns (BREAK-INCIDENT-1) ────────────────
+    //
+    // ⚠ The HAPPY path is NOT here, and cannot be: promoting needs a real Object Engine, which ships in
+    // the optional `inspecto-ops` module that a default `mvn test` does not build. It is asserted in
+    // `ControlApiReconPromoteTest` in that module. What core owns is the refusals — including the one
+    // below that IS the Personal-edition behaviour rather than an error condition.
+
+    @Test
+    void promoteWithoutTheRequiredFieldsIs422(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/promote", "{}").statusCode(),
+                    "no reconciliation, no promotion");
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/promote",
+                    "{\"reconciliation\":\"orders_recon\"}").statusCode(),
+                    "a Break without its key has no dedupe identity, so promoting it twice would clone");
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/promote",
+                    "{\"reconciliation\":\"orders_recon\",\"key\":\"  \"}").statusCode(),
+                    "a blank key is not a key");
+        }
+    }
+
+    @Test
+    void promoteFromAnUnknownReconciliationIs404(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(404, postJson(c.port, "/spaces/s1/recon/promote",
+                    "{\"reconciliation\":\"ghost_recon\",\"key\":\"EU|voice\"}").statusCode(),
+                    "an Incident that outlives the session must reference a reconciliation someone can open");
+        }
+    }
+
+    /**
+     * The Personal edition has no {@code inspecto-ops} module, so the object seam is empty and promotion
+     * answers 503 — <b>by design, not by failure</b>. This whole module's test classpath is the Personal
+     * shape, which is what makes the assertion possible here at all.
+     *
+     * <p>⚠ The status code is load-bearing for the UI: the project's contract is an explained panel for a
+     * missing optional module, never a toast. A 500 or a 422 here would send it down the wrong path.
+     */
+    @Test
+    void promoteWithoutTheOperationalObjectsModuleIs503(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            var r = postJson(c.port, "/spaces/s1/recon/promote",
+                    "{\"reconciliation\":\"orders_recon\",\"key\":\"EU|voice\"}");
+            assertEquals(503, r.statusCode(), r.body());
+            assertTrue(r.body().contains("inspecto-ops"),
+                    "the refusal must name the module to install, not just fail: " + r.body());
         }
     }
 }
