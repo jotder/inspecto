@@ -740,6 +740,43 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   is the config section (snake_case, flat) and carries **no run state** — `lastStatus`/`nextFire` exist
   only on the list, so a detail pane must merge an enable/reschedule response, never replace with it.
 
+- **An optional module that is PRESENT but cannot LINK used to kill the whole boot.** Every optional
+  module is found by `ServiceLoader`, and the contract is the absence contract — a missing module 503s
+  its routes and nothing else changes. A raw `ServiceLoader.load(X.class).findFirst()` does **not**
+  honour that: a jar that is present but unloadable throws, and it throws an `Error`
+  (`UnsupportedClassVersionError`, `NoClassDefFoundError`) which `ServiceLoader` propagates rather than
+  wrapping in a `ServiceConfigurationError`. Nothing up the stack caught it, and there was **no**
+  `LinkageError` handling anywhere in `inspecto`'s main tree. Discovered 2026-09-12 scoping `PKG-5`:
+  staging the assistant would have made the server fail to boot on a host whose Java was older than the
+  assistant's dependency needs. Fixed by `com.gamma.service.OptionalSpi`, which all six discovery sites
+  now use. ⛔ It deliberately does **not** catch `RuntimeException` from a provider's constructor —
+  unloadable is an absence, misbehaving is a defect, and widening the catch turns a bug into a silent
+  absence. 🔴 The lesson generalises past this fix: **"optional" is a property of the FAILURE HANDLING,
+  not of the packaging.** A module you merely decline to stage is optional; a module whose absence has
+  no handled path is mandatory however you ship it.
+
+- **A shaded sidecar must scope the core `provided`, or it ships a second copy of the product.**
+  `inspecto-connectors` gets this right; `inspecto-agent` had `inspecto-processor` at `compile` until
+  2026-09-12, so its shaded jar carried 8660 entries — 137 duplicate `etl` classes, 69 duplicate
+  `service` classes, **98 MB against 3.5 MB of actual module**. Duplicate `ServiceLoader` registrations
+  on one classpath are not merely wasteful: they are a second, older copy of the product competing with
+  the real one. ⚠ Also exclude anything the core OWNS — the SLF4J binding above all (two bindings make
+  backend selection non-deterministic), plus `java.sql.Driver` and `ServletContainerInitializer`.
+  Verify on the **staged artifact**: a module's own tests can never fail for a packaging gap, because
+  its classes are trivially on its own test classpath (the `CONNECTORS-BUNDLE-1` lesson, re-learned).
+
+- **`powershell -File` invoked from Bash reads the script as ANSI**, so `package.ps1` reports ~40
+  phantom parse errors on lines nobody touched (mangled em-dashes). Use **`pwsh`** (PowerShell 7 is
+  installed) to RUN it, and `[Parser]::ParseInput` with explicit UTF-8 — never `ParseFile` — to CHECK
+  it. 🔴 Before believing any gate that goes red, run it on `git show HEAD:<file>` first: that is what
+  showed this was pre-existing rather than a change of mine.
+
+- **Never start a foreground build while a background one is running in this tree.** A concurrent
+  `mvn clean` wipes the sibling build mid-run. On 2026-09-12 a gauntlet reported `MVN_EXIT=1` with 11
+  of 26 modules and looked exactly like a regression; it was self-inflicted. ⚠ Related: always check
+  **both** `BUILD SUCCESS` and the module count, because a clobbered run can still print a plausible
+  test total (it printed 3752 against a true 4315).
+
 ---
 
 ## 5. Engine seams & performance (durable; current in `inspecto/`)
