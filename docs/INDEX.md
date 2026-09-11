@@ -111,6 +111,9 @@ paid for violating them.
   capabilities, technical architecture, operations guide, testing guide, and the **competitive landscape**
   ([`stakeholders/COMPETITIVE_LANDSCAPE.md`](stakeholders/COMPETITIVE_LANDSCAPE.md), 2026-09-10 — a living
   two-sided alignment doc: what ships vs who we meet, counts derived by the count guard, market claims dated).
+  Beside it, the external-facing [`stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md`](stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md)
+  (v1.2, 2026-09-11) — written to the landscape's §4 claims register, with a release-basis note naming the
+  Sprint 8 rows it assumes shipped; its `.docx` is generated, gitignored.
 - [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks.
 
 ## In-flight plans (`superpower/` — a plan lives here ONLY while its work is active)
