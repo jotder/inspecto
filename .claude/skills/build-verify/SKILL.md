@@ -42,11 +42,20 @@ main context.
 
 🔴 **Reading the reactor total: FOUR module summaries are logged at `[WARNING]`, not `[INFO]`** — Maven does
 that for any module with a skipped test. A grep of `^\[INFO\] Tests run:` therefore finds **22 modules and
-sums to ~3443** against a real **26 / 4199**, and the shortfall reads like a regression rather than a
+sums to ~3480** against a real **26 / 4243**, and the shortfall reads like a regression rather than a
 log-parsing bug. ⚠ The mirror image is real too: told to include WARNING lines, a reader then
 **double-counts**. ⇒ Match **both** levels, count only lines **without** `-- in` (those are per-class), and
-**assert the module count is 26** before trusting the total. Baselines as of 2026-09-10:
-**reactor 4199 / 0 / 0 / 16 over 26 modules**, **UI 2889 passed / 5 skipped over 335 files, exit 0**.
+**assert the module count is 26** before trusting the total.
+
+The four WARNING-level modules, measured 2026-09-11 (tests/fail/err/skip): `asn-schema` **34**/0/0/2 ·
+`asn-golden` **3**/0/0/1 · `Inspecto etl` **498**/0/0/2 · `Inspecto — Operational objects` **228**/0/0/11.
+That is **763 tests and all 16 skips** — so an `[INFO]`-only sum is short by exactly 763, and the four
+skip counts summing to 16 is a cheap check that you caught all four.
+
+**Baselines as of 2026-09-11** (⚠ these move most shifts — re-derive, never quote):
+- reactor **4243 / 0 / 0 / 16 over 26 test-bearing modules** (`-Pedition-enterprise`; 32 reactor modules)
+- UI **2914 passed / 5 skipped over 338 files, exit 0**
+- dependency guard **95 third-party artifacts across 32 reactor modules**
 
 ### ⚠ Narrowing to specific tests — commas, never `+`
 
@@ -84,6 +93,24 @@ Observed 2026-07-25: `OidcAuthenticatorTest.adminRoleGrantsOnboardConnectionsAnd
 default-profile run skipped the module. Two lessons: run the enterprise profile for any
 `Roles.SEED` change, and remember the reactor is **fail-fast** — a failure in `inspecto-security`
 leaves `inspecto-policy` **SKIPPED**, i.e. unverified, not passing.
+
+⚠ **The same hole is in `package`, and it bites harder** (2026-09-11). `mvn -o clean package` with no
+profile cannot produce `inspecto-security.jar`, `inspecto-policy.jar` or `inspecto-notify-channels.jar` —
+those modules are not in the reactor at all — yet it reports BUILD SUCCESS. So "the bundle packages" from a
+default-profile run is a claim about the **Personal** flavor only. Prove Standard/Enterprise separately:
+
+```powershell
+mvn -o clean package -DskipTests -Pedition-enterprise -B
+```
+
+🔴 **And do NOT infer reactor membership from `<module>/target/` existence or mtimes.** `mvn clean` only
+cleans modules **in the current reactor**, so a profile-excluded module keeps stale output from an earlier
+run — and if that earlier run was minutes ago, its mtimes fall inside your build window and read as
+"rebuilt just now". Observed 2026-09-11: a default-profile `package` was reported as having recompiled all
+22 modules *including* security and policy, purely from `target/classes` timestamps left by an enterprise
+**test** run three minutes earlier. ⇒ Read membership from **Maven's own** "Reactor Build Order" /
+"Reactor Summary". `-q` suppresses those, so drop it (or add `-B`) when the module list is the thing you
+are checking.
 
 ### ⚠ …and on the UI, `npm run build` is a false green for anything a SPEC references
 
