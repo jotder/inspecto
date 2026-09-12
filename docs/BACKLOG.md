@@ -837,6 +837,17 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   over from a *paused* owner double-executes. ⚠ Its only would-be regression test switches the relevant leg
   off — `FinalizeSourceConcurrencyTest:291-294` passes empty outputs/lineage, *"the registry leg is
   deliberately out of play"*. → `superpower/enterprise-scale-out-plan.md` §12, §4.2, D15
+- **P2** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
+  The C2 audit (`SpaceInboxAudit`, shipped 2026-09-12) warns when two Spaces **hosted by this pod** declare
+  the same `dirs.poll`. 🔴 Once Spaces are partitioned across pods (C1), the dangerous case is two Spaces on
+  **different** pods sharing a directory — and that is **undetectable locally**, because no pod can see
+  another's config. ⚠ The consequence is not a race that self-heals: `MarkerManager` marks only *after* a
+  batch commits, so there is no pre-poll claim and both pods ingest the same files — **silent
+  double-ingestion**. **Work:** a shared registry of declared inboxes (an ops-DB family, the way `RunLease`
+  is), written at config-write time and checked across pods; or structurally prevent it by requiring
+  `dirs.poll` to resolve under its declaring Space's root. ⛔ The latter is NOT a free win — an external
+  vendor drop directory outside the Space tree is a legitimate, common arrangement, so making containment
+  mandatory is a product decision, not a cleanup. → `superpower/enterprise-scale-out-plan.md` §5.3
 - **P2** · **`INTAKE-POLICY-SYSTEM-SCOPE-1` — "system scope" becomes PER-POD on N pods.**
   `IntakeGovernor`'s per-pipeline `caps`/`overrides` are Space-keyed (`SPACES-GOVERNOR-1`, closed), but the
   fleet-wide `Policy` is **deliberately** process-wide because `PUT /system/scheduler` is system scope

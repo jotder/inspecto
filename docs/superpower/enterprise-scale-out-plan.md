@@ -666,8 +666,37 @@ Work:
   ⚠ **`partition.toon` bypasses `ConfigSafetyValidator`**, like every other global settings file — that
   validator only covers path-bearing `pipeline`/`enrichment` configs. Its own parse is the fail-closed
   gate here instead.
-- **Inbox ownership follows Space ownership.** `dirs.poll` lives on the owning pod's volume (a
-  per-pod PVC) or on an object-store prefix only that pod polls. ⛔ No shared inbox (§3.7).
+- 🟡 **PARTIALLY SHIPPED 2026-09-12 (slice C2) — inbox ownership: the DETECTABLE half.** `dirs.poll`
+  should live on the owning pod's volume (a per-pod PVC) or an object-store prefix only that pod polls.
+  ⛔ No shared inbox (§3.7). `SpaceManager.discover` now ends with `auditInboxOwnership()`, which WARNS
+  when two hosted Spaces declare the same normalised `dirs.poll`.
+
+  🔴 **Grounded 2026-09-12: there is NO pre-poll claim, so a shared inbox double-ingests silently.**
+  `MarkerManager` writes its marker only *after* a batch commits, i.e. a file is claimed retroactively,
+  never before it is read. Two pollers on one directory both see the same un-marked files as pending and
+  both ingest them. ⛔ Do not assume the dedup ledger or the marker rescues this — neither runs early
+  enough. That is why the bullet exists at all, and why a *detector* is worth shipping ahead of a fix.
+
+  🔴 **And nothing constrains `dirs.poll` to its Space.** It is a free-form path
+  (`PipelineConfigParser`: `require(dirs, "poll")`), jailed only to the JVM-wide allowed roots by
+  `PathJail` — never to the declaring Space. The per-Space default comes from the bundle/settings routes
+  and is **convention, not a guard**. `PipelineDataDirs.conflictsFor` looks like the check but fires only
+  at pipeline *deletion*, within one write root.
+
+  ⛔ **This does NOT enforce the invariant, and must not be described as doing so.** The audit compares
+  Spaces booted in *this process*. Once Spaces are partitioned (C1), two Spaces on **different pods**
+  sharing a directory is precisely the dangerous case and is **invisible** — no pod can see the other's
+  config. C2 catches the single-node and same-pod cases, which are real but the lesser half.
+  → the remaining half is filed as `INBOX-REGISTRY-CROSS-POD-1`.
+
+  ⚠ **WARNS, never refuses** — same blast-radius reasoning as C1's unassigned-Space case: a config smell
+  that may predate the check must not take down every Space on the pod.
+
+  ⚠ **Within one Space, two pipelines MAY share an inbox** and that is deliberately not a finding: one
+  `CollectorService` on one pod polls them, which is what makes it safe. Mutation-verified — flagging
+  per-declaration instead of per-Space fails exactly `twoPipelinesInTheSameSpaceMayShareAnInbox`, and
+  dropping path normalisation fails exactly `theComparisonNormalisesEquivalentPaths` (a `./` or `..`
+  spelling is how this gets authored in practice).
 - ✅ **`IntakeGovernor`'s Space key — ALREADY FIXED, this bullet was STALE** (`SPACES-GOVERNOR-1`,
   2026-09-10; §12 of this same document records it closed). Re-grounded 2026-09-12: the `caps` and
   `overrides` maps key on `EventLog.currentSpaceId() + '/' + pipelineId`

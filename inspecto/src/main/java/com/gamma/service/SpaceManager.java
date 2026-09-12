@@ -101,6 +101,7 @@ public final class SpaceManager implements AutoCloseable {
                 .forEach(m::bootQuietly);
         }
         log.info("SpaceManager: {} space(s) booted from {}", m.spaces.size(), spacesRoot.toAbsolutePath());
+        m.auditInboxOwnership();   // §5.3: two Spaces on one inbox = silent double-ingestion
         return m;
     }
 
@@ -123,6 +124,36 @@ public final class SpaceManager implements AutoCloseable {
         boolean mine = partition.hosts(id);
         if (!mine) log.info("Space '{}' belongs to another pod — not booting it here", id);
         return mine;
+    }
+
+    /**
+     * Warn when two hosted Spaces declare the same {@code dirs.poll} (§5.3). ⚠ WARN, never refuse — the
+     * blast-radius reasoning of {@link SpacePartition}'s unassigned-Space case applies: a config smell that
+     * may predate this check must not take down every Space on the pod.
+     *
+     * <p>⛔ This sees only the Spaces THIS pod hosts. Two Spaces on different pods sharing an inbox is the
+     * dangerous case and is invisible here — see {@link SpaceInboxAudit}'s scope note.
+     *
+     * @return the findings, so a caller (and the test) can assert on them rather than scrape the log
+     */
+    List<String> auditInboxOwnership() {
+        List<SpaceInboxAudit.InboxDecl> declared = new ArrayList<>();
+        for (SpaceContext ctx : spaces.values()) {
+            try {
+                for (com.gamma.etl.PipelineConfig cfg : ctx.service().loadedPipelines()) {
+                    if (cfg.dirs() == null) continue;
+                    declared.add(new SpaceInboxAudit.InboxDecl(
+                            ctx.id().value(), cfg.identity().pipelineName(), cfg.dirs().poll()));
+                }
+            } catch (RuntimeException e) {
+                // A space whose configs will not enumerate is already warned about at boot; an audit
+                // must never be the thing that fails a boot that otherwise succeeded.
+                log.debug("Inbox audit skipped space {}: {}", ctx.id().value(), e.getMessage());
+            }
+        }
+        List<String> findings = SpaceInboxAudit.sharedInboxFindings(declared);
+        for (String f : findings) log.warn("[SPACES] {}", f);
+        return findings;
     }
 
     private void bootQuietly(Path dir) {
