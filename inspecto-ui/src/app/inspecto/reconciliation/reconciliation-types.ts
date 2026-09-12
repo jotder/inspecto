@@ -34,7 +34,14 @@ export interface ReconBands {
 /** The locked defaults: < 1 % ok · 1–2 % warn · > 2 % breach. */
 export const DEFAULT_BANDS: ReconBands = { warnPct: 1, breachPct: 2 };
 
-export type BreakType = 'missing_left' | 'missing_right' | 'value_break';
+/**
+ * ⚠ `cardinality_break` (2026-09-12, `RECON-CARDINALITY-1`) is an ASSERTION failure, not a value
+ * mismatch: the key matched, but a side contributed more rows than the reconciliation's declared
+ * `cardinality` allows. Its evidence is the per-side ROW COUNT, carried in `leftValue`/`rightValue`.
+ * The server emits it only for a reconciliation that declares a cardinality, so it never appears for
+ * one authored before the option existed.
+ */
+export type BreakType = 'missing_left' | 'missing_right' | 'value_break' | 'cardinality_break';
 export type BreakStatus = 'open' | 'resolved' | 'auto_closed';
 
 /** One reconciliation discrepancy for a single key (and, for value breaks, a single compare column). */
@@ -274,7 +281,12 @@ export function summarize(
     matchedKeys: number,
     now: Date = new Date(),
 ): ReconSummary {
-    const byType: Record<BreakType, number> = { missing_left: 0, missing_right: 0, value_break: 0 };
+    const byType: Record<BreakType, number> = {
+        missing_left: 0,
+        missing_right: 0,
+        value_break: 0,
+        cardinality_break: 0,
+    };
     const byAge: Record<AgeBucket, number> = { '0-30': 0, '30-60': 0, '60-90': 0, '90+': 0, unknown: 0 };
     let open = 0,
         resolved = 0,

@@ -159,7 +159,9 @@ public final class ReconService {
     /**
      * The Board payload: grain rows shaped {@code {key:{dim:v}, a:{measure:v}, b:{…}, inA, inB}}, exact
      * per-side {@code totals} ({@code {a:{…}, b:{…}}}), and the exact Break {@code summary}
-     * ({@code {groups, matchedKeys, byType:{missing_left, missing_right, value_break}}}).
+     * ({@code {groups, matchedKeys, byType:{missing_left, missing_right, value_break}}}; {@code byType}
+     * also carries {@code cardinality_break} when, and only when, the spec declares a
+     * {@link Cardinality}).
      */
     public record RunResult(List<Map<String, Object>> rows, Map<String, Object> totals,
                             Map<String, Object> summary, boolean truncated, long elapsedMs) {}
@@ -199,6 +201,8 @@ public final class ReconService {
                 byType.put("missing_left", s.get("missing_left"));
                 byType.put("missing_right", s.get("missing_right"));
                 byType.put("value_break", s.get("value_break"));
+                if (spec.cardinality() != Cardinality.MANY_TO_MANY)
+                    byType.put("cardinality_break", s.get("cardinality_break"));
                 Map<String, Object> pair = new LinkedHashMap<>();
                 pair.put("side", WIRE_SIDES[other]);
                 pair.put("matchedKeys", s.get("matched"));
@@ -438,6 +442,13 @@ public final class ReconService {
                     .toList();
             sb.append('(').append(String.join(" + ", terms)).append(") AS \"value_break\"");
         }
+        // ⚠ Only when an assertion is declared — the column is absent otherwise, so a reconciliation that
+        // predates this option gets the same summary row it always got. Counts KEYS, unlike value_break,
+        // which counts (key × column): a key has one cardinality, not one per compare column.
+        if (spec.cardinality() != Cardinality.MANY_TO_MANY)
+            sb.append(", COUNT(*) FILTER (WHERE __s0.\"mr\" IS NOT NULL AND ").append(o)
+              .append(".\"mr\" IS NOT NULL AND (").append(cardinalityViolation(spec, o))
+              .append(")) AS \"cardinality_break\"");
         sb.append(" FROM __s0 FULL OUTER JOIN ").append(o).append(" ON ").append(keyJoin(spec, 0, other));
         return sb.toString();
     }
@@ -478,15 +489,7 @@ public final class ReconService {
      */
     static String cardinalityBreaksSql(Spec spec, int other, Map<String, String> path, int limit, int offset) {
         String o = "__s" + other;
-        String anchorMany = "__s0." + q("mr") + " > 1";
-        String otherMany = o + "." + q("mr") + " > 1";
-        String violates = switch (spec.cardinality()) {
-            case ONE_TO_ONE -> anchorMany + " OR " + otherMany;
-            case ONE_TO_MANY -> anchorMany;     // the anchor side must contribute exactly one row
-            case MANY_TO_ONE -> otherMany;      // the compared side must contribute exactly one row
-            case MANY_TO_MANY -> throw new IllegalStateException(
-                    "many_to_many asserts nothing and must be short-circuited before building SQL");
-        };
+        String violates = cardinalityViolation(spec, o);
         StringBuilder sb = new StringBuilder(with(spec)).append("SELECT ");
         for (int i = 0; i < spec.keyColumns().size(); i++)
             sb.append("__s0.").append(q("k" + i)).append(", ");
@@ -501,6 +504,24 @@ public final class ReconService {
           .append(" ORDER BY ").append(orderByKeys(spec, "__s0."))
           .append(" LIMIT ").append(Math.max(0, limit) + 1).append(" OFFSET ").append(Math.max(0, offset));
         return sb.toString();
+    }
+
+    /**
+     * The predicate that makes a matched key violate the declared {@link Cardinality}.
+     *
+     * <p>⚠ Shared by {@link #cardinalityBreaksSql} and {@link #pairSummarySql} deliberately: a summary
+     * that counted a different thing from the break list it summarises is worse than no summary.
+     */
+    private static String cardinalityViolation(Spec spec, String o) {
+        String anchorMany = "__s0." + q("mr") + " > 1";
+        String otherMany = o + "." + q("mr") + " > 1";
+        return switch (spec.cardinality()) {
+            case ONE_TO_ONE -> anchorMany + " OR " + otherMany;
+            case ONE_TO_MANY -> anchorMany;     // the anchor side must contribute exactly one row
+            case MANY_TO_ONE -> otherMany;      // the compared side must contribute exactly one row
+            case MANY_TO_MANY -> throw new IllegalStateException(
+                    "many_to_many asserts nothing and must be short-circuited before building SQL");
+        };
     }
 
     /** Matched keys of the anchor↔{@code other} pair where any compare column is outside its tolerance. */

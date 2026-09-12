@@ -82,7 +82,9 @@ export interface ReconBreakSet {
 }
 
 /** The `/recon/breaks` payload, keyed by break type. */
-export type ReconBreakSets = Partial<Record<'missing_left' | 'missing_right' | 'value_break', ReconBreakSet>>;
+export type ReconBreakSets = Partial<
+    Record<'missing_left' | 'missing_right' | 'value_break' | 'cardinality_break', ReconBreakSet>
+>;
 
 // ── offline aggregate engine (mirror of the backend ReconService) ────────────────────
 
@@ -152,6 +154,17 @@ export function breaksFromSets(
         out.push({ key: breakKeyOf(row.key, recon.keyColumns), type: 'missing_right', status: 'open' });
     for (const row of sets.missing_left?.rows ?? [])
         out.push({ key: breakKeyOf(row.key, recon.keyColumns), type: 'missing_left', status: 'open' });
+    // A cardinality break is one per KEY, not one per compare column: a key has one cardinality. Its
+    // evidence is the per-side row count, which the server always includes for this set even when the
+    // reconciliation has the implicit record count switched off.
+    for (const row of sets.cardinality_break?.rows ?? [])
+        out.push({
+            key: breakKeyOf(row.key, recon.keyColumns),
+            type: 'cardinality_break',
+            leftValue: row.a?.[RECON_RECORDS] ?? null,
+            rightValue: row.b?.[RECON_RECORDS] ?? null,
+            status: 'open',
+        });
     for (const row of sets.value_break?.rows ?? []) {
         for (const c of recon.compareColumns) {
             const a = row.a?.[c.column] ?? null;

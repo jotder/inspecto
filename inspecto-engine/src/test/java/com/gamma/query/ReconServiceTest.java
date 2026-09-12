@@ -432,6 +432,24 @@ class ReconServiceTest {
                 () -> ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_ONE), null, "nope", 1, 100, 0));
     }
 
+    /** The summary must agree with the break list it summarises — and stay silent when nothing is asserted. */
+    @Test
+    void theRunSummaryCountsCardinalityBreaksOnlyWhenAsserted() throws Exception {
+        Map<?, ?> lax = (Map<?, ?>) ReconService.run(specWith(ReconService.Cardinality.MANY_TO_MANY), 100)
+                .summary().get("byType");
+        assertFalse(lax.containsKey("cardinality_break"),
+                "asserting nothing leaves the summary byType exactly as it was before the option existed");
+
+        ReconService.RunResult strict = ReconService.run(specWith(ReconService.Cardinality.ONE_TO_ONE), 100);
+        Map<?, ?> byType = (Map<?, ?>) strict.summary().get("byType");
+        assertEquals(1L, longOf(byType.get("cardinality_break")), "EU/voice is 2 rows against 1");
+        assertEquals(1, ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_ONE),
+                        null, "cardinality_break", 1, 100, 0).get("cardinality_break").rowCount(),
+                "the summary count and the break list must agree");
+        assertEquals(1L, longOf(byType.get("value_break")), "the other tallies are untouched");
+        assertEquals(1L, longOf(byType.get("missing_right")));
+    }
+
     private static String key(Map<String, Object> breakRow, String dim) {
         Object v = ((Map<?, ?>) breakRow.get("key")).get(dim);
         return v == null ? null : v.toString();

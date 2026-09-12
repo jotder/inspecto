@@ -259,11 +259,17 @@ it was; both are corrected below.
   one_to_one|one_to_many|many_to_one|many_to_many` on a reconciliation config; absent ⇒ `many_to_many`,
   which asserts nothing, and the `cardinality_break` key is emitted **only** when an assertion is declared
   — so a reconciliation authored before this option gets a byte-identical payload. 32 modules, 4373 tests,
-  mutation-proven on the whole feature. ⛔ **Two consumer-side residuals are OPEN and named in the plan's
-  §6**: `ReconService.run`'s summary `byType` does not count the new type, and the UI's `BreakType` union
-  (`reconciliation-types.ts:37`) has only three members, so the type is unreachable from the client. They
-  must land together (the summary widens `byType`, which the UI mirrors). Tier 2 (row-level pairing) stays
-  demand-gated.
+  mutation-proven on the whole feature. ✅ **TIER 1 IS COMPLETE END TO END** — the two
+  consumer-side residuals landed the same shift: the run summary counts the type (one `COUNT(*) FILTER`,
+  emitted only when asserted, over a `cardinalityViolation` predicate now SHARED with the break query so
+  the summary cannot count something different from the list it summarises), and the client names it
+  (`BreakType`, the `ReconBreakSets` wire key, the `summarize` seed, and `breaksFromSets` carrying the
+  per-side counts as evidence). 🔴 **Picking the right client seam was the trap**: `recon-board.ts:17-19`
+  records that the offline `aggregateRecon`/`reconBreakSets` mirror has had NO caller since the mock
+  backend was removed (2026-08-31), so wiring the type only into it would have looked done and been
+  invisible to the running app — the live path is `/recon/breaks` → `breaksFromSets`, which **had no spec
+  at all** until this added three. Backend 4374 tests, UI 2952, both halves mutation-proven separately.
+  Tier 2 (row-level pairing) stays demand-gated.
 
   ✅ **DESIGN PASS DONE 2026-09-12 — [`superpower/recon-cardinality-plan.md`](superpower/recon-cardinality-plan.md).**
   It answers the row's "what is a break when one row matches three?": for the canonical case (one invoice

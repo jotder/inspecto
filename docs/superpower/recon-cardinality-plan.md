@@ -1,7 +1,7 @@
 # `RECON-CARDINALITY-1` — one-to-many / many-to-many reconciliation
 
-**Status:** ✅ **tier 1 BACKEND SHIPPED 2026-09-12.** Tier 2 remains demand-gated; two named residuals in
-§6. Opened 2026-09-12. The row calls the design half the hard half, and it
+**Status:** ✅ **tier 1 COMPLETE 2026-09-12 — backend AND client.** Both §6 residuals are closed; the type
+is reachable end to end. Tier 2 remains demand-gated. Opened 2026-09-12. The row calls the design half the hard half, and it
 is right — but for a different reason than it states, and the job is much smaller than it looks.
 
 ⚠ **Read first: this is NOT a release gate.** The row's *"until it lands the brochure is untrue"* is false.
@@ -112,22 +112,33 @@ feature (`asserted = false`, i.e. the pre-option behaviour): 4 of the 6 new test
 `expected: <1> but was: <0>`, with no compilation error, and the two that stay green are exactly the two
 that should (pure enum parsing, and type-filter acceptance).
 
-## 6. Residuals — tracked, not half-done
+## 6. ✅ Residuals CLOSED 2026-09-12 — the pair landed together
 
-⛔ **This shipped a SERVER half.** Two consumer-side gaps are deliberately NOT in it, because guessing at
-them is how this repo grows the pairs `CONSUMER-PAIRS-1` exists to police:
+Both consumer-side gaps this shipped with are now closed, in the same shift, rather than being left as the
+kind of unpaired half `CONSUMER-PAIRS-1` exists to police.
 
-1. **The run summary does not count cardinality breaks.** `ReconService.run`'s `byType` still counts
-   `missing_right`/`missing_left`/`value_break` only, so the Board's totals will not show a cardinality
-   breach even when `/recon/breaks` reports it. Adding it is one more `COUNT(*) FILTER` in the same query
-   — but it widens `byType`, which the UI mirrors as `Record<BreakType, number>`, so the two must land
-   together.
-2. **The UI cannot name the type.** `inspecto-ui/.../reconciliation/reconciliation-types.ts:37` declares
-   `BreakType = 'missing_left' | 'missing_right' | 'value_break'`, and `:277` seeds a `byType` record from
-   exactly those three. Until it gains the fourth member the type is unreachable from the client.
+1. **The run summary counts them.** `pairSummarySql` gains one `COUNT(*) FILTER` and `byType` gains the
+   key — **both only when a cardinality is declared**, so a reconciliation predating the option gets the
+   summary row it always got. ⚠ The predicate is now extracted as `cardinalityViolation` and **shared**
+   with `cardinalityBreaksSql`: a summary that counted something different from the break list it
+   summarises would be worse than no summary. ⚠ It counts **keys**, unlike `value_break`, which counts
+   (key × column) — a key has one cardinality, not one per compare column.
+2. **The client can name it.** `BreakType` gains the member, `ReconBreakSets` gains the wire key, the
+   `summarize` seed gains the tally, and `breaksFromSets` maps the set — carrying the per-side row counts
+   in `leftValue`/`rightValue`, which is why `breakSet`'s `alwaysCounts` exists.
 
-⚠ Nothing is broken meanwhile: the backend simply never emits the key unless a reconciliation declares a
-cardinality, and none does until someone authors one.
+🔴 **Picking the right client seam mattered.** `recon-board.ts:17-19` records that
+`aggregateRecon`/`reconBreakSets` — the offline mirror — **have had no caller since the mock backend was
+removed (2026-08-31)** and survive only as a parity mirror. A type wired only into *them* would have looked
+done and been invisible to the running app. The live path is
+`/recon/breaks` → `breaksFromSets` → the Break lifecycle, and **`breaksFromSets` had no spec at all** until
+this change added three. ⚠ The offline mirror is deliberately left alone and remains in parity: with no
+cardinality declared the server emits nothing, which is exactly what the mirror produces.
+
+Verified: backend 32 modules / **4374** tests; UI **2952** passed, `recon-board.spec` 16/16, lint and
+production build exit 0. Mutation-proven on both halves separately — dropping the summary key fails the
+summary test on `expected: not <null>`, and dropping the client mapping fails exactly the two specs that
+assert presence while the one asserting absence correctly stays green.
 
 ## 7. Open question for the operator
 

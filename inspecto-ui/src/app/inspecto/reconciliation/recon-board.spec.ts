@@ -14,6 +14,8 @@ import {
     RECON_RECORDS,
     reconBreakSets,
     ReconRunResult,
+    breaksFromSets,
+    ReconBreakSets,
 } from './recon-board';
 
 /**
@@ -245,5 +247,53 @@ describe('bands + cells + paths', () => {
         const enc = encodePath({ region: 'EU|x', product: 'a:b' }, ['region', 'product']);
         expect(decodePath(enc)).toEqual({ region: 'EU|x', product: 'a:b' });
         expect(decodePath('')).toBeNull();
+    });
+});
+
+describe('breaksFromSets — cardinality_break reaches the client (RECON-CARDINALITY-1)', () => {
+    /**
+     * 🔴 This is the mapper the LIVE path uses: `/recon/breaks` → {@link breaksFromSets} → the Break
+     * lifecycle. The offline `aggregateRecon`/`reconBreakSets` mirror above has had no caller since the
+     * mock backend was removed, so a type that only reached THEM would still be invisible to the app.
+     */
+    it('maps a cardinality set, carrying the per-side row counts as the evidence', () => {
+        const sets: ReconBreakSets = {
+            cardinality_break: {
+                rows: [
+                    {
+                        key: { region: 'EU', product: 'voice' },
+                        a: { [RECON_RECORDS]: 2 },
+                        b: { [RECON_RECORDS]: 1 },
+                    },
+                ],
+                rowCount: 1,
+                truncated: false,
+            },
+        };
+        const out = breaksFromSets(CONFIG, sets);
+        expect(out).toHaveLength(1);
+        expect(out[0].type).toBe('cardinality_break');
+        expect(out[0].leftValue).toBe(2);
+        expect(out[0].rightValue).toBe(1);
+        expect(out[0].status).toBe('open');
+        expect(out[0].column).toBeUndefined();
+    });
+
+    it('emits one break per KEY, not one per compare column', () => {
+        const sets: ReconBreakSets = {
+            cardinality_break: {
+                rows: [
+                    { key: { region: 'EU', product: 'voice' }, a: { [RECON_RECORDS]: 3 }, b: { [RECON_RECORDS]: 1 } },
+                    { key: { region: 'US', product: 'voice' }, a: { [RECON_RECORDS]: 1 }, b: { [RECON_RECORDS]: 4 } },
+                ],
+                rowCount: 2,
+                truncated: false,
+            },
+        };
+        expect(breaksFromSets(CONFIG, sets)).toHaveLength(2);
+    });
+
+    it('is absent when the server sends no cardinality set', () => {
+        expect(breaksFromSets(CONFIG, {})).toEqual([]);
     });
 });
