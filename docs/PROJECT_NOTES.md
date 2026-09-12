@@ -837,6 +837,27 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   calls `authoredPipelineKey()` rather than recomputing it. The payoff showed up in mutation testing: keying `authoredPipelineKey`
   on the job name failed the *pre-existing* fence test alongside the new ones, which is the evidence they
   genuinely share a key rather than happening to agree today.
+- **⚠ A full reactor build can fail TRANSIENTLY in an untouched module on Windows — re-run before
+  believing it.** Twice on 2026-09-12 `mvn -o clean test -Pedition-enterprise` died in the `asn-*` subtree
+  on sources nobody had edited: once as `asn-golden` test-compile errors (*"package com.gamma.asn.schema
+  does not exist"*), once as `asn-schema` failing at test execution with `NoClassDefFoundError` for **its
+  own just-compiled classes**. Both vanished on a clean re-run that then went fully green. The signature
+  is a **missing-symbol or missing-class failure in a module your change does not touch**, and it looks
+  exactly like a real regression. 🔴 Before chasing it: confirm the module's sources are unmodified
+  (`git status`), check the installed jar actually contains the "missing" symbol (`jar tf`), and look for
+  a **stale `java.exe`** — a leftover JVM holding file locks is the likeliest cause on this platform.
+  ⛔ Do not "fix" the untouched module, and do not commit over a red build without establishing which of
+  the two it is.
+- **⚠ `-pl` on the `asn-*` subtree SILENTLY DROPS `-Pedition-enterprise`** — Maven warns *"The requested
+  profile could not be activated because it does not exist"* and carries on with the default profile set,
+  because the profile is declared at the Inspecto root, not in that subtree's poms. So a narrow `-pl`
+  re-run **does not exercise the same build as the gauntlet** and cannot, on its own, clear a failure the
+  full build produced. Use it to gather evidence, never as the proof. (Sibling of the known
+  `mvn package` w/o a profile SKIPS the edition modules trap.)
+- **⚠ Counting a reactor's modules by its dot-leader summary lines UNDER-reports.** A regex keyed on
+  `\.{5,}` matched 12 of 32 on a full green build — which, against the "fewer than 26 = clobbered partial"
+  rule, reads as a catastrophic partial. Count `^\[INFO\] Building ` lines instead, and treat a surprising
+  module count as a suspect *regex* before a suspect *build*.
 
 ---
 

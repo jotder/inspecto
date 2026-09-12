@@ -837,17 +837,32 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   over from a *paused* owner double-executes. ⚠ Its only would-be regression test switches the relevant leg
   off — `FinalizeSourceConcurrencyTest:291-294` passes empty outputs/lineage, *"the registry leg is
   deliberately out of play"*. → `superpower/enterprise-scale-out-plan.md` §12, §4.2, D15
-- **P3** · **`JOB-PIPELINE-PARAM-UNIQUE-1` — nothing validates that two jobs target the same pipeline.**
+- ✅ **SHIPPED 2026-09-12 (the warning half)** · **`JOB-PIPELINE-PARAM-UNIQUE-1` — nothing validates that two jobs target the same pipeline.**
   A job's `name` is the only unique key (`JobService.jobs` is keyed by it); the pipeline a `type: pipeline`
   job targets is a **param** (`params.pipeline`, read at `JobService.java:1258`), and no config-load or
   route-level check rejects two `JobConfig`s carrying the same value. Filed 2026-09-12 while shipping B3.
   ⚠ **Not a correctness hole any more** — B3's `SCOPE_AUTHORED` claim means the second job now records
   `SKIPPED` instead of overlapping, which is the safe outcome. What is left is **discoverability**: an
   operator who authored two jobs onto one pipeline sees intermittent skips with no indication why, and the
-  skip message names the pipeline but not the other job. **Work (small):** warn at config load / job upsert
-  when a `pipeline:` param is already claimed by another job, and name the holder in the skip message.
-  ⛔ Do **not** make it a hard refusal without an operator decision — two jobs on one pipeline with
-  different schedules or params may well be deliberate. → `superpower/enterprise-scale-out-plan.md` §5.2
+  skip message names the pipeline but not the other job.
+
+  **Both halves of the warning work SHIPPED 2026-09-12:** `SchedulerAuditTask.sharedPipelineFindings` is a
+  pure config scan reporting every pipeline targeted by more than one enabled job, naming **all** of them;
+  it runs inside the on-demand `scheduler_audit` task **and** as a default-on host audit
+  (`JobService.auditSharedPipelines`) hooked to the same two transition sources as the orphan audit, with
+  the same once-per-transition debounce and the same `-Djobs.orphan.audit=false` kill switch. The skip
+  message now appends `— may be held by [other jobs]`.
+
+  🔴 **The finding keys through `JobService.authoredPipelineKeyOf`, never its own copy.** Recomputing it
+  as `params().get("pipeline")` drops the Tier-3 `flow:` dual read *and* the type check — mutation-verified
+  2026-09-12: that change fails exactly `theLegacyFlowKeyAndTheCanonicalPipelineKeyAreTheSamePipeline` and
+  `aMaintenanceJobCarryingAPipelineParamIsNotASharer`. The production symptom would be a pair of jobs that
+  skip each other while the audit calls them healthy. ⛔ Naming only the first sharer is likewise
+  mutation-guarded — it leaves the operator exactly as unable to act as the bare skip message did.
+
+  **STILL OPEN — needs the operator:** whether this should ever *refuse* rather than warn. ⛔ Do not make
+  it fail closed without that decision; two jobs on one pipeline with different schedules or params may
+  well be deliberate. → `superpower/enterprise-scale-out-plan.md` §5.2
 - **P2** · **`OPENAPI-GEN-1` — generate the OpenAPI path/method skeleton from the route table** (⛔ decided 2026-09-10
   over "exemplar coverage, deliberately" and "document the rest by hand"). `openapi-v1.json` documents 24 operations
   against 266 live registrations (9.0 %, measured and ratcheted by `ApiContractTest`). Derive every path + method from

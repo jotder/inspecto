@@ -600,6 +600,7 @@ public final class JobService implements AutoCloseable {
             if (c.hasCron() && started) armCron(c);
         }
         auditOrphanOutputStores();   // a job change is an orphan transition source (e.g. disabling the runner)
+        auditSharedPipelines();      // ...and may be the moment a second job is pointed at one pipeline
     }
 
     /** Unregister a Job — {@code jobs}/{@code crons}/coalescer entries are removed so listings, manual
@@ -608,6 +609,7 @@ public final class JobService implements AutoCloseable {
     public synchronized void removeJob(String name) {
         removeJobInternal(name);
         auditOrphanOutputStores();   // deleting a runner job can orphan a pipeline's Stage-2 chain
+        auditSharedPipelines();      // ...and deleting one of two sharers resolves the shared-pipeline finding
     }
 
     /** {@link #removeJob} minus the orphan audit — for {@link #upsertJob}, whose remove-then-re-add
@@ -1104,8 +1106,10 @@ public final class JobService implements AutoCloseable {
                 String authoredPipelineId = authoredPipelineKey(job, cfg, name);
                 RunClaims.Claim authored = authoredPipelineId == null ? null : authoredClaims.tryClaim(authoredPipelineId);
                 if (authoredPipelineId != null && authored == null) {
+                    List<String> others = otherJobsTargeting(authoredPipelineId, name);
                     recordSkip(runId, name, job, trigger, start,
-                            "authored pipeline '" + authoredPipelineId + "' is already running");
+                            "authored pipeline '" + authoredPipelineId + "' is already running"
+                                    + (others.isEmpty() ? "" : " — may be held by " + others));
                     return;
                 }
                 try {
@@ -1336,8 +1340,23 @@ public final class JobService implements AutoCloseable {
      */
     private static String authoredPipelineKey(Job job, JobConfig cfg, String name) {
         if (!"pipeline".equals(job.type())) return null;
-        // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key.
-        return cfg != null ? cfg.opt("pipeline", cfg.opt("flow", name)) : name;
+        return cfg != null ? authoredPipelineParam(cfg, name) : name;
+    }
+
+    /**
+     * The same key off a {@link JobConfig} alone — for callers that hold a config but no built {@link Job}
+     * ({@code SchedulerAuditTask}'s shared-pipeline finding). {@code null} for any non-pipeline type.
+     */
+    static String authoredPipelineKeyOf(JobConfig cfg) {
+        if (cfg == null || !"pipeline".equals(cfg.type())) return null;
+        return authoredPipelineParam(cfg, cfg.name());
+    }
+
+    /** ⛔ The ONE place the authored-pipeline id is read off a config — three callers key off it (the
+     *  deletion fence, {@link #authoredClaims}, and the audit), and they must never disagree.
+     *  Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key. */
+    private static String authoredPipelineParam(JobConfig cfg, String fallbackName) {
+        return cfg.opt("pipeline", cfg.opt("flow", fallbackName));
     }
 
     /** The configured job by name (the run path keys by name; configs is the source of truth for params). */
@@ -1643,6 +1662,48 @@ public final class JobService implements AutoCloseable {
                     Ref.of("job", "orphan_audit"),
                     Map.of("count", fresh.size(), "findings", fresh));
         return fresh;
+    }
+
+    /** Shared-pipeline findings already signalled — same transition semantics as {@link #reportedOrphans}. */
+    private volatile Set<String> reportedSharedPipelines = Set.of();
+
+    /**
+     * Default-on detection of two jobs targeting one authored pipeline
+     * ({@code JOB-PIPELINE-PARAM-UNIQUE-1}), hosted beside {@link #auditOrphanOutputStores()} and invoked
+     * from the same two transition sources so an operator learns of it when they author it, not when a run
+     * mysteriously skips. Shares the orphan audit's kill switch. See
+     * {@link SchedulerAuditTask#sharedPipelineFindings} for why this warns rather than refuses.
+     *
+     * @return the freshly-emitted findings (empty when nothing new, or when disabled)
+     */
+    public List<String> auditSharedPipelines() {
+        if (!Boolean.parseBoolean(System.getProperty(ORPHAN_AUDIT_FLAG, "true"))) return List.of();
+        List<String> findings = SchedulerAuditTask.sharedPipelineFindings(configSnapshot());
+        Set<String> previous = reportedSharedPipelines;
+        reportedSharedPipelines = Set.copyOf(findings);
+        List<String> fresh = findings.stream().filter(f -> !previous.contains(f)).toList();
+        if (!fresh.isEmpty()) {
+            for (String f : fresh) log.warn("[JOB] {}", f);
+            emitSignal("maintenance.scheduler.findings", Severity.WARN, null, null,
+                    Ref.of("job", "shared_pipeline_audit"),
+                    Map.of("count", fresh.size(), "findings", fresh));
+        }
+        return fresh;
+    }
+
+    /**
+     * The OTHER enabled jobs targeting {@code pipeline} — named in the skip message so an operator can act
+     * on it. ⚠ Best-effort naming only: it reports who *could* be holding the claim (a config scan), not
+     * who demonstrably is. On another pod the holder may not even be in this registry, which is why the
+     * message says "may be held by" rather than asserting.
+     */
+    private List<String> otherJobsTargeting(String pipeline, String self) {
+        return configSnapshot().stream()
+                .filter(JobConfig::enabled)
+                .filter(c -> !c.name().equals(self))
+                .filter(c -> pipeline.equals(authoredPipelineKeyOf(c)))
+                .map(JobConfig::name)
+                .toList();
     }
 
     /** Immutable snapshot of every configured job, for the scheduler_audit task. */

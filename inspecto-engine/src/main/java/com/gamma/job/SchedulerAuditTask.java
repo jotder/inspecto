@@ -69,6 +69,7 @@ final class SchedulerAuditTask {
         // with no such enabled job the chain quietly never runs (the prepare() silent-skip, deferred).
         Map<String, String> outputStores = host.pipelineOutputStores();   // null = host never wired them — skip, don't guess
         if (outputStores != null) findings.addAll(orphanOutputStoreFindings(all, outputStores));
+        findings.addAll(sharedPipelineFindings(all));   // JOB-PIPELINE-PARAM-UNIQUE-1: why a job skips
         Set<String> emitted = new LinkedHashSet<>(List.of("job.run.started", "job.run.completed",
                 "job.run.failed", "job.run.rejected", "job.chain.cut", "pipeline.commit"));
         for (JobTypeDescriptor d : host.jobTypes()) emitted.addAll(d.emits());
@@ -107,6 +108,37 @@ final class SchedulerAuditTask {
             if (!shaped.contains(pipeline))
                 findings.add("orphan output_store: pipeline '" + pipeline + "' declares output_store '"
                         + store + "' but no enabled pipeline_config job runs its chain");
+        });
+        return findings;
+    }
+
+    /**
+     * Jobs that target the SAME authored pipeline ({@code JOB-PIPELINE-PARAM-UNIQUE-1}). A job's
+     * {@code name} is the only unique key; the pipeline it targets is a {@code pipeline:} param that
+     * nothing validates, so two jobs may point at one pipeline.
+     *
+     * <p>⚠ This is a <b>discoverability</b> finding, not a correctness one. Since B3 the authored-pipeline
+     * claim means the second job records {@code SKIPPED} rather than overlapping — the safe outcome. What
+     * the operator cannot otherwise see is <em>why</em> a job intermittently skips, because the skip names
+     * the pipeline but not the job holding it. ⛔ Not a refusal: two jobs on one pipeline with different
+     * schedules or params may be deliberate, and making it fail closed needs an operator decision.
+     *
+     * <p>Keys through {@link JobService#authoredPipelineKeyOf} so this can never drift from what the claim
+     * actually keys on. Pure: a config scan, no data reads.
+     */
+    static List<String> sharedPipelineFindings(List<JobConfig> all) {
+        Map<String, List<String>> byPipeline = new LinkedHashMap<>();
+        for (JobConfig c : all) {
+            if (!c.enabled()) continue;
+            String pipeline = JobService.authoredPipelineKeyOf(c);
+            if (pipeline != null && !pipeline.isBlank())
+                byPipeline.computeIfAbsent(pipeline, k -> new ArrayList<>()).add(c.name());
+        }
+        List<String> findings = new ArrayList<>();
+        byPipeline.forEach((pipeline, names) -> {
+            if (Set.copyOf(names).size() > 1)
+                findings.add("shared pipeline: jobs " + names + " all target authored pipeline '"
+                        + pipeline + "' — only one runs at a time, the others record SKIPPED");
         });
         return findings;
     }
