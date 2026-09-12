@@ -11,9 +11,36 @@ timestamp: 2026-07-16T00:00:00Z
 
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Reconciliation** compares **Datasets** on key columns
-with per-column tolerances; a **Break** is `missing_left | missing_right | value_break` with an
-`open/resolved/auto_closed` lifecycle (auto-close on re-match within tolerance). Never a parallel
-"comparison" concept.
+with per-column tolerances; a **Break** is
+`missing_left | missing_right | value_break | cardinality_break` with an `open/resolved/auto_closed`
+lifecycle (auto-close on re-match within tolerance). Never a parallel "comparison" concept.
+
+**Cardinality is an ASSERTION, not a matching strategy** (`RECON-CARDINALITY-1` tier 1, 2026-09-12). A
+Reconciliation may declare `cardinality: one_to_one | one_to_many | many_to_one | many_to_many`; a
+violation on a **matched** key becomes a `cardinality_break` carrying the per-side row count as its
+evidence (in `leftValue`/`rightValue`).
+
+⚠ **Default `many_to_many` asserts nothing**, and the server omits the key entirely unless a cardinality
+is declared — so a Reconciliation authored before the option gets a byte-identical payload.
+
+🔴 **Why it is an assertion and not a matcher.** Each side is pre-aggregated to one row per key *before*
+the join, so for the canonical case — one invoice against three payments — summing the payments and
+comparing to the invoice is **already the right arithmetic**. The defect was narrower and is a
+*correctness* hole: a **duplicated** row was indistinguishable from a genuinely larger value, so it
+reconciled clean. The multiplicity was in fact already computed (`COUNT(*) AS mr`) and carried through the
+join, then discarded as a presence boolean — this reads the number that was always there, with no new SQL
+and no change to the join.
+
+⚠ A `cardinality_break` is one per **key**, unlike `value_break` which is one per (key × column): a key
+has one cardinality, not one per compare column. ⛔ Row-level pairing — *which* of the N counterparts
+matched — is deliberately NOT built: the Incident attrs (`reconciliation`/`breakKey`/`breakType`/`column`/
+`runId`) cannot express it, and its Break shape cannot be designed without a named workflow.
+
+🔴 **Client seam, because the obvious one is dead.** `aggregateRecon`/`reconBreakSets` in
+`recon-board.ts` are an offline mirror of the backend with **no caller since the mock backend was removed
+(2026-08-31)**; they survive only as a parity mirror and are the most test-covered recon code in the SPA.
+The live path is `/recon/breaks` → **`breaksFromSets`** → the Break lifecycle. Wiring a new break type
+into the mirror would turn specs green and change nothing in the running app.
 
 **Aging** (`BREAK-AGING-1`, 2026-09-11). A Break carries `firstSeenAt`, stamped when it is first observed
 and **carried forward by `mergeBreaks` on every later run**. Age is derived from it and rolled up by

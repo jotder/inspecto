@@ -1,5 +1,13 @@
 # `RECON-CARDINALITY-1` — one-to-many / many-to-many reconciliation
 
+**⚠ Lifecycle note (2026-09-13).** Tier 1's as-built facts are distilled into
+[`okf/frontend/features/reconciliation.md`](../okf/frontend/features/reconciliation.md), so this file is
+kept ONLY for tier 2's design rationale and the §7 decision. ⛔ Per root `CLAUDE.md` a plan lives in
+`superpower/` only while its work is in flight, and tier 2 is demand-gated rather than scheduled — so
+**once §7 is answered this should be `git mv`'d to `archived-documents/plans-archive/`** with any residue
+moved to `BACKLOG.md`. Left in place deliberately rather than archived mid-decision; it is a one-step move,
+not an open question.
+
 **Status:** ✅ **tier 1 COMPLETE 2026-09-12 — backend AND client.** Both §6 residuals are closed; the type
 is reachable end to end. Tier 2 remains demand-gated. Opened 2026-09-12. The row calls the design half the hard half, and it
 is right — but for a different reason than it states, and the job is much smaller than it looks.

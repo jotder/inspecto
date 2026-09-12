@@ -140,6 +140,34 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **Local dev services live in [`dev-infra/`](../dev-infra/README.md) — and two test suites SKIP
+  without them, which is not a pass.** `docker compose -f dev-infra/docker-compose.yml up -d` brings up
+  PostgreSQL (for `PostgresStateStoreTest`, 15 tests) and WSO2 Identity Server (for
+  `OidcAgainstRealProviderTest`, 2). Every command needed to arm them is in that README because none is
+  guessable: the Postgres URL must arrive via **env var** (Windows `mvn.cmd` re-parses args and drops the
+  password after the `&`), PG 18 rejects the legacy `Asia/Calcutta` zone a Windows JVM sends (fix with
+  `Asia/Kolkata`, **never `UTC`** — that would move `record_day` boundaries), and WSO2 must be registered
+  with `ext_token_type: JWT` or it issues an opaque token and every request 401s silently.
+
+- 🔴 **`-DargLine` does NOT reach the forked surefire JVM.** The parent POM is
+  `<argLine>@{argLine} …</argLine>`, and that late-bound property resolves the **project** property — a
+  command-line `-D` does not override it. `systemPropertyVariables` is also too late for anything the JVM
+  fixes at startup (the default TimeZone). **`-DforkCount=0` plus `MAVEN_OPTS`** is the working route.
+  ⚠ Related: `-Dtest='A+B'` silently runs **nothing** under `failIfNoSpecifiedTests=false` (exit 0, empty
+  log) — the separator is a **comma**.
+
+- 🔴 **A skipping test can hide a broken harness, not just absent coverage.** `PostgresStateStoreTest`
+  skipped cleanly from 2026-09-07 while `inspecto-ops` had **no JDBC driver at all** — `inspecto/` and
+  `inspecto-engine/` declare it test-scope and **test scope is not transitive**. When a skip's
+  precondition finally arrives, treat the code as untested rather than as coverage that merely paused.
+
+- 🔴 **A doc rewrite silently retracts the claims other rows depend on.** Twice on 2026-09-12/13: the
+  whitepaper's one-to-many sentence was deleted by the v1.2 rewrite a day *before* an operator chose to
+  "build rather than drop" it, and `auth-security.md`'s *"`SpiSlot.active()` has no try/catch"* was true
+  when written and falsified by PKG-5 routing that call through `OptionalSpi` — which is what let a
+  misconfigured Standard build boot **wide open**. ✅ **When a stakeholder or concept doc is rewritten,
+  re-ground every row that cites it**; `git log -S "<exact phrase>" -- <doc>` settles it in one command.
+
 - 🔴 **A raw `jdbc:` value in a `*.backend` property is a URL, not a keyword — never lowercase it.**
   Six `ServiceStores` openers read `System.getProperty(…).trim().toLowerCase()` and then passed that same
   string on as the connection URL, so `-Djobs.backend=jdbc:postgresql://db/MyDb?user=Alice&password=Secret`
