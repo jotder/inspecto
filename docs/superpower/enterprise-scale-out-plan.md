@@ -518,8 +518,10 @@ Work:
   wakes up still believing it holds the lease. Every write is conditional on `owner = me AND epoch = mine`,
   so a stale owner can neither release nor extend a lease someone else now holds. ⚠ **This is the half of
   D15 that survives its refutation** — fencing works here precisely because `(space, pipeline)` is a
-  *stable* id, which `batchId` is not (`CONSIGNMENT-ID-DETERMINISTIC-1`). ⛔ It fences the lease, not the
-  writes a run performs; do not read B0 as discharging D15.
+  *stable* id, which `batchId` was not (`CONSIGNMENT-ID-DETERMINISTIC-1` — identity half shipped
+  `036f32f9`; `file_stages` keyed + CAS'd 2026-09-12; `consignment_outputs` still unkeyed pending a
+  reprocess/supersede design pass). ⛔ It fences the lease, not the writes a run performs; do not read B0
+  as discharging D15.
 
   ⚠ **The fencing test was wrong on the first attempt and a mutation run caught it.** The obvious
   scenario — pod A paused, pod B takes over, pod A releases — is blocked by the `owner` predicate alone,

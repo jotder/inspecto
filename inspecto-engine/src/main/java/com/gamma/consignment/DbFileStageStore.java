@@ -24,6 +24,14 @@ import java.util.List;
  * default-off behind {@code -Dfile.stages.backend}. <b>Insert-only</b> — a stage is a fact about a
  * point in time, never updated or superseded; the history for one file is its own progression.
  *
+ * <p><b>Idempotent (CONSIGNMENT-ID-DETERMINISTIC-1, constraints half).</b> The table carries
+ * {@code UNIQUE (batch_id, source_id, relative_path, stage)} and {@link #record} is
+ * {@code ON CONFLICT DO NOTHING}, so two executors of the same work — or a retry of one transition —
+ * leave one row, not two. Insert-only is what makes this key safe: there is no state transition to
+ * collide with. A pre-constraint table is rebuilt on open (rename → create → copy distinct → drop) in
+ * one transaction, because neither DuckDB nor a live table accepts {@code ADD CONSTRAINT}; the
+ * already-migrated check reads {@code information_schema.table_constraints}, which both engines expose.
+ *
  * <p><b>Absence is not degraded correctness.</b> With no store registered, {@link FileStages#record}
  * is a no-op and the crash-safe ordering {@code finalizeSource} already enforces is unchanged — this
  * table only adds the queryable index, exactly the existence/state split
@@ -54,25 +62,65 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
         return new DbFileStageStore(JdbcDrivers.connect(url));
     }
 
+    private static final String CREATE = "CREATE TABLE IF NOT EXISTS " + T + " ("
+            + "source_id VARCHAR, relative_path VARCHAR, batch_id VARCHAR, "
+            + "stage VARCHAR, recorded_at VARCHAR, "
+            + "UNIQUE (batch_id, source_id, relative_path, stage))";
+
     private void initSchema() {
         try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
-                    + "source_id VARCHAR, relative_path VARCHAR, batch_id VARCHAR, "
-                    + "stage VARCHAR, recorded_at VARCHAR)");
+            if (tableExists(st) && !hasUniqueConstraint(st)) rebuildWithConstraint(st);
+            st.execute(CREATE);
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise file-stages schema", e);
         }
     }
 
+    private static boolean tableExists(Statement st) throws SQLException {
+        try (ResultSet rs = st.executeQuery(
+                "SELECT 1 FROM information_schema.tables WHERE table_name = '" + T + "'")) {
+            return rs.next();
+        }
+    }
+
+    private static boolean hasUniqueConstraint(Statement st) throws SQLException {
+        try (ResultSet rs = st.executeQuery("SELECT 1 FROM information_schema.table_constraints "
+                + "WHERE table_name = '" + T + "' AND constraint_type = 'UNIQUE'")) {
+            return rs.next();
+        }
+    }
+
+    /** Legacy (unconstrained) table → constrained copy, duplicates collapsed, atomically. */
+    private void rebuildWithConstraint(Statement st) throws SQLException {
+        String legacy = T + "_v1";
+        boolean auto = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            st.execute("ALTER TABLE " + T + " RENAME TO " + legacy);
+            st.execute(CREATE);
+            st.execute("INSERT INTO " + T + " (" + COLS + ") SELECT " + COLS + " FROM " + legacy
+                    + " ON CONFLICT DO NOTHING");
+            st.execute("DROP TABLE " + legacy);
+            conn.commit();
+            log.info("file-stages: rebuilt {} with its unique constraint", T);
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(auto);
+        }
+    }
+
     /**
-     * Append one stage transition per file. <b>Best-effort: a write failure is logged, never
-     * thrown</b> — this is an index beside the manifest, so losing a row must not fail a batch that
-     * has already committed its data.
+     * Append one stage transition per file; a transition already recorded (same batch, file and
+     * stage) is kept as-is. <b>Best-effort: a write failure is logged, never thrown</b> — this is
+     * an index beside the manifest, so losing a row must not fail a batch that has already committed
+     * its data.
      */
     public synchronized void record(List<FileStageRecord> records) {
         if (records == null || records.isEmpty()) return;
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?)")) {
+                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING")) {
             for (FileStageRecord r : records) {
                 ps.setString(1, r.sourceId());
                 ps.setString(2, r.relativePath());

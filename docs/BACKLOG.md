@@ -846,7 +846,19 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   *equal*, so the equality assertion alone would NOT have caught a reintroduced clock — the regex guard is
   what does. Verified: 32 modules, 4364 tests, 0 failures.
 
-  ⛔ **STILL OPEN — the CONSTRAINTS half. DuckDB capabilities PROBED 2026-09-12; read this before coding.**
+  🟡 **CONSTRAINTS half — the SAFE store SHIPPED 2026-09-12 (`DbFileStageStore`); only the
+  `DbConsignmentOutputStore` design pass remains.** `file_stages` now carries
+  `UNIQUE (batch_id, source_id, relative_path, stage)`, `record` is `ON CONFLICT DO NOTHING`, and a
+  pre-constraint table is rebuilt on open (rename → create → `INSERT … SELECT … ON CONFLICT DO NOTHING`
+  → drop) in one transaction; the already-migrated check is `information_schema.table_constraints`,
+  portable to Postgres (the store has a real Postgres backend — `PostgresStateStoreTest` round-trips it,
+  so `duckdb_constraints()` was NOT usable). Mutation-proven with the **pre-change code as the mutant**
+  (no key, no CAS, no rebuild): exactly the two dedupe tests go red, reading 4 and 3 rows where 2 are
+  asserted. ⚠ A single mutant (drop only `UNIQUE`) goes red for the WRONG reason — DuckDB refuses
+  `ON CONFLICT` with no constraint present, so every insert fails and reads return 0; that proves the
+  constraint is load-bearing but not that duplicates are detected. Mutate the whole feature away, not one
+  clause. ⚠ **What remains is a DESIGN question, not code** — see the ⛔ bullet below.
+  DuckDB capabilities PROBED 2026-09-12 — read this before touching the outputs store:
 
   **Verified empirically** (throwaway JDBC probe against a temp DuckDB, then deleted):
   | Probe | Result |
@@ -873,20 +885,22 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ **Nothing shipped is broken** — without a constraint, reprocess merely accumulates SUPERSEDED rows and
   readers filter correctly. It is the CONSTRAINT that would break it.
 
-  **Recommended split, so the safe half is not held hostage:**
-  - ✅ **`DbFileStageStore` is safe to constrain now** — its class doc states it is *"Insert-only — a stage
-    is a fact about a point in time, never updated or superseded"*, so there are no state transitions to
-    collide with. Key: `(batch_id, source_id, relative_path, stage)`; a retry of the same transition
-    dedupes, different stages and different batches stay distinct.
+  **The split, so the safe half was not held hostage:**
+  - ✅ **`DbFileStageStore` — SHIPPED 2026-09-12** (above). It was safe because its class doc states it
+    is *"Insert-only — a stage is a fact about a point in time, never updated or superseded"*, so there
+    are no state transitions to collide with. Key: `(batch_id, source_id, relative_path, stage)`; a retry
+    of the same transition dedupes (first write's `recorded_at` wins), different stages and different
+    batches stay distinct.
   - ⛔ **`DbConsignmentOutputStore` needs a design pass on supersede semantics first** — specifically
     whether a reprocess should reuse its Consignment id (it now does) and, if so, how a row's state
     transitions relate to uniqueness. ⚠ Do NOT pick a key without answering that.
 
-  ⚠ **Still unverified, needed for the migration itself:** whether DuckDB supports
-  `ALTER TABLE … RENAME TO`, `INSERT … SELECT … ON CONFLICT DO NOTHING`, and a cheap way to detect that
-  the migration already ran (a marker table avoids introspection). ⛔ Probe these before writing the
-  migration — 2 of the 4 DDL probes above came back "not implemented", so DuckDB DDL must be tested, never
-  assumed.
+  ✅ **Migration DDL VERIFIED 2026-09-12** (second throwaway probe, deleted): `ALTER TABLE … RENAME TO`,
+  `INSERT … SELECT … ON CONFLICT DO NOTHING`, `ON CONFLICT (cols)`, a duplicate pair inside ONE batched
+  `INSERT`, `information_schema.tables` / `.table_constraints`, and the whole rename→create→copy→drop
+  sequence inside a transaction all work on DuckDB. The outputs store can reuse `DbFileStageStore`'s
+  `rebuildWithConstraint` shape verbatim once its key is decided. ⚠ No marker table was needed —
+  `information_schema.table_constraints` IS the truth and cannot drift from it.
   ✅ **DECIDED 2026-09-12 (operator): the id is a digest over the batch's SORTED RELATIVE PATHS + BYTE
   SIZES**, alongside the existing `slug`/`seq`. ⛔ Not a content checksum — that would cost a full read of
   every member file at plan time, on every run, before any work begins. `Member.file()` and `.bytes()` are

@@ -498,9 +498,20 @@ CREATE TABLE IF NOT EXISTS file_stages (
   relative_path  VARCHAR,
   batch_id       VARCHAR,
   stage          VARCHAR,  -- FileStage: REGISTERED | MANIFESTED | OUTPUT_REGISTERED | BACKED_UP | MARKED | WATERMARK_ADVANCED
-  recorded_at    VARCHAR
+  recorded_at    VARCHAR,
+  UNIQUE (batch_id, source_id, relative_path, stage)
 );
 ```
+
+**Idempotent since 2026-09-12 (`CONSIGNMENT-ID-DETERMINISTIC-1`, constraints half):** `record` is
+`INSERT … ON CONFLICT DO NOTHING`, so a retried transition or a second executor of the same Consignment
+leaves one row (the first write's `recorded_at` wins). Insert-only is what makes the key safe — there is
+no state transition to collide with, unlike `consignment_outputs` (§3.9), which is **deliberately still
+unconstrained** pending a design pass on reprocess/supersede semantics. A pre-constraint table is
+**rebuilt on open** — `RENAME TO file_stages_v1` → create → `INSERT … SELECT … ON CONFLICT DO NOTHING`
+→ drop — in one transaction, because DuckDB has no `ADD CONSTRAINT` (probed 2026-09-12: partial
+indexes and `ALTER … ADD CONSTRAINT` are both "not supported"). The already-migrated check is
+`information_schema.table_constraints`, portable to Postgres.
 
 Phase 4 §2.4's per-file stage progression: one row per `(source_id, relative_path)` file at each
 boundary `ConsignmentIngestor.finalizeSource` genuinely crosses, so *"where is file X right now"* is a
