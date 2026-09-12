@@ -846,10 +846,47 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   *equal*, so the equality assertion alone would NOT have caught a reintroduced clock — the regex guard is
   what does. Verified: 32 modules, 4364 tests, 0 failures.
 
-  ⛔ **STILL OPEN — the CONSTRAINTS half**, and it must stay second: unique constraints on
-  `DbFileStageStore` / `DbConsignmentOutputStore` plus a CAS, modelled on `DbDedupLedger`'s `PRIMARY KEY` +
-  insert-wins. 🔴 Now *safe* to build, because ids no longer collide across different batches — that
-  precondition is exactly what this half established.
+  ⛔ **STILL OPEN — the CONSTRAINTS half. DuckDB capabilities PROBED 2026-09-12; read this before coding.**
+
+  **Verified empirically** (throwaway JDBC probe against a temp DuckDB, then deleted):
+  | Probe | Result |
+  |---|---|
+  | `CREATE UNIQUE INDEX … WHERE state='LIVE'` (partial) | ⛔ *"Creating partial indexes is not supported currently"* |
+  | `UNIQUE (…)` declared at `CREATE TABLE` | ✅ works; rejects dupes with a Constraint Error |
+  | `INSERT … ON CONFLICT DO NOTHING` against it | ✅ works |
+  | `ON CONFLICT` with **no** constraint present | ⛔ refused — the CAS REQUIRES the constraint to exist |
+  | `ALTER TABLE … ADD CONSTRAINT UNIQUE` | ⛔ *"No support for that ALTER TABLE option yet!"* |
+  | `ALTER TABLE … ADD PRIMARY KEY` | ⛔ fails on existing duplicate data |
+
+  ✅ **Operator decision 2026-09-12 on migration — REBUILD (copy DISTINCT into a new table, swap) — is
+  therefore the ONLY route**, not merely the preferred one: a constraint cannot be added to an existing
+  DuckDB table at all.
+
+  🔴 **The operator's key choice `(consignment_id, path, generation)` is NOT SAFE, and the reason only
+  appeared once the identity half landed.** `ReprocessCommand` (`:68-70`) supersedes batch X, restores its
+  members and re-polls. Before deterministic ids the re-poll minted a FRESH clock-based id; now the same
+  files mint **X again**, so the new LIVE rows land on `(X, path, generation)` — exactly matching X's own
+  just-superseded rows — and `ON CONFLICT DO NOTHING` would **silently drop the new LIVE row**, leaving
+  only SUPERSEDED. Every `state='LIVE'` read (including `dailyVolume`) would then report nothing for that
+  path. ⛔ Adding `state` to the key does not rescue it: the NEXT reprocess's
+  `UPDATE … SET state='SUPERSEDED'` would collide with the already-superseded row.
+  ⚠ **Nothing shipped is broken** — without a constraint, reprocess merely accumulates SUPERSEDED rows and
+  readers filter correctly. It is the CONSTRAINT that would break it.
+
+  **Recommended split, so the safe half is not held hostage:**
+  - ✅ **`DbFileStageStore` is safe to constrain now** — its class doc states it is *"Insert-only — a stage
+    is a fact about a point in time, never updated or superseded"*, so there are no state transitions to
+    collide with. Key: `(batch_id, source_id, relative_path, stage)`; a retry of the same transition
+    dedupes, different stages and different batches stay distinct.
+  - ⛔ **`DbConsignmentOutputStore` needs a design pass on supersede semantics first** — specifically
+    whether a reprocess should reuse its Consignment id (it now does) and, if so, how a row's state
+    transitions relate to uniqueness. ⚠ Do NOT pick a key without answering that.
+
+  ⚠ **Still unverified, needed for the migration itself:** whether DuckDB supports
+  `ALTER TABLE … RENAME TO`, `INSERT … SELECT … ON CONFLICT DO NOTHING`, and a cheap way to detect that
+  the migration already ran (a marker table avoids introspection). ⛔ Probe these before writing the
+  migration — 2 of the 4 DDL probes above came back "not implemented", so DuckDB DDL must be tested, never
+  assumed.
   ✅ **DECIDED 2026-09-12 (operator): the id is a digest over the batch's SORTED RELATIVE PATHS + BYTE
   SIZES**, alongside the existing `slug`/`seq`. ⛔ Not a content checksum — that would cost a full read of
   every member file at plan time, on every run, before any work begins. `Member.file()` and `.bytes()` are
