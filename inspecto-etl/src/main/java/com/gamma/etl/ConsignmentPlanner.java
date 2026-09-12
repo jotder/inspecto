@@ -40,7 +40,15 @@ public final class ConsignmentPlanner {
     public static List<Consignment> plan(List<File> files, SchemaResolver resolver,
                                    int maxFiles, long maxBytes, String runTimestamp)
             throws IOException {
-        return plan(files, resolver, maxFiles, maxBytes, runTimestamp, Order.MTIME);
+        return plan(files, resolver, maxFiles, maxBytes, runTimestamp, Order.MTIME, null);
+    }
+
+    /** @deprecated pass the poll root — without it a member's id falls back to its basename. */
+    @Deprecated
+    public static List<Consignment> plan(List<File> files, SchemaResolver resolver,
+                                   int maxFiles, long maxBytes, String runTimestamp, Order order)
+            throws IOException {
+        return plan(files, resolver, maxFiles, maxBytes, runTimestamp, order, null);
     }
 
     /**
@@ -50,13 +58,23 @@ public final class ConsignmentPlanner {
      * @param resolver      schema/table resolver
      * @param maxFiles      max member files per batch (>= 1)
      * @param maxBytes      max summed bytes per batch (>= 1)
-     * @param runTimestamp  run timestamp embedded in each batch id
+     * @param runTimestamp  ⚠ NO LONGER PART OF THE BATCH ID — retained only so existing call sites keep
+     *                      compiling. 🔴 It WAS the id's leading component, and being {@code now()} at
+     *                      second granularity it was the ONLY non-deterministic input, which is exactly
+     *                      what made two executors of the same work clobber or duplicate
+     *                      ({@code CONSIGNMENT-ID-DETERMINISTIC-1}). ⛔ Do not wire it back into the id.
+     *                      Removing the parameter outright is a follow-up, kept out of the identity
+     *                      change so that diff stays reviewable.
+     * @param pollRoot      root the member paths are relativized against, so the id is mount-independent;
+     *                      {@code null} falls back to basenames (the dry-run path, which needs no
+     *                      cross-pod stability)
      * @param order         ordering before packing ({@link Order})
      * @return batches, grouped by schema/table, in deterministic order
      * @throws IOException if schema resolution fails
      */
     public static List<Consignment> plan(List<File> files, SchemaResolver resolver,
-                                   int maxFiles, long maxBytes, String runTimestamp, Order order)
+                                   int maxFiles, long maxBytes, String runTimestamp, Order order,
+                                   java.nio.file.Path pollRoot)
             throws IOException {
 
         // Group by table key (insertion-ordered for determinism), preserving each file's resolved
@@ -90,7 +108,7 @@ public final class ConsignmentPlanner {
                 boolean wouldExceed = !current.isEmpty()
                         && (current.size() >= maxFiles || currentBytes + bytes > maxBytes);
                 if (wouldExceed) {
-                    batches.add(buildBatch(runTimestamp, slug, seq++, key, current, selByFile));
+                    batches.add(buildBatch(pollRoot, slug, seq++, key, current, selByFile));
                     current = new ArrayList<>();
                     currentBytes = 0;
                 }
@@ -98,12 +116,12 @@ public final class ConsignmentPlanner {
                 currentBytes += bytes;
             }
             if (!current.isEmpty())
-                batches.add(buildBatch(runTimestamp, slug, seq++, key, current, selByFile));
+                batches.add(buildBatch(pollRoot, slug, seq++, key, current, selByFile));
         }
         return batches;
     }
 
-    private static Consignment buildBatch(String ts, String slug, int seq, String table,
+    private static Consignment buildBatch(java.nio.file.Path pollRoot, String slug, int seq, String table,
                                     List<Consignment.Member> members,
                                     Map<File, SchemaSelector.Selection> selByFile) {
         // Re-index srcId from 0 within the final batch (members were added with running index).
@@ -112,7 +130,10 @@ public final class ConsignmentPlanner {
             Consignment.Member m = members.get(i);
             reindexed.add(new Consignment.Member(m.file(), i, m.bytes(), m.selection()));
         }
-        String batchId = String.format("%s_%s_%04d", ts, slug, seq);
+        // 🔴 The id is derived from the batch's CONTENT SHAPE, never the clock — see ConsignmentId.
+        // ⛔ Do not reintroduce runTimestamp here: it was the ONLY non-deterministic component, and it is
+        // what made two executors of the same work either clobber one manifest or produce two.
+        String batchId = ConsignmentId.of(slug, seq, pollRoot, reindexed);
         String schemaName = schemaNameOf(reindexed.get(0).selection());
         return new Consignment(batchId, schemaName, "default".equals(table) ? null : table, reindexed);
     }

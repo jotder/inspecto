@@ -116,7 +116,10 @@ class ConsignmentPlannerTest {
         assertEquals(2, t1.members().size());
         assertEquals(0, t1.members().get(0).srcId());
         assertEquals(1, t1.members().get(1).srcId());
-        // batchId carries the run timestamp and the table slug
-        assertTrue(t1.batchId().startsWith("TS_t1_"));
+        // 🔴 The id no longer carries the run timestamp — that was the ONLY non-deterministic component
+        // and the whole defect (CONSIGNMENT-ID-DETERMINISTIC-1). It is now <slug>_<content digest>_<seq>,
+        // so it leads with the table slug and the "TS" passed above appears nowhere in it.
+        assertTrue(t1.batchId().startsWith("t1_"), t1.batchId());
+        assertFalse(t1.batchId().contains("TS"), "⛔ the clock must not be back in the id: " + t1.batchId());
     }
 }

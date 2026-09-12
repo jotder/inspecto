@@ -139,7 +139,9 @@ public class CollectorProcessor {
         List<Consignment> batches = ConsignmentPlanner.plan(
                 candidates, resolver, cfg.processing().batchMaxFiles(), cfg.processing().batchMaxBytes(),
                 cfg.identity().runTimestamp(),
-                ConsignmentPlanner.Order.valueOf(cfg.processing().batchOrder().toUpperCase(java.util.Locale.ROOT)));
+                ConsignmentPlanner.Order.valueOf(cfg.processing().batchOrder().toUpperCase(java.util.Locale.ROOT)),
+                root);   // 🔴 the poll root: member paths are relativized against it so the id is
+                         // MOUNT-INDEPENDENT — absolute paths would differ per pod and defeat the point
         log.info("Planned {} batch(es) from {} file(s) using {} thread(s)...",
                 batches.size(), candidates.size(), cfg.processing().threads());
 

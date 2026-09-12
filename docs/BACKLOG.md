@@ -835,6 +835,21 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ## 4. Engineering / tech-debt
 
 - **P1** · **`CONSIGNMENT-ID-DETERMINISTIC-1` — a Consignment's identity is the wall clock, so two executors
+  🟡 **HALF SHIPPED 2026-09-12 — the IDENTITY half.** `ConsignmentId` mints
+  `<slug>_<sha256(sorted relPath bytes)>_<seq>`; `runTimestamp` is gone from the id, which was the ONLY
+  non-deterministic input. Paths are relativized against the **poll root** (threaded into
+  `ConsignmentPlanner.plan`) with `/` separators, so two pods mounting the same data at different paths —
+  or on different OSes — agree. A member outside the root (an `UnpackStage` expansion) falls back to its
+  basename, because relativizing would emit mount-dependent `../..` segments.
+  Mutation-proven: absolute paths fail the two mount-independence tests; a reintroduced clock fails the
+  no-timestamp guard **and** the planner's format assertion. ⚠ Two calls in the same second would still be
+  *equal*, so the equality assertion alone would NOT have caught a reintroduced clock — the regex guard is
+  what does. Verified: 32 modules, 4364 tests, 0 failures.
+
+  ⛔ **STILL OPEN — the CONSTRAINTS half**, and it must stay second: unique constraints on
+  `DbFileStageStore` / `DbConsignmentOutputStore` plus a CAS, modelled on `DbDedupLedger`'s `PRIMARY KEY` +
+  insert-wins. 🔴 Now *safe* to build, because ids no longer collide across different batches — that
+  precondition is exactly what this half established.
   ✅ **DECIDED 2026-09-12 (operator): the id is a digest over the batch's SORTED RELATIVE PATHS + BYTE
   SIZES**, alongside the existing `slug`/`seq`. ⛔ Not a content checksum — that would cost a full read of
   every member file at plan time, on every run, before any work begins. `Member.file()` and `.bytes()` are
