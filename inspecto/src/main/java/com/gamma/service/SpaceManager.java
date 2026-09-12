@@ -90,14 +90,39 @@ public final class SpaceManager implements AutoCloseable {
             log.warn("Spaces root {} does not exist — no spaces booted", spacesRoot.toAbsolutePath());
             return m;
         }
+        // §5.3: which Spaces are THIS pod's. Absent a partition.toon this hosts everything, so the
+        // single-node path is unchanged; a malformed one is fatal rather than defaulted (see SpacePartition).
+        SpacePartition partition = SpacePartition.load(m.spacesRoot);
         try (Stream<Path> dirs = Files.list(spacesRoot)) {
             dirs.filter(Files::isDirectory)
                 .filter(d -> Files.isDirectory(d.resolve("config")))
                 .sorted()
+                .filter(d -> m.ownedByThisPod(partition, d))
                 .forEach(m::bootQuietly);
         }
         log.info("SpaceManager: {} space(s) booted from {}", m.spaces.size(), spacesRoot.toAbsolutePath());
         return m;
+    }
+
+    /**
+     * Whether {@code dir}'s Space belongs to this pod (§5.3). ⚠ The id used here is the <b>directory
+     * name</b>, which is what {@code partition.toon} maps — the {@link SpaceContext#id()} is not known
+     * until the Space loads, and loading it is exactly what we are deciding whether to do.
+     *
+     * <p>An unassigned Space is skipped with a WARN rather than failing boot: zero owners stalls one
+     * Space, a boot failure takes down every other Space on this pod. See {@link SpacePartition}.
+     */
+    private boolean ownedByThisPod(SpacePartition partition, Path dir) {
+        if (partition.hostsEverything()) return true;
+        String id = dir.getFileName().toString();
+        if (partition.isUnassigned(id)) {
+            log.warn("Space '{}' is present here but appears in NO partition.toon entry — not booting it. "
+                    + "⚠ It has no owning pod at all: add it to the partition map, or it never runs.", id);
+            return false;
+        }
+        boolean mine = partition.hosts(id);
+        if (!mine) log.info("Space '{}' belongs to another pod — not booting it here", id);
+        return mine;
     }
 
     private void bootQuietly(Path dir) {

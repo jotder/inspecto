@@ -837,6 +837,19 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   over from a *paused* owner double-executes. ⚠ Its only would-be regression test switches the relevant leg
   off — `FinalizeSourceConcurrencyTest:291-294` passes empty outputs/lineage, *"the registry leg is
   deliberately out of play"*. → `superpower/enterprise-scale-out-plan.md` §12, §4.2, D15
+- **P2** · **`INTAKE-POLICY-SYSTEM-SCOPE-1` — "system scope" becomes PER-POD on N pods.**
+  `IntakeGovernor`'s per-pipeline `caps`/`overrides` are Space-keyed (`SPACES-GOVERNOR-1`, closed), but the
+  fleet-wide `Policy` is **deliberately** process-wide because `PUT /system/scheduler` is system scope
+  (`IntakeGovernor.java:21,91`). Correct on one node; on N pods an operator's policy write lands on
+  whichever pod served the request and **every other pod keeps its boot-time policy**, with nothing
+  reporting the divergence — so intake admission differs per pod and the UI shows whichever pod answered.
+  Filed 2026-09-12 while re-grounding the (stale) `IntakeGovernor` bullet in scale-out §5.3.
+  ⚠ Same *class* as B2's cadence — per-process state that reads as global — but this is **configuration,
+  not run state**, so ⛔ the `RunLease` is the wrong home and this must not be folded into §5.2.
+  **Needs a decision, not just a build:** a shared config row (like the lease's ops-DB family), or route
+  system-scope writes through a single owner. ⚠ Scope check first — `PUT /system/scheduler` is unlikely to
+  be the only system-scope write; audit the others before choosing, or the fix lands one endpoint deep.
+  → `superpower/enterprise-scale-out-plan.md` §5.3
 - ✅ **SHIPPED 2026-09-12 (the warning half)** · **`JOB-PIPELINE-PARAM-UNIQUE-1` — nothing validates that two jobs target the same pipeline.**
   A job's `name` is the only unique key (`JobService.jobs` is keyed by it); the pipeline a `type: pipeline`
   job targets is a **param** (`params.pipeline`, read at `JobService.java:1258`), and no config-load or

@@ -619,14 +619,79 @@ Work:
 - **Partition by Space, not by pipeline** (D3). Spaces are already the tenant boundary and the
   namespace for every store and directory (§3.8); pipelines within a Space share inboxes, ledgers and
   dedup state. Splitting a Space across pods would re-open every §3.7 race.
-- **Static assignment first.** A `partition.toon` (or the Kubernetes ConfigMap that renders it)
-  mapping Space → pod ordinal, read at boot; a pod hosts only the Spaces assigned to it. Dynamic
-  rebalancing (a pod dies, its Spaces migrate) is **phase C+1**, explicitly deferred — it needs the
-  lease's heartbeat and a controller, and static assignment already delivers scale.
+- ✅ **SHIPPED 2026-09-12 (slice C1) — static assignment.** `partition.toon` beside the spaces root maps
+  Space id → pod ordinal; `SpaceManager.discover` gates each discovered directory through
+  `SpacePartition` before booting it. Dynamic rebalancing (a pod dies, its Spaces migrate) remains
+  **phase C+1**, explicitly deferred — it needs the lease's heartbeat and a controller.
+
+  ⛔ **Absent the file, nothing changes** — `hostsEverything()`, every discovered Space boots. That
+  default is load-bearing: Personal and single-node Standard must never need this file, and
+  `withNoPartitionFileEverySpaceIsHosted` is what fails if it is ever lost.
+
+  🔴 **This file deliberately does NOT follow the fail-soft idiom every other global TOON file uses.**
+  `SchedulerSettings.read` (and `branding.toon`, `roles.toon`, …) swallow a malformed file and fall back
+  to defaults, because for them the fallback is harmless. Here the fallback would be **"host everything"**
+  — every pod hosting every Space, precisely the invariant this file exists to hold — and it would surface
+  as *duplicate processing*, not as a config error. So present-but-unreadable, no `spaces:` section, a
+  non-integer ordinal, or an **empty** section are all boot failures. ⛔ Do not "make it robust" by
+  catching and defaulting; mutation-verified 2026-09-12 — wrapping the load in catch-and-default fails
+  exactly `aMalformedMapRefusesToBootRatherThanHostingEverything` and
+  `anEmptyMapIsRefusedRatherThanTreatedAsNoMap`.
+
+  ⚠ **Three failure modes, deliberately different, because their blast radii differ:**
+  | Case | Behaviour | Why |
+  |---|---|---|
+  | Map present, **pod ordinal unknown** | **fail boot** | hosting nothing idles the pod silently; hosting everything double-hosts. Same call as A1's partitioned-mode boot failure |
+  | Map present, **local Space unassigned** | **skip it, WARN** | ⚠ *not* fatal — zero owners stalls one Space, a boot failure takes down every other Space on the pod, so a ConfigMap lagging a new directory would turn a small mistake into a pod-wide outage. The dangerous violation is **two** owners, never zero |
+  | Map names a Space **not present here** | ignore, silent | normal with per-pod volumes — it lives on its owner's volume |
+
+  ⚠ **The partition key is the Space DIRECTORY NAME**, verified not assumed: `DirSpaceRoot.id()` is
+  `base.getFileName().toString()` (`SpaceRoot.java:190`), so it equals `SpaceContext.id()`. It has to be
+  the directory name regardless — the context id is not known until the Space loads, and whether to load
+  it is what the gate is deciding.
+
+  ⚠ **Pod identity did not exist and is introduced minimally here**: `-Dinspecto.pod.ordinal`, else the
+  trailing `-N` of `HOSTNAME` (the StatefulSet convention), so an ordinary deployment needs no extra flag.
+  ⛔ This is **not** the general "instance id" §10 estimates at 12+ classes / 60–90 sites — that one exists
+  to give per-process registries an instance dimension. 🔴 **Static partitioning removes the need for it
+  there**: with each Space owned by exactly one pod, the Space-keyed statics (`CircuitBreaker`,
+  `GapTracker`, `IntakeGovernor`'s caps) are already disjoint across pods. ⚠ It does **not** rescue
+  genuinely process-scoped state — see the `INTAKE-POLICY-SYSTEM-SCOPE-1` row above.
+
+  ⚠ **Gating at discovery is sufficient for the read paths.** `SchedulerRoutes:85,256` and
+  `BootstrapRoutes:107` iterate `SpaceManager.all()`, which only ever holds what was booted — so they
+  agree automatically. ⚠ Not exhaustively swept: a full pass over `api.spaces().all()` call sites is owed
+  before phase C closes.
+
+  ⚠ **`partition.toon` bypasses `ConfigSafetyValidator`**, like every other global settings file — that
+  validator only covers path-bearing `pipeline`/`enrichment` configs. Its own parse is the fail-closed
+  gate here instead.
 - **Inbox ownership follows Space ownership.** `dirs.poll` lives on the owning pod's volume (a
   per-pod PVC) or on an object-store prefix only that pod polls. ⛔ No shared inbox (§3.7).
-- **Fix `IntakeGovernor`'s missing Space key** (§3.8, §12) — required before two Spaces may ever
-  share a pod safely, which they do in this model.
+- ✅ **`IntakeGovernor`'s Space key — ALREADY FIXED, this bullet was STALE** (`SPACES-GOVERNOR-1`,
+  2026-09-10; §12 of this same document records it closed). Re-grounded 2026-09-12: the `caps` and
+  `overrides` maps key on `EventLog.currentSpaceId() + '/' + pipelineId`
+  (`IntakeGovernor.java:166-168`), pinned by three tests — `aSaturatedSpaceDoesNotThrottleAnotherSpaces
+  SameNamedPipeline`, `aPerPipelineOverrideBelongsToItsSpaceOnly`, `forgetDropsOnlyTheCallingSpacesState`
+  (`IntakeGovernorTest.java:33,46,55`). Its sibling `SPACE-UNKEYED-STATICS-1` is closed too. **The
+  "two Spaces may share a pod safely" precondition is therefore MET** — nothing to build here.
+
+  ⚠ **It does NOT follow `RunLease`'s bind-at-construction idiom, and could not.** The governor is a
+  process-wide singleton created at class-init before any Space exists (`IntakeGovernor.java:91`), so it
+  reads the *ambient* Space from the MDC per call instead — the same idiom as `EventLog.current()`. ⛔ Do
+  not "unify" these two: both are established, and which one applies is decided by whether the object's
+  lifetime can start after the Space is known.
+
+- 🔴 **NEW, found while re-grounding the bullet above (2026-09-12): `IntakeGovernor.policy` is
+  deliberately process-wide, and that is a REAL gap in this model.** The fleet-wide `Policy` is
+  intentionally *not* Space-keyed because `PUT /system/scheduler` is system scope
+  (`IntakeGovernor.java:21`) — a correct single-node decision. On N pods "system scope" silently becomes
+  **per-pod** scope: an operator setting the intake policy on the pod that happens to serve their request
+  changes admission on that pod alone, while every other pod keeps its boot-time policy, and nothing
+  reports the divergence. ⚠ This is the same class of defect as B2's cadence (per-process state that
+  reads as global) but it is **configuration**, not run state, so the lease is the wrong home for it.
+  ⛔ Do not fold it into §5.2. It needs its own decision: either a shared config row, or route
+  system-scope writes through a single owner. **Not built; filed for the board.**
 - **Per-tenant ABAC** — the security module's existing data-scoped grants, extended so a subject's
   Space grant is enforced identically on whichever pod serves the request.
 
