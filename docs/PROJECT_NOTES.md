@@ -777,6 +777,38 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   **both** `BUILD SUCCESS` and the module count, because a clobbered run can still print a plausible
   test total (it printed 3752 against a true 4315).
 
+- **Promoting per-process state to a shared row changes the cost CATEGORY of every write — so audit
+  the READERS, not just the writers.** `PipelineScheduler.lastRunAtMs` stamped a cadence baseline for
+  *every* due pipeline each tick: free as a heap `put`, but one `UPDATE` per pipeline per tick once the
+  state moved onto the shared run lease (B2, 2026-09-12). Only 2 of the 5 trigger kinds ever read the
+  value back — `DEFAULT_POLL` is due every tick *without consulting it*, and `EVENT`/`MANUAL` never run
+  on the loop — so the fix was to stamp only triggers that read it (`usesCadence`). ⚠ That is a
+  **write-elision, not a behaviour change**: the elided value is unreadable by construction. 🔴 The
+  general rule: when state crosses the process boundary, re-derive who actually consumes it; the write
+  pattern that was free in heap is a hot-path round trip in a table.
+
+- **Split the fencing decision per operation — a shared row can need a fenced WRITE and an unfenced
+  READ.** On the run lease, "who may run this now" and "when did it last run" are different questions:
+  the cadence write is fenced on `owner = me AND epoch = mine` (a pod paused past its TTL must not move
+  another owner's baseline), but the read is deliberately owner-independent, because an expired or
+  released lease still carries a valid baseline and **a pod that has never held the lease must be able
+  to read it** — that is the entire cross-pod fix. ⛔ Adding an `owner`/`expires_at` predicate to the
+  read would make every idle pipeline fire immediately.
+
+- **`CREATE TABLE IF NOT EXISTS` is not a migration, and the gap is invisible on a fresh install.**
+  Adding `last_run_at` to the lease table (B2) would have thrown on the first read for any deployment
+  whose table was already created by B0/B1 — no ordinary test can see it, because every test starts
+  from an empty database. Needs a guarded `ALTER TABLE … ADD COLUMN IF NOT EXISTS` (both DuckDB and
+  Postgres support it) **plus a regression test that builds the pre-migration table by hand**. ⚠ Apply
+  this to every `CREATE TABLE IF NOT EXISTS` in the ops-DB families whenever a column is added.
+
+- **Moving a private field breaks the tests that reflect on it — grep `getDeclaredField` first.**
+  `CollectorServicePipelineForgetTest` read `PipelineScheduler.lastRunAtMs` reflectively; the B2 move
+  required re-pointing it at `PipelineRunGuard` *and* switching its driver from `runAllOnce()` to
+  `runPipeline(id)`, because its no-`trigger:` fixture is exactly the `DEFAULT_POLL` case the new
+  elision stops stamping. A reflective test fails at RUN time with `NoSuchFieldException`, not at
+  compile time, so the compiler will not warn you.
+
 ---
 
 ## 5. Engine seams & performance (durable; current in `inspecto/`)
