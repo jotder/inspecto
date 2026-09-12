@@ -68,7 +68,11 @@ Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepa
    **pipeline** anchor per the operator's call; residuals filed as `STALE-TILES-PRECISION-1` and
    `CATALOG-WIDGET-NODES-1`. **⇒ SPRINT 8 IS COMPLETE — all seven rows.** →
    then the signed scale-out plan's **phases A + B**, which are the Standard DR page. ⚠ Two §1 decisions gate
-   the rest of the brochure: ~~`PKG-5`~~ ✅ **RESOLVED + SHIPPED 2026-09-12** and `RECON-CARDINALITY-1`
+   the rest of the brochure: ~~`PKG-5`~~ ✅ **RESOLVED + SHIPPED 2026-09-12** and ~~`RECON-CARDINALITY-1`~~
+   🔴 **NOT a brochure gate — regrounded 2026-09-12**: the whitepaper's cardinality sentence was deleted
+   by the v1.2 rewrite (`db11a412`) a day BEFORE the build-over-drop decision was recorded, so nothing in
+   the brochure is untrue while it waits. It stays a P2 feature; see its §3 row. ⇒ **No §1 decision gates
+   the brochure any more**
    (now the only one left).
    ⛔ Do not start v1.2 of the whitepaper until 0–4 are green: it is the claims that move, not the prose.
 1. ~~**`SBOM-RESOLVE-1` (§4)**~~ ✅ **SHIPPED 2026-09-09** — `release.yml` now installs the reactor under `-Pedition-enterprise` before the packaging steps. Was the only queued P1. The bill of materials cannot generate on a clean
@@ -92,10 +96,17 @@ code before filing, not just the board.
 ## 1. Operator decisions pending
 
 *(2026-09-12: **`RECON-CARDINALITY-1` DECIDED — BUILD IT.** Operator chose to build one-to-many /
-many-to-many recon matching rather than drop the phrase from whitepaper §4. ⚠ **The brochure stays untrue
-until it lands**, which is the cost the decision accepts; ⛔ do not quietly soften the whitepaper in the
-meantime — that would convert a tracked gap into an untracked one. Moved to §3 as a build row. **§1 is
-EMPTY again** — every operator decision on the board is answered.)*
+many-to-many recon matching rather than drop the phrase from whitepaper §4. Moved to §3 as a build row.
+**§1 is EMPTY again** — every operator decision on the board is answered.
+🔴 **CORRECTION, later the same day: this decision was taken on a false premise and its two warnings are
+struck.** The phrase was **already gone** — whitepaper v1.2 (`db11a412`, 2026-09-11) deleted it during a
+market-focused rewrite, a day before the decision was recorded, so "build rather than drop" offered as the
+alternative something already done, and "the brochure stays untrue until it lands" was never true. ⛔ The
+"do not quietly soften the whitepaper" instruction had itself been violated before it was written — by a
+rewrite that was not reviewed against the rows depending on that sentence. ⚠ **A doc rewrite silently
+retracts the claims other rows are tracking**: when a stakeholder doc is rewritten, re-ground every board
+row that cites it. The build decision stands as a feature call and deserves re-confirmation on the
+corrected basis; see the §3 row.)*
 
 *(2026-09-12: four more decisions answered in one sitting, all recorded on their own rows in §4 —
 `CONSIGNMENT-ID-DETERMINISTIC-1` (paths+sizes digest, no checksum), `POD-SCOPE-DIVERGENCE-1` (declare
@@ -211,9 +222,34 @@ it was; both are corrected below.
   matching with `exact`/`absolute`/`percent` tolerance only; cardinality is not a match option today.
   ⚠ An **M**, and the design half is the hard half, not the code: *what is a "break" when one row
   legitimately matches three?* Settle the break semantics before building the matcher, or the Incident
-  counts become meaningless. ⚠ **Until it lands the brochure is untrue** — that is the accepted cost of
-  choosing build over drop; ⛔ do not soften the whitepaper meanwhile, which would hide a tracked gap.
-  → whitepaper §4
+  counts become meaningless.
+
+  🔴 **REGROUNDED 2026-09-12: the "brochure is untrue" clause is FALSE, and the decision's basis is
+  inverted.** The whitepaper makes no cardinality claim today and has not since v1.2. Verifiable sequence:
+  `48bd6d04` (2026-09-11) landed **v1.1**, whose "Declarative Matching Rules" bullet read *"… and
+  one-to-many or many-to-many reconciliation logic"*; `9547d495` filed THIS ROW against that sentence
+  hours later; `db11a412` — the **v1.2 market-focused rewrite, the same day** — **deleted the sentence**;
+  `7da8bf3d` (2026-09-12) then recorded the operator's *"BUILD it, rather than drop the claim"*.
+  ⚠ **The claim had already been dropped when that choice was made**, so "build over drop" offered as its
+  alternative something that had already happened. §4.1 and the §2 layer summary both now say tolerance is
+  *"exact, absolute or percentage"* — **exactly what the code does**.
+  ⛔ The row's "do not soften the whitepaper meanwhile" instruction was therefore violated **a day before
+  it was written**, inside an unrelated rewrite — the precise failure it existed to prevent: a tracked gap
+  turned into an untracked one. That is the reusable lesson here, not the matcher.
+  ⇒ **Now an ordinary P2 feature, NOT a release gate.** Nothing is untrue while it waits. The operator's
+  build decision stands but deserves re-confirmation on the corrected basis.
+
+  ⚠ **Premise re-checked 2026-09-12 — it HOLDS, but the row states it too weakly.** Cardinality is not
+  merely "not a match option", it is **structurally unreachable**: `ReconService.sideSql` (`:290-302`)
+  pre-aggregates each side to one row per key (`SUM`/`COUNT` … `GROUP BY keys`) *before* `joinChain`
+  (`:342-351`) runs its DuckDB `FULL OUTER JOIN`, so many rows sharing a key are **summed away before
+  matching ever happens**. Building this means making a side *not* aggregate, which changes join semantics.
+  🔴 The design half is concrete, not cautionary: a Break is computed fresh per call
+  (`ReconService.breaks:181-206`) and becomes durable only through `POST /recon/promote`, whose Incident
+  attrs are `reconciliation`/`breakKey`/`breakType`/`column`/`runId` (`ReconRoutes.java:190-197`) — that
+  shape **cannot express which of N counterparts, nor how many**. No test feeds a duplicate key on either
+  side, because the `GROUP BY` made it impossible.
+  → whitepaper §4.1 (carries no such claim) · `ReconService` · `ReconConfigLoader`
 Grouped by area. A row with lettered items keeps the letters of its source doc so the two stay aligned.
 
 ### Authoring (Parse / Transform / pipeline editor)
