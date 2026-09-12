@@ -123,6 +123,48 @@ class OidcAuthenticatorTest {
         }
     }
 
+    /**
+     * 🔴 RFC 9068: a real OAuth 2.0 JWT access token is stamped {@code typ: at+jwt}, and Nimbus's default
+     * type verifier allows only {@code JWT} or an absent typ — so every standards-compliant access token
+     * was rejected until 2026-09-13 with <em>"JOSE header typ (type) at+jwt not allowed"</em>.
+     *
+     * <p>⚠ <b>This suite could not have caught it</b>, which is why it is worth stating here: {@link #token}
+     * mints headers with <b>no typ at all</b>, and "absent" was always allowed. The defect only appeared
+     * against a live provider (WSO2 Identity Server 7.3.0), and recent Keycloak stamps the same type, so it
+     * was never a one-vendor quirk. See {@code OidcAgainstRealProviderTest}.
+     */
+    @Test
+    void anRfc9068AccessTokenTypeIsAccepted() throws Exception {
+        String jwt = typedToken("at+jwt", List.of("pipeline-developer"));
+        assertTrue(authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).isPresent(),
+                "typ: at+jwt is what RFC 9068 mandates for an access token — refusing it refuses every "
+                        + "compliant provider");
+    }
+
+    /** ⛔ And it stays an ALLOWLIST: a type minted for another purpose must still be refused. */
+    @Test
+    void anUnexpectedTokenTypeIsStillRefused() throws Exception {
+        assertTrue(authenticateWithHeader(authenticator(ISSUER, AUDIENCE),
+                        "Bearer " + typedToken("dpop+jwt", List.of("pipeline-developer"))).isEmpty(),
+                "a DPoP proof is correctly signed by the same issuer and must NOT authenticate — widening "
+                        + "the typ allowlist must not become 'accept anything'");
+    }
+
+    /** As {@link #token}, but stamping an explicit {@code typ} header. */
+    private static String typedToken(String typ, List<String> roles) throws Exception {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(ISSUER).subject("jdoe").audience(AUDIENCE)
+                .expirationTime(Date.from(Instant.now().plusSeconds(60)))
+                .claim("roles", roles).build();
+        SignedJWT jwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256)
+                        .type(new com.nimbusds.jose.JOSEObjectType(typ))
+                        .keyID(RSA_KEY.getKeyID()).build(),
+                claims);
+        jwt.sign(new RSASSASigner(RSA_KEY));
+        return jwt.serialize();
+    }
+
     @Test
     void validTokenResolvesSubjectWithMappedCapabilities() throws Exception {
         String jwt = token(Instant.now().plusSeconds(60), List.of("pipeline-developer"), RSA_KEY, ISSUER, AUDIENCE, "jdoe");

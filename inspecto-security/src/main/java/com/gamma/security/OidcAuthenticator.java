@@ -5,9 +5,11 @@ import com.gamma.control.Authenticator;
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.Roles;
 import com.gamma.control.Subject;
+import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.jwk.source.RemoteJWKSet;
+import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -101,10 +103,25 @@ public final class OidcAuthenticator implements Authenticator {
         return audience;
     }
 
+    /**
+     * The RFC 9068 type for an OAuth 2.0 JWT access token. Real providers stamp it; Nimbus does not allow
+     * it by default.
+     */
+    private static final JOSEObjectType AT_JWT = new JOSEObjectType("at+jwt");
+
     private static ConfigurableJWTProcessor<SecurityContext> processor(
             JWKSource<SecurityContext> jwkSource, String issuer, String audience) {
         DefaultJWTProcessor<SecurityContext> p = new DefaultJWTProcessor<>();
         p.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, jwkSource));
+        // 🔴 Without this, EVERY standards-compliant access token is rejected. Nimbus's default type
+        // verifier allows only `typ: JWT` or an absent typ, while RFC 9068 — the spec for OAuth 2.0 JWT
+        // access tokens — says to stamp `typ: at+jwt`. Proven 2026-09-13 against WSO2 Identity Server
+        // 7.3.0: "BadJOSEException: JOSE header typ (type) at+jwt not allowed", and recent Keycloak emits
+        // the same type, so this was not a one-vendor quirk. ⚠ The offline suite could never catch it —
+        // it mints its own tokens, which carry no typ at all.
+        // ⛔ Still an ALLOWLIST, not "accept anything": an unexpected type is a token minted for another
+        // purpose (an id_token, a DPoP proof) and must stay refused.
+        p.setJWSTypeVerifier(new DefaultJOSEObjectTypeVerifier<>(JOSEObjectType.JWT, AT_JWT, null));
         JWTClaimsSet.Builder exact = new JWTClaimsSet.Builder().issuer(issuer);
         if (audience != null && !audience.isBlank()) exact.audience(audience);
         p.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(exact.build(), Set.of("sub", "exp")));

@@ -58,6 +58,40 @@ The blueprint's realm/client names map to the `-Dauth.oidc.*` flags `OidcAuthent
 | `-Dauth.oidc.clientId` | `inspecto-spa` (default) |
 | `-Dauth.oidc.clientSecret` | *optional* (public PKCE client needs none). Pass a **`SecretResolver` reference** — `${ENV:NAME}` / `${SYS:prop}` — never the raw value |
 
+### 🔴 Proven against a real provider 2026-09-13 — four corrections to the table above
+
+The blueprint is Keycloak-shaped and was never run against an IdP. Standing up **WSO2 Identity Server
+7.3.0** (`docker run -d --name wso2is -p 9443:9443 -p 9763:9763 wso2/wso2is`) and authenticating a real
+token through `OidcAuthenticator` contradicted four of its assumptions. Pinned by
+`OidcAgainstRealProviderTest`, which SKIPS without a configured provider — so read its skip count, not its
+pass count.
+
+1. ⛔ **A provider's default access token may not be a JWT at all.** WSO2 issues an **opaque** token
+   until the application is switched to `ext_token_type: JWT`; `OidcAuthenticator` is a Nimbus RS256 JWT
+   validator, so every request 401s until then, with nothing in the log saying why.
+2. 🔴 **The code rejected every RFC 9068 access token, and this was a real defect — now fixed.** RFC 9068
+   mandates `typ: at+jwt` on an OAuth 2.0 JWT access token; Nimbus's default type verifier allows only
+   `JWT` or an absent typ, so validation failed with *"JOSE header typ (type) at+jwt not allowed"*.
+   ⚠ **Not a WSO2 quirk** — recent Keycloak stamps the same type, so the blueprint's own vendor was
+   affected. The offline suite could not have caught it: it mints headers with no `typ` at all.
+3. ⚠ **`aud` is the CLIENT ID, not a separate API audience.** The table's `inspecto-api` is a Keycloak
+   convention. Set `-Dauth.oidc.audience` to what the provider actually emits — read it out of a token,
+   do not assume it.
+4. ⚠ **`-Dauth.oidc.clientId=inspecto-spa` is not issuable on WSO2**, whose client ids must match
+   `[a-zA-Z0-9_]{15,30}` — too short, and hyphens are refused. The default is a default, not a contract.
+
+⚠ **Roles are the remaining gap, and it is a real one.** A WSO2 client-credentials token carries **no
+roles claim at all** — neither `roles` nor Keycloak's `realm_access.roles`. `RoleMapper` grants nothing,
+so the caller authenticates with **zero capabilities**: fail-closed and correct, but *authenticated is not
+authorized*. Issuing roles needs a user-bearing grant and an IdP-side claim mapping, which this pass did
+not configure.
+
+🔴 **TLS: there is no skip switch, by design.** JWKS is fetched with stock Nimbus `RemoteJWKSet` over the
+JVM default truststore. A self-signed dev IdP must have its certificate imported
+(`keytool -importcert -alias wso2is -file wso2is.crt -keystore ts.jks`) and the JVM pointed at it.
+⚠ On this repo `-DargLine` does **not** reach a forked surefire JVM — the parent POM's `@{argLine}`
+resolves the project property — so TLS flags need `-DforkCount=0` plus `MAVEN_OPTS`.
+
 `serve.sh`/`serve.bat` (bundled by `package.ps1 -Edition Standard`) read these from
 `AUTH_OIDC_ISSUER` / `AUTH_OIDC_JWKS_URI` / `AUTH_OIDC_AUDIENCE` / `AUTH_OIDC_CLIENT_ID` /
 `AUTH_OIDC_CLIENT_SECRET` environment variables — the secret is forwarded as an `${ENV:…}` reference
