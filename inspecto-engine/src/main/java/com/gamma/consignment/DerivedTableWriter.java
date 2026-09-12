@@ -54,7 +54,8 @@ public final class DerivedTableWriter {
      * @param producer     what asked for them (the processor id), so the rows are attributable
      */
     public static List<ConsignmentOutput> write(ConsignmentReader reader, String derivedRoot,
-                                                String consignmentId, List<DerivedTable> tables,
+                                                String consignmentId, String runId,
+                                                List<DerivedTable> tables,
                                                 String producer) throws Exception {
         if (tables == null || tables.isEmpty()) return List.of();
         // ⚠ The reader, not a bare Connection: the author's SQL names the Consignment's own lazy VIEWS,
@@ -68,12 +69,14 @@ public final class DerivedTableWriter {
 
         List<ConsignmentOutput> out = new ArrayList<>();
         String writtenAt = Instant.now().toString();
-        for (DerivedTable t : tables) out.addAll(writeOne(conn, derivedRoot, consignmentId, t, writtenAt, producer));
+        for (DerivedTable t : tables)
+            out.addAll(writeOne(conn, derivedRoot, consignmentId, runId, t, writtenAt, producer));
         return out;
     }
 
     private static List<ConsignmentOutput> writeOne(Connection conn, String derivedRoot, String consignmentId,
-                                                    DerivedTable table, String writtenAt, String producer)
+                                                    String runId, DerivedTable table, String writtenAt,
+                                                    String producer)
             throws Exception {
         // A scratch relation first: the SELECT is evaluated ONCE, and every later step (schema, count,
         // partition list, COPY) reads that result rather than re-running author SQL with its own cost and
@@ -90,7 +93,7 @@ public final class DerivedTableWriter {
             List<ConsignmentOutput> rows = new ArrayList<>();
             if (table.partitionBy() == null) {
                 Written w = copyTo(conn, "SELECT * FROM " + scratch, dir, consignmentId + ".parquet");
-                rows.add(row(consignmentId, table, "", w, writtenAt, producer, fingerprint,
+                rows.add(row(consignmentId, runId, table, "", w, writtenAt, producer, fingerprint,
                         count(conn, "SELECT count(*) FROM " + scratch)));
             } else {
                 String col = '"' + table.partitionBy() + '"';
@@ -104,7 +107,7 @@ public final class DerivedTableWriter {
                     Files.createDirectories(pdir);
                     String where = " WHERE " + col + " = '" + value.replace("'", "''") + "'";
                     Written w = copyTo(conn, "SELECT * FROM " + scratch + where, pdir, consignmentId + ".parquet");
-                    rows.add(row(consignmentId, table, value, w, writtenAt, producer, fingerprint,
+                    rows.add(row(consignmentId, runId, table, value, w, writtenAt, producer, fingerprint,
                             count(conn, "SELECT count(*) FROM " + scratch + where)));
                 }
             }
@@ -158,9 +161,10 @@ public final class DerivedTableWriter {
         }
     }
 
-    private static ConsignmentOutput row(String consignmentId, DerivedTable table, String partition, Written w,
+    private static ConsignmentOutput row(String consignmentId, String runId, DerivedTable table,
+                                         String partition, Written w,
                                          String writtenAt, String producer, String fingerprint, long rows) {
-        return new ConsignmentOutput(consignmentId, null, table.name() + DERIVED_SUFFIX, partition,
+        return new ConsignmentOutput(consignmentId, runId, table.name() + DERIVED_SUFFIX, partition,
                 null, w.path(), rows, w.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE,
                 fingerprint, null, producer);
     }

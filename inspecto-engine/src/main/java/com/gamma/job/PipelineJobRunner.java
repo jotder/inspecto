@@ -294,7 +294,13 @@ public final class PipelineJobRunner implements Job {
             // The pipeline id is the producer stamped on this run's registry rows (§3.6): the id rather than the
             // display name, because a watermark folds over producer identity and a renamed pipeline must stay
             // the same producer.
-            PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase, batchId, pipelineId);
+            // ⚠ batchId is the CONSIGNMENT id; the run id is the ATTEMPT. They are different concepts
+            // (GLOSSARY §6-A) and a reprocess reuses the former while minting the latter.
+            // ⚠ ctx is null on the legacy no-arg run() path above, which therefore still writes a NULL
+            // run_id — one of the gaps slice 3 of docs/superpower/run-model-plan.md has to close before
+            // the registry can carry a unique key (NULL ≠ NULL would exempt exactly these rows).
+            PartitionSinkWriter writer = new PartitionSinkWriter(
+                    conn, dir, sinkBase, batchId, ctx == null ? null : ctx.runId(), pipelineId);
             BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(
                     Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
 

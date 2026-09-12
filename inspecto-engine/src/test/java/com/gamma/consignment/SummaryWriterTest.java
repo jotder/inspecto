@@ -37,7 +37,7 @@ class SummaryWriterTest {
     private static List<ConsignmentOutput> write(Path root, String consignmentId, List<SummaryRow> rows,
                                                  String producer) throws Exception {
         try (Connection c = JdbcDrivers.connect("jdbc:duckdb:")) {
-            return SummaryWriter.write(c, root.toString(), consignmentId, rows, producer);
+            return SummaryWriter.write(c, root.toString(), consignmentId, "run-1", rows, producer);
         }
     }
 
@@ -66,6 +66,10 @@ class SummaryWriterTest {
                 row("cdr", "2026-07-02", Measure.additive("count", 9))));
 
         assertEquals(2, written.size(), "one file per (Consignment × record-day)");
+        for (ConsignmentOutput o : written)
+            assertEquals("run-1", o.runId(),
+                    "the RUN is the attempt (GLOSSARY §6-A) — a null here is what made the registry's unique "
+                    + "key unimplementable, because NULL ≠ NULL exempts the row from any constraint");
         assertEquals(List.of("record_day=2026-07-01", "record_day=2026-07-02"),
                 written.stream().map(ConsignmentOutput::partitionKey).sorted().toList());
         assertTrue(Files.exists(Path.of(written.get(0).path())));

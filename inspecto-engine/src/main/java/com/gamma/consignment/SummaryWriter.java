@@ -87,7 +87,7 @@ public final class SummaryWriter {
      *                      {@link #boundsByPartition} folds those declarations per file.
      */
     public static List<ConsignmentOutput> write(Connection conn, String summariesRoot,
-                                               String consignmentId, List<SummaryRow> rows,
+                                               String consignmentId, String runId, List<SummaryRow> rows,
                                                String producer) throws Exception {
         if (rows == null || rows.isEmpty()) return List.of();
         requireSafe(consignmentId, "consignment id");
@@ -98,15 +98,15 @@ public final class SummaryWriter {
         List<ConsignmentOutput> out = new ArrayList<>();
         String writtenAt = Instant.now().toString();
         for (Map.Entry<String, List<SummaryRow>> e : byTarget.entrySet())
-            out.addAll(writeTarget(conn, summariesRoot, consignmentId, e.getKey(), e.getValue(), writtenAt,
-                    producer));
+            out.addAll(writeTarget(conn, summariesRoot, consignmentId, runId, e.getKey(), e.getValue(),
+                    writtenAt, producer));
         return out;
     }
 
     // ── one target ───────────────────────────────────────────────────────────────
 
     private static List<ConsignmentOutput> writeTarget(Connection conn, String summariesRoot,
-                                                       String consignmentId, String target,
+                                                       String consignmentId, String runId, String target,
                                                        List<SummaryRow> rows, String writtenAt,
                                                        String producer) throws Exception {
         requireSafe(target, "summary target");
@@ -155,8 +155,8 @@ public final class SummaryWriter {
 
             Map<String, Long> counts = ConsignmentOutputs.countByPartition(conn, scratch,
                     partitioned ? List.of(RECORD_DAY) : List.of());
-            return register(consignmentId, target, written, counts, boundsByPartition(rows, partitioned),
-                    writtenAt, producer);
+            return register(consignmentId, runId, target, written, counts,
+                    boundsByPartition(rows, partitioned), writtenAt, producer);
         } finally {
             try (Statement st = conn.createStatement()) {
                 st.execute("DROP TABLE IF EXISTS " + scratch);
@@ -264,14 +264,14 @@ public final class SummaryWriter {
      * registering a summary under the target's own name would inflate that total and silently break §7.2's
      * reconciliation — the very check these rows exist to support.
      */
-    private static List<ConsignmentOutput> register(String consignmentId, String target,
+    private static List<ConsignmentOutput> register(String consignmentId, String runId, String target,
                                                     List<PartitionOutput> written, Map<String, Long> counts,
                                                     Map<String, EventTimeBounds> bounds,
                                                     String writtenAt, String producer) {
         List<ConsignmentOutput> out = new ArrayList<>(written.size());
         for (PartitionOutput p : written) {
             String partition = p.partition() == null ? "" : p.partition();
-            out.add(new ConsignmentOutput(consignmentId, null, target + SUMMARY_SUFFIX, partition,
+            out.add(new ConsignmentOutput(consignmentId, runId, target + SUMMARY_SUFFIX, partition,
                     recordDayOf(partition), p.outputFile(), counts.getOrDefault(partition, 0L),
                     p.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE, null, bounds.get(partition),
                     producer));

@@ -373,7 +373,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 return;
             }
             List<ConsignmentOutput> written = DerivedTableWriter.write(
-                    reader, derivedRoot(dataDir), consignmentId, tables, processorId);
+                    reader, derivedRoot(dataDir), consignmentId, ctx.runId(), tables, processorId);
             ConsignmentOutputStores.record(written);
             for (ConsignmentOutput o : written)
                 ctx.log().info("derived table written", "consignment_id", consignmentId,
@@ -400,7 +400,8 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
             }
             try (java.sql.Connection scratch = com.gamma.util.JdbcDrivers.connect("jdbc:duckdb:")) {
                 List<ConsignmentOutput> written =
-                        SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, rows, processorId);
+                        SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, ctx.runId(),
+                                rows, processorId);
                 ConsignmentOutputStores.record(written);
                 // S3a: the summaries are visible once recorded — one dataset.write per distinct store
                 // (additive, never throws).

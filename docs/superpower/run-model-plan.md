@@ -1,6 +1,7 @@
 # §13 Run model — the dependency that unblocks `consignment_outputs`
 
-**Status:** PLAN, nothing built. Opened 2026-09-12 after `CONSIGNMENT-ID-DETERMINISTIC-1` closed with
+**Status:** ✅ **slices 1 and 2 SHIPPED 2026-09-12**; slice 3 (the expensive one) open, and it carries the
+one decision in §6. ⛔ The constraint of slice 4 is NOT yet addable — see the gap list in §4.1. Opened 2026-09-12 after `CONSIGNMENT-ID-DETERMINISTIC-1` closed with
 `DbConsignmentOutputStore` *deliberately unconstrained*. This is the named blocker from that row.
 
 ⚠ Until 2026-09-12 "§13's Run model" was a **forward pointer with no content** — referenced from
@@ -65,6 +66,28 @@ constraint early.
 | **2** | Thread the run id into the pipeline sink path | `PipelineJobRunner.execute(JobContext ctx)` (`:223`) has `ctx` and never reads it — it mints a clock-derived `batchId` at `:255` instead. Pass `ctx.runId()` into the `PartitionSinkWriter` ctor → `:117` | **Low-medium** — one ctor change; ⚠ do not conflate with `batchId`, which stays the Consignment id |
 | **3** | Give the two framework-less paths a run identity | `ConsignmentIngestor:440` (reached from the static `CollectorProcessor.run`/`ingest`, no `JobContext` on the path at all) and `EnrichmentEngine:158`/`:179` (via `EnrichJob`, which implements only the legacy no-arg `run()`) | **High — the real cost.** Needs either a run identity minted at the `CollectorProcessor` entry point and threaded down, or these paths adopting `JobContext` |
 | **4** | Make `run_id` `NOT NULL`, then add the key | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE` (§3), migrating by rebuild | **Medium** — reuse `DbFileStageStore.rebuildWithConstraint` verbatim; every DDL it needs is probed OK |
+
+### 4.1 As-built after slices 1 + 2 — the paths that still write NULL
+
+✅ **Shipped:** `ctx.runId()` now reaches the registry from derived tables and summaries
+(`ConsignmentProcessJobType` → `DerivedTableWriter.write` / `SummaryWriter.write`, both of which gained a
+`runId` parameter threaded through their private helpers) and from the pipeline sink path
+(`PipelineJobRunner` → a new six-arg `PartitionSinkWriter` constructor). Mutation-proven: reverting just
+the two `ConsignmentOutput` constructions to `null` turns exactly the two new assertions red, reading
+`expected: <run-1> but was: <null>`.
+
+⚠ **A third null path surfaced while building slice 2, and it was not in the original survey.**
+`PipelineJobRunner.run()` (the legacy no-arg `Job` method) calls `execute(null)` — so `ctx` is legitimately
+null there and that path still writes a NULL `run_id`. The call is now `ctx == null ? null : ctx.runId()`.
+**This is a supported path, not an edge case**, and it must be closed with the other two.
+
+⛔ **Therefore `run_id` is still NOT universally non-null. The remaining gaps are:**
+
+| Path | Why it has no run id |
+|---|---|
+| `ConsignmentIngestor:440` | reached from the static `CollectorProcessor.run`/`ingest`; no `JobContext` anywhere on the path |
+| `EnrichmentEngine:158`/`:179` | via `EnrichJob`, which implements only the legacy no-arg `run()` |
+| `PipelineJobRunner.run()` → `execute(null)` | the legacy no-arg `Job` entry point (**found 2026-09-12 during slice 2**) |
 
 🔴 **Fix the naming collision in slice 3.** `EnrichmentEngine.runResult(..., String runId)` (`:115`) passes
 its `runId` local as the **`consignmentId`** argument at `:158`/`:179`, while the actual `run_id` column

@@ -177,12 +177,15 @@ class DerivedTableWriterTest {
         Path base = seed(tmp.resolve("base"), 6);
         Path derived = tmp.resolve("_derived");
         try (ConsignmentReader r = readerOver(base, 6)) {
-            List<ConsignmentOutput> rows = DerivedTableWriter.write(r, derived.toString(), "c1",
+            List<ConsignmentOutput> rows = DerivedTableWriter.write(r, derived.toString(), "c1", "run-1",
                     List.of(new DerivedTable("big", "SELECT id, amt FROM base WHERE amt >= 30")), "step_a");
 
             assertEquals(1, rows.size());
             ConsignmentOutput o = rows.get(0);
             assertEquals("c1", o.consignmentId(), "registered onto the SAME Consignment — that is the chain");
+            assertEquals("run-1", o.runId(),
+                    "the RUN is the attempt (GLOSSARY §6-A) — a null here is what made the registry's unique "
+                    + "key unimplementable, because NULL ≠ NULL exempts the row from any constraint");
             assertEquals("big" + DerivedTableWriter.DERIVED_SUFFIX, o.tableName(), "namespaced");
             assertEquals("step_a", o.producer(), "attributable");
             assertEquals(3, o.rows(), "ids 3,4,5");
@@ -200,7 +203,7 @@ class DerivedTableWriterTest {
         Path base = seed(tmp.resolve("base"), 6);
         Path derived = tmp.resolve("_derived");
         try (ConsignmentReader r = readerOver(base, 6)) {
-            List<ConsignmentOutput> rows = DerivedTableWriter.write(r, derived.toString(), "c1",
+            List<ConsignmentOutput> rows = DerivedTableWriter.write(r, derived.toString(), "c1", "run-1",
                     List.of(new DerivedTable("by_grp", "SELECT grp, amt FROM base", "grp")), "step_a");
 
             assertEquals(2, rows.size(), "one per distinct grp");
@@ -228,7 +231,7 @@ class DerivedTableWriterTest {
         }
         try (ConsignmentReader r = readerOver(file, 1)) {
             Exception e = assertThrows(IllegalArgumentException.class, () -> DerivedTableWriter.write(
-                    r, tmp.resolve("_derived").toString(), "c1",
+                    r, tmp.resolve("_derived").toString(), "c1", "run-1",
                     List.of(new DerivedTable("t", "SELECT * FROM base", "grp")), "step_a"));
             assertTrue(e.getMessage().contains("safe directory name"), e.getMessage());
         }
@@ -243,7 +246,7 @@ class DerivedTableWriterTest {
             @Override public void close() { }
         };
         Exception e = assertThrows(IllegalArgumentException.class,
-                () -> DerivedTableWriter.write(foreign, "x", "c1",
+                () -> DerivedTableWriter.write(foreign, "x", "c1", "run-1",
                         List.of(new DerivedTable("t", "SELECT 1")), "p"));
         assertTrue(e.getMessage().contains("framework's own reader"), e.getMessage());
     }

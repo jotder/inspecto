@@ -43,6 +43,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
     private final String dataDir;
     private final String baseName;
     private final String consignmentId;
+    private final String runId;
     private final String producer;
     private final List<PartitionOutput> outputs = new ArrayList<>();
     private final Map<String, Long> rowsByStore = new LinkedHashMap<>();
@@ -61,18 +62,36 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         this(conn, dataDir, baseName, consignmentId, null);
     }
 
+    /** As above, without a run id — see the five-arg constructor for when that is still the case. */
+    public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId,
+                               String producer) {
+        this(conn, dataDir, baseName, consignmentId, null, producer);
+    }
+
     /**
      * As above, with the {@code producer} recorded on every registry row this writer creates — the pipeline
      * identity the §3.6 per-stream watermark needs. Without it a table written by this path has an
      * <em>unattributed</em> producer, which suppresses its watermark entirely (and correctly: a stream
      * receiving writes nobody owns cannot report completeness).
      */
+    /**
+     * As above, with the {@code runId} recorded on every registry row — the <em>attempt</em>, which
+     * {@code GLOSSARY.md} §6-A distinguishes from the Consignment: {@code Run ⊇ Consignment ⊇ File}, and a
+     * reprocess is a new Run over the <em>same</em> Consignment.
+     *
+     * <p>⚠ {@code runId} may still be {@code null} on paths that have no Run identity yet —
+     * {@code ConsignmentGraphRunner} is one. That is slice 3 of
+     * {@code docs/superpower/run-model-plan.md}, and it is why the registry still carries NO unique key:
+     * NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres, so a single remaining null path
+     * would silently exempt its rows. ⛔ Do not add the constraint until every path supplies this.
+     */
     public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId,
-                               String producer) {
+                               String runId, String producer) {
         this.conn = conn;
         this.dataDir = dataDir;
         this.baseName = baseName;
         this.consignmentId = consignmentId;
+        this.runId = runId;
         this.producer = producer;
     }
 
@@ -115,7 +134,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         rowsByStore.merge(store, branchRows, Long::sum);
         if (consignmentId != null)
             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
-                    consignmentId, null, store, outs, rowsByPartition,
+                    consignmentId, runId, store, outs, rowsByPartition,
                     boundsFor(sink, inputTable, partCols), producer));
         log.info("[PIPELINEJOB] sink '{}' → store '{}': {} file(s){}",
                 sink.id(), store, outs.size(), partCols.isEmpty() ? " (unpartitioned)" : " partitioned by " + partCols);
