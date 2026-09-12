@@ -64,6 +64,7 @@ constraint early.
 |---|---|---|---|
 | **1** | Thread `ctx.runId()` into derived tables + summaries | `ConsignmentProcessJobType.persistDerivedTables`/`persistSummaries` already receive `ctx`; add a `runId` parameter to `DerivedTableWriter.write` (`:163`) and `SummaryWriter.write` (`:274`) | **Low** — the value is already in scope one frame up |
 | **2** | Thread the run id into the pipeline sink path | `PipelineJobRunner.execute(JobContext ctx)` (`:223`) has `ctx` and never reads it — it mints a clock-derived `batchId` at `:255` instead. Pass `ctx.runId()` into the `PartitionSinkWriter` ctor → `:117` | **Low-medium** — one ctor change; ⚠ do not conflate with `batchId`, which stays the Consignment id |
+| **3a** ✅ | **SHIPPED 2026-09-13** — the legacy no-arg `Job.run()` path | `PipelineJobRunner.run()` called `execute(null)`; it now builds a `StandaloneRunContext` | **Low** — done |
 | **3** | Give the two framework-less paths a run identity | `ConsignmentIngestor:440` (reached from the static `CollectorProcessor.run`/`ingest`, no `JobContext` on the path at all) and `EnrichmentEngine:158`/`:179` (via `EnrichJob`, which implements only the legacy no-arg `run()`) | **High — the real cost.** Needs either a run identity minted at the `CollectorProcessor` entry point and threaded down, or these paths adopting `JobContext` |
 | **4** | Make `run_id` `NOT NULL`, then add the key | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE` (§3), migrating by rebuild | **Medium** — reuse `DbFileStageStore.rebuildWithConstraint` verbatim; every DDL it needs is probed OK |
 
@@ -87,7 +88,7 @@ null there and that path still writes a NULL `run_id`. The call is now `ctx == n
 |---|---|
 | `ConsignmentIngestor:440` | reached from the static `CollectorProcessor.run`/`ingest`; no `JobContext` anywhere on the path |
 | `EnrichmentEngine:158`/`:179` | via `EnrichJob`, which implements only the legacy no-arg `run()` |
-| `PipelineJobRunner.run()` → `execute(null)` | the legacy no-arg `Job` entry point (**found 2026-09-12 during slice 2**) |
+| ~~`PipelineJobRunner.run()` → `execute(null)`~~ | ✅ **CLOSED 2026-09-13 (slice 3a)** — it now builds a `StandaloneRunContext` |
 
 ### 4.2 ✅ Slice 3's precondition CLEARED 2026-09-12 — and it exposed a bigger finding
 
@@ -130,10 +131,36 @@ this code safely; two different concepts currently share one name in one argumen
 - The Postgres leg must run, not skip: `PostgresStateStoreTest` covers `consignment_outputs` and now
   executes (15 tests, 0 skipped on PG 18.6, `1760a143`). Its class javadoc carries the working command.
 
-## 6. Open question for the operator
+## 5.1 ✅ Slice 3a SHIPPED 2026-09-13 — and the shared pieces it built
 
-Slice 3 is most of the cost and has two shapes: **(a)** mint a run id at the `CollectorProcessor` entry
-point and thread it down — smaller, but creates a *second* run-id generator alongside `JobService`'s; or
-**(b)** bring `CollectorProcessor` and `EnrichJob` onto `JobContext` so there is exactly one generator —
-larger, and it touches the `Job` SPI. ⚠ (a) risks two ids both called "run"; (b) is the one that matches
-the GLOSSARY's single `Run` concept. Not decided.
+- **`RunIds`** — the Run id generator, **extracted from `JobService` so there is exactly one**. That is the
+  point of the chosen option: a second generator at the Collector would have made "run id" mean two
+  different things depending on which path produced the row. ⚠ Its counter moved from
+  per-`JobService`-instance to process-wide — a widening, and the timestamp dominates anyway.
+  `JobService`'s `RUN_TS`, its `seq` field and the `AtomicLong` import were removed as orphans.
+- **`StandaloneRunContext`** — a minimal, **inert** `JobContext` for work outside the scheduler: no run
+  log, no signals, no artifacts. ⛔ Do not wire it to the real stores — a standalone context that recorded
+  runs would put CLI invocations into `job_runs` as though the scheduler had run them.
+  🔴 `artifacts()` **must be a no-op, not a throw.** The first attempt threw and broke **29 tests**,
+  because `PipelineJobRunner.execute` resolves `ctx.artifacts()` unconditionally; dropping is the contract
+  `log()` and `signals()` already kept, and throwing was an inconsistency inside one class.
+- **`PipelineJobRunner.run()`** now passes a real context. Mutation-proven: restoring `execute(null)` reds
+  the new test on `expected: not <null>`. Verified 32 modules, 4391 tests, 0 failures.
+
+⚠ **Slices 3b and 3c remain, and they are different shapes — not more of the same.**
+**3b `EnrichJob`** must adopt `run(JobContext)` and *split one string into two*: today a single value is
+both the audit run id and the Consignment id, so the split changes what `EnrichmentAuditWriter` rows and
+`ConsignmentEvent` payloads mean. **3c `CollectorProcessor`/`ConsignmentIngestor`** is the widest — no
+`Job` exists on that path at all, so a context must be built inside `ingest` and threaded four frames down
+through the `finalizeSource` overloads, and `run`/`ingest` are `@PublicApi` so their signatures must stay.
+⛔ **The constraint cannot be added until 3b AND 3c land**: one NULL path exempts exactly its own rows.
+
+## 6. ✅ DECIDED 2026-09-13 — bring them onto `JobContext`
+
+**Operator: option (b).** The alternative — minting a run id at the `CollectorProcessor` entry point — was
+smaller, but would have created a *second* generator alongside `JobService`'s, leaving "run id" meaning
+two different things depending on the path. ⚠ That is not hypothetical here: the enrichment path already
+conflated a run id and a Consignment id into one string, and untangling it cost a commit of its own.
+Option (b) also matches the GLOSSARY's single `Run` concept.
+
+✅ Discharged for slice 3a by extracting `RunIds`; 3b and 3c reuse it and `StandaloneRunContext`.

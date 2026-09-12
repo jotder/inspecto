@@ -189,9 +189,19 @@ public final class PipelineJobRunner implements Job {
     @Override public String name() { return cfg.name(); }
     @Override public String type() { return "pipeline"; }
 
+    /**
+     * The legacy no-arg entry point. ⚠ It used to call {@code execute(null)}, so a pipeline invoked this
+     * way wrote a NULL {@code run_id} into the output registry — and one NULL path is enough to make a
+     * unique key over that table a silent no-op. It now carries a real Run id from the single
+     * {@link RunIds} generator, so the row is indistinguishable from one the scheduler produced.
+     *
+     * <p>⚠ A {@link StandaloneRunContext} is inert by design — no run log, no signals, no artifacts —
+     * because nothing scheduled this run and there is nowhere for it to report. It exists to carry the
+     * identity, not to make a CLI invocation look like a scheduled one.
+     */
     @Override
     public JobResult run() throws Exception {
-        return execute(null);
+        return execute(StandaloneRunContext.forJob(cfg.name()));
     }
 
     /**
@@ -296,9 +306,10 @@ public final class PipelineJobRunner implements Job {
             // the same producer.
             // ⚠ batchId is the CONSIGNMENT id; the run id is the ATTEMPT. They are different concepts
             // (GLOSSARY §6-A) and a reprocess reuses the former while minting the latter.
-            // ⚠ ctx is null on the legacy no-arg run() path above, which therefore still writes a NULL
-            // run_id — one of the gaps slice 3 of docs/superpower/run-model-plan.md has to close before
-            // the registry can carry a unique key (NULL ≠ NULL would exempt exactly these rows).
+            // ✅ Both entry points now supply a Run id: the scheduler passes its own ctx, and the legacy
+            // no-arg run() builds a StandaloneRunContext rather than passing null (slice 3a, 2026-09-13).
+            // ⚠ The null-guard stays because ctx is a parameter and a caller can still pass null; it is no
+            // longer a path this class takes on its own.
             PartitionSinkWriter writer = new PartitionSinkWriter(
                     conn, dir, sinkBase, batchId, ctx == null ? null : ctx.runId(), pipelineId);
             BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(

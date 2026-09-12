@@ -42,7 +42,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Registry + scheduler for config-driven {@link Job}s (v2.8.0). It hosts a uniform "what
@@ -83,7 +82,6 @@ public final class JobService implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(JobService.class);
     private static final DateTimeFormatter TS     = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter RUN_TS  = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     /** Mutable so job CRUD ({@link #upsertJob}/{@link #removeJob}) can add/replace/remove a config at
      *  runtime — every dispatch loop below (event/signal/catch-up) re-derives from this list on each
@@ -155,7 +153,6 @@ public final class JobService implements AutoCloseable {
      * uniqueness. ⛔ Keyed on the authored-pipeline id, never the job name — that is the whole point.
      */
     private volatile RunClaims authoredClaims = RunClaims.GRANT_ALL;
-    private final AtomicLong seq = new AtomicLong();
     /** Open Job Type registry (job-framework P0) — replaced the compiled-in {@link JobType} switch; the four
      *  built-ins register here in {@link #registerBuiltins()} and {@link #build} delegates to it.
      *  Constructed against {@link #platform} so every registration's {@code requires:} validates
@@ -972,9 +969,13 @@ public final class JobService implements AutoCloseable {
         return Optional.empty();
     }
 
+    /**
+     * Delegates to {@link RunIds}, which is the single generator (2026-09-13). ⚠ It used to live here,
+     * and moving it is the point: the paths that never reach this scheduler — {@code CollectorProcessor},
+     * {@code EnrichJob} — need Run ids that mean the same thing as these, not a second dialect of them.
+     */
     private String newRunId(String name) {
-        return name.toLowerCase().replace(' ', '_') + "-"
-                + LocalDateTime.now().format(RUN_TS) + "-" + seq.incrementAndGet();
+        return RunIds.next(name);
     }
 
     private void submit(String name, String trigger) {

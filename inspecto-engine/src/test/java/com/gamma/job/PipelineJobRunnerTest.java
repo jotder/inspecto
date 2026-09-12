@@ -187,6 +187,46 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * 🔴 The legacy no-arg {@code run()} must still stamp a Run id on its registry rows. It used to call
+     * {@code execute(null)}, so a pipeline invoked this way wrote a NULL {@code run_id} — and one NULL path
+     * is enough to make a unique key over {@code consignment_outputs} a <b>silent no-op</b>, because
+     * NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres.
+     *
+     * <p>⚠ This is the entry point {@code JobService} does NOT use, which is exactly why it was missed:
+     * the scheduler's own path had carried a Run id since slice 2, and nothing exercised this one.
+     */
+    @Test
+    void theLegacyNoArgRunStillStampsARunIdOnItsRegistryRows() throws Exception {
+        String dataDir = tmp.resolve("data-legacy-runid").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows-legacy-runid"));
+        store.write("evt", new PipelineGraph("evt", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        new PipelineNode("out", "sink.persistent", "Out", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+        JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline", "evt", "data_dir", dataDir, "batch_id", "legacy-b1"));
+
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
+                    tmp.resolve("audit-legacy-runid").toString()).run().success());
+
+            var rows = registry.outputs("legacy-b1");
+            assertFalse(rows.isEmpty(), "the run must have registered at least one output to assert on");
+            for (var o : rows) {
+                assertNotNull(o.runId(), "the legacy no-arg run() path must carry a Run id, not null");
+                assertFalse(o.runId().isBlank(), "and it must be a real id, not an empty string");
+                assertNotEquals("legacy-b1", o.runId(),
+                        "⚠ the Run is the ATTEMPT and the Consignment is the unit of work (GLOSSARY §6-A) — "
+                                + "they must not collapse back into one string");
+            }
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /**
      * X2 cross-lane provenance, end to end: with the output registry on, a run reports the Consignments behind
      * the files its source view scanned — LIVE rows only — and with the registry OFF it reports NOTHING,
      * because an unfiltered read has an unknown file set and unknown must never be recorded as empty.
