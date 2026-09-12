@@ -849,11 +849,36 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   DuckDB file — two *processes* as far as the lease is concerned — which is why B0–B3 are trustworthy at
   the unit level. ⛔ `ControlApiMultiSpaceTest` is **not** it (several Spaces in ONE ControlApi); §7 warns
   by name against that substitution, and nothing in the repo boots two control planes in one JVM today.
-  **Work:** S4 already settled the technique — **a classloader per simulated pod** (zero production
-  changes, already proven here for pack-jar isolation), ⛔ *not* per-instance registry scoping, which
-  needs an instance-id concept that does not exist (12+ classes, 60–90+ sites). ⚠ Needs Postgres, so it
-  will SKIP on a machine without Docker exactly as `PostgresStateStoreTest` does — write it skipping
-  rather than not at all. → `superpower/enterprise-scale-out-plan.md` §7, §5.2
+  **DESIGN GROUNDED 2026-09-12 — read this first; three of §7's own premises need amending.**
+
+  1. 🔴 **It does NOT need Postgres and must not gate on Docker.** §7 says "against one Postgres", but
+     `ServiceStores.openRunLease` takes backend `db` over `SpaceRoot.runLeaseDbUrl()`, which defaults to a
+     local **DuckDB** file (`ServiceStores.java:317-318`, `SpaceRoot.java:169`), and `DbRunLeaseTest:53-66`
+     already proves two `DbRunLease` instances over one DuckDB file mutually exclude. Set
+     `-Drun.lease.backend=db` over a `@TempDir` and the gate **runs everywhere, every CI run**, instead of
+     skipping. ⛔ A gate that skips on every dev machine is how this one went missing for two phases.
+  2. 🔴 **"Classloader isolation is already proven in this repo" (S4) is an OVER-CLAIM.**
+     `JobPackManager:195-220` isolates **one job-pack jar with the engine as parent**; it does not boot a
+     second copy of the application, and booting two whole apps in one JVM has **zero prior art here**.
+     ⚠ It may also be unnecessary: two `SpaceManager.discover(root)` calls already yield two independent
+     `CollectorService`s, each opening its **own** `DbRunLease` over the **same** file — genuine
+     cross-instance exclusion with no classloader work. The shared statics (`EventLog.SPACES`,
+     `StabilityGate.SHARED`, `AcquisitionLedgers`) are **Space-keyed**, so two instances on one Space id do
+     share them — ⚠ judge per assertion whether that masks anything, rather than reaching for classloaders
+     by default.
+  3. 🔴 **The missing piece is a FIXTURE, not a harness: a run that can be HELD OPEN.** §7's claim is a
+     race, and the operator-trigger path deliberately **blocks** (`CollectorService.runPipeline` →
+     `runGuard.acquire`, not `tryAcquire`), so two operator triggers legitimately serialise and both
+     complete — asserting on them proves nothing. The one-run claim lives on the **poll-cycle** path
+     (`tryAcquire`, skip-never-queue). ⛔ Do not write a sleep-based race: build a pipeline fixture whose
+     run blocks on a latch, so pod A demonstrably holds the claim while pod B's cycle is asserted to skip.
+     **That fixture is the actual work** — the harness around it is ~20 lines.
+
+  ⚠ Harness idiom to copy: `ControlApiMultiSpaceTest:46-56` (`SpaceManager.discover` → `new ControlApi(
+  spaces, 0)` → `startAll()` → `api.start()`; ephemeral ports, so two instances never collide) plus its
+  `send`/`awaitRun` helpers. ⛔ That test is NOT prior art for two control planes — it is several Spaces in
+  ONE — and §7 warns by name against the substitution.
+  → `superpower/enterprise-scale-out-plan.md` §7, §5.2
 - **P2** · **`SPACES-LIST-PER-POD-1` — `GET /spaces` returns only the answering pod's Spaces.**
   Found 2026-09-12 by the all-Spaces sweep C1 owed. Exactly four sites iterate every hosted Space —
   `SpaceRoutes.java:45` (`GET /spaces`), `BootstrapRoutes.java:108`, `SchedulerRoutes.java:85,256` — and
