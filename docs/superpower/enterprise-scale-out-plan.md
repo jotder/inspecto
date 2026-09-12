@@ -515,8 +515,42 @@ Work:
   ⚠ A failed open **degrades to the heap guard and records DEGRADED**, which
   `-Dinspecto.topology=partitioned` turns into a boot failure (A1): on N pods a per-process lease is not
   a weaker guarantee, it is none.
-- **`lastRunAtMs` moves to the lease row.** Today it is a local map (§3.1); an interval trigger on a
-  pod that has never run the pipeline would otherwise fire immediately after a failover.
+- ✅ **SHIPPED 2026-09-12 (slice B2) — `lastRunAtMs` moved onto the lease.** It was a
+  `ConcurrentHashMap` field on `PipelineScheduler`, i.e. per process; on N pods that is not a shared
+  baseline but N independent ones, so a pod that had never run the pipeline read "never" — which
+  `dueThisTick` turns into "due now" — and re-ran a pipeline another pod had just run, however long the
+  interval. `RunLease` gained `lastRunAt(pipeline)` / `recordRun(pipeline, epochMs)`; `PipelineRunGuard`
+  holds the identical map (⛔ **Personal and single-node Standard are unchanged**) and `DbRunLease` holds
+  a `last_run_at` column on the row it already had.
+
+  🔴 **The scope question here is answered by the code, not by the operator — and it is NOT the B1
+  question repeated.** The cadence belongs to the **run** scope alone: `selectDueForAcquire` never calls
+  `dueThisTick` and never touches the baseline, because acquisition runs on *the acquisition timer's own
+  interval* and deliberately ignores a pipeline's `trigger:` (a cron-gated pipeline still wants its files
+  staged before the cron fires). `theRunAndAcquireCadencesAreIndependent` pins it.
+
+  🔴 **The read is unfenced and owner-independent; the write is fenced.** "Who may run it now" and "when
+  did it last run" are different questions — a released or expired lease still carries a valid baseline,
+  and a pod that has never held the lease *must* be able to read it or the whole fix is undone. The write
+  is fenced on `owner = me AND epoch = mine` exactly like `release`, so a pod paused past its TTL cannot
+  push another owner's pipeline out by a full interval. ⛔ Do not add an `owner`/`expires_at` predicate to
+  the read.
+
+  ⚠ **The poll cycle stamps only triggers that READ the baseline** (`usesCadence`). Unconditional
+  stamping was free as a heap map; against a shared lease it is one `UPDATE` per due pipeline per tick,
+  and `DEFAULT_POLL` pipelines — the common case, due *every* tick — never read the value back. This is a
+  write-elision, not a behaviour change: the elided value is unreadable. `recordManualRun` stays
+  unconditional (operator path, not the hot loop). ⛔ Keep `usesCadence` in step with `dueThisTick`.
+
+  ⚠ **A guarded `ALTER` migrates tables B0/B1 already created** — `CREATE TABLE IF NOT EXISTS` would
+  leave them without the column and fail on the first cadence read, a fault that cannot appear on a fresh
+  install. `aLeaseTableFromBeforeTheCadenceColumnIsMigrated` builds the pre-migration table by hand.
+
+  ⚠ **All three new guards were mutation-verified 2026-09-12**: unfencing the write fails exactly the
+  fencing + unclaimed-write tests, deleting the `ALTER` fails exactly the migration test, and stubbing
+  `lastRunAt` fails the cross-pod test. The elision is itself guarded by the pre-existing
+  `CollectorServiceTriggerTest.intervalTriggerGatesTheLoopByItsOwnCadence` (runs on tick 1, must NOT run
+  on tick 2) and `noTriggerRidesEveryPollCycle`.
 - **`JobService` cron arming goes through the same lease** — the per-instance `Scheduler` keeps
   firing everywhere, but `submit` becomes `if (lease.tryAcquire(job)) submit`. Two arming pods, one run.
 - **`TriggerCoalescer`** stays local: coalescing is per-pod, the lease is what makes that safe.

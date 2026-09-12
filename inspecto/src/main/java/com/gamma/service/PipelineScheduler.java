@@ -109,10 +109,13 @@ final class PipelineScheduler {
     private final Runnable syncStatus;
 
     // ── Owned by the scheduler ───────────────────────────────────────────────────
-    /** T13 / §3.8 — per-pipeline last-run epoch (ms); gates a {@code schedule:{every}}/{@code cron} pipeline
-     *  by its own cadence instead of running every active pipeline each tick. A pipeline with no {@code trigger:}
-     *  is {@code DEFAULT_POLL} and still runs every cycle. */
-    private final Map<String, Long> lastRunAtMs = new ConcurrentHashMap<>();
+    // ⚠ The per-pipeline last-run epoch (T13 / §3.8) that used to live here as a `Map<String,Long>` now lives
+    // on {@link #runGuard} ({@code RunLease.lastRunAt}/{@code recordRun}, phase B §5.2). It gates a
+    // `schedule:{every}`/`cron` pipeline by its own cadence; a pipeline with no `trigger:` is DEFAULT_POLL and
+    // still runs every cycle. 🔴 It had to move because a per-process baseline is not a baseline on N pods:
+    // a pod that has never run the pipeline read "no last run" and fired immediately, so any failover — or a
+    // second pod merely joining — re-ran a pipeline the other had just run. The heap guard still holds the
+    // identical map, so single-node behaviour is unchanged.
     /** Per-pipeline coalescer for {@code event}-triggered flows: an upstream-commit storm collapses to one
      *  non-overlapping run (the in-process run-guard debounce, lifted to the pipeline grain). */
     private final Map<String, TriggerCoalescer> eventCoalescers = new ConcurrentHashMap<>();
@@ -260,7 +263,15 @@ final class PipelineScheduler {
         } finally {
             registryLock.unlock();
         }
-        due.forEach(d -> lastRunAtMs.put(d.id(), nowMs));   // stamp cadence baseline (start-to-start)
+        // Stamp the cadence baseline (start-to-start) — but ONLY for the triggers that ever read it.
+        // 🔴 Unconditional stamping was free while this was a heap map; against a shared lease it is one
+        // UPDATE per due pipeline per tick, and DEFAULT_POLL pipelines (the common case, due EVERY tick)
+        // never read the value back — `dueThisTick` answers `true` for them without consulting it. So an
+        // unconditional stamp would buy nothing and put a database write on the hot path for every pipeline
+        // on every cycle. ⚠ This is a write-elision, not a behaviour change: the elided value is unreadable.
+        due.forEach(d -> {
+            if (usesCadence(d.cfg())) runGuard.recordRun(d.id(), nowMs);
+        });
         return due;
     }
 
@@ -381,8 +392,8 @@ final class PipelineScheduler {
             case EVENT, MANUAL -> false;                       // driven off the poll loop
             case LOOP -> switch (t.kind()) {
                 case SCHEDULE_INTERVAL -> {
-                    Long last = lastRunAtMs.get(id);
-                    yield last == null || (nowMs - last) >= t.everyMs();
+                    long last = runGuard.lastRunAt(id);
+                    yield last == 0L || (nowMs - last) >= t.everyMs();   // 0 = never run (see RunLease.lastRunAt)
                 }
                 case SCHEDULE_CRON -> cronDue(id, t.cron(), nowMs);
                 default -> true;                               // DEFAULT_POLL — every tick (today's behaviour)
@@ -390,10 +401,27 @@ final class PipelineScheduler {
         };
     }
 
+    /**
+     * Whether {@code cfg}'s trigger measures from the cadence baseline — i.e. whether {@link #dueThisTick}
+     * would ever read {@code lastRunAt} for it. True for exactly the two {@code schedule:} kinds; false for
+     * {@code DEFAULT_POLL} (due every tick regardless) and for {@code event}/{@code manual} (never loop-driven).
+     * ⛔ Keep this in step with {@link #dueThisTick}: if a new trigger kind starts reading the baseline and is
+     * not listed here, it will never be stamped and will re-fire on every tick.
+     */
+    private static boolean usesCadence(PipelineConfig cfg) {
+        PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
+        if (t.scheduler() != PipelineTrigger.Scheduler.LOOP) return false;
+        return t.kind() == PipelineTrigger.Kind.SCHEDULE_INTERVAL || t.kind() == PipelineTrigger.Kind.SCHEDULE_CRON;
+    }
+
     /** A cron trigger is due when its next fire after the last run (or service start) is at/​before now. */
     private boolean cronDue(String id, String cron, long nowMs) {
         try {
-            long lastMs = lastRunAtMs.getOrDefault(id, serviceStartMs);
+            long recorded = runGuard.lastRunAt(id);
+            // ⚠ 0 means "no run recorded", NOT 1970 — substitute this service's start, the documented cron
+            // baseline before a pipeline has ever run. Across pods the recorded value now wins over a local
+            // start time, which is exactly the failover case this move exists to fix.
+            long lastMs = recorded == 0L ? serviceStartMs : recorded;
             ZonedDateTime from = Instant.ofEpochMilli(lastMs).atZone(triggerZone);
             ZonedDateTime next = CronExpression.parse(cron).next(from);
             return !next.isAfter(Instant.ofEpochMilli(nowMs).atZone(triggerZone));   // next <= now ⇒ fire due
@@ -473,17 +501,23 @@ final class PipelineScheduler {
      * cadence map.
      */
     void recordManualRun(String id, long nowMs) {
-        lastRunAtMs.put(id, nowMs);
+        // ⚠ Unconditional, unlike the poll cycle's stamp: this is the operator path, not the hot loop, so the
+        // write-elision that matters there buys nothing here — and the caller holds the same run lease, which
+        // is what makes the stamp land (a shared lease fences this write on that claim).
+        runGuard.recordRun(id, nowMs);
     }
 
     /**
-     * Drop a pipeline's scheduler bookkeeping when it is unregistered. Without this, the cadence
-     * ({@link #lastRunAtMs}) and coalescer ({@link #eventCoalescers}) maps accumulate one orphan entry
-     * per deleted pipeline for the lifetime of the space's service — a slow leak under pipeline churn.
-     * The {@link TriggerCoalescer} holds only in-heap atomics, so dropping the reference is enough.
+     * Drop a pipeline's scheduler bookkeeping when it is unregistered. Without this, the coalescer
+     * ({@link #eventCoalescers}) map accumulates one orphan entry per deleted pipeline for the lifetime of
+     * the space's service — a slow leak under pipeline churn. The {@link TriggerCoalescer} holds only
+     * in-heap atomics, so dropping the reference is enough.
+     *
+     * <p>⚠ The cadence entry is no longer dropped here: it moved onto {@link #runGuard} and is dropped by
+     * {@code RunLease.forget}, which {@code CollectorService} already calls on the same unregistration. The
+     * shared implementation deliberately keeps its row — see {@code DbRunLease.forget}.
      */
     void forget(String id) {
-        lastRunAtMs.remove(id);
         eventCoalescers.remove(id);
         acquireGuard.forget(id);              // per-pipeline acquire lock (B3b) — same leak-under-churn reason
         IntakeGovernor.shared().forget(id);   // same leak-under-churn reason, one map further down

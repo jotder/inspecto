@@ -361,4 +361,156 @@ class DbRunLeaseTest {
             }
         }
     }
+
+    // ── cadence: the shared last-run baseline (§5.2) ─────────────────────────────────
+
+    /**
+     * 🔴 <b>The whole reason the cadence moved onto the lease.</b> A pod that has never run this pipeline
+     * must still see when another pod last ran it.
+     *
+     * <p>While the baseline was a per-process map, this read returned "never" on the second pod — which
+     * {@code PipelineScheduler.dueThisTick} turns into "due now". So a failover, or simply a second pod
+     * joining the Space, re-ran a pipeline the first pod had run a moment earlier, no matter how long its
+     * {@code schedule:{every}} interval was. ⛔ This is the test that fails if the cadence is ever moved
+     * back into a field.
+     */
+    @Test
+    void aProcessThatNeverRanThePipelineStillSeesWhenAnotherPodRanIt(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease podA = lease(url, "s1", "pod-a"); DbRunLease podB = lease(url, "s1", "pod-b")) {
+            assertEquals(0L, podB.lastRunAt("orders"), "no run recorded yet reads as 0, never as an epoch");
+
+            try (RunLease.Claim a = podA.tryAcquire("orders")) {
+                assertNotNull(a);
+                podA.recordRun("orders", 1_700_000_000_000L);
+            }
+
+            assertEquals(1_700_000_000_000L, podB.lastRunAt("orders"),
+                    "pod-b never ran 'orders' and must STILL read pod-a's baseline — otherwise it fires "
+                            + "immediately and the interval means nothing across pods");
+        }
+    }
+
+    /**
+     * ⚠ The cadence read is deliberately independent of who holds the lease, and of whether anyone does.
+     * "Who may run it now" and "when did it last run" are different questions; a released or expired lease
+     * still carries a valid baseline. ⛔ Do not add an {@code owner}/{@code expires_at} predicate to the
+     * read — this test is what fails if you do, and the symptom in production would be every pipeline
+     * firing immediately whenever it is idle.
+     */
+    @Test
+    void theCadenceOutlivesTheLeaseThatRecordedIt(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease pod = lease(url, "s1", "pod-a")) {
+            try (RunLease.Claim c = pod.tryAcquire("orders")) {
+                assertNotNull(c);
+                pod.recordRun("orders", 4_242L);
+            }
+            assertFalse(pod.isRunning("orders"), "the lease is released");
+            assertEquals(4_242L, pod.lastRunAt("orders"), "and the baseline survives it");
+
+            expire(url, "s1", "orders");
+            assertEquals(4_242L, pod.lastRunAt("orders"), "an EXPIRED lease still carries its baseline");
+        }
+    }
+
+    /**
+     * 🔴 <b>The fencing test for the cadence write</b>, built the same way as
+     * {@link #fencing_aStaleEpochCannotReleaseTheSameOwnersNewerLease}: the <b>same owner id</b> on both, so
+     * the {@code owner} predicate cannot be what refuses it and only the epoch can.
+     *
+     * <p>A pod paused past its TTL must not stamp the cadence of a pipeline another process has since taken
+     * over — doing so would push that pipeline's next run out by a full interval using a timestamp from a
+     * run that is no longer authoritative.
+     */
+    @Test
+    void fencing_aStaleEpochCannotMoveTheCadenceOfTheSameOwnersNewerLease(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease first = lease(url, "s1", "pod-1"); DbRunLease second = lease(url, "s1", "pod-1")) {
+            RunLease.Claim stale = first.tryAcquire("orders");            // epoch N
+            assertNotNull(stale);
+
+            expire(url, "s1", "orders");
+            try (RunLease.Claim live = second.tryAcquire("orders")) {     // epoch N+1, SAME owner
+                assertNotNull(live);
+                second.recordRun("orders", 1_000L);                       // the authoritative baseline
+
+                first.recordRun("orders", 9_999L);                        // the paused pod wakes up late
+
+                assertEquals(1_000L, second.lastRunAt("orders"),
+                        "ONLY the epoch can refuse this write — the owner matches. Unfenced, a stale pod "
+                                + "rewrites the cadence of a lease it no longer holds");
+            }
+            stale.close();
+        }
+    }
+
+    /**
+     * Recording without holding the claim is refused, not an error — the contract on
+     * {@code RunLease.recordRun}. ⚠ The discriminating part is that the row EXISTS and is writable: a pod
+     * that simply lost the race would otherwise stamp a baseline for a pipeline it never ran.
+     */
+    @Test
+    void recordingWithoutHoldingTheClaimIsRefused(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease holder = lease(url, "s1", "pod-a"); DbRunLease other = lease(url, "s1", "pod-b")) {
+            try (RunLease.Claim c = holder.tryAcquire("orders")) {
+                assertNotNull(c);
+                holder.recordRun("orders", 5_000L);
+
+                assertNull(other.tryAcquire("orders"), "pod-b lost the race");
+                other.recordRun("orders", 8_000L);                        // ... and must not stamp anyway
+
+                assertEquals(5_000L, holder.lastRunAt("orders"), "only the holder's baseline counts");
+            }
+        }
+    }
+
+    /**
+     * The cadence is per scope, like the lease itself. ⛔ Do not collapse it: remote acquisition runs on the
+     * acquisition timer's own interval and never consults a pipeline's {@code trigger:}, so sharing one
+     * baseline would let a fetch move the run cadence of the same pipeline — the same independence the
+     * operator preserved for the guards themselves on 2026-09-12.
+     */
+    @Test
+    void theRunAndAcquireCadencesAreIndependent(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease run = lease(url, "s1", DbRunLease.SCOPE_RUN, "pod-a");
+             DbRunLease acq = lease(url, "s1", DbRunLease.SCOPE_ACQUIRE, "pod-a")) {
+            try (RunLease.Claim r = run.tryAcquire("orders")) {
+                assertNotNull(r);
+                run.recordRun("orders", 7_000L);
+            }
+            assertEquals(7_000L, run.lastRunAt("orders"));
+            assertEquals(0L, acq.lastRunAt("orders"),
+                    "the acquire scope has its own baseline and must not see the run scope's");
+        }
+    }
+
+    /**
+     * ⚠ The upgrade path. A lease table created by B0/B1 has no {@code last_run_at} column, and
+     * {@code CREATE TABLE IF NOT EXISTS} will not add one — so without the guarded {@code ALTER} in
+     * {@code initSchema} the first cadence read on an upgraded deployment throws. 🔴 This cannot be caught
+     * on a fresh install, which is why the pre-migration table is built by hand here.
+     */
+    @Test
+    void aLeaseTableFromBeforeTheCadenceColumnIsMigrated(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (Connection c = JdbcDrivers.connect(url, null, null);
+             java.sql.Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE " + DbRunLease.TABLE + " ("
+                    + "space VARCHAR, scope VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT, "
+                    + "acquired_at BIGINT, expires_at BIGINT, "
+                    + "PRIMARY KEY (space, scope, pipeline))");
+        }
+
+        try (DbRunLease pod = lease(url, "s1", "pod-a")) {     // opening it must migrate, not throw
+            assertEquals(0L, pod.lastRunAt("orders"), "a migrated column reads as 0, not as an error");
+            try (RunLease.Claim claim = pod.tryAcquire("orders")) {
+                assertNotNull(claim, "and the lease still works over the migrated table");
+                pod.recordRun("orders", 6_000L);
+            }
+            assertEquals(6_000L, pod.lastRunAt("orders"));
+        }
+    }
 }

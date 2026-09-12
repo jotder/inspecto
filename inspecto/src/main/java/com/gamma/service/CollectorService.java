@@ -1187,8 +1187,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             if (!removed) return false;
             configRegistry.rebuild(registry);   // refresh the read surface now; fires catalog invalidation
             id.ifPresent(i -> {                 // prune per-pipeline bookkeeping so it can't leak under churn
-                pipelineScheduler.forget(i);    // cadence + coalescer maps (keyed by pipeline id)
-                runGuard.forget(i);             // per-pipeline run lock (no-op while a final run is in flight)
+                pipelineScheduler.forget(i);    // coalescer map (keyed by pipeline id)
+                runGuard.forget(i);             // per-pipeline run lock + cadence baseline (no-op while a
+                                                // final run is in flight; a shared lease keeps its row)
                 paused.remove(i);               // a paused-then-deleted pipeline would otherwise linger here
                 var timer = referenceRefreshTimers.remove(i);   // else compaction of a deleted store keeps firing
                 if (timer != null) timer.cancel(false);

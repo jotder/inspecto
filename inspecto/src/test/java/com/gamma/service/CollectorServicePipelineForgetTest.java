@@ -43,7 +43,11 @@ class CollectorServicePipelineForgetTest {
         Path a = source(dir);
         try (CollectorService svc = new CollectorService(List.of(a), 3600, 1)) {
             String id = svc.pipelines().get(0).name();
-            svc.runAllOnce();                                    // a cycle stamps lastRunAtMs[id]
+            // ⚠ The operator path, not runAllOnce(): the poll cycle now stamps only triggers that READ the
+            // cadence, and this fixture has no `trigger:` (DEFAULT_POLL), which is due every tick regardless
+            // and never consults the baseline. runPipeline stamps unconditionally, so it is what puts an entry
+            // in the map this test is about — the leak path is identical either way.
+            svc.runPipeline(id);
             Map<String, ?> cadence = cadenceMap(svc);
             assertTrue(cadence.containsKey(id), "a run should stamp the pipeline's cadence baseline");
 
@@ -116,9 +120,15 @@ class CollectorServicePipelineForgetTest {
         Field schedField = CollectorService.class.getDeclaredField("pipelineScheduler");
         schedField.setAccessible(true);
         Object scheduler = schedField.get(svc);
-        Field mapField = PipelineScheduler.class.getDeclaredField("lastRunAtMs");
+        // ⚠ The cadence map moved OFF the scheduler onto the run lease (phase B §5.2) so that it can be shared
+        // across pods. For the default heap guard it is the identical map, so this test's subject is unchanged
+        // — but it is now reached through CollectorService.runGuard, and pruned by RunLease.forget.
+        Field guardField = CollectorService.class.getDeclaredField("runGuard");
+        guardField.setAccessible(true);
+        Object guard = guardField.get(svc);
+        Field mapField = PipelineRunGuard.class.getDeclaredField("lastRunAtMs");
         mapField.setAccessible(true);
-        return (Map<String, ?>) mapField.get(scheduler);
+        return (Map<String, ?>) mapField.get(guard);
     }
 
     @SuppressWarnings("unchecked")

@@ -57,6 +57,17 @@ final class PipelineRunGuard implements RunLease {
     /** One binary semaphore per pipeline id, created on first use. */
     private final Map<String, Semaphore> permits = new ConcurrentHashMap<>();
 
+    /**
+     * T13 / §3.8 — per-pipeline last-run epoch (ms), the cadence baseline for {@code schedule:{every}}/{@code cron}.
+     *
+     * <p>⚠ This map <b>moved here from {@link PipelineScheduler}</b> (phase B, §5.2). It is the same map with
+     * the same semantics — in-heap, per process, unshared — because for the heap guard that is <em>correct</em>:
+     * one instance per Space, one process, so "this process's baseline" and "the baseline" are the same thing.
+     * It moved so that the shared implementation can make it shared, without the scheduler knowing which it has.
+     * ⛔ Personal and single-node Standard therefore behave byte-identically to before the move.
+     */
+    private final Map<String, Long> lastRunAtMs = new ConcurrentHashMap<>();
+
     // ⚠ `Claim` is INHERITED from RunLease, not declared here. Java resolves a nested type through the
     // implementing class, so every existing `PipelineRunGuard.Claim` reference still compiles — which is
     // why extracting the seam touched no call site.
@@ -107,9 +118,23 @@ final class PipelineRunGuard implements RunLease {
         return permit != null && permit.availablePermits() == 0;
     }
 
+    /** The cadence baseline, or 0 when this pipeline has not run in this process's lifetime. */
+    @Override public long lastRunAt(String pipeline) {
+        return lastRunAtMs.getOrDefault(pipeline, 0L);
+    }
+
+    /**
+     * Stamp the cadence baseline. Unfenced, and correctly so: the heap guard's claim cannot be stolen — there
+     * is no other process to steal it — so there is no stale owner for a fence to exclude.
+     */
+    @Override public void recordRun(String pipeline, long epochMs) {
+        lastRunAtMs.put(pipeline, epochMs);
+    }
+
     /** Drop {@code pipeline}'s permit so the map cannot grow without bound as pipelines are unregistered. */
     @Override public void forget(String pipeline) {
         Semaphore permit = permits.get(pipeline);
         if (permit != null && permit.availablePermits() > 0) permits.remove(pipeline, permit);
+        lastRunAtMs.remove(pipeline);   // same leak-under-churn reason the permit is dropped
     }
 }

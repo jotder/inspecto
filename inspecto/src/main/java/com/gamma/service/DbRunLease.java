@@ -272,6 +272,66 @@ final class DbRunLease implements RunLease, AutoCloseable {
         }
     }
 
+    // ── cadence (§5.2) ──────────────────────────────────────────────────────────────
+
+    /**
+     * The shared cadence baseline. ⚠ Read <b>unfenced and independently of the lease's owner</b>, and that is
+     * the point: a pod that has never run this pipeline must still see when another pod last ran it, or it
+     * fires immediately on joining. An expired or unowned lease still carries a valid {@code last_run_at} —
+     * the lease says who may run it <em>now</em>, this column says when it last ran, and they are different
+     * questions. ⛔ Do not add an {@code owner}/{@code expires_at} predicate here.
+     */
+    @Override
+    public synchronized long lastRunAt(String pipeline) {
+        String sql = "SELECT last_run_at FROM " + TABLE + " WHERE space = ? AND scope = ? AND pipeline = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, space);
+            ps.setString(2, scope);
+            ps.setString(3, pipeline);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0L;   // absent row / SQL NULL both read as 0 = "never"
+            }
+        } catch (SQLException e) {
+            // ⚠ Fail to "never ran", which makes a cadence-gated pipeline due. The opposite default would
+            // silently freeze a pipeline for as long as the database were unreachable; a spurious run is
+            // caught by the lease itself, a skipped one is invisible.
+            log.warn("Could not read the run cadence for '{}': {} — treating it as never run", pipeline, e.getMessage());
+            return 0L;
+        }
+    }
+
+    /**
+     * Stamp the cadence baseline, <b>fenced on owner+epoch</b> exactly as {@link #release} is — a process
+     * paused past its TTL must not rewrite the cadence of a pipeline another process now owns, or it would
+     * push that pipeline's next run out by a full interval.
+     */
+    @Override
+    public synchronized void recordRun(String pipeline, long epochMs) {
+        Long epoch = held.get(pipeline);
+        if (epoch == null) {
+            // Not ours to stamp. Per the interface contract this is refused, not an error.
+            log.debug("Not recording a run of '{}': this process does not hold its lease", pipeline);
+            return;
+        }
+        String sql = "UPDATE " + TABLE + " SET last_run_at = ? "
+                + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, epochMs);
+            ps.setString(2, space);
+            ps.setString(3, scope);
+            ps.setString(4, pipeline);
+            ps.setString(5, owner);
+            ps.setLong(6, epoch);
+            if (ps.executeUpdate() == 0) {
+                log.warn("Run cadence for '{}' not stamped (epoch {}) — the lease had been taken over; the "
+                        + "fencing predicate refused a write that would have moved another owner's cadence",
+                        pipeline, epoch);
+            }
+        } catch (SQLException e) {
+            log.warn("Could not record the run cadence for '{}': {}", pipeline, e.getMessage());
+        }
+    }
+
     /**
      * ⛔ Deliberately a no-op on the row. Unlike the heap guard — whose {@code forget} stops an in-memory
      * map growing — deleting the row would discard another pod's live lease when THIS pod happens to
@@ -298,8 +358,8 @@ final class DbRunLease implements RunLease, AutoCloseable {
     private void insertIfAbsent(String pipeline) throws SQLException {
         // The DbDedupLedger idiom: let the database resolve the race rather than a read-then-write.
         String sql = "INSERT INTO " + TABLE
-                + " (space, scope, pipeline, owner, epoch, acquired_at, expires_at) "
-                + "VALUES (?,?,?,NULL,0,0,0) ON CONFLICT DO NOTHING";
+                + " (space, scope, pipeline, owner, epoch, acquired_at, expires_at, last_run_at) "
+                + "VALUES (?,?,?,NULL,0,0,0,0) ON CONFLICT DO NOTHING";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, space);
             ps.setString(2, scope);
@@ -331,8 +391,14 @@ final class DbRunLease implements RunLease, AutoCloseable {
             //   pipeline — the exclusion is per pipeline, never global.
             st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
                     + "space VARCHAR, scope VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT, "
-                    + "acquired_at BIGINT, expires_at BIGINT, "
+                    + "acquired_at BIGINT, expires_at BIGINT, last_run_at BIGINT, "
                     + "PRIMARY KEY (space, scope, pipeline))");
+            // 🔴 `CREATE TABLE IF NOT EXISTS` is a no-op against a table B0/B1 already created, so a pod
+            // upgrading over an existing lease table would find NO `last_run_at` column and fail on the
+            // first cadence read — a fault that cannot appear on a fresh install and therefore only ever
+            // in production. Both backends behind Family.RUN_LEASE (DuckDB, Postgres) support the guarded
+            // ALTER, so this is the whole migration. ⛔ Do not drop it once fresh installs have the column.
+            st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS last_run_at BIGINT");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise the run-lease schema", e);
         }
