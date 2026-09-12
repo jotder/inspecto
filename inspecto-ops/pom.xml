@@ -67,5 +67,17 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- PostgreSQL JDBC driver (version managed by the parent, M1) — test scope only, exactly as
+             inspecto/ and inspecto-engine/ declare it. PostgresStateStoreTest lives in THIS module and
+             loads the driver through DriverManager; test scope is not transitive, so inheriting it from
+             a dependency was never possible. Without this the class does not skip cleanly — it ERRORS
+             with "No suitable driver found" the moment -Dinspecto.test.pg.url is supplied, which is how
+             it went unnoticed while no server was configured. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

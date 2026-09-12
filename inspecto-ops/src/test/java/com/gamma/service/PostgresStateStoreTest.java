@@ -78,6 +78,46 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * {@code okf/backend/build-run/guard-coverage.md} warns about, so the skip message names exactly how to
  * turn it back on rather than passing quietly.
  *
+ * <h2>Runbook — the command that actually works (proven 2026-09-12, PG 18.6 in Docker)</h2>
+ *
+ * <pre>{@code
+ * MAVEN_OPTS="-Duser.timezone=Asia/Kolkata"  * INSPECTO_TEST_PG_URL='jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'  * mvn -o -B test -Pedition-enterprise -pl inspecto-ops -am  *     -Dtest=PostgresStateStoreTest -Dsurefire.failIfNoSpecifiedTests=false -DforkCount=0
+ * }</pre>
+ *
+ * <p>That shape is not arbitrary. The obvious command fails three times over, and because this class
+ * skipped for months none of it had ever been exercised — the skip hid a harness that could not have
+ * connected even with a server present:
+ *
+ * <ol>
+ *   <li>🔴 <b>The driver was missing from this module.</b> {@code inspecto/} and {@code inspecto-engine/}
+ *       declare {@code org.postgresql:postgresql} at test scope, and <b>test scope is not transitive</b>
+ *       — so the module that OWNS this test had no driver and died with
+ *       {@code No suitable driver found}. Fixed 2026-09-12 by declaring it in {@code inspecto-ops/pom.xml}.
+ *       ⚠ A skipping test cannot tell you its classpath is broken.</li>
+ *   <li>🔴 <b>{@code -D...&password=...} loses the password on Windows.</b> {@code mvn.cmd} re-parses
+ *       the argument list, so the {@code &} splits the URL and the driver connects with no password
+ *       ({@code The server requested SCRAM-based authentication, but no password was provided}).
+ *       Use the {@code INSPECTO_TEST_PG_URL} <em>environment variable</em> instead — it never passes
+ *       through the shell. The skip message below still names the {@code -D} form because it is correct
+ *       on a POSIX shell; on Windows, prefer the env var.</li>
+ *   <li>🔴 <b>PostgreSQL 18 rejects the legacy zone alias the Windows JVM reports.</b> pgjdbc sends
+ *       {@code TimeZone.getDefault().getID()} as a startup parameter; a Windows JVM in IST reports
+ *       {@code Asia/Calcutta}, and PG 18.6's {@code pg_timezone_names} carries only {@code Asia/Kolkata}
+ *       — so the handshake dies with {@code invalid value for parameter "TimeZone"}. This is a
+ *       <em>name</em> mismatch, not an offset one, so the fix must keep the SAME offset:
+ *       {@code Asia/Kolkata}, never {@code UTC}. Forcing UTC would move {@code record_day} boundaries
+ *       and quietly change what the assertions in here mean.</li>
+ * </ol>
+ *
+ * <p>🔴 <b>{@code -DargLine=...} does NOT reach the forked test JVM</b>, so it cannot carry the zone:
+ * the parent POM's surefire config is {@code <argLine>@{argLine} …</argLine>}, and that late-bound
+ * {@code @{argLine}} resolves the <em>project</em> property, which a command-line user property does not
+ * override. Nor can {@code systemPropertyVariables} do it — surefire applies those <em>after</em> the JVM
+ * has started, and the default {@code TimeZone} is already resolved by then. {@code -DforkCount=0} runs
+ * the tests in the Maven JVM, where {@code MAVEN_OPTS} is applied before startup and therefore does win.
+ *
+ * <p>Verified 2026-09-12 against PostgreSQL 18.6: <b>15 tests, 0 failures, 0 skipped</b>.
+ *
  * <p>🔴 The assertions are exact counts ({@code total == 6}, {@code all.size() == 2}), so they need a
  * clean database — which a shared server is not. Each run therefore creates its own uniquely-named
  * SCHEMA, points the stores at it through {@code currentSchema}, and drops it afterwards. Never let this
