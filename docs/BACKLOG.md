@@ -921,7 +921,10 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     ⚠ `generation` is no escape either — it is declared (`ConsignmentOutput.java:70`) but hard-coded
     to `0` at every construction site, so it is as inert as `run_id`. **Any key over
     `(consignment_id, path, …)` is blocked on §13's Run model landing first**, which is what would give
-    a write round a real identity. Until then the outputs store stays unconstrained — which breaks
+    a write round a real identity — now SPECIFIED in
+    [`superpower/run-model-plan.md`](superpower/run-model-plan.md) (four slices; ⚠ it also records that a
+    run id does **not** discharge D15, because two pods mint different ids — the fenced `RunLease` is what
+    stops split-brain). Until then the outputs store stays unconstrained — which breaks
     nothing: a reprocess merely accumulates SUPERSEDED rows and every reader filters on `state`.
     ✅ **The dedupe guarantee is therefore `file_stages`-only, deliberately, and this P1's constraints
     half closes there.**

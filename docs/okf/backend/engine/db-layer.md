@@ -401,8 +401,11 @@ candidate key over `(consignment_id, path, …)` fails on a *missing discriminat
 
 Reprocess makes this sharper, not softer: since the identity half landed, a re-poll re-mints the **same**
 `consignment_id`, so new LIVE rows would collide with that batch's own just-superseded rows. The unblocker
-is §13's Run model giving a write round a real identity; until then this table stays unconstrained, which
-costs nothing — a reprocess merely accumulates SUPERSEDED rows and every reader filters on `state`.
+is §13's Run model giving a write round a real identity — specified in
+[`superpower/run-model-plan.md`](../../../superpower/run-model-plan.md), which also settles that this
+table must use `ON CONFLICT DO UPDATE` rather than `DO NOTHING` (the file on disk is genuinely
+overwritten, so last-writer-wins matches the filesystem — the opposite choice from `file_stages` §3.10,
+and deliberately so). Until then this table stays unconstrained, which costs nothing — a reprocess merely accumulates SUPERSEDED rows and every reader filters on `state`.
 The dedupe guarantee is `file_stages`-only (§3.10), deliberately.
 
 **Null bounds mean *unknown*, never *empty*.** A consumer that prunes on bounds must treat a null-bounds row
