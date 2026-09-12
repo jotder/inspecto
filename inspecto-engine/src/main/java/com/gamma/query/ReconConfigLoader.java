@@ -52,7 +52,14 @@ public final class ReconConfigLoader {
                 }
         boolean includeRecordCount = !(config.get("includeRecordCount") instanceof Boolean b) || b;
 
-        return ReconService.Spec.of(sides, strings(config.get("keyColumns")), measures, includeRecordCount);
+        // ⚠ Absent ⇒ many_to_many, which asserts nothing: every reconciliation authored before this key
+        // existed must keep its exact verdict. fromConfig throws on an unknown word, which both callers
+        // already surface as a 422.
+        ReconService.Cardinality cardinality =
+                ReconService.Cardinality.fromConfig(Values.blankToNull(config.get("cardinality")));
+
+        return ReconService.Spec.of(sides, strings(config.get("keyColumns")), measures, includeRecordCount,
+                cardinality);
     }
 
     // ── config-map parsing helpers ────────────────────────────────────────────────

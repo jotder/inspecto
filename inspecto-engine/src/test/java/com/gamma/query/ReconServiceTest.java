@@ -341,4 +341,99 @@ class ReconServiceTest {
         assertNotNull(v, "expected a count");
         return ((Number) v).longValue();
     }
+
+    // ── cardinality as an ASSERTION (RECON-CARDINALITY-1, tier 1) ─────────────────────────
+
+    private static ReconService.Spec specWith(ReconService.Cardinality c) {
+        return ReconService.Spec.of(
+                List.of(side("a_ds", REL_A), side("b_ds", REL_B)),
+                List.of("region", "product"),
+                List.of(new ReconService.Measure("amount", "sum", "percent", 0.5)),
+                true, c);
+    }
+
+    /**
+     * 🔴 The reference fixture has ALWAYS contained a hidden 2:1 — {@code REL_A} carries two
+     * {@code ('EU','voice',100.0)} rows that sum to the 200.0 {@code REL_B} holds in one — and its own
+     * comment calls that "matched-equal". It reconciles clean, which is exactly the hole this closes: a
+     * duplicated row is indistinguishable from a genuinely larger value.
+     */
+    @Test
+    void theFixturesHiddenTwoToOneReconcilesCleanUntilCardinalityIsAsserted() throws Exception {
+        Map<String, ReconService.BreakSet> lax = ReconService.breaks(specWith(ReconService.Cardinality.MANY_TO_MANY),
+                null, null, 1, 100, 0);
+        assertFalse(lax.containsKey("cardinality_break"),
+                "asserting nothing must leave the payload byte-identical to before the option existed");
+        assertTrue(lax.get("value_break").rows().stream().noneMatch(r -> "voice".equals(key(r, "product"))
+                        && "EU".equals(key(r, "region"))),
+                "EU/voice sums to 200 on both sides, so it is NOT a value break — the duplicate is invisible");
+
+        ReconService.BreakSet strict = ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_ONE),
+                null, "cardinality_break", 1, 100, 0).get("cardinality_break");
+        assertEquals(1, strict.rowCount(), "the same data, now a break: EU/voice is 2 rows against 1");
+        Map<String, Object> row = strict.rows().get(0);
+        assertEquals("EU", key(row, "region"));
+        assertEquals("voice", key(row, "product"));
+        assertEquals(2L, longOf(((Map<?, ?>) row.get("a")).get(ReconService.RECORDS)), "two rows on the anchor");
+        assertEquals(1L, longOf(((Map<?, ?>) row.get("b")).get(ReconService.RECORDS)), "one on the compared side");
+    }
+
+    /** The counts are the evidence, so they appear even when the record count is switched off. */
+    @Test
+    void aCardinalityBreakCarriesTheCountsEvenWithRecordCountOff() throws Exception {
+        ReconService.Spec s = ReconService.Spec.of(
+                List.of(side("a_ds", REL_A), side("b_ds", REL_B)),
+                List.of("region", "product"),
+                List.of(new ReconService.Measure("amount", "sum", "percent", 0.5)),
+                false, ReconService.Cardinality.ONE_TO_ONE);
+        Map<String, Object> row = ReconService.breaks(s, null, "cardinality_break", 1, 100, 0)
+                .get("cardinality_break").rows().get(0);
+        assertEquals(2L, longOf(((Map<?, ?>) row.get("a")).get(ReconService.RECORDS)),
+                "a violation the reader cannot interpret is not a report");
+    }
+
+    /** {@code one_to_many} constrains the ANCHOR only — the compared side may legitimately repeat. */
+    @Test
+    void oneToManyStillRefusesADuplicatedAnchorRow() throws Exception {
+        assertEquals(1, ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_MANY),
+                        null, "cardinality_break", 1, 100, 0).get("cardinality_break").rowCount(),
+                "EU/voice repeats on the ANCHOR, which one_to_many forbids");
+        assertEquals(0, ReconService.breaks(specWith(ReconService.Cardinality.MANY_TO_ONE),
+                        null, "cardinality_break", 1, 100, 0).get("cardinality_break").rowCount(),
+                "many_to_one constrains the compared side, and B has one row per key");
+    }
+
+    /** A key present on ONE side only is already a missing_* break — never double-reported. */
+    @Test
+    void anUnmatchedKeyIsNotAlsoACardinalityBreak() throws Exception {
+        Map<String, ReconService.BreakSet> all = ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_ONE),
+                null, null, 1, 100, 0);
+        assertEquals(1, all.get("missing_right").rowCount(), "MEA/voice is only in A");
+        assertTrue(all.get("cardinality_break").rows().stream().noneMatch(r -> "MEA".equals(key(r, "region"))),
+                "an unmatched key is reported once, as missing — not twice");
+    }
+
+    @Test
+    void anUnknownCardinalityWordIsRefused() {
+        assertEquals(ReconService.Cardinality.MANY_TO_MANY, ReconService.Cardinality.fromConfig(null),
+                "absent asserts nothing — every pre-existing reconciliation keeps its verdict");
+        assertEquals(ReconService.Cardinality.MANY_TO_MANY, ReconService.Cardinality.fromConfig("  "));
+        assertEquals(ReconService.Cardinality.ONE_TO_ONE, ReconService.Cardinality.fromConfig("one_to_one"));
+        assertEquals(ReconService.Cardinality.ONE_TO_ONE, ReconService.Cardinality.fromConfig("ONE_TO_ONE"));
+        assertEquals("one_to_many", ReconService.Cardinality.ONE_TO_MANY.wire());
+        assertThrows(IllegalArgumentException.class, () -> ReconService.Cardinality.fromConfig("1:N"));
+    }
+
+    @Test
+    void cardinalityBreakIsAnAcceptedBreakType() throws Exception {
+        assertEquals(1, ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_ONE),
+                null, "cardinality_break", 1, 100, 0).size(), "the type filter accepts it");
+        assertThrows(IllegalArgumentException.class,
+                () -> ReconService.breaks(specWith(ReconService.Cardinality.ONE_TO_ONE), null, "nope", 1, 100, 0));
+    }
+
+    private static String key(Map<String, Object> breakRow, String dim) {
+        Object v = ((Map<?, ?>) breakRow.get("key")).get(dim);
+        return v == null ? null : v.toString();
+    }
 }

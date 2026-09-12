@@ -247,8 +247,24 @@ it was; both are corrected below.
   🔴 The design half is concrete, not cautionary: a Break is computed fresh per call
   (`ReconService.breaks:181-206`) and becomes durable only through `POST /recon/promote`, whose Incident
   attrs are `reconciliation`/`breakKey`/`breakType`/`column`/`runId` (`ReconRoutes.java:190-197`) — that
-  shape **cannot express which of N counterparts, nor how many**. No test feeds a duplicate key on either
-  side, because the `GROUP BY` made it impossible.
+  shape **cannot express which of N counterparts, nor how many**.
+  🔴 **Correction to that same-day note: the reference fixture DID contain a duplicate key all along.**
+  `ReconServiceTest`'s `REL_A` carries two `('EU','voice',100.0)` rows summing to the single `200.0` in
+  `REL_B`, and the fixture's own comment calls it *"matched-equal"* — it reconciled clean, and an existing
+  assertion at `:101` already read `2L` records for that key without anyone treating it as a cardinality
+  question. ⚠ The duplicate was not absent from the tests, it was **invisible in them**, which is a
+  sharper statement of the defect than "untested".
+  ✅ **TIER 1 BACKEND SHIPPED 2026-09-12** — design + as-built in
+  [`superpower/recon-cardinality-plan.md`](superpower/recon-cardinality-plan.md). `cardinality:
+  one_to_one|one_to_many|many_to_one|many_to_many` on a reconciliation config; absent ⇒ `many_to_many`,
+  which asserts nothing, and the `cardinality_break` key is emitted **only** when an assertion is declared
+  — so a reconciliation authored before this option gets a byte-identical payload. 32 modules, 4373 tests,
+  mutation-proven on the whole feature. ⛔ **Two consumer-side residuals are OPEN and named in the plan's
+  §6**: `ReconService.run`'s summary `byType` does not count the new type, and the UI's `BreakType` union
+  (`reconciliation-types.ts:37`) has only three members, so the type is unreachable from the client. They
+  must land together (the summary widens `byType`, which the UI mirrors). Tier 2 (row-level pairing) stays
+  demand-gated.
+
   ✅ **DESIGN PASS DONE 2026-09-12 — [`superpower/recon-cardinality-plan.md`](superpower/recon-cardinality-plan.md).**
   It answers the row's "what is a break when one row matches three?": for the canonical case (one invoice
   vs three payments) **today's arithmetic is already correct** — you want the sum. The real defect is

@@ -59,12 +59,56 @@ public final class ReconService {
     /** One compared Measure: {@code agg} = sum|count; tolerance is the record-grain break truth (UI parity). */
     public record Measure(String name, String agg, String toleranceType, double tolerance) {}
 
+    /**
+     * How many rows per key each side may contribute — an <b>assertion</b>, not a matching strategy.
+     *
+     * <p>🔴 Read this before assuming it changes the join: it does not, and it must not. Each side is
+     * pre-aggregated to one row per key ({@link #sideSql}), so for the canonical case — one invoice against
+     * three payments — summing the payments and comparing to the invoice is <b>already the right
+     * arithmetic</b>. What was missing is that a <em>duplicated</em> row was indistinguishable from a
+     * genuinely larger value, so it reconciled clean. This declares the expected shape so that becomes a
+     * Break instead.
+     *
+     * <p>⛔ {@link #MANY_TO_MANY} is the default and asserts NOTHING — anything else would change the
+     * verdict of every reconciliation that predates this option. Design:
+     * {@code docs/superpower/recon-cardinality-plan.md}.
+     */
+    public enum Cardinality {
+        /** Exactly one row per key on both sides; more on either is a break. */
+        ONE_TO_ONE,
+        /** One row per key on the anchor, any number on the compared side. */
+        ONE_TO_MANY,
+        /** Any number on the anchor, one row per key on the compared side. */
+        MANY_TO_ONE,
+        /** No assertion — the shipped behaviour before this option existed, and the default. */
+        MANY_TO_MANY;
+
+        /** Parse a config value; {@code null}/blank ⇒ {@link #MANY_TO_MANY}. Throws on an unknown word (→ 422). */
+        public static Cardinality fromConfig(String v) {
+            if (v == null || v.isBlank()) return MANY_TO_MANY;
+            for (Cardinality c : values())
+                if (c.name().equalsIgnoreCase(v.trim())) return c;
+            throw new IllegalArgumentException("cardinality must be one_to_one|one_to_many|many_to_one|many_to_many, got '"
+                    + v + "'");
+        }
+
+        /** Lower-case wire spelling, as authored in config. */
+        public String wire() { return name().toLowerCase(java.util.Locale.ROOT); }
+    }
+
     /** A validated reconciliation spec — construct via {@link #of}. Side 0 is the anchor ("a"). */
-    public record Spec(List<Side> sides, List<String> keyColumns, List<Measure> measures, boolean includeRecordCount) {
+    public record Spec(List<Side> sides, List<String> keyColumns, List<Measure> measures,
+                       boolean includeRecordCount, Cardinality cardinality) {
+
+        /** As {@link #of(List, List, List, boolean, Cardinality)} asserting nothing about cardinality. */
+        public static Spec of(List<Side> sides, List<String> keyColumns, List<Measure> measures,
+                              boolean includeRecordCount) {
+            return of(sides, keyColumns, measures, includeRecordCount, Cardinality.MANY_TO_MANY);
+        }
 
         /** Validate + normalize; throws {@link IllegalArgumentException} on anything unusable (→ 422). */
         public static Spec of(List<Side> sides, List<String> keyColumns, List<Measure> measures,
-                              boolean includeRecordCount) {
+                              boolean includeRecordCount, Cardinality cardinality) {
             if (sides == null || sides.size() < 2 || sides.size() > 3)
                 throw new IllegalArgumentException("expected 2 or 3 datasets (side 0 is the anchor), got "
                         + (sides == null ? 0 : sides.size()));
@@ -99,7 +143,8 @@ public final class ReconService {
                     }
                 if (s.filter() != null) ExpressionGuard.check(s.filter());
             }
-            return new Spec(List.copyOf(sides), List.copyOf(keyColumns), List.copyOf(ms), includeRecordCount);
+            return new Spec(List.copyOf(sides), List.copyOf(keyColumns), List.copyOf(ms), includeRecordCount,
+                    cardinality == null ? Cardinality.MANY_TO_MANY : cardinality);
         }
 
         /** This side's physical column for a unified column name. */
@@ -184,8 +229,10 @@ public final class ReconService {
             for (String dim : path.keySet())
                 if (!spec.keyColumns().contains(dim))
                     throw new IllegalArgumentException("path column '" + dim + "' is not a key column");
-        if (type != null && !type.equals("missing_left") && !type.equals("missing_right") && !type.equals("value_break"))
-            throw new IllegalArgumentException("type must be missing_left|missing_right|value_break, got '" + type + "'");
+        if (type != null && !type.equals("missing_left") && !type.equals("missing_right")
+                && !type.equals("value_break") && !type.equals("cardinality_break"))
+            throw new IllegalArgumentException(
+                    "type must be missing_left|missing_right|value_break|cardinality_break, got '" + type + "'");
         if (other < 1 || other >= spec.sides().size())
             throw new IllegalArgumentException("side '" + (other >= 0 && other < WIRE_SIDES.length ? WIRE_SIDES[other] : other)
                     + "' is not a compared side of this reconciliation");
@@ -194,13 +241,22 @@ public final class ReconService {
             Connection conn = registerSides(sandbox, spec);
             Map<String, BreakSet> out = new LinkedHashMap<>();
             if (type == null || type.equals("missing_right"))
-                out.put("missing_right", breakSet(conn, spec, missingSql(spec, other, true, path, limit, offset), 'a', limit));
+                out.put("missing_right", breakSet(conn, spec, missingSql(spec, other, true, path, limit, offset), 'a', limit, false));
             if (type == null || type.equals("missing_left"))
-                out.put("missing_left", breakSet(conn, spec, missingSql(spec, other, false, path, limit, offset), 'b', limit));
+                out.put("missing_left", breakSet(conn, spec, missingSql(spec, other, false, path, limit, offset), 'b', limit, false));
             if (type == null || type.equals("value_break"))
                 out.put("value_break", spec.measures().isEmpty()
                         ? new BreakSet(List.of(), 0, false)
-                        : breakSet(conn, spec, valueBreaksSql(spec, other, path, limit, offset), 'x', limit));
+                        : breakSet(conn, spec, valueBreaksSql(spec, other, path, limit, offset), 'x', limit, false));
+            // ⚠ MANY_TO_MANY asserts nothing, so it can never produce a row. Two consequences, both
+            // deliberate: never build SQL whose WHERE is vacuously false, and — when no type was asked for
+            // — do not add the key at all, so a reconciliation that predates this option gets a payload
+            // byte-identical to before. An explicit ask still gets an explicit (empty) answer.
+            boolean asserted = spec.cardinality() != Cardinality.MANY_TO_MANY;
+            if (type == null ? asserted : type.equals("cardinality_break"))
+                out.put("cardinality_break", asserted
+                        ? breakSet(conn, spec, cardinalityBreaksSql(spec, other, path, limit, offset), 'x', limit, true)
+                        : new BreakSet(List.of(), 0, false));
             return out;
         }
     }
@@ -408,6 +464,45 @@ public final class ReconService {
         return sb.toString();
     }
 
+    /**
+     * Matched keys of the anchor↔{@code other} pair whose per-side row counts violate the declared
+     * {@link Cardinality}.
+     *
+     * <p>🔴 <b>No new aggregation, and no change to the join.</b> {@code COUNT(*) AS mr} was already
+     * computed per side per key by {@link #sideSql} and already carried through the join — it was simply
+     * reduced to a presence boolean and discarded. This reads the number that was always there.
+     *
+     * <p>⚠ Scoped to <b>matched</b> keys (a JOIN, exactly like {@link #valueBreaksSql}) on purpose: a key
+     * present on one side only is already reported as {@code missing_left}/{@code missing_right}, and
+     * emitting a cardinality break for it too would double-report one fact.
+     */
+    static String cardinalityBreaksSql(Spec spec, int other, Map<String, String> path, int limit, int offset) {
+        String o = "__s" + other;
+        String anchorMany = "__s0." + q("mr") + " > 1";
+        String otherMany = o + "." + q("mr") + " > 1";
+        String violates = switch (spec.cardinality()) {
+            case ONE_TO_ONE -> anchorMany + " OR " + otherMany;
+            case ONE_TO_MANY -> anchorMany;     // the anchor side must contribute exactly one row
+            case MANY_TO_ONE -> otherMany;      // the compared side must contribute exactly one row
+            case MANY_TO_MANY -> throw new IllegalStateException(
+                    "many_to_many asserts nothing and must be short-circuited before building SQL");
+        };
+        StringBuilder sb = new StringBuilder(with(spec)).append("SELECT ");
+        for (int i = 0; i < spec.keyColumns().size(); i++)
+            sb.append("__s0.").append(q("k" + i)).append(", ");
+        for (int i = 0; i < spec.measures().size(); i++)
+            sb.append("__s0.").append(q("m" + i)).append(" AS ").append(q("sa_m" + i)).append(", ")
+              .append(o).append('.').append(q("m" + i)).append(" AS ").append(q("sb_m" + i)).append(", ");
+        sb.append("__s0.").append(q("mr")).append(" AS ").append(q("sa_mr")).append(", ")
+          .append(o).append('.').append(q("mr")).append(" AS ").append(q("sb_mr"))
+          .append(" FROM __s0 JOIN ").append(o).append(" ON ").append(keyJoin(spec, 0, other))
+          .append(" WHERE (").append(violates).append(')')
+          .append(pathPredicate(spec, path, "__s0."))
+          .append(" ORDER BY ").append(orderByKeys(spec, "__s0."))
+          .append(" LIMIT ").append(Math.max(0, limit) + 1).append(" OFFSET ").append(Math.max(0, offset));
+        return sb.toString();
+    }
+
     /** Matched keys of the anchor↔{@code other} pair where any compare column is outside its tolerance. */
     static String valueBreaksSql(Spec spec, int other, Map<String, String> path, int limit, int offset) {
         String o = "__s" + other;
@@ -470,8 +565,15 @@ public final class ReconService {
         return conn;
     }
 
-    /** Shape a pair-scoped break query: {@code roles} 'a' = anchor only, 'b' = compared side only, 'x' = both. */
-    private static BreakSet breakSet(Connection conn, Spec spec, String sql, char roles, int limit)
+    /**
+     * Shape a pair-scoped break query: {@code roles} 'a' = anchor only, 'b' = compared side only, 'x' = both.
+     *
+     * <p>{@code alwaysCounts} forces the per-side row count into the payload even when
+     * {@code includeRecordCount} is off — for a cardinality break the count IS the evidence, so omitting it
+     * would report a violation the reader cannot interpret.
+     */
+    private static BreakSet breakSet(Connection conn, Spec spec, String sql, char roles, int limit,
+                                     boolean alwaysCounts)
             throws SQLException {
         List<Map<String, Object>> raw = select(conn, sql);
         boolean truncated = raw.size() > limit;
@@ -480,8 +582,8 @@ public final class ReconService {
         for (Map<String, Object> r : raw) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("key", keysOf(spec, r));
-            if (roles != 'b') row.put("a", measuresOf(spec, r, "sa_"));
-            if (roles != 'a') row.put("b", measuresOf(spec, r, "sb_"));
+            if (roles != 'b') row.put("a", withCount(spec, measuresOf(spec, r, "sa_"), r, "sa_", alwaysCounts));
+            if (roles != 'a') row.put("b", withCount(spec, measuresOf(spec, r, "sb_"), r, "sb_", alwaysCounts));
             rows.add(row);
         }
         return new BreakSet(rows, rows.size(), truncated);
@@ -513,6 +615,18 @@ public final class ReconService {
             m.put(spec.measures().get(i).name(), r.get(p + "m" + i));
         if (spec.includeRecordCount()) m.put(RECORDS, r.get(p + "mr"));
         return m;
+    }
+
+    /**
+     * The side payload with its row count present when the caller needs it as evidence.
+     *
+     * <p>{@link #measuresOf} already emits {@link #RECORDS} when {@code includeRecordCount} is on, so this
+     * only fills the gap when it is off — never overwriting a value already shaped there.
+     */
+    private static Map<String, Object> withCount(Spec spec, Map<String, Object> side, Map<String, Object> r,
+                                                 String prefix, boolean alwaysCounts) {
+        if (alwaysCounts && !spec.includeRecordCount()) side.put(RECORDS, r.get(prefix + "mr"));
+        return side;
     }
 
     private static List<Map<String, Object>> select(Connection conn, String sql) throws SQLException {

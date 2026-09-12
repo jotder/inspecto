@@ -1,6 +1,7 @@
 # `RECON-CARDINALITY-1` — one-to-many / many-to-many reconciliation
 
-**Status:** DESIGN, nothing built. Opened 2026-09-12. The row calls the design half the hard half, and it
+**Status:** ✅ **tier 1 BACKEND SHIPPED 2026-09-12.** Tier 2 remains demand-gated; two named residuals in
+§6. Opened 2026-09-12. The row calls the design half the hard half, and it
 is right — but for a different reason than it states, and the job is much smaller than it looks.
 
 ⚠ **Read first: this is NOT a release gate.** The row's *"until it lands the brochure is untrue"* is false.
@@ -86,7 +87,49 @@ is still unique. ⛔ Only tier 2 forces that redesign, which is a further reason
   assertion**, not on a sum that merely changed — the whole-feature rule, not one clause.
 - ⚠ A regression test that an existing reconciliation with **no** `cardinality` key behaves byte-identically.
 
-## 5. Open question for the operator
+## 5. As-built (tier 1 backend, 2026-09-12)
+
+`ReconService.Cardinality` (`ONE_TO_ONE`/`ONE_TO_MANY`/`MANY_TO_ONE`/`MANY_TO_MANY`) is a new `Spec`
+component; `Spec.of` keeps a 4-arg overload defaulting to `MANY_TO_MANY`, so the one production call site
+and every existing test compiled unchanged. `ReconConfigLoader` parses a `cardinality` key (absent ⇒
+`MANY_TO_MANY`; an unknown word throws, which both callers already surface as 422).
+`cardinalityBreaksSql` mirrors `valueBreaksSql` — same join, different `WHERE` — and reads the `mr` that
+was already there. `breakSet` gained `alwaysCounts`, because for this break type the count IS the evidence.
+
+⚠ **The key is emitted only when an assertion is declared** (or when asked for by name). Adding it
+unconditionally broke the pre-existing `breaksSetsPathScopingAndTypeFilter`, which asserts the map has
+exactly **3** entries — a good failure: it caught the payload changing for reconciliations that assert
+nothing. That test now passes untouched and is the regression proof.
+
+🔴 **The reference fixture had contained a hidden 2:1 all along.** `REL_A` carries two
+`('EU','voice',100.0)` rows summing to the single `200.0` in `REL_B`, and the fixture's own comment calls
+it *"matched-equal"*. It reconciled clean — the exact hole this closes — and an existing assertion at
+`ReconServiceTest:101` already read `2L` records for that key without anyone treating it as a cardinality
+question. ⚠ So the earlier claim that "no test feeds a duplicate key" was **wrong**: one always did.
+
+Verified: 32 modules, **4373** tests (4367 + 6), 0 failures, 20 skipped. Mutation-proven on the WHOLE
+feature (`asserted = false`, i.e. the pre-option behaviour): 4 of the 6 new tests go red reading
+`expected: <1> but was: <0>`, with no compilation error, and the two that stay green are exactly the two
+that should (pure enum parsing, and type-filter acceptance).
+
+## 6. Residuals — tracked, not half-done
+
+⛔ **This shipped a SERVER half.** Two consumer-side gaps are deliberately NOT in it, because guessing at
+them is how this repo grows the pairs `CONSUMER-PAIRS-1` exists to police:
+
+1. **The run summary does not count cardinality breaks.** `ReconService.run`'s `byType` still counts
+   `missing_right`/`missing_left`/`value_break` only, so the Board's totals will not show a cardinality
+   breach even when `/recon/breaks` reports it. Adding it is one more `COUNT(*) FILTER` in the same query
+   — but it widens `byType`, which the UI mirrors as `Record<BreakType, number>`, so the two must land
+   together.
+2. **The UI cannot name the type.** `inspecto-ui/.../reconciliation/reconciliation-types.ts:37` declares
+   `BreakType = 'missing_left' | 'missing_right' | 'value_break'`, and `:277` seeds a `byType` record from
+   exactly those three. Until it gains the fourth member the type is unreachable from the client.
+
+⚠ Nothing is broken meanwhile: the backend simply never emits the key unless a reconciliation declares a
+cardinality, and none does until someone authors one.
+
+## 7. Open question for the operator
 
 Tier 1 reports a cardinality violation as a **Break**. Should a `one_to_one` violation instead be a
 **hard failure of the recon run** (nothing reconciles when the inputs are malformed), or a Break like any
