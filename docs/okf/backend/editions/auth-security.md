@@ -299,5 +299,43 @@ message names the missing property, so the failure is legible; it is the *timing
 nothing about "auth is optional per edition" suggests the process will not start.
 
 ⚠ There is no way to run a Standard/Enterprise bundle "with the module present but auth off". If that is
-ever wanted, it needs a guard around the SPI resolution, not a config flag — `SpiSlot.active()` has no
-try/catch, which is also why a missing transitive there is a boot failure (SEC-SIDECAR-BOOT-1).
+ever wanted, it needs a guard around the SPI resolution, not a config flag.
+
+### 🔴 This guarantee was SILENTLY LOST and restored 2026-09-12
+
+The sentence above used to end *"— `SpiSlot.active()` has no try/catch, which is also why a missing
+transitive there is a boot failure (SEC-SIDECAR-BOOT-1)"*. **That was true when written (2026-09-07) and
+false by the time anyone relied on it.** `PKG-5` later routed `SpiSlot.active()` through
+`com.gamma.service.OptionalSpi`, whose entire purpose is to catch `ServiceConfigurationError` /
+`LinkageError` so an unloadable OPTIONAL module is an *absence* rather than a boot failure — correct for
+the assistant sidecar compiled against a newer JDK, and the exact opposite of what this SPI needs.
+
+⛔ **The effect: a Standard deployment with a mistyped `-Dauth.oidc.jwksUri` booted WIDE OPEN.**
+`ServiceLoader` wraps the constructor's `IllegalStateException` in a `ServiceConfigurationError`;
+`OptionalSpi` caught it, logged *"the product runs without it and its routes answer 503"*, and returned
+empty — and an empty `Authenticator` means `ControlApi.dispatch` skips authentication for **every** route.
+There are no "its routes" for this SPI. Nothing failed; nothing 503'd; the control plane simply served
+unauthenticated, while `ControlApi`'s own constructor comment promised it would *"fail to boot instead of
+silently accepting traffic"*.
+
+✅ **Fixed:** `SpiSlot` gained a `failClosed` posture and `Authenticators` is the one slot that uses it
+(`new SpiSlot<>(Authenticator.class, true)`). ⚠ The distinction it draws is **registered-but-broken** vs
+**never-registered** — it has to be, because Personal ships no registration at all and that absence is
+legitimate. `OptionalSpi` itself is unchanged and still fail-soft: the defect was never in that helper,
+it was in the Authenticator sharing it. Pinned by `SpiSlotFailClosedTest` and
+`AuthenticatorDiscoveryFailClosedTest`, mutation-proven both ways.
+
+⚠ **A second defect surfaced while proving the first.** `SpiSlot.forTest(null)` read
+`cached = Optional.ofNullable(t)`, which caches an EMPTY Optional rather than clearing the cache — so a
+teardown that documented itself as restoring the classpath scan actually **pinned the slot to "no
+provider" for the rest of the JVM**. `SpiSlotTest` asserted that contract and passed anyway, because it
+probed an SPI with no registration, where pinned-empty and scanned-empty are the same observation. Fixed,
+and the test strengthened to re-arm a slot whose provider genuinely resolves.
+
+⚠ **OPEN, deliberately not changed: `AccessDeciders` has the same shape.** Its own javadoc says an absent
+provider makes both PEPs *"skip policy evaluation entirely"* — same "absence disables a safety property"
+semantics. It is left fail-soft because, unlike `OidcAuthenticator`, `PolicyEngine` requires no
+configuration and so cannot fail from a typo; its only trigger is a class-init or `LinkageError`, which is
+precisely the case PKG-5 made non-fatal on purpose. ⛔ Flipping it is therefore a **posture decision**, not
+a bug fix, and wants an operator call. (`TokenRelays` needs nothing: absence already yields a 503 at
+`AuthRoutes:86`, which is fail-safe.)

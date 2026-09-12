@@ -30,4 +30,28 @@ class SpiSlotTest {
         slot.forTest(null);
         assertTrue(slot.active().isEmpty(), "null restores classpath-scanned behaviour");
     }
+
+    /**
+     * 🔴 The assertion above CANNOT detect the bug it describes, and did not: with an unregistered SPI,
+     * "re-armed the scan" and "pinned to empty" are the same observation. {@code forTest} read
+     * {@code cached = Optional.ofNullable(t)} until 2026-09-12, so {@code forTest(null)} cached an EMPTY
+     * Optional and every later lookup returned it — the opposite of the documented teardown contract.
+     *
+     * <p>⚠ This probe re-arms a slot whose provider genuinely RESOLVES, so pinned-empty and
+     * scanned-present are distinguishable. Keep both: the one above pins the Personal-edition path, this
+     * one pins that the seam is actually released.
+     */
+    @Test
+    void nullReArmsTheScanEvenWhenTheScanWouldFindSomething() {
+        SpiSlot<SpiSlotFailClosedTest.Working> slot = new SpiSlot<>(SpiSlotFailClosedTest.Working.class);
+        assertTrue(slot.active().isPresent(), "precondition: this SPI really is registered");
+
+        SpiSlotFailClosedTest.Working fake = new SpiSlotFailClosedTest.Working() {};
+        slot.forTest(fake);
+        assertSame(fake, slot.active().orElseThrow(), "the seam wins while it is set");
+
+        slot.forTest(null);
+        assertInstanceOf(SpiSlotFailClosedTest.WorkingProvider.class, slot.active().orElseThrow(),
+                "releasing the seam must SCAN again, not pin the slot to whatever it last held");
+    }
 }
