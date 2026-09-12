@@ -854,6 +854,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   re-run **does not exercise the same build as the gauntlet** and cannot, on its own, clear a failure the
   full build produced. Use it to gather evidence, never as the proof. (Sibling of the known
   `mvn package` w/o a profile SKIPS the edition modules trap.)
+- **🔴 A PLAN SECTION CAN BE STALER THAN THE CODE IT PLANS — ground every bullet before building it.**
+  Scale-out §5.3 listed five work items on 2026-09-12; **three were already shipped**: `IntakeGovernor`'s
+  Space key (fixed 2026-09-10 — and recorded as closed in **§12 of the same document**), per-tenant ABAC
+  (shipped 2026-07-24, *seven weeks* before the bullet was read), and "partition by Space", which was
+  always a statement of direction rather than work. ⚠ The cost of not checking is building something that
+  exists; the cost of checking is one read-only grounding pass. ⛔ Treat a plan bullet exactly like a
+  BACKLOG row's stated cause — a hypothesis. **Check §12 / the defects section of the same plan first**:
+  it is where the closures get recorded when the work section does not get updated.
 - **⚠ Counting a reactor's modules by its dot-leader summary lines UNDER-reports.** A regex keyed on
   `\.{5,}` matched 12 of 32 on a full green build — which, against the "fewer than 26 = clobbered partial"
   rule, reads as a catastrophic partial. Count `^\[INFO\] Building ` lines instead, and treat a surprising

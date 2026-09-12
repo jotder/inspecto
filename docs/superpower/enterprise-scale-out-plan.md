@@ -615,6 +615,16 @@ the promote runbook's "stop A → start B" becomes automatic.
 **Invariant:** *Every Space has exactly one owning pod at any moment; no pod polls an inbox it does
 not own.*
 
+> ✅ **§5.3 CLOSED 2026-09-12.** C1 (static Space→pod assignment) and C2 (shared-inbox detection) shipped;
+> one item remains open only as a filed row, `INBOX-REGISTRY-CROSS-POD-1`.
+>
+> 🔴 **THREE of this section's five bullets were STALE — already shipped before the section was read.**
+> `IntakeGovernor`'s Space key (`SPACES-GOVERNOR-1`, 2026-09-10), per-tenant ABAC (SEC-06, **2026-07-24** —
+> seven weeks before the plan bullet was written), and "partition by Space" which was always a statement of
+> direction rather than work. ⚠ **A plan section can be staler than the code it plans**, and §12 of *this
+> same document* already recorded one of them as closed. ⛔ Ground every bullet against the code before
+> building it — see PROJECT_NOTES §4.
+
 Work:
 - **Partition by Space, not by pipeline** (D3). Spaces are already the tenant boundary and the
   namespace for every store and directory (§3.8); pipelines within a Space share inboxes, ledgers and
@@ -721,8 +731,21 @@ Work:
   reads as global) but it is **configuration**, not run state, so the lease is the wrong home for it.
   ⛔ Do not fold it into §5.2. It needs its own decision: either a shared config row, or route
   system-scope writes through a single owner. **Not built; filed for the board.**
-- **Per-tenant ABAC** — the security module's existing data-scoped grants, extended so a subject's
-  Space grant is enforced identically on whichever pod serves the request.
+- ✅ **Per-tenant ABAC — ALREADY SHIPPED, this bullet was STALE** (SEC-06, 2026-07-24; `EDITIONS.md:111`).
+  Re-grounded 2026-09-12: `PolicyEngine` seeds `space-isolation` and `space-isolation-rows`
+  (`PolicyEngine.java:60-66`), enforced **per request** at both PEPs — route level
+  (`ControlApi.authorize:809-818`, DENY→403) and row level (`RowScope.visible:30-42`, DENY→404/filtered).
+  Pinned by `PolicyEngineTest.java:150-154,208-236` and `ControlApiPolicyEnforcementTest`.
+
+  ⚠ **"Identically on whichever pod" is already true, for a reason worth stating**: grants live in the
+  per-space `roles.toon` / `access-policies.toon` under the Space's config root and are re-read per request
+  (mtime-checked) — only the authored *document* is cached, never a decision. So there is no per-process
+  grant state to converge. ⛔ Do not add a cross-pod grant store; there is nothing per-pod to share.
+
+  ⚠ **The residual is wiring, not engineering**: the seed policies engage only once a `space` claim is
+  mapped onto `Subject.attributes()` — unmapped means no isolation, deliberately ("never a bricked API").
+  🔴 That is **not** blocked on an IdP: ABAC needs a `space` claim from *some* `Authenticator`, not OIDC
+  specifically. Personal ships auth-free by design, so ABAC is inert there — an edition boundary, not a gap.
 
 ### 5.4 The shared lakehouse — visibility is the catalog commit
 
