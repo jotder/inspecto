@@ -108,11 +108,25 @@ public final class EnrichmentEngine {
      * As {@link #runResult(EnrichmentConfig, List, List)}, additionally naming the unit of work so
      * Decision Rules can check the output: {@code ruleTargets} are extra {@code targetType: job}
      * names to match (the wrapping job's — the enrichment's own name always matches), and
-     * {@code runId} correlates each {@code decision-rule.applied} signal with the run's audit row.
+     * {@code consignmentId} correlates each {@code decision-rule.applied} signal with the audit row
+     * <em>and</em> is what the §11.3 registry rows are keyed on.
+     *
+     * <p>🔴 <b>This parameter was called {@code runId} until 2026-09-12, and it never held one.</b> It is
+     * the <b>unit of work</b> — {@code GLOSSARY.md} §6-A separates the two: {@code Run ⊇ Consignment ⊇ File},
+     * so a Run is the <em>attempt</em> and a reprocess is a new Run over the <em>same</em> Consignment.
+     * The value callers actually pass confirms it: {@code EnrichJob} mints
+     * {@code cfg.name() + "-job-" + runStamp()}, an audit stamp used as the unit of work. Renaming it is
+     * a precondition of slice 3 of {@code docs/superpower/run-model-plan.md} — that slice gives this path
+     * a REAL run id, and two different concepts could not keep sharing one name in one argument list.
+     *
+     * <p>⚠ It is still handed to {@link DecisionRuleApplier.Subject#enrichment} whose third argument fills
+     * a slot the signal payload publishes under the key {@code "run"} — so that payload currently reports a
+     * Consignment id under a run label. That is a <b>pre-existing</b> mismatch in an emitted payload, left
+     * alone here deliberately: changing a published key is observable behaviour, not a rename.
      */
     public static Result runResult(EnrichmentConfig cfg, List<Map<String, String>> partitionFilter,
                                    List<PipelineConfig> pipelines, List<String> ruleTargets,
-                                   String runId) throws Exception {
+                                   String consignmentId) throws Exception {
         File db = DuckDbUtil.tempDbFile("enrich_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
             // Enrichment has no per-config processing.duckdb section; honour the global -D caps so this
@@ -143,7 +157,7 @@ public final class EnrichmentEngine {
             //     EnrichmentAuditWriter sibling-suffix convention).
             String baseName = cfg.name().toLowerCase().replace(' ', '_');
             DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(conn, "__enriched",
-                    DecisionRuleApplier.Subject.enrichment(cfg.name(), ruleTargets, runId),
+                    DecisionRuleApplier.Subject.enrichment(cfg.name(), ruleTargets, consignmentId),
                     cfg.output().database() + "_quarantine", baseName,
                     (c, routedTable, dest) -> {
                         List<PartitionOutput> routed = PartitionWriter.write(c, routedTable,
@@ -154,9 +168,9 @@ public final class EnrichmentEngine {
                         // __enriched's GROUP BY; count routedTable here, while it is still live.
                         // producer is the enrichment, not `dest`: a routed destination can be written by
                         // more than one enrichment.
-                        if (runId != null)
+                        if (consignmentId != null)
                             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
-                                    runId, null, dest, routed,
+                                    consignmentId, null, dest, routed,
                                     ConsignmentOutputs.countByPartition(c, routedTable,
                                             cfg.output().partitions()),
                                     boundsOf(c, routedTable, cfg), cfg.name()));
@@ -170,14 +184,16 @@ public final class EnrichmentEngine {
                     baseName, cfg.output().partitions(), List.of());
             // §11.3 slice 2 — register the main write's files before the routed ones are merged in below (those
             // registered themselves, from their own relation). There is no lineage matrix on this path, so the
-            // per-file count comes from a GROUP BY over the relation just written. `runId` is the unit of work
-            // for a recompute; the run_id column stays null until §13's Run model gives it a distinct identity.
+            // per-file count comes from a GROUP BY over the relation just written. `consignmentId` is the unit
+            // of work for a recompute; the run_id column stays null on THIS path until slice 3 of
+            // docs/superpower/run-model-plan.md lands — EnrichJob implements only the legacy no-arg run(), so
+            // no JobContext (and therefore no run id) reaches here at all.
             // `bounds` is recorded when the output DECLARES its event time, which `output.partitions` can
             // now carry as the sink's `{column, source}` map entry (2026-08-11). Null without one, exactly
             // as before the key existed.
-            if (runId != null)
+            if (consignmentId != null)
                 ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
-                        runId, null, cfg.name(), outputs,
+                        consignmentId, null, cfg.name(), outputs,
                         ConsignmentOutputs.countByPartition(conn, "__enriched", cfg.output().partitions()),
                         boundsOf(conn, "__enriched", cfg), cfg.name()));
 

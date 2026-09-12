@@ -89,6 +89,31 @@ null there and that path still writes a NULL `run_id`. The call is now `ctx == n
 | `EnrichmentEngine:158`/`:179` | via `EnrichJob`, which implements only the legacy no-arg `run()` |
 | `PipelineJobRunner.run()` → `execute(null)` | the legacy no-arg `Job` entry point (**found 2026-09-12 during slice 2**) |
 
+### 4.2 ✅ Slice 3's precondition CLEARED 2026-09-12 — and it exposed a bigger finding
+
+`EnrichmentEngine.runResult`'s fifth parameter was named `runId` and **never held one**: it is passed as
+the `consignmentId` argument to `ConsignmentOutputs.fromPartitionCounts` at `:158`/`:179`. Renamed to
+`consignmentId` (no behaviour change, callers are positional).
+
+🔴 **But do NOT rename the callers' locals to match — the conflation is real, not cosmetic.** All three
+callers (`EnrichJob:36`, `EnrichmentProcessor:48`, `EnrichmentService:200`) mint ONE string and use it for
+**both** identities at once:
+
+| Use | What it is there |
+|---|---|
+| `EnrichmentAuditWriter` row, `ConsignmentEvent(…)` | an **audit run id** — the attempt |
+| `ConsignmentOutputs.fromPartitionCounts(…)` → registry | the **Consignment id** — the unit of work |
+
+⚠ So on the enrichment path **Run and Consignment are currently the same string**, which is why nobody
+noticed the missing run id: the value was already there, wearing the wrong hat. ⛔ Slice 3 on this path is
+therefore **not** "thread a run id in" — it is "**split one identity into two**", and the split changes
+what the audit and event rows mean. That is a behaviour change and needs the §6 decision first.
+
+⚠ A related **pre-existing** mismatch is left alone deliberately:
+`DecisionRuleApplier.Subject.enrichment`'s third argument fills a slot the signal payload publishes under
+the key `"run"` (`DecisionRuleApplier:290`), so that payload reports a Consignment id under a run label.
+Changing a published key is observable behaviour, not a rename — fold it into slice 3.
+
 🔴 **Fix the naming collision in slice 3.** `EnrichmentEngine.runResult(..., String runId)` (`:115`) passes
 its `runId` local as the **`consignmentId`** argument at `:158`/`:179`, while the actual `run_id` column
 gets a literal `null` beside it. That local holds `cfg.name() + "-job-" + runStamp()` from
