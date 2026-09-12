@@ -91,11 +91,17 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-*(2026-09-11, from the whitepaper review — two decisions the brochure's claims depend on:)*
+*(2026-09-12: **`RECON-CARDINALITY-1` DECIDED — BUILD IT.** Operator chose to build one-to-many /
+many-to-many recon matching rather than drop the phrase from whitepaper §4. ⚠ **The brochure stays untrue
+until it lands**, which is the cost the decision accepts; ⛔ do not quietly soften the whitepaper in the
+meantime — that would convert a tracked gap into an untracked one. Moved to §3 as a build row. **§1 is
+EMPTY again** — every operator decision on the board is answered.)*
 
-| Decision | Why it is a decision, not a build | Unblocks |
-|---|---|---|
-| **`RECON-CARDINALITY-1`** — add one-to-many / many-to-many match modes to reconciliation, or drop the claim | `ReconService` supports `exact` / `absolute` / `percent` tolerance and key matching only; cardinality is not a recon option. The brochure asserts it. Building it is an M; dropping it is a sentence | whether §4 of the whitepaper keeps the phrase |
+*(2026-09-12: four more decisions answered in one sitting, all recorded on their own rows in §4 —
+`CONSIGNMENT-ID-DETERMINISTIC-1` (paths+sizes digest, no checksum), `POD-SCOPE-DIVERGENCE-1` (declare
+per-pod scope in payloads), `INBOX-REGISTRY-CROSS-POD-1` (shared ops-DB registry), and
+`JOB-PIPELINE-PARAM-UNIQUE-1` (warn only — closed). Plus **D4 SIGNED**: option (ii), object store +
+DuckLake catalog on Postgres — see the scale-out plan §5.4.)*
 
 *(2026-09-12: **`PKG-5` DECIDED and SHIPPED same day.** Operator: the assistant ships **Standard and
 Enterprise, as an optional component** — taken first as "all editions, optional" and narrowed once the
@@ -199,6 +205,15 @@ it was; both are corrected below.
 
 ## 3. Product features — decided or unblocked, simply unbuilt
 
+
+- **P2** · **`RECON-CARDINALITY-1` — one-to-many / many-to-many recon matching.** ✅ **DECIDED 2026-09-12
+  (operator): BUILD it**, rather than drop the claim from whitepaper §4. `ReconService` supports key
+  matching with `exact`/`absolute`/`percent` tolerance only; cardinality is not a match option today.
+  ⚠ An **M**, and the design half is the hard half, not the code: *what is a "break" when one row
+  legitimately matches three?* Settle the break semantics before building the matcher, or the Incident
+  counts become meaningless. ⚠ **Until it lands the brochure is untrue** — that is the accepted cost of
+  choosing build over drop; ⛔ do not soften the whitepaper meanwhile, which would hide a tracked gap.
+  → whitepaper §4
 Grouped by area. A row with lettered items keeps the letters of its source doc so the two stay aligned.
 
 ### Authoring (Parse / Transform / pipeline editor)
@@ -820,6 +835,28 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ## 4. Engineering / tech-debt
 
 - **P1** · **`CONSIGNMENT-ID-DETERMINISTIC-1` — a Consignment's identity is the wall clock, so two executors
+  ✅ **DECIDED 2026-09-12 (operator): the id is a digest over the batch's SORTED RELATIVE PATHS + BYTE
+  SIZES**, alongside the existing `slug`/`seq`. ⛔ Not a content checksum — that would cost a full read of
+  every member file at plan time, on every run, before any work begins. `Member.file()` and `.bytes()` are
+  already in scope at the mint site (`ConsignmentPlanner.buildBatch:106-117`), so this costs **zero new
+  I/O**. ⛔ Not mtime either: it is not preserved across copies, restores or container mounts, so it would
+  reopen duplication from another direction.
+
+  ⚠ **ACCEPTED RESIDUAL, deliberate and not an oversight:** a member file edited **in place to the same
+  byte length** yields the same id, so a genuine re-run over changed content is treated as the same
+  Consignment. The operator took this knowingly against the I/O cost of hashing. ⛔ Do not "fix" it by
+  quietly adding a checksum — that reverses a decision; re-open the row instead. ⚠ Worth stating in
+  operator docs: *an in-place same-size edit is not a new Consignment.*
+
+  🔴 **ORDER IS LOAD-BEARING — identity FIRST, constraints SECOND.** `seq` restarts at 1 per run and
+  `slug` is the table key, so today two *different* batches of one table in the same second mint the same
+  `batchId`. Adding the unique constraint + CAS **before** the id is deterministic converts a visible
+  duplication defect into **silent data loss** (the second batch's rows vanish on conflict). Grounded
+  2026-09-12; ⛔ do not reorder.
+
+  ⚠ Migration is smaller than it looks: nothing parses `batchId` apart (greps for split/substring/regex
+  are empty), so no reader breaks. The one durable name is the **manifest filename** on disk
+  (`ManifestStore.java:24`, and `supersede` rebuilds the same path).
   can never agree on it.** `batchId` is `String.format("%s_%s_%04d", ts, slug, seq)`
   (`ConsignmentPlanner.java:115`) where `ts` is `LocalDateTime.now()` at **second** granularity
   (`PipelineConfig.java:1472-1475`); `slug` and `seq` are deterministic from the input files, so **only the
@@ -900,6 +937,14 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ONE — and §7 warns by name against the substitution.
   → `superpower/enterprise-scale-out-plan.md` §7, §5.2
 - **P2** · **`POD-SCOPE-DIVERGENCE-1` — six places where "global" silently becomes "per-pod".**
+  ✅ **DECIDED 2026-09-12 (operator): DECLARE the per-pod scope in the payloads.** Keep the behaviour;
+  end the silence. `GET /system/scheduler` states that its values are this pod's; `GET /spaces` and
+  `GET /bootstrap` state that the roster is this pod's. ⛔ Not a shared config row and not a single-owner
+  write path — both were weighed and refused as disproportionate for now.
+  ⚠ **Consequence the decision accepts:** an operator must set system-scope knobs on **every** pod, and
+  the **UI becomes responsible for unioning** the Space list across pods. That second half is real work
+  and is filed as `UI-POD-SCOPE-UNION-1` — ⛔ declaring the scope without the UI acting on it leaves the
+  operator exactly as misled, just with more JSON.
   🔴 **Consolidates and REPLACES `SPACES-LIST-PER-POD-1` and `INTAKE-POLICY-SYSTEM-SCOPE-1`** (filed
   separately 2026-09-12, before a census showed they were two samples of one defect). ⚠ Both
   **undercounted**: the intake row named ONE static; `PUT /system/scheduler` fans out to **four**.
@@ -945,7 +990,24 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   responsible for unioning. ⚠ Related but a DIFFERENT remedy, so kept separate:
   `INBOX-REGISTRY-CROSS-POD-1`. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 
+- **P2** · **`UI-POD-SCOPE-UNION-1` — the UI must union the Space list across pods.**
+  Derived 2026-09-12 from `POD-SCOPE-DIVERGENCE-1`'s decision (declare per-pod scope in payloads rather
+  than share the state). Once `GET /spaces` and `GET /bootstrap` declare that their roster is **this
+  pod's**, something has to act on that declaration — otherwise the operator is exactly as misled as
+  before, just with more JSON. 🔴 The `/bootstrap` case is the sharp one: it feeds the SPA's space-switcher
+  on every page load, so a reload landing on a different pod can drop a Space the user was just in.
+  **Work:** union across pods for the switcher, or state plainly in the UI which pod answered and that the
+  list is partial. ⚠ Depends on the backend half of `POD-SCOPE-DIVERGENCE-1` landing first (the payload
+  needs the scope field before the UI can read it). → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
+
 - **P2** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
+  ✅ **DECIDED 2026-09-12 (operator): build the SHARED REGISTRY of declared inboxes** — an ops-DB family
+  in the shape `RunLease` already uses, written at config-write time and checked across pods. ⛔ Rejected:
+  requiring `dirs.poll` to resolve under its declaring Space's root. That would prevent collisions
+  structurally with no new infrastructure, but it **bans an external vendor drop directory** outside the
+  Space tree — legitimate, common, and already in use — so it would break existing deployments.
+  ⚠ This remains **detection**, not prevention: it turns an undetectable cross-pod collision into a loud
+  one. Prevention would need the containment rule that was just refused.
   The C2 audit (`SpaceInboxAudit`, shipped 2026-09-12) warns when two Spaces **hosted by this pod** declare
   the same `dirs.poll`. 🔴 Once Spaces are partitioned across pods (C1), the dangerous case is two Spaces on
   **different** pods sharing a directory — and that is **undetectable locally**, because no pod can see
@@ -959,6 +1021,10 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - ✅ **SUPERSEDED 2026-09-12 by `POD-SCOPE-DIVERGENCE-1`** · **`INTAKE-POLICY-SYSTEM-SCOPE-1`** — it named one
   static; the census found `PUT /system/scheduler` diverges **four**. See that row.
 - ✅ **SHIPPED 2026-09-12 (the warning half)** · **`JOB-PIPELINE-PARAM-UNIQUE-1` — nothing validates that two jobs target the same pipeline.**
+  ✅ **CLOSED 2026-09-12 (operator): WARN ONLY — it must never refuse.** Two jobs on one pipeline with
+  different schedules or params may be deliberate, so failing closed would refuse valid deployments.
+  ⛔ Do not revisit as a refusal without re-opening this decision. The audit + the named skip message are
+  the whole deliverable, and both shipped.
   A job's `name` is the only unique key (`JobService.jobs` is keyed by it); the pipeline a `type: pipeline`
   job targets is a **param** (`params.pipeline`, read at `JobService.java:1258`), and no config-load or
   route-level check rejects two `JobConfig`s carrying the same value. Filed 2026-09-12 while shipping B3.

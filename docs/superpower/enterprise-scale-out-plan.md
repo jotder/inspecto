@@ -782,6 +782,19 @@ Work:
 
 ### 5.4 The shared lakehouse — visibility is the catalog commit
 
+
+> ✅ **D4 SIGNED 2026-09-12 (operator): option (ii) — object store + DuckLake catalog on Postgres.**
+> A Parquet file becomes visible to every pod exactly when its catalog transaction commits. ⛔ Option (i)
+> (shared POSIX volume) is REFUSED: it keeps `PartitionWriter`'s rename-reveal untouched and is the smaller
+> code change, but it puts a POSIX-semantics filer in every Enterprise deployment and rests on cross-node
+> rename/locking behaviour that is a known source of subtle faults.
+>
+> ⚠ **Signing D4 unblocks §5.4's DESIGN, not its execution here.** It needs an object store **and**
+> Postgres; this sandbox has neither (Docker daemon down, no MinIO), so §5.4 cannot be gate-verified in
+> this checkout — the same constraint that leaves C1/C2 unit-verified only.
+> ⚠ `DUCKLAKE-COMMIT-COUNT-1` is its stated precondition: **no test would catch a double catalog
+> registration**, and the double-emit hazard is implementation-order, so it would otherwise ship green.
+> ⛔ Build that guard before the visibility work, not after.
 **Invariant:** *A Parquet file written by any pod is visible to every pod exactly when its DuckLake
 catalog transaction commits — never before, never partially.*
 
