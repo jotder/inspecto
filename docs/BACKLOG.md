@@ -836,7 +836,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 - **P1** · **`CONSIGNMENT-ID-DETERMINISTIC-1` — a Consignment's identity is the wall clock, so two executors
   🟡 **HALF SHIPPED 2026-09-12 — the IDENTITY half.** `ConsignmentId` mints
-  `<slug>_<sha256(sorted relPath bytes)>_<seq>`; `runTimestamp` is gone from the id, which was the ONLY
+  `<slug>_<sha256(sorted relPath\0bytes)>_<seq>`; `runTimestamp` is gone from the id, which was the ONLY
   non-deterministic input. Paths are relativized against the **poll root** (threaded into
   `ConsignmentPlanner.plan`) with `/` separators, so two pods mounting the same data at different paths —
   or on different OSes — agree. A member outside the root (an `UnpackStage` expansion) falls back to its
