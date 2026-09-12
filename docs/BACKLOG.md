@@ -899,17 +899,52 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `send`/`awaitRun` helpers. ⛔ That test is NOT prior art for two control planes — it is several Spaces in
   ONE — and §7 warns by name against the substitution.
   → `superpower/enterprise-scale-out-plan.md` §7, §5.2
-- **P2** · **`SPACES-LIST-PER-POD-1` — `GET /spaces` returns only the answering pod's Spaces.**
-  Found 2026-09-12 by the all-Spaces sweep C1 owed. Exactly four sites iterate every hosted Space —
-  `SpaceRoutes.java:45` (`GET /spaces`), `BootstrapRoutes.java:108`, `SchedulerRoutes.java:85,256` — and
-  all read `SpaceManager.all()`, so all are **correct** under partitioning: they only ever see what this
-  pod booted. ⚠ The consequence is user-visible, though: once Spaces are partitioned (C1), the space list
-  a UI receives **depends on which pod served the request**, with nothing saying so. An operator sees a
-  partial estate and cannot tell it is partial. **Work:** either aggregate across pods for the listing
-  routes, or state the pod's scope in the response so the UI can say "showing this pod's Spaces".
-  ⚠ Third instance of one pattern — see `INTAKE-POLICY-SYSTEM-SCOPE-1` and `INBOX-REGISTRY-CROSS-POD-1`:
-  a read or write that is implicitly *global* on one node silently becomes *per-pod* on N. 🔴 Worth
-  deciding as ONE question rather than three rows. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
+- **P2** · **`POD-SCOPE-DIVERGENCE-1` — six places where "global" silently becomes "per-pod".**
+  🔴 **Consolidates and REPLACES `SPACES-LIST-PER-POD-1` and `INTAKE-POLICY-SYSTEM-SCOPE-1`** (filed
+  separately 2026-09-12, before a census showed they were two samples of one defect). ⚠ Both
+  **undercounted**: the intake row named ONE static; `PUT /system/scheduler` fans out to **four**.
+
+  **The shape:** state or an endpoint that is implicitly *global* on one node becomes *per-pod* once
+  Spaces are partitioned (C1) — with **nothing reporting the divergence**. ⛔ Decide this once, as one
+  question; fixing it six times independently is how the answers end up inconsistent.
+
+  **A. One write, four divergent statics** — `PUT /system/scheduler` (`SchedulerRoutes.java:67`), which
+  its own doc calls "system scope", hot-applies on the receiving pod only:
+  | Static | Set at | On N pods |
+  |---|---|---|
+  | `ConcurrencyBroker` **system** cap (`ConcurrencyBroker.java:41-44`) | `SchedulerRoutes.java:226` | other pods keep boot value |
+  | `IntakeGovernor` fleet `policy` (`IntakeGovernor.java:21`) | `SchedulerRoutes.java:227` | ditto |
+  | `DuckDbUtil.installedMemoryLimit` (`DuckDbUtil.java:199`) | `SchedulerRoutes.java:247` | ditto |
+  | `JobService.installedMaxConcurrentRuns` (`JobService.java:202`) | `SchedulerRoutes.java:253` | ditto |
+  ⚠ `installResourceCaps` *does* fan out across `spaces().all()` — but only on **this** pod, so a
+  `JobService` on another pod (or constructed later) never sees the write. ⚠ `GET /system/scheduler`
+  returns the answering pod's values with **no field saying they may differ**, so the divergence is not
+  even observable. ⛔ Their per-Space siblings (`ConcurrencyBroker.setSpaceCap`, the governor's
+  per-pipeline caps) are Space-keyed and **correct** — do not "fix" those.
+
+  **B. Two reads that report only the answering pod's roster:** `GET /spaces`
+  (`SpaceRoutes.java:45`) and `GET /bootstrap`'s `spaces` field (`BootstrapRoutes.java:107`). 🔴 The
+  bootstrap one is the worse of the two: it feeds the SPA's space-switcher on every page load, so a
+  reload landing on a different pod can drop a Space the user was just in.
+
+  **C. ⚠ One to verify, not yet confirmed:** `EventLog.global()` as the sink for SLA-breach
+  (`ObjectService.java:874`) and boot-violation (`SpaceLayoutContract.java:107`) events — not Space-keyed,
+  and possibly unreadable from a per-Space Events view. ⚠ May be a pre-existing single-tenant-era bug
+  unrelated to partitioning. **Confirm before bundling it into the fix.**
+
+  **Ruled OUT explicitly** (Space-keyed, therefore correct under partitioning — ⛔ do not re-file):
+  `IntakeGovernor` per-pipeline caps, `ConcurrencyBroker` space cap, `AcquisitionLedgers`,
+  `CircuitBreaker`, `GapTracker`, `StabilityGate`, `ConsignmentOutputStores`, `DedupLedgers`,
+  `FileStages`, `ProvenanceStores`, `ConnectionRegistry` (`PROFILES` keyed on `currentSpaceId()`),
+  `CurrentSpace` (an MDC key, not state), `DiscoveredRoots` (a per-pod path jail — local by design),
+  `MetricRegistry` (per-pod scrape is normal), `OperationalDb` (stateless over `-D`).
+
+  **Work — needs a DECISION first, one of:** (i) route system-scope writes through a single owner;
+  (ii) persist them in a shared config row (the ops-DB family shape the lease already uses); or
+  (iii) accept per-pod scope and **say so** in the payloads — cheapest, and honest, but it makes the UI
+  responsible for unioning. ⚠ Related but a DIFFERENT remedy, so kept separate:
+  `INBOX-REGISTRY-CROSS-POD-1`. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
+
 - **P2** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
   The C2 audit (`SpaceInboxAudit`, shipped 2026-09-12) warns when two Spaces **hosted by this pod** declare
   the same `dirs.poll`. 🔴 Once Spaces are partitioned across pods (C1), the dangerous case is two Spaces on
@@ -921,19 +956,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `dirs.poll` to resolve under its declaring Space's root. ⛔ The latter is NOT a free win — an external
   vendor drop directory outside the Space tree is a legitimate, common arrangement, so making containment
   mandatory is a product decision, not a cleanup. → `superpower/enterprise-scale-out-plan.md` §5.3
-- **P2** · **`INTAKE-POLICY-SYSTEM-SCOPE-1` — "system scope" becomes PER-POD on N pods.**
-  `IntakeGovernor`'s per-pipeline `caps`/`overrides` are Space-keyed (`SPACES-GOVERNOR-1`, closed), but the
-  fleet-wide `Policy` is **deliberately** process-wide because `PUT /system/scheduler` is system scope
-  (`IntakeGovernor.java:21,91`). Correct on one node; on N pods an operator's policy write lands on
-  whichever pod served the request and **every other pod keeps its boot-time policy**, with nothing
-  reporting the divergence — so intake admission differs per pod and the UI shows whichever pod answered.
-  Filed 2026-09-12 while re-grounding the (stale) `IntakeGovernor` bullet in scale-out §5.3.
-  ⚠ Same *class* as B2's cadence — per-process state that reads as global — but this is **configuration,
-  not run state**, so ⛔ the `RunLease` is the wrong home and this must not be folded into §5.2.
-  **Needs a decision, not just a build:** a shared config row (like the lease's ops-DB family), or route
-  system-scope writes through a single owner. ⚠ Scope check first — `PUT /system/scheduler` is unlikely to
-  be the only system-scope write; audit the others before choosing, or the fix lands one endpoint deep.
-  → `superpower/enterprise-scale-out-plan.md` §5.3
+- ✅ **SUPERSEDED 2026-09-12 by `POD-SCOPE-DIVERGENCE-1`** · **`INTAKE-POLICY-SYSTEM-SCOPE-1`** — it named one
+  static; the census found `PUT /system/scheduler` diverges **four**. See that row.
 - ✅ **SHIPPED 2026-09-12 (the warning half)** · **`JOB-PIPELINE-PARAM-UNIQUE-1` — nothing validates that two jobs target the same pipeline.**
   A job's `name` is the only unique key (`JobService.jobs` is keyed by it); the pipeline a `type: pipeline`
   job targets is a **param** (`params.pipeline`, read at `JobService.java:1258`), and no config-load or
