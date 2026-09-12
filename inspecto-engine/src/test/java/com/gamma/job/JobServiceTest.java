@@ -947,4 +947,157 @@ class JobServiceTest {
             assertTrue(js.runsFor("fresh").isEmpty(), "no prior run = no baseline = no catch-up");
         }
     }
+
+    // ── Scale-out plan §5.2: the two RunClaims exclusions on the job run path ───────────
+
+    /**
+     * A genuine non-reentrant per-key exclusion — the test stand-in for a {@code DbRunLease}. Shared
+     * between two {@link JobService} instances it is exactly the cross-pod case; held directly by the
+     * test thread it pins <b>which key</b> a gate uses, with no timing.
+     */
+    private static final class KeyedClaims implements RunClaims {
+        private final Set<String> held = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        @Override public Claim tryClaim(String key) {
+            if (!held.add(key)) return null;
+            return () -> held.remove(key);
+        }
+    }
+
+    private static JobConfig heartbeat(String name) {
+        return maintenance(name, null, null, Map.of("task", "heartbeat"));
+    }
+
+    @Test
+    void aFiringIsTurnedAwayWhileAnotherNodeHoldsTheJobsArmingClaim(@TempDir Path dir) throws Exception {
+        // §5.2: the per-instance Scheduler keeps firing on every pod; the arming claim is what makes
+        // exactly one of those fires run. Holding the claim here IS the other pod.
+        KeyedClaims claims = new KeyedClaims();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(heartbeat("hb")), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            js.armingClaims(claims);
+            js.start();
+            try (RunClaims.Claim otherPod = claims.tryClaim("hb")) {
+                assertNotNull(otherPod, "the other pod took the claim first");
+                assertTrue(js.trigger("hb"));
+                JobRun run = await(() -> js.lastRunOf("hb").orElse(null));
+                assertEquals("SKIPPED", run.status(), "a claimed job must not run a second time");
+                assertEquals("another node is running this job", run.message());
+            }
+            // and once the other pod lets go, the very same job runs
+            assertTrue(js.trigger("hb"));
+            JobRun after = await(() -> js.lastRunOf("hb").filter(r -> !"SKIPPED".equals(r.status())).orElse(null));
+            assertEquals("SUCCESS", after.status(), "the claim gates the run, it does not poison the job");
+        }
+    }
+
+    @Test
+    void theArmingClaimIsKeyedByJobNameSoUnrelatedJobsStillRun(@TempDir Path dir) throws Exception {
+        // the discriminator for the key: holding some OTHER name must not turn this job away.
+        KeyedClaims claims = new KeyedClaims();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(heartbeat("hb")), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            js.armingClaims(claims);
+            js.start();
+            try (RunClaims.Claim unrelated = claims.tryClaim("some_other_job")) {
+                assertNotNull(unrelated);
+                assertTrue(js.trigger("hb"));
+                JobRun run = await(() -> js.lastRunOf("hb").orElse(null));
+                assertEquals("SUCCESS", run.status(), run.message());
+            }
+        }
+    }
+
+    @Test
+    void aPipelineJobIsTurnedAwayWhileItsAuthoredPipelineIsClaimed(@TempDir Path dir) throws Exception {
+        // 🔴 The hole this closes: triggerPipelineRun builds a synthetic job named after the PIPELINE ID,
+        // while a registered job targeting that same flow carries its OWN name — so the job-name lock
+        // (LockingRunner) does not exclude them and both run the one flow at once. Keyed on the flow, it does.
+        String dataDir = dir.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(dir.resolve("flows"));
+        writeRollupFlow(store, "evt_rollup");
+        KeyedClaims claims = new KeyedClaims();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString(), null, store, dataDir)) {
+            js.authoredClaims(claims);
+            js.start();
+            js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1")));
+            // the ad-hoc run of evt_rollup is in flight — i.e. something holds the FLOW
+            try (RunClaims.Claim adhoc = claims.tryClaim("evt_rollup")) {
+                assertNotNull(adhoc);
+                assertTrue(js.trigger("nightly"));
+                JobRun run = await(() -> js.lastRunOf("nightly").orElse(null));
+                assertEquals("SKIPPED", run.status(), "two names, one flow — they must not overlap");
+                assertEquals("authored pipeline 'evt_rollup' is already running", run.message());
+            }
+        }
+    }
+
+    @Test
+    void theAuthoredClaimIsKeyedByThePipelineAndNotTheJobName(@TempDir Path dir) throws Exception {
+        // ⛔ the discriminator that keeps authoredPipelineKey() honest: claiming the job's NAME must not gate it.
+        // If authoredPipelineKey ever returned `name`, this job would be SKIPPED instead of running.
+        String dataDir = dir.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(dir.resolve("flows"));
+        writeRollupFlow(store, "evt_rollup");
+        KeyedClaims claims = new KeyedClaims();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString(), null, store, dataDir)) {
+            js.authoredClaims(claims);
+            js.start();
+            js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b2")));
+            try (RunClaims.Claim byName = claims.tryClaim("nightly")) {
+                assertNotNull(byName);
+                assertTrue(js.trigger("nightly"));
+                JobRun run = await(() -> js.lastRunOf("nightly").orElse(null));
+                assertEquals("SUCCESS", run.status(),
+                        run.message() + " -- the flow claim must not key on the job name");
+            }
+        }
+    }
+
+    @Test
+    void aNonPipelineJobIsNeverGatedByTheAuthoredClaim(@TempDir Path dir) throws Exception {
+        // authoredPipelineKey() returns null for every other type, so a deny-everything flow lease is inert for them.
+        RunClaims denyAll = key -> null;
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(heartbeat("hb")), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            js.authoredClaims(denyAll);
+            js.start();
+            assertTrue(js.trigger("hb"));
+            JobRun run = await(() -> js.lastRunOf("hb").orElse(null));
+            assertEquals("SUCCESS", run.status(), "a maintenance job has no authored pipeline to be gated on");
+        }
+    }
+
+    @Test
+    void twoPodsSharingOneLeaseRunAJobOnceBetweenThem(@TempDir Path dir) throws Exception {
+        // the end-to-end shape: two JobService instances (= two pods) over ONE shared lease.
+        KeyedClaims shared = new KeyedClaims();
+        try (Scheduler s1 = new Scheduler(); Scheduler s2 = new Scheduler();
+             JobService podA = new JobService(List.of(heartbeat("hb")), new ConsignmentEventBus(), s1, null,
+                     dir.resolve("a").toString());
+             JobService podB = new JobService(List.of(heartbeat("hb")), new ConsignmentEventBus(), s2, null,
+                     dir.resolve("b").toString())) {
+            podA.armingClaims(shared);
+            podB.armingClaims(shared);
+            podA.start();
+            podB.start();
+            // pod A's claim is held for the whole run, so pod B's simultaneous firing must skip
+            try (RunClaims.Claim podAHolds = shared.tryClaim("hb")) {
+                assertNotNull(podAHolds);
+                assertTrue(podB.trigger("hb"));
+                JobRun onB = await(() -> podB.lastRunOf("hb").orElse(null));
+                assertEquals("SKIPPED", onB.status(), "one run between the two pods, not one each");
+            }
+        }
+    }
 }

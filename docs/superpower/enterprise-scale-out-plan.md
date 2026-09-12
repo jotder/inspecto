@@ -465,6 +465,12 @@ T4 active/passive standby.
 **Invariant:** *Across N processes sharing one Postgres, a given pipeline runs at most once per
 trigger, and a lease abandoned by a dead pod is reclaimable within a bounded time.*
 
+> ✅ **§5.2 COMPLETE 2026-09-12 — B0, B1, B2, B3 all shipped.** Four lease scopes now exist and are
+> deliberately disjoint: `run` (collector-pipeline names), `acquire` (remote fetch), `job` (job names),
+> `authored` (authored-pipeline ids). `TriggerCoalescer` is an explicit non-item — coalescing stays per-pod.
+> ⛔ The four scopes key **four different id spaces**; collapsing any of them together excludes unrelated
+> units of work. See the `SCOPE_AUTHORED` note in `DbRunLease` for why that is not merely a tidiness rule.
+
 Work:
 - ✅ **SHIPPED 2026-09-12 (slice B0).** `RunLease` extracted at the `PipelineRunGuard` seam (§3.2),
   with `PipelineRunGuard` itself as the heap implementation — the default, so **Personal and single-node
@@ -551,8 +557,52 @@ Work:
   `lastRunAt` fails the cross-pod test. The elision is itself guarded by the pre-existing
   `CollectorServiceTriggerTest.intervalTriggerGatesTheLoopByItsOwnCadence` (runs on tick 1, must NOT run
   on tick 2) and `noTriggerRidesEveryPollCycle`.
-- **`JobService` cron arming goes through the same lease** — the per-instance `Scheduler` keeps
-  firing everywhere, but `submit` becomes `if (lease.tryAcquire(job)) submit`. Two arming pods, one run.
+- ✅ **SHIPPED 2026-09-12 (slice B3) — `JobService` arming + the authored-pipeline guard.** The last item in
+  §5.2. The per-instance `Scheduler` keeps firing everywhere; `runJob` now passes **three** exclusions,
+  cheapest first, each a *skip* and never a queue: this pod's own `LockingRunner`, then a **cross-pod
+  arming claim keyed by job NAME**, then — for a pipeline job — a claim on the **authored PIPELINE** it targets.
+
+  🔴 **Two keys, because the operator's decision was "job name arms, pipeline guards"** (2026-09-12).
+  The arming claim is the cross-pod form of the in-process lock: N pods arm one cron, one wins. The authored-pipeline
+  claim closes a **different, pre-existing** hole — `triggerPipelineRun` builds a synthetic config named
+  after the *pipeline id*, while a registered job targeting that same pipeline carries its *own* name, so the
+  job-name lock never excluded them and both ran the one pipeline at once. Two registered jobs sharing a
+  `pipeline:` param are the same hole; nothing validates that param for uniqueness.
+
+  🔴 **⛔ Neither claim is `runGuard`, and the premise that they could be was WRONG.** When this bullet
+  was written it was assumed a cron pipeline-job and a poll-cycle run could collide on one pipeline. They
+  cannot: `SCOPE_RUN` keys **collector-pipeline config names** (`*_pipeline.toon`, via `ConfigRegistry` /
+  `CollectorService.pathFor`), while a pipeline job keys an **authored-pipeline id** (`*_flow.toon`, via
+  `PipelineStore`) — disjoint stores, no uniqueness rule between them (`PipelineStore`'s class note states
+  the split). Sharing one lease would never have produced the intended exclusion; it would only ever fire
+  on an *accidental* name collision between two unrelated units of work. Hence `SCOPE_JOB` and
+  `SCOPE_AUTHORED` as their own scopes, pinned by `DbRunLeaseTest.theJobAndAuthoredScopesAreDisjoint`.
+
+  ⚠ **The claim is held for the WHOLE run, not just the submit.** `if (lease.tryAcquire(job)) submit` —
+  this bullet's original wording — is *not* sufficient: releasing at submit time lets the next pod claim
+  and submit the same firing, which is the double run the slice exists to stop.
+
+  ⚠ **The seam is `com.gamma.job.RunClaims`, not `RunLease`.** `RunLease` lives in **inspecto**, and
+  **inspecto depends on inspecto-engine**, so `JobService` cannot name it. `RunClaims` is the narrow
+  engine-side view; `CollectorService.claimsOver` adapts the lease onto it at wiring time. ⛔ Do not
+  "simplify" by moving `RunLease` down into the engine — it is bound to a `SpaceRoot` and opens
+  operational-DB families, neither of which the engine knows about.
+
+  ⚠ **Heap-backed by default** like every other lease, so Personal and single-node Standard *do* get the
+  authored-pipeline fix (two differently-named jobs on one pipeline stop overlapping) without a DB. The arming
+  claim is a no-op on one node, where the `LockingRunner` already covers it.
+
+  ⚠ **`authoredPipelineKey()` is shared with the deletion fence** (`trackPipelineStart` calls it rather than
+  recomputing the id). ⛔ They must not drift: if the fence and the claim ever keyed differently a job
+  would be excluded from one and not the other. Mutating `authoredPipelineKey` to return the job name fails the
+  pre-existing `flowJobRunsEndToEndAndIsTrackedWhileRunning` as well as the two new authored-pipeline tests — that
+  shared failure *is* the proof the two key off one value.
+
+  ⚠ **All four mutations were verified 2026-09-12**, each discriminating: disabling the arming gate fails
+  exactly `aFiringIsTurnedAwayWhileAnotherNodeHoldsTheJobsArmingClaim` + `twoPodsSharingOneLeaseRunAJobOnceBetweenThem`;
+  disabling the authored-pipeline gate fails exactly `aPipelineJobIsTurnedAwayWhileItsAuthoredPipelineIsClaimed`; keying
+  `authoredPipelineKey` on the job name fails the two authored-pipeline tests plus the fence test; collapsing `SCOPE_JOB`/`SCOPE_AUTHORED`
+  onto `"run"` fails `theJobAndAuthoredScopesAreDisjoint`. ⛔ Do not "simplify" any of them away.
 - **`TriggerCoalescer`** stays local: coalescing is per-pod, the lease is what makes that safe.
 
 **Why this ships value with zero pods:** this *is* T4. The signed RPO/RTO table promises a T4

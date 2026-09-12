@@ -700,14 +700,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   did not exist in the parsed config. ⇒ after editing any `.toon`, **decode it and diff the top-level key
   list**; a clean load proves nothing. (2) **Lists need counts**:
   inline `members[1]: operator` or tabular `tiles[3]{widgetId,span}:`; bare `- item` lists fail (exception:
-  authored-flow `nodes[n]:` blocks accept `- id:` maps). (3) **Alert rules need an `alert:` wrapper** and
+  authored-pipeline `nodes[n]:` blocks accept `- id:` maps). (3) **Alert rules need an `alert:` wrapper** and
   `severity` ∈ {CRITICAL, INFO, WARNING} — not WARN. (4) **Job-type params are FLAT keys under `job:`**
   (`JobConfig.fromMap` treats unknown keys as params); only `args:`/`bind:` nest. A `params:` wrapper in some
   design-doc sketches is doc-only, not the shipped parser.
 - **Authored flows live under `config/flows/` — one dir for both readers (FIXED 2026-07-10):** the UI/HTTP
   authored-pipeline CRUD always wrote `writeRoot()/flows` (= the space's `config/flows/`), but
   `DirSpaceRoot.flowsDir()` pointed `JobService`/the T32 deletion fence at a sibling `spaces/<id>/flows/`, so a
-  `type: pipeline` job couldn't resolve a UI-authored flow in multi-space mode. `flowsDir()` now returns
+  `type: pipeline` job couldn't resolve a UI-authored pipeline in multi-space mode. `flowsDir()` now returns
   `config().resolve("flows")`; a top-level `spaces/<id>/flows/` is dead (still tolerated by
   `SpaceLayoutContract` as historical) and new spaces no longer mint it. Regression test:
   `SpaceBootstrapTest.flowJobResolvesAFlowAuthoredUnderConfigFlows`.
@@ -808,6 +808,35 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `runPipeline(id)`, because its no-`trigger:` fixture is exactly the `DEFAULT_POLL` case the new
   elision stops stamping. A reflective test fails at RUN time with `NoSuchFieldException`, not at
   compile time, so the compiler will not warn you.
+- **⛔ "Pipeline" names TWO disjoint id spaces, and reusing one key across them is a silent bug.** A
+  **collector pipeline** is a `*_pipeline.toon` config, named through `ConfigRegistry` /
+  `CollectorService.pathFor`; an **authored pipeline** is a `*_flow.toon` graph in `PipelineStore`, named by a
+  pipeline job's `pipeline:`/`flow:` param. Different stores, and *nothing* enforces uniqueness between
+  them, so one literal string can denote two unrelated things. 🔴 The B3 slice was designed on the
+  assumption they were one namespace — that a cron pipeline-job could collide with a poll-cycle run — and
+  the assumption was **false**; a shared lease would have excluded unrelated work on an accidental name
+  match while fixing nothing. **Before keying any shared structure on "a pipeline id", establish which of
+  the two you have.** `PipelineStore`'s class note states the split; `DbRunLease.SCOPE_AUTHORED` records it.
+- **A per-name lock only excludes callers that agree on the name.** `JobService.runJob` serializes on the
+  **job name**, but `triggerPipelineRun` builds a *synthetic* config named after the **pipeline id**, so an
+  ad-hoc authored-pipeline run and a registered job targeting that same pipeline have different names and never
+  excluded each other — they ran the one pipeline concurrently, on a single node, for as long as both paths
+  existed. Two registered jobs sharing a `pipeline:` param are the same hole. ⚠ When a second entry point
+  is added to an existing guarded path, check it derives the **same key**, not merely that it is guarded.
+- **⚠ An exclusion claim must span the WORK, not the submit.** `if (lease.tryAcquire(x)) submit(x)` reads
+  like cross-pod arming but is not: the claim is released before the run, so the next pod claims and
+  submits the same firing. The plan bullet for B3 was written that way and had to be corrected in the
+  build. Hold the claim in the run body's `try`/`finally`.
+- **⚠ Module direction beats convenience when placing a seam.** `RunLease` lives in **inspecto**, and
+  **inspecto depends on inspecto-engine** — so `JobService` (engine) cannot name it, no matter how obviously
+  it is "the same idea". The fix is a narrow engine-side interface (`com.gamma.job.RunClaims`) that the host
+  adapts onto at wiring time. ⛔ Do not answer this by moving the richer type downward: `RunLease` is bound
+  to a `SpaceRoot` and opens operational-DB families, neither of which the engine knows about.
+- **Two things that must key off one value should CALL one function, not both compute it.** The deletion
+  fence's running-set and the B3 authored-pipeline claim both need a pipeline job's authored-pipeline id; `trackPipelineStart` now
+  calls `authoredPipelineKey()` rather than recomputing it. The payoff showed up in mutation testing: keying `authoredPipelineKey`
+  on the job name failed the *pre-existing* fence test alongside the new ones, which is the evidence they
+  genuinely share a key rather than happening to agree today.
 
 ---
 

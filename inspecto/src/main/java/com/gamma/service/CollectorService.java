@@ -445,6 +445,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             this.jobs.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             this.jobs.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
+            wireJobClaims(this.jobs);                                // §5.2: cron arming + authored-pipeline exclusion
         }
         this.semanticModels    = List.copyOf(semanticModels);
         // Invalidate the catalog whenever configs are (re)indexed — the registry is now the
@@ -1346,6 +1347,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             created.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             created.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
+            wireJobClaims(created);                                // §5.2: cron arming + authored-pipeline exclusion
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.eventStore(events);                            // event_prune maintenance task (COMPLY-3)
             created.objects(this.objects().orElse(null));           // recon.run promotion (seam; empty on Personal)
@@ -1353,6 +1355,34 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             jobs = created;
         }
         return jobs;
+    }
+
+    /**
+     * Give a {@link JobService} its two exclusions (scale-out plan §5.2): the cross-pod <b>arming</b> claim
+     * keyed by job name, and the <b>authored pipeline</b> claim keyed by a pipeline job's {@code pipeline:} param.
+     *
+     * <h3>🔴 Two leases, and neither is {@code runGuard}</h3>
+     * ⛔ Do not pass {@link #runGuard} here. That lease's key space is <b>collector-pipeline config names</b>
+     * ({@code *_pipeline.toon}, via {@link #pathFor}); a pipeline job's key is an <b>authored pipeline</b> id
+     * ({@code *_flow.toon}, via {@code PipelineStore}). The two are disjoint stores with no uniqueness rule
+     * between them, so sharing one lease would never produce the intended exclusion — it would only ever fire
+     * on an accidental name collision between two unrelated units of work. Hence {@code SCOPE_AUTHORED}.
+     *
+     * <p>⚠ Heap-backed by default like every other lease, so Personal and single-node Standard get the
+     * authored-pipeline fix (two differently-named jobs on one flow no longer overlap) without a DB.
+     */
+    private void wireJobClaims(JobService target) {
+        target.armingClaims(claimsOver(ServiceStores.openRunLease(root, DbRunLease.SCOPE_JOB)));
+        target.authoredClaims(claimsOver(ServiceStores.openRunLease(root, DbRunLease.SCOPE_AUTHORED)));
+    }
+
+    /** Adapt a {@link RunLease} onto the engine-side {@code RunClaims} seam — see that interface's class
+     *  note for why {@code JobService} cannot name {@code RunLease} (inspecto depends on inspecto-engine). */
+    private static com.gamma.job.RunClaims claimsOver(RunLease lease) {
+        return key -> {
+            RunLease.Claim claim = lease.tryAcquire(key);
+            return claim == null ? null : claim::close;
+        };
     }
 
     /** Live pipeline names, lowercased to match {@code ConsignmentEvent.pipeline()} — the valid

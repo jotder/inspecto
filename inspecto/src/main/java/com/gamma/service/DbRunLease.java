@@ -75,6 +75,24 @@ final class DbRunLease implements RunLease, AutoCloseable {
     static final String SCOPE_RUN = "run";
     /** Scope for <b>remote acquisition</b> — {@code PipelineScheduler.acquireGuard}. */
     static final String SCOPE_ACQUIRE = "acquire";
+    /**
+     * Scope for <b>job arming</b> — keyed by job NAME. The cross-pod form of {@code JobService}'s
+     * in-process {@code LockingRunner}: N pods each arm the same cron, one wins, the rest skip.
+     */
+    static final String SCOPE_JOB = "job";
+    /**
+     * Scope for a pipeline job's <b>authored pipeline</b> — keyed by the {@code pipeline:}/{@code flow:} param.
+     *
+     * <h3>🔴 This is NOT {@link #SCOPE_RUN}, and the two keys are disjoint id spaces</h3>
+     * {@code SCOPE_RUN} is keyed by a <b>collector-pipeline</b> config name ({@code *_pipeline.toon}, via
+     * {@code ConfigRegistry}/{@code CollectorService.pathFor}). This scope is keyed by an <b>authored pipeline</b>
+     * id ({@code *_flow.toon}, via {@code PipelineStore}) — see {@code PipelineStore}'s class note on the
+     * split. Nothing stops an operator giving a flow and a collector pipeline the same literal name, so
+     * pointing both at one scope would exclude two <em>unrelated</em> units of work.
+     * ⛔ Do not collapse this into {@code SCOPE_RUN}; {@code DbRunLeaseTest.theJobAndAuthoredScopesAreDisjoint}
+     * and {@code JobServiceTest.theAuthoredClaimIsKeyedByThePipelineAndNotTheJobName} are what fail.
+     */
+    static final String SCOPE_AUTHORED = "authored";
 
     private final Connection conn;
     private final String space;

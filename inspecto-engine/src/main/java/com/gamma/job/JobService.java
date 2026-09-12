@@ -135,6 +135,26 @@ public final class JobService implements AutoCloseable {
     private final Map<String, CronExpression> crons = new ConcurrentHashMap<>();
     private final Map<String, Scheduler.CronHandle> cronHandles = new ConcurrentHashMap<>();
     private final LockingRunner runner = new LockingRunner();
+    /**
+     * Cross-pod arming exclusion, keyed by <b>job name</b> (scale-out plan §5.2). The per-instance
+     * {@link Scheduler} keeps firing on every pod; this is what makes exactly one of those fires run.
+     * ⚠ The claim is held for the <b>whole run</b>, not just the submit — releasing at submit time lets
+     * the next pod claim and submit the same fire, which is the double run this exists to stop.
+     * Defaults to {@link RunClaims#GRANT_ALL} so a bare test constructor behaves as before phase B.
+     */
+    private volatile RunClaims armingClaims = RunClaims.GRANT_ALL;
+    /**
+     * Exclusion for a pipeline job's <b>authored pipeline</b> id, so two differently-named units of work that
+     * target the same authored pipeline cannot run it at once.
+     *
+     * <h3>🔴 Why the job-name lock does not already cover this</h3>
+     * {@link #triggerPipelineRun} builds a synthetic config named after the <b>pipeline id</b>, while a
+     * registered cron job targeting that same pipeline carries its <b>own</b> name. Two different names →
+     * {@link LockingRunner} does not exclude them → both run the one pipeline concurrently. Two registered
+     * jobs sharing a {@code pipeline:} param are the same hole; nothing validates that param for
+     * uniqueness. ⛔ Keyed on the authored-pipeline id, never the job name — that is the whole point.
+     */
+    private volatile RunClaims authoredClaims = RunClaims.GRANT_ALL;
     private final AtomicLong seq = new AtomicLong();
     /** Open Job Type registry (job-framework P0) — replaced the compiled-in {@link JobType} switch; the four
      *  built-ins register here in {@link #registerBuiltins()} and {@link #build} delegates to it.
@@ -1069,110 +1089,147 @@ public final class JobService implements AutoCloseable {
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
                         String correlationId, String causationId, int chainDepth, Firing firing) {
+        // Three exclusions, cheapest first, each a SKIP and never a queue (scale-out plan §5.2): this
+        // pod's own non-overlap lock, then the cross-pod arming claim on the job NAME, then — for a
+        // pipeline job — the authored PIPELINE it targets.
+        // ⚠ Every claim is held for the WHOLE run, not just the submit: releasing at submit time lets the
+        // next pod claim and submit the same firing, which is the double run this exists to stop.
         runner.runExclusiveOrSkip(name, () -> {
-            fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
-            String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a pipeline job's stores active for the fence
-            Map<String, String> params = cfg != null ? cfg.params() : Map.of();
-            RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, causationId,
-                    chainDepth, params, runLogStore, runLogMax, runArtifactStore);
-            if (unavailableJobs.contains(name)) {
-                String reason = "job type '" + job.type() + "' unavailable: owning Job Pack was unloaded";
-                ctx.log().error("run rejected: " + reason, null);
-                ctx.signals().emit("job.run.rejected", Severity.WARN,
-                        Map.of("job", name, "run", runId, "reason", reason));
-                if (pipelineId != null) runningPipelines.remove(pipelineId);
-                record(new JobRun(runId, name, job.type(), trigger, start,
-                        LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
+            RunClaims.Claim arming = armingClaims.tryClaim(name);
+            if (arming == null) {
+                recordSkip(runId, name, job, trigger, start, "another node is running this job");
                 return;
             }
-            // P3a/P3a-2: resolve the Job Type's declared parameters across the §7.2 ladder — trigger args
-            // (this fire's explicit args over any static config args:) → signal bind: → config params: →
-            // deduce → default. A missing required parameter fails the Run REJECTED before any user code.
-            List<ParameterDecl> decls = cfg != null ? registry.parameters(job.type(), cfg) : List.of();
-            Map<String, String> args = new LinkedHashMap<>(cfg != null ? cfg.args() : Map.of());
-            args.putAll(firing.args());                         // explicit manual args win over static config args:
-            Map<String, String> bind = cfg != null ? cfg.bind() : Map.of();
-            ParameterResolver.Resolution pr = ParameterResolver.resolve(decls, args, bind, params, expressions,
-                    new ExpressionContext(runId, Instant.now(), trigger, zone,
-                            () -> ledger.lastSuccessEnd(name), this::upstreamArtifact, firing.signalPayload(),
-                            com.gamma.consignment.ConsignmentOutputStores::bounds));
-            if (!pr.missingRequired().isEmpty() || !pr.invalidType().isEmpty()
-                    || !pr.unknownExpression().isEmpty()) {
-                List<String> reasons = new ArrayList<>();
-                if (!pr.missingRequired().isEmpty())
-                    reasons.add("missing required parameter(s): " + String.join(", ", pr.missingRequired()));
-                if (!pr.invalidType().isEmpty())
-                    reasons.add("invalid parameter(s): " + String.join(", ", pr.invalidType()));
-                if (!pr.unknownExpression().isEmpty())
-                    reasons.add("unknown expression(s): " + String.join(", ", pr.unknownExpression()));
-                String reason = String.join("; ", reasons);
-                ctx.log().error("run rejected: " + reason, null);
-                ctx.signals().emit("job.run.rejected", Severity.WARN,
-                        Map.of("job", name, "run", runId, "missing", pr.missingRequired(),
-                                "invalidType", pr.invalidType(),
-                                "unknownExpression", pr.unknownExpression()));
-                if (pipelineId != null) runningPipelines.remove(pipelineId);
-                record(new JobRun(runId, name, job.type(), trigger, start,
-                        LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
-                return;
-            }
-            ctx.params(pr.resolved());
-            ctx.dryRun(firing.dryRun());
-            // S1-2: grant exactly the type's declared requires: — registration already validated the
-            // ids, so this cannot throw for a registered type. Grants are honest (R4): a service that
-            // exists but was not declared stays invisible to the Run.
-            if (platform != null) {
-                PlatformServices granted = platform.grant(Set.copyOf(
-                        registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of())));
-                // S1-3/S1-4 dry-run contract (§3.4): mutating services record instead of act.
-                ctx.services(firing.dryRun() ? DryRunServices.wrap(granted, ctx.log()) : granted);
-            }
-            ctx.log().info("run started", "trigger", trigger, "params", pr.resolved(),
-                    "dryRun", firing.dryRun());   // resolved Parameter Context (R2/R5)
-            ctx.signals().emit("job.run.started", Severity.INFO,
-                    Map.of("job", name, "run", runId, "trigger", trigger));
-            JobResult res;
-            boolean threw = false;
-            // Job Pack in-flight-Run quiesce (§12.2): pin the owning pack's classloader open for the
-            // duration of job.run — a concurrent rescan/unload defers closing it until this Run finishes.
-            // No-op for built-in job types (registry.ownerOf returns empty).
-            String packOwner = registry.ownerOf(job.type()).orElse(null);
-            packs.acquireRun(packOwner);
             try {
-                res = job.run(ctx);
-            } catch (Exception e) {
-                threw = true;
-                log.error("Job '{}' ({}) failed", name, trigger, e);
-                ctx.log().error("run failed", e);
-                res = JobResult.failed(String.valueOf(e.getMessage()),
-                        0L);
+                String authoredPipelineId = authoredPipelineKey(job, cfg, name);
+                RunClaims.Claim authored = authoredPipelineId == null ? null : authoredClaims.tryClaim(authoredPipelineId);
+                if (authoredPipelineId != null && authored == null) {
+                    recordSkip(runId, name, job, trigger, start,
+                            "authored pipeline '" + authoredPipelineId + "' is already running");
+                    return;
+                }
+                try {
+                    executeRun(job, cfg, runId, name, trigger, start, correlationId, causationId,
+                            chainDepth, firing);
+                } finally {
+                    if (authored != null) authored.close();
+                }
             } finally {
-                packs.releaseRun(packOwner);
-                if (pipelineId != null) runningPipelines.remove(pipelineId);
+                arming.close();
             }
-            ctx.log().info("run completed", "status", res.status(), "durationMs", res.durationMs());
-            // One terminal lifecycle signal: job.run.failed on a thrown exception, else job.run.completed.
-            if (threw)
-                ctx.signals().emit("job.run.failed", Severity.CRITICAL,
-                        Map.of("job", name, "run", runId, "outcome", res.status(), "message", String.valueOf(res.message())));
-            else
-                ctx.signals().emit("job.run.completed", res.success() ? Severity.INFO : Severity.WARN,
-                        Map.of("job", name, "run", runId, "outcome", res.status(), "durationMs", res.durationMs()));
-            JobRun run = new JobRun(runId, name, job.type(), trigger, start,
-                    LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());
-            record(run);
-            // X2: the Consignments this run READ, beside its row. Only the DB projection carries it (the
-            // CSV ledger is the nine-column record of the run); nothing to write when the job said nothing.
-            runStore().ifPresent(rs -> rs.recordSources(runId, ctx.consignmentsRead()));
-            MetricRegistry.global().inc("inspecto_jobs_total", "Config-driven job executions",
-                    Map.of("job", name, "type", job.type(), "status", res.status()));
-            MetricRegistry.global().observe("inspecto_job_duration_seconds", "Job wall time",
-                    Map.of("job", name), res.durationMs() / 1000.0);
-            log.info("[JOB] {} ({}) {} in {}ms — {}",
-                    name, trigger, res.status(), res.durationMs(), res.message());
-        }, () ->   // a previous run is still in flight — don't overlap
+        }, () ->   // a previous run on THIS pod is still in flight — don't overlap
+            recordSkip(runId, name, job, trigger, start, "previous run still in flight"));
+    }
+
+    /** Record a {@code SKIPPED} run — one of the three exclusions in {@link #runJob} turned this firing away. */
+    private void recordSkip(String runId, String name, Job job, String trigger, String start, String why) {
+        record(new JobRun(runId, name, job.type(), trigger, start,
+                LocalDateTime.now().format(TS), "SKIPPED", 0L, why));
+    }
+
+    /** The run itself, once every exclusion in {@link #runJob} has been passed and its claims are held. */
+    private void executeRun(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
+                            String correlationId, String causationId, int chainDepth, Firing firing) {
+        fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
+        String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a pipeline job's stores active for the fence
+        Map<String, String> params = cfg != null ? cfg.params() : Map.of();
+        RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, causationId,
+                chainDepth, params, runLogStore, runLogMax, runArtifactStore);
+        if (unavailableJobs.contains(name)) {
+            String reason = "job type '" + job.type() + "' unavailable: owning Job Pack was unloaded";
+            ctx.log().error("run rejected: " + reason, null);
+            ctx.signals().emit("job.run.rejected", Severity.WARN,
+                    Map.of("job", name, "run", runId, "reason", reason));
+            if (pipelineId != null) runningPipelines.remove(pipelineId);
             record(new JobRun(runId, name, job.type(), trigger, start,
-                    LocalDateTime.now().format(TS), "SKIPPED", 0L, "previous run still in flight")));
+                    LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
+            return;
+        }
+        // P3a/P3a-2: resolve the Job Type's declared parameters across the §7.2 ladder — trigger args
+        // (this fire's explicit args over any static config args:) → signal bind: → config params: →
+        // deduce → default. A missing required parameter fails the Run REJECTED before any user code.
+        List<ParameterDecl> decls = cfg != null ? registry.parameters(job.type(), cfg) : List.of();
+        Map<String, String> args = new LinkedHashMap<>(cfg != null ? cfg.args() : Map.of());
+        args.putAll(firing.args());                         // explicit manual args win over static config args:
+        Map<String, String> bind = cfg != null ? cfg.bind() : Map.of();
+        ParameterResolver.Resolution pr = ParameterResolver.resolve(decls, args, bind, params, expressions,
+                new ExpressionContext(runId, Instant.now(), trigger, zone,
+                        () -> ledger.lastSuccessEnd(name), this::upstreamArtifact, firing.signalPayload(),
+                        com.gamma.consignment.ConsignmentOutputStores::bounds));
+        if (!pr.missingRequired().isEmpty() || !pr.invalidType().isEmpty()
+                || !pr.unknownExpression().isEmpty()) {
+            List<String> reasons = new ArrayList<>();
+            if (!pr.missingRequired().isEmpty())
+                reasons.add("missing required parameter(s): " + String.join(", ", pr.missingRequired()));
+            if (!pr.invalidType().isEmpty())
+                reasons.add("invalid parameter(s): " + String.join(", ", pr.invalidType()));
+            if (!pr.unknownExpression().isEmpty())
+                reasons.add("unknown expression(s): " + String.join(", ", pr.unknownExpression()));
+            String reason = String.join("; ", reasons);
+            ctx.log().error("run rejected: " + reason, null);
+            ctx.signals().emit("job.run.rejected", Severity.WARN,
+                    Map.of("job", name, "run", runId, "missing", pr.missingRequired(),
+                            "invalidType", pr.invalidType(),
+                            "unknownExpression", pr.unknownExpression()));
+            if (pipelineId != null) runningPipelines.remove(pipelineId);
+            record(new JobRun(runId, name, job.type(), trigger, start,
+                    LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
+            return;
+        }
+        ctx.params(pr.resolved());
+        ctx.dryRun(firing.dryRun());
+        // S1-2: grant exactly the type's declared requires: — registration already validated the
+        // ids, so this cannot throw for a registered type. Grants are honest (R4): a service that
+        // exists but was not declared stays invisible to the Run.
+        if (platform != null) {
+            PlatformServices granted = platform.grant(Set.copyOf(
+                    registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of())));
+            // S1-3/S1-4 dry-run contract (§3.4): mutating services record instead of act.
+            ctx.services(firing.dryRun() ? DryRunServices.wrap(granted, ctx.log()) : granted);
+        }
+        ctx.log().info("run started", "trigger", trigger, "params", pr.resolved(),
+                "dryRun", firing.dryRun());   // resolved Parameter Context (R2/R5)
+        ctx.signals().emit("job.run.started", Severity.INFO,
+                Map.of("job", name, "run", runId, "trigger", trigger));
+        JobResult res;
+        boolean threw = false;
+        // Job Pack in-flight-Run quiesce (§12.2): pin the owning pack's classloader open for the
+        // duration of job.run — a concurrent rescan/unload defers closing it until this Run finishes.
+        // No-op for built-in job types (registry.ownerOf returns empty).
+        String packOwner = registry.ownerOf(job.type()).orElse(null);
+        packs.acquireRun(packOwner);
+        try {
+            res = job.run(ctx);
+        } catch (Exception e) {
+            threw = true;
+            log.error("Job '{}' ({}) failed", name, trigger, e);
+            ctx.log().error("run failed", e);
+            res = JobResult.failed(String.valueOf(e.getMessage()),
+                    0L);
+        } finally {
+            packs.releaseRun(packOwner);
+            if (pipelineId != null) runningPipelines.remove(pipelineId);
+        }
+        ctx.log().info("run completed", "status", res.status(), "durationMs", res.durationMs());
+        // One terminal lifecycle signal: job.run.failed on a thrown exception, else job.run.completed.
+        if (threw)
+            ctx.signals().emit("job.run.failed", Severity.CRITICAL,
+                    Map.of("job", name, "run", runId, "outcome", res.status(), "message", String.valueOf(res.message())));
+        else
+            ctx.signals().emit("job.run.completed", res.success() ? Severity.INFO : Severity.WARN,
+                    Map.of("job", name, "run", runId, "outcome", res.status(), "durationMs", res.durationMs()));
+        JobRun run = new JobRun(runId, name, job.type(), trigger, start,
+                LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());
+        record(run);
+        // X2: the Consignments this run READ, beside its row. Only the DB projection carries it (the
+        // CSV ledger is the nine-column record of the run); nothing to write when the job said nothing.
+        runStore().ifPresent(rs -> rs.recordSources(runId, ctx.consignmentsRead()));
+        MetricRegistry.global().inc("inspecto_jobs_total", "Config-driven job executions",
+                Map.of("job", name, "type", job.type(), "status", res.status()));
+        MetricRegistry.global().observe("inspecto_job_duration_seconds", "Job wall time",
+                Map.of("job", name), res.durationMs() / 1000.0);
+        log.info("[JOB] {} ({}) {} in {}ms — {}",
+                name, trigger, res.status(), res.durationMs(), res.message());
     }
 
     /** Record a terminal run to both the durable ledger and the live-run registry (so a poll sees the result). */
@@ -1224,6 +1281,16 @@ public final class JobService implements AutoCloseable {
         this.deliveryReceiptStore = store;
     }
 
+    /** Install the cross-pod arming exclusion keyed by job name (§5.2). {@code null} restores the no-op. */
+    public void armingClaims(RunClaims claims) {
+        this.armingClaims = claims == null ? RunClaims.GRANT_ALL : claims;
+    }
+
+    /** Install the exclusion keyed by a pipeline job's authored-pipeline id (§5.2). {@code null} restores the no-op. */
+    public void authoredClaims(RunClaims claims) {
+        this.authoredClaims = claims == null ? RunClaims.GRANT_ALL : claims;
+    }
+
     /** Install the deletion fence (T25) consulted before a delete job declaring a {@code store:} runs. */
     public void deletionGuard(DeletionFence.Guard guard) {
         this.deletionGuard = guard;
@@ -1253,11 +1320,24 @@ public final class JobService implements AutoCloseable {
      * {@code CollectorService} feeds it — a delete racing this pipeline's store then surfaces as a conflict.
      */
     private String trackPipelineStart(Job job, JobConfig cfg, String name) {
-        if (!"pipeline".equals(job.type())) return null;
-        // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key.
-        String pipelineId = cfg != null ? cfg.opt("pipeline", cfg.opt("flow", name)) : name;
+        String pipelineId = authoredPipelineKey(job, cfg, name);
+        if (pipelineId == null) return null;
         runningPipelines.add(pipelineId);
         return pipelineId;
+    }
+
+    /**
+     * The authored pipeline a {@link JobType#PIPELINE} job targets, or {@code null} for any other type —
+     * the key for both the deletion fence's running-set and {@link #authoredClaims}.
+     *
+     * <p>⛔ The two must not drift apart: if the fence and the claim ever key differently, a job would be
+     * excluded from one and not the other. That is why {@link #trackPipelineStart} calls this rather than
+     * recomputing it.
+     */
+    private static String authoredPipelineKey(Job job, JobConfig cfg, String name) {
+        if (!"pipeline".equals(job.type())) return null;
+        // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key.
+        return cfg != null ? cfg.opt("pipeline", cfg.opt("flow", name)) : name;
     }
 
     /** The configured job by name (the run path keys by name; configs is the source of truth for params). */

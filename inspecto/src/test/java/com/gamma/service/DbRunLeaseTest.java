@@ -114,6 +114,45 @@ class DbRunLeaseTest {
         }
     }
 
+    /**
+     * 🔴 A job's two scopes are disjoint from the run scope, and from each other, on the SAME key.
+     *
+     * <p>They key different id spaces: {@code SCOPE_RUN} on a collector-pipeline config name
+     * ({@code *_pipeline.toon}), {@code SCOPE_AUTHORED} on an authored-pipeline id ({@code *_flow.toon} at rest), and
+     * {@code SCOPE_JOB} on a job name. Nothing stops an operator reusing one literal string across all
+     * three, so if the scope were ever collapsed out of the key, three unrelated units of work would
+     * start excluding each other — and each would look, from its own side, like a mysterious skip.
+     */
+    @Test
+    void theJobAndAuthoredScopesAreDisjoint(@TempDir Path dir) throws Exception {
+        String url = urlIn(dir);
+        try (DbRunLease runs = lease(url, "s1", DbRunLease.SCOPE_RUN, "pod-a");
+             DbRunLease jobs = lease(url, "s1", DbRunLease.SCOPE_JOB, "pod-a");
+             DbRunLease authored = lease(url, "s1", DbRunLease.SCOPE_AUTHORED, "pod-a")) {
+
+            // one and the same string, claimed under all three scopes at once
+            RunLease.Claim running = runs.tryAcquire("orders");
+            assertNotNull(running, "a collector pipeline called 'orders' runs");
+            RunLease.Claim armed = jobs.tryAcquire("orders");
+            assertNotNull(armed, "a JOB called 'orders' must still arm — a different id space");
+            RunLease.Claim authoring = authored.tryAcquire("orders");
+            assertNotNull(authoring, "an authored PIPELINE called 'orders' must still run — a third id space");
+
+            assertTrue(runs.isRunning("orders"));
+            assertTrue(jobs.isRunning("orders"));
+            assertTrue(authored.isRunning("orders"), "all three held at once, under different scopes");
+
+            // ...and exclusion still bites within each of the new scopes
+            try (DbRunLease otherPod = lease(url, "s1", DbRunLease.SCOPE_JOB, "pod-b")) {
+                assertNull(otherPod.tryAcquire("orders"),
+                        "a second pod must not arm the same job while pod-a holds it");
+            }
+            running.close();
+            armed.close();
+            authoring.close();
+        }
+    }
+
     /** ...and within one scope the exclusion still holds, so the scope did not simply disable it. */
     @Test
     void theScopeDoesNotWeakenExclusionWithinAScope(@TempDir Path dir) throws Exception {
