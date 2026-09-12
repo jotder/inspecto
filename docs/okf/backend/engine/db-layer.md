@@ -383,6 +383,28 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
 created before they existed (CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows
 read back `NULL`.
 
+🔴 **Why this table has NO unique constraint, and cannot get one yet (settled 2026-09-12).** Every
+candidate key over `(consignment_id, path, …)` fails on a *missing discriminator*, not on taste:
+
+- **`run_id` is unconditionally `NULL`.** The column is nullable and all four `record()` call sites pass
+  a literal `null` — [`ConsignmentIngestor`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java) `:440`,
+  [`PartitionSinkWriter`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/PartitionSinkWriter.java) `:117`
+  and [`EnrichmentEngine`](../../../../inspecto-engine/src/main/java/com/gamma/enrich/EnrichmentEngine.java) `:158`/`:179`
+  — as do `DerivedTableWriter:163` and `SummaryWriter:274`. ⚠ **NULL ≠ NULL inside a UNIQUE constraint on
+  both DuckDB and Postgres**, so such a key would be a silent no-op on every row while advertising a
+  guarantee in the schema. That is strictly worse than no constraint.
+- **`generation` is inert** — declared on the record but hard-coded `0` at every construction site.
+- **One run can legitimately write one `path` twice.** Two sinks may target one store
+  (`PartitionSinkWriter:115` sums `rowsByStore`), and `PartitionWriter:171,226` reveals each partition
+  under a stable `<baseName>_out.<ext>` with `OVERWRITE_OR_IGNORE` — so the second branch's row carries a
+  *different* `row_count` for the same path. `ON CONFLICT DO NOTHING` would keep the stale one.
+
+Reprocess makes this sharper, not softer: since the identity half landed, a re-poll re-mints the **same**
+`consignment_id`, so new LIVE rows would collide with that batch's own just-superseded rows. The unblocker
+is §13's Run model giving a write round a real identity; until then this table stays unconstrained, which
+costs nothing — a reprocess merely accumulates SUPERSEDED rows and every reader filters on `state`.
+The dedupe guarantee is `file_stages`-only (§3.10), deliberately.
+
 **Null bounds mean *unknown*, never *empty*.** A consumer that prunes on bounds must treat a null-bounds row
 as a **possible match**, or it will silently drop data. Two write paths can fill them, each from its own
 declaration, and neither ever guesses which column is temporal:
@@ -507,7 +529,7 @@ CREATE TABLE IF NOT EXISTS file_stages (
 `INSERT … ON CONFLICT DO NOTHING`, so a retried transition or a second executor of the same Consignment
 leaves one row (the first write's `recorded_at` wins). Insert-only is what makes the key safe — there is
 no state transition to collide with, unlike `consignment_outputs` (§3.9), which is **deliberately still
-unconstrained** pending a design pass on reprocess/supersede semantics. A pre-constraint table is
+unconstrained** — and, as of 2026-09-12, *provably* cannot be constrained yet (§3.9). A pre-constraint table is
 **rebuilt on open** — `RENAME TO file_stages_v1` → create → `INSERT … SELECT … ON CONFLICT DO NOTHING`
 → drop — in one transaction, because DuckDB has no `ADD CONSTRAINT` (probed 2026-09-12: partial
 indexes and `ALTER … ADD CONSTRAINT` are both "not supported"). The already-migrated check is

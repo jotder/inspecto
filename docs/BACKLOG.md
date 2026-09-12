@@ -247,7 +247,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — X4 record-level replay from quarantine: sidecar error manifests (offset/reason), all-or-nothing vs eject-and-continue as per-pipeline CONFIG — ⛔ no build without a driver (same item as the run-detail "reprocess is whole-batch only" note). X1 deferrals: per-pipeline `processing.retry` block (regenerate node-attributes + step-types contracts); operator cancel / retry-now affordance (today: delete the sidecar under `<status_dir>/retries/`, or `reprocess`). → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
 - **P2** · **`STREAM-CONSUMER-1` — adapter stream-consumer runtime** (filed 2026-09-10 — it was committed in `roadmap/ROADMAP.md` §3.4 and listed in `okf/capabilities/acquisition/acquisition.md` §"Open elsewhere on the board" with **no board row**, the id column pointing back at the ROADMAP paragraph). The land-then-ack seam exists (a source-side `post` that deletes the remote original runs only after the local copy is committed); the **consumer loop** that keeps an adapter draining a streaming source with at-least-once semantics does not. Not demand-gated: the ROADMAP commits to it. First action is a design pass on where the loop lives (Collector scan vs a long-running job), not code. → `okf/capabilities/acquisition/acquisition.md`
 - **P2** · **Pipeline graph** — flip the intake cap on by default (needs a soak); a pre-materialise cap to save remote-fetch bandwidth (cap applies post-dedup); 🔴 **THREE** kinds still last-one-wins, deliberately out of A2 scope: `acquisition`, `gap`, `dedup.marker` — *corrected 2026-09-09: `parser` was in this list and does NOT belong; a second parser is REFUSED by name (`MULTI_PARSER`, `PipelineEditable.java:65,696`), which is the opposite of last-one-wins. `pipeline-editor.md` §Multiplicity states it correctly.*; 🔴 ~~`BatchGraphRunner` has zero production callers~~ **WRONG ON BOTH COUNTS — corrected 2026-09-09.** (a) **There is no class of that name** — it was renamed in the 2026-08-31 Consignment commit. (b) The class that DOES exist, `ConsignmentGraphRunner`, has **production callers**: `engages()` drives the live lane admission (`ConsignmentIngestStrategy.admittedLift`) and **`run(...)` executes on the ingest path** (`ConsignmentIngestStrategy:355`). ⛔ This row was cited as Row 15's parity blocker, so re-derive that gate before using it. What IS still owed is §6 step 2, the parity gate through the compiled-recipe path. Owner: `okf/capabilities/pipeline-execution/pipeline-execution.md` §2.3; → `okf/backend/pipeline-graph/pipeline-graph-design.md` §14
-- **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed; and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations; `run_id` is `null` everywhere; §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
+- **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed; and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations; `run_id` is `null` everywhere (⚠ **this is now load-bearing** — it is exactly why `CONSIGNMENT-ID-DETERMINISTIC-1` could NOT constrain `consignment_outputs`, and §13's Run model is the unblocker; see that row's REFUTED bullet before proposing any key); §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
 - **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built, needs `SeqScope`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (⚠ do not grow the `EventType` enum; a constants class should land before ~10 string literals do), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
 - **P2** · **`SPACE-UNKEYED-STATICS-1` — four process-wide registries have NO Space dimension** (filed
   2026-09-10 by scale-out spike S4). `CircuitBreaker.SHARED` and `GapTracker.SHARED` are keyed on a bare
@@ -835,7 +835,11 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ## 4. Engineering / tech-debt
 
 - **P1** · **`CONSIGNMENT-ID-DETERMINISTIC-1` — a Consignment's identity is the wall clock, so two executors
-  🟡 **HALF SHIPPED 2026-09-12 — the IDENTITY half.** `ConsignmentId` mints
+  ✅ **CLOSED 2026-09-12 — both halves resolved:** the IDENTITY half SHIPPED, and the CONSTRAINTS half
+  shipped for `file_stages` while `consignment_outputs` is settled as *deliberately unconstrained*
+  (its blocker is §13's Run model, not this row — see the REFUTED bullet). Nothing here is left open.
+
+  ✅ **IDENTITY half SHIPPED 2026-09-12.** `ConsignmentId` mints
   `<slug>_<sha256(sorted relPath\0bytes)>_<seq>`; `runTimestamp` is gone from the id, which was the ONLY
   non-deterministic input. Paths are relativized against the **poll root** (threaded into
   `ConsignmentPlanner.plan`) with `/` separators, so two pods mounting the same data at different paths —
@@ -846,8 +850,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   *equal*, so the equality assertion alone would NOT have caught a reintroduced clock — the regex guard is
   what does. Verified: 32 modules, 4364 tests, 0 failures.
 
-  🟡 **CONSTRAINTS half — the SAFE store SHIPPED 2026-09-12 (`DbFileStageStore`); only the
-  `DbConsignmentOutputStore` design pass remains.** `file_stages` now carries
+  ✅ **CONSTRAINTS half CLOSED 2026-09-12 — `DbFileStageStore` SHIPPED; `DbConsignmentOutputStore`
+  deliberately stays UNCONSTRAINED, blocked on §13's Run model (see the REFUTED bullet below).** `file_stages` now carries
   `UNIQUE (batch_id, source_id, relative_path, stage)`, `record` is `ON CONFLICT DO NOTHING`, and a
   pre-constraint table is rebuilt on open (rename → create → `INSERT … SELECT … ON CONFLICT DO NOTHING`
   → drop) in one transaction; the already-migrated check is `information_schema.table_constraints`,
@@ -894,6 +898,33 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   - ⛔ **`DbConsignmentOutputStore` needs a design pass on supersede semantics first** — specifically
     whether a reprocess should reuse its Consignment id (it now does) and, if so, how a row's state
     transitions relate to uniqueness. ⚠ Do NOT pick a key without answering that.
+
+    🔴 **2026-09-12 — the operator chose `(consignment_id, path, run_id)` and it is REFUTED. Do not
+    re-attempt it; the table has NO usable discriminator today.** Two independent findings, both
+    checked at the source:
+    1. **`run_id` is unconditionally NULL on every shipped write path.** The column is
+       `run_id VARCHAR` with no `NOT NULL` (`DbConsignmentOutputStore.java:82`), and all four
+       `record()` call sites pass a literal `null` for it — `ConsignmentIngestor.java:440`,
+       `PartitionSinkWriter.java:117`, `EnrichmentEngine.java:158` and `:179` — as do
+       `DerivedTableWriter.java:163` and `SummaryWriter.java:274`. `EnrichmentEngine.java:174` says
+       why in an inline comment: *"the run_id column stays null until §13's Run model gives it a
+       distinct identity."* ⚠ NULL ≠ NULL in a UNIQUE constraint on **both** DuckDB and Postgres, so
+       this key would be a **no-op on every row in the table** — strictly worse than no constraint,
+       because the schema would then advertise a guarantee that does not exist.
+    2. **A single run can legitimately write the same `path` twice.**
+       `PartitionSinkWriter.java:115` is `rowsByStore.merge(store, branchRows, Long::sum)`, and the
+       class documents that two sinks may target one store; `PartitionWriter.java:171,226` reveals
+       each partition under a stable `<baseName>_out.<ext>` with `OVERWRITE_OR_IGNORE`. Two sink
+       branches on one store therefore `record()` the same `(consignment_id, path)` with **different
+       `row_count`s**, and `ON CONFLICT DO NOTHING` would keep the STALE row.
+
+    ⚠ `generation` is no escape either — it is declared (`ConsignmentOutput.java:70`) but hard-coded
+    to `0` at every construction site, so it is as inert as `run_id`. **Any key over
+    `(consignment_id, path, …)` is blocked on §13's Run model landing first**, which is what would give
+    a write round a real identity. Until then the outputs store stays unconstrained — which breaks
+    nothing: a reprocess merely accumulates SUPERSEDED rows and every reader filters on `state`.
+    ✅ **The dedupe guarantee is therefore `file_stages`-only, deliberately, and this P1's constraints
+    half closes there.**
 
   ✅ **Migration DDL VERIFIED 2026-09-12** (second throwaway probe, deleted): `ALTER TABLE … RENAME TO`,
   `INSERT … SELECT … ON CONFLICT DO NOTHING`, `ON CONFLICT (cols)`, a duplicate pair inside ONE batched

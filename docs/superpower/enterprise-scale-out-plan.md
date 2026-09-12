@@ -168,10 +168,23 @@ round-trips **twelve** store classes — it gained `DbEventStore` (new with D6) 
 and `DbDedupLedger`, the two this section called out as *"same factory, portable SQL, simply untested"*.
 Only the **acquisition ledger** is still uncovered.
 
-⛔ **But read that as COVERAGE, not evidence.** Every method in the class `assumeTrue`s on a configured
-server, so with no `INSPECTO_TEST_PG_URL` the whole class SKIPS — **the three added in A3 have never
-executed anywhere**, and neither have the original nine on this machine. The number to read is the SKIP
-count. This is the same trap as a guard that reports nothing because it was never armed.
+⛔ **That was COVERAGE, not evidence — until 2026-09-12.** Every method `assumeTrue`s on a configured
+server, so with no `INSPECTO_TEST_PG_URL` the whole class SKIPS; the number to read was the SKIP count.
+
+✅ **RESOLVED 2026-09-12 — the class has now actually EXECUTED: 15 tests, 0 failures, 0 skipped**, against
+a real PostgreSQL **18.6**. All fifteen stores round-trip, including the three A3 added and
+`fileStageStore_recordAndStagesRoundTrip`, which proves the `file_stages` migration (§B, `009fa92b`) is
+portable off DuckDB rather than merely *believed* portable. Only the acquisition ledger stays uncovered.
+
+🔴 **And the skip was hiding a harness that could NOT have connected.** `inspecto-ops` — the module that
+OWNS this test — never declared `org.postgresql:postgresql`; `inspecto/` and `inspecto-engine/` declare it
+at test scope and **test scope is not transitive**, so the first real run died with *"No suitable driver
+found"*. Fixed in `1760a143`. ⚠ **This is the guard-never-armed trap in its purest form**: a skipping test
+cannot report that its own classpath is broken, so the defect sat behind a clean-looking SKIP line since
+the embedded harness was dropped (2026-09-07). Two further traps, both cost a run to find, are written up
+in the class javadoc — `-D…&password=…` silently loses the password on Windows (`mvn.cmd` re-parses the
+args), and PostgreSQL 18 rejects the legacy `Asia/Calcutta` zone name a Windows JVM sends, which
+`-DargLine` cannot fix because surefire's `@{argLine}` resolves the *project* property, not a CLI one.
 
 The defaults that a second pod turns into split-brain (`ServiceStores.java`):
 
@@ -519,8 +532,13 @@ Work:
   so a stale owner can neither release nor extend a lease someone else now holds. ⚠ **This is the half of
   D15 that survives its refutation** — fencing works here precisely because `(space, pipeline)` is a
   *stable* id, which `batchId` was not (`CONSIGNMENT-ID-DETERMINISTIC-1` — identity half shipped
-  `036f32f9`; `file_stages` keyed + CAS'd 2026-09-12; `consignment_outputs` still unkeyed pending a
-  reprocess/supersede design pass). ⛔ It fences the lease, not the writes a run performs; do not read B0
+  `036f32f9`; `file_stages` keyed + CAS'd 2026-09-12 and now PROVEN on real Postgres 18.6;
+  `consignment_outputs` **settled 2026-09-12 as permanently unkeyed for now** — the design pass ran and
+  REFUTED every candidate key: `run_id` is unconditionally `NULL` at all four `record()` sites (and
+  NULL ≠ NULL in a UNIQUE constraint on both engines, so any such key is a silent no-op), `generation` is
+  hard-coded `0`, and two sinks may write one path in one run. ⚠ **D15's precondition is therefore 2-of-3,
+  not 3-of-3, and the missing third is blocked on §13's Run model** — so D15 still cannot be signed as
+  written, but the reason is now narrow and named rather than open-ended). ⛔ It fences the lease, not the writes a run performs; do not read B0
   as discharging D15.
 
   ⚠ **The fencing test was wrong on the first attempt and a mutation run caught it.** The obvious
