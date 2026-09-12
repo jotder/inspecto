@@ -249,6 +249,15 @@ it was; both are corrected below.
   attrs are `reconciliation`/`breakKey`/`breakType`/`column`/`runId` (`ReconRoutes.java:190-197`) — that
   shape **cannot express which of N counterparts, nor how many**. No test feeds a duplicate key on either
   side, because the `GROUP BY` made it impossible.
+  ✅ **DESIGN PASS DONE 2026-09-12 — [`superpower/recon-cardinality-plan.md`](superpower/recon-cardinality-plan.md).**
+  It answers the row's "what is a break when one row matches three?": for the canonical case (one invoice
+  vs three payments) **today's arithmetic is already correct** — you want the sum. The real defect is
+  narrower and is a **correctness hole, not a feature gap**: a duplicated row on either side is
+  indistinguishable from a genuinely larger value, so it **reconciles clean**. 🔴 And `COUNT(*) AS mr`
+  **already carries per-key multiplicity through the join**, discarded as a boolean at `:495-497` — so
+  tier 1 (cardinality as an *assertion*: a fourth `cardinality_break` type, default `many_to_many` so
+  nothing existing changes, no join change) needs **no new SQL**. Row-level pairing is tier 2 and
+  demand-gated. One decision open in §5.
   → whitepaper §4.1 (carries no such claim) · `ReconService` · `ReconConfigLoader`
 Grouped by area. A row with lettered items keeps the letters of its source doc so the two stay aligned.
 
