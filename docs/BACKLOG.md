@@ -255,7 +255,7 @@ it was; both are corrected below.
   question. ⚠ The duplicate was not absent from the tests, it was **invisible in them**, which is a
   sharper statement of the defect than "untested".
   ✅ **TIER 1 BACKEND SHIPPED 2026-09-12** — design + as-built in
-  [`superpower/recon-cardinality-plan.md`](superpower/recon-cardinality-plan.md). `cardinality:
+  [`plans-archive/recon-cardinality-plan.md`](archived-documents/plans-archive/recon-cardinality-plan.md). `cardinality:
   one_to_one|one_to_many|many_to_one|many_to_many` on a reconciliation config; absent ⇒ `many_to_many`,
   which asserts nothing, and the `cardinality_break` key is emitted **only** when an assertion is declared
   — so a reconciliation authored before this option gets a byte-identical payload. 32 modules, 4373 tests,
@@ -271,7 +271,7 @@ it was; both are corrected below.
   at all** until this added three. Backend 4374 tests, UI 2952, both halves mutation-proven separately.
   Tier 2 (row-level pairing) stays demand-gated.
 
-  ✅ **DESIGN PASS DONE 2026-09-12 — [`superpower/recon-cardinality-plan.md`](superpower/recon-cardinality-plan.md).**
+  ✅ **DESIGN PASS DONE 2026-09-12 — [`plans-archive/recon-cardinality-plan.md`](archived-documents/plans-archive/recon-cardinality-plan.md).**
   It answers the row's "what is a break when one row matches three?": for the canonical case (one invoice
   vs three payments) **today's arithmetic is already correct** — you want the sum. The real defect is
   narrower and is a **correctness hole, not a feature gap**: a duplicated row on either side is

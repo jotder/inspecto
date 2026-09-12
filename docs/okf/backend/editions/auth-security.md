@@ -332,10 +332,15 @@ provider" for the rest of the JVM**. `SpiSlotTest` asserted that contract and pa
 probed an SPI with no registration, where pinned-empty and scanned-empty are the same observation. Fixed,
 and the test strengthened to re-arm a slot whose provider genuinely resolves.
 
-⚠ **OPEN, deliberately not changed: `AccessDeciders` has the same shape.** Its own javadoc says an absent
-provider makes both PEPs *"skip policy evaluation entirely"* — same "absence disables a safety property"
-semantics. It is left fail-soft because, unlike `OidcAuthenticator`, `PolicyEngine` requires no
-configuration and so cannot fail from a typo; its only trigger is a class-init or `LinkageError`, which is
-precisely the case PKG-5 made non-fatal on purpose. ⛔ Flipping it is therefore a **posture decision**, not
-a bug fix, and wants an operator call. (`TokenRelays` needs nothing: absence already yields a 503 at
-`AuthRoutes:86`, which is fail-safe.)
+✅ **`AccessDeciders` FLIPPED TOO — operator decision 2026-09-13.** It had the same shape, and the cost of
+absence turned out to be higher than the first reading suggested. Both PEPs read an absent decider as
+**allow** — `ControlApi.authorize` returns early (`:811`) and `RowScope.visible` returns `true` (`:32`) —
+and `PolicyEngine`'s seeded policies are `space-isolation` / `space-isolation-rows`. So a
+registered-but-unloadable `inspecto-policy` would silently stop enforcing the **multi-tenant Space
+boundary** at both route and row level, letting a subject bound to one Space address and read another.
+
+⚠ **Its trigger is genuinely different from the Authenticator's, and the decision was made knowing that.**
+`PolicyEngine` takes no configuration, so no typo can break it — only a packaging fault or `LinkageError`,
+which is exactly what PKG-5 chose to make non-fatal. ⛔ The judgement: a tenancy boundary is not a feature,
+so losing it silently is worse than refusing to boot. (`TokenRelays` needs nothing: absence already yields
+a 503 at `AuthRoutes:86`, which is fail-safe.)

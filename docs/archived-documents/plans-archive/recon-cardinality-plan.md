@@ -148,9 +148,19 @@ production build exit 0. Mutation-proven on both halves separately — dropping 
 summary test on `expected: not <null>`, and dropping the client mapping fails exactly the two specs that
 assert presence while the one asserting absence correctly stays green.
 
-## 7. Open question for the operator
+## 7. ✅ DECIDED 2026-09-13 — a cardinality violation is a Break
 
-Tier 1 reports a cardinality violation as a **Break**. Should a `one_to_one` violation instead be a
-**hard failure of the recon run** (nothing reconciles when the inputs are malformed), or a Break like any
-other (the run completes, the violation is triaged)? ⚠ Break is the smaller, more consistent choice and
-what this plan assumes; a hard failure is defensible if duplicate keys mean the upstream feed is corrupt.
+The question was whether a `one_to_one` violation should instead **fail the recon run** outright (nothing
+reconciles when the inputs are malformed). **Operator: keep it a Break**, which is what tier 1 shipped.
+
+Reasoning of record: the run completes and the violation is triaged like any other discrepancy, with the
+per-side counts riding along as evidence; it is consistent with the other three break types; and it stays
+reversible — a hard-fail mode can be added later as config without undoing anything, whereas the converse
+would mean removing a Break path operators had started using. ⚠ The case for hard-failing is not silly and
+is recorded here rather than lost: if duplicate keys mean the upstream feed is corrupt rather than merely
+discrepant, a completed reconciliation over it is arguably a false reassurance. Revisit if a real feed
+produces that shape.
+
+⇒ **This plan now has no open decisions.** Per the lifecycle note at the top, it is ready to be
+`git mv`'d to `archived-documents/plans-archive/` — tier 2 (row-level pairing) stays demand-gated and its
+rationale is the only thing this file still carries.
