@@ -837,6 +837,34 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   over from a *paused* owner double-executes. ⚠ Its only would-be regression test switches the relevant leg
   off — `FinalizeSourceConcurrencyTest:291-294` passes empty outputs/lineage, *"the registry leg is
   deliberately out of play"*. → `superpower/enterprise-scale-out-plan.md` §12, §4.2, D15
+- **P1** · **`RUNLEASE-CONTRACT-TEST-1` — the gate for phases A and B was never built, and both shipped.**
+  Scale-out §7 specifies `RunLeaseContractTest` as "the first test to write — **before any Enterprise
+  code**": two `ControlApi` instances in one JVM over one Postgres, one interval + one operator trigger,
+  asserting **exactly one run per trigger** across both, the loser's `tryAcquire` returning false rather
+  than blocking, and a killed owner's lease reclaimable after TTL and **not before**. The phase-A/B row in
+  `archived-documents/plans-archive/post-consolidation-sprints.md:390` names it as the gate. 🔴 **It does
+  not exist.** Phase A shipped, phase B shipped (B0–B3, closed 2026-09-12), and §5.2's "COMPLETE" means
+  built-and-unit-verified, **not** gate-passed. Filed 2026-09-12 on discovering the absence.
+  ⚠ **The unit coverage is real but is not this**: `DbRunLeaseTest` drives two lease instances over one
+  DuckDB file — two *processes* as far as the lease is concerned — which is why B0–B3 are trustworthy at
+  the unit level. ⛔ `ControlApiMultiSpaceTest` is **not** it (several Spaces in ONE ControlApi); §7 warns
+  by name against that substitution, and nothing in the repo boots two control planes in one JVM today.
+  **Work:** S4 already settled the technique — **a classloader per simulated pod** (zero production
+  changes, already proven here for pack-jar isolation), ⛔ *not* per-instance registry scoping, which
+  needs an instance-id concept that does not exist (12+ classes, 60–90+ sites). ⚠ Needs Postgres, so it
+  will SKIP on a machine without Docker exactly as `PostgresStateStoreTest` does — write it skipping
+  rather than not at all. → `superpower/enterprise-scale-out-plan.md` §7, §5.2
+- **P2** · **`SPACES-LIST-PER-POD-1` — `GET /spaces` returns only the answering pod's Spaces.**
+  Found 2026-09-12 by the all-Spaces sweep C1 owed. Exactly four sites iterate every hosted Space —
+  `SpaceRoutes.java:45` (`GET /spaces`), `BootstrapRoutes.java:108`, `SchedulerRoutes.java:85,256` — and
+  all read `SpaceManager.all()`, so all are **correct** under partitioning: they only ever see what this
+  pod booted. ⚠ The consequence is user-visible, though: once Spaces are partitioned (C1), the space list
+  a UI receives **depends on which pod served the request**, with nothing saying so. An operator sees a
+  partial estate and cannot tell it is partial. **Work:** either aggregate across pods for the listing
+  routes, or state the pod's scope in the response so the UI can say "showing this pod's Spaces".
+  ⚠ Third instance of one pattern — see `INTAKE-POLICY-SYSTEM-SCOPE-1` and `INBOX-REGISTRY-CROSS-POD-1`:
+  a read or write that is implicitly *global* on one node silently becomes *per-pod* on N. 🔴 Worth
+  deciding as ONE question rather than three rows. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 - **P2** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
   The C2 audit (`SpaceInboxAudit`, shipped 2026-09-12) warns when two Spaces **hosted by this pod** declare
   the same `dirs.poll`. 🔴 Once Spaces are partitioned across pods (C1), the dangerous case is two Spaces on

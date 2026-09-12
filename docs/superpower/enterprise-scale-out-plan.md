@@ -465,6 +465,16 @@ T4 active/passive standby.
 **Invariant:** *Across N processes sharing one Postgres, a given pipeline runs at most once per
 trigger, and a lease abandoned by a dead pod is reclaimable within a bounded time.*
 
+> 🔴 **⚠ QUALIFIER on "COMPLETE" below, added 2026-09-12: §7's `RunLeaseContractTest` WAS NEVER WRITTEN.**
+> §7 calls it "the first test to write — **before any Enterprise code**", and the phase-A/B row in the
+> archived sprint plan names it as the gate ("the §7 contract test green on two JVMs sharing one
+> Postgres"). Phases A and B both shipped without it, and the "COMPLETE" below means **every slice is
+> built and unit-verified**, NOT that the plan's stated gate is met. ⛔ Do not cite §5.2 as gate-passed.
+> The unit coverage is real (`DbRunLeaseTest` drives two lease instances over one DuckDB file, which is
+> two *processes* as far as the lease is concerned) but it is **not** two `ControlApi` instances, and
+> `ControlApiMultiSpaceTest` is not it either — §7 warns explicitly against mistaking one for the other.
+> Filed as `RUNLEASE-CONTRACT-TEST-1`.
+>
 > ✅ **§5.2 COMPLETE 2026-09-12 — B0, B1, B2, B3 all shipped.** Four lease scopes now exist and are
 > deliberately disjoint: `run` (collector-pipeline names), `acquire` (remote fetch), `job` (job names),
 > `authored` (authored-pipeline ids). `TriggerCoalescer` is an explicit non-item — coalescing stays per-pod.
@@ -668,10 +678,18 @@ Work:
   `GapTracker`, `IntakeGovernor`'s caps) are already disjoint across pods. ⚠ It does **not** rescue
   genuinely process-scoped state — see the `INTAKE-POLICY-SYSTEM-SCOPE-1` row above.
 
-  ⚠ **Gating at discovery is sufficient for the read paths.** `SchedulerRoutes:85,256` and
-  `BootstrapRoutes:107` iterate `SpaceManager.all()`, which only ever holds what was booted — so they
-  agree automatically. ⚠ Not exhaustively swept: a full pass over `api.spaces().all()` call sites is owed
-  before phase C closes.
+  ✅ **Gating at discovery is sufficient for the read paths — SWEEP COMPLETE 2026-09-12.** Exactly **four**
+  sites iterate every hosted Space: `SpaceRoutes.java:45` (`GET /spaces`), `BootstrapRoutes.java:108`,
+  `SchedulerRoutes.java:85` and `:256`. All read `SpaceManager.all()`, which only ever holds what this pod
+  booted, so all agree with the partition automatically — no code change needed. (The owed sweep from C1
+  is hereby discharged.)
+
+  ⚠ **But the sweep found a user-visible consequence, filed as `SPACES-LIST-PER-POD-1`:** the space list a
+  UI receives now **depends on which pod served the request**, and nothing in the response says so — an
+  operator sees a partial estate and cannot tell that it is partial. 🔴 Third instance of one pattern
+  today, beside `INTAKE-POLICY-SYSTEM-SCOPE-1` and `INBOX-REGISTRY-CROSS-POD-1`: **a read or write that is
+  implicitly global on one node silently becomes per-pod on N.** ⛔ These are worth deciding as one
+  question, not three rows.
 
   ⚠ **`partition.toon` bypasses `ConfigSafetyValidator`**, like every other global settings file — that
   validator only covers path-bearing `pipeline`/`enrichment` configs. Its own parse is the fail-closed
