@@ -837,8 +837,19 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   calls `authoredPipelineKey()` rather than recomputing it. The payoff showed up in mutation testing: keying `authoredPipelineKey`
   on the job name failed the *pre-existing* fence test alongside the new ones, which is the evidence they
   genuinely share a key rather than happening to agree today.
+- **🔴 CAUSE FOUND 2026-09-12 (correcting the note below): "transient" `NoClassDefFoundError` in an
+  untouched module is CONCURRENT MAVEN RUNS IN ONE TREE — it is self-inflicted, not flaky.** It happened
+  **four times** in one shift (`asn-golden` ×2, `inspecto-etl`, plus one ambiguous run) and the pattern was
+  identical every time: a **background** gauntlet still running while **foreground** targeted/mutation
+  builds were fired in the same checkout. The sibling's `clean` wipes `target/classes` mid-run, so a class
+  that is *demonstrably on disk when you look* was absent when the other JVM's surefire loaded it.
+  ⛔ **The tell: `NoClassDefFoundError` for a class you can `ls`.** ⚠ A stale JVM is NOT the cause — that
+  was this note's first hypothesis and it was wrong. ⛔ **One build at a time in this tree, full stop**;
+  before launching a gauntlet, confirm no other build is live, and never fire a targeted run "just
+  quickly" while one is in flight. 🔴 The expensive part is not the lost build — it is that a clobbered run
+  looks exactly like a real regression in code you never touched, and costs a diagnosis every time.
 - **⚠ A full reactor build can fail TRANSIENTLY in an untouched module on Windows — re-run before
-  believing it.** Twice on 2026-09-12 `mvn -o clean test -Pedition-enterprise` died in the `asn-*` subtree
+  believing it.** *(Kept for the diagnosis technique; the CAUSE is the entry above, not staleness.)* Twice on 2026-09-12 `mvn -o clean test -Pedition-enterprise` died in the `asn-*` subtree
   on sources nobody had edited: once as `asn-golden` test-compile errors (*"package com.gamma.asn.schema
   does not exist"*), once as `asn-schema` failing at test execution with `NoClassDefFoundError` for **its
   own just-compiled classes**. Both vanished on a clean re-run that then went fully green. The signature

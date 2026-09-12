@@ -465,7 +465,22 @@ T4 active/passive standby.
 **Invariant:** *Across N processes sharing one Postgres, a given pipeline runs at most once per
 trigger, and a lease abandoned by a dead pod is reclaimable within a bounded time.*
 
-> 🔴 **⚠ QUALIFIER on "COMPLETE" below, added 2026-09-12: §7's `RunLeaseContractTest` WAS NEVER WRITTEN.**
+> ✅ **UPDATE 2026-09-12 (later): `RunLeaseContractTest` EXISTS AND THE GATE IS MET.** Four tests, running
+> on every machine (DuckDB, no Docker gate): a really-booted pod skips a pipeline held by an
+> independently-opened lease and runs it on release; a claim on an *unrelated* pipeline does not gate it;
+> two independently-booted pods both honour one held claim without re-ingesting; and **two full
+> `ControlApi` instances over real HTTP** both skip via `POST /trigger`. Mutation-proven by §7's own
+> recipe — backend→`heap` fails all three gate assertions (the HTTP one ingesting 5 files instead of 0)
+> and leaves the discriminator passing. `RUNLEASE-CONTRACT-TEST-1` is CLOSED.
+>
+> 🔴 **§7 itself was wrong in three ways, each of which made this look bigger than it was** — corrected in
+> §7 below: no Postgres needed (DuckDB, so it runs everywhere instead of skipping — *which is how it went
+> unwritten for two phases*), no classloader-per-pod harness needed (the only channel between holder and
+> pod is the database), and no latch fixture or race needed (hold the *claim*, not the run).
+> ⚠ Deliberately out of scope and NOT a gap: the operator-trigger path blocks by design, so asserting a
+> skip there would be asserting a bug.
+>
+> 🔴 **⚠ ORIGINAL QUALIFIER on "COMPLETE" below, added 2026-09-12: §7's `RunLeaseContractTest` HAD NEVER BEEN WRITTEN.**
 > §7 calls it "the first test to write — **before any Enterprise code**", and the phase-A/B row in the
 > archived sprint plan names it as the gate ("the §7 contract test green on two JVMs sharing one
 > Postgres"). Phases A and B both shipped without it, and the "COMPLETE" below means **every slice is

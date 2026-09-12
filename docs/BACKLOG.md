@@ -837,7 +837,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   over from a *paused* owner double-executes. ⚠ Its only would-be regression test switches the relevant leg
   off — `FinalizeSourceConcurrencyTest:291-294` passes empty outputs/lineage, *"the registry leg is
   deliberately out of play"*. → `superpower/enterprise-scale-out-plan.md` §12, §4.2, D15
-- **P1** · **`RUNLEASE-CONTRACT-TEST-1` — the gate for phases A and B was never built, and both shipped.**
+- ✅ **CLOSED 2026-09-12** *(was P1)* · **`RUNLEASE-CONTRACT-TEST-1` — the gate for phases A and B was never built, and both shipped.**
+  ✅ **`RunLeaseContractTest` now exists** (`inspecto/src/test/java/com/gamma/service/`): **four** tests,
+  running everywhere over DuckDB — no Docker gate — covering the poll-cycle path at the service level
+  **and two full `ControlApi` instances over real HTTP**. It proves a really-booted pod honours a claim
+  held by an independently-opened lease it was never told about: the wiring neither
+  `CollectorServiceIngestLockTest` (same heap, reflected guard) nor `DbRunLeaseTest` (lease only, no
+  service) covered. Mutation-proven by §7's own recipe — backend→`heap` fails all **three** gate
+  assertions (the HTTP one by ingesting 5 files instead of 0) and leaves the discriminator passing.
+
+  🔴 **Three of §7's premises were wrong, and each made the job look bigger than it was:**
+  (a) it does **not** need Postgres — the `db` backend defaults to local DuckDB, so the gate runs on every
+  machine rather than skipping, which is *how it went unwritten for two phases*;
+  (b) it does **not** need a classloader-per-pod harness — the holder is a separate lease over a separate
+  connection, and the only channel to the pod under test is the database;
+  (c) it does **not** need a latch fixture or a timing race — holding the *claim* asserts the same
+  invariant deterministically, and `POST /trigger` (`RunRoutes:128`) is an HTTP door onto the cycle path.
+  ⛔ Do not "restore" any of the three; each would make the gate slower, flakier, or skipped.
+
+  ⚠ Deliberately out of scope, and not a gap: the **operator-trigger** path
+  (`/runs/{pipeline}/trigger`) **blocks** by design (`runGuard.acquire`), so two operator triggers
+  legitimately both complete — asserting a skip there would be asserting a bug.
   Scale-out §7 specifies `RunLeaseContractTest` as "the first test to write — **before any Enterprise
   code**": two `ControlApi` instances in one JVM over one Postgres, one interval + one operator trigger,
   asserting **exactly one run per trigger** across both, the loser's `tryAcquire` returning false rather
