@@ -837,6 +837,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   calls `authoredPipelineKey()` rather than recomputing it. The payoff showed up in mutation testing: keying `authoredPipelineKey`
   on the job name failed the *pre-existing* fence test alongside the new ones, which is the evidence they
   genuinely share a key rather than happening to agree today.
+- **⚠ A python-in-bash edit REWRITES LINE ENDINGS on Windows and inflates the diff ~6×.** `.gitattributes`
+  is `* text=auto eol=lf`, but Python's `io.open(path, 'w')` does universal-newline translation and emits
+  **CRLF** on Windows. Git then normalises to LF in the index, so the committed *content* is right — but a
+  file previously stored with CRLF shows as **fully rewritten**: a 302-line change reported as 1783/1491
+  on 2026-09-12. ⛔ Nothing is broken and ⛔ do not rewrite history over it; just know the real size is
+  `git show --stat --ignore-cr-at-eol`. **Pass `newline=''` when writing** (`io.open(p, 'w', newline='')`)
+  to preserve what was there, or use the Edit tool for small changes. ⚠ The tell is a diff far larger
+  than the edit, plus git's "CRLF will be replaced by LF" warning at commit time.
 - **🔴 CAUSE FOUND 2026-09-12 (correcting the note below): "transient" `NoClassDefFoundError` in an
   untouched module is CONCURRENT MAVEN RUNS IN ONE TREE — it is self-inflicted, not flaky.** It happened
   **four times** in one shift (`asn-golden` ×2, `inspecto-etl`, plus one ambiguous run) and the pattern was
