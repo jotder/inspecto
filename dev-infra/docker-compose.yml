@@ -1,0 +1,46 @@
+# Local development infrastructure for Inspecto.
+#
+# NOT a deployment artifact. The shipped topology is docs/api/deployment/README.md; this file exists so
+# every shift of a shared sandbox gets the same PostgreSQL and IdP instead of re-deriving them, and so
+# the test suites that SKIP without them can actually run.
+#
+#   docker compose -f dev-infra/docker-compose.yml up -d
+#
+# See README.md beside this file for the commands that turn the skipping suites on — several of them are
+# not guessable and cost a run each to rediscover.
+services:
+
+  # Exercises the Postgres leg of the operational stores. Without it PostgresStateStoreTest SKIPS all 15.
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres      # dev-only, and deliberately not a secret worth protecting
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # The OIDC provider inspecto-security authenticates against (Standard/Enterprise editions).
+  # ⚠ State lives in the container layer: it survives stop/start, and `docker rm` discards the registered
+  # OAuth application. Re-register it with the DCR call in README.md.
+  wso2is:
+    image: wso2/wso2is:latest       # 7.3.0 as of 2026-09-13
+    container_name: wso2is
+    restart: unless-stopped
+    ports:
+      - "9443:9443"                 # HTTPS: management console + all OIDC endpoints
+      - "9763:9763"                 # HTTP
+    healthcheck:
+      # Carbon takes ~40s to start; the OIDC endpoints answer only after it does.
+      test: ["CMD", "curl", "-skf", "https://localhost:9443/oauth2/token/.well-known/openid-configuration"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+volumes:
+  pgdata:
