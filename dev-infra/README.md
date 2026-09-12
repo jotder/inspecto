@@ -94,9 +94,34 @@ through `mvn.cmd`'s argument re-parsing.
 `-Dauth.oidc.tokenEndpoint` is required precisely because no vendor path layout is assumed (BACKLOG D15),
 and WSO2's issuer is `…/oauth2/token` rather than a Keycloak-style realm path.
 
-🔴 **Roles are a known gap.** A client-credentials token carries **no roles claim at all** — neither
-`roles` nor Keycloak's `realm_access.roles` — so `RoleMapper` grants nothing and the caller authenticates
-with **zero capabilities**. Fail-closed and correct, but *authenticated is not authorized*: issuing roles
-needs a user-bearing grant and IdP-side claim mapping, which is not configured here.
+### Roles — three settings, and missing any one looks identical
+
+⚠ A client-credentials token carries **no roles claim at all**, so the caller authenticates with **zero
+capabilities** — fail-closed and correct, but *authenticated is not authorized*. Roles need a
+**user-bearing** grant plus all three of the following. 🔴 Miss any one and the symptom is the same: the
+token validates and the Subject has no capabilities.
+
+1. **A group whose name matches a seeded role** (`Roles.SEED`: `pipeline-developer`, `app-developer`,
+   `developer`, `operations`, `support`, `admin`, `power`, `super`, `business`). An unrecognised name
+   grants nothing — deliberately.
+2. **The application requests the claim** — add `http://wso2.org/claims/groups` to its `requestedClaims`
+   (`PATCH /api/server/v1/applications/{appId}`; `requestedClaims` is empty by default).
+3. 🔴 **The application lists `groups` in `accessTokenAttributes`**
+   (`PUT /api/server/v1/applications/{appId}/inbound-protocols/oidc`). **Without this WSO2 puts the claim
+   in the id_token and userinfo ONLY** — and `OidcAuthenticator` reads the Bearer **access** token, so the
+   role silently never arrives.
+
+⛔ **The claim is `groups`, so `-Dauth.oidc.rolesClaim=groups` is required.** It is neither the `roles`
+default nor Keycloak's `realm_access.roles` fallback — that fallback does not apply to this vendor at all.
+
+```bash
+read -rsp 'test user password: ' INSPECTO_TEST_OIDC_PASSWORD; export INSPECTO_TEST_OIDC_PASSWORD; echo
+export INSPECTO_TEST_OIDC_USERNAME=inspecto_tester
+# … then re-run the suite command above; it picks up the third test automatically.
+```
+
+Verified 2026-09-13: a user in group `pipeline-developer` authenticates with `CAN_AUTHOR_WORKBENCH`,
+`CAN_AUTHOR_ALERT_RULES` and `CAN_REQUEST_SHARES` — pinned by
+`OidcAgainstRealProviderTest.aRealUsersGroupBecomesRealCapabilities`.
 
 Console: <https://localhost:9443/console> (`admin` / `admin`).

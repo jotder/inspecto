@@ -80,11 +80,19 @@ pass count.
 4. ⚠ **`-Dauth.oidc.clientId=inspecto-spa` is not issuable on WSO2**, whose client ids must match
    `[a-zA-Z0-9_]{15,30}` — too short, and hyphens are refused. The default is a default, not a contract.
 
-⚠ **Roles are the remaining gap, and it is a real one.** A WSO2 client-credentials token carries **no
-roles claim at all** — neither `roles` nor Keycloak's `realm_access.roles`. `RoleMapper` grants nothing,
-so the caller authenticates with **zero capabilities**: fail-closed and correct, but *authenticated is not
-authorized*. Issuing roles needs a user-bearing grant and an IdP-side claim mapping, which this pass did
-not configure.
+✅ **Roles now proven too (2026-09-13), and they need THREE provider settings, not one.** A
+client-credentials token carries no roles claim at all, so that path authenticates with **zero
+capabilities** — fail-closed and correct, but *authenticated is not authorized*. Over a **user-bearing**
+grant, all three of these are required, and 🔴 **missing any one produces the identical symptom**: a valid
+token whose Subject has no capabilities.
+
+1. the user is in a **group named for a seeded role** (`Roles.SEED`) — an unrecognised name grants nothing;
+2. the application **requests** the claim (`requestedClaims` is empty by default);
+3. 🔴 the application lists it in **`accessTokenAttributes`** — otherwise the provider puts the claim in
+   the **id_token and userinfo only**, and `OidcAuthenticator` reads the Bearer **access** token.
+
+⛔ On WSO2 the claim is **`groups`**, so `-Dauth.oidc.rolesClaim=groups`. The table's `roles` default and
+the documented `realm_access.roles` fallback are both Keycloak conventions and neither applies here.
 
 🔴 **TLS: there is no skip switch, by design.** JWKS is fetched with stock Nimbus `RemoteJWKSet` over the
 JVM default truststore. A self-signed dev IdP must have its certificate imported

@@ -147,6 +147,79 @@ class OidcAgainstRealProviderTest {
         });
     }
 
+    /**
+     * 🔴 The half that makes authentication USEFUL: a real user's group membership becoming real
+     * capabilities. Skips unless a user is also configured, so the two tests above still run with client
+     * credentials alone.
+     *
+     * <p>⚠ Three separate WSO2 settings are required before a role reaches this code, and missing any one
+     * of them looks identical from here — the caller authenticates with zero capabilities:
+     * <ol>
+     *   <li>the user is in a <b>group</b> whose name matches a seeded role ({@code Roles.SEED});</li>
+     *   <li>the application <b>requests</b> {@code http://wso2.org/claims/groups};</li>
+     *   <li>🔴 the application lists {@code groups} in <b>{@code accessTokenAttributes}</b> — without this
+     *       WSO2 puts the claim in the <b>id_token and userinfo only</b>, and this code reads the Bearer
+     *       ACCESS token, so the role silently never arrives.</li>
+     * </ol>
+     *
+     * <p>⛔ And the claim is {@code groups}, so {@code -Dauth.oidc.rolesClaim=groups} is required. It is
+     * neither the {@code roles} default nor Keycloak's {@code realm_access.roles} fallback — the fallback
+     * in {@code RoleMapper} does not apply to this vendor at all.
+     */
+    @Test
+    void aRealUsersGroupBecomesRealCapabilities() throws Exception {
+        String user = prop("inspecto.test.oidc.username", "INSPECTO_TEST_OIDC_USERNAME");
+        String pass = prop("inspecto.test.oidc.password", "INSPECTO_TEST_OIDC_PASSWORD");
+        assumeTrue(user != null && pass != null,
+                "needs a user too: pass -Dinspecto.test.oidc.username/.password (or INSPECTO_TEST_OIDC_"
+                        + "USERNAME/_PASSWORD). Without one, only the client-credentials path is covered and "
+                        + "role mapping stays unverified.");
+
+        String jwks = discover("jwks_uri");
+        String token = passwordGrantToken(discover("token_endpoint"), user, pass);
+        assertTrue(claimsOf(token).contains("\"groups\""),
+                "the ACCESS token must carry the groups claim — if it does not, the application is missing "
+                        + "accessTokenAttributes: [groups] and WSO2 has put it in the id_token only");
+
+        String savedClaim = System.getProperty("auth.oidc.rolesClaim");
+        System.setProperty("auth.oidc.rolesClaim", "groups");
+        try {
+            withProperties(jwks, issuer, audienceOf(token), () -> {
+                Optional<Subject> subject = new OidcAuthenticator().authenticate(bearer(token));
+                assertTrue(subject.isPresent(), "a live user token must authenticate");
+                assertTrue(subject.get().capabilities().contains(com.gamma.control.Roles.CAN_AUTHOR_WORKBENCH),
+                        "group 'pipeline-developer' must map through Roles.SEED to real capabilities — got "
+                                + subject.get().capabilities());
+            });
+        } finally {
+            restore("auth.oidc.rolesClaim", savedClaim);
+        }
+    }
+
+    /** The raw claim JSON, for assertions about what the provider actually emitted. */
+    private static String claimsOf(String jwt) {
+        return new String(Base64.getUrlDecoder().decode(jwt.split("\\.")[1]), StandardCharsets.UTF_8);
+    }
+
+    private String passwordGrantToken(String tokenEndpoint, String user, String pass) throws Exception {
+        String basic = Base64.getEncoder().encodeToString(
+                (clientId + ':' + clientSecret).getBytes(StandardCharsets.UTF_8));
+        HttpResponse<String> r = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create(tokenEndpoint))
+                        .header("Authorization", "Basic " + basic)
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "grant_type=password&scope=openid+groups&username="
+                                        + java.net.URLEncoder.encode(user, StandardCharsets.UTF_8)
+                                        + "&password=" + java.net.URLEncoder.encode(pass, StandardCharsets.UTF_8)))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, r.statusCode(), "token endpoint said: " + r.body());
+        String body = r.body();
+        int start = body.indexOf('"', body.indexOf(':', body.indexOf("\"access_token\"")) + 1) + 1;
+        return body.substring(start, body.indexOf('"', start));
+    }
+
     // ── plumbing ──────────────────────────────────────────────────────────────────────────────
 
     private interface Body { void run() throws Exception; }
