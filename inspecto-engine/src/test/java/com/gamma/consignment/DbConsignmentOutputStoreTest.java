@@ -675,4 +675,117 @@ class DbConsignmentOutputStoreTest {
                     "scoped to the store that was read");
         }
     }
+
+    // == identity: UNIQUE (consignment_id, path, run_id) + ON CONFLICT DO UPDATE (run-model slice 4) ====
+
+    /**
+     * The case the key exists for, and the reason it is DO UPDATE rather than DO NOTHING: one Run can write
+     * one path twice (two sinks targeting one store, a partition revealed under a stable
+     * {@code <baseName>_out.<ext>} with OVERWRITE_OR_IGNORE). The file on disk really was overwritten, so the
+     * registry must report the LATER count; DO NOTHING would keep a count for content that no longer exists.
+     */
+    @Test
+    void oneRunRewritingOnePathOverwritesTheRowRatherThanDuplicatingIt() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String path = "/w/cdr/dt=2026-08-04/orders_out.parquet";
+            db.record(List.of(out("c1", path, 100, State.LIVE)));
+            db.record(List.of(out("c1", path, 250, State.LIVE)));
+
+            List<ConsignmentOutput> rows = db.outputs("c1");
+            assertEquals(1, rows.size(), "one Consignment, one path, one Run is ONE file");
+            assertEquals(250, rows.get(0).rows(), "last writer wins - the earlier count is stale, not a peer");
+            assertEquals(25_000, rows.get(0).bytes(), "every non-key column is rewritten, not just row_count");
+        }
+    }
+
+    /**
+     * A re-revealed file is LIVE again. Leaving a COMPACTED_AWAY flag standing over content that now exists
+     * is the same stale-row defect from the other direction, so {@code state} is in the upsert SET list.
+     */
+    @Test
+    void aRewriteRestoresTheStateOfTheFileThatNowExists() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String path = "/w/cdr/dt=2026-08-04/gone.parquet";
+            db.record(List.of(out("c1", path, 10, State.COMPACTED_AWAY)));
+            assertFalse(db.isReadable(path));
+
+            db.record(List.of(out("c1", path, 10, State.LIVE)));
+            assertTrue(db.isReadable(path), "the file was written again; the registry must not still say gone");
+            assertEquals(1, db.outputs("c1").size());
+        }
+    }
+
+    /** A different Run writing the same path is a different file version, and both rows stand - which is what
+     *  makes the per-PATH (not per-row) reads of {@code isReadable} and {@code dailyVolume} necessary. */
+    @Test
+    void adifferentRunKeepsBothRows() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String path = "/w/cdr/dt=2026-08-04/stable.parquet";
+            db.record(List.of(withRun("c1", "run-1", path, 100, State.SUPERSEDED)));
+            db.record(List.of(withRun("c1", "run-2", path, 120, State.LIVE)));
+            assertEquals(2, db.outputs("c1").size(), "run_id is part of the key");
+        }
+    }
+
+    /**
+     * NULL != NULL in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is exempt from the
+     * key. That exemption is deliberate and must stay: every production path has supplied a run id since
+     * slice 3, and NOT NULL would make {@code record}'s fail-open contract DROP a landed file's row.
+     */
+    @Test
+    void aNullRunIdIsExemptFromTheKeyRatherThanRejected() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String path = "/w/cdr/dt=2026-08-04/legacy.parquet";
+            db.record(List.of(withRun("c1", null, path, 100, State.LIVE)));
+            db.record(List.of(withRun("c1", null, path, 250, State.LIVE)));
+
+            assertEquals(2, db.outputs("c1").size(),
+                    "both rows are kept - a row with no run identity is never silently discarded");
+        }
+    }
+
+    /**
+     * A registry written before the constraint existed is rebuilt on reopen: every row survives, duplicates of
+     * one (consignment, path, run) collapse to the FIRST arrival (nothing in the table orders them, so
+     * choosing a winner would fabricate one), and the reopened store upserts from then on.
+     */
+    @Test
+    void aPreConstraintRegistryGainsTheKeyOnReopen(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("outputs.duckdb");
+        try (Connection legacy = com.gamma.util.JdbcDrivers.connect(url);
+             Statement st = legacy.createStatement()) {
+            st.execute("CREATE TABLE consignment_outputs ("
+                    + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
+                    + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
+                    + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
+                    + "generation INTEGER, state VARCHAR)");
+            st.execute("INSERT INTO consignment_outputs VALUES "
+                    + "('c0','run-0','cdr','dt=2026-08-01','2026-08-01','/w/dup.parquet',9,900,"
+                    + "'2026-08-01T10:00:00Z',0,'LIVE'),"
+                    + "('c0','run-0','cdr','dt=2026-08-01','2026-08-01','/w/dup.parquet',11,1100,"
+                    + "'2026-08-01T11:00:00Z',0,'LIVE'),"
+                    + "('c0','run-0','cdr','dt=2026-08-01','2026-08-01','/w/other.parquet',5,500,"
+                    + "'2026-08-01T10:00:00Z',0,'LIVE'),"
+                    + "('c0',NULL,'cdr','dt=2026-08-01','2026-08-01','/w/nulls.parquet',1,100,"
+                    + "'2026-08-01T10:00:00Z',0,'LIVE'),"
+                    + "('c0',NULL,'cdr','dt=2026-08-01','2026-08-01','/w/nulls.parquet',2,200,"
+                    + "'2026-08-01T10:00:00Z',0,'LIVE')");
+        }
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open(url)) {
+            List<ConsignmentOutput> rows = db.outputs("c0");
+            assertEquals(4, rows.size(), "one duplicate pair collapsed; the two NULL-run rows both survive");
+            assertEquals(9, rows.stream().filter(o -> o.path().endsWith("dup.parquet"))
+                    .findFirst().orElseThrow().rows(), "the first arrival is kept - nothing orders them");
+
+            db.record(List.of(withRun("c0", "run-0", "/w/dup.parquet", 42, State.LIVE)));
+            assertEquals(4, db.outputs("c0").size(), "and the rebuilt table upserts from then on");
+        }
+    }
+
+    /** As {@link #out} but naming the Run - the key column these tests are about. */
+    private static ConsignmentOutput withRun(String consignment, String runId, String path, long rows,
+                                             State state) {
+        return new ConsignmentOutput(consignment, runId, "cdr", "dt=2026-08-04", "2026-08-04",
+                path, rows, rows * 100, "2026-08-04T10:00:00Z", 1, state);
+    }
 }

@@ -374,7 +374,8 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
   event_time_min VARCHAR,      -- addressing §3.1: ISO-8601 LOCAL, no zone offset
   event_time_max VARCHAR,
   event_time_spread_ms BIGINT, -- max - min; NULL (not 0) when bounds are unknown
-  producer       VARCHAR       -- the pipeline that wrote the file, for the §3.6 per-stream watermark
+  producer       VARCHAR,      -- the pipeline that wrote the file, for the §3.6 per-stream watermark
+  UNIQUE (consignment_id, path, run_id)
 );
 ```
 
@@ -383,40 +384,45 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
 created before they existed (CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows
 read back `NULL`.
 
-🔴 **Why this table has NO unique constraint, and cannot get one yet (settled 2026-09-12).** Every
-candidate key over `(consignment_id, path, …)` fails on a *missing discriminator*, not on taste:
+✅ **`UNIQUE (consignment_id, path, run_id)` SHIPPED 2026-09-13** (Run model slice 4) — one Consignment
+writing one path in one Run is **one file**, and `record` is
+`INSERT … ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET <every non-key column> = excluded.…`.
 
-- ~~**`run_id` is unconditionally `NULL`.**~~ ✅ **CLOSED 2026-09-13 — `run_id` is now non-null on every
-  production path** (Run model slice 3, `62d6eb64`/`de91b699`/`1fda46d5`). It was the reason a key over
-  this table would have been a **silent no-op**: NULL ≠ NULL inside a UNIQUE constraint on both DuckDB and
-  Postgres, so the schema would have advertised a guarantee it did not enforce.
-  ⚠ Still NULL by design on the five-arg `EnrichmentEngine.runResult` overload, which only tests call;
-  pinned by its own test so the exemption stays visible.
-- **`generation` is inert** — declared on the record but hard-coded `0` at every construction site.
-- **One run can legitimately write one `path` twice.** Two sinks may target one store
-  (`PartitionSinkWriter:115` sums `rowsByStore`), and `PartitionWriter:171,226` reveals each partition
-  under a stable `<baseName>_out.<ext>` with `OVERWRITE_OR_IGNORE` — so the second branch's row carries a
-  *different* `row_count` for the same path. `ON CONFLICT DO NOTHING` would keep the stale one.
+🔴 **`DO UPDATE`, not `DO NOTHING`, and that is the whole decision.** One Run can legitimately write one
+`path` twice: two sinks may target one store (`PartitionSinkWriter:115` sums `rowsByStore`) and
+`PartitionWriter:171,226` reveals each partition under a stable `<baseName>_out.<ext>` with
+`OVERWRITE_OR_IGNORE`, so the second write carries a **different `row_count` for the same path**. The file on
+disk really was overwritten, so last-writer-wins matches the filesystem while `DO NOTHING` would keep a count
+for content that no longer exists. ⚠ This is the **opposite** choice from `file_stages` (§3.10),
+deliberately: a stage is an immutable fact about a point in time, an output row describes a **mutable file**.
+⚠ `state` is in the SET list too — a re-revealed file is LIVE again, and leaving a `COMPACTED_AWAY` flag
+standing over content that now exists is the same stale-row defect from the other direction.
 
-Reprocess makes this sharper, not softer: since the identity half landed, a re-poll re-mints the **same**
-`consignment_id`, so new LIVE rows would collide with that batch's own just-superseded rows.
+⚠ **`run_id` is deliberately still nullable**, even though every production path has supplied one since
+slice 3. `NULL ≠ NULL` in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is **exempt**
+from the key — but `NOT NULL` would be strictly worse than the exemption: `record` is fail-open, so a
+violation would drop a *landed* file's row into a WARN, and a registry written before slice 3 could not be
+rebuilt at all (its legacy rows have no run identity, and inventing one would report a Run that never
+existed). The remaining exemption is the five-arg `EnrichmentEngine.runResult` overload that only tests call,
+pinned by its own test so it stays visible. ⚠ `generation` stays **inert** — declared on the record, hard-coded
+`0` at every construction site — and is therefore not part of the key.
 
-🔴 **State as of 2026-09-13: one of the two blockers is gone, the other is not — and that distinction is
-the thing to get right before touching this again.** The Run model (`superpower/run-model-plan.md`) landed
-in full, so `run_id` now carries a real attempt on every production path. ⛔ **The constraint is still NOT
-addable**, because the *second* finding is untouched: two sinks can legitimately write one `path` in one
-run with different `row_count`s, so `(consignment_id, path, run_id)` would collide on rows that are **not**
-duplicates.
+**Migration.** A pre-constraint table is **rebuilt on open**, the `file_stages` idiom (§3.10): the additive
+`ADD COLUMN IF NOT EXISTS` widening runs **first** (the rebuild copies every column by name, so it can only
+run once a legacy table has them all), then `RENAME TO consignment_outputs_v1` → create →
+`INSERT … SELECT … ON CONFLICT DO NOTHING` → drop, in one transaction — DuckDB has no `ADD CONSTRAINT`.
+⚠ The collapse is `DO NOTHING` here and `DO UPDATE` at write time, which is not an inconsistency: at
+migration time there is no "later" writer, the rows are already interleaved and the table carries no column
+that orders two rows for the same key, so keeping the first arrival is the only choice that fabricates
+nothing.
 
-✅ **The resolution is settled but unbuilt: `ON CONFLICT DO UPDATE`, not `DO NOTHING`** — the file on disk
-is genuinely overwritten, so last-writer-wins matches the filesystem, while `DO NOTHING` would preserve a
-`row_count` for content that no longer exists. ⚠ That is the **opposite** choice from `file_stages`
-(§3.10), deliberately: a stage is an immutable fact about a point in time, an output row describes a
-**mutable file**. ⚠ It is a decision about write semantics, not a mechanical migration, so this cannot
-simply reuse `DbFileStageStore.rebuildWithConstraint` verbatim.
-
-Until then the table stays unconstrained, which costs nothing — a reprocess merely accumulates SUPERSEDED
-rows and every reader filters on `state`. The dedupe guarantee is `file_stages`-only (§3.10), deliberately.
+🔴 **The legacy NULL-`run_id` rows are copied by a SECOND statement, and that is load-bearing** (probed on
+DuckDB 1.5.2.1, 2026-09-13, after a test caught it). The constraint really does treat NULLs as distinct
+*between* statements — two single-row inserts of the same null-run key both land — but
+`INSERT … SELECT … ON CONFLICT DO NOTHING` **also de-duplicates the incoming rows against each other, and
+there NULL matches NULL**. So a single-statement migration silently drops every repeat of a null-run key:
+the exact data loss the nullable-`run_id` decision exists to avoid, arriving through the migration instead
+of the constraint. ⛔ Do not merge the two inserts back together.
 
 **How a Run id gets here** (slice 3, 2026-09-13): [`RunIds`](../../../../inspecto-engine/src/main/java/com/gamma/job/RunIds.java)
 is the **single** generator — a second one at the Collector was refused so "run id" could not mean two

@@ -68,7 +68,7 @@ constraint early.
 | **3b** ✅ | **SHIPPED 2026-09-13** — the enrichment path | `EnrichJob` adopts `run(JobContext)`; `runResult` gains a `runId` beside `consignmentId`; all three callers supply one | **Medium** — done |
 | **3** | Give the two framework-less paths a run identity | `ConsignmentIngestor:440` (reached from the static `CollectorProcessor.run`/`ingest`, no `JobContext` on the path at all) and `EnrichmentEngine:158`/`:179` (via `EnrichJob`, which implements only the legacy no-arg `run()`) | **High — the real cost.** Needs either a run identity minted at the `CollectorProcessor` entry point and threaded down, or these paths adopting `JobContext` |
 | **3c** ✅ | **SHIPPED 2026-09-13** — the Collector's ingest path | `CollectorProcessor.ingest` mints one `cycleRunId` per poll cycle; threaded through `process` → `commit` → `finalizeSource` | **Medium** — done |
-| **4** | Make `run_id` `NOT NULL`, then add the key | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE` (§3), migrating by rebuild | 🔴 **STILL BLOCKED, but no longer by `run_id`** — see §5.3 |
+| **4** ✅ | **SHIPPED 2026-09-13** — the key, without the `NOT NULL` half | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE`, migrating by rebuild | **Medium** — done; see §5.4 for why `NOT NULL` was dropped |
 
 ### 4.1 As-built after slices 1 + 2 — the paths that still write NULL
 
@@ -176,7 +176,10 @@ Mutation-proven: restoring a literal `null` reds the new test with
 misnomer in an operator-visible persisted surface, left alone on purpose: renaming it rewrites an audit
 header, which is a separate decision from filling the registry's column.
 
-## 5.3 ✅ Slice 3 COMPLETE 2026-09-13 — and 🔴 the constraint is STILL blocked, for the *other* reason
+## 5.3 ✅ Slice 3 COMPLETE 2026-09-13 — and why the constraint was still blocked, for the *other* reason
+
+*(✅ That block is now LIFTED — §5.4 shipped the key. This section is kept because the distinction it draws
+is the reason slice 4 looks the way it does; read it before changing the write semantics.)*
 
 Slice 3c closed the last path. `CollectorProcessor.ingest` mints **one `cycleRunId` per poll cycle** —
 ⚠ per cycle, not per Consignment, because `GLOSSARY.md` §6-A says a Run *contains* one or more
@@ -187,7 +190,7 @@ exactly one Consignment, **which is still true rather than null**. Mutation-prov
 ⇒ **`run_id` is now non-null on every production path.** That was one of the two reasons the operator's
 key was refuted.
 
-🔴 **The OTHER reason stands untouched, and slice 4 must not proceed until it is answered.** The original
+🔴 **The OTHER reason stood untouched, and slice 4 could not proceed until it was answered.** The original
 refutation had two independent findings; closing the first does nothing for the second:
 
 > **One run can legitimately write the same `path` twice.** Two sinks may target one store
@@ -205,6 +208,40 @@ why slice 4's difficulty cell no longer reads "reuse `rebuildWithConstraint` ver
 ⚠ **Also still NULL by design: the five-arg `EnrichmentEngine.runResult` overload** that tests use, pinned
 by its own test. Production never calls it, so it does not block the constraint — but a future caller
 reaching for it would silently reopen the hole.
+
+
+## 5.4 ✅ Slice 4 SHIPPED 2026-09-13 — the key is on, and the `NOT NULL` half was DROPPED on purpose
+
+`UNIQUE (consignment_id, path, run_id)` is live, and `record` is
+`INSERT … ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET <every non-key column> = excluded.…`.
+⚠ `state` is in the SET list: a re-revealed file is LIVE again, and leaving a `COMPACTED_AWAY` flag over
+content that now exists is the same stale-row defect from the other direction. A pre-constraint table is
+rebuilt on open, the `file_stages` idiom — with the additive `ADD COLUMN IF NOT EXISTS` widening moved
+**before** the rebuild, since the copy names every column.
+
+🔴 **`run_id` stays NULLABLE — operator decision, against the slice's own cell.** Grounding the "make it
+`NOT NULL`" half found two consequences the plan never weighed, and both make the constraint destroy data
+rather than protect it: `record` is **fail-open**, so a violation drops a row for a file that has already
+*landed* into a WARN; and a registry written before slice 3 could not be rebuilt at all, its legacy rows
+having no run identity (and inventing one would report a Run that never existed). Every production path has
+supplied a run id since slice 3, so the constraint would only ever fire on those two cases. ⚠ The exemption
+is real and stays visible: `NULL ≠ NULL` in a UNIQUE constraint, so a null-run row is not deduped.
+
+🔴 **A probe corrected a claim this plan repeated throughout** (DuckDB 1.5.2.1, 2026-09-13). "NULL ≠ NULL
+in a UNIQUE constraint" is true *between statements* — but `INSERT … SELECT … ON CONFLICT DO NOTHING`
+**also de-duplicates the incoming rows against each other, and there NULL matches NULL**. The first rebuild
+therefore silently dropped every repeat of a null-run legacy key — caught by
+`aPreConstraintRegistryGainsTheKeyOnReopen`, not by reading. The migration now copies the null-run rows in a
+**second statement**. ⛔ Do not merge them back together.
+
+✅ **Mutation-proven on the WHOLE feature**, as §5 requires — constraint, upsert clause and rebuild all
+reverted together, never one clause. Three tests go red with the right VALUES: `expected: <1> but was: <2>`
+twice (a duplicate row survives) and `expected: <4> but was: <5>` (the legacy pair does not collapse).
+⚠ Dropping only the `UNIQUE` would have been red for the wrong reason — DuckDB refuses `ON CONFLICT`
+outright and every insert fails.
+
+⚠ **Still NULL by design:** the five-arg `EnrichmentEngine.runResult` overload that only tests call, pinned
+by its own test. A future production caller reaching for it would silently reopen the exemption.
 
 ## 6. ✅ DECIDED 2026-09-13 — bring them onto `JobContext`
 

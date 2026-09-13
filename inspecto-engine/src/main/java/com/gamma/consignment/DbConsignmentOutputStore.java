@@ -42,6 +42,23 @@ import java.util.Optional;
  * id-keyed {@code UPDATE}s that never insert</b>: a row is only ever created by {@link #record} at the moment a
  * file is revealed, so a state flip cannot resurrect a file the registry never saw. Neither transition is
  * reversible, and neither is a substitute for the JSON manifest — see the existence/state split above.
+ *
+ * <p><b>Identity (run-model plan slice 4, 2026-09-13).</b> {@code UNIQUE (consignment_id, path, run_id)} —
+ * one Consignment writing one path in one Run is <em>one</em> file, and re-recording it is
+ * <b>{@code ON CONFLICT DO UPDATE}</b>, not {@code DO NOTHING}. 🔴 That is a write-semantics decision, not a
+ * dedupe detail: one Run can legitimately write the same path twice, because two sinks may target one store
+ * ({@code PartitionSinkWriter} sums {@code rowsByStore}) and {@code PartitionWriter} reveals each partition
+ * under a stable {@code <baseName>_out.<ext>} with {@code OVERWRITE_OR_IGNORE}. The second write carries a
+ * <b>different {@code row_count} for the same path</b> — and the file on disk really was overwritten, so
+ * last-writer-wins matches the filesystem while {@code DO NOTHING} would keep a count for content that no
+ * longer exists.
+ *
+ * <p>⚠ <b>{@code run_id} is deliberately still nullable</b>, though every production path has supplied one
+ * since slice 3. {@code NULL ≠ NULL} in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is
+ * exempt from the key — but {@code NOT NULL} would be strictly worse than that exemption: {@link #record} is
+ * fail-open, so a violation would drop a <em>landed</em> file's row into a WARN, and a registry written before
+ * slice 3 could not be rebuilt at all (its legacy rows have no run identity, and inventing one would report a
+ * Run that never existed).
  */
 @PublicApi(since = "4.0.0")
 public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.util.BrowsableStore {
@@ -56,6 +73,19 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             "consignment_id, run_id, table_name, partition_key, record_day, "
                     + "path, row_count, bytes, written_at, generation, state, schema_fingerprint, "
                     + "event_time_min, event_time_max, event_time_spread_ms, producer";
+
+    /** Every column except the three key columns, rewritten from the incoming row — last-writer-wins, because
+     *  the file on disk was genuinely overwritten (see the class javadoc). ⚠ {@code state} is in here: a
+     *  re-revealed file is live again, and leaving a {@code COMPACTED_AWAY} flag standing over content that
+     *  now exists would be the same stale-row defect from the other direction. */
+    private static final String UPSERT_SET =
+            "table_name = excluded.table_name, partition_key = excluded.partition_key, "
+                    + "record_day = excluded.record_day, row_count = excluded.row_count, "
+                    + "bytes = excluded.bytes, written_at = excluded.written_at, "
+                    + "generation = excluded.generation, state = excluded.state, "
+                    + "schema_fingerprint = excluded.schema_fingerprint, "
+                    + "event_time_min = excluded.event_time_min, event_time_max = excluded.event_time_max, "
+                    + "event_time_spread_ms = excluded.event_time_spread_ms, producer = excluded.producer";
 
     private final Connection conn;
 
@@ -76,15 +106,18 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         return new DbConsignmentOutputStore(JdbcDrivers.connect(url));
     }
 
+    private static final String CREATE = "CREATE TABLE IF NOT EXISTS " + T + " ("
+            + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
+            + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
+            + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
+            + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR, "
+            + "event_time_min VARCHAR, event_time_max VARCHAR, "
+            + "event_time_spread_ms BIGINT, producer VARCHAR, "
+            + "UNIQUE (consignment_id, path, run_id))";
+
     private void initSchema() {
         try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
-                    + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
-                    + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
-                    + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
-                    + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR, "
-                    + "event_time_min VARCHAR, event_time_max VARCHAR, "
-                    + "event_time_spread_ms BIGINT, producer VARCHAR)");
+            st.execute(CREATE);
             // §3.4.3 additive migration: CREATE TABLE IF NOT EXISTS never widens a pre-existing table, so a
             // registry created before the column existed gets it added here; existing rows read back NULL.
             st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS schema_fingerprint VARCHAR");
@@ -95,8 +128,56 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_max VARCHAR");
             st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_spread_ms BIGINT");
             st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS producer VARCHAR");
+            // ⚠ The constraint is added LAST, after the widening above: the rebuild copies every column by
+            // name, so it can only run once a pre-constraint registry has them all.
+            if (!hasUniqueConstraint(st)) rebuildWithConstraint(st);
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise consignment-outputs schema", e);
+        }
+    }
+
+    private static boolean hasUniqueConstraint(Statement st) throws SQLException {
+        try (ResultSet rs = st.executeQuery("SELECT 1 FROM information_schema.table_constraints "
+                + "WHERE table_name = '" + T + "' AND constraint_type = 'UNIQUE'")) {
+            return rs.next();
+        }
+    }
+
+    /**
+     * Legacy (unconstrained) table → constrained copy, duplicates collapsed, atomically.
+     *
+     * <p>⚠ The collapse is {@code DO NOTHING}, not the {@code DO UPDATE} of {@link #record}: at migration time
+     * there is no "later" writer — the rows are already interleaved and the table carries no column that
+     * orders two rows for the same key. Keeping the first arrival is the only choice that fabricates nothing.
+     *
+     * <p>🔴 <b>The NULL-{@code run_id} rows are copied by a SECOND statement, and that is load-bearing.</b>
+     * Probed on DuckDB 1.5.2.1: a UNIQUE constraint really does treat NULLs as distinct <em>between</em>
+     * statements (two single-row inserts of the same null-run key both land), but
+     * {@code INSERT … SELECT … ON CONFLICT DO NOTHING} <b>also de-duplicates the incoming rows against each
+     * other, and there NULL matches NULL</b> — so folding the legacy rows into one statement silently drops
+     * every repeat of a null-run key. That is the exact silent data loss the nullable-{@code run_id} decision
+     * exists to avoid, arriving through the migration instead of the constraint. ⛔ Do not merge these two
+     * inserts back together.
+     */
+    private void rebuildWithConstraint(Statement st) throws SQLException {
+        String legacy = T + "_v1";
+        boolean auto = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            st.execute("ALTER TABLE " + T + " RENAME TO " + legacy);
+            st.execute(CREATE);
+            st.execute("INSERT INTO " + T + " (" + COLS + ") SELECT " + COLS + " FROM " + legacy
+                    + " WHERE run_id IS NOT NULL ON CONFLICT DO NOTHING");
+            st.execute("INSERT INTO " + T + " (" + COLS + ") SELECT " + COLS + " FROM " + legacy
+                    + " WHERE run_id IS NULL");
+            st.execute("DROP TABLE " + legacy);
+            conn.commit();
+            log.info("consignment-outputs: rebuilt {} with its unique constraint", T);
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(auto);
         }
     }
 
@@ -113,14 +194,17 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     /**
-     * Append the output files of one Consignment. <b>Best-effort: a write failure is logged, never thrown</b> —
+     * Record the output files of one Consignment — an insert, or, for a path this Consignment already wrote in
+     * this Run, an <b>overwrite of the earlier row</b> (see the class javadoc on identity).
+     * <b>Best-effort: a write failure is logged, never thrown</b> —
      * the registry is an index beside the manifest, so losing a row must not fail a Consignment that has
      * already landed its data. §5.4's commit discipline stays the thing that guarantees visibility.
      */
     public synchronized void record(List<ConsignmentOutput> outputs) {
         if (outputs == null || outputs.isEmpty()) return;
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                        + "ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET " + UPSERT_SET)) {
             for (ConsignmentOutput o : outputs) {
                 EventTimeBounds b = o.bounds();
                 ps.setString(1, o.consignmentId());
