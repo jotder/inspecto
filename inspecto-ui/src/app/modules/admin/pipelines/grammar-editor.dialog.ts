@@ -39,6 +39,9 @@ export interface GrammarEditorDialogData {
     node: AuthoredNode;
     typeLabel: string;
     categoryLabel: string;
+    /** The pipeline's own config directory, threaded to the onward Schema editor so a drafted satellite
+     *  lands beside its pipeline (`SCHEMA-SATELLITE-SUBDIR-1`). Blank/absent = the write root. */
+    configSubdir?: string;
 }
 
 /**
@@ -186,11 +189,14 @@ export class GrammarEditorDialog {
         this.dialog.open(SchemaEditorDialog, {
             // home: 'config' — a pipeline's satellite schema, which a parse node references by bare
             // `<name>.toon`; the registry spelling `schema/<id>` is authored by no shipped surface.
-            // ⚠ It still lands at the write ROOT rather than beside its pipeline: this opener passes no
-            // subdir, which is the SATELLITE-WRITE-1 shape the real parse surface already fixed. Filed
-            // as SCHEMA-SATELLITE-SUBDIR-1 — not fixed here, because it needs the pipeline's
-            // configSubdir threaded through this dialog's data and nothing pins the destination today.
-            data: { sampleRows: this.previewRows(), home: 'config' } satisfies SchemaEditorData,
+            // ✅ SCHEMA-SATELLITE-SUBDIR-1 (2026-09-13): the pipeline's own directory is threaded through so
+            // the draft lands BESIDE its pipeline. It used to land at the write root — the SATELLITE-WRITE-1
+            // shape, where the root file wins the read and the drawer edits a schema the engine never loads.
+            data: {
+                sampleRows: this.previewRows(),
+                home: 'config',
+                subdir: this.data.configSubdir,
+            } satisfies SchemaEditorData,
             width: '1000px',
             maxHeight: '88vh',
         });

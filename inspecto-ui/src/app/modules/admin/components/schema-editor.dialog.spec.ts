@@ -51,6 +51,7 @@ function create(
     sampleRows?: Record<string, unknown>[],
     components: Partial<ComponentsService> = {},
     home?: 'registry' | 'config',
+    subdir?: string,
 ) {
     const ref = { close: vi.fn(), disableClose: false };
     // An EDIT saves here (the registry component); only a CREATE goes to ConfigService.write.
@@ -97,7 +98,7 @@ function create(
         imports: [SchemaEditorDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows, home } },
+            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows, home, subdir } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ConfigService, useValue: api },
             { provide: ComponentsService, useValue: comps },
@@ -270,7 +271,53 @@ describe('SchemaEditorDialog', () => {
             { overwrite: true },
         );
         // A CREATE stays on /config/write on purpose: this dialog is also opened with no `def` from the
-        // parse editor, where authoring a pipeline's satellite schema at the write root IS the intent.
+        // parse editor, where authoring a pipeline's satellite schema is the intent.
+        // ⚠ Corrected 2026-09-13: this said the WRITE ROOT is the intent. It never was — a satellite belongs
+        // beside its pipeline (SATELLITE-WRITE-1), and landing at the root makes the root file win the read.
+        // The destination is now the `subdir` the opener threads; see the satellite-home block below.
         expect(comps.update).not.toHaveBeenCalled();
+    });
+});
+
+describe('SchemaEditorDialog satellite home (SCHEMA-SATELLITE-SUBDIR-1)', () => {
+    /**
+     * 🔴 A pipeline's satellite schema must land BESIDE its pipeline, not at the write root. The parse
+     * editor drafts one for a pipeline that may live in a subdirectory, and `SATELLITE-WRITE-1` records
+     * what a root-level write costs: the root file then WINS the read, so the drawer edits a schema the
+     * engine never loads, and a duplicate is orphaned beside the real one.
+     */
+    it('writes a drafted satellite schema into the pipeline directory it was opened for', () => {
+        const { c, api } = create(undefined, {}, undefined, {}, 'config', 'feeds/orders');
+        c.name.setValue('orders_schema');
+        c.onRows([{ name: 'ID', selector: '0', type: 'VARCHAR', description: '', unit: '', classification: '' }]);
+        c.save();
+        expect(api.write).toHaveBeenCalledWith(
+            'schema',
+            expect.anything(),
+            expect.objectContaining({ subdir: 'feeds/orders' }),
+        );
+    });
+
+    /**
+     * ⚠ A root-level pipeline has NO subdir, and blank must stay absent rather than travel as `''` — the
+     * server falls back to its own scan when the key is missing, and an empty string is a different
+     * instruction from an absent one.
+     */
+    it('sends no subdir at all for a root-level pipeline', () => {
+        const { c, api } = create(undefined, {}, undefined, {}, 'config', '');
+        c.name.setValue('orders_schema');
+        c.onRows([{ name: 'ID', selector: '0', type: 'VARCHAR', description: '', unit: '', classification: '' }]);
+        c.save();
+        const opts = (vi.mocked(api.write).mock.calls[0][2] ?? {}) as Record<string, unknown>;
+        expect('subdir' in opts).toBe(false);
+    });
+
+    /** ⛔ The registry home is NOT a satellite — a subdir must not follow it there. */
+    it('ignores a subdir when the home is the registry', () => {
+        const { c, comps } = create(undefined, {}, undefined, {}, 'registry', 'feeds/orders');
+        c.name.setValue('orders_schema');
+        c.onRows([{ name: 'ID', selector: '0', type: 'VARCHAR', description: '', unit: '', classification: '' }]);
+        c.save();
+        expect(comps.create).toHaveBeenCalled();
     });
 });

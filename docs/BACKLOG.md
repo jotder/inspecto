@@ -494,7 +494,23 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   template and no route — so nothing mounts it. ⛔ **Do not delete on sight:** `MOCK-DEAD-COMPUTE-1` was closed as
   a **RETAIN** precisely because dead code here can be a deliberate test vehicle. Establish which this is first.
   → `okf/frontend/features/schema-mapping-authoring.md`
-- **P2** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at the write ROOT,**
+- ✅ **SHIPPED 2026-09-13** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at
+  the write ROOT,**
+  ✅ **BUILT:** the pipeline's own directory is threaded `pipeline-editor` → `GrammarEditorDialogData`
+  → `SchemaEditorData.subdir` → `/config/write`, so a drafted satellite lands **beside its pipeline**.
+  ✅ **The row's own instruction was followed: the test was written FIRST** and confirmed failing for the
+  right reason — the write options carried `{overwrite: true}` and no `subdir` key at all. ⚠ Only ONE of
+  the three new tests was a defect test; the other two are edge guards for the fix (a root-level
+  pipeline must send **no key**, not `''`; a `registry` home must not take a subdir) and passed before
+  and after — worth stating, because three green tests could otherwise be read as three proofs.
+  🔴 **Two stale claims retired in the same change**, both asserting the old behaviour was deliberate:
+  `schema-editor.dialog.spec.ts` said authoring at the write root *"IS the intent"*, and
+  `okf/capabilities/control-api/control-api.md` said the parse editor writes there *"on purpose"*.
+  Neither was ever true — a root write is the `SATELLITE-WRITE-1` defect, where the root file wins the
+  read and the drawer edits a schema the engine never loads.
+  ⚠ The sibling `openMappingEditor` was checked and is **NOT** the same defect: it writes through
+  `ComponentsService` (the registry), not `/config/write`.
+  *(original row follows)*
   ✅ **PROMOTED P3→P2 2026-09-13 (operator)** — misfiled config is found late, and the cost/benefit never
   matched "build only when someone asks by name".
   🔴 **It is NOT the one-parameter thread-through it looks like — measured 2026-09-13 before ranking it.**

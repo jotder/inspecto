@@ -34,6 +34,19 @@ export interface SchemaEditorData {
      *   pipeline's satellite schema that a node references by bare `<name>.toon`.
      */
     home?: 'registry' | 'config';
+    /**
+     * The pipeline's own config directory, for a `home: 'config'` satellite (`SCHEMA-SATELLITE-SUBDIR-1`).
+     *
+     * 🔴 Without it a drafted satellite lands at the WRITE ROOT rather than beside its pipeline, and
+     * `SATELLITE-WRITE-1` records what that costs: the root file then **wins the read**
+     * (`resolveSatelliteForRead` only scans when the convention path misses), so the drawer edits a schema
+     * the engine never loads, and a duplicate is orphaned beside the real one.
+     *
+     * ⚠ Blank or absent is the correct value for a root-level pipeline and must travel as **absent**, not
+     * `''` — the server falls back to its own scan when the key is missing, which is a different
+     * instruction from an empty one. ⛔ Ignored for `home: 'registry'`: that is not a satellite.
+     */
+    subdir?: string;
 }
 
 /** One typed field row — `ConfigSpecs.schema()`'s `raw.fields[]` keys, verbatim. */
@@ -310,6 +323,8 @@ export class SchemaEditorDialog {
               : this.config
                     .write('schema', config, {
                         overwrite: true,
+                        // ⚠ Only when non-blank — a root-level pipeline must send NO key at all, not `''`.
+                        ...(this.data.subdir?.trim() ? { subdir: this.data.subdir.trim() } : {}),
                         ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
                     })
                     .pipe(

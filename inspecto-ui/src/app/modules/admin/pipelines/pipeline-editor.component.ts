@@ -2158,7 +2158,14 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 width: '1100px',
                 maxWidth: '95vw',
                 autoFocus: false,
-                data: { node, typeLabel: node.type, categoryLabel: categoryLabel(category) },
+                // ⚠ configSubdir travels so the dialog's onward Schema editor writes the satellite
+                // beside this pipeline (SCHEMA-SATELLITE-SUBDIR-1), not at the write root.
+                data: {
+                    node,
+                    typeLabel: node.type,
+                    categoryLabel: categoryLabel(category),
+                    configSubdir: this.configSubdir(),
+                },
             })
             .afterClosed()
             .subscribe((res?: { node?: AuthoredNode }) => {

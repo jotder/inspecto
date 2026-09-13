@@ -234,10 +234,18 @@ is bounded with a `truncated` flag that reports the *true* total.
   are deliberately excluded from ETags (above), so `contentHash` in the body **is** the only handle, and
   that asymmetry is why the conversion cannot live at the call site.
   ⛔ **A schema's two write routes address different files** — `registry/schemas/<id>.toon` for the
-  component vs `<write-root>/<name>.toon` for `/config/write` (no `subdir`). That is a seam, not a bug to
-  collapse: the parse editor authors a pipeline's satellite schema at the write root on purpose. It became
-  a silent data loss only because the *editor* chose the wrong one. Pinned by
+  component vs `<subdir>/<name>.toon` for `/config/write`. That is a seam, not a bug to collapse: the parse
+  editor authors a pipeline's **satellite** schema, the Components pane authors a registry component. It
+  became a silent data loss only because the *editor* chose the wrong one. Pinned by
   `ControlApiComponentsTest.configWriteSchemaDoesNotUpdateTheRegistryComponentOfTheSameName`.
+  ✅ **Corrected 2026-09-13 (`SCHEMA-SATELLITE-SUBDIR-1`).** This passage used to say the parse editor
+  writes to the write ROOT *"on purpose"*. 🔴 It never was on purpose — a satellite belongs **beside its
+  pipeline**, and a root-level write is the `SATELLITE-WRITE-1` defect: the root file then **wins the read**
+  (`resolveSatelliteForRead` scans only when the convention path misses), so the drawer edits a schema the
+  engine never loads while a duplicate is orphaned beside the real one. The opener now threads the
+  pipeline's `configSubdir` through `GrammarEditorDialogData` → `SchemaEditorData.subdir`. ⚠ A root-level
+  pipeline still sends **no `subdir` key at all** — absent means "fall back to the server's scan", which is
+  a different instruction from `''`.
   ⚠ Also: `Envelope.java` **never sets an `etag` key in `metadata`** for any route, so the SPA's
   `V1EnvelopeMetadata.etag` (`v1.ts:27`) is a field the server has never populated. The ETag travels only
   as an HTTP header — which means `v1.interceptor.ts` is **not** what withholds it: that interceptor clones
