@@ -386,13 +386,12 @@ read back `NULL`.
 🔴 **Why this table has NO unique constraint, and cannot get one yet (settled 2026-09-12).** Every
 candidate key over `(consignment_id, path, …)` fails on a *missing discriminator*, not on taste:
 
-- **`run_id` is unconditionally `NULL`.** The column is nullable and all four `record()` call sites pass
-  a literal `null` — [`ConsignmentIngestor`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java) `:440`,
-  [`PartitionSinkWriter`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/PartitionSinkWriter.java) `:117`
-  and [`EnrichmentEngine`](../../../../inspecto-engine/src/main/java/com/gamma/enrich/EnrichmentEngine.java) `:158`/`:179`
-  — as do `DerivedTableWriter:163` and `SummaryWriter:274`. ⚠ **NULL ≠ NULL inside a UNIQUE constraint on
-  both DuckDB and Postgres**, so such a key would be a silent no-op on every row while advertising a
-  guarantee in the schema. That is strictly worse than no constraint.
+- ~~**`run_id` is unconditionally `NULL`.**~~ ✅ **CLOSED 2026-09-13 — `run_id` is now non-null on every
+  production path** (Run model slice 3, `62d6eb64`/`de91b699`/`1fda46d5`). It was the reason a key over
+  this table would have been a **silent no-op**: NULL ≠ NULL inside a UNIQUE constraint on both DuckDB and
+  Postgres, so the schema would have advertised a guarantee it did not enforce.
+  ⚠ Still NULL by design on the five-arg `EnrichmentEngine.runResult` overload, which only tests call;
+  pinned by its own test so the exemption stays visible.
 - **`generation` is inert** — declared on the record but hard-coded `0` at every construction site.
 - **One run can legitimately write one `path` twice.** Two sinks may target one store
   (`PartitionSinkWriter:115` sums `rowsByStore`), and `PartitionWriter:171,226` reveals each partition
@@ -400,13 +399,33 @@ candidate key over `(consignment_id, path, …)` fails on a *missing discriminat
   *different* `row_count` for the same path. `ON CONFLICT DO NOTHING` would keep the stale one.
 
 Reprocess makes this sharper, not softer: since the identity half landed, a re-poll re-mints the **same**
-`consignment_id`, so new LIVE rows would collide with that batch's own just-superseded rows. The unblocker
-is §13's Run model giving a write round a real identity — specified in
-[`superpower/run-model-plan.md`](../../../superpower/run-model-plan.md), which also settles that this
-table must use `ON CONFLICT DO UPDATE` rather than `DO NOTHING` (the file on disk is genuinely
-overwritten, so last-writer-wins matches the filesystem — the opposite choice from `file_stages` §3.10,
-and deliberately so). Until then this table stays unconstrained, which costs nothing — a reprocess merely accumulates SUPERSEDED rows and every reader filters on `state`.
-The dedupe guarantee is `file_stages`-only (§3.10), deliberately.
+`consignment_id`, so new LIVE rows would collide with that batch's own just-superseded rows.
+
+🔴 **State as of 2026-09-13: one of the two blockers is gone, the other is not — and that distinction is
+the thing to get right before touching this again.** The Run model (`superpower/run-model-plan.md`) landed
+in full, so `run_id` now carries a real attempt on every production path. ⛔ **The constraint is still NOT
+addable**, because the *second* finding is untouched: two sinks can legitimately write one `path` in one
+run with different `row_count`s, so `(consignment_id, path, run_id)` would collide on rows that are **not**
+duplicates.
+
+✅ **The resolution is settled but unbuilt: `ON CONFLICT DO UPDATE`, not `DO NOTHING`** — the file on disk
+is genuinely overwritten, so last-writer-wins matches the filesystem, while `DO NOTHING` would preserve a
+`row_count` for content that no longer exists. ⚠ That is the **opposite** choice from `file_stages`
+(§3.10), deliberately: a stage is an immutable fact about a point in time, an output row describes a
+**mutable file**. ⚠ It is a decision about write semantics, not a mechanical migration, so this cannot
+simply reuse `DbFileStageStore.rebuildWithConstraint` verbatim.
+
+Until then the table stays unconstrained, which costs nothing — a reprocess merely accumulates SUPERSEDED
+rows and every reader filters on `state`. The dedupe guarantee is `file_stages`-only (§3.10), deliberately.
+
+**How a Run id gets here** (slice 3, 2026-09-13): [`RunIds`](../../../../inspecto-engine/src/main/java/com/gamma/job/RunIds.java)
+is the **single** generator — a second one at the Collector was refused so "run id" could not mean two
+things depending on the path. Work outside `JobService` carries
+[`StandaloneRunContext`](../../../../inspecto-engine/src/main/java/com/gamma/job/StandaloneRunContext.java),
+a deliberately inert `JobContext` (no log, no signals, no artifacts) that exists to carry identity, not to
+make a CLI invocation look scheduled. ⚠ **One Run spans a whole poll cycle, not one Consignment** —
+`GLOSSARY.md` §6-A binds `Run ⊇ Consignment ⊇ File`, so `CollectorProcessor.ingest` mints one id and every
+batch in that cycle shares it.
 
 **Null bounds mean *unknown*, never *empty*.** A consumer that prunes on bounds must treat a null-bounds row
 as a **possible match**, or it will silently drop data. Two write paths can fill them, each from its own
@@ -486,8 +505,9 @@ separate the derived summary tier (`<dataDir>/_summaries/<target>/record_day=…
 `row_count` is never a field copy — `PartitionWriter.reveal()` supplies only `(partition, outputFile, bytes)`,
 because a partitioned `COPY` reports no per-file count back. **`record_day` is currently derived from the
 partition key's `year`/`month`/`day` segments and is `null` for any other scheme** — a write-time approximation
-that plan §10.1's pinned-timezone event-time-at-load must replace, not fall back to. `run_id` is `null`
-everywhere: no path yet has a Run identity distinct from its unit of work.
+that plan §10.1's pinned-timezone event-time-at-load must replace, not fall back to. ✅ `run_id` **is no
+longer null** (2026-09-13): every production path now carries a Run identity distinct from its unit of
+work — see §3.9's *"How a Run id gets here"*.
 
 Reads return **all** states, not just `LIVE` — hiding `COMPACTED_AWAY` would conceal exactly the case the
 registry exists to expose.

@@ -140,6 +140,34 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **An SPI whose absence removes a safety property must be fail-CLOSED, and two were not.**
+  `SpiSlot` routes discovery through `OptionalSpi`, which catches `ServiceConfigurationError` so an
+  unloadable **optional** module is an absence rather than a boot failure (PKG-5 — right for the assistant
+  sidecar). ⛔ For `Authenticator` and `AccessDecider` absence means *allow*: an empty Authenticator makes
+  `ControlApi.dispatch` skip auth on **every** route, and an empty AccessDecider makes both PEPs return
+  early, so `PolicyEngine`'s seeded `space-isolation` stops enforcing the **multi-tenant boundary**. Both
+  slots now pass `failClosed=true` (2026-09-13). ⚠ The distinction that has to survive any future edit is
+  **registered-but-broken vs never-registered** — Personal registers nothing and must still resolve empty.
+  ⚠ A new `ATTR_*` constant must also be added to `ControlApi.REQUEST_SCOPED_ATTRS` or it **leaks across
+  requests**; `ExchangeAttributeScopeTest` is the guard that catches it.
+
+- 🔴 **Only a REAL provider finds provider-shaped defects.** Standing up WSO2 IS 7.3.0 immediately exposed
+  that `OidcAuthenticator` rejected **every RFC 9068 access token** (`typ: at+jwt`; Nimbus allows only
+  `JWT`/absent) — and recent Keycloak stamps the same type, so it was never one vendor's quirk. ⚠ The
+  offline suite could not have caught it: it mints headers with **no `typ` at all**, which was always
+  allowed. Getting a role through needs **three** provider settings (group named for a seeded role · the
+  app *requests* the claim · the app lists it in `accessTokenAttributes`), and missing any one gives the
+  identical symptom — a valid token whose Subject has **zero capabilities**. ⛔ On WSO2 the claim is
+  `groups`; neither the `roles` default nor Keycloak's `realm_access.roles` applies.
+
+- 🔴 **A row DERIVED from a decision inherits confidence without evidence.** `UI-POD-SCOPE-UNION-1` was
+  filed as a consequence of a decision rather than from code; grounding it found **both** its remedies
+  impossible — a signed plan (`enterprise-scale-out-plan.md` §5.5) already refused client-side routing
+  outright, and no pod identity is serialized anywhere — and its premise false (`/bootstrap` does **not**
+  feed the space-switcher; `session.service.ts` never reads `spaces`). ⚠ Worse, that unchecked claim had
+  been copied into a shipped code comment, where it reads as verified fact. ⛔ **Never restate a row's
+  claim in a comment without checking it — a comment outlives the row.**
+
 - 🔴 **Local dev services live in [`dev-infra/`](../dev-infra/README.md) — and two test suites SKIP
   without them, which is not a pass.** `docker compose -f dev-infra/docker-compose.yml up -d` brings up
   PostgreSQL (for `PostgresStateStoreTest`, 15 tests) and WSO2 Identity Server (for
