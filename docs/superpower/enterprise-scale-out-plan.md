@@ -382,7 +382,7 @@ local staging tree "so the rest of the engine … treats them exactly like local
 🔴 **§3.7's "an inbox must have exactly one owning pod" does not apply to a remote origin.** A local
 inbox needs a single owner because `MarkerManager` does a bare `Files.exists` with no claim. A remote
 origin is *already shared by definition*, listing it is idempotent, and a pre-fetch dedup ledger already
-exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the fourteen families** (§3.3), so
+exists — and **`ACQUISITION_LEDGER` and `FILE_STAGES` are both among the fifteen families** (§3.3), so
 both are already Postgres-capable and phase A puts them on shared state as a side effect.
 
 ⇒ N pods can pull from one remote origin safely, claiming per file, **with no new mechanism and no
@@ -750,7 +750,10 @@ Work:
   Spaces booted in *this process*. Once Spaces are partitioned (C1), two Spaces on **different pods**
   sharing a directory is precisely the dangerous case and is **invisible** — no pod can see the other's
   config. C2 catches the single-node and same-pod cases, which are real but the lesser half.
-  → the remaining half is filed as `INBOX-REGISTRY-CROSS-POD-1`.
+  → ✅ the remaining half **SHIPPED 2026-09-13** as `INBOX-REGISTRY-CROSS-POD-1`: `DbInboxRegistry`, a shared
+  `inbox_registry` table each pod publishes its own Spaces into and then audits in full, so C2's roster becomes
+  fleet-wide wherever `-Dinbox.registry.backend` is set. ⚠ Still **detection**, still WARN-only — prevention is
+  the containment rule that was refused. Design of record: `okf/backend/engine/db-layer.md` §3.4.
 
   ⚠ **WARNS, never refuses** — same blast-radius reasoning as C1's unassigned-Space case: a config smell
   that may predate the check must not take down every Space on the pod.

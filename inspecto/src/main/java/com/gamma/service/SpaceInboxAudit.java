@@ -26,13 +26,15 @@ import java.util.Set;
  * not a guard</b>. {@code PipelineDataDirs.conflictsFor} looks similar but fires only at pipeline
  * <em>deletion</em>, within a single write root.
  *
- * <h3>⚠ SCOPE — this sees only what this pod hosts</h3>
- * 🔴 It compares the Spaces booted in <b>this process</b>. Once Spaces are partitioned across pods
- * ({@link SpacePartition}), two Spaces on <b>different</b> pods pointing at one directory are exactly the
- * dangerous case and are <b>invisible here</b> — no pod can see the other's config. Closing that needs a
- * shared registry of declared inboxes (an ops-DB family, the way the lease is), which is filed rather than
- * built. ⛔ Do not describe this audit as enforcing the §5.3 invariant; it catches the single-node and
- * same-pod cases, which are real but are the lesser half.
+ * <h3>⚠ SCOPE — this compares whatever roster it is handed</h3>
+ * 🔴 This class holds no roster of its own. {@code SpaceManager.auditInboxOwnership} hands it the Spaces
+ * booted in <b>this process</b> — and, when {@link DbInboxRegistry} is configured
+ * ({@code -Dinbox.registry.backend}), the <b>fleet's</b> roster instead, which is what makes two Spaces on
+ * <b>different</b> pods visible to each other at all. ⛔ Without that registry (the default) the
+ * cross-pod case stays invisible: no pod can see another's config. ⛔ Do not describe this audit as
+ * enforcing the §5.3 invariant either way — it is detection, and prevention (requiring {@code dirs.poll}
+ * to resolve under its declaring Space's root) was refused because an external vendor drop directory is
+ * legitimate and common.
  *
  * <h3>⚠ It WARNS; it does not refuse</h3>
  * Same blast-radius reasoning as {@link SpacePartition}'s unassigned-Space case: refusing at boot would

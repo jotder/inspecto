@@ -131,18 +131,24 @@ public final class SpaceManager implements AutoCloseable {
      * blast-radius reasoning of {@link SpacePartition}'s unassigned-Space case applies: a config smell that
      * may predate this check must not take down every Space on the pod.
      *
-     * <p>⛔ This sees only the Spaces THIS pod hosts. Two Spaces on different pods sharing an inbox is the
-     * dangerous case and is invisible here — see {@link SpaceInboxAudit}'s scope note.
+     * <p>⚠ With {@code -Dinbox.registry.backend} set, this pod publishes what it hosts to the shared
+     * registry and audits the <b>fleet's</b> roster ({@code INBOX-REGISTRY-CROSS-POD-1}). Without it — the
+     * default — it sees only the Spaces THIS pod hosts, and two Spaces on different pods sharing an inbox
+     * stays invisible. ⛔ Absence is never reported as health: see {@link DbInboxRegistry}.
      *
      * @return the findings, so a caller (and the test) can assert on them rather than scrape the log
      */
     List<String> auditInboxOwnership() {
-        List<SpaceInboxAudit.InboxDecl> declared = new ArrayList<>();
+        Map<String, List<SpaceInboxAudit.InboxDecl>> mine = new LinkedHashMap<>();
         for (SpaceContext ctx : spaces.values()) {
+            // ⚠ Seeded even when the Space declares nothing — publish() must then DELETE its old rows, or a
+            // removed dirs.poll goes on being reported by every other pod for ever.
+            List<SpaceInboxAudit.InboxDecl> forSpace =
+                    mine.computeIfAbsent(ctx.id().value(), k -> new ArrayList<>());
             try {
                 for (com.gamma.etl.PipelineConfig cfg : ctx.service().loadedPipelines()) {
                     if (cfg.dirs() == null) continue;
-                    declared.add(new SpaceInboxAudit.InboxDecl(
+                    forSpace.add(new SpaceInboxAudit.InboxDecl(
                             ctx.id().value(), cfg.identity().pipelineName(), cfg.dirs().poll()));
                 }
             } catch (RuntimeException e) {
@@ -151,8 +157,31 @@ public final class SpaceManager implements AutoCloseable {
                 log.debug("Inbox audit skipped space {}: {}", ctx.id().value(), e.getMessage());
             }
         }
-        List<String> findings = SpaceInboxAudit.sharedInboxFindings(declared);
-        for (String f : findings) log.warn("[SPACES] {}", f);
+        List<SpaceInboxAudit.InboxDecl> declared = new ArrayList<>();
+        mine.values().forEach(declared::addAll);
+
+        List<SpaceInboxAudit.InboxDecl> audited = declared;
+        boolean fleetWide = false;
+        // ⚠ Opened and closed per audit, not held: this runs once at boot, and a connection kept open for
+        // the life of the pod would be one more thing to fence during a restart for no gain.
+        // ⚠ The null guard is on spacesRoot, not on the feature flag: the argument is evaluated before the
+        // opener can decide the registry is off, and a manager built without a spaces root (tests, the
+        // legacy single-tenant path) would NPE on a default-off feature.
+        try (DbInboxRegistry registry = spacesRoot == null
+                ? null : ServiceStores.openInboxRegistry(SpaceRoot.under(spacesRoot))) {
+            if (registry != null) {
+                mine.forEach(registry::publish);
+                List<SpaceInboxAudit.InboxDecl> fleet = registry.declarations();
+                // ⛔ An empty read means the registry could not be read (it has just been written to), so
+                // fall back to what this pod knows rather than auditing nothing and calling it healthy.
+                if (!fleet.isEmpty()) {
+                    audited = fleet;
+                    fleetWide = true;
+                }
+            }
+        }
+        List<String> findings = SpaceInboxAudit.sharedInboxFindings(audited);
+        for (String f : findings) log.warn("[SPACES] {}{}", fleetWide ? "(fleet-wide) " : "", f);
         return findings;
     }
 

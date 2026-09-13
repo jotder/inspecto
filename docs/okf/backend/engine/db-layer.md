@@ -87,6 +87,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | **`duckdb`** — the only default-on store; see below |
 | Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
 | Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
+| Fleet-wide inbox registry (`INBOX-REGISTRY-CROSS-POD-1`) | *(class is the API)* | [`DbInboxRegistry`](../../../../inspecto/src/main/java/com/gamma/service/DbInboxRegistry.java) | `inbox.registry.backend=none\|duckdb\|postgres\|jdbc:…` | `none` — off, the inbox audit compares only the Spaces this pod hosts, exactly as before |
 | Ops escalation queues | `ops/queue/QueueStore` | **none** — in-memory only | — | — |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
@@ -210,6 +211,46 @@ free — defaulting to a DB would create a file for every Personal install to co
 ⚠ A failure to open **degrades to the heap guard and is recorded as DEGRADED**, which
 `-Dinspecto.topology=partitioned` turns into a boot failure (A1). On N pods a per-process lease is not a
 weaker guarantee, it is *no* guarantee.
+
+#### `inbox_registry` — the fleet-wide roster of declared inboxes (`DbInboxRegistry`, 2026-09-13)
+
+```sql
+CREATE TABLE IF NOT EXISTS inbox_registry (
+  space VARCHAR, pipeline VARCHAR, poll_dir VARCHAR, pod VARCHAR, declared_at BIGINT,
+  PRIMARY KEY (space, pipeline))
+```
+
+🔴 **Why it has to be shared state at all.** Two Spaces polling one `dirs.poll` is **silent
+double-ingestion** — `MarkerManager` marks a file only *after* a batch commits, so nothing claims it before
+it is read, and neither the marker nor the dedup ledger runs early enough to rescue it. `SpaceInboxAudit`
+has caught the same-pod case since 2026-09-12, but once Spaces are partitioned across pods the dangerous
+pairing is two Spaces on **different** pods, and **no pod can see another's config**. This table is the only
+place that knowledge can meet.
+
+⚠ **Detection, never prevention** (operator decision 2026-09-12). It turns an undetectable collision into a
+loud one. ⛔ Prevention — requiring `dirs.poll` to resolve under its declaring Space's root — was **refused**:
+an external vendor drop directory outside the Space tree is legitimate, common, and already in use.
+
+🔴 **Keyed by Space, not by pod, and that is what makes it self-healing.** `publish` REPLACES every row a
+Space owns, so a Space moved to another pod rewrites its rows on that pod's next boot instead of leaving a
+ghost that collides with itself. ⛔ Keying on the pod would produce exactly that false finding — the worst
+failure a detector has, because an operator who learns to ignore it has lost the real one too. ⚠ A Space
+with **no** declarations still publishes: that is when the delete matters.
+
+🔴 **Known gap: a Space DELETED outright leaves its rows behind**, because deletion happens where nothing
+publishes. `pod` and `declared_at` make such a finding diagnosable; clearing it is manual
+(`DELETE FROM inbox_registry WHERE space = …`). ⛔ Do not "fix" it with a TTL — an inbox declaration has no
+natural lifetime, and a pod that is merely down would then vanish from the roster this table exists to fill.
+
+**Selected by `-Dinbox.registry.backend`** (`none` default · `duckdb` · `postgres` · a raw `jdbc:` URL), with
+`-Dinbox.registry.db.url` / `.user` / `.password` and `-Dinbox.registry.pod` (a label on the row, not an
+identity anything keys on). ⚠ Opened **once per pod against the spaces root**, not once per Space — comparing
+Spaces is the whole point — so its per-root DuckDB default file can only ever repeat what the local audit
+already knows. Only a URL pointing at shared Postgres makes the cross-pod finding possible.
+
+⛔ **Fail-open at every seam, and never silent about it.** A failed open, write or read is a WARN, and the
+audit falls back to this pod's own Spaces — the pre-registry behaviour. An empty read is treated as
+*unreadable*, not as *healthy*: the pod has just published into it, so an empty roster cannot be true.
 
 #### `inspecto_events` — the shared event store (`DbEventStore`, D6, 2026-09-12)
 
@@ -616,7 +657,7 @@ the ledger armed against the real `DbDedupLedger` while writing nothing. It is s
 value, not the per-family `*.db.url`: a raw `jdbc:` backend is a first-class source that both
 `ServiceStores` and `OperationalDb.resolve` short-circuit on, so `urlFor` is never consulted —
 setting `-Ddedup.ledger.db.url` instead defeats the shared `-Dinspecto.db` selection that
-`OperationalDbTest` pins across all fourteen families (it fails that test). Tests needing durable dedup
+`OperationalDbTest` pins across all fifteen families (it fails that test). Tests needing durable dedup
 state construct `DbDedupLedger` on an explicit `@TempDir` URL. `STATUS` is `DB_FLAG` mode (`db` |
 `file`) and could not take the hatch until 2026-09-02: `ServiceStores.openStatusStore` now also reads a
 raw `jdbc:` backend value as "db, at exactly this URL", so the root pom pins `-Dstatus.backend=jdbc:duckdb:`

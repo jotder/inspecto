@@ -207,4 +207,103 @@ class SpaceManagerTest {
             assertThrows(IllegalStateException.class, () -> mgr.delete(SpaceId.of("default"), false));
         }
     }
+
+    // == the fleet-wide inbox audit (INBOX-REGISTRY-CROSS-POD-1) ======================================
+
+    /**
+     * 🔴 The property the shared registry exists for: a pod reports a collision between two Spaces it does
+     * <b>not host</b>. Seeded as if two other pods had published, then this pod boots and audits.
+     *
+     * <p>⚠ Pinned at the {@link SpaceManager} seam on purpose. {@code SpaceInboxAuditTest} covers the pure
+     * function, and it passed just as well while the roster it was handed could only ever be this pod's — the
+     * wiring is the part that was missing, so the wiring is what must be tested.
+     */
+    @Test
+    void theAuditReportsACollisionBetweenSpacesThisPodDoesNotHost(@TempDir Path root) throws Exception {
+        String url = "jdbc:duckdb:" + root.resolve("inbox.duckdb");
+        try (DbInboxRegistry seed = DbInboxRegistry.open(url, null, null, "pod-a")) {
+            seed.publish("tenant-a", List.of(
+                    new SpaceInboxAudit.InboxDecl("tenant-a", "orders", "/data/shared/inbox")));
+            seed.publish("tenant-b", List.of(
+                    new SpaceInboxAudit.InboxDecl("tenant-b", "orders", "/data/shared/inbox")));
+        }
+        Files.createDirectories(root.resolve("local").resolve("config"));
+        withRegistry(url, () -> {
+            try (SpaceManager mgr = SpaceManager.discover(root)) {
+                List<String> findings = mgr.auditInboxOwnership();
+                assertEquals(1, findings.size(),
+                        "the collision is between two Spaces this pod never booted: " + findings);
+                assertTrue(findings.get(0).contains("tenant-a/orders"), findings.get(0));
+                assertTrue(findings.get(0).contains("tenant-b/orders"), findings.get(0));
+            }
+        });
+    }
+
+    /**
+     * ⛔ And the same audit stays SILENT about it with no registry configured — which is the default. A
+     * detector that is off must not be mistaken for one that found nothing.
+     */
+    @Test
+    void withNoRegistryTheAuditSeesOnlyThisPodsSpaces(@TempDir Path root) throws Exception {
+        String url = "jdbc:duckdb:" + root.resolve("inbox.duckdb");
+        try (DbInboxRegistry seed = DbInboxRegistry.open(url, null, null, "pod-a")) {
+            seed.publish("tenant-a", List.of(
+                    new SpaceInboxAudit.InboxDecl("tenant-a", "orders", "/data/shared/inbox")));
+            seed.publish("tenant-b", List.of(
+                    new SpaceInboxAudit.InboxDecl("tenant-b", "orders", "/data/shared/inbox")));
+        }
+        Files.createDirectories(root.resolve("local").resolve("config"));
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            assertTrue(mgr.auditInboxOwnership().isEmpty(),
+                    "the rows exist, but nothing is configured to read them");
+        }
+    }
+
+    /**
+     * 🔴 A Space this pod hosts that declares NO inbox must have its earlier rows cleared, or a `dirs.poll`
+     * that has been removed goes on being reported by every other pod for ever. This is why
+     * {@code auditInboxOwnership} seeds an entry for every hosted Space before publishing, empty or not.
+     */
+    @Test
+    void aHostedSpaceThatDeclaresNothingClearsItsStaleRows(@TempDir Path root) throws Exception {
+        String url = "jdbc:duckdb:" + root.resolve("inbox.duckdb");
+        try (DbInboxRegistry seed = DbInboxRegistry.open(url, null, null, "pod-old")) {
+            seed.publish("tenant-a", List.of(
+                    new SpaceInboxAudit.InboxDecl("tenant-a", "orders", "/data/shared/inbox")));
+            seed.publish("tenant-b", List.of(
+                    new SpaceInboxAudit.InboxDecl("tenant-b", "orders", "/data/shared/inbox")));
+        }
+        Files.createDirectories(root.resolve("tenant-a").resolve("config"));   // hosted here, declares nothing
+        withRegistry(url, () -> {
+            try (SpaceManager mgr = SpaceManager.discover(root)) {
+                assertTrue(mgr.auditInboxOwnership().isEmpty(),
+                        "tenant-a no longer polls anything, so the collision is gone");
+            }
+            try (DbInboxRegistry after = DbInboxRegistry.open(url, null, null, "pod-check")) {
+                assertEquals(1, after.declarations().size(), "only tenant-b's row survives");
+                assertEquals("tenant-b", after.declarations().get(0).spaceId());
+            }
+        });
+    }
+
+    /** Runs {@code body} with the inbox registry pointed at {@code url}; the properties are process-global,
+     *  so they are always restored. */
+    private static void withRegistry(String url, ThrowingRunnable body) throws Exception {
+        String backend = System.getProperty("inbox.registry.backend");
+        String prior = System.getProperty("inbox.registry.db.url");
+        System.setProperty("inbox.registry.backend", "duckdb");
+        System.setProperty("inbox.registry.db.url", url);
+        try {
+            body.run();
+        } finally {
+            restore("inbox.registry.backend", backend);
+            restore("inbox.registry.db.url", prior);
+        }
+    }
+
+    private static void restore(String key, String value) {
+        if (value == null) System.clearProperty(key); else System.setProperty(key, value);
+    }
+
+    private interface ThrowingRunnable { void run() throws Exception; }
 }

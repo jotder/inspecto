@@ -414,6 +414,10 @@ class PostgresStateStoreTest {
     // ⚠ `DbDeliveryReceiptStore` and `DbDedupLedger` were named in the scale-out plan §3.3 as "same
     // factory, portable SQL, simply untested" — the gap in DAT-6's own claim of coverage. `DbEventStore`
     // is new with D6. Ten of twelve becomes twelve of twelve, plus events.
+    //
+    // ⚠ 2026-09-13: `DbInboxRegistry` (`INBOX-REGISTRY-CROSS-POD-1`) joins them at the foot of this file.
+    // It is covered here for the same reason the two best-effort stores above are: it swallows every
+    // SQLException by design, so a Postgres dialect break in it is COMPLETELY SILENT.
 
     /**
      * {@code DbEventStore} on Postgres (D6) — the backend that makes the Signal ledger visible across
@@ -530,6 +534,41 @@ class PostgresStateStoreTest {
                     "the stale epoch's release must be refused on Postgres too — the owner matches, so "
                             + "only the fencing token can save the live lease");
             live.close();
+        }
+    }
+
+    /**
+     * {@code DbInboxRegistry} on Postgres (`INBOX-REGISTRY-CROSS-POD-1`) — the table that lets one pod see an
+     * inbox collision between Spaces it does not host. Two instances over one server ARE two pods as far as
+     * the registry is concerned.
+     *
+     * <p>⚠ Asserts the READ BACK and the REPLACE, not merely that {@code publish} returned: both of its
+     * seams swallow {@code SQLException} by design (an audit must never fail a boot), so a Postgres dialect
+     * break here would otherwise vanish into a WARN. The delete-then-insert inside one transaction is the
+     * part most likely to diverge.
+     */
+    @Test
+    void inboxRegistry_crossPodRosterAndReplaceRoundTrip() throws Exception {
+        try (DbInboxRegistry podA = DbInboxRegistry.open(url, null, null, "pod-a");
+             DbInboxRegistry podB = DbInboxRegistry.open(url, null, null, "pod-b")) {
+
+            podA.publish("pg-tenant-a", List.of(
+                    new SpaceInboxAudit.InboxDecl("pg-tenant-a", "orders", "/data/pg-shared/inbox")));
+            podB.publish("pg-tenant-b", List.of(
+                    new SpaceInboxAudit.InboxDecl("pg-tenant-b", "orders", "/data/pg-shared/inbox")));
+
+            List<SpaceInboxAudit.InboxDecl> roster = podB.declarations();
+            assertEquals(2, roster.size(),
+                    "both pods' rows read back — publish() swallows SQLException, so only this proves it wrote");
+            List<String> findings = SpaceInboxAudit.sharedInboxFindings(roster);
+            assertEquals(1, findings.size(), "the cross-pod collision is reported on Postgres: " + findings);
+            assertTrue(findings.get(0).contains("pg-tenant-a/orders"), findings.get(0));
+
+            // REPLACE, not append: the delete-then-insert transaction is the dialect-sensitive half.
+            podA.publish("pg-tenant-a", List.of());
+            assertEquals(1, podB.declarations().size(), "pg-tenant-a's row is gone, pg-tenant-b's stands");
+            assertTrue(SpaceInboxAudit.sharedInboxFindings(podB.declarations()).isEmpty(),
+                    "and the finding goes with it");
         }
     }
 

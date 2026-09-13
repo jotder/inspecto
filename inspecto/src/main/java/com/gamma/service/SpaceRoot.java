@@ -105,6 +105,17 @@ public interface SpaceRoot {
      *  in the lean in-memory store and this file is never created. */
     String deliveryReceiptsDbUrl();
 
+    /**
+     * Default JDBC URL for the fleet-wide registry of declared inboxes ({@code INBOX-REGISTRY-CROSS-POD-1}),
+     * when {@code -Dinbox.registry.backend} is set.
+     *
+     * <p>⚠ A per-root DuckDB file is the DEFAULT only so the flag has somewhere to point on one node; it is
+     * close to useless there, because a registry nobody else writes to cannot show a collision this pod could
+     * not already see. The value of this store is a URL pointing at shared Postgres. ⚠ It is opened once per
+     * POD, against the spaces root — not once per Space — because comparing Spaces is the whole point.
+     */
+    String inboxRegistryDbUrl();
+
     /** The pre-spaces flat layout: historical file names in the working directory. */
     static SpaceRoot legacy() {
         return new LegacySpaceRoot();
@@ -179,6 +190,9 @@ final class LegacySpaceRoot implements SpaceRoot {
 
     @Override
     public String deliveryReceiptsDbUrl() { return "jdbc:duckdb:inspecto-delivery-receipts.db"; }
+
+    @Override
+    public String inboxRegistryDbUrl() { return "jdbc:duckdb:inspecto-inbox-registry.db"; }
 }
 
 /** A self-contained per-space directory: {@code base/{config,data,audit,duckdb}}. */
@@ -247,4 +261,7 @@ final class DirSpaceRoot implements SpaceRoot {
 
     @Override
     public String deliveryReceiptsDbUrl() { return duckdb("inspecto-delivery-receipts.db"); }
+
+    @Override
+    public String inboxRegistryDbUrl() { return duckdb("inspecto-inbox-registry.db"); }
 }

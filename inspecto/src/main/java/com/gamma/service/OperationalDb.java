@@ -145,7 +145,15 @@ public final class OperationalDb {
         STATUS("Status", "status.backend", "db", Mode.DB_FLAG,
                 "status.db.url", "status.db.user", "status.db.password", SpaceRoot::statusDbUrl),
         ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "memory", Mode.DB_FLAG,
-                "acquire.ledger.db.url", null, null, SpaceRoot::acquisitionLedgerDbUrl);
+                "acquire.ledger.db.url", null, null, SpaceRoot::acquisitionLedgerDbUrl),
+        // `INBOX-REGISTRY-CROSS-POD-1` (scale-out §5.3). ⛔ Default "none": absent, SpaceInboxAudit keeps
+        // comparing only the Spaces this pod hosts, exactly as before — a detector that is off is the
+        // shipped behaviour, not a degraded one. ⚠ This is the one family whose per-Space default file is
+        // not merely "close to useless" but structurally unable to do its job: the collision it detects is
+        // BETWEEN Spaces on DIFFERENT pods, so it is opened once per pod against the SPACES ROOT, and only
+        // a URL pointing at shared Postgres makes the finding possible at all.
+        INBOX_REGISTRY("Inbox registry", "inbox.registry.backend", "none", Mode.URL_OR_ENGINE,
+                "inbox.registry.db.url", null, null, SpaceRoot::inboxRegistryDbUrl);
 
         /** How a family spells "enabled" on its {@code *.backend} property — they genuinely differ. */
         enum Mode {

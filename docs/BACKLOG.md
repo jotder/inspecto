@@ -1201,9 +1201,9 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   1. ⛔ **"Union across pods" is IMPOSSIBLE by construction, and refused by the plan.**
      `superpower/enterprise-scale-out-plan.md` §5.5 says it verbatim: *"Client-side routing is refused
      outright: it leaks topology to the browser and needs per-pod hostnames plus CORS."* There is also no
-     mechanism to build it with — no fleet enumeration (none of `OperationalDb`'s 14 families is a node
+     mechanism to build it with — no fleet enumeration (none of `OperationalDb`'s families is a node
      registry, and `DbRunLease` is only ever queried by `(space, scope, pipeline)`, never scanned by
-     owner), and the SPA has a single same-origin `apiBaseUrl: '/api'`. This is a missing **mechanism**,
+     owner), and the SPA has a single same-origin `apiBaseUrl: '/api'`. ⚠ `inbox_registry` (shipped 2026-09-13) is **not** the missing enumeration either — its `pod` column is a diagnostic label on a Space's inbox declaration, not a roster of live pods or of who hosts what. This is a missing **mechanism**,
      not missing effort.
   2. ⛔ **"State which pod answered" is IMPOSSIBLE today.** The payload carries `podScoped: true`, a
      boolean. The only per-process identity anywhere is `DbRunLease.defaultOwner()` (`:131-133`) —
@@ -1235,7 +1235,10 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `podScoped: true` declaration becomes WRONG and must be removed — leaving it only on
   `GET /system/scheduler`, which stays genuinely per-Pod. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 
-- **P2** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
+- ✅ **SHIPPED 2026-09-13** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
+  ✅ **BUILT:** `DbInboxRegistry` (`OperationalDb.Family.INBOX_REGISTRY`, `-Dinbox.registry.backend`, default **`none`**) is a shared `inbox_registry` table keyed `(space, pipeline)`. Each pod publishes the `dirs.poll` its own Spaces declare — `publish` REPLACING that Space's rows, so a Space moved between pods leaves no ghost to collide with itself — then reads the whole roster and hands it to the EXISTING `SpaceInboxAudit.sharedInboxFindings`, which needed no change: it audits whatever roster it is given. Design of record: `okf/backend/engine/db-layer.md` §3.4 (`inbox_registry`).
+  ⚠ **Still detection, not prevention**, as decided — and still WARN-only. 🔴 **Known gap kept visible:** a Space DELETED outright leaves its rows behind, because deletion happens where nothing publishes; the rows carry `pod`/`declared_at` so the finding is diagnosable, and clearing is manual. ⛔ Not to be fixed with a TTL — a pod that is merely down would then vanish from the roster.
+  ⚠ **Write-time hooks were deliberately NOT added.** The registry is published at BOOT, where the full roster is known; `ConfigWriteRoutes.writeConfig`/`patchConfig` and bundle import are three more seams that would each see only their own change. A `dirs.poll` added by a config write is therefore detected on that pod's next boot — which is also when the pre-existing local audit runs.
   ✅ **DECIDED 2026-09-12 (operator): build the SHARED REGISTRY of declared inboxes** — an ops-DB family
   in the shape `RunLease` already uses, written at config-write time and checked across pods. ⛔ Rejected:
   requiring `dirs.poll` to resolve under its declaring Space's root. That would prevent collisions

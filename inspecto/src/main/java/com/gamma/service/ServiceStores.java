@@ -345,6 +345,43 @@ final class ServiceStores {
     }
 
     /**
+     * The fleet-wide inbox registry ({@code -Dinbox.registry.backend=db|postgres|jdbc:…}), or {@code null}
+     * when it is off — which is the default, and is the behaviour that shipped before it existed.
+     *
+     * <p>⚠ {@code root} here is the <b>spaces root</b>, not a Space: the registry exists to compare Spaces,
+     * so one pod opens one of these. ⛔ Returns {@code null} rather than a no-op implementation on purpose —
+     * an absent registry must make {@link SpaceManager} audit its own Spaces and say nothing about the
+     * fleet, never quietly report a fleet of one as healthy.
+     *
+     * <p>⛔ A failure to open is a WARN and a {@code null}, never a throw: this is an audit seam, and an
+     * audit must not be the thing that fails a boot which otherwise succeeded.
+     */
+    static DbInboxRegistry openInboxRegistry(SpaceRoot root) {
+        String raw = System.getProperty("inbox.registry.backend", "none").trim();
+        String backend = raw.toLowerCase();
+        boolean db = "db".equals(backend) || "duckdb".equals(backend) || "postgres".equals(backend)
+                || "postgresql".equals(backend) || backend.startsWith("jdbc:");
+        if (!db) return null;
+        // ⛔ RAW value for the URL, lowercased only for the comparison — a jdbc: value carries a path, a
+        // database name and credentials, all case-sensitive on Postgres.
+        String url = backend.startsWith("jdbc:")
+                ? raw
+                : OperationalDb.urlFor(OperationalDb.Family.INBOX_REGISTRY, root.inboxRegistryDbUrl());
+        try {
+            DbInboxRegistry registry = DbInboxRegistry.open(url,
+                    System.getProperty("inbox.registry.db.user"),
+                    System.getProperty("inbox.registry.db.password"),
+                    System.getProperty("inbox.registry.pod"));
+            log.info("Inbox registry: database ({})", url);
+            return registry;
+        } catch (Exception e) {
+            log.warn("Could not open the shared inbox registry at {} — the inbox audit sees only the Spaces "
+                    + "this pod hosts: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * {@code -Devents.backend=db|postgres|jdbc:…} — the shared event store (D6). The one backend two
      * processes can both read, which is the whole point: Parquet survives a restart but is written by
      * exactly one pod, so on N pods the Signal ledger shows a different world per replica.

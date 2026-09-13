@@ -270,7 +270,7 @@ decided representation for non-additive measures. ⛔ Do not re-litigate from Du
 ### 3.8 The operational stores and Postgres
 
 **`OperationalDb.Family`** (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`) is **the
-roster — fourteen families**, each with its own `-D<family>.backend` toggle and default:
+roster — fifteen families**, each with its own `-D<family>.backend` toggle and default:
 
 | Family | Default | Family | Default |
 |---|---|---|---|
@@ -567,7 +567,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 
 `ControlApiQueryRunV1Test` (the route, `422` on structured, limits), `ControlApiBiQueryTest` (spec compile,
 `422` grain, TEXT buckets), `ControlApiDbBrowserTest` (`/db/*`, limits, guard), `OperationalDbTest` (the
-fourteen-family roster, `verifySelectable`, the `-Dinspecto.db` selection pinned across families),
+fifteen-family roster, `verifySelectable`, the `-Dinspecto.db` selection pinned across families),
 `PostgresStateStoreTest` (`inspecto-ops`; **opt-in**, 11 methods, 9 store classes; 11 SKIPPED without a
 server), `PipelineJobRunnerTest` (`sinkNestedInsideAnotherStoreFailsClosed`, `slashedSinkStoreNameFailsClosed`,
 `externalDataDirStaysAllowed`, `seedReadsAPipelineShapedStoresMappedOutputOnly`).
