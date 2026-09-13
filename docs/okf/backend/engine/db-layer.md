@@ -448,6 +448,28 @@ existed). The remaining exemption is the five-arg `EnrichmentEngine.runResult` o
 pinned by its own test so it stays visible. ⚠ `generation` stays **inert** — declared on the record, hard-coded
 `0` at every construction site — and is therefore not part of the key.
 
+**Measured cost (2026-09-13, DuckDB 1.5.2.1, throwaway harness).** Per row, steady from 500 to 8 000 rows:
+plain `INSERT` ~610 µs · **UNIQUE constraint + plain `INSERT` ~740 µs (+15 %)** · `ON CONFLICT DO NOTHING`
+~7 000 µs · `ON CONFLICT DO UPDATE` ~7 200 µs.
+
+✅ **Three readings that matter, because the headline number misleads.** (1) The **index is nearly free**;
+the ~11× belongs to the `ON CONFLICT` clause, not to the key. (2) **`DO UPDATE` costs the same as
+`DO NOTHING`** — so §3.9's write-semantics decision is free, and nobody should "optimise" it back to
+`DO NOTHING` for speed, which would buy nothing and reintroduce the stale-count defect. (3) The cost is
+**linear, not degrading with table size** — the registry accumulates forever, so a super-linear cost would
+have been disqualifying. It is not.
+
+🔴 **But this is the FIRST default-on store to pay it.** `file_stages` (§3.10) has carried the same
+`ON CONFLICT` cost since 2026-09-12 and is **default-off**; `consignment_outputs` is default-**on**, so every
+deployment now pays ~7 ms per output-file row on the commit path. ⚠ Best-effort and off the data path (the
+files have already landed), and at real sizes — one row per output file per Consignment, typically tens —
+that is tens to a few hundred ms. ⛔ Revisit if a deployment writes thousands of output files per
+Consignment; the remedy is batching or DuckDB's Appender, **not** dropping the conflict clause.
+
+⚠ Absolute throughput above is **harness-bound**, not production throughput: ~610 µs for a plain insert is
+far slower than DuckDB manages natively (JDBC `addBatch`, not the Appender API). The **ratios** are sound —
+both arms shared the harness — the rows/second figures are not; do not quote them as capacity.
+
 **Migration.** A pre-constraint table is **rebuilt on open**, the `file_stages` idiom (§3.10): the additive
 `ADD COLUMN IF NOT EXISTS` widening runs **first** (the rebuild copies every column by name, so it can only
 run once a legacy table has them all), then `RENAME TO consignment_outputs_v1` → create →
