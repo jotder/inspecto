@@ -22,6 +22,17 @@ public enum EdgeKind {
     JOINS_INTO,
     /** KPI → table/column: the KPI is computed from this input. */
     COMPUTED_FROM,
-    /** REPORT → KPI/table: the report consumes this artifact. */
-    CONSUMES
+    /**
+     * A consumer → the artifact it consumes: REPORT → KPI/table, WIDGET → DATASET, and
+     * DASHBOARD → WIDGET (one per tile). ⚠ No longer REPORT-only — widened when the Studio BI
+     * layer joined the graph.
+     */
+    CONSUMES,
+    /**
+     * DATASET → STREAM / REFERENCE_DATASET: the Studio Dataset binds to this catalog origin,
+     * resolved from its {@code sourceName} or the head segment of its {@code physicalRef}. Absent
+     * when the binding names something the catalog does not model — a Job output store, or nothing
+     * ({@code physicalRef: null}); the Dataset's {@code resolved} attr says which.
+     */
+    BINDS_TO
 }

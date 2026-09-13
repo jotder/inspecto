@@ -203,9 +203,37 @@ edge.
 
 | Vocabulary | Values |
 |---|---|
-| `NodeKind` (7) | `STREAM · RAW_SCHEMA · COLUMN · TABLE · DERIVED_TABLE · REFERENCE_DATASET · KPI` |
-| `EdgeKind` (8, the P2 lineage plane) | `EMITS · DECLARES · DESCRIBES · MATERIALIZES · FEEDS · JOINS_INTO · COMPUTED_FROM · CONSUMES` |
-| `IdScheme` tokens | `stream:` · `schema:` · `event:` · `col:` · `xform:` · `ref:<enrich>/<ref>` · `ref:<pipeline>` (a produced Reference) · `kpi:` · `report:` |
+| `NodeKind` (11) | ETL half — `STREAM · RAW_SCHEMA · COLUMN · TABLE · DERIVED_TABLE · REFERENCE_DATASET`; semantic — `KPI · REPORT`; Studio BI — `DATASET · WIDGET · DASHBOARD` (⚠ this row read "(7)" and omitted `REPORT` until 2026-09-13) |
+| `EdgeKind` (9, the P2 lineage plane) | `EMITS · DECLARES · DESCRIBES · MATERIALIZES · FEEDS · JOINS_INTO · COMPUTED_FROM · CONSUMES · BINDS_TO` |
+| `IdScheme` tokens | `stream:` · `schema:` · `event:` · `col:` · `xform:` · `ref:<enrich>/<ref>` · `ref:<pipeline>` (a produced Reference) · `kpi:` · `report:` · `dataset:` · `widget:` · `dashboard:` |
+
+**The Studio BI layer** (`MetadataGraphBuilder.addStudioLayer`, 2026-09-13) reads `dataset` / `widget` /
+`dashboard` components through `ConfigSource.components(type)` — a channel added because a Widget's
+`datasetId` names a **Studio component** (`registry/widgets/*.toon`), not a catalog node. It wires
+`DASHBOARD → WIDGET → DATASET` with `CONSUMES` and `DATASET → STREAM | REFERENCE_DATASET` with
+`BINDS_TO`.
+
+🔴 **The bridge does not always resolve, and that is modelled, not hidden.** A Studio Dataset names its
+origin by `sourceName` and/or the head segment of `physicalRef` — and that head names an **origin, not a
+table**. It is sometimes a Job output store the catalog has no node kind for (`rollup`), and sometimes
+absent (`kind: virtual`, `physicalRef: null`). Such a Dataset still gets a node, carrying `resolved=false`
+with no `BINDS_TO` edge; an edge is drawn only to a node that exists (broken component refs are
+`ComponentIntegrity`'s report, not the builder's).
+
+⚠ **That binding rule is mirrored in FOUR places and cannot be shared** (different modules):
+`MetadataGraphBuilder.addStudioLayer`, `PipelineDependents.datasets` (the delete-impact and dependents
+routes), `DataSourceBundleResolver.datasetReadsStore` (`physicalRef` half only) and
+`PipelineRenameRoutes.rewriteDatasetRefs`. ⛔ Do not let `sourceName` shadow `physicalRef` — the mirrors
+check both, so a Dataset naming two origins binds to two.
+
+⚠ **A Dataset node's `binding` attr is a DIFFERENT question from `resolved`, and a FIFTH mirror.**
+`binding` (`view` | `physicalRef` | `unbound`) is `BiRoutes.datasets`' vocabulary and answers on **key
+presence**, so a `physicalRef: null` reads as `physicalRef` on both routes; `resolved` says whether that
+declared binding reaches a catalog node. Keep the two apart — answering `unbound` for a declared-but-
+unresolvable ref would make one Dataset describe itself two ways on two routes.
+
+All of the above is covered by `MetadataGraphStudioLayerTest`
+(`inspecto-engine/src/test/java/com/gamma/catalog/MetadataGraphStudioLayerTest.java`).
 
 `CatalogRoutes` (`inspecto/src/main/java/com/gamma/control/CatalogRoutes.java`): `GET /catalog` (tables) ·
 `/catalog/streams` (`:30`, **per-Collector** data-origin nodes shaped to the UI `MetadataNode` contract —
@@ -225,7 +253,7 @@ reference`, `reference: {load: replace | upsert | scd2, key[], refresh_seconds}`
 | Plane | Relates | Words | Backed by |
 |---|---|---|---|
 | **P1 artifact** | Components | Component / Part — `part-of`, `uses` | the derived Registry (`refsForComponent`) — rendered as the Catalog's **Usage** tab |
-| **P2 lineage** | data assets | Asset — the eight `EdgeKind`s | `MetadataGraphService` — the **Lineage** tab |
+| **P2 lineage** | data assets | Asset — the nine `EdgeKind`s | `MetadataGraphService` — the **Lineage** tab |
 | **P2′ provenance** | a Consignment's records through Steps | Step — `flowed-through` (+ row counts) | `DbProvenanceStore` (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`) + `GET /lineage?store=` |
 | **P3 entity / link** | records as business entities | Entity / Link | the Entity Projection over a Dataset — frontend-first; the backend projection is **open** |
 

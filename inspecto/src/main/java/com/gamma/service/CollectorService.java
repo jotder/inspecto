@@ -461,6 +461,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 return enrichment.configs();
             }
             public List<SemanticModel> semantics() { return CollectorService.this.semanticModels; }
+            public List<com.gamma.pipeline.ComponentRegistry.Component> components(String type) {
+                return componentRegistry().ofType(type);
+            }
         };
         this.configSource = configSource;
         // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module

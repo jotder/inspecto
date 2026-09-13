@@ -27,5 +27,17 @@ public enum NodeKind {
     /** A named KPI from a {@code *_meta.toon} ({@code kpi:<name>}). */
     KPI,
     /** A named report from a {@code *_meta.toon} ({@code report:<name>}). */
-    REPORT
+    REPORT,
+    /**
+     * A Studio Dataset component — the BI-bindable relation ({@code dataset:<name>}), i.e. the
+     * GLOSSARY umbrella "Table | Derived Table | Reference Dataset | View" seen from the BI side.
+     * It is the <em>binding</em>, not the relation: a {@link EdgeKind#BINDS_TO} edge names the
+     * catalog node it resolves to, and its {@code resolved} attr is {@code false} when it names
+     * something the catalog does not model (a Job output store) or nothing at all.
+     */
+    DATASET,
+    /** A Studio Widget ({@code widget:<name>}) — a Visualization Type bound to a {@link #DATASET}. */
+    WIDGET,
+    /** A Studio Dashboard ({@code dashboard:<name>}) — tiles, each naming a {@link #WIDGET}. */
+    DASHBOARD
 }

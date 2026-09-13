@@ -3,6 +3,7 @@ package com.gamma.catalog;
 import com.gamma.api.PublicApi;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.pipeline.ComponentRegistry;
 
 import java.util.List;
 
@@ -25,4 +26,13 @@ public interface ConfigSource {
 
     /** All loaded {@code *_meta.toon} semantic models (KPI catalog + domain notes). */
     List<SemanticModel> semantics();
+
+    /**
+     * Studio components of one registry type — {@code "dataset"} / {@code "widget"} /
+     * {@code "dashboard"} feed the BI half of the graph. Defaulted to empty so a caller that only
+     * cares about the ETL half (and every existing implementor) needs no change.
+     */
+    default List<ComponentRegistry.Component> components(String type) {
+        return List.of();
+    }
 }

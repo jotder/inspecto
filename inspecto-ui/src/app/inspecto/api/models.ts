@@ -250,8 +250,15 @@ export type NodeKind =
     | 'KPI'
     | 'REPORT'
     | 'ENRICHMENT'
+    // The Studio BI layer (backend `MetadataGraphBuilder.addStudioLayer`, 2026-09-13). A DATASET is the
+    // BINDING, not a store: it carries `resolved` + `sourceName`/`physicalRef` attrs and reaches the
+    // catalog origin it reads through a BINDS_TO edge, which is absent when the binding names something
+    // the catalog does not model (a Job output store, or `physicalRef: null`).
+    | 'DATASET'
+    | 'WIDGET'
+    | 'DASHBOARD'
     | string;
-export type EdgeKind = 'EMITS' | 'CONSUMES' | 'COMPUTED_FROM' | 'REFERENCES' | string;
+export type EdgeKind = 'EMITS' | 'CONSUMES' | 'COMPUTED_FROM' | 'REFERENCES' | 'BINDS_TO' | string;
 export type Freshness = 'FRESH' | 'STALE' | 'MISSING' | string;
 
 export interface NodeDescription {

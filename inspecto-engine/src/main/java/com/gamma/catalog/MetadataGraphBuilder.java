@@ -4,6 +4,7 @@ import com.gamma.catalog.spi.DescriptionProvider;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
+import com.gamma.pipeline.ComponentRegistry;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -17,8 +18,9 @@ import java.util.Set;
  * sources, schemas, columns and emitted event tables from the pipelines, Stage-2 transforms and
  * references from the enrichments, and the KPI/report semantic layer — wired together with the typed
  * edges ({@code DECLARES}, {@code DESCRIBES}, {@code EMITS}, {@code MATERIALIZES}, {@code FEEDS},
- * {@code JOINS_INTO}, {@code COMPUTED_FROM}, {@code CONSUMES}). Empty COLUMN descriptions are filled via
- * the {@link DescriptionProvider} SPI. Pure and stateless apart from its inputs — {@link MetadataGraphService}
+ * {@code JOINS_INTO}, {@code COMPUTED_FROM}, {@code CONSUMES}, {@code BINDS_TO}), plus the Studio BI
+ * layer (Datasets, Widgets, Dashboards) read through {@link ConfigSource#components}. Empty COLUMN
+ * descriptions are filled via the {@link DescriptionProvider} SPI. Pure and stateless apart from its inputs — {@link MetadataGraphService}
  * caches the result and attaches the operational overlay separately.
  */
 final class MetadataGraphBuilder {
@@ -214,12 +216,142 @@ final class MetadataGraphBuilder {
             }
         }
 
+        // ── Studio BI layer: Datasets, Widgets, Dashboards ─────────────────────────
+        // Runs LAST: BINDS_TO resolves against the origin nodes the pipeline pass created.
+        addStudioLayer(nodes, edges);
+
         // fill empty column descriptions via the provider SPI (no-op in core; AI at M3)
         applyDescribers(nodes);
 
         // de-dup edges, preserving order
         List<MetadataEdge> deduped = new ArrayList<>(new LinkedHashSet<>(edges));
         return new MetadataGraph(new ArrayList<>(nodes.values()), deduped);
+    }
+
+    /**
+     * Adds the Studio BI half of the graph: a {@link NodeKind#DATASET} per {@code dataset} component,
+     * a {@link NodeKind#WIDGET} per {@code widget}, a {@link NodeKind#DASHBOARD} per {@code dashboard},
+     * wired {@code DASHBOARD → WIDGET → DATASET} with {@link EdgeKind#CONSUMES} and
+     * {@code DATASET → origin} with {@link EdgeKind#BINDS_TO}.
+     *
+     * <p><b>The binding rule is mirrored, not shared</b> — {@code sourceName} and the head segment of
+     * {@code physicalRef} are BOTH candidates, each compared case-insensitively against an origin name,
+     * with {@code ""}/{@code "null"} read as absent. It is the same rule applied by
+     * {@code PipelineDependents.datasets} (the delete-impact and dependents routes),
+     * {@code DataSourceBundleResolver.datasetReadsStore} ({@code physicalRef} half only — an export
+     * never needs the virtual case) and {@code PipelineRenameRoutes.rewriteDatasetRefs}; all three live
+     * in another module and cannot share code. ⚠ <b>If the rule changes in one, change it in all
+     * four.</b> ⛔ Do not make {@code sourceName} shadow {@code physicalRef}: the mirrors check both,
+     * so a Dataset naming two origins binds to two.
+     *
+     * <p>A binding that names something the catalog does not model resolves to nothing: a Job output
+     * store ({@code orders_rollup_dataset}'s {@code physicalRef: rollup}) has no node kind, and a
+     * virtual Dataset carries {@code physicalRef: null}. Those Datasets still get a node — with
+     * {@code resolved=false} — because a missing node is exactly the silent incompleteness this
+     * layer exists to end. Broken component references are not this builder's job
+     * ({@code ComponentIntegrity} reports them); an edge is drawn only to a node that exists.
+     */
+    private void addStudioLayer(Map<String, MetadataNode> nodes, List<MetadataEdge> edges) {
+        for (ComponentRegistry.Component c : cs.components("dataset")) {
+            Map<String, Object> content = c.content();
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            String sourceName = trimmedOrNull(content.get("sourceName"));
+            String physicalRef = trimmedOrNull(content.get("physicalRef"));
+            String view = trimmedOrNull(content.get("view"));
+            if (sourceName != null) attrs.put("sourceName", sourceName);
+            if (physicalRef != null) attrs.put("physicalRef", physicalRef);
+            if (view != null) attrs.put("view", view);
+            // How the Dataset DECLARES its binding. ⚠ This is BiRoutes.datasets' vocabulary and must
+            // stay byte-identical to it, KEY PRESENCE included — `physicalRef: null` reads as
+            // "physicalRef" there, so answering "unbound" here would make the same Dataset describe
+            // itself two ways on two routes. (Resolution is a separate question: see `resolved`.)
+            attrs.put("binding", content.containsKey("view") ? "view"
+                    : content.containsKey("physicalRef") ? "physicalRef" : "unbound");
+
+            // BOTH fields are candidates, exactly as the mirrors treat them: a sourceName that
+            // resolves to nothing must not hide a physicalRef head that does.
+            Set<String> originIds = new LinkedHashSet<>();
+            for (String origin : new String[]{sourceName, headSegment(physicalRef)}) {
+                String id = originNode(origin, nodes);
+                if (id != null) originIds.add(id);
+            }
+            attrs.put("resolved", !originIds.isEmpty());
+
+            String did = IdScheme.dataset(c.name());
+            String desc = trimmedOrNull(content.get("description"));
+            nodes.put(did, new MetadataNode(did, NodeKind.DATASET, c.name(),
+                    desc == null ? Description.EMPTY : Description.manual(desc), attrs));
+            for (String originId : originIds) edges.add(new MetadataEdge(did, originId, EdgeKind.BINDS_TO));
+        }
+
+        for (ComponentRegistry.Component c : cs.components("widget")) {
+            Map<String, Object> content = c.content();
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            String vizType = trimmedOrNull(content.get("vizType"));
+            String datasetId = trimmedOrNull(content.get("datasetId"));
+            if (vizType != null) attrs.put("vizType", vizType);
+            if (datasetId != null) attrs.put("datasetId", datasetId);
+
+            String wid = IdScheme.widget(c.name());
+            String desc = trimmedOrNull(content.get("description"));
+            nodes.put(wid, new MetadataNode(wid, NodeKind.WIDGET, c.name(),
+                    desc == null ? Description.EMPTY : Description.manual(desc), attrs));
+            if (datasetId != null) {
+                String did = IdScheme.dataset(datasetId);
+                if (nodes.containsKey(did)) edges.add(new MetadataEdge(wid, did, EdgeKind.CONSUMES));
+            }
+        }
+
+        for (ComponentRegistry.Component c : cs.components("dashboard")) {
+            Map<String, Object> content = c.content();
+            String bid = IdScheme.dashboard(c.name());
+            String desc = trimmedOrNull(content.get("description"));
+            nodes.put(bid, new MetadataNode(bid, NodeKind.DASHBOARD, c.name(),
+                    desc == null ? Description.EMPTY : Description.manual(desc), Map.of()));
+            if (!(content.get("tiles") instanceof List<?> tiles)) continue;
+            for (Object t : tiles) {
+                if (!(t instanceof Map<?, ?> tile)) continue;
+                String widgetId = trimmedOrNull(tile.get("widgetId"));
+                if (widgetId == null) continue;
+                String wid = IdScheme.widget(widgetId);
+                if (nodes.containsKey(wid)) edges.add(new MetadataEdge(bid, wid, EdgeKind.CONSUMES));
+            }
+        }
+    }
+
+    /** The catalog origin node an origin name denotes — a Stream, or a {@code produces: reference}
+     *  pipeline's standalone Reference Dataset — or {@code null} when the catalog models neither. */
+    private static String originNode(String origin, Map<String, MetadataNode> nodes) {
+        if (origin == null) return null;
+        String stream = IdScheme.stream(origin);
+        String produced = IdScheme.producedReference(origin);
+        if (nodes.containsKey(stream)) return stream;
+        if (nodes.containsKey(produced)) return produced;
+        // Origin names are lowercase identifiers, but a physicalRef is operator-typed: match the way
+        // every other consumer of this rule does, case-insensitively, before giving up.
+        for (Map.Entry<String, MetadataNode> e : nodes.entrySet()) {
+            NodeKind k = e.getValue().kind();
+            if (k != NodeKind.STREAM && k != NodeKind.REFERENCE_DATASET) continue;
+            if (e.getKey().equalsIgnoreCase(stream) || e.getKey().equalsIgnoreCase(produced)) {
+                return e.getKey();
+            }
+        }
+        return null;
+    }
+
+    /** The part of a {@code physicalRef} before its first {@code /} — the origin it reads. */
+    private static String headSegment(String physicalRef) {
+        if (physicalRef == null) return null;
+        int slash = physicalRef.indexOf('/');
+        return slash < 0 ? physicalRef : physicalRef.substring(0, slash);
+    }
+
+    /** A trimmed non-blank string, or {@code null} — treating the literal {@code "null"} that a TOON
+     *  {@code physicalRef: null} parses to as absent, exactly as the shipped binding rule does. */
+    private static String trimmedOrNull(Object value) {
+        if (value == null) return null;
+        String t = String.valueOf(value).trim();
+        return t.isEmpty() || "null".equals(t) ? null : t;
     }
 
     /**

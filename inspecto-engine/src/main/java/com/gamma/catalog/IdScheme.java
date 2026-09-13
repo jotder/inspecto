@@ -21,6 +21,9 @@ import java.util.Optional;
  *       no {@code /}, which keeps it disjoint from the enrichment-scoped form above)</li>
  *   <li>{@code kpi:<name>}</li>
  *   <li>{@code report:<name>}</li>
+ *   <li>{@code dataset:<name>} — a Studio Dataset component</li>
+ *   <li>{@code widget:<name>} — a Studio Widget component</li>
+ *   <li>{@code dashboard:<name>} — a Studio Dashboard component</li>
  * </ul>
  *
  * <p>Pipeline names, enrichment names, and KPI/report names are already lowercase, underscore-safe
@@ -69,6 +72,21 @@ public final class IdScheme {
         return "report:" + name;
     }
 
+    /** A Studio Dataset component, by its registry name. */
+    public static String dataset(String name) {
+        return "dataset:" + name;
+    }
+
+    /** A Studio Widget component, by its registry name. */
+    public static String widget(String name) {
+        return "widget:" + name;
+    }
+
+    /** A Studio Dashboard component, by its registry name. */
+    public static String dashboard(String name) {
+        return "dashboard:" + name;
+    }
+
     /** The id token for a kind, e.g. {@code TABLE} → {@code "event"}. */
     public static String token(NodeKind kind) {
         return switch (kind) {
@@ -80,6 +98,9 @@ public final class IdScheme {
             case REFERENCE_DATASET -> "ref";
             case KPI -> "kpi";
             case REPORT -> "report";
+            case DATASET -> "dataset";
+            case WIDGET -> "widget";
+            case DASHBOARD -> "dashboard";
         };
     }
 

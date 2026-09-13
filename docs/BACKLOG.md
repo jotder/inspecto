@@ -897,19 +897,37 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   a quarantined file is only caught via the `FILE_QUARANTINED` event. Take this only if operators report
   the over-approximation as noise — it is a correct-but-wide badge, not a wrong one.
   → `okf/capabilities/observability/observability.md` §3.1
-- **P2** · **`CATALOG-WIDGET-NODES-1` — Widgets and Dashboards are not Catalog nodes.**
-  🔴 **PROMOTED P3→P2 2026-09-13 (operator).** Demand-gating cannot fire on this one: `/catalog/graph`
-  returns an impact answer that is **silently incomplete**, so nobody ever learns there was something to ask
-  for. A confidently wrong impact answer is worse than a missing one. ⚠ A cheaper half exists if the
-  modelling is too big — declare the gap in the payload, the remedy `POD-SCOPE-DIVERGENCE-1` took.
-  *(original row follows)*** Grounded
-  2026-09-11 with a control probe: zero hits for widget/dashboard across the `catalog` package while the
-  same grep returns dozens elsewhere. So `/catalog/graph` **cannot** answer "what depends on Dataset X"
-  for any BI consumer, and `SIGNAL-STALE-TILES-1` had to resolve that join client-side off
-  `widget.datasetId`. Adding `WIDGET`/`DASHBOARD` node kinds with a `CONSUMES` edge would serve every
-  consumer, not just the badge — impact analysis before a Dataset change being the obvious second one.
-  Sized larger than the badge itself: it changes `NodeKind`/`EdgeKind`, `MetadataGraphBuilder` and the
-  catalog contract. → `okf/capabilities/metamodel/metamodel.md`
+- ~~**P2** · **`CATALOG-WIDGET-NODES-1` — Widgets and Dashboards are not Catalog nodes**~~
+  ✅ **SHIPPED 2026-09-13.** `NodeKind` gained `DATASET` / `WIDGET` / `DASHBOARD`, `EdgeKind` gained
+  `BINDS_TO`, and `MetadataGraphBuilder.addStudioLayer` wires `DASHBOARD → WIDGET → DATASET` with
+  `CONSUMES` plus `DATASET →` its catalog origin with `BINDS_TO`. Covered by
+  `MetadataGraphStudioLayerTest` (12 tests, mutation-checked against four mutants). The as-built facts
+  — the new `ConfigSource.components(type)` channel, the unresolved-binding model, and the FOUR-way
+  mirror of the binding rule — are in `okf/capabilities/metamodel/metamodel.md` §3.5.
+  🔴 **Three of this row's premises were WRONG and are corrected there, not here.** (a) A Widget's
+  `datasetId` does **not** name a catalog node — it names a Studio component, a separate persistence
+  system, which is why a new `ConfigSource` channel was needed at all. (b) The bridge does not resolve
+  cleanly: a Studio Dataset's `physicalRef` head names an **origin**, sometimes a Job output store the
+  catalog has no node kind for, sometimes nothing (`kind: virtual`) — hence the `resolved` attr rather
+  than a silent omission. (c) The urgency premise was overstated: `PipelineDependents` **already** walked
+  `physicalRef → widget.datasetId → dashboard tile.widgetId` and was live on the delete-impact and
+  dependents routes, so the place users actually ask "what breaks?" already covered BI consumers.
+  ⚠ **Residual, unbuilt and deliberately so:** the SPA's `NodeKind` union carries the three new kinds,
+  but `NODE_KIND_COLORS` / `KIND_GLYPH` / `nodeKindLabel` / `nodeShape` have no entries for them, so they
+  render as grey circles labelled with the raw enum token. That is the **pre-existing** behaviour for
+  `DERIVED_TABLE` and `REFERENCE_DATASET` too (also absent from `NODE_KIND_COLORS`), so it is a
+  consistent gap, not a regression — filed as `CATALOG-KIND-STYLING-1` below. `isStore()` in
+  `node-detail.dialog.ts` deliberately excludes `DATASET`: a Studio Dataset is the **binding**, not a
+  store. → `okf/capabilities/metamodel/metamodel.md`
+- **P3** · **`CATALOG-KIND-STYLING-1` — five catalog node kinds render as unstyled grey circles.**
+  Filed 2026-09-13 while shipping `CATALOG-WIDGET-NODES-1`. `NODE_KIND_COLORS`
+  (`inspecto-ui/src/app/inspecto/theme/chart-tokens.ts`) has 7 of 12 kinds; `DERIVED_TABLE`,
+  `REFERENCE_DATASET`, `DATASET`, `WIDGET`, `DASHBOARD` all fall to `NODE_KIND_FALLBACK` grey, and
+  `nodeKindLabel` prints the raw enum token for every kind but `DERIVED_TABLE`. 🔴 **TypeScript cannot
+  catch this**: `Record<NodeKind, string>` is effectively `Record<string, string>` because the union ends
+  in `| string`, so a missing kind is not a type error. Nothing is broken — every map falls back
+  gracefully — so this is legibility, not correctness, and it needs a colour/glyph decision per kind
+  rather than a mechanical fill. → `okf/capabilities/metamodel/metamodel.md`
 
 ### Deployment & packaging
 
