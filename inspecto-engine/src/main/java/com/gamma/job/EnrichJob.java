@@ -30,16 +30,40 @@ final class EnrichJob implements Job {
     @Override public String name() { return cfg.name(); }
     @Override public String type() { return "enrich"; }
 
+    /**
+     * The legacy no-arg entry point, kept because callers outside {@link JobService} still use it. It now
+     * builds a {@link StandaloneRunContext} rather than leaving this path without a Run identity.
+     */
     @Override
     public JobResult run() throws Exception {
+        return run(StandaloneRunContext.forJob(cfg.name()));
+    }
+
+    /**
+     * 🔴 <b>Two identities, deliberately not one.</b> This job mints {@code consignmentId} — the unit of
+     * work — and takes the Run id (the ATTEMPT) from {@code ctx}. {@code GLOSSARY.md} §6-A separates them:
+     * {@code Run ⊇ Consignment ⊇ File}, and a reprocess is a new Run over the <em>same</em> Consignment.
+     *
+     * <p>⚠ <b>The Consignment id keeps its exact previous value</b>, and that is the point. A single
+     * string used to serve three roles here — the audit row's {@code runId} column, the
+     * {@link ConsignmentEvent} correlation id, and the registry's {@code consignment_id}. Repurposing it
+     * would have changed three observable values in order to fill one null column, so instead the Run id
+     * is <b>added</b> alongside. ⛔ Do not "tidy" this by collapsing them back together.
+     *
+     * <p>⚠ The audit row's column is still named {@code runId} while holding the unit of work. That is a
+     * pre-existing misnomer in a persisted CSV header, left alone on purpose: renaming it would rewrite an
+     * operator-visible audit surface, which is a separate decision from filling the registry's column.
+     */
+    @Override
+    public JobResult run(JobContext ctx) throws Exception {
         EnrichmentConfig job = EnrichmentConfig.load(cfg.require("config"));
-        String runId = cfg.name().toLowerCase().replace(' ', '_') + "-job-" + EnrichmentAuditWriter.runStamp();
+        String consignmentId = cfg.name().toLowerCase().replace(' ', '_') + "-job-" + EnrichmentAuditWriter.runStamp();
         String start = EnrichmentAuditWriter.now();
         long t0 = System.nanoTime();
 
         // full recompute; decision rules match this job's name as well as the enrichment's
         EnrichmentEngine.Result res = EnrichmentEngine.runResult(job, null, List.of(),
-                List.of(cfg.name()), runId);
+                List.of(cfg.name()), consignmentId, ctx.runId());
         List<PartitionOutput> outs = res.outputs();
         long ms = (System.nanoTime() - t0) / 1_000_000L;
         long bytes = outs.stream().mapToLong(PartitionOutput::bytes).sum();
@@ -48,12 +72,12 @@ final class EnrichJob implements Job {
         EnrichmentAuditWriter audit =
                 new EnrichmentAuditWriter(EnrichmentAuditWriter.auditDir(job), job.name());
         audit.record(new EnrichmentAuditWriter.RunRow(
-                runId, job.name(), "job", "job:" + cfg.name(), "full", 0,
+                consignmentId, job.name(), "job", "job:" + cfg.name(), "full", 0,
                 start, EnrichmentAuditWriter.now(), "SUCCESS",
                 parts.size(), outs.size(), res.totalRows(), bytes, ms, ""), outs);
 
         // chain: a successful enrichment is a commit downstream jobs can subscribe to
-        bus.publish(new ConsignmentEvent(job.name(), runId, "SUCCESS", parts, res.totalRows(), ms, 0));
+        bus.publish(new ConsignmentEvent(job.name(), consignmentId, "SUCCESS", parts, res.totalRows(), ms, 0));
 
         return JobResult.ok(outs.size() + " partition file(s), " + res.totalRows() + " row(s)", ms);
     }

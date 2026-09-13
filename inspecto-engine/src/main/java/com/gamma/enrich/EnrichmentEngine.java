@@ -127,6 +127,33 @@ public final class EnrichmentEngine {
     public static Result runResult(EnrichmentConfig cfg, List<Map<String, String>> partitionFilter,
                                    List<PipelineConfig> pipelines, List<String> ruleTargets,
                                    String consignmentId) throws Exception {
+        return runResult(cfg, partitionFilter, pipelines, ruleTargets, consignmentId, null);
+    }
+
+    /**
+     * As above, additionally carrying the <b>Run id</b> — the ATTEMPT, which is a different thing from the
+     * {@code consignmentId} beside it ({@code GLOSSARY.md} §6-A: {@code Run ⊇ Consignment ⊇ File}, and a
+     * reprocess is a new Run over the same Consignment).
+     *
+     * <p>🔴 Until 2026-09-13 this path wrote a NULL {@code run_id} into every §11.3 registry row it
+     * created, because no {@code JobContext} reached it. One NULL path is enough to make a unique key over
+     * {@code consignment_outputs} a <b>silent no-op</b> — NULL ≠ NULL in a UNIQUE constraint on both DuckDB
+     * and Postgres — so this was one of the three gaps slice 3 of
+     * {@code docs/superpower/run-model-plan.md} had to close.
+     *
+     * <p>⚠ <b>The run id is ADDED, not substituted.</b> The obvious move was to repurpose the string
+     * callers already mint — but that one value is simultaneously the audit row's {@code runId}, the
+     * {@code ConsignmentEvent} correlation id, and the Consignment id, so repurposing it would have
+     * changed three observable values to fix a null column. ⛔ Every one of those keeps its exact previous
+     * value; only the previously-null column is filled.
+     *
+     * <p>⚠ The {@code overload without a run id} above remains for callers that genuinely have no Run
+     * identity — tests constructing an engine run directly. It still writes NULL, and is the reason the
+     * outputs-store constraint waits on slice 3c as well.
+     */
+    public static Result runResult(EnrichmentConfig cfg, List<Map<String, String>> partitionFilter,
+                                   List<PipelineConfig> pipelines, List<String> ruleTargets,
+                                   String consignmentId, String runId) throws Exception {
         File db = DuckDbUtil.tempDbFile("enrich_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
             // Enrichment has no per-config processing.duckdb section; honour the global -D caps so this
@@ -170,7 +197,7 @@ public final class EnrichmentEngine {
                         // more than one enrichment.
                         if (consignmentId != null)
                             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
-                                    consignmentId, null, dest, routed,
+                                    consignmentId, runId, dest, routed,
                                     ConsignmentOutputs.countByPartition(c, routedTable,
                                             cfg.output().partitions()),
                                     boundsOf(c, routedTable, cfg), cfg.name()));
@@ -184,16 +211,16 @@ public final class EnrichmentEngine {
                     baseName, cfg.output().partitions(), List.of());
             // §11.3 slice 2 — register the main write's files before the routed ones are merged in below (those
             // registered themselves, from their own relation). There is no lineage matrix on this path, so the
-            // per-file count comes from a GROUP BY over the relation just written. `consignmentId` is the unit
-            // of work for a recompute; the run_id column stays null on THIS path until slice 3 of
-            // docs/superpower/run-model-plan.md lands — EnrichJob implements only the legacy no-arg run(), so
-            // no JobContext (and therefore no run id) reaches here at all.
+            // per-file count comes from a GROUP BY over the relation just written. `consignmentId` is the
+            // unit of work for a recompute; `runId` is the ATTEMPT, and since 2026-09-13 (slice 3b) every
+            // production caller supplies one — EnrichJob from its JobContext, EnrichmentService and
+            // EnrichmentProcessor from RunIds. It is null only on the five-arg overload, which tests use.
             // `bounds` is recorded when the output DECLARES its event time, which `output.partitions` can
             // now carry as the sink's `{column, source}` map entry (2026-08-11). Null without one, exactly
             // as before the key existed.
             if (consignmentId != null)
                 ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
-                        consignmentId, null, cfg.name(), outputs,
+                        consignmentId, runId, cfg.name(), outputs,
                         ConsignmentOutputs.countByPartition(conn, "__enriched", cfg.output().partitions()),
                         boundsOf(conn, "__enriched", cfg), cfg.name()));
 

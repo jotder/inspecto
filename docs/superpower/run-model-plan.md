@@ -65,6 +65,7 @@ constraint early.
 | **1** | Thread `ctx.runId()` into derived tables + summaries | `ConsignmentProcessJobType.persistDerivedTables`/`persistSummaries` already receive `ctx`; add a `runId` parameter to `DerivedTableWriter.write` (`:163`) and `SummaryWriter.write` (`:274`) | **Low** — the value is already in scope one frame up |
 | **2** | Thread the run id into the pipeline sink path | `PipelineJobRunner.execute(JobContext ctx)` (`:223`) has `ctx` and never reads it — it mints a clock-derived `batchId` at `:255` instead. Pass `ctx.runId()` into the `PartitionSinkWriter` ctor → `:117` | **Low-medium** — one ctor change; ⚠ do not conflate with `batchId`, which stays the Consignment id |
 | **3a** ✅ | **SHIPPED 2026-09-13** — the legacy no-arg `Job.run()` path | `PipelineJobRunner.run()` called `execute(null)`; it now builds a `StandaloneRunContext` | **Low** — done |
+| **3b** ✅ | **SHIPPED 2026-09-13** — the enrichment path | `EnrichJob` adopts `run(JobContext)`; `runResult` gains a `runId` beside `consignmentId`; all three callers supply one | **Medium** — done |
 | **3** | Give the two framework-less paths a run identity | `ConsignmentIngestor:440` (reached from the static `CollectorProcessor.run`/`ingest`, no `JobContext` on the path at all) and `EnrichmentEngine:158`/`:179` (via `EnrichJob`, which implements only the legacy no-arg `run()`) | **High — the real cost.** Needs either a run identity minted at the `CollectorProcessor` entry point and threaded down, or these paths adopting `JobContext` |
 | **4** | Make `run_id` `NOT NULL`, then add the key | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE` (§3), migrating by rebuild | **Medium** — reuse `DbFileStageStore.rebuildWithConstraint` verbatim; every DDL it needs is probed OK |
 
@@ -87,7 +88,7 @@ null there and that path still writes a NULL `run_id`. The call is now `ctx == n
 | Path | Why it has no run id |
 |---|---|
 | `ConsignmentIngestor:440` | reached from the static `CollectorProcessor.run`/`ingest`; no `JobContext` anywhere on the path |
-| `EnrichmentEngine:158`/`:179` | via `EnrichJob`, which implements only the legacy no-arg `run()` |
+| ~~`EnrichmentEngine:158`/`:179`~~ | ✅ **CLOSED 2026-09-13 (slice 3b)** — all three callers now supply a Run id |
 | ~~`PipelineJobRunner.run()` → `execute(null)`~~ | ✅ **CLOSED 2026-09-13 (slice 3a)** — it now builds a `StandaloneRunContext` |
 
 ### 4.2 ✅ Slice 3's precondition CLEARED 2026-09-12 — and it exposed a bigger finding
@@ -147,13 +148,37 @@ this code safely; two different concepts currently share one name in one argumen
 - **`PipelineJobRunner.run()`** now passes a real context. Mutation-proven: restoring `execute(null)` reds
   the new test on `expected: not <null>`. Verified 32 modules, 4391 tests, 0 failures.
 
-⚠ **Slices 3b and 3c remain, and they are different shapes — not more of the same.**
-**3b `EnrichJob`** must adopt `run(JobContext)` and *split one string into two*: today a single value is
-both the audit run id and the Consignment id, so the split changes what `EnrichmentAuditWriter` rows and
-`ConsignmentEvent` payloads mean. **3c `CollectorProcessor`/`ConsignmentIngestor`** is the widest — no
-`Job` exists on that path at all, so a context must be built inside `ingest` and threaded four frames down
-through the `finalizeSource` overloads, and `run`/`ingest` are `@PublicApi` so their signatures must stay.
-⛔ **The constraint cannot be added until 3b AND 3c land**: one NULL path exempts exactly its own rows.
+## 5.2 ✅ Slice 3b SHIPPED 2026-09-13 — the enrichment path
+
+🔴 **The plan said this slice had to "split one string into two", and that framing was wrong — usefully
+so.** The single value `EnrichJob` mints is simultaneously the audit row's `runId` column, the
+`ConsignmentEvent` correlation id, and the registry's `consignment_id`. Splitting it would have changed
+**three observable values in order to fill one null column**.
+
+✅ **So the Run id is ADDED, not substituted.** `EnrichmentEngine.runResult` gains a sixth parameter
+carrying the attempt alongside the unit of work; every previously-emitted value keeps its exact prior
+content, proven by construction — the local was *renamed* to `consignmentId` and the same variable still
+feeds the audit row and the event. Only `run_id`, previously always NULL, is filled.
+
+- `EnrichJob` now overrides `run(JobContext)` and reads `ctx.runId()`; its no-arg `run()` delegates via
+  `StandaloneRunContext`, so both entry points carry an identity.
+- **All three production callers supply one** — `EnrichJob` from its context, `EnrichmentProcessor` (CLI)
+  and `EnrichmentService` (hosted) from `RunIds`. ⚠ Missing any one of the three would have left the path
+  half-closed, which is indistinguishable from closed until a constraint is added.
+- The five-arg overload survives for tests and **still writes NULL**, pinned by its own test so the
+  honesty is deliberate rather than an oversight.
+
+Mutation-proven: restoring a literal `null` reds the new test with
+`expected: <enrich-attempt-1> but was: <null>`. Verified 32 modules, 4393 tests, 0 failures.
+
+⚠ **The audit CSV's column is still named `runId` while holding the unit of work.** A pre-existing
+misnomer in an operator-visible persisted surface, left alone on purpose: renaming it rewrites an audit
+header, which is a separate decision from filling the registry's column.
+
+⛔ **Only 3c remains, and the constraint still cannot be added.** `CollectorProcessor`/`ConsignmentIngestor`
+is the widest slice — no `Job` exists on that path at all, so a context must be built inside `ingest` and
+threaded four frames down through the `finalizeSource` overloads, with the `@PublicApi` signatures of
+`run`/`ingest` preserved. One NULL path exempts exactly its own rows.
 
 ## 6. ✅ DECIDED 2026-09-13 — bring them onto `JobContext`
 

@@ -50,8 +50,11 @@ public final class EnrichmentProcessor {
         long startNanos = System.nanoTime();
         EnrichmentAuditWriter audit = new EnrichmentAuditWriter(EnrichmentAuditWriter.auditDir(cfg), cfg.name());
         try {
+            // ⚠ `runId` here is the unit of work (it stamps the audit row); the Run id — the ATTEMPT —
+            // comes from the single RunIds generator. Both are passed, neither substituted, so the audit
+            // surface keeps its exact previous value and only the registry's null column is filled.
             EnrichmentEngine.Result res = EnrichmentEngine.runResult(cfg, filter, List.of(),
-                    List.of(), runId);
+                    List.of(), runId, com.gamma.job.RunIds.next(cfg.name()));
             List<PartitionOutput> outputs = res.outputs();
             long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
             long bytes = outputs.stream().mapToLong(PartitionOutput::bytes).sum();

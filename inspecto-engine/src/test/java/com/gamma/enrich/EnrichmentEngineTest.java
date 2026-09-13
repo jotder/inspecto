@@ -407,6 +407,57 @@ class EnrichmentEngineTest {
      * The assertion that matters is §7.2's reconciliation holding here too, on counts derived a different way
      * from the ingest path's.
      */
+    /**
+     * 🔴 The enrichment path wrote a NULL {@code run_id} into every registry row it created, because no
+     * {@code JobContext} reached it. One NULL path is enough to make a unique key over
+     * {@code consignment_outputs} a <b>silent no-op</b> — NULL ≠ NULL in a UNIQUE constraint on both DuckDB
+     * and Postgres — which is why slice 3b of {@code docs/superpower/run-model-plan.md} had to close it.
+     *
+     * <p>⚠ The Run id is <b>added, not substituted</b>: the Consignment id keeps its exact previous value.
+     * The two must stay distinguishable — a reprocess is a new Run over the <em>same</em> Consignment
+     * ({@code GLOSSARY.md} §6-A) — so this asserts they are not the same string.
+     */
+    @Test
+    void theEnrichmentPathStampsARunIdDistinctFromTheConsignmentId(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        EnrichmentConfig cfg = load(dir, in, out, DAILY_COUNT, "");
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+            EnrichmentEngine.runResult(cfg, null, List.of(), List.of(), "enrich-c1", "enrich-attempt-1");
+
+            List<ConsignmentOutput> rows = store.outputs("enrich-c1");
+            assertFalse(rows.isEmpty(), "the run must have registered rows to assert on");
+            for (ConsignmentOutput o : rows) {
+                assertEquals("enrich-attempt-1", o.runId(), "the ATTEMPT must reach the run_id column");
+                assertEquals("enrich-c1", o.consignmentId(), "and the unit of work keeps its own column");
+            }
+        } finally {
+            ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /** ⚠ The five-arg overload still writes NULL — tests use it, and that is why slice 3c still matters. */
+    @Test
+    void theOverloadWithoutARunIdStillWritesNull(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        EnrichmentConfig cfg = load(dir, in, out, DAILY_COUNT, "");
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+            EnrichmentEngine.runResult(cfg, null, List.of(), List.of(), "enrich-c2");
+
+            List<ConsignmentOutput> rows = store.outputs("enrich-c2");
+            assertFalse(rows.isEmpty());
+            assertNull(rows.get(0).runId(),
+                    "the no-run-id overload must stay honest about writing NULL rather than inventing one");
+        } finally {
+            ConsignmentOutputStores.use(null);
+        }
+    }
+
     @Test
     void registersEveryOutputFileWithPerFileRowCounts(@TempDir Path dir) throws Exception {
         Path in = dir.resolve("in"), out = dir.resolve("out");

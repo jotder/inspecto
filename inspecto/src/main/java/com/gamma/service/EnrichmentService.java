@@ -202,8 +202,10 @@ public final class EnrichmentService implements AutoCloseable {
         String startTime = EnrichmentAuditWriter.now();
         long startNanos = System.nanoTime();
         try {
+            // ⚠ As in EnrichmentProcessor: `runId` is this path's unit-of-work stamp (it keys the audit
+            // row and the ConsignmentEvent), and the Run id is minted separately from the one generator.
             EnrichmentEngine.Result res = EnrichmentEngine.runResult(job, filter, pipelines.get(),
-                    List.of(), runId);
+                    List.of(), runId, com.gamma.job.RunIds.next(job.name()));
             List<PartitionOutput> outs = res.outputs();
             List<String> parts = outs.stream().map(PartitionOutput::partition).distinct().toList();
             long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
