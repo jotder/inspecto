@@ -294,12 +294,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/frontend/features/pipeline-editor.md`
 - **P2** · **Canonical-pipeline selective bundle export/import** — the metadata bundle's `authored-pipeline` kind still targets the RETIRED `*_flow.toon` `PipelineStore`; a canonical `*_pipeline.toon` transfers only via the datasource zip or the client-side stream-config bundle. Wanted: one selective export/import with dependency closure (schemas, per-segment schemas, grammar/enrichment companions, Connection as secret-free requirement) and retire/repoint the `authored-pipeline` kind. **Decided 2026-09-06 (operator): in bundle manifests `schema` = the REGISTRY id (`registry/schemas/<id>`); a pipeline-owned `<name>_schema.toon` (+ its `_mapping.csv`/`_structure.csv` siblings) travels under its own kind, not as `schema`.** Apply this in `BundleRoutes`/`transfer/bundle.ts` when the row is built → `okf/frontend/features/onboarding.md`
 
-- **P3** · **AI drafting has no applicable component kind** — restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes them) or rework `SchemaEditorDialog`. No low-risk slice survives — design first. → `okf/frontend/features/inline-ai-authoring.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** an author asks for AI drafting on a **non-`schema` kind**. The capability
+  was removed because its one applicable kind lost its `ConfigSpec`, so restoring it is worth the design cost only
+  if someone wants it where none exists. · **AI drafting has no applicable component kind** — restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes them) or rework `SchemaEditorDialog`. No low-risk slice survives — design first. → `okf/frontend/features/inline-ai-authoring.md`
 - **P3** · **`AGT-SEGMENT-1` — the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" moat argument and the SHADOW-first on-ramp were written as a read of the codebase + roadmap and **never validated against a client segment** — the archived plan's own words. Telecom vs general regulated enterprise changes the emphasis. ⛔ **Decided 2026-09-10: keep the caveat — reopen on the first customer conversation**, not before; guessing a segment now would replace one unvalidated read with another. ⚠ Needs **product input**, not engineering; nothing in the product depends on it, but the framing is now quoted in a stakeholder-facing doc, so it must carry its caveat until this closes. (Was `agt-6-plan.md` D6, which had no board home at all.) → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
 ### Onboarding, Catalog, Parsing
 
 
-- **P3** · **Unpack (11) absent codecs** — (xz/zstd need a new decompression library: a dependency sign-off, not a build) — xz and zstd have no plugin; `.Z` has no round-trip test; multi-part/split archives (`.z01`, `.part1.rar`) unhandled — arrival-completeness is a Collector question. ⚠ The UI cannot author the explicit empty-list `data_extensions[0]:` opt-out (schema-form `list` writes empty as `null`). 🔴 Stale `META-INF/services` "ORDER MATTERS" header. → `okf/backend/engine/unpack-stage.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first `.xz`/`.zst` delivery arrives (it forces the decompression-library
+  sign-off at the same moment). ⛔ **Two items were removed from this row 2026-09-13** — the "stale
+  `META-INF/services` ORDER MATTERS header" was **grounded FALSE** (it correctly describes the live linear-scan
+  order, TarGz before Gzip), and the schema-form empty-list opt-out is a **UI defect** that was riding in a codec
+  row where nobody would find it — filed separately in §3. · **Unpack (11) absent codecs** — (xz/zstd need a new decompression library: a dependency sign-off, not a build) — xz and zstd have no plugin; `.Z` has no round-trip test; multi-part/split archives (`.z01`, `.part1.rar`) unhandled — arrival-completeness is a Collector question. ⛔ ~~The UI cannot author the explicit empty-list `data_extensions[0]:` opt-out~~ — **split out 2026-09-13** as its own §3 row (`SCHEMA-FORM-EMPTY-LIST-1`). ⛔ ~~Stale `META-INF/services` "ORDER MATTERS" header~~ — **grounded FALSE 2026-09-13**: the header is current and correctly describes the live linear-scan order. → `okf/backend/engine/unpack-stage.md`
 - **P2** · **Onboarding (Stream/Reference)** — D5-ref: how a `delete` tombstone *enters* the reference store (reserved column? Decision Rule consequence?) — wait for a real delete-feed; D6-ref: within-batch same-key tie-break is arbitrary — add an optional latest-by-`order_by` column only when needed; optional templates entry (space-template-gallery precedent). ⚠ Enrichment/job configs still derive identity from name. ⚠ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
 - **P2** · **Onboarding ↔ Pipeline unification W4/W5** — (W0 PROVEN 2026-09-06: `LiftLowerFixtureSweepTest` runs every `spaces/**/*_pipeline.toon` through the editor's own seam — `PipelineEditable.toMap` → codec → STRICT lower — and all 22 survive verbatim; it stays as the standing gate.) W4: `EnrichmentService` incremental-vs-full recompute — never silently convert one into the other. W5 promotion-grade export: extend `BundleExporter`/`DataSourceBundleResolver` to decision rules + reference datasets; import-time referential integrity (a missing connection is not caught until first poll). Engine has no grouping transform (rollup honestly = `sink.materialized`). ⛔ `PipelineCompiler.toConfigMap` deliberately not migrated. → `archived-documents/plans-archive/onboarding-pipeline-unification.md` · `okf/backend/pipeline-graph/editable-round-trip.md`
 - **P2** · **Parsing (Stage-1)** — ASN.1 grammar source: a reference to a stored schema module instead of pasted module text (also the prerequisite for a per-vendor transform config home); drop-in `plugins/` jar directory (JobPackManager classloader precedent) so a customer parser deploys without a rebuild. ⚠ `asn-parser/src/main/java` is NOT dead (compiled by `legacy-code/pom.xml`); corpus tests are opt-in and data-gated (DATA-GOV-1). → `okf/backend/engine/parser-plugins.md`
@@ -474,7 +480,29 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `c:\sandbox\inspecto-clean\…` output path, so it cannot run on another checkout.
   ⇒ Either make it render the committed `.md`, or delete it and produce the `.docx` by conversion. ⛔ Do not
   hand the `.docx` to anyone until this is settled. → `docs/stakeholders/README.md`
-- **P3** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at the write ROOT,
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** an author needs to declare "this Collector takes NO data
+  extensions". · **`SCHEMA-FORM-EMPTY-LIST-1` — the UI cannot author an explicit empty list** (filed 2026-09-13,
+  split out of the Unpack codecs row, where it was a UI defect nobody would have found). schema-form's `list`
+  control writes an empty list as `null`, so the explicit `data_extensions[0]:` opt-out is unauthorable from the
+  UI — `null` means "unset, use the default", which is the opposite of "deliberately none". ⚠ Hand-authored TOON
+  can still express it, so this is an authoring gap, not a capability gap. → `okf/backend/engine/unpack-stage.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** decide it on its own terms — wire the panel somewhere, or
+  delete it with its endpoint's only consumer. · **`DERIVED-SCHEMA-PANEL-ORPHAN-1` — a live endpoint's only UI is
+  mounted nowhere** (filed 2026-09-13, split out of `TYPEFLOW-DATASET-COLUMNS-1` where it was a sub-clause).
+  `GET /config/schema/derived` is wired end to end (`ConfigService.derivedSchema`), but
+  `DerivedSchemaPanelComponent:29`'s selector appears only in its own spec and the `schema/index.ts` barrel — in no
+  template and no route — so nothing mounts it. ⛔ **Do not delete on sight:** `MOCK-DEAD-COMPUTE-1` was closed as
+  a **RETAIN** precisely because dead code here can be a deliberate test vehicle. Establish which this is first.
+  → `okf/frontend/features/schema-mapping-authoring.md`
+- **P2** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at the write ROOT,**
+  ✅ **PROMOTED P3→P2 2026-09-13 (operator)** — misfiled config is found late, and the cost/benefit never
+  matched "build only when someone asks by name".
+  🔴 **It is NOT the one-parameter thread-through it looks like — measured 2026-09-13 before ranking it.**
+  `configSubdir` is a signal on **`pipeline-editor.component.ts:1377`**, while `openSchemaEditor()` lives on a
+  **different component**, `grammar-editor.dialog.ts:185`. So the fix is a cross-component plumb through the
+  dialog's data, not a parameter added within one file. ⚠ `configSubdir` is also legitimately `''` (set from a
+  path prefix at `:1386`, cleared on error at `:1390`), so the receiving side must treat empty as "write root",
+  not as "missing". *(original row follows)*
   not beside its pipeline** (filed 2026-09-11 by `SCHEMA-DIALOG-CREATE-HOME-1`'s grounding). `grammar-editor.dialog.ts`
   `openSchemaEditor()` passes no `subdir`, so a satellite authored there lands at the write root — 🔴 the
   exact shape of `SATELLITE-WRITE-1`, which the *real* parse surface already fixed: its own comment
@@ -484,50 +512,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   the destination today** (no test asserts where that draft lands), which is why it was filed rather than
   changed alongside the create-home fix — it is a behaviour change on a shipped surface with no
   regression net. Write the test first. → `okf/capabilities/control-api/control-api.md` §3.5
-- **P3** · **`PACK-UNLOAD-EXPOSURE-1` — unloading a pack makes a stored pipeline unloadable** (filed
-  2026-09-10 by Sprint 7.6). A pipeline naming a pack-contributed node type stops loading once that pack is
-  unloaded — the same exposure a Job typed on an unloaded pack already has, and the reason a pack is normally
-  *replaced* rather than removed. **Stated, not fixed**, in the plan that shipped the overlay; decide whether
-  this is accepted posture or work. → `okf/backend/control-plane/job-vs-step.md`
-- **P2 · PARTLY SHIPPED 2026-09-11** · **`TYPEFLOW-CONSUMERS-1` — consumers of the type-flow description**
-  (filed 2026-09-10 by Sprint 7.6). ⚠ **Two of the row's own premises were wrong, found by grounding
-  before any build:**
-  - 🔴 **`TypeFlow.describe` was never unconsumed.** It backs `POST /components/transform/describe`
-    (`ComponentRoutes:145`), which the transform SQL pane calls, and `TypeFlow.sinkColumns` backs
-    `ConfigPreviewRoutes:110`. What was missing is a consumer **in a save-time path** — a narrower claim.
-  - 🔴 **(a) was a third already built.** "A Mapping over a nonexistent field" is `SchemaMappingDrift.check`,
-    wired into `/config/write` and `/config/patch` since AUTHORING-REDESIGN-1 (g). The row counted it as
-    missing. ⚠ The declaring plan (`elt-final-amendment-plan.md` P2 S2) is narrower still than the row: it
-    deferred exactly "save-time/dry-run wiring … into ConfigRoutes/PipelineDryRun", *because it needs the
-    recipe/pipeline context, not the schema component alone* — which is why these land on the PIPELINE
-    save paths and not on a schema save.
-  ✅ **(a)'s two genuinely-absent checks SHIPPED:** `ConfigRoutes.routeColumnFindings` (a `route:` branch
-  whose `where:` reads a column the declared schema does not carry) and `ConfigRoutes.summarizeMeasureFindings`
-  (a `sum`/`avg` over a non-numeric declared field — `min`/`max` order text and dates fine, `count` ignores
-  the value, so only those two are a type error). Both wired into `/config/write`, `/config/patch` and
-  `PipelineGraphRoutes`, with the house severity split (ERROR when `active`, WARNING on a draft).
-  🔴 **Three traps, each of which had shipped a silent hole.** (1) `SqlGuard` requires SQL to BEGIN with
-  SELECT/WITH, so guarding the bare predicate rejected **every** predicate and skipped the bind for all of
-  them — the check passed everything while looking like it worked; guard the *assembled* statement, and
-  report a violation rather than skipping. (2) `/config/write`'s only ERROR gate runs **before** `target`
-  is resolved, and these checks need it to resolve `processing.schema_file` — so an ERROR added at the
-  natural place was *reported and the config written anyway*; a second gate was added (before the
-  conflict/If-Match checks, so 422 still precedes 409). `schemaFileFindings` sits there safely only because
-  it is pinned to WARNING by an explicit argument. (3) A split schema keeps `raw.fields[]` in the sibling
-  `_structure.csv` (STRUCTURE-CSV-1), so reading the TOON alone sees ZERO columns and both checks fall
-  silent — `declaredColumns` merges the sibling, and a test pins it.
-  ⚠ **`declaredColumns` returns EMPTY, never a finding, when the schema cannot be read** — an unresolvable
-  reference is already a deliberate WARNING (the file may be created after the save). Treating unknown as
-  "declares nothing" would refuse every save made in the normal authoring order. Unknown ≠ empty.
-  ✅ **(c) SPI SHIPPED on the operator's explicit call**, over my recommendation to wait:
-  `PipelineNodeType.outputColumns(inputColumns, config)` returning `Optional.empty()` by default — a
-  plugin Step has no SQL for DuckDB to plan, so only the provider can state its output shape. ⚠ **Declared,
-  not enforced: nothing reads it, and no gate compares a provider's answer with what `shape` actually
-  produces.** Whoever wires the first consumer decides what happens when they disagree, and should expect
-  existing packs to be wrong. `default` ⇒ non-breaking (the interface has 6 defaults and one abstract);
-  blast radius is `BuiltinNodeType` + one sample pack outside the reactor.
-  **Still open — (b) Dataset auto-registration**, needing a design call, → `TYPEFLOW-DATASET-COLUMNS-1`.
-  Tests: 13 (`TypeFlowSaveTimeFindingsTest`). → `okf/backend/engine/catalog-vs-executors.md`
 - **P3** · **`TYPEFLOW-DATASET-COLUMNS-1` — a Dataset's columns are never derived from the pipeline that
   fills it** (filed 2026-09-11, split out of `TYPEFLOW-CONSUMERS-1` (b)). A `DatasetColumn` is
   `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic lives
@@ -551,6 +535,10 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     four job-owned keys are restated, so authored `columns`/roles/labels ride through untouched. The code
     carries the rule as a comment so a future field list cannot silently start dropping keys.
 
+  ✅ **TRIGGER (operator, 2026-09-13):** a **second code-registered dataset producer** appears. With one producer (`MaterializeTask`), a
+  human authors columns once and they now survive a refresh — the merge fix shipped; the pain begins when code
+  registers datasets in more than one place and hand-authoring stops scaling.
+
   ⚠ **The HEADLINE is still open and this row stays P3** — steps 3+4: `TypeFlow.Column` is still
   `record Column(String name, String type)` (`TypeFlow.java:30`), `sinkColumns` (`:75`) yields no role, its
   only consumer is `ConfigPreviewRoutes.java:110`, and no DuckDB-type → coarse-type mapping exists.
@@ -570,12 +558,21 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     proves nothing. That copy is independent verification, not duplication — the distinction is recorded
     on `splitShorthand` so nobody "finishes the job" by collapsing it.
   → `okf/backend/engine/catalog-vs-executors.md`
-- **P3** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY** (filed
+- **P2** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY**
+  ✅ **PROMOTED P3→P2 2026-09-13 (operator): a row whose own title says the work is unblocked was mis-ranked
+  by its own text.** It is documentation-and-vocabulary work with no dependency — `node-types.md:136-138` says
+  so explicitly. ⚠ **Do not confuse it with the runtime CONSTANT rename**, which genuinely is gated to Phase 7
+  because it breaks two committed contracts; a grounding pass conflated the two layers in 2026-09-13's sweep. (filed
   2026-09-10 by Sprint 7.6). Delete the **four** non-edges in favour of Signals, and collapse the four reject
   relations to `reject:<reason>`. ⚠ **These two are documentation and vocabulary and need no runtime
   decision** — unlike steps 4 and 5, which need D2's runtime half (X5, next MAJOR). ⛔ Do not bundle them
   with the runtime work; that is what has kept them unstarted. → `okf/backend/engine/node-types.md`
-- **P3** · **`GLOSSARY-CASE-1` — split the two `Case`s in code** (filed 2026-09-10 by Sprint 7.3, `SPEC-GLOSSARY-1`). The
+- **P3 · RELEASE-GATED (next MAJOR), not demand-gated** · **`GLOSSARY-CASE-1` — split the two `Case`s in code**
+  ✅ **Re-gated 2026-09-13 (operator).** It is not waiting for anyone to ask — it renames **four published
+  routes** (`AgentRoutes.java:133,138,144,150`), so it waits for the version that may break them, like the
+  Tier-3 vocabulary rows. ⛔ Do not do the non-breaking half alone: two spellings for one concept during the
+  interim reads worse than the collision does. ⚠ Re-grounded 2026-09-13 — both senses still collide
+  (`ObjectType.CASE` vs `intelligence/investigation/Case.java`), in the UI too. (filed 2026-09-10 by Sprint 7.3, `SPEC-GLOSSARY-1`). The
   glossary now defines both senses and says which keeps the word: `ObjectType.CASE` (groups Incidents — the pane, the
   user guide and the controls matrix all use it) stays `Case`; the Assistant's `com.gamma.intelligence.investigation.Case`
   — one RCA playbook run against one Incident, and the **only** type in the repo actually named `Case` — becomes
@@ -584,7 +581,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   alias or a deprecation window, not a silent flip — that is why 7.3 filed it instead of applying it. Touchpoint list in
   `GLOSSARY.md` §13. ⛔ Do **not** also rename `mode: case` (route branching) or `caseType` (line of business): different
   words that merely look alike, and `caseType` feeds RBAC data scopes.
-- **P3** · **D-8 XLSX export** — zero groundwork (no spreadsheet library in any pom); gated only by a bare label — state the operator question before answering it. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first operator who asks for a spreadsheet download — which is
+  also when the new-dependency question gets answered, rather than in advance. · **D-8 XLSX export** — zero groundwork (no spreadsheet library in any pom); gated only by a bare label — state the operator question before answering it. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
 ### Control plane, jobs, notifications, queries
@@ -789,12 +787,20 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **Bundle / Exchange** — `requires` present-but-different classification; per-editor "load as draft" import — design first, likely multi-session (`BundleTransferService.write` commits straight through; no generic draft seam). ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/exchange-sharing.md`
 - **P2** · **Notifications** — D8 residuals: soft-bounce retry scheduling (distinction recorded, nothing retries); SES/SNS adapter (needs SNS subscription confirmation + a cert-chain fetch from a validated `amazonaws.com` URL — ⚠ outbound fetch from an unauthenticated callback path deserves its own review); GeoIP; auth-gated per-user prefs / security triggers. (Auto-disable policy is a §1 decision.) → `okf/backend/control-plane/events-metrics.md`
 
-- **P3** · **Job framework** — Maintenance COULD tier: space-to-space comparison; predictive maintenance (AGT-5 territory) deliberately deferred. → `okf/backend/control-plane/jobs.md`
-- **P3** · **D6 spec-authoring UI** — a matrix/editor for `findings-spec`; today authored as TOON through generic `/components` CRUD. Nothing broken without it. → `okf/frontend/features/objects.md`
-- **P3** · **Signal / Decision networks** — optional S8 (connector-direct emission + cross-space controller); a general event-triggered consequence policy gate (still `/apply`-only); RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet). → `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first **space-to-space comparison request**. ⚠ The trigger governs the
+  comparison half only — predictive maintenance stays deferred to AGT-5 regardless. · **Job framework** — Maintenance COULD tier: space-to-space comparison; predictive maintenance (AGT-5 territory) deliberately deferred. → `okf/backend/control-plane/jobs.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first **non-engineer** authors a `findings-spec`. TOON-through-CRUD is
+  workable for someone who reads the schema; for an analyst the editor is the difference between usable and not.
+  · **D6 spec-authoring UI** — a matrix/editor for `findings-spec`; today authored as TOON through generic `/components` CRUD. Nothing broken without it. → `okf/frontend/features/objects.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the **first cross-Space consequence** — a Signal in one Space
+  that must cause something in another, which none of today's `/apply`-only machinery can express. ⚠ All three
+  items below are speculative extensions of a backbone that works today, so one gate covers them.
+  · **Signal / Decision networks** — optional S8 (connector-direct emission + cross-space controller); a general event-triggered consequence policy gate (still `/apply`-only); RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet). → `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md`
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (DuckDB `spatial` extension itself: zero demand re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (outbound mirror of the connector SPI reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
-- **P3** · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first install where hand-edited policy TOON goes wrong. ⚠ The
+  read-only Policies tab and the "why denied?" endpoint already make such a mistake diagnosable, which is what
+  bounds the cost of waiting. · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
 - **P2** · **`LAUNCHER-GUARD-1` — nothing executes an emitted launcher, and that is how `SERVEBAT-OPTS-1`
   shipped.** `serve.bat` spent its life dropping `-Dauth.mode=oidc` on every Windows Standard/Enterprise
   bundle (cmd.exe expands `%OPTS%` in a parenthesised block at PARSE time, so five of six `set` statements
@@ -806,7 +812,11 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   stubbed, and asserts the emitted flag set per edition (Personal: no `auth.mode`, no `events.backend`;
   Standard+: both). ⚠ The `.bat` half only proves anything on a Windows runner. Filed 2026-09-11.
   → `okf/capabilities/security/security.md` §2.2, §8.7
-- **P3** · **`BREAK-INCIDENT-RESOLVE-1` — a promoted Break carries no back-reference on the board.**
+- **P2** · **`BREAK-INCIDENT-RESOLVE-1` — a promoted Break carries no back-reference on the board.**
+  ✅ **PROMOTED P3→P2 2026-09-13 (operator)** — re-grounded first: `promoted` is a **session-only in-memory
+  signal** (`reconciliation-detail.component.ts:82-84`), so a promotion is **lost on reload**. That is
+  user-visible data loss, not a missing feature. ✅ The server half already exists — `breakKey` is written as an
+  Incident attribute at `ReconRoutes.java:193` — so this is mostly a read path. *(original row follows)***
   Filed 2026-09-11 while shipping `BREAK-INCIDENT-1`. The board marks a Break promoted **for the session
   only** (an in-memory set), because a Break is not persisted server-side and the route's dedupe reply does
   **not** name the surviving Incident: `IncidentAccess.openIncident` reports suppression as
@@ -818,14 +828,20 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   correlation id = the reconciliation) and match on the `breakKey` attribute — read-only, no new SPI, and
   it survives a reload. Only worth doing if an operator asks; the promote itself is idempotent either way.
   → `okf/capabilities/incidents/incidents.md`
-- **P3** · **`INCIDENT-KPI-MTTD-1` — MTTD still has no anchor.** Split out of `INCIDENT-KPI-MTTR-1` when its
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** an **SLA commitment names MTTD**. Until then it is a metric nobody reads,
+  and the "first signal" instant is a modelling choice better made against a real definition. ⚠ Re-grounded
+  2026-09-13: MTTR's anchor DID ship (`ATTR_RESOLVED_AT`) and does **not** confer one on MTTD — that is a
+  self-stamped transition, while MTTD needs a *pre-Incident* instant; `detectedAt`/`firstSignal` have zero hits.
+  · **`INCIDENT-KPI-MTTD-1` — MTTD still has no anchor.** Split out of `INCIDENT-KPI-MTTR-1` when its
   MTTR half shipped 2026-09-11. Detection time needs a *first-signal* instant and nothing records one on an
   Incident. The proposed anchor stands: **earliest Signal at the Incident's `causationId` root → the
   Incident's `createdAt`**. ⚠ Adopting it means reading the event store from the analytics path, a seam
   `ObjectService` does not have — it emits through `EventLog` but never queries. ⛔ Do **not** publish a
   placeholder meanwhile: an undefined KPI is indistinguishable from a measured one once it is on a
   dashboard, which is the failure the MTTR half was filed against. → `okf/capabilities/incidents/incidents.md`
-- **P3** · **`STALE-TILES-PRECISION-1` — narrow the stale badge below pipeline granularity.** ✅ The badge
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first **false-stale complaint** at pipeline granularity. The shipped
+  badge is correct but coarse; coarse-but-correct is only imprecise, so it waits until someone is actually misled.
+  · **`STALE-TILES-PRECISION-1` — narrow the stale badge below pipeline granularity.** ✅ The badge
   SHIPPED 2026-09-11 on a **pipeline** anchor (operator's call over two larger options). ⚠ The residual is
   the granularity that follows: a disruption marks **every** Dataset fed by that pipeline, not only the
   rows or column that gapped. Narrowing it is a BACKEND change, not a resolver change — the emitters must
@@ -834,7 +850,12 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   a quarantined file is only caught via the `FILE_QUARANTINED` event. Take this only if operators report
   the over-approximation as noise — it is a correct-but-wide badge, not a wrong one.
   → `okf/capabilities/observability/observability.md` §3.1
-- **P3** · **`CATALOG-WIDGET-NODES-1` — Widgets and Dashboards are not Catalog nodes.** Grounded
+- **P2** · **`CATALOG-WIDGET-NODES-1` — Widgets and Dashboards are not Catalog nodes.**
+  🔴 **PROMOTED P3→P2 2026-09-13 (operator).** Demand-gating cannot fire on this one: `/catalog/graph`
+  returns an impact answer that is **silently incomplete**, so nobody ever learns there was something to ask
+  for. A confidently wrong impact answer is worse than a missing one. ⚠ A cheaper half exists if the
+  modelling is too big — declare the gap in the payload, the remedy `POD-SCOPE-DIVERGENCE-1` took.
+  *(original row follows)*** Grounded
   2026-09-11 with a control probe: zero hits for widget/dashboard across the `catalog` package while the
   same grep returns dozens elsewhere. So `/catalog/graph` **cannot** answer "what depends on Dataset X"
   for any BI consumer, and `SIGNAL-STALE-TILES-1` had to resolve that join client-side off
@@ -1363,7 +1384,10 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   not fix by hand-editing the list a fifth time — pin it: the repo has already recorded a derived map
   drifting three times. → generate or contract-test the pair, as `RecordTransformContractTest` does for
   `sql-functions`.
-- **P3** · **Two author-facing messages name things that do not exist.** Both verified 2026-09-08 in the
+- **P2** · **Two author-facing messages name things that do not exist.**
+  ✅ **PROMOTED P3→P2 2026-09-13 (operator), and the guard gap is part of the SAME change.** ⛔ Do not fix (b)
+  without adding the third `SOURCE_RULES` entry to `tools/check-vocabulary.mjs` — the sweep proved the guard
+  *structurally cannot* see Collector messages (see below), so a fix alone leaves the next one unguarded. Both verified 2026-09-08 in the
   same sweep. (a) `pipeline-editor.component.ts:673` warns *"Only filter, dedup and summarize Steps can run
   inside a branch"*, but the real gate `BRANCH_STEP_TYPES` (`pipeline-graph.ts:794-799`) also contains
   **`transform.sql`**, added by SQL-BRANCH-1 on 2026-09-06 — so the toast tells an author a Step cannot do
@@ -1601,7 +1625,8 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
 - **P3** · **`SPEC-ORPHANPAGE-1` — shipped surfaces with no concept page.** 🔴 **The "roughly twenty" was
   wrong and contradicted the row's OWN enumeration, which sums to 33** (re-grounded 2026-09-13). A recount
   against `docs/okf/frontend/**` and the `resource:` front-matter map measured **≈44**: 17 routed admin panes,
-  4 unrouted shell surfaces, 12 shared components, 11 shared libraries. ⚠ Treat ≈44 as a measurement needing
+  4 unrouted shell surfaces, 12 shared components, 11 shared libraries. ✅ **GATE (operator, 2026-09-13): confirm the ≈44 before building anything from it** — so the next person
+  sizes from a real number instead of re-litigating the estimate. ⚠ Treat ≈44 as a measurement needing
   its own confirmation pass before anyone sizes the work from it — ⛔ but never carry "roughly twenty" forward
   again. The enumerated areas: panes in the shell tier (two of them the very rows that area owns), shared
   components and shared libraries, three Ops Lens screens (audit log, processing status, the scheduler), the
@@ -1617,6 +1642,13 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
 One line each; the reasoning is in the pointer. Reopen only on the stated trigger.
 *(Triggers audited 2026-09-07 — every countable one was recounted against the code; none had fired.)*
 
+- **A removed Job pack leaving a stored pipeline unloadable** — ⛔ decided 2026-09-13: **accepted risk, not
+  work.** `JobPackManager.java:278-279` already carries the exposure as its own inline comment and states the
+  workaround in the same breath: *"the same exposure a Job typed on an unloaded pack already has, which is why
+  a pack is normally REPLACED rather than removed."* ⚠ It sat at P3 instead, so every sweep re-grounded a
+  question that had already been answered in the code. Trigger: an operator removes rather than replaces a pack
+  in a live install, or a guard is wanted at unload time. *(Was `PACK-UNLOAD-EXPOSURE-1` in §3; the original
+  row's grounding is preserved in git history at `fa3780e4`.)*
 - **Mapping sidecars for the committed schemas** — ⛔ decided 2026-09-10: inline `mapping:` is the norm; **0** of 24
   schemas use a `*_mapping.csv` and nothing depends on one (the single sidecar in the tree is untracked evidence).
   Trigger: an operator picks the sidecar form in the mapping editor for a committed pipeline. → `MAPPING-GEN-1` (§3)
