@@ -377,6 +377,43 @@ const SOURCE_RULES = [
         re: /\bflows?\b/gi,
         msg: 'A message, label or description the operator READS must say **Pipeline**, never "flow" (GLOSSARY §5) — a 4xx body, a Signal message and an attribute description are user-facing text. Keep the word only where it is a CONTRACT (a config key, a query param, an agent tool argument); then put `vocab-allow` on the line, naming the contract, or allowlist the file.',
     },
+    {
+        // The THIRD rule, added 2026-09-13 — and it exists because this list having only two was itself the
+        // defect. A row had carried the open question *"does the guard cover the Source→Collector case at
+        // all, or only Flow→Pipeline?"* since 2026-09-08. It did not: SOURCE_RULES held `flow-identifier`
+        // and `flow-message`, both Flow→Pipeline, and the Source→Collector rule is a PROSE rule that never
+        // runs over source files. So `RemoteAcquisitionHandler`'s two messages named a config key —
+        // `source.post_action.on_success` — that has not existed since the 2026-07-14 rename, and the guard
+        // could not have fired on them. ⛔ A guard's SCOPE is a silent exemption: audit it apart from its
+        // rules.
+        //
+        // ⚠ Why this is NOT a bare-word rule, unlike `flow-message`. "Source" is ordinary English all over
+        // this domain — source files, source column, source timezone, the `TRY_CAST(<source> …)` bounds —
+        // so a bare `\bsource\b` would fire on dozens of correct messages and be allowlisted into
+        // uselessness within a shift. What IS tractable is the same trick `flow-message` uses: SHAPE. The
+        // banned thing is a message naming a CONFIG KEY under the pre-rename `source.` root, and a key path
+        // is `source.` glued to an identifier. Measured before shipping: exactly two literals in the whole
+        // tree match `source.<ident>`, and both are excluded by the machinery already — `source.size()` is
+        // outside the literal, and Signal's `"source.kind"` payload keys carry no whitespace, so
+        // `sentencesOnly` drops them as the contracts they are.
+        id: 'source-key-message',
+        // ⚠ NOT wrapped in sentencesOnly, unlike `flow-message` — and that difference is load-bearing.
+        // A key path is frequently a CONCATENATED fragment with no internal whitespace:
+        // `"source.post_action.on_success=" + kind + " but connector …"`. sentencesOnly would discard that
+        // as a contract and miss half the very defect this rule was written for — which it did, caught by
+        // MUTATING the second message rather than by reading it. A key path stays tractable without the
+        // sentence filter because its shape is already narrow; a genuine contract gets a SOURCE_ALLOW entry.
+        // ⚠ `${…}` interpolations are stripped: they are CODE, not text. `${source.kind}` inside a template
+        // literal is a property access that happens to sit between backticks — measured, that was 3 of this
+        // rule's first 4 hits (`signal.ts` sourceLabel, the onboarding name suggester). A guard that cries
+        // wolf three times in four gets allowlisted into uselessness within a shift.
+        prepare: (raw, rel) => (rel.endsWith('.html')
+            ? [templateText(raw)]
+            : stringLiterals(raw.replace(BINDINGS_RE, '')).map((lit) => lit.replace(INTERPOLATION_RE, ' '))
+        ).join('\n'),
+        re: /\bsource\.[a-z][a-z0-9_]*\b/gi,
+        msg: 'A message the operator READS must name the canonical config root **`collector.`**, never the pre-rename `source.` (GLOSSARY §2/§3, Source→Collector flipped 2026-07-14) — an operator who greps for the key you printed must find it. If the literal really is a CONTRACT (a Signal payload key, a stored attribute path), put `vocab-allow` on the line naming the contract, or allowlist the file.',
+    },
 ];
 
 /**
@@ -414,6 +451,9 @@ function sentencesOnly(fragments) {
  * attribute reads as one long sentence-shaped literal, and the contract inside it looks like prose.
  */
 const BINDINGS_RE = /[\[(][^\])]*[\])]\s*=\s*"[^"]*"/g;
+
+/** A template literal's ${...} interpolations — CODE inside quotes, never text a user reads. */
+const INTERPOLATION_RE = /\$\{[^}]*\}/g;
 
 /**
  * The reader-visible text of one template line: element text plus plain attribute values, with the
@@ -467,6 +507,9 @@ const SOURCE_ALLOW = {
         'Reads the Tier-2 legacy alias above so pre-rename events still promote — the whole point of the alias.',
 
     // ── the sanctioned lowercase "flow of value" sense: NOT the Pipeline entity ────────────────────
+    'inspecto-engine/src/main/java/com/gamma/signal/Signal.java::source-key-message':
+        'SRC_KIND/SRC_ID/SRC_REL/SRC_VIA are Signal PAYLOAD KEYS ("source.kind", "source.id", …) — a published wire contract consumers read, not text an operator reads. Renaming them would break every Signal already stored.',
+
     'inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java::flow-identifier':
         'FLOW_KEYWORDS is the SQL **control-flow** keyword set (CASE/WHEN/…) — English sense, nothing to do with a Pipeline.',
     'inspecto-ui/src/app/modules/admin/studio/datasets/calculated-column-guard.ts::flow-identifier':

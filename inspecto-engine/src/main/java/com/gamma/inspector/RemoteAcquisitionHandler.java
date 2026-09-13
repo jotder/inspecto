@@ -282,7 +282,10 @@ final class RemoteAcquisitionHandler {
         try {
             kind = PostAction.Kind.valueOf(pac.onSuccess());
         } catch (IllegalArgumentException bad) {
-            log.warn("Unknown source.post_action.on_success '{}' for {} — retaining source files",
+            // ⛔ The key is `collector.post_action`, not `source.post_action` — this method reads it from
+            // cfg.collector().postAction() three lines up. It named the pre-rename `source` for months and
+            // sent operators looking for a key that does not exist (BACKLOG, "Two author-facing messages").
+            log.warn("Unknown collector.post_action.on_success '{}' for {} — retaining source files",
                     pac.onSuccess(), cfg.identity().pipelineName());
             return null;
         }
@@ -296,7 +299,7 @@ final class RemoteAcquisitionHandler {
             case RETAIN -> null;
         };
         if (needed != null && !connector.capabilities().contains(needed)) {
-            String msg = "source.post_action.on_success=" + kind + " but connector '" + connector.scheme()
+            String msg = "collector.post_action.on_success=" + kind + " but connector '" + connector.scheme()
                     + "' lacks capability " + needed;
             switch (pac.onUnsupported()) {
                 case "FAIL"   -> throw new IllegalStateException(msg + " (on_unsupported=FAIL)");

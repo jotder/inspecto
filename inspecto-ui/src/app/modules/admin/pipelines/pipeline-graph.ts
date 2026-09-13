@@ -799,6 +799,26 @@ export const BRANCH_STEP_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The branch-safe Step types as prose, rendered FROM {@link BRANCH_STEP_TYPES} so a message can never
+ * drift from the gate it describes.
+ *
+ * 🔴 It drifted: the editor's refusal toast read *"Only filter, dedup and summarize Steps can run inside a
+ * branch"* from SQL-BRANCH-1 (2026-09-06) until 2026-09-13 — telling an author a Step could not do something
+ * it could, which is worse than silence because it discourages a supported use. ⛔ Never hand-write this list
+ * again. The Java authority never had the bug for exactly this reason: `RouteArming` renders its own set into
+ * the refusal (`new TreeSet<>(BRANCH_STEP_KINDS)`); this is the same discipline on the client.
+ *
+ * ⚠ The `transform.` prefix is dropped because the message names Steps to an author, who sees the short verb
+ * in the palette — the set's members stay fully qualified.
+ */
+export function branchStepTypesLabel(): string {
+    const names = [...BRANCH_STEP_TYPES].map((t) => t.replace(/^transform\./, '')).sort();
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
  * Splice a new node in at the HEAD of a route branch (MIDBRANCH-UI-1): the `route:<key>` edge
  * `route → first` becomes `route → node` (still `route:<key>`) plus `node → first` (`data`), so the
  * branch keeps its key and the node becomes the branch's first Step. Returns `null` when the node id is

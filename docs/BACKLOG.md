@@ -1384,8 +1384,22 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   not fix by hand-editing the list a fifth time — pin it: the repo has already recorded a derived map
   drifting three times. → generate or contract-test the pair, as `RecordTransformContractTest` does for
   `sql-functions`.
-- **P2** · **Two author-facing messages name things that do not exist.**
-  ✅ **PROMOTED P3→P2 2026-09-13 (operator), and the guard gap is part of the SAME change.** ⛔ Do not fix (b)
+- ✅ **SHIPPED 2026-09-13** · **Two author-facing messages name things that do not exist.**
+  ✅ **BOTH messages fixed, and the guard that could not see them now can.**
+  - (a) The branch toast is now **rendered FROM `BRANCH_STEP_TYPES`** (`branchStepTypesLabel()`), never
+    hand-listed — the same discipline the Java authority already had (`RouteArming:180` renders
+    `new TreeSet<>(BRANCH_STEP_KINDS)`), which is exactly why the server side never drifted. Pinned by 3
+    specs asserting the label names every member of the set.
+  - (b) Both `RemoteAcquisitionHandler` messages now say **`collector.post_action.on_success`**.
+  - 🔴 **The guard's third rule, `source-key-message`, was the load-bearing half** — and building it found
+    two things reading could not: (1) inheriting `flow-message`'s `sentencesOnly` filter **missed the
+    second message entirely**, because a concatenated fragment (`"source.post_action.on_success=" + kind`)
+    carries no whitespace and was discarded as a contract; (2) scanning template literals raw made **3 of
+    the first 4 hits false positives** (`${source.kind}` is code, not text), so interpolations are now
+    stripped. ⚠ Both were caught by MUTATING each message separately, not by reading — a guard that
+    passes proves nothing until it is proven red.
+  *(original row follows)*
+  ✅ **PROMOTED P3→P2 2026-09-13 (operator), and the guard gap was part of the SAME change.** ⛔ Do not fix (b)
   without adding the third `SOURCE_RULES` entry to `tools/check-vocabulary.mjs` — the sweep proved the guard
   *structurally cannot* see Collector messages (see below), so a fix alone leaves the next one unguarded. Both verified 2026-09-08 in the
   same sweep. (a) `pipeline-editor.component.ts:673` warns *"Only filter, dedup and summarize Steps can run

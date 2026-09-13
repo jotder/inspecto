@@ -133,6 +133,7 @@ import {
     uniqueNodeId,
     validatePipeline,
     BRANCH_STEP_TYPES,
+    branchStepTypesLabel,
     insertBranchHead,
     groupByFamily,
     ProcessorGroup,
@@ -670,7 +671,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         // mid-branch; the check here is defense in depth mirroring RouteArming.BRANCH_STEP_KINDS.
         if (e.branch) {
             if (!BRANCH_STEP_TYPES.has(e.type)) {
-                this.toast.warning('Only filter, dedup and summarize Steps can run inside a branch.');
+                // ⛔ Rendered from the set, never hand-written — this message drifted for a week once. See
+                // branchStepTypesLabel's own comment.
+                this.toast.warning(`Only ${branchStepTypesLabel()} Steps can run inside a branch.`);
                 return;
             }
             const node: AuthoredNode = { id: uniqueNodeId(m, e.type), type: e.type };

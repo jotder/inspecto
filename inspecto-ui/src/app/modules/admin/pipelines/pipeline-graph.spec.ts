@@ -9,8 +9,10 @@ import {
 } from 'app/inspecto/api';
 import { NODE_KIND_COLORS } from 'app/inspecto/theme/chart-tokens';
 import {
+    BRANCH_STEP_TYPES,
     TestOutcome,
     addEdgeToModel,
+    branchStepTypesLabel,
     addNodeToModel,
     addRouteBranch,
     insertBranchHead,
@@ -1181,5 +1183,33 @@ describe('route parity round trip (mock lift/lower mirrors PipelineEditable/Pipe
         const branchEdge = relifted.edges.find((e) => e.rel === 'route:errors');
         expect(branchEdge, 'the branch lost its destination on the round trip').toBeDefined();
         expect(relifted.nodes.some((n) => n.id === branchEdge!.to && n.type === 'sink.persistent')).toBe(true);
+    });
+});
+
+describe('branchStepTypesLabel', () => {
+    /**
+     * 🔴 The anti-drift assertion, and the reason this function exists. The editor's refusal toast
+     * hand-listed "filter, dedup and summarize" and went stale the day SQL-BRANCH-1 added `transform.sql`
+     * — for a week it told authors a Step could not run in a branch when it could. Adding a member to
+     * BRANCH_STEP_TYPES must never again leave a message behind.
+     */
+    it('names every member of the set it describes', () => {
+        const label = branchStepTypesLabel();
+        for (const type of BRANCH_STEP_TYPES) {
+            const shortName = type.replace(/^transform\./, '');
+            expect(label).toContain(shortName);
+        }
+    });
+
+    it('names no Step that is not in the set', () => {
+        const label = branchStepTypesLabel();
+        // `join` and `route` are the two the gate exists to refuse — RouteArming names them explicitly.
+        expect(label).not.toContain('join');
+        expect(label).not.toContain('route');
+    });
+
+    it('reads as prose, not as a dumped set', () => {
+        // The message is shown to an author mid-edit, so it has to read like a sentence.
+        expect(branchStepTypesLabel()).toBe('dedup, filter, sql and summarize');
     });
 });
