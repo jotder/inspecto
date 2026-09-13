@@ -125,6 +125,13 @@ was the edge itself (`data`); one was content demux (`route:*`); four were a sin
 in *reason*; and four were **Signals, not edges at all** (`success` · `failure` · `on_commit` · `gap`).
 Reading that list as one vocabulary is what made the type system contradict the engine.
 
+⚠ **Recounted 2026-09-13: the non-edge set is FOUR, not five.** The sentence below said "five" in both
+its homes (here and `BACKLOG.md`'s `TOKEN-VOCAB-STEPS-1`) and matched neither measurement: §above names
+**four** Signals (`success` · `failure` · `on_commit` · `gap`), while `PipelineRel.java:24` names a
+**different** set of **six** that never appear as a lifted edge (those four minus `gap`, plus `dropped` /
+`invalid` / `duplicate`). ⛔ Do not merge the two sets — "not a Signal" and "not lifted" are different
+properties, which is why one number could never serve both.
+
 ⛔ **What the token model does NOT fix**, so nobody scopes it wrongly: it does **not** make the config
 non-flat (lift/lower stays); fan-in still needs its own decision; and it **breaks two committed contracts**
 plus `BuiltinNodeType`'s declared sets. ⚠ **`ConservationCheck` must keep working across the change** — loss
@@ -134,7 +141,7 @@ which kind". That migration is real work, tracked as X5 on [`BACKLOG.md`](../../
 ⚠ **Today the constants keep their pre-token spelling deliberately** (renaming breaks the two committed
 contracts): `DATA` = the token continues; `DROPPED`/`INVALID`/`DUPLICATE`/`route:*` = a token whose
 `dataRefs` point at that side-relation. The runtime converges at **Phase 7** — the vocabulary is adopted now,
-the runtime later. Steps 2 and 3 of that sequence (delete the five non-edges in favour of Signals; collapse
+the runtime later. Steps 2 and 3 of that sequence (delete the **four** non-edges in favour of Signals; collapse
 the rejects to `reject:<reason>`) are **documentation and vocabulary, and can land before any redesign is
 agreed**; steps 4 and 5 need the runtime decision.
 

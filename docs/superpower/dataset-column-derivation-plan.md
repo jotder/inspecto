@@ -29,12 +29,20 @@ was filed on.**
 | # | Finding | Where |
 |---|---|---|
 | 1 | 🔴 **The server-side role heuristic ALREADY EXISTS** — it does not need writing | `ResultSetDescriptor.roleFor(name, type)` |
-| 2 | 🔴 **It is mirrored byte-for-byte in TWO more places, with NO contract test** | `dataset-types.ts:93-97` **and** `result-set.ts:39-43` |
-| 3 | 🔴 **`MaterializeTask`'s dataset refresh REPLACES the whole document** | `MaterializeTask:109-115` |
+| 2 | ~~🔴 **It is mirrored byte-for-byte in TWO more places, with NO contract test**~~ ✅ **CLOSED 2026-09-13** — one copy per language, pinned by a contract test | `result-set.ts:49` owns it; `dataset-types.ts:85-91` delegates |
+| 3 | ~~🔴 **`MaterializeTask`'s dataset refresh REPLACES the whole document**~~ ✅ **CLOSED 2026-09-13** — it is a keys-by-owner MERGE | `MaterializeTask.java:118-128` |
 | 4 | ⚠ **`role: temporal` is fail-closed on "exactly one"**, and the heuristic cannot honour that | `DatasetRelation.temporalColumn:128-144` |
 | 5 | ⚠ **`TypeFlow` yields DuckDB type NAMES; `roleFor` consumes coarse JDBC-derived types** | `TypeFlow.Column` vs `ResultSetDescriptor:27-34` |
 
-### 2.1 The heuristic exists twice and is unpinned
+### 2.1 ✅ CLOSED 2026-09-13 — the heuristic existed twice and unpinned; both are fixed
+
+> 🔴 **Everything below §2.1 and §2.2 is written in the PRESENT TENSE about a world that no longer
+> exists.** Step 1 and step 2 have SHIPPED. `result-set.ts:49` owns `roleFor`, `dataset-types.ts:85-91`
+> delegates to it and says so in its own comment, and the rule is pinned by `column-role.contract.json`
+> + `ColumnRoleContractTest` (Java) + `column-role.spec.ts` (TS). `MaterializeTask.java:118-128` is a
+> **keys-by-owner MERGE** — the stored document is seeded first and only four job-owned keys are
+> restated, so authored `columns`/roles/labels ride through untouched. ⚠ Kept for the grounding that
+> justified the work; ⛔ do not read the two sections below as current behaviour.
 
 **Three** copies are already identical — one Java, two TypeScript:
 
@@ -56,7 +64,7 @@ stored dataset, a drift becomes a silent data difference rather than a cosmetic 
 covers only the Java↔`dataset-types.ts` pair would leave `result-set.ts` free to drift — which is
 exactly the "audit the guard's CALL-SITE list, not just its rules" failure this repo has hit before.
 
-### 2.2 The refresh destroys authored columns — today, with no derivation involved
+### 2.2 ✅ CLOSED 2026-09-13 — the refresh USED TO destroy authored columns (see the banner in §2.1)
 
 `MaterializeTask` builds a fresh map (`name`, `physicalRef`, `description`, `materialized`) and calls
 `store.write("dataset", target, content)`, whose own comment calls it *"idempotent overwrite = the

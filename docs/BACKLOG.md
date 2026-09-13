@@ -369,7 +369,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `logback-classic` in `inspecto-etl`: `tools/dependencies.lock` covers **runtime** scope and logback is
   already in it at compile scope, so nothing enters the product — the dependency guard stays at 95 artifacts,
   unchanged. 5 tests, **5 of 5 mutants killed**.
-- **P3** · **`DUCKLAKE-COMMIT-COUNT-1` — nothing would catch a double catalog registration** (filed
+- ✅ **CLOSED 2026-09-10** · **`DUCKLAKE-COMMIT-COUNT-1` — nothing would catch a double catalog registration** (filed
   2026-09-10 by scale-out spike S2). `DuckLakeRegistrar.register` has exactly **one** call site, on the flat
   ingest lane, once per batch, after every file's reveal; the graph lane registers nothing.
   `DuckLakeRegistrarTest` covers only the no-op, disabled and no-flag branches with `assertDoesNotThrow` and
@@ -530,17 +530,30 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   Tests: 13 (`TypeFlowSaveTimeFindingsTest`). → `okf/backend/engine/catalog-vs-executors.md`
 - **P3** · **`TYPEFLOW-DATASET-COLUMNS-1` — a Dataset's columns are never derived from the pipeline that
   fills it** (filed 2026-09-11, split out of `TYPEFLOW-CONSUMERS-1` (b)). A `DatasetColumn` is
-  `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic
-  (`inferRoles`, `dataset-types.ts:85-91`) lives **client-side** and is wired to live-query results, not to
-  a derived schema. 🔴 **`MaterializeTask:109-115` is the one place a dataset is registered by code rather
-  than a human, and it writes NO `columns` at all** — so auto-population is absent even where
-  auto-registration already happens; that is the natural first consumer. ⚠ `GET /config/schema/derived`
-  is wired end-to-end (`ConfigService.derivedSchema` → `DerivedSchemaPanelComponent:135`) but the panel
-  is **ORPHANED** — its selector is in no template or route, so nothing mounts it. Design:
-  `superpower/dataset-column-derivation-plan.md`, which recommends shipping its first two steps (pin the
-  role heuristic as a contract; make the materialize refresh a MERGE) **even if the headline derivation
-  is never built** — 🔴 `MaterializeTask`'s refresh replaces the whole document, so a human's authored
-  roles/labels are destroyed on every run today, derivation or not.
+  `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic lives
+  **client-side**, wired to live-query results rather than to a derived schema. 🔴 **`MaterializeTask` is the
+  one place a dataset is registered by code rather than a human, and it writes NO `columns` at all** — so
+  auto-population is absent even where auto-registration already happens; that is the natural first consumer.
+  ⚠ `GET /config/schema/derived` is wired end-to-end (`ConfigService.derivedSchema` →
+  `DerivedSchemaPanelComponent:29`) but the panel is **ORPHANED** — its selector appears only in its own spec
+  and the `schema/index.ts` barrel, in no template or route, so nothing mounts it. *(Re-grounded 2026-09-13 —
+  still true.)*
+
+  ✅ **BOTH of the design's first two steps have SHIPPED, and this row's statement of them was STALE**
+  (re-grounded 2026-09-13; the same two sentences were still present-tense in
+  `superpower/dataset-column-derivation-plan.md` §2 and are corrected there too):
+  - ⛔ ~~"the role heuristic exists in three unpinned copies"~~ — **collapsed to one per language and
+    PINNED.** `inspecto/viz/result-set.ts:49` owns `roleFor`; `studio/datasets/dataset-types.ts:85-91`
+    now *delegates* to it and says so in its own comment. Pinned by `column-role.contract.json` +
+    `ColumnRoleContractTest` (Java) + `column-role.spec.ts` (TS).
+  - ⛔ ~~"`MaterializeTask`'s refresh replaces the whole document, destroying authored roles"~~ — it is a
+    **keys-by-owner MERGE** (`MaterializeTask.java:118-128`): the stored document is seeded first and only
+    four job-owned keys are restated, so authored `columns`/roles/labels ride through untouched. The code
+    carries the rule as a comment so a future field list cannot silently start dropping keys.
+
+  ⚠ **The HEADLINE is still open and this row stays P3** — steps 3+4: `TypeFlow.Column` is still
+  `record Column(String name, String type)` (`TypeFlow.java:30`), `sinkColumns` (`:75`) yields no role, its
+  only consumer is `ConfigPreviewRoutes.java:110`, and no DuckDB-type → coarse-type mapping exists.
   → `okf/backend/engine/catalog-vs-executors.md`
 - **SHIPPED 2026-09-11** · **`MEASURE-SHORTHAND-ONE-HOME-1` — the measure shorthand had FIVE statements,
   not three** (filed 2026-09-11 by `TYPEFLOW-CONSUMERS-1`, shipped the same day). ⚠ **The row's count was
@@ -558,7 +571,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     on `splitShorthand` so nobody "finishes the job" by collapsing it.
   → `okf/backend/engine/catalog-vs-executors.md`
 - **P3** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY** (filed
-  2026-09-10 by Sprint 7.6). Delete the five non-edges in favour of Signals, and collapse the four reject
+  2026-09-10 by Sprint 7.6). Delete the **four** non-edges in favour of Signals, and collapse the four reject
   relations to `reject:<reason>`. ⚠ **These two are documentation and vocabulary and need no runtime
   decision** — unlike steps 4 and 5, which need D2's runtime half (X5, next MAJOR). ⛔ Do not bundle them
   with the runtime work; that is what has kept them unstarted. → `okf/backend/engine/node-types.md`
@@ -1358,8 +1371,14 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   and `:299` builds an operator-facing message reading `source.post_action.on_success=…`, for a key that is
   actually **`collector.post_action`** — `post_action` is read via `castMapAt(src, "post_action")` where
   `src = castMapAt(raw, "collector")` (`PipelineConfigParser.java:376,483`). 🔴 The vocabulary guard has a
-  rule for exactly this class (an operator-read message must use the canonical term) and it did not fire —
-  worth checking whether the rule covers the Source→Collector case at all, not just Flow→Pipeline. <!-- vocab-allow: names both renames themselves -->
+  rule for exactly this class (an operator-read message must use the canonical term) and it did not fire.
+  ✅ **ANSWERED 2026-09-13 — it CANNOT fire, and the reason is scope, not a bad pattern.**
+  `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (`:343`, applied at `:665`) holds exactly **two** rules —
+  `flow-identifier` and `flow-message` — both Flow→Pipeline. <!-- vocab-allow: names the rename itself --> **There is no Collector rule over source files
+  at all**; the Source→Collector rule is a *prose* rule and never runs over `.java`. ⛔ So this message was
+  never in the guard's reach, and no amount of tightening the existing rules would have caught it.
+  ⚠ Both halves — (a) and (b) — **re-verified still present 2026-09-13**. Whoever fixes (b) should add the
+  third `SOURCE_RULES` entry in the same change, or the next such message lands unguarded too. <!-- vocab-allow: names both renames themselves -->
 - **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder.** The **UI half SHIPPED 2026-09-07**:
   every emitter was verified to dual-emit (`LineageRoutes:112/113`, `ViewRoutes:100/101`,
   `PipelineProjection:198/207/242`), so the DTO fields now read the canonical key — `DownstreamPipeline.pipeline`,
@@ -1579,11 +1598,18 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   what is computed. 🔴 A sixth collision the row never named: `INTERNAL` is both a classification label
   and an API error code. The one thing 7.3 did **not** do is rename anything — the `Case` split is code
   over four published routes, filed as `GLOSSARY-CASE-1` (§3) with a §13 touchpoint list.
-- **P3** · **`SPEC-ORPHANPAGE-1` — shipped surfaces with no concept page.** Roughly twenty across areas: nine
-  panes in the shell tier (two of them the very rows that area owns), eleven shared components and six shared
-  libraries, three Ops Lens screens (audit log, processing status, the scheduler), the Notification Center,
-  the Catalog read model (`com.gamma.catalog`, mentioned by eight files and owned by none), the operational
-  objects domain, and a guarantees panel whose own docblock cites a plan its page does not link. ⚠ Filed
+- **P3** · **`SPEC-ORPHANPAGE-1` — shipped surfaces with no concept page.** 🔴 **The "roughly twenty" was
+  wrong and contradicted the row's OWN enumeration, which sums to 33** (re-grounded 2026-09-13). A recount
+  against `docs/okf/frontend/**` and the `resource:` front-matter map measured **≈44**: 17 routed admin panes,
+  4 unrouted shell surfaces, 12 shared components, 11 shared libraries. ⚠ Treat ≈44 as a measurement needing
+  its own confirmation pass before anyone sizes the work from it — ⛔ but never carry "roughly twenty" forward
+  again. The enumerated areas: panes in the shell tier (two of them the very rows that area owns), shared
+  components and shared libraries, three Ops Lens screens (audit log, processing status, the scheduler), the
+  Notification Center, the operational objects domain, and a guarantees panel whose own docblock cites a plan
+  its page does not link.
+  ⛔ **One listed item is FALSE and is struck:** ~~the Catalog read model (`com.gamma.catalog`) is "owned by
+  none"~~ — it is a declared `resource:` of
+  [`okf/capabilities/metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md) (front matter, line 5). ⚠ Filed
   as P3 deliberately — an undocumented pane is a smaller problem than a *wrongly* documented one, and
   `SPEC-STALEREF-1` is the same budget better spent.
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
