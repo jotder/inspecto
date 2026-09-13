@@ -261,4 +261,89 @@ class ConsignmentOutputRegistrationTest {
             DuckDbUtil.deleteTempDb(db);
         }
     }
+
+    /**
+     * 🔴 The ingest path wrote a NULL {@code run_id} into every registry row it created, because no
+     * {@code JobContext} exists anywhere on it — {@code CollectorProcessor} is a static entry point, not a
+     * {@code Job}. One NULL path is enough to make a unique key over {@code consignment_outputs} a
+     * <b>silent no-op</b>: NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres.
+     *
+     * <p>⚠ The Run id is a genuinely different thing from the Consignment id beside it —
+     * {@code Run ⊇ Consignment ⊇ File} ({@code GLOSSARY.md} §6-A), and a reprocess is a new Run over the
+     * <em>same</em> Consignment — so this asserts the two do not collapse into one string.
+     */
+    @Test
+    void theIngestPathStampsARunIdDistinctFromTheConsignmentId(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path solo = inbox.resolve("runid.csv");
+        Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment("runid_b1", "mini", null, survivors);
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+            File db = DuckDbUtil.tempDbFile("cor_runid_");
+            try (Connection conn = openWithTwoPartitions(db)) {
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
+                        conn, "transformed", List.of("year", "month", "day"), cfg,
+                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(),
+                        written.lineage(), Map.of(), List.of(), "cycle-run-7");
+            } finally {
+                DuckDbUtil.deleteTempDb(db);
+            }
+
+            List<ConsignmentOutput> rows = store.outputs(batch.batchId());
+            assertFalse(rows.isEmpty(), "the harness must have registered rows to assert on");
+            for (ConsignmentOutput o : rows) {
+                assertEquals("cycle-run-7", o.runId(), "the ATTEMPT must reach the run_id column");
+                assertEquals("runid_b1", o.consignmentId(), "and the unit of work keeps its own column");
+            }
+        } finally {
+            ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /**
+     * ⚠ A caller with no enclosing poll cycle still gets a REAL id, not null — a Run of exactly one
+     * Consignment. {@code DrainCommand} and the older overloads take this path, and returning null there
+     * would leave the constraint unaddable for exactly those rows.
+     */
+    @Test
+    void anOverloadWithoutACycleStillMintsARealRunId(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path solo = inbox.resolve("runid2.csv");
+        Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
+        List<Consignment.Member> survivors = List.of(member(cfg, solo.toFile(), 0));
+        Consignment batch = new Consignment("runid_b2", "mini", null, survivors);
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+            File db = DuckDbUtil.tempDbFile("cor_runid2_");
+            try (Connection conn = openWithTwoPartitions(db)) {
+                ConsignmentIngestStrategy.Written written = ConsignmentIngestStrategy.writeAndTrace(
+                        conn, "transformed", List.of("year", "month", "day"), cfg,
+                        cfg.dirs().database(), "b1", batch.batchId(), Map.of(1, "a.csv", 2, "b.csv"), "");
+                ConsignmentIngestor.finalizeSource(batch, cfg, survivors, written.outputs(), written.lineage());
+            } finally {
+                DuckDbUtil.deleteTempDb(db);
+            }
+
+            List<ConsignmentOutput> rows = store.outputs(batch.batchId());
+            assertFalse(rows.isEmpty());
+            for (ConsignmentOutput o : rows) {
+                assertNotNull(o.runId(), "no enclosing cycle is not a reason to write NULL");
+                assertFalse(o.runId().isBlank());
+                assertNotEquals("runid_b2", o.runId(), "and it must not merely echo the Consignment id");
+            }
+        } finally {
+            ConsignmentOutputStores.use(null);
+        }
+    }
 }

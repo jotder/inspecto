@@ -67,7 +67,8 @@ constraint early.
 | **3a** ✅ | **SHIPPED 2026-09-13** — the legacy no-arg `Job.run()` path | `PipelineJobRunner.run()` called `execute(null)`; it now builds a `StandaloneRunContext` | **Low** — done |
 | **3b** ✅ | **SHIPPED 2026-09-13** — the enrichment path | `EnrichJob` adopts `run(JobContext)`; `runResult` gains a `runId` beside `consignmentId`; all three callers supply one | **Medium** — done |
 | **3** | Give the two framework-less paths a run identity | `ConsignmentIngestor:440` (reached from the static `CollectorProcessor.run`/`ingest`, no `JobContext` on the path at all) and `EnrichmentEngine:158`/`:179` (via `EnrichJob`, which implements only the legacy no-arg `run()`) | **High — the real cost.** Needs either a run identity minted at the `CollectorProcessor` entry point and threaded down, or these paths adopting `JobContext` |
-| **4** | Make `run_id` `NOT NULL`, then add the key | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE` (§3), migrating by rebuild | **Medium** — reuse `DbFileStageStore.rebuildWithConstraint` verbatim; every DDL it needs is probed OK |
+| **3c** ✅ | **SHIPPED 2026-09-13** — the Collector's ingest path | `CollectorProcessor.ingest` mints one `cycleRunId` per poll cycle; threaded through `process` → `commit` → `finalizeSource` | **Medium** — done |
+| **4** | Make `run_id` `NOT NULL`, then add the key | `UNIQUE (consignment_id, path, run_id)` + `ON CONFLICT DO UPDATE` (§3), migrating by rebuild | 🔴 **STILL BLOCKED, but no longer by `run_id`** — see §5.3 |
 
 ### 4.1 As-built after slices 1 + 2 — the paths that still write NULL
 
@@ -83,11 +84,11 @@ the two `ConsignmentOutput` constructions to `null` turns exactly the two new as
 null there and that path still writes a NULL `run_id`. The call is now `ctx == null ? null : ctx.runId()`.
 **This is a supported path, not an edge case**, and it must be closed with the other two.
 
-⛔ **Therefore `run_id` is still NOT universally non-null. The remaining gaps are:**
+✅ **ALL THREE GAPS ARE NOW CLOSED (2026-09-13). `run_id` is non-null on every production path.**
 
 | Path | Why it has no run id |
 |---|---|
-| `ConsignmentIngestor:440` | reached from the static `CollectorProcessor.run`/`ingest`; no `JobContext` anywhere on the path |
+| ~~`ConsignmentIngestor:440`~~ | ✅ **CLOSED 2026-09-13 (slice 3c)** — `CollectorProcessor.ingest` mints one `cycleRunId` per poll cycle and threads it down |
 | ~~`EnrichmentEngine:158`/`:179`~~ | ✅ **CLOSED 2026-09-13 (slice 3b)** — all three callers now supply a Run id |
 | ~~`PipelineJobRunner.run()` → `execute(null)`~~ | ✅ **CLOSED 2026-09-13 (slice 3a)** — it now builds a `StandaloneRunContext` |
 
@@ -175,10 +176,35 @@ Mutation-proven: restoring a literal `null` reds the new test with
 misnomer in an operator-visible persisted surface, left alone on purpose: renaming it rewrites an audit
 header, which is a separate decision from filling the registry's column.
 
-⛔ **Only 3c remains, and the constraint still cannot be added.** `CollectorProcessor`/`ConsignmentIngestor`
-is the widest slice — no `Job` exists on that path at all, so a context must be built inside `ingest` and
-threaded four frames down through the `finalizeSource` overloads, with the `@PublicApi` signatures of
-`run`/`ingest` preserved. One NULL path exempts exactly its own rows.
+## 5.3 ✅ Slice 3 COMPLETE 2026-09-13 — and 🔴 the constraint is STILL blocked, for the *other* reason
+
+Slice 3c closed the last path. `CollectorProcessor.ingest` mints **one `cycleRunId` per poll cycle** —
+⚠ per cycle, not per Consignment, because `GLOSSARY.md` §6-A says a Run *contains* one or more
+Consignments — and threads it through `process` → `commit` → `finalizeSource` to the registry. Callers
+with no enclosing cycle (`DrainCommand`, tests) mint their own through delegating overloads: a Run of
+exactly one Consignment, **which is still true rather than null**. Mutation-proven; 4395 tests, 0 failures.
+
+⇒ **`run_id` is now non-null on every production path.** That was one of the two reasons the operator's
+key was refuted.
+
+🔴 **The OTHER reason stands untouched, and slice 4 must not proceed until it is answered.** The original
+refutation had two independent findings; closing the first does nothing for the second:
+
+> **One run can legitimately write the same `path` twice.** Two sinks may target one store
+> (`PartitionSinkWriter:115` sums `rowsByStore`, and its class doc says so), and `PartitionWriter:171,226`
+> reveals each partition under a stable `<baseName>_out.<ext>` with `OVERWRITE_OR_IGNORE`. The second
+> branch's row carries a **different `row_count` for the same path**.
+
+⛔ So `(consignment_id, path, run_id)` can still collide on rows that are **not** duplicates, and
+`ON CONFLICT DO NOTHING` would keep the **stale** count. ✅ The resolution is the one already reached for
+the recon registry: **`ON CONFLICT DO UPDATE`** — the file on disk really is overwritten, so
+last-writer-wins matches the filesystem, while `DO NOTHING` would preserve a count for content that no
+longer exists. ⚠ That is a *design decision about write semantics*, not a mechanical migration — which is
+why slice 4's difficulty cell no longer reads "reuse `rebuildWithConstraint` verbatim".
+
+⚠ **Also still NULL by design: the five-arg `EnrichmentEngine.runResult` overload** that tests use, pinned
+by its own test. Production never calls it, so it does not block the constraint — but a future caller
+reaching for it would silently reopen the hole.
 
 ## 6. ✅ DECIDED 2026-09-13 — bring them onto `JobContext`
 

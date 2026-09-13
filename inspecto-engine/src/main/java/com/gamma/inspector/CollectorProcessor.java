@@ -109,6 +109,14 @@ public class CollectorProcessor {
             return;
         }
 
+        // ⚠ ONE Run id for the whole cycle, not one per Consignment. GLOSSARY §6-A is explicit —
+        // Run ⊇ Consignment ⊇ File — so a Run CONTAINS the batches this cycle plans, and every registry
+        // row they write shares this attempt's id. Minted from RunIds, the single generator, so an id
+        // produced here means the same thing as one JobService produced (run-model-plan §6, slice 3c).
+        // 🔴 Until 2026-09-13 this path wrote a NULL run_id, which is why consignment_outputs could not
+        // carry a unique key: NULL ≠ NULL exempts exactly those rows from it.
+        String cycleRunId = com.gamma.job.RunIds.next(cfg.identity().pipelineName());
+
         // ── unpack stage (Collector-level, unpack-stage plan §2.0) ───────────────
         // Expand compressed candidates the chosen engine lane cannot read itself BEFORE the planner
         // freezes the list — every expanded file is an ordinary member from birth, so the EL below
@@ -182,7 +190,7 @@ public class CollectorProcessor {
                         try (ConcurrencyBroker.Permit permit =
                                      broker.admit(spaceId, pipelineId, maxConcurrent, priority)) {
                             try {
-                                ConsignmentIngestor.process(b, cfg, audit);
+                                ConsignmentIngestor.process(b, cfg, audit, cycleRunId);
                             } catch (Exception thrown) {
                                 // X1: a THROWN ingest (framework/schema fault) also leaves its files for the
                                 // next cycle — count the attempt, then let the failure surface as before.

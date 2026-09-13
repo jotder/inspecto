@@ -48,7 +48,17 @@ public final class ConsignmentIngestor {
 
     // ── entry point ───────────────────────────────────────────────────────────
 
+    /**
+     * ⚠ For a caller with no enclosing poll cycle (tests, one-off drivers): mints a Run of exactly one
+     * Consignment. {@code CollectorProcessor.ingest} uses the overload below so every batch in a cycle
+     * shares one Run id, which is what {@code GLOSSARY.md} §6-A's {@code Run ⊇ Consignment} means.
+     */
     public static void process(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit) {
+        process(batch, cfg, audit, com.gamma.job.RunIds.next(cfg.identity().pipelineName()));
+    }
+
+    public static void process(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit,
+                               String runId) {
         ConsignmentIngestStrategy strategy = (cfg.schemas().ingesterClass() == null)
                 ? new CsvIngestStrategy()
                 : new StreamingPluginIngestStrategy();
@@ -83,7 +93,7 @@ public final class ConsignmentIngestor {
             } else {
                 try {
                     commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
-                            outcome.bounds(), outcome.memberAudits());
+                            outcome.bounds(), outcome.memberAudits(), runId);
                 } catch (Exception e) {
                     // Output was written, but a side effect (backup/manifest/markers) failed. Demote
                     // to FAILED so the batch stays visible to audit/lineage/recovery instead of
@@ -132,14 +142,14 @@ public final class ConsignmentIngestor {
 
     private static void commit(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
-                               Map<String, EventTimeBounds> bounds, List<MemberAudit> audits)
+                               Map<String, EventTimeBounds> bounds, List<MemberAudit> audits, String runId)
             throws IOException {
         // lineage is persisted by writeAudit (from the outcome); it is passed on here too because it is the
         // only place a per-output-file row count exists (§11.3). The durable side effects —
         // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
         // the branch-aware graph path (ConsignmentGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
-        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits);
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits, runId);
 
         // S4-pre (elt-s4-park-drain-plan): the per-batch branch commit log has served its purpose once
         // the source is finalised — a fully committed batch never replays. A FAILED batch keeps its
@@ -271,6 +281,29 @@ public final class ConsignmentIngestor {
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
                                Map<String, EventTimeBounds> bounds,
                                List<MemberAudit> audits) throws IOException {
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits,
+                com.gamma.job.RunIds.next(cfg.identity().pipelineName()));
+    }
+
+    /**
+     * As above, carrying the <b>Run id</b> — the ATTEMPT this Consignment was ingested under.
+     *
+     * <p>🔴 This path wrote a NULL {@code run_id} into every §11.3 registry row until 2026-09-13, because
+     * no {@code JobContext} exists anywhere on it — {@code CollectorProcessor} is a static entry point, not
+     * a {@code Job}. One NULL path is enough to make a unique key over {@code consignment_outputs} a
+     * <b>silent no-op</b> (NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres), so this was the
+     * last of the three gaps in slice 3 of {@code docs/superpower/run-model-plan.md}.
+     *
+     * <p>⚠ <b>One Run spans the whole poll cycle, not one per Consignment.</b> {@code GLOSSARY.md} §6-A is
+     * explicit: {@code Run ⊇ Consignment ⊇ File} — a Run <em>contains</em> one or more Consignments. So
+     * {@code CollectorProcessor.ingest} mints one id and passes it to every batch in that cycle. The
+     * overloads above, for callers with no enclosing cycle ({@code DrainCommand}, tests), mint their own:
+     * a Run of exactly one Consignment, which is still true rather than null.
+     */
+    static void finalizeSource(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
+                               List<PartitionOutput> outputs, List<LineageRow> lineage,
+                               Map<String, EventTimeBounds> bounds,
+                               List<MemberAudit> audits, String runId) throws IOException {
 
         // ── ordering rationale ────────────────────────────────────────────────
         // Markers signal "already processed; skip on next poll." If a crash leaves
@@ -438,7 +471,7 @@ public final class ConsignmentIngestor {
         // registered for this space, record() is a no-op and nothing about this sequence changes.
         if (lineage != null && !lineage.isEmpty()) {
             ConsignmentOutputStores.record(ConsignmentOutputs.fromLineage(
-                    batch.batchId(), null, batch.table(), outputs, lineage, schemaFingerprint,
+                    batch.batchId(), runId, batch.table(), outputs, lineage, schemaFingerprint,
                     bounds, cfg.identity().pipelineName()));
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.OUTPUT_REGISTERED);
         }

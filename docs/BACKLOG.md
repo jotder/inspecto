@@ -988,7 +988,14 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     ⚠ `generation` is no escape either — it is declared (`ConsignmentOutput.java:70`) but hard-coded
     to `0` at every construction site, so it is as inert as `run_id`. **Any key over
     `(consignment_id, path, …)` is blocked on §13's Run model landing first**, which is what would give
-    a write round a real identity — now SPECIFIED in
+    a write round a real identity — ✅ **SPECIFIED AND slices 3a/3b/3c ALL SHIPPED 2026-09-13, so
+    `run_id` is now non-null on every production path.** 🔴 **The key is STILL not addable, but for the
+    OTHER of the two original reasons**: two sinks may write one path in a single run with different
+    `row_count`s, so `(consignment_id, path, run_id)` can collide on rows that are not duplicates.
+    ✅ Resolution reached but NOT yet built: `ON CONFLICT DO UPDATE` (the file on disk is genuinely
+    overwritten, so last-writer-wins matches the filesystem; `DO NOTHING` would keep a count for content
+    that no longer exists). ⚠ That is a write-semantics decision, not a mechanical migration — see
+    
     [`superpower/run-model-plan.md`](superpower/run-model-plan.md) (four slices; ⚠ it also records that a
     run id does **not** discharge D15, because two pods mint different ids — the fenced `RunLease` is what
     stops split-brain). Until then the outputs store stays unconstrained — which breaks
