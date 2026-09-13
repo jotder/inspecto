@@ -242,7 +242,11 @@ export interface EnrichmentRunReport {
 // ── catalog / metadata graph ─────────────────────────────────────────────────
 export type NodeKind =
     | 'STREAM'
+    // Two spellings, both meaning GLOSSARY §3 "Schema", styled identically: `RAW_SCHEMA` is what the
+    // catalog wire carries (`CatalogRoutes` emits `NodeKind.RAW_SCHEMA.name()`); `SCHEMA` is the pipeline
+    // editor's SYNTHETIC visual kind (`categoryVisualKind`: PARSE → SCHEMA), never a wire value.
     | 'SCHEMA'
+    | 'RAW_SCHEMA'
     | 'COLUMN'
     | 'TABLE'
     | 'DERIVED_TABLE'

@@ -912,22 +912,12 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   than a silent omission. (c) The urgency premise was overstated: `PipelineDependents` **already** walked
   `physicalRef → widget.datasetId → dashboard tile.widgetId` and was live on the delete-impact and
   dependents routes, so the place users actually ask "what breaks?" already covered BI consumers.
-  ⚠ **Residual, unbuilt and deliberately so:** the SPA's `NodeKind` union carries the three new kinds,
-  but `NODE_KIND_COLORS` / `KIND_GLYPH` / `nodeKindLabel` / `nodeShape` have no entries for them, so they
-  render as grey circles labelled with the raw enum token. That is the **pre-existing** behaviour for
-  `DERIVED_TABLE` and `REFERENCE_DATASET` too (also absent from `NODE_KIND_COLORS`), so it is a
-  consistent gap, not a regression — filed as `CATALOG-KIND-STYLING-1` below. `isStore()` in
+  ✅ **The styling residual is CLOSED** (`CATALOG-KIND-STYLING-1`, 2026-09-14): every wire kind now has a
+  colour, a shape and a GLOSSARY label, and the survey found the gap was **wider than filed** — the wire
+  kind `RAW_SCHEMA` was modelled nowhere in the SPA, while `KIND_GLYPH` turned out unreachable for catalog
+  kinds. `isStore()` in
   `node-detail.dialog.ts` deliberately excludes `DATASET`: a Studio Dataset is the **binding**, not a
   store. → `okf/capabilities/metamodel/metamodel.md`
-- **P3** · **`CATALOG-KIND-STYLING-1` — five catalog node kinds render as unstyled grey circles.**
-  Filed 2026-09-13 while shipping `CATALOG-WIDGET-NODES-1`. `NODE_KIND_COLORS`
-  (`inspecto-ui/src/app/inspecto/theme/chart-tokens.ts`) has 7 of 12 kinds; `DERIVED_TABLE`,
-  `REFERENCE_DATASET`, `DATASET`, `WIDGET`, `DASHBOARD` all fall to `NODE_KIND_FALLBACK` grey, and
-  `nodeKindLabel` prints the raw enum token for every kind but `DERIVED_TABLE`. 🔴 **TypeScript cannot
-  catch this**: `Record<NodeKind, string>` is effectively `Record<string, string>` because the union ends
-  in `| string`, so a missing kind is not a type error. Nothing is broken — every map falls back
-  gracefully — so this is legibility, not correctness, and it needs a colour/glyph decision per kind
-  rather than a mechanical fill. → `okf/capabilities/metamodel/metamodel.md`
 
 ### Deployment & packaging
 

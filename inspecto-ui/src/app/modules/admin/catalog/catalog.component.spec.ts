@@ -156,7 +156,8 @@ describe('CatalogComponent', () => {
         const c = create().componentInstance;
         c.runGraph();
         expect(c.graph()?.nodes).toEqual([TABLE]);
-        expect(c.legend).toEqual([{ kind: 'TABLE', fill: expect.any(String), label: 'TABLE' }]);
+        // The legend prints the GLOSSARY label, not the enum token (CATALOG-KIND-STYLING-1, 2026-09-14).
+        expect(c.legend).toEqual([{ kind: 'TABLE', fill: expect.any(String), label: 'Table' }]);
     });
 
     it('deep-links to the Lineage tab and runs the traversal from ?tab=graph&from=', () => {

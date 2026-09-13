@@ -21,6 +21,8 @@ export function nodeShape(kind: NodeKind): string {
             return 'circle';
         case 'SCHEMA':
             return 'rect';
+        case 'RAW_SCHEMA':
+            return 'rect';
         case 'TABLE':
             return 'rect';
         case 'DERIVED_TABLE':
@@ -35,6 +37,13 @@ export function nodeShape(kind: NodeKind): string {
             return 'hexagon';
         case 'ENRICHMENT':
             return 'triangle';
+        // Studio BI layer — one magenta hue family, so shape is what separates the three.
+        case 'DATASET':
+            return 'rect'; // a Dataset is a relation binding — the relation shape
+        case 'WIDGET':
+            return 'hexagon'; // a rendering, like REPORT
+        case 'DASHBOARD':
+            return 'star'; // the top-level container
         default:
             return 'circle';
     }
@@ -49,10 +58,53 @@ export function nodeColor(kind: NodeKind): string {
  * User-facing display name per node kind. Additive-label only (GLOSSARY §13 "Cube → Matrix"): the model
  * type stays `NodeKind.DERIVED_TABLE` — only what the UI PRINTS changes. Unmapped kinds fall back to the
  * raw enum token (the historical behaviour every call site had before this map existed).
+ *
+ * <p>Every label is the GLOSSARY's canonical term, not a coined one — "Matrix" for a summary Derived
+ * Table (§6-B / §13), "Reference Dataset" (§6-B), "Dataset" / "Widget" / "Dashboard" (§7), "Schema" (§3).
+ *
+ * <p>⛔ `ENRICHMENT` is deliberately UNMAPPED and must stay so: GLOSSARY §5 retires the user-facing term
+ * ("author no new user-facing 'Enrichment' copy", amendment v1.0 D-4). It is also a pipeline-editor
+ * synthetic kind, never a catalog wire value, so nothing in the Catalog prints it.
  */
 const NODE_KIND_LABELS: Partial<Record<NodeKind, string>> = {
+    STREAM: 'Stream',
+    SCHEMA: 'Schema',
+    RAW_SCHEMA: 'Schema',
+    COLUMN: 'Column',
+    TABLE: 'Table',
     DERIVED_TABLE: 'Matrix',
+    REFERENCE_DATASET: 'Reference Dataset',
+    KPI: 'KPI',
+    REPORT: 'Report',
+    DATASET: 'Dataset',
+    WIDGET: 'Widget',
+    DASHBOARD: 'Dashboard',
 };
+
+/**
+ * The closed set of kinds the catalog wire can carry — one per `NodeKind` enum constant, which
+ * `CatalogRoutes` serializes as `kind().name()`.
+ *
+ * <p>🔴 TypeScript cannot police the style maps: the `NodeKind` union ends in `| string`, so
+ * `Record<NodeKind, string>` is really `Record<string, string>` and a missing kind is not an error.
+ * This list is what the completeness specs iterate instead — add a kind here when the enum grows.
+ *
+ * <p>⚠ It excludes `SCHEMA` and `ENRICHMENT`: those are the pipeline editor's synthetic visual kinds
+ * (`categoryVisualKind`), which reuse the same style maps but never appear on a catalog response.
+ */
+export const CATALOG_NODE_KINDS: readonly NodeKind[] = [
+    'STREAM',
+    'RAW_SCHEMA',
+    'COLUMN',
+    'TABLE',
+    'DERIVED_TABLE',
+    'REFERENCE_DATASET',
+    'KPI',
+    'REPORT',
+    'DATASET',
+    'WIDGET',
+    'DASHBOARD',
+];
 
 /** Display label for a node kind — see {@link NODE_KIND_LABELS}. */
 export function nodeKindLabel(kind: NodeKind): string {

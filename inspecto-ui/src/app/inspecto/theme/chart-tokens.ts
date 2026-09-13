@@ -89,15 +89,33 @@ export function nodeStatusStroke(status: string): string | null {
     }
 }
 
-/** Categorical accent per catalog node kind — drives the legend and node outlines. */
+/**
+ * Accent per node kind — drives the legend, node fill and node outlines.
+ *
+ * <p>The rule (operator decision 2026-09-14, `CATALOG-KIND-STYLING-1`): <b>colour names the layer,
+ * shape names the structural role</b>. The catalog kinds keep their mutually-distinct categorical hues;
+ * the three Studio BI kinds share one magenta family so the BI layer reads as a layer at a glance, and
+ * {@code nodeShape} separates them within it. `SCHEMA` and `RAW_SCHEMA` are the same concept (one
+ * synthetic, one on the wire) and so deliberately share a hue — the only intentional collision.
+ *
+ * <p>🔴 A missing kind here is NOT a type error: `NodeKind` ends in `| string`, so this is effectively
+ * `Record<string, string>`. Completeness is pinned at runtime by `CATALOG_NODE_KINDS` + its spec.
+ */
 export const NODE_KIND_COLORS: Record<NodeKind, string> = {
     STREAM: '#5B8FF9',
     SCHEMA: '#61DDAA',
+    RAW_SCHEMA: '#61DDAA',
     TABLE: '#65789B',
     COLUMN: '#F6BD16',
+    DERIVED_TABLE: '#1E9493',
+    REFERENCE_DATASET: '#945FB9',
     KPI: '#7262FD',
     REPORT: '#78D3F8',
     ENRICHMENT: '#F6903D',
+    // Studio BI layer — one magenta family, separated by shape (rect / hexagon / star).
+    DATASET: '#E8618C',
+    WIDGET: '#FF99C3',
+    DASHBOARD: '#C04277',
 };
 
 export const NODE_KIND_FALLBACK = '#9AA0A6';

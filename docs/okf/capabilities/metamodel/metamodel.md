@@ -306,8 +306,28 @@ graph editor writes the canonical `*_pipeline.toon`. Seams: `onboarding-authorin
 
 **Catalog** (`/admin/catalog`): tabs Streams (default) · References · Tables · KPIs · Lineage (`graph`) ·
 Usage · Shared with / by me (Exchange-gated); `MetadataNode` / `NodeKind` in `inspecto/api/models.ts:243-278`
-as an **open** union (the UI also names `SCHEMA`, `REPORT`, `ENRICHMENT` the server never emits); one G6
-`GraphViewComponent` renders every plane; `DERIVED_TABLE` displays as **Matrix**. **Components**
+as an **open** union. ⚠ **One concept, two spellings — corrected 2026-09-14.** The wire carries
+`RAW_SCHEMA` (`CatalogRoutes` serializes `kind().name()`, so the enum constant IS the wire value); the
+UI's `SCHEMA` is the *pipeline editor's* *synthetic* visual kind (`categoryVisualKind`: PARSE → SCHEMA),
+as is `ENRICHMENT`. 🔴 The SPA had modelled `SCHEMA` only, so **every real catalog schema node rendered
+unstyled** — the previously recorded note "the UI also names `SCHEMA`, `REPORT`, `ENRICHMENT` the server
+never emits" was right about the synthetics but missed that a wire kind had no home. Both Schema
+spellings are now styled identically, pinned by a spec so a palette de-duplication cannot split them.
+One G6 `GraphViewComponent` renders every plane.
+
+**Node styling — `colour names the layer, shape names the structural role`** (operator decision
+2026-09-14, `CATALOG-KIND-STYLING-1`). All eleven wire kinds now carry a colour, a shape and a GLOSSARY
+label: `DERIVED_TABLE` displays as **Matrix**, `REFERENCE_DATASET` as **Reference Dataset**, and the
+three Studio BI kinds (`DATASET` / `WIDGET` / `DASHBOARD`) share one magenta family separated by shape
+(rect / hexagon / star), so the BI layer reads as a layer. ⛔ `ENRICHMENT` is left **deliberately
+unlabelled** — GLOSSARY §5 D-4 retires the user-facing term ("author no new user-facing 'Enrichment'
+copy"); a spec pins its absence. 🔴 **TypeScript polices none of this**: `NodeKind` ends in `| string`,
+so `Record<NodeKind, …>` is `Record<string, …>` and a missing kind is not an error — the runtime list
+`CATALOG_NODE_KINDS` (one entry per enum constant) plus its completeness specs is the only guard, and a
+new `NodeKind` must be added there. ⚠ **Glyphs are NOT part of this surface:** the catalog mapper
+(`toG6Data`) sets no `iconSrc`, and `graph-view.component` only draws an icon when one is present, so
+`KIND_GLYPH` is reached solely by the pipeline editor — a glyph added for a catalog-only kind is dead
+code. Shape is likewise live *only* for the catalog (the pipeline editor forces `rect`). **Components**
 (`/admin/components`): `COMPONENT_TYPES = grammar · schema · mapping · transform · sink` is the editable
 palette (the `ComponentType` union is wider); generic CRUD through `ComponentsService`; a History action on
 all five; a `409` on delete shows "referenced by a pipeline" with **no force option** (unlike pipeline
@@ -517,9 +537,9 @@ About 43 test classes reference the store, registry, catalog or schema generator
 and `PipelineDryRunTest` (the fail-closed field-type refusal at load), `RecordTransformContractTest`
 (`sql-functions.contract.json` — both sides compile SQL).
 
-### 8.4 UI specs — vitest (15 files, ~127 cases)
+### 8.4 UI specs — vitest (15 files, ~137 cases)
 
-`catalog.component.spec.ts` (tabs, onboarding CTA), `catalog-graph.spec.ts` (glyphs, legend),
+`catalog.component.spec.ts` (tabs, onboarding CTA), `catalog-graph.spec.ts` (per-kind colour/shape/label completeness over `CATALOG_NODE_KINDS`, legend),
 `graph-view.component.spec.ts`, `node-detail.dialog.spec.ts`, `onboard-redirect.spec.ts`,
 `onboarding-create.dialog.spec.ts`, `platform-kinds.spec.ts`, `registry.component.spec.ts`,
 `sharing.component.spec.ts`, `store-lineage.component.spec.ts`, `component-form.dialog.spec.ts`,
