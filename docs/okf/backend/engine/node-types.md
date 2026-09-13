@@ -141,9 +141,24 @@ which kind". That migration is real work, tracked as X5 on [`BACKLOG.md`](../../
 ⚠ **Today the constants keep their pre-token spelling deliberately** (renaming breaks the two committed
 contracts): `DATA` = the token continues; `DROPPED`/`INVALID`/`DUPLICATE`/`route:*` = a token whose
 `dataRefs` point at that side-relation. The runtime converges at **Phase 7** — the vocabulary is adopted now,
-the runtime later. Steps 2 and 3 of that sequence (delete the **four** non-edges in favour of Signals; collapse
-the rejects to `reject:<reason>`) are **documentation and vocabulary, and can land before any redesign is
-agreed**; steps 4 and 5 need the runtime decision.
+the runtime later.
+
+**The sequence, restated here as the current-tier copy of record.** ⚠ It previously lived ONLY in
+`archived-documents/plans-archive/pipeline-spec.md` §11.5 — a tier that is never maintained — while this,
+the design of record, merely pointed at it. That archived copy still says "delete the **five** non-edges";
+**the number is four**, and this copy is the one to cite.
+
+1. **Say it before building it** — correct `BuiltinNodeType`'s doc and this page so `accepts`/`emits`
+   describe *tokens*, and stop describing `data` as a record flow. Costs nothing, ends the contradiction.
+2. **Delete the four non-edges** — move `success` / `failure` / `on_commit` / `gap` to **Signals**, which
+   they effectively already are. No runtime change.
+3. **Collapse the rejects** into `reject:<reason>` (`unmatched` · `dropped` · `invalid` · `duplicate`);
+   teach `ConservationCheck` to read the reason.
+4. **Open the Step SPI** on the `ConsignmentProcessor` shape, with the `LOWERED`/`EXECUTED` mode from D0-B.
+5. Only then revisit **fan-in** and the authoring shape.
+
+**Steps 1–3 are documentation and vocabulary and can land before any redesign is agreed**; steps 4 and 5
+need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../BACKLOG.md)).
 
 | Type | emits | Authorable? |
 |---|---|---|
@@ -161,7 +176,7 @@ agreed**; steps 4 and 5 need the runtime decision.
 | `transform.summarize` | `DATA` | ✅ |
 | `transform.split` | `DATA` | ❌ |
 | `transform.merge` | `DATA` (multi-**input**) | ❌ |
-| `enrichment` | accepts/emits `DATA` + **`ON_COMMIT`** | ✅ |
+| `enrichment` | accepts/emits `DATA`; fires the **`on_commit` Signal** (⚠ spelled `ON_COMMIT` in `PipelineRel` until Phase 7 — a Signal, not an edge, per the token model above) | ✅ |
 
 ## Can the transform family fold into one SQL node?
 
@@ -189,8 +204,9 @@ over a DuckDB relation, so they operate on the previous node's output metadata, 
 * 🔴 **`split` / `merge` / `summarize` cannot fold into `enrichment`.** They are specialised SQL
   (`UNNEST`, `UNION ALL BY NAME`/join, `GROUP BY`) — but **`RowShaper` contains zero references to
   enrichment**. Enrichment is not a graph verb: it runs on its own engine, registered via
-  `POST /enrichment`, as a partition-scoped per-batch recompute, and its relationship is `ON_COMMIT` —
-  documented as *"a batch committed … **cross-flow only**"*. Folding in-batch operators into it would
+  `POST /enrichment`, as a partition-scoped per-batch recompute, and it fires on the **`on_commit`
+  Signal** — *"a batch committed … **cross-flow only**"*. (⚠ `PipelineRel.ON_COMMIT` keeps that
+  spelling until Phase 7; it is a Signal, not an edge.) Folding in-batch operators into it would
   move them from *inside* the batch to *after commit*, and from same-pipeline to cross-pipeline.
   `merge` is fan-in, which enrichment has no concept of; `summarize` changes cardinality that later
   same-batch Steps depend on. **It is a change of execution moment, not a rename.**

@@ -37,10 +37,32 @@ token vocabulary now; the remaining runtime pieces converge with the amendment p
 corrected model and its migration are [`node-types.md`](../engine/node-types.md) § *The token model*.
 Everything else here — IR, lift, validator, registry, commit model — stands as built.
 
-`PipelineRel` constants: `data` (default), the control set `success`/`failure`/`unmatched`/`gap`/
-`on_commit` (cross-flow ONLY — a same-graph `on_commit` is rejected, since the data-edge-only DAG
-check cannot see the cycle it would create), the diverted set `dropped`/`invalid`/`duplicate`, and
-operator-named `route:*`.
+**The three outlets (the token vocabulary, and what the constants below mean).** `main` — the token
+continues · `reject:<reason>` — one reject kind carrying its reason · `route:<key>` — content demux.
+
+🔴 **The ten `PipelineRel` constants are NOT one vocabulary, and the old control/split grouping is the
+conflation being removed.** They split **four and four** around the edge itself:
+
+* `data` — the edge; the token continues (default when an edge omits `rel`).
+* **Four are Signals, not edges at all** — `success` · `failure` · `on_commit` · `gap`.
+* **Four are one reject kind differing only in reason** — `unmatched` · `dropped` · `invalid` ·
+  `duplicate` → `reject:<reason>`.
+* `route:*` — operator-named content demux; survives the token model unchanged.
+
+⛔ **`unmatched` is a reject, not a control relationship.** An earlier revision of this line grouped it
+with `success`/`failure`/`gap`/`on_commit` as a five-member "control set" against a three-member
+"diverted set"; that is the 5/3 misgrouping the design of record corrected to 4/4 on 2026-09-13. Do not
+reintroduce it. The membership of record is
+[`node-types.md`](../engine/node-types.md) § *The token model*.
+
+⚠ Two SEPARATE properties, easy to merge and wrong to: "is not a Signal" and "is not lifted".
+`PipelineLift` builds only `data`, `unmatched`, `gap` and `route:*` — so `dropped`/`invalid`/`duplicate`
+are real at runtime yet never drawn as edges, while `success`/`failure`/`on_commit` have no producer at
+all. A same-graph `on_commit` is rejected (cross-flow ONLY), since the data-edge-only DAG check cannot
+see the cycle it would create.
+
+⚠ The constants keep their pre-token spelling deliberately until **Phase 7** — renaming them breaks two
+committed contracts.
 
 ## 2. Two graphs — keep them distinct
 

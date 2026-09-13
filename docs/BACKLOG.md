@@ -576,8 +576,9 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/backend/engine/catalog-vs-executors.md`
 - **P2** · **`TOKEN-VOCAB-STEPS-1` — the token sequence's steps 2 and 3 are unblocked TODAY**
   ✅ **PROMOTED P3→P2 2026-09-13 (operator): a row whose own title says the work is unblocked was mis-ranked
-  by its own text.** It is documentation-and-vocabulary work with no dependency — `node-types.md:136-138` says
-  so explicitly. ⚠ **Do not confuse it with the runtime CONSTANT rename**, which genuinely is gated to Phase 7
+  by its own text.** It is documentation-and-vocabulary work with no dependency — `node-types.md` § *The token
+  model — the design of record*, step list, says so explicitly (⚠ an earlier citation of `:136-138` pointed at
+  the ⛔ *what the token model does NOT fix* block, which says the opposite). ⚠ **Do not confuse it with the runtime CONSTANT rename**, which genuinely is gated to Phase 7
   because it breaks two committed contracts; a grounding pass conflated the two layers in 2026-09-13's sweep. (filed
   2026-09-10 by Sprint 7.6). Delete the **four** non-edges in favour of Signals, and collapse the four reject
   relations to `reject:<reason>`. ⚠ **These two are documentation and vocabulary and need no runtime

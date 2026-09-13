@@ -73,9 +73,11 @@ by `consignment_id`, and Reprocess by batch id.
    a clean batch. `EXPR` mapping rules are excluded by design: author-owned SQL has no defined
    "non-blank source".
 
-**Job-lane rejects** are first-class relations (`filter`→`dropped`, `validate`→`invalid`,
-`dedup`→`duplicate`, `merge`→`unmatched`) but scratch unless the author **wires a sink to the reject
-edge** — the designed pattern ("the user never wires these, only tunes where they rest").
+**Job-lane rejects are ONE kind carrying a reason** — `reject:<reason>`, where the reason names which
+operator diverted the rows (`filter`→`dropped`, `validate`→`invalid`, `dedup`→`duplicate`,
+`merge`→`unmatched`). ⚠ They are four *reasons*, not four relations; the constants keep their
+pre-token spelling until Phase 7. Rejects are scratch unless the author **wires a sink to the reject
+outlet** — the designed pattern ("the user never wires these, only tunes where they rest").
 `ConservationCheck` alerts on an unexplained in/out imbalance either way.
 
 ⚠ **The batches-ledger header has FIVE mirrors** — `ConsignmentAuditWriter`'s header string, its

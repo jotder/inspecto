@@ -258,7 +258,9 @@ reserved for Incidents/Cases, §9). A Stream is *populated by* a **Connection** 
 **Streaming Ingest Mode** (§5 — a decode strategy, not an origin); the `/…/stream` segment of a route path,
 which is the **server-sent-events transport** (`GET /signals/stream`, `/notifications/stream`); and the
 "stream" in `StreamWatermark`, which is **one output table** (§6-B). ⛔ A "reject stream" is prose, not an
-entity — the model's word is the **reject relation** (`DROPPED` / `INVALID` / `DUPLICATE` / `UNMATCHED`).
+entity — the model's word is the **reject outlet**, `reject:<reason>`: ONE kind whose reason names the
+operator that diverted the rows (`dropped` · `invalid` · `duplicate` · `unmatched`). ⚠ Four *reasons*,
+not four relations; the `PipelineRel` constants keep their pre-token spelling until Phase 7.
 
 **Reference** — A named external **dimension data origin**, the slow-changing counterpart to a **Stream**:
 lookup / master data (rate plans, cell sites, customer master). Its nature differs from a Stream — it is

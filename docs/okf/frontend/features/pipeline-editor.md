@@ -131,9 +131,15 @@ executable vocabulary is still exactly what follows.
 The palette is a **faithful port of the backend enum `BuiltinNodeType`** as served by
 `GET /pipelines/node-types`: `acquisition`/`adapter` (SOURCE), `parser` and the `parser.*`
 per-format family (PARSE), the `transform.*` family + `enrichment` (TRANSFORM),
-`sink.persistent|materialized|view` (SINK), `alert`/`gap`/`event` (CONTROL). Edge `rel`s are
-`PipelineRel` constants (`data` default; `success`/`failure` sink-emitted;
-`dropped`/`invalid`/`duplicate` diverted; `route:*` operator-named).
+`sink.persistent|materialized|view` (SINK), `alert`/`gap`/`event` (CONTROL) — ⚠ the `gap` here is a
+CONTROL **node type**, unrelated to the `gap` edge relation below.
+
+Edge `rel`s are `PipelineRel` constants, and in the token vocabulary they are **three outlets**: `data`
+(default — the token continues), `reject:<reason>` over `unmatched`/`dropped`/`invalid`/`duplicate`, and
+operator-named `route:*`. 🔴 **`success`/`failure` are NOT sink-emitted** — an earlier revision of this
+line said so; `PipelineRel` records that they are "constructed nowhere … declared vocabulary with no
+producer at all". They, with `on_commit` and `gap`, are **Signals, not edges**. See
+[`node-types.md`](../../backend/engine/node-types.md) § *The token model*.
 
 ⚠ **An invented vocabulary survives unnoticed because nothing rejects it**: `PipelineValidator`
 flags an unknown type as a *warning*, `PipelineCodec` stores `config` as an unchecked map, and

@@ -500,7 +500,7 @@ and the Run warns that validated rows were not stored.
 ## Three corrections worth keeping about commit-fired work
 
 🔴 **There is no `on_commit` Job trigger, and `ON_COMMIT_SAME_GRAPH` is not the at-rest enforcement.**
-`on_commit` is a *pipeline-edge* relation (`PipelineRel.ON_COMMIT`, cross-pipeline only). Commit-fired Jobs
+`on_commit` is a **Signal, not an edge** (spelled `PipelineRel.ON_COMMIT`, cross-pipeline only, until Phase 7 — it has no producer as an edge). Commit-fired Jobs
 ride the **Signal** bus — `JobService.mirrorPipelineCommit` turns a commit into a signal a Job trigger
 matches. `ON_COMMIT_SAME_GRAPH` is a **graph-structure refusal** (it stops an edge pointing back into its own
 graph); ⛔ do not cite it as the thing that keeps Job work at rest. The real reason Jobs are the at-rest seam

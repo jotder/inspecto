@@ -16,10 +16,18 @@ import com.gamma.api.PublicApi;
  * the major-bump window with the Step SPI. Only the MEANING is corrected here — do not read
  * {@code DATA} as "records flow along this edge", because nothing in the runtime does that.
  *
- * <p>The default is {@link #DATA} — the downstream token. <b>Control</b> relationships route a
- * Consignment on an outcome (failure / unmatched / gap / on_commit); <b>split</b> relationships are the
- * diverted side of a record operator (dropped / invalid / duplicate). Operator-defined content routes
- * use the {@link #ROUTE_PREFIX} ({@code route:emea}).
+ * <p>🔴 <b>The ten constants split FOUR and FOUR around the edge</b>, not into a control set and a
+ * split set. {@link #DATA} is the edge itself (the downstream token, and the default when an edge omits
+ * {@code rel}). Four are <b>Signals, not edges at all</b> — {@link #SUCCESS} / {@link #FAILURE} /
+ * {@link #ON_COMMIT} / {@link #GAP}. Four are <b>one reject kind differing only in reason</b> —
+ * {@link #UNMATCHED} / {@link #DROPPED} / {@link #INVALID} / {@link #DUPLICATE}, i.e.
+ * {@code reject:<reason>}. Operator-defined content routes use the {@link #ROUTE_PREFIX}
+ * ({@code route:emea}) and survive the token model unchanged.
+ *
+ * <p>⛔ <b>{@link #UNMATCHED} is a reject, not a control relationship.</b> An earlier revision of this
+ * javadoc grouped it with the outcome set, a 5/3 split against the design of record's 4/4. Do not
+ * reintroduce it. ⚠ "Is not a Signal" and "is not lifted" are DIFFERENT properties — see the note
+ * below, which is about lifting and correctly names a different set.
  *
  * <p>🔴 <b>Six of the ten never appear as a LIFTED edge</b>, and they are not one group.
  * {@code PipelineLift} builds only {@link #DATA}, {@link #UNMATCHED} (parse → quarantine),
@@ -31,8 +39,9 @@ import com.gamma.api.PublicApi;
  * are declared vocabulary with no producer at all. D2 moves that outcome set to Signals.
  *
  * <p>See {@code docs/okf/backend/engine/node-types.md} (the token model — the design of record) and
- * {@code docs/okf/backend/pipeline-graph/pipeline-graph-design.md} §3.2 (edges) and §15 (the inventory that
- * fixed the split-relationship set). Provenance only, not maintained:
+ * {@code docs/okf/backend/pipeline-graph/pipeline-graph-design.md} §1 (the token rule and the relation
+ * inventory) — ⚠ an earlier citation named §3.2 and §15, neither of which exists in that file.
+ * Provenance only, not maintained:
  * {@code docs/archived-documents/plans-archive/pipeline-spec.md} §11.
  */
 @PublicApi(since = "4.0.0")
