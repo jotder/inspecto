@@ -46,6 +46,7 @@ final class ReconRoutes implements RouteModule {
         api.post("/recon/run", (e, m) -> run(api, api.body(e)));
         api.post("/recon/breaks", (e, m) -> breaks(api, api.body(e)));
         api.post("/recon/promote", (e, m) -> promote(api, api.body(e)));
+        api.get("/recon/promoted", (e, m) -> promoted(api, ApiContext.query(e, "reconciliation")));
     }
 
     // ── POST /recon/columns {datasets:[ids]} ────────────────────────────────────────
@@ -210,6 +211,73 @@ final class ReconRoutes implements RouteModule {
         out.put("key", key);
         return out;
     }
+
+    // ── GET /recon/promoted?reconciliation=<id> ──────────────────────────────
+
+    /**
+     * Which Breaks of {@code reconId} already have an <b>active</b> Incident — {@code breakKey → incidentId},
+     * the read half of {@link #promote}.
+     *
+     * <p>🔴 <b>Why the server answers this and not the client.</b> The SPA held "promoted" as an in-memory
+     * Set, so a reload forgot every promotion and re-offered the action as if it had never happened. The
+     * obvious client-side fix — list the Incidents for this reconciliation and match {@code breakKey} — is
+     * wrong in a way that is easy to miss: {@link #promote} dedupes on <b>non-terminal</b> Incidents only
+     * ({@code IncidentAccess} → {@code hasActiveMatching}), so a Break whose Incident was CLOSED <em>can</em>
+     * be promoted again. A client matching on mere existence would report "already promoted" and discourage
+     * a legitimate action — the same defect class as a refusal message that outlived its rule. Both halves
+     * now read {@code ObjectAccess.activeAttributeIndex}, so the offer and the dedupe cannot disagree.
+     *
+     * <p>⚠ Bounded like every diagnostic read: at most {@link #PROMOTED_CAP} entries, with {@code truncated}
+     * and the TRUE {@code total} reported rather than a silently short map.
+     *
+     * <p>⚠ No write-root gate — this writes nothing. It keeps {@link #promote}'s <b>503</b> when the ops
+     * module is absent, because "no Incidents here" and "Incidents are not installed" are different answers
+     * and a client that cannot tell them apart would render an empty board as a healthy one.
+     */
+    private static Object promoted(ApiContext api, String reconId) {
+        if (reconId == null || reconId.isBlank())
+            throw new ApiException(422, "missing 'reconciliation' (the reconciliation id to report on)");
+        // The id becomes a filename under the registry, so it is gated as a bare name (422) rather than
+        // jailed after the fact — a separator never reaches a path resolve.
+        String safeId = WriteGates.safeName(reconId, "reconciliation id");
+
+        // ⚠ NO write-root 503: this route writes nothing. `api.writeRoot()` is read directly rather than
+        // through `requireWriteRoot`, and an unset root means there is no component registry at all — which
+        // makes "no such reconciliation" the TRUE answer, not "service unavailable".
+        Path root = api.writeRoot();
+        // ⚠ 404 on an unknown reconciliation, exactly as promote() does — an empty map would be
+        // indistinguishable from "nothing is promoted", so a typo would read as a healthy board.
+        if (root == null || component(new ComponentStore(root.resolve("registry")), "reconciliation", safeId).isEmpty())
+            throw new ApiException(404, "no reconciliation '" + safeId + "'");
+
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503,
+                "operational objects are not installed — reading promoted Breaks needs the "
+                        + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
+
+        // ⚠ `scope` is the reconciliation id, exactly as promote() passes it to openIncident — that shared
+        // spelling is what makes this index findable at all.
+        Map<String, String> index = objects.activeAttributeIndex(
+                com.gamma.objects.ObjectType.INCIDENT, safeId, "breakKey");
+
+        Map<String, String> page = index;
+        if (index.size() > PROMOTED_CAP) {
+            page = new LinkedHashMap<>();
+            for (Map.Entry<String, String> en : index.entrySet()) {
+                if (page.size() >= PROMOTED_CAP) break;
+                page.put(en.getKey(), en.getValue());
+            }
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("reconciliation", safeId);
+        out.put("promoted", page);
+        out.put("total", index.size());
+        out.put("truncated", index.size() > PROMOTED_CAP);
+        return out;
+    }
+
+    /** Hard cap on {@link #promoted}'s map — a diagnostic read must not become an unbounded export. */
+    private static final int PROMOTED_CAP = 1000;
 
     // ── spec assembly ───────────────────────────────────────────────────────────────
 

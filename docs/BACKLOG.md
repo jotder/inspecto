@@ -812,7 +812,37 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   stubbed, and asserts the emitted flag set per edition (Personal: no `auth.mode`, no `events.backend`;
   Standard+: both). ⚠ The `.bat` half only proves anything on a Windows runner. Filed 2026-09-11.
   → `okf/capabilities/security/security.md` §2.2, §8.7
-- **P2** · **`BREAK-INCIDENT-RESOLVE-1` — a promoted Break carries no back-reference on the board.**
+- **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first operator who promotes two Breaks on one key and
+  finds only one Incident. · **`BREAK-DEDUPE-GRAIN-1` — the server dedupes promotion on `key` alone, but a
+  Break's identity includes its COLUMN** (filed 2026-09-13 while shipping `BREAK-INCIDENT-RESOLVE-1`;
+  pre-existing, not introduced by it). `ReconRoutes` stores `breakKey = key` and dedupes on that
+  attribute, while the client's own `breakId` is `type|key|column`
+  (`reconciliation-types.ts:173`). So two value Breaks on one key differing only by column — `amount`
+  vs `count` — are **ONE Incident** to the server: the second promote is suppressed with *"an Incident
+  for key … is already open"*. ⚠ **Untested in either direction**: `aDifferentBreakInTheSameReconciliation
+  OpensItsOwnIncident` varies only the key, so nothing pins which behaviour is intended.
+  ⚠ It may well be RIGHT — one key being worked is arguably one Incident — which is why this is a
+  product question, not a bug fix. ⛔ Whoever answers it must change the dedupe attribute and the client
+  key together: `BREAK-INCIDENT-RESOLVE-1`'s read is keyed on `b.key` precisely to match the write, and
+  changing one alone would make the offer and the dedupe disagree.
+  → `okf/capabilities/incidents/incidents.md`
+- ✅ **SHIPPED 2026-09-13** · **`BREAK-INCIDENT-RESOLVE-1` — a promoted Break carries no back-reference on
+  the board.**
+  ✅ **BUILT:** `GET /recon/promoted?reconciliation=<id>` reports `breakKey → incidentId` for Breaks whose
+  Incident is still ACTIVE, backed by a new `ObjectAccess.activeAttributeIndex`. The SPA loads it on
+  open (no longer a session-only Set) and a promoted Break gains an **Open the Incident** action — the
+  back-reference this row was named for.
+  🔴 **Why a route and not a client-side filter of `GET /objects`:** promotion is suppressed only while
+  the Incident is **non-terminal**, so an ARCHIVED one means the Break is promotable again. Both halves
+  now read the same seam, so the offer and the dedupe cannot disagree; a client matching on mere
+  existence would have reported an available action as unavailable. Pinned by
+  `anArchivedIncidentStopsCountingAsPromoted`.
+  ⚠ **Two things the build corrected in my own plan:** the map is keyed on **`b.key`**, the server's real
+  dedupe grain, not the client's richer `breakId` (`type|key|column`) — which would never have matched;
+  and the promote action is deliberately **NOT disabled** when promoted, because an archived Incident
+  makes re-promoting legitimate and the server, not the button, decides that.
+  ⚠ A pre-existing question this surfaced is filed separately as `BREAK-DEDUPE-GRAIN-1`.
+  *(original row follows)*
   ✅ **PROMOTED P3→P2 2026-09-13 (operator)** — re-grounded first: `promoted` is a **session-only in-memory
   signal** (`reconciliation-detail.component.ts:82-84`), so a promotion is **lost on reload**. That is
   user-visible data loss, not a missing feature. ✅ The server half already exists — `breakKey` is written as an

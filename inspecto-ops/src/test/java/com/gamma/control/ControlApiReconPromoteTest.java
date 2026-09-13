@@ -73,6 +73,12 @@ class ControlApiReconPromoteTest {
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> promoted(int port, String reconId) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create(
+                "http://localhost:" + port + "/api/v1/recon/promoted?reconciliation=" + reconId))
+                .GET().build(), BodyHandlers.ofString());
+    }
+
     private List<OperationalObject> incidents(Ctx c) {
         return TestOpsEngine.of(c.svc).query(new ObjectQuery(
                 ObjectType.INCIDENT, null, null, null, null, null, null, 100, 0, 0L, false));
@@ -176,6 +182,60 @@ class ControlApiReconPromoteTest {
             assertFalse(data.get("deduped").asBoolean(),
                     "once the Incident is terminal, a recurrence of the same Break is new news");
             assertEquals(2, incidents(c).size(), "the archived one plus the fresh one");
+        }
+    }
+
+    // ── GET /recon/promoted — the READ half (BREAK-INCIDENT-RESOLVE-1) ──────────────────
+
+    @Test
+    void promotedNamesTheIncidentEachBreakOpened(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            assertEquals(200, promote(c.port, "{\"reconciliation\":\"" + RECON + "\",\"key\":\"EU|voice\"}").statusCode());
+            assertEquals(200, promote(c.port, "{\"reconciliation\":\"" + RECON + "\",\"key\":\"NA|data\"}").statusCode());
+
+            JsonNode data = V1Body.of(promoted(c.port, RECON).body());
+            JsonNode map = data.get("promoted");
+            assertEquals(2, map.size(), "both promoted Breaks are reported: " + map);
+            assertFalse(map.get("EU|voice").asText().isBlank(), "the Break names its Incident, not just a flag");
+            assertEquals(2, data.get("total").asInt());
+            assertFalse(data.get("truncated").asBoolean());
+
+            // The ids are the real Incidents, not invented.
+            List<String> live = incidents(c).stream().map(OperationalObject::id).toList();
+            assertTrue(live.contains(map.get("EU|voice").asText()), "the reported id is a real Incident");
+        }
+    }
+
+    @Test
+    void aBreakThatWasNeverPromotedIsAbsent(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            assertEquals(200, promote(c.port, "{\"reconciliation\":\"" + RECON + "\",\"key\":\"EU|voice\"}").statusCode());
+            JsonNode map = V1Body.of(promoted(c.port, RECON).body()).get("promoted");
+            assertFalse(map.has("NA|data"), "an unpromoted Break must not appear: " + map);
+        }
+    }
+
+    /**
+     * 🔴 <b>The test this route exists for.</b> {@code promote} suppresses only while the Incident is
+     * NOT terminal — pinned by {@code suppressionLastsUntilTheIncidentIsArchivedNotMerelyResolved} above.
+     * The read MUST agree: once the Incident is ARCHIVED the Break is promotable again, so reporting it as
+     * still promoted would tell an operator an available action is unavailable. A client that reconstructed
+     * this by listing Incidents and matching {@code breakKey} would fail exactly here.
+     */
+    @Test
+    void anArchivedIncidentStopsCountingAsPromoted(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            String body = "{\"reconciliation\":\"" + RECON + "\",\"key\":\"EU|voice\"}";
+            assertEquals(200, promote(c.port, body).statusCode());
+            String opened = incidents(c).get(0).id();
+            assertTrue(V1Body.of(promoted(c.port, RECON).body()).get("promoted").has("EU|voice"),
+                    "promoted while the Incident is open");
+
+            TestOpsEngine.of(c.svc).transition(opened, "archive", "alice");
+
+            assertFalse(V1Body.of(promoted(c.port, RECON).body()).get("promoted").has("EU|voice"),
+                    "⛔ an ARCHIVED Incident must NOT read as promoted — promote() would open a fresh one, so "
+                            + "the offer and the dedupe would disagree");
         }
     }
 }

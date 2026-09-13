@@ -74,6 +74,20 @@ public final class FakeObjectAccess implements ObjectAccess {
     }
 
     @Override
+    public Map<String, String> activeAttributeIndex(ObjectType kind, String scope, String attribute) {
+        // ⚠ Same active() helper hasActiveMatching uses, so a test can exercise the CLOSED case: close(id)
+        // must drop the entry here exactly as it stops suppressing a duplicate there. A fake that indexed
+        // every opened object would make the read look right while the real one disagreed.
+        if (attribute == null || attribute.isBlank()) return Map.of();
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Opened o : active(kind, scope)) {
+            String value = o.attributes().get(attribute);
+            if (value != null && !value.isBlank()) out.putIfAbsent(value, o.id());
+        }
+        return out;
+    }
+
+    @Override
     public String open(ObjectType kind, String title, String description, String severity,
                        String scope, Map<String, String> attributes) {
         String id = UUID.randomUUID().toString();

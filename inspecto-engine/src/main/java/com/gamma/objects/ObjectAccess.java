@@ -58,6 +58,22 @@ public interface ObjectAccess {
     boolean hasActiveMatching(ObjectType kind, String scope, Map<String, String> matchAttributes);
 
     /**
+     * The value of {@code attribute} → object id, for every <b>non-terminal</b> object of {@code kind} in
+     * {@code scope} that carries that attribute — the READ half of {@link #hasActiveMatching}.
+     *
+     * <p>🔴 <b>It must apply the same not-terminal rule as {@link #hasActiveMatching}, and that is the whole
+     * reason it exists here rather than in a caller.</b> A client that reconstructs this by listing objects
+     * and matching an attribute cannot see the workflow's terminal set, so it reports "already there" for a
+     * CLOSED object the write path would happily re-open — telling a user an action is unavailable when it
+     * is. One rule, one place, so the read and the write cannot disagree.
+     *
+     * <p>⚠ An object missing the attribute is absent from the map, not mapped to null. Where two active
+     * objects share a value (possible only if a caller deduped on something else) the <b>first</b> wins;
+     * the map is a lookup, not a count.
+     */
+    Map<String, String> activeAttributeIndex(ObjectType kind, String scope, String attribute);
+
+    /**
      * Open an object and return its id.
      *
      * <p>⚠ Returns the {@code String} id, not the object. Every caller in the codebase either discards the

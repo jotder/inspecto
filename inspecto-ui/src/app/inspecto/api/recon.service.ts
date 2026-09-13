@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ReconBreakSets, ReconRunResult } from 'app/inspecto/reconciliation/recon-board';
-import { apiUrl } from './api-base';
+import { apiUrl, toParams } from './api-base';
 
 /** One dataset's column inventory as `/recon/columns` reports it. */
 export interface ReconDatasetColumns {
@@ -44,6 +44,24 @@ export interface ReconPromoteResult {
     deduped: boolean;
     reconciliation: string;
     key: string;
+}
+
+/**
+ * What `GET /recon/promoted` reports (`BREAK-INCIDENT-RESOLVE-1`) — the READ half of promotion.
+ *
+ * 🔴 `promoted` maps a Break key to the id of the Incident covering it, and lists **only Breaks whose
+ * Incident is still ACTIVE**. That is not a detail: `POST /recon/promote` suppresses a duplicate only while
+ * the Incident is non-terminal, so an ARCHIVED one means the Break can be promoted again. The server
+ * applies that rule for both halves, which is why this is a route rather than the client filtering
+ * `GET /objects` — a client matching on mere existence would call an available action unavailable.
+ *
+ * ⚠ `total` is the TRUE count; `truncated` says the map was capped. Do not infer the count from the map.
+ */
+export interface ReconPromotedResult {
+    reconciliation: string;
+    promoted: Record<string, string>;
+    total: number;
+    truncated: boolean;
 }
 
 /**
@@ -92,6 +110,13 @@ export class ReconApiService {
      * ⚠ A **503** here is the expected Personal-edition state (no `inspecto-ops` module), not a failure:
      * render it as an explained panel, never a toast.
      */
+    /** Which Breaks of {@link reconciliation} already have an ACTIVE Incident — see {@link ReconPromotedResult}. */
+    promoted(reconciliation: string): Observable<ReconPromotedResult> {
+        return this.http.get<ReconPromotedResult>(apiUrl('/recon/promoted'), {
+            params: toParams({ reconciliation }),
+        });
+    }
+
     promote(
         reconciliation: string,
         key: string,

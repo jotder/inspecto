@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -64,6 +64,7 @@ export class ReconciliationDetailComponent implements OnInit {
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
     private reconApi = inject(ReconApiService);
+    private router = inject(Router);
 
     readonly recon = signal<Reconciliation | null>(null);
     readonly loading = signal(true);
@@ -79,9 +80,29 @@ export class ReconciliationDetailComponent implements OnInit {
      * probe, and the operator has already been told what happened by the panel.
      */
     readonly incidentsUnavailable = signal(false);
-    /** Break ids promoted in this session — drives the row action's "already promoted" affordance. */
-    private readonly promoted = signal<ReadonlySet<string>>(new Set<string>());
-    readonly isPromoted = (b: ReconBreak): boolean => this.promoted().has(breakId(b));
+    /**
+     * Break key → the id of the ACTIVE Incident covering it (`BREAK-INCIDENT-RESOLVE-1`).
+     *
+     * 🔴 Loaded from `GET /recon/promoted`, not remembered in-session. It used to be a bare `Set` filled
+     * only by this tab's own promotes, so a reload forgot every promotion and re-offered the action as if
+     * it had never happened.
+     *
+     * 🔴 Keyed by **`b.key`, NOT `breakId(b)`** — that is the server's dedupe grain. `promote()` sends
+     * `key: b.key`, and the route stores it as the `breakKey` attribute it dedupes on; `breakId` is a
+     * richer client-side identity (`type|key|column`) that would never match what came back. ⚠ A
+     * consequence worth knowing: two Breaks sharing a key but differing in type or column are ONE Incident
+     * to the server, so both read as promoted here. That is the dedupe the write path actually performs —
+     * reporting it faithfully is right; disagreeing with it would be the bug.
+     *
+     * ⛔ Do NOT "simplify" this into a client-side filter of `GET /objects` by `breakKey`. Promotion is
+     * suppressed only while the Incident is **non-terminal**, so an ARCHIVED one means the Break is
+     * promotable again; the server applies that rule to both the offer and the dedupe, and a client
+     * matching on mere existence would report an available action as unavailable.
+     */
+    private readonly promoted = signal<Readonly<Record<string, string>>>({});
+    readonly isPromoted = (b: ReconBreak): boolean => b.key in this.promoted();
+    /** The Incident covering this Break, or null — the back-reference the board was missing. */
+    readonly incidentFor = (b: ReconBreak): string | null => this.promoted()[b.key] ?? null;
 
     /** The Board dimension path this page is scoped to (from `?path=`), or null for the whole recon. */
     readonly path = signal<Record<string, string> | null>(null);
@@ -182,7 +203,17 @@ export class ReconciliationDetailComponent implements OnInit {
             // Hidden outright once the bundle has told us Incidents do not exist here — an affordance that
             // can only ever explain itself is worse than no affordance (the ai-status rule).
             visible: () => !this.incidentsUnavailable(),
+            // ⛔ Deliberately NOT disabled when already promoted: an ARCHIVED Incident makes re-promoting
+            // legitimate, and the server decides that, not this button.
             onClick: (b) => this.promote(b),
+        },
+        {
+            // The back-reference `BREAK-INCIDENT-RESOLVE-1` was filed for: a promoted Break can now be
+            // followed to the Incident working it, instead of only hinting that one exists somewhere.
+            icon: 'heroicons_outline:arrow-top-right-on-square',
+            hint: () => 'Open the Incident for this Break',
+            visible: (b) => !this.incidentsUnavailable() && !!this.incidentFor(b),
+            onClick: (b) => this.openIncident(b),
         },
     ];
 
@@ -276,6 +307,18 @@ export class ReconciliationDetailComponent implements OnInit {
                 if (b) void this.promote(b);
             },
         },
+        {
+            icon: 'heroicons_outline:arrow-top-right-on-square',
+            hint: () => 'Open the Incident for this Break',
+            visible: (row) => {
+                const b = this.breakOf(row);
+                return !!b && !this.incidentsUnavailable() && !!this.incidentFor(b);
+            },
+            onClick: (row) => {
+                const b = this.breakOf(row);
+                if (b) this.openIncident(b);
+            },
+        },
     ];
 
     private breakOf(row: FlatTreeRow): ReconBreak | undefined {
@@ -289,11 +332,30 @@ export class ReconciliationDetailComponent implements OnInit {
             next: (r) => {
                 this.recon.set(r);
                 this.loading.set(false);
+                this.loadPromoted(r.id);
                 void this.compute();
             },
             error: (e) => {
                 this.loading.set(false);
                 this.toastr.error(apiErrorMessage(e, `Could not load reconciliation "${id}"`));
+            },
+        });
+    }
+
+    /**
+     * Load which Breaks already carry an active Incident.
+     *
+     * ⚠ A **503** latches the explained panel rather than toasting — a missing `inspecto-ops` module is a
+     * deployment state, not an error. ⛔ And it must not leave the map looking merely empty: "no Incidents
+     * here" and "Incidents are not installed" are different answers, which is why the panel latch carries it.
+     * Any other failure is silent by design: this is an affordance hint, and a toast on every page load
+     * would be worse than a missing tooltip.
+     */
+    private loadPromoted(reconId: string): void {
+        this.reconApi.promoted(reconId).subscribe({
+            next: (res) => this.promoted.set(res.promoted ?? {}),
+            error: (e) => {
+                if (e?.status === 503) this.incidentsUnavailable.set(true);
             },
         });
     }
@@ -331,6 +393,13 @@ export class ReconciliationDetailComponent implements OnInit {
      * nothing went wrong. A **503** means this bundle has no operational-objects module and latches
      * {@link incidentsUnavailable}, which explains itself in place and removes the action.
      */
+    /** Follow a promoted Break to its Incident. ⚠ No-op when unpromoted — the action is hidden then, and a
+     *  navigate to `/incidents/null` would be a worse answer than none. */
+    openIncident(b: ReconBreak): void {
+        const id = this.incidentFor(b);
+        if (id) void this.router.navigate(['/incidents', id]);
+    }
+
     async promote(b: ReconBreak): Promise<void> {
         const r = this.recon();
         if (!r || this.incidentsUnavailable()) return;
@@ -344,7 +413,10 @@ export class ReconciliationDetailComponent implements OnInit {
             return;
         this.reconApi.promote(r.id, b.key, b.type, b.column ?? null, r.lastRunAt ?? null).subscribe({
             next: (res) => {
-                this.promoted.set(new Set([...this.promoted(), breakId(b)]));
+                // ⚠ `incidentId` is null exactly when `deduped` — the dedupe seam suppresses without naming
+                // the survivor — so a re-read is the only way to learn which Incident covers this Break.
+                if (res.incidentId) this.promoted.set({ ...this.promoted(), [b.key]: res.incidentId });
+                else this.loadPromoted(r.id);
                 if (res.deduped) this.toastr.info(`An Incident for key "${b.key}" is already open.`);
                 else this.toastr.success(`Incident opened for key "${b.key}".`);
             },

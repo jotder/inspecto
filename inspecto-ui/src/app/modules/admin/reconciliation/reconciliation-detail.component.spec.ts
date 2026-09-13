@@ -43,7 +43,14 @@ const recon = (breaks: ReconBreak[] = []): Reconciliation => ({
     lastRunAt: null,
 });
 
-async function create(opts: { path?: string; breaks?: ReconBreak[]; promote?: ReturnType<typeof vi.fn> } = {}) {
+async function create(
+    opts: {
+        path?: string;
+        breaks?: ReconBreak[];
+        promote?: ReturnType<typeof vi.fn>;
+        promoted?: ReturnType<typeof vi.fn>;
+    } = {},
+) {
     let current = recon(opts.breaks ?? []);
     const save = vi.fn((r: Reconciliation) => ((current = r), of(r)));
     const breaks = vi.fn(async (r: Reconciliation, path?: Record<string, string> | null) =>
@@ -52,6 +59,11 @@ async function create(opts: { path?: string; breaks?: ReconBreak[]; promote?: Re
     const promote =
         opts.promote ??
         vi.fn(() => of({ incidentId: 'inc-1', deduped: false, reconciliation: current.id, key: 'EU · data' }));
+    // ⚠ `promoted` is called on EVERY load (ngOnInit), so the stub must exist or every test in this file
+    // fails on an undefined method rather than on what it is asserting.
+    const promoted =
+        opts.promoted ??
+        vi.fn(() => of({ reconciliation: current.id, promoted: {}, total: 0, truncated: false }));
     const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     TestBed.configureTestingModule({
         imports: [ReconciliationDetailComponent],
@@ -73,7 +85,7 @@ async function create(opts: { path?: string; breaks?: ReconBreak[]; promote?: Re
             { provide: ReconciliationsService, useValue: { get: () => of(current), save } },
             { provide: ReconExecService, useValue: { breaks } },
             { provide: ToastrService, useValue: toastr },
-            { provide: ReconApiService, useValue: { promote } },
+            { provide: ReconApiService, useValue: { promote, promoted } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
@@ -82,7 +94,7 @@ async function create(opts: { path?: string; breaks?: ReconBreak[]; promote?: Re
     fixture.detectChanges(); // ngOnInit — load + compute
     await fixture.whenStable();
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, save, breaks, promote, toastr };
+    return { fixture, c: fixture.componentInstance, save, breaks, promote, promoted, toastr };
 }
 
 describe('ReconciliationDetailComponent (Breaks page)', () => {
@@ -155,7 +167,13 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         const promote = vi.fn(() => throwError(() => ({ status: 503 })));
         const { fixture, c, toastr } = await create({ promote });
         const vb = c.valueBreaks()[0];
-        expect(c.rowActions.some((a) => a.visible?.(vb) === false)).toBe(false);
+        // ⚠ Identify the promote affordance by its ICON, not by position. This used to assert "no action is
+        // invisible" and then read `rowActions[length - 1]` — two positional proxies that both broke when
+        // BREAK-INCIDENT-RESOLVE-1 added an "open the Incident" action after it (which is legitimately
+        // hidden until a Break HAS an Incident). The intent was always "the promote action is withdrawn".
+        const promoteAction = c.rowActions.find((a) => a.icon === 'heroicons_outline:exclamation-triangle');
+        expect(promoteAction, 'the promote affordance must exist to be withdrawn').toBeDefined();
+        expect(promoteAction!.visible?.(vb)).toBe(true);
 
         await c.promote(vb);
         fixture.detectChanges();
@@ -165,8 +183,7 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Incidents are not installed');
         // and the affordance is gone — one that can only explain itself is worse than none
-        const promoteAction = c.rowActions[c.rowActions.length - 1];
-        expect(promoteAction.visible?.(vb)).toBe(false);
+        expect(promoteAction!.visible?.(vb)).toBe(false);
     });
 
     it('still toasts a genuine failure', async () => {
@@ -196,5 +213,71 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
     it('renders with no a11y violations', async () => {
         const { fixture } = await create();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('promoted Breaks (BREAK-INCIDENT-RESOLVE-1)', () => {
+    /**
+     * 🔴 The defect: `promoted` used to be an in-memory Set filled only by this tab's own clicks, so a
+     * reload forgot every promotion. It is now read from the server on load.
+     */
+    it('reads the promoted map from the server on load, not from session memory', async () => {
+        const { c, promoted } = await create({
+            promoted: vi.fn(() =>
+                of({ reconciliation: 'r1', promoted: { 'EU · data': 'inc-7' }, total: 1, truncated: false }),
+            ),
+        });
+        expect(promoted).toHaveBeenCalled();
+        const b = c.valueBreaks()[0];
+        expect(c.isPromoted(b)).toBe(true);
+        expect(c.incidentFor(b)).toBe('inc-7');
+    });
+
+    it('reports an unpromoted Break as unpromoted and offers no Incident', async () => {
+        const { c } = await create();
+        const b = c.valueBreaks()[0];
+        expect(c.isPromoted(b)).toBe(false);
+        expect(c.incidentFor(b)).toBeNull();
+    });
+
+    /**
+     * ⚠ A 503 means the ops module is absent — a deployment state. It must latch the explained panel, never
+     * toast, and must NOT leave the page looking like a healthy board with nothing promoted.
+     */
+    it('latches the explained panel on 503 instead of toasting', async () => {
+        const { c, toastr } = await create({
+            promoted: vi.fn(() => throwError(() => ({ status: 503 }))),
+        });
+        expect(c.incidentsUnavailable()).toBe(true);
+        expect(toastr.error).not.toHaveBeenCalled();
+    });
+
+    /** ⛔ Any other failure is silent: this is an affordance hint, and a toast on every page load would be
+     *  worse than a missing tooltip. */
+    it('stays quiet on a non-503 failure', async () => {
+        const { c, toastr } = await create({
+            promoted: vi.fn(() => throwError(() => ({ status: 500 }))),
+        });
+        expect(c.incidentsUnavailable()).toBe(false);
+        expect(toastr.error).not.toHaveBeenCalled();
+    });
+
+    it('follows a promoted Break to its Incident', async () => {
+        const { c } = await create({
+            promoted: vi.fn(() =>
+                of({ reconciliation: 'r1', promoted: { 'EU · data': 'inc-7' }, total: 1, truncated: false }),
+            ),
+        });
+        const router = TestBed.inject(Router);
+        c.openIncident(c.valueBreaks()[0]);
+        expect(router.navigate).toHaveBeenCalledWith(['/incidents', 'inc-7']);
+    });
+
+    /** ⛔ An unpromoted Break must not navigate — `/incidents/null` is a worse answer than none. */
+    it('does not navigate for an unpromoted Break', async () => {
+        const { c } = await create();
+        const router = TestBed.inject(Router);
+        c.openIncident(c.valueBreaks()[0]);
+        expect(router.navigate).not.toHaveBeenCalled();
     });
 });

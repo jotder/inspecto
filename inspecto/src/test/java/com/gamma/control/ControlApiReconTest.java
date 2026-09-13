@@ -110,6 +110,11 @@ class ControlApiReconTest {
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> getJson(int port, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .GET().build(), BodyHandlers.ofString());
+    }
+
     private static JsonNode data(HttpResponse<String> r) throws Exception {
         return V1Body.of(r.body());
     }
@@ -397,6 +402,58 @@ class ControlApiReconTest {
             assertEquals(503, r.statusCode(), r.body());
             assertTrue(r.body().contains("inspecto-ops"),
                     "the refusal must name the module to install, not just fail: " + r.body());
+        }
+    }
+
+    // ── GET /recon/promoted ─ the gates core owns (BREAK-INCIDENT-RESOLVE-1) ───────────────
+    //
+    // ⚠ Like promote, the HAPPY path needs a real Object Engine and lives in `inspecto-ops`. Core owns
+    // the refusals — including the 503 that IS the Personal-edition answer rather than a failure.
+
+    @Test
+    void promotedWithoutAReconciliationIs422(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(422, getJson(c.port, "/spaces/s1/recon/promoted").statusCode(),
+                    "no reconciliation named, nothing to report on");
+            assertEquals(422, getJson(c.port, "/spaces/s1/recon/promoted?reconciliation=").statusCode(),
+                    "a blank id is not an id");
+        }
+    }
+
+    /**
+     * ⛔ The id becomes a filename under the registry, so a separator must be refused BEFORE any path
+     * resolve — not jailed afterwards.
+     */
+    @Test
+    void promotedRefusesAnIdThatCouldTraverse(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(422, getJson(c.port, "/spaces/s1/recon/promoted?reconciliation=../secrets").statusCode(),
+                    "a path separator is not a reconciliation id");
+        }
+    }
+
+    /**
+     * 🔴 404, never an empty map. "This reconciliation has no promoted Breaks" and "there is no such
+     * reconciliation" are different answers, and a client that cannot tell them apart renders a typo as a
+     * healthy board.
+     */
+    @Test
+    void promotedForAnUnknownReconciliationIs404(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(404, getJson(c.port, "/spaces/s1/recon/promoted?reconciliation=ghost_recon").statusCode(),
+                    "an unknown reconciliation is not an empty one");
+        }
+    }
+
+    /** The Personal edition has no ops module, so the read answers 503 — the same explained-panel contract
+     *  promote relies on. ⚠ A 200 with an empty map here would tell the UI every Break is unpromoted. */
+    @Test
+    void promotedWithoutTheOperationalObjectsModuleIs503(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            var r = getJson(c.port, "/spaces/s1/recon/promoted?reconciliation=orders_recon");
+            assertEquals(503, r.statusCode(), r.body());
+            assertTrue(r.body().contains("inspecto-ops"),
+                    "the refusal must name the module to install: " + r.body());
         }
     }
 }

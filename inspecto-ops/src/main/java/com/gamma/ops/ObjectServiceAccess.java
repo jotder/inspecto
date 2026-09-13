@@ -68,6 +68,20 @@ public final class ObjectServiceAccess implements ObjectAccess {
     }
 
     @Override
+    public Map<String, String> activeAttributeIndex(ObjectType kind, String scope, String attribute) {
+        // ⚠ service.active(...) is the SAME not-terminal filter hasActiveMatching above relies on — that
+        // shared call is what keeps this read from disagreeing with the dedupe that guards the write.
+        if (attribute == null || attribute.isBlank()) return Map.of();
+        Map<String, String> out = new LinkedHashMap<>();
+        for (var o : service.active(kind, scope)) {
+            String value = o.attributes().get(attribute);
+            // putIfAbsent, not put: first active object wins, as the SPI documents.
+            if (value != null && !value.isBlank()) out.putIfAbsent(value, o.id());
+        }
+        return out;
+    }
+
+    @Override
     public String open(ObjectType kind, String title, String description, String severity,
                        String scope, Map<String, String> attributes) {
         return service.open(kind, title, description, severity, scope, attributes).id();
