@@ -1131,8 +1131,14 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `ControlApi.REQUEST_SCOPED_ATTRS` leaks across requests on a shared-attribute runtime, so a later
   unrelated response would have falsely claimed `podScoped`. `ExchangeAttributeScopeTest` failed with
   exactly that message. Registered.
-  ⚠ **The consumer half is still open** — `UI-POD-SCOPE-UNION-1`. ⛔ Declaring the scope without the UI
-  unioning the roster leaves the operator exactly as misled, just with more JSON.
+  🔴 **The shipped flag is NOT READABLE by the SPA yet, and that limits what this bought.**
+  `v1.interceptor.ts:20` does `event.clone({ body: event.body.data })`, discarding `metadata` at the one
+  HttpClient seam — so `metadata.podScoped` never reaches a feature service. The declaration is correct
+  and machine-readable for any API client; the SPA needs the interceptor to surface metadata before it can
+  act on it.
+  ⚠ **The consumer half was `UI-POD-SCOPE-UNION-1`, now REFUTED** (both its remedies are impossible and
+  its premise was false — see that row). The sanctioned remedy is server-side: `SPACES-FROM-PARTITION-MAP-1`.
+  ⛔ Until one of them lands, this declaration ends the *silence* but not the divergence.
 
   *(Original decision, 2026-09-12:)* ✅ **DECIDED (operator): DECLARE the per-pod scope in the payloads.** Keep the behaviour;
   end the silence. `GET /system/scheduler` states that its values are this pod's; `GET /spaces` and
@@ -1187,15 +1193,47 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   responsible for unioning. ⚠ Related but a DIFFERENT remedy, so kept separate:
   `INBOX-REGISTRY-CROSS-POD-1`. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 
-- **P2** · **`UI-POD-SCOPE-UNION-1` — the UI must union the Space list across pods.**
-  Derived 2026-09-12 from `POD-SCOPE-DIVERGENCE-1`'s decision (declare per-pod scope in payloads rather
-  than share the state). Once `GET /spaces` and `GET /bootstrap` declare that their roster is **this
-  pod's**, something has to act on that declaration — otherwise the operator is exactly as misled as
-  before, just with more JSON. 🔴 The `/bootstrap` case is the sharp one: it feeds the SPA's space-switcher
-  on every page load, so a reload landing on a different pod can drop a Space the user was just in.
-  **Work:** union across pods for the switcher, or state plainly in the UI which pod answered and that the
-  list is partial. ⚠ Depends on the backend half of `POD-SCOPE-DIVERGENCE-1` landing first (the payload
-  needs the scope field before the UI can read it). → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
+- **P2** · ~~**`UI-POD-SCOPE-UNION-1` — the UI must union the Space list across pods.**~~
+  🔴 **REFUTED AND RE-SCOPED 2026-09-13 — do not build this as written.** Grounding the row before
+  starting it found that **both** of its offered remedies are impossible, and that its premise is false.
+  Re-scoped below as `SPACES-FROM-PARTITION-MAP-1`.
+
+  1. ⛔ **"Union across pods" is IMPOSSIBLE by construction, and refused by the plan.**
+     `superpower/enterprise-scale-out-plan.md` §5.5 says it verbatim: *"Client-side routing is refused
+     outright: it leaks topology to the browser and needs per-pod hostnames plus CORS."* There is also no
+     mechanism to build it with — no fleet enumeration (none of `OperationalDb`'s 14 families is a node
+     registry, and `DbRunLease` is only ever queried by `(space, scope, pipeline)`, never scanned by
+     owner), and the SPA has a single same-origin `apiBaseUrl: '/api'`. This is a missing **mechanism**,
+     not missing effort.
+  2. ⛔ **"State which pod answered" is IMPOSSIBLE today.** The payload carries `podScoped: true`, a
+     boolean. The only per-process identity anywhere is `DbRunLease.defaultOwner()` (`:131-133`) —
+     `<HOSTNAME-or-"owner">-<random UUID>`, never serialized over HTTP. Naming the Pod would require
+     minting and exposing an identity first.
+  3. 🔴 **The premise is FALSE.** The row says `/bootstrap` "feeds the SPA's space-switcher on every page
+     load". It does not: `session.service.ts` consumes only `edition`/`features`/`session`/`auth` and has
+     **no reference to `spaces`**; the switcher calls `GET /spaces` + `/spaces/_meta`
+     (`spaces.service.ts:122-148`). ⚠ `/bootstrap.spaces` is currently **dead weight on the wire**, and
+     `GET /spaces` — not `/bootstrap` — is the sharp roster. *(The same false claim had been copied into
+     `BootstrapRoutes.java`'s comment when the backend half shipped; corrected 2026-09-13.)*
+  4. ⚠ **A second, unstated UI prerequisite exists:** `v1.interceptor.ts:20` does
+     `event.clone({ body: event.body.data })`, **discarding `metadata` entirely** at the single HttpClient
+     seam. So `metadata.podScoped` never reaches a feature service. Any UI that reads the flag must unwrap
+     metadata first — which the row's "depends on the backend half landing" did not cover.
+
+- **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
+  Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
+  sanctions**, and it is SERVER-side, so it fixes the partial roster for *every* client with no UI union:
+  `enterprise-scale-out-plan.md` §5.5 — *"Answer `/spaces` from the partition map, not a disk scan. The
+  map declares every Space and its owner, so this needs no fan-out."* `partition.toon`
+  (`SpacePartition.java:66,86`) already declares every Space and its owner; `SpaceManager.all()`
+  (`:93,104,120`) holds only what THIS Pod booted, which is the whole defect.
+  ⚠ **Not buildable in isolation — it needs ingress path-routing first** (same §5.5): once `/spaces`
+  lists Spaces this Pod does not own, their detail routes must reach the owner or the UI offers Spaces it
+  cannot open. ⛔ And the rules must be GENERATED from the map — hand-maintained ingress rules make the
+  ingress a second copy of the map, and the two drift.
+  ⚠ **Interaction with what shipped:** once `/spaces` and `/bootstrap` answer fleet-wide, their
+  `podScoped: true` declaration becomes WRONG and must be removed — leaving it only on
+  `GET /system/scheduler`, which stays genuinely per-Pod. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 
 - **P2** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
   ✅ **DECIDED 2026-09-12 (operator): build the SHARED REGISTRY of declared inboxes** — an ops-DB family

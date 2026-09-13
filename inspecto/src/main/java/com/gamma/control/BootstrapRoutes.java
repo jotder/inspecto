@@ -32,9 +32,14 @@ final class BootstrapRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        // POD-SCOPE-DIVERGENCE-1: the `spaces` field is the answering Pod's roster. ⚠ This is the worse
-        // of the two rosters — it feeds the SPA's space-switcher on every page load, so a reload landing
-        // on a different Pod can drop a Space the user was just in.
+        // POD-SCOPE-DIVERGENCE-1: the `spaces` field is the answering Pod's roster, so it declares that.
+        //
+        // 🔴 CORRECTION 2026-09-13: this comment previously said the field "feeds the SPA's space-switcher
+        // on every page load", inherited from the backlog row. That is FALSE and was never checked.
+        // `session.service.ts` consumes only `edition`/`features`/`session`/`auth` from this payload and
+        // contains no reference to `spaces` at all; the switcher calls GET /spaces and /spaces/_meta
+        // (`spaces.service.ts:122-148`). ⚠ So `spaces` here is currently DEAD WEIGHT on the wire — the
+        // sharp roster is GET /spaces, not this one.
         api.get("/bootstrap", (e, m) -> {
             ApiContext.podScoped(e);
             return bootstrap(api, e);
