@@ -326,7 +326,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   Open with `newline=''`, match on the file's own EOL, and `git checkout --` a stat-only ghost. Related: the Bash tool
   collapses backslashes inside heredocs AND `python -c`, so a `
 ` in an `old` string matches nothing and a regex's
-  `\b` reaches the file as `` — author scripts with the Write tool and assert `count == 1` on every replace; that
+  `\b` reaches the file as `\b` — author scripts with the Write tool and assert `count == 1` on every replace; that
   assert is what caught every instance.
 - 🔴 **Ground a decision before asking it, and read a free-text answer against the QUESTION.** Of the decisions
   "owed to the operator" on 2026-09-10, three dissolved on measurement (`CONTRACT-ORPHAN-1`'s premise was a `grep`
@@ -586,6 +586,30 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `-Dtest=ControlApiSystemRoutesTest+OperationalDbTest`: green build, no `Tests run:` line anywhere.
   **A pass is only a pass if a `Tests run:` line appeared for each class you named** — otherwise run them
   as separate invocations.
+  ⚠ **The same trap fires on a class name that simply DOES NOT EXIST** (2026-09-13): `-Dtest=` named
+  `RemoteAcquisitionHandlerTest`, which is not a class in this tree — the real one is
+  `RemoteAcquisitionStagingTest` — and because a SIBLING name in the same list did match, surefire ran the
+  sibling and swallowed the miss entirely. BUILD SUCCESS, no "Running…" line for the absent class, and the
+  totals looked plausible. 🔴 **Confirm each class BY NAME in `target/surefire-reports/TEST-<fqcn>.xml`**;
+  arithmetic on a total ("16 presumably includes the 4 new ones") is not confirmation.
+
+- **🔴 A heredoc collapses `\b` and `\n` into control characters — it can silently break a REGEX.**
+  (2026-09-13 — **three times in one shift: the third was this very note**, whose escapes were eaten
+  as it was being written.) Writing a JS rule through `python - <<'PY'` produced
+  `re: /^Hsource\.…/` where `^H` is a literal **BACKSPACE byte**, not the word-boundary `\b`. The guard
+  loaded, ran, and matched nothing — reading as a clean pass. The second instance put a real newline inside
+  a JS string literal and broke the module outright (that one at least crashed). ⛔ Build such literals from
+  `chr(92)+'b'`, and **`cat -A` the line** to see what actually landed. ⚠ The general rule this is an
+  instance of: **a guard that passes proves nothing until it is proven RED** — mutate the thing it guards
+  and watch it fire, or you have written a decoration.
+
+- **⚠ `cmd | head; echo $?` reports the PIPE's status, not the command's.** A crashed Node guard printed
+  its stack through `head` and still showed `EXIT=0` (2026-09-13). Redirect to a file and test the command's
+  own exit code when the exit code is the thing you are asserting.
+
+- **⚠ `$!` in bash is the SHELL JOB, not the JVM it launched.** `nohup java … & echo $!` then
+  `kill $PID` left `ControlApi` serving on :8080 while the wait loop hung (2026-09-13). Take the pid from
+  `jps -l | grep ControlApi`.
 
 - **Ask a verify agent for the MODULE COUNT, not just the total.** Two `-Pedition-enterprise -fae` runs on
   the same tree reported 3355 and 3458 (2026-08-18); nothing had changed but the summariser, which dropped a
