@@ -1111,7 +1111,30 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ONE — and §7 warns by name against the substitution.
   → `superpower/enterprise-scale-out-plan.md` §7, §5.2
 - **P2** · **`POD-SCOPE-DIVERGENCE-1` — six places where "global" silently becomes "per-pod".**
-  ✅ **DECIDED 2026-09-12 (operator): DECLARE the per-pod scope in the payloads.** Keep the behaviour;
+  ✅ **SHIPPED 2026-09-13.** The v1 envelope emits `metadata.podScoped: true` on `GET /spaces`,
+  `GET /bootstrap` and `GET /system/scheduler`, declared per route through `ApiContext.podScoped(ex)`
+  (the `pagination` helper's shape). `GLOSSARY.md` gains **Pod** as the canonical term.
+  🔴 **Two corrections found while grounding — the row was wrong twice:**
+  1. **`GET /spaces` is a BARE ARRAY**, so a scope marker cannot go in the body without changing the
+     response type and breaking every consumer doing `response.map(...)`. The row assumed a cheap
+     in-body addition. ✅ The **v1 envelope's `metadata`** is what makes this work at all — it wraps
+     `data`, so the array shape is untouched, and legacy unversioned responses stay byte-identical.
+  2. **Item C is PARTLY REFUTED.** `ObjectService.java` uses `EventLog.**current()**` (correctly
+     Space-keyed via the MDC `CollectorService.underSpace` sets) — the row cited `global()` from its
+     *javadoc prose*, not its code. Only `SpaceLayoutContract.java:107` is genuinely `global()`-only, and
+     that is a deliberate boot-ordering workaround (the Space's own log is not registered yet), **not** a
+     single-tenant-era bug. ⛔ Do not "fix" either; item C is closed as refuted-plus-explained.
+  ⚠ **`nodeId` is already bound to pipeline-node grants** (`AccessRoutes.java:309`) and the GLOSSARY binds
+  *Node → Step*, so "node" for a process would be the one-word-two-concepts collision §0 forbids — hence
+  **Pod**.
+  🔴 **A guard test caught a real leak before it shipped**: a request-scoped attribute missing from
+  `ControlApi.REQUEST_SCOPED_ATTRS` leaks across requests on a shared-attribute runtime, so a later
+  unrelated response would have falsely claimed `podScoped`. `ExchangeAttributeScopeTest` failed with
+  exactly that message. Registered.
+  ⚠ **The consumer half is still open** — `UI-POD-SCOPE-UNION-1`. ⛔ Declaring the scope without the UI
+  unioning the roster leaves the operator exactly as misled, just with more JSON.
+
+  *(Original decision, 2026-09-12:)* ✅ **DECIDED (operator): DECLARE the per-pod scope in the payloads.** Keep the behaviour;
   end the silence. `GET /system/scheduler` states that its values are this pod's; `GET /spaces` and
   `GET /bootstrap` state that the roster is this pod's. ⛔ Not a shared config row and not a single-owner
   write path — both were weighed and refused as disproportionate for now.

@@ -42,10 +42,18 @@ final class SpaceRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/spaces", (e, m) -> api.spaces().all().stream()
-                .sorted(java.util.Comparator.comparing(c -> c.id().value()))
-                .map(SpaceRoutes::manifest)
-                .toList());
+        // POD-SCOPE-DIVERGENCE-1: this roster is the ANSWERING Pod's, not the fleet's — under
+        // partitioning (C1) each Pod owns a subset of Spaces, so a reload landing elsewhere sees a
+        // different list. ⚠ The declaration rides in the v1 envelope's metadata because this response is a
+        // BARE ARRAY: there is nowhere in the body to put it without changing the type, which would break
+        // every consumer doing `response.map(...)`.
+        api.get("/spaces", (e, m) -> {
+            ApiContext.podScoped(e);
+            return api.spaces().all().stream()
+                    .sorted(java.util.Comparator.comparing(c -> c.id().value()))
+                    .map(SpaceRoutes::manifest)
+                    .toList();
+        });
 
         // Server capability probe — lets the UI distinguish the discover (CRUD-capable) runtime from a
         // single-tenant server without inferring it from the (possibly empty) space list. See class javadoc.

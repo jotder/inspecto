@@ -32,7 +32,13 @@ final class BootstrapRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/bootstrap", (e, m) -> bootstrap(api, e));
+        // POD-SCOPE-DIVERGENCE-1: the `spaces` field is the answering Pod's roster. ⚠ This is the worse
+        // of the two rosters — it feeds the SPA's space-switcher on every page load, so a reload landing
+        // on a different Pod can drop a Space the user was just in.
+        api.get("/bootstrap", (e, m) -> {
+            ApiContext.podScoped(e);
+            return bootstrap(api, e);
+        });
     }
 
     private Object bootstrap(ApiContext api, HttpExchange ex) throws IOException {

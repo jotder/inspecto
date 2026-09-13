@@ -63,7 +63,13 @@ final class SchedulerRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/system/scheduler", (e, m) -> ETags.respond(e, systemShape(api)));
+        // POD-SCOPE-DIVERGENCE-1: despite its own doc calling these "system scope", every value here is
+        // the answering Pod's — PUT hot-applies four statics on the receiving Pod only, so the others keep
+        // their boot values. ⚠ Until this, the divergence was not even observable from the response.
+        api.get("/system/scheduler", (e, m) -> {
+            ApiContext.podScoped(e);
+            return ETags.respond(e, systemShape(api));
+        });
         api.put("/system/scheduler", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> writeSystem(api, e, api.body(e))));
         api.get("/settings/scheduler", (e, m) -> ETags.respond(e, spaceShape(api)));

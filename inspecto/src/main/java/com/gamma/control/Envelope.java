@@ -35,6 +35,11 @@ final class Envelope {
         metadata.put("apiVersion", "v1");
         if (ApiContext.attr(ex, ApiContext.ATTR_PAGINATION) instanceof Map<?, ?> pagination)
             metadata.put("pagination", pagination);
+        // POD-SCOPE-DIVERGENCE-1: a route that answers for THIS Pod only says so here, rather than
+        // letting a per-Pod value read as fleet-wide. Absent = no claim either way, which is what every
+        // route said before this existed.
+        if (Boolean.TRUE.equals(ApiContext.attr(ex, ApiContext.ATTR_POD_SCOPED)))
+            metadata.put("podScoped", true);
 
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("data", body);

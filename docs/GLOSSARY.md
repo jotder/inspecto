@@ -50,6 +50,18 @@
 Collectors, Schemas, Pipelines, Jobs, Datasets, Widgets, Dashboards, Incidents, Config, and audit trail. Activity
 in one Space is invisible to another.
 
+**Pod** *(added 2026-09-13, `POD-SCOPE-DIVERGENCE-1`)* — One running Inspecto process in a
+horizontally-scaled Enterprise deployment. Under partitioning each Pod **owns a subset of Spaces**, so
+state that is implicitly global on a single installation becomes **per-Pod** once there is more than one.
+
+> ⛔ **Never "node".** That word is bound to the pipeline canvas (see *Node → Step* in §2), and `nodeId`
+> already means a pipeline node in the access-grant model (`AccessRoutes.java:309`). Using it for a
+> process would be exactly the one-word-two-concepts collision §0 forbids.
+
+⚠ A response that reflects only the answering Pod declares `metadata.podScoped: true` in the v1 envelope.
+That **declares a divergence rather than fixing one**: system-scope knobs must still be set on every Pod,
+and a fleet-wide roster must be unioned by the reader.
+
 **Config** — The JSON specification of any Component, stored in **TOON** format. *Every* Component has a Config;
 its **Component Type** decides the Config's shape. Think of a Component as a manifest: `{ kind, name, config }`.
 

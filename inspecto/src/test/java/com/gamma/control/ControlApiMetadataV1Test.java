@@ -167,4 +167,47 @@ class ControlApiMetadataV1Test {
             }
         }
     }
+
+    // ── POD-SCOPE-DIVERGENCE-1: a per-Pod payload says so ──────────────────────────────
+
+    /**
+     * 🔴 Three endpoints return values that are the ANSWERING Pod's, not the fleet's, and said nothing
+     * about it. Under partitioning each Pod owns a subset of Spaces, so {@code /spaces} and
+     * {@code /bootstrap} report a partial roster, and {@code /system/scheduler}'s "system scope" values
+     * are whatever the receiving Pod was last told — the divergence was not even observable.
+     *
+     * <p>⚠ The declaration rides in the v1 envelope's {@code metadata} because {@code GET /spaces} is a
+     * <b>bare array</b>: there is nowhere in that body to put a marker without changing its type, which
+     * would break every consumer doing {@code response.map(...)}.
+     */
+    @Test
+    void perPodResponsesDeclareTheirScope(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            for (String path : List.of("/spaces", "/bootstrap", "/system/scheduler")) {
+                HttpResponse<String> r = client.send(req(c.port, path).GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+                assertEquals(200, r.statusCode(), path);
+                JsonNode metadata = JSON.readTree(r.body()).get("metadata");
+                assertNotNull(metadata, path + " must carry the v1 envelope's metadata");
+                assertTrue(metadata.path("podScoped").asBoolean(false),
+                        path + " reports only this Pod's view and must declare it: " + r.body());
+            }
+        }
+    }
+
+    /**
+     * ⚠ The other half: {@code podScoped} is a CLAIM, so a route that does not make it must stay silent.
+     * An envelope that stamped every response would tell a reader nothing.
+     */
+    @Test
+    void aFleetWideResponseMakesNoPodScopeClaim(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = client.send(req(c.port, "/components/widget").GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            JsonNode metadata = JSON.readTree(r.body()).get("metadata");
+            assertNotNull(metadata, "the envelope is present");
+            assertFalse(metadata.has("podScoped"),
+                    "absent = no claim either way, which is what every route said before this existed");
+        }
+    }
 }

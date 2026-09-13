@@ -82,6 +82,9 @@ public interface ApiContext {
     /** Cursor pagination (api-contract-design §7): a list route's paging block, declared via
      *  {@link #pagination}; {@link Envelope} emits it under {@code metadata.pagination}. Absent ⇒ no block. */
     String ATTR_PAGINATION = "inspecto.pagination";
+    /** Pod-scoped response (`POD-SCOPE-DIVERGENCE-1`): this payload describes only the Pod that answered,
+     *  declared via {@link #podScoped}; {@link Envelope} emits it as {@code metadata.podScoped}. */
+    String ATTR_POD_SCOPED = "inspecto.podScoped";
 
     /** JSON bodies at or above this size are gzipped when the client sent {@code Accept-Encoding: gzip}. */
     int GZIP_MIN_BYTES = 1024;
@@ -179,6 +182,22 @@ public interface ApiContext {
      *  echoes the request cursor (null = first page), {@code nextCursor} is the opaque token for the next
      *  page (null = last page). {@link Envelope} emits it under {@code metadata.pagination} on a v1
      *  response; a no-op for the legacy (unversioned) view, which stays byte-for-byte unchanged. */
+    /**
+     * Declare that this response describes only the <b>Pod</b> that answered, so a reader must not treat
+     * it as a fleet-wide view ({@code POD-SCOPE-DIVERGENCE-1}). {@link Envelope} emits it as
+     * {@code metadata.podScoped} on a v1 response; a no-op for the legacy (unversioned) view, which stays
+     * byte-for-byte unchanged — the same contract {@link #pagination} keeps.
+     *
+     * <p>🔴 <b>This declares a divergence, it does not fix one.</b> The operator decision
+     * (2026-09-12) was to keep the per-Pod behaviour and end the SILENCE about it: system-scope knobs must
+     * still be set on every Pod, and the UI is what must union a roster across Pods
+     * ({@code UI-POD-SCOPE-UNION-1}). ⛔ Declaring the scope without a consumer acting on it leaves the
+     * operator exactly as misled, just with more JSON.
+     */
+    static void podScoped(HttpExchange ex) {
+        attr(ex, ATTR_POD_SCOPED, Boolean.TRUE);
+    }
+
     static void pagination(HttpExchange ex, String cursor, String nextCursor, int limit, long total) {
         java.util.Map<String, Object> p = new java.util.LinkedHashMap<>();
         p.put("cursor", cursor);
