@@ -67,7 +67,7 @@ authoritative for the Edition column**; this table mirrors it.
 | `DAT-1` | **Dataset** umbrella (Table / Derived Table / View) over partitioned Parquet, described by Schemas, browsable in the Catalog | Must | ✅ SHIPPED | All |
 | `DAT-2` | **Query** as a first-class Component (`sql \| structured`) + Query Library + `$`-**Parameters** + **Result Set** | Must | ✅ SHIPPED (R3 + W4) | All |
 | `DAT-3` | Live query execution `POST /queries/{id}/run` on DuckDB with **server-side** parameter resolution | Must | ✅ **server SHIPPED — no client consumer.** The SPA never calls the route; the Query Library previews through `/db/query` after resolving `$`-parameters **client-side** (§3.4) | All |
-| `DAT-4` | **Matrix** materialization: persisted summary Derived Tables as managed assets | Should | ✅ SHIPPED 2026-07-08 (`task: materialize`) — ⚠ the glossary still says "not yet surfaced" (§2 corrections); no UI action triggers it | All |
+| `DAT-4` | **Matrix** materialization: persisted summary Derived Tables as managed assets | Should | ✅ SHIPPED 2026-07-08 (`task: materialize`); **surfaced 2026-09-14** — `POST /datasets/{id}/materialize` (202 + `runId`) plus one committed example job, and the task's five parameters declared at last (§3.6) | All |
 | `DAT-5` | Row-level calculated columns on Datasets | Should | ✅ SHIPPED 2026-07-08; window functions 2026-07-24. Design of record: §6.2 of this spec (why a real SQL parser
 was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provenance:
 `docs/archived-documents/plans-archive/calculated-columns-design.md`, not maintained.)* | All |
@@ -235,8 +235,40 @@ delete stale** (a crash leaves only glob-invisible leftovers, self-cleaning); th
 `dataset` component** stamped `materialized: {from, at, rows}` and emits `DatasetWriteSignal`. So a Matrix is
 queryable everywhere a Dataset is — **zero net-new read paths**. The `materialize` → `summarize` rename was
 **dropped as done-by-absence** (D-7, 2026-09-06): `summarize` shipped independently as a Step, `MaterializeTask`
-stays a Job, the two share only the measure grammar. ⚠ No committed job schedules a materialization and no SPA
-action triggers one.
+stays a Job, the two share only the measure grammar.
+
+✅ **Both of the gaps this section recorded are CLOSED 2026-09-14** (STUDIO-HALVES-1) — until then the task
+was reachable in principle and never taken in practice:
+- **A route:** `POST /datasets/{id}/materialize` (`DatasetRoutes`) triggers it ad hoc, **asynchronously** —
+  202 + `runId` + a `Location` to poll, the shape `POST /jobs/{name}/trigger` already uses, because the
+  default snapshot is a million rows. It runs through `JobService.triggerMaterializeRun`, a synthetic
+  `type: maintenance` config executed on the ordinary run lifecycle but **never registered**, so asking for
+  a materialization authors nothing. ⛔ That was the point of choosing a route: the rejected alternative had
+  the Dataset page create and trigger a real job, making a viewer action write a job document.
+  Gates: write root → 503 · unknown source → 404 · missing/unsafe/self-referential `target` → 422 · the same
+  target already in flight → 409. ⚠ The 409 is load-bearing — the run name is `materialize:<target>`, so
+  per-name non-overlap would otherwise admit a second fire and silently record it `SKIPPED`, handing the
+  caller a `runId` for a run that does nothing. Capability: **`canOperateRuns`**, as for any job trigger —
+  materializing writes data, never config, and the same effect was already reachable that way.
+- **A committed job:** `spaces/demo/config/jobs/orders_by_region_materialize_job.toon` (daily 05:00,
+  `region` × `sum(gross)` → the Dataset `orders_by_region`).
+- **A UI action:** Materialize in the Dataset editor header, gated on `canOperateRuns`, asking only for
+  the target id.
+
+🔴 **`MaterializeTask` IS SPACE-BLIND, and the first live run proved it** (`MATERIALIZE-SPACE-ROOT-1`).
+It re-reads the JVM-wide `-Dassist.write.root` on the worker thread (`:55-57`), while every control-plane
+route resolves the **current space's** config root. In a multi-space deployment the run therefore reads one
+space's registry while writing another's data dir, and fails with `unknown dataset <the id the route just
+resolved>` — after a 202. ⚠ **`JobService:471` states the same design for `report` and `recon.run`**, so
+this is a property of every registry-reading job type, not of materialize. The route refuses with 503 when
+the two roots differ; that containment is a placeholder for a per-space write root threaded into
+`JobService`. ⇒ **single-space deployments make the two paths identical, which is why no test ever saw it.**
+
+🔴 **Found while wiring it: `materialize`'s five parameters were UNDECLARED on the `maintenance` job type**
+(`JobService`'s `JobTypeDescriptor`), so the authoring form could offer the task and not one parameter that
+makes it do anything, and the resolver could not bound them. Declared 2026-09-14 — the same defect the
+`min_files` comment records one line above, and worse here because nothing shipped had ever fired the task
+to expose it. ⇒ **a task's presence in the runner's switch is not evidence its contract is declared.**
 
 ### 3.7 The DuckDB runtime
 

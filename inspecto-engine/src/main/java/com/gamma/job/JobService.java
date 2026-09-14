@@ -422,7 +422,18 @@ public final class JobService implements AutoCloseable {
                                 .description("compact: only merge a partition directory holding at least N files")
                                 .build(),
                         ParameterDecl.optional("source", ParamType.STRING, null, "ledger_prune: scope to one Source"),
-                        ParameterDecl.optional("store", ParamType.STRING, null, "Store(s) a delete task targets (fenced)")),
+                        ParameterDecl.optional("store", ParamType.STRING, null, "Store(s) a delete task targets (fenced)"),
+                        // materialize's five, read by MaterializeTask:63-68,139,147 and undeclared until
+                        // 2026-09-14 — the same defect recorded on min_files above, and it mattered more
+                        // here: nothing shipped ever fired this task, so an authoring form offering
+                        // `materialize` could not offer a single parameter that makes it do anything.
+                        // Declared optional (not required) because requiredness is per-TASK on this type,
+                        // exactly as retention_days is — MaterializeTask owns the refusal.
+                        ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "materialize: source Dataset id (required)"),
+                        ParameterDecl.optional("target", ParamType.STRING, null, "materialize: output Dataset id and directory (required; must differ from dataset)"),
+                        ParameterDecl.optional("measures", ParamType.STRING, null, "materialize: comma-separated measure shorthand (field,agg); empty = a raw SELECT * snapshot"),
+                        ParameterDecl.optional("group_by", ParamType.STRING, null, "materialize: comma-separated dimensions to group by"),
+                        ParameterDecl.optional("limit", ParamType.INTEGER, "1000000", "materialize: row cap on the snapshot")),
                 List.of("maintenance.storage.threshold", "maintenance.storage.trend",
                         "maintenance.scheduler.findings", "maintenance.backup.completed",
                         "maintenance.backup.verify_failed", "maintenance.restore.completed",
@@ -915,6 +926,44 @@ public final class JobService implements AutoCloseable {
                 Map.of("pipeline", pipelineId), null, null);
         Job job = buildPipelineJob(cfg);   // fails closed without an authored-pipeline store
         String runId = newRunId(pipelineId);
+        String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
+        submitAdhocRun(job, cfg, runId, trigger);
+        return runId;
+    }
+
+    /**
+     * Materialize one Dataset once, ad-hoc, without a registered job — the seam behind
+     * {@code POST /datasets/{id}/materialize}. A synthetic {@code type: maintenance} config carrying
+     * {@code task: materialize} is built on the fly and executed through the exact registered-job run
+     * lifecycle — per-name non-overlap, the durable run ledger and {@link #runById} polling — but it is
+     * never added to the registry, so {@link #jobs()} stays config-only. Modelled on
+     * {@link #triggerPipelineRun}; the reason a route exists at all is that the alternative was making a
+     * viewer action write a job document (STUDIO-HALVES-1, decided 2026-09-14).
+     *
+     * <p>⚠ The run is named {@code materialize:<target>}, and that naming is load-bearing, not cosmetic:
+     * per-name non-overlap then means two materializes of the SAME target cannot run at once (the second
+     * records {@code SKIPPED}) while different targets run freely. {@code MaterializeTask} reveals its
+     * snapshot with a tmp -> stale -> {@code ATOMIC_MOVE} swap that two concurrent writers of one target
+     * would race on, and it holds no lock of its own.
+     *
+     * <p>⛔ Parameters are NOT validated here. {@code MaterializeTask} owns that contract — {@code dataset}
+     * and {@code target} required, {@code target} shape-checked and required to differ from the source —
+     * and re-encoding it at this seam would give two definitions that drift. A caller that wants to refuse
+     * a hopeless request BEFORE a run is admitted (an HTTP route should) checks presence itself.
+     *
+     * @param params task parameters: {@code dataset} + {@code target} (required by the task),
+     *               {@code measures} / {@code group_by} / {@code limit} (optional). A {@code task} key is
+     *               overwritten — this seam runs materialize and nothing else.
+     * @param actor  attribution for the run trigger, as {@link #triggerPipelineRun}
+     * @return the {@code runId} to poll
+     */
+    public String triggerMaterializeRun(Map<String, String> params, String actor) {
+        Map<String, String> p = new LinkedHashMap<>(params == null ? Map.of() : params);
+        p.put("task", "materialize");
+        String name = "materialize:" + p.getOrDefault("target", "");
+        JobConfig cfg = new JobConfig(name, "maintenance", null, null, true, false, Map.copyOf(p), null, null);
+        Job job = new MaintenanceJob(cfg, dataDir, auditDir, ledger.runStore().orElse(null), this);
+        String runId = newRunId(name);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
         submitAdhocRun(job, cfg, runId, trigger);
         return runId;

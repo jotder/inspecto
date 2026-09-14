@@ -10,7 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage } from 'app/inspecto/api';
+import { LensService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
@@ -29,6 +29,7 @@ import {
     inferRoles,
 } from './dataset-types';
 import { DatasetsService } from './datasets.service';
+import { MaterializeDatasetDialog } from './materialize-dataset.dialog';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 
 const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
@@ -69,6 +70,8 @@ export class DatasetEditorComponent implements OnInit {
     private router = inject(Router);
     private destroyRef = inject(DestroyRef);
     private matDialog = inject(MatDialog);
+    /** Materializing is an OPERATION, not authoring — same capability as any job trigger (§7). */
+    readonly lens = inject(LensService);
 
     /** Route param — the dataset id to edit; absent on the `new` route (create mode). */
     @Input() id?: string;
@@ -89,6 +92,7 @@ export class DatasetEditorComponent implements OnInit {
     readonly previewProblem = computed(() => this.page()?.error ?? null);
     readonly editing = signal(false);
     readonly saving = signal(false);
+    readonly materializing = signal(false);
     readonly writesDisabled = signal(false);
 
     readonly form = this.fb.group({
@@ -238,6 +242,55 @@ export class DatasetEditorComponent implements OnInit {
         this.calculated.set(calculated);
     }
 
+    /**
+     * Ask for a target, then fire `POST /datasets/{id}/materialize`. The route is **asynchronous**: a 202
+     * says the run was admitted, so the toast reports the run id rather than claiming a snapshot exists.
+     *
+     * ⚠ There is no run poller in this SPA and this does not invent one — every other trigger call site
+     * reloads its list and lets the existing Runs/Jobs views show the outcome, and so does this.
+     * ⚠ 409 ("already running") and 422 (bad target) are the states worth naming; a 503 latches the same
+     * writes-disabled banner `save()` uses, because it is the same cause.
+     */
+    materialize(): void {
+        if (!this.id || !this.lens.canOperateRuns()) return;
+        const source = this.id;
+        // The existing ids are fetched HERE rather than on load: the editor's own id list is loaded only
+        // in create mode, and materialize is edit-only. One request on click beats one on every open, and
+        // the list is only an advisory hint — a failure must not block the action.
+        this.datasets
+            .list()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (all) =>
+                    this.openMaterializeDialog(
+                        source,
+                        all.map((d) => d.id),
+                    ),
+                error: () => this.openMaterializeDialog(source, []),
+            });
+    }
+
+    private openMaterializeDialog(source: string, existingNames: string[]): void {
+        this.matDialog
+            .open(MaterializeDatasetDialog, { data: { source, existingNames } })
+            .afterClosed()
+            .subscribe((target?: string) => {
+                if (!target) return;
+                this.materializing.set(true);
+                this.datasets.materialize(source, target).subscribe({
+                    next: (run) => {
+                        this.materializing.set(false);
+                        this.toastr.success(`Materializing "${source}" into "${target}" — run ${run.runId}`);
+                    },
+                    error: (e) => {
+                        this.materializing.set(false);
+                        if (e?.status === 503) this.writesDisabled.set(true);
+                        this.toastr.error(materializeError(e, source, target));
+                    },
+                });
+            });
+    }
+
     save(): void {
         const ctrl = this.form.controls.name;
         const name = String(ctrl.value ?? '').trim() || (this.id ?? '');
@@ -271,4 +324,11 @@ export class DatasetEditorComponent implements OnInit {
             },
         });
     }
+}
+
+/** The materialize failures worth naming; everything else falls back to the server's own message. */
+function materializeError(e: { status?: number }, source: string, target: string): string {
+    if (e?.status === 503) return 'Writes are disabled (no write root configured).';
+    if (e?.status === 409) return `A materialize of "${target}" is already running — wait for it to finish.`;
+    return apiErrorMessage(e, `Could not materialize "${source}" into "${target}"`);
 }

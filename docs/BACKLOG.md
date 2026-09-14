@@ -592,6 +592,65 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   rather than an incidental widening; and `target` must differ from `source` (`:63`). ⛔ The row's "ONE
   committed example job" half is **still zero** and is not discharged by the route — it is the thing that
   proves the path, so ship it in the same change.
+  ✅ **MATERIALIZE HALF SHIPPED 2026-09-14 — `STUDIO-HALVES-1` is COMPLETE on the server side.**
+  `POST /datasets/{id}/materialize` (`DatasetRoutes`, registered in `ControlApi`), **asynchronous**: 202 +
+  `runId` + `Location`, the `POST /jobs/{name}/trigger` shape, because the default snapshot is a million
+  rows. Behind it `JobService.triggerMaterializeRun` builds a synthetic `type: maintenance` config and runs
+  it on the ordinary lifecycle **without registering it** — a test asserts `jobs()` is still empty after a
+  202, because authoring nothing is the entire reason a route was chosen over route (b).
+  Gates, one real-HTTP test each (`ControlApiDatasetMaterializeTest`, **9/9 green**): 503 · 404 · 422 ×3 ·
+  409 · 202, plus "a different target is not blocked". Capability **`canOperateRuns`**, not an authoring
+  one — materializing writes data, never config, and a holder could already reach the same effect by
+  triggering a `maintenance` job, so an authoring gate would be stricter than the existing path to the same
+  outcome while protecting nothing. ✅ The example job shipped with it:
+  `spaces/demo/config/jobs/orders_by_region_materialize_job.toon` (daily, `region` × `sum(gross)` → the
+  Dataset `orders_by_region`), documented in that space's README.
+  🔴 **Two things this uncovered that the row did not predict:**
+  (a) **`materialize`'s five parameters were UNDECLARED on the `maintenance` job type** — the authoring
+  form could offer the task and not one parameter that makes it do anything, and the resolver could not
+  bound them. It is the identical defect the `min_files` comment records one line above it in
+  `JobService`, and it survived because **nothing shipped had ever fired the task**. Declared now.
+  ⇒ *a task's presence in the runner's switch is not evidence its contract is declared.*
+  (b) ⚠ **The new test class's admitted runs all FAIL by construction, so 9/9 is NOT end-to-end proof** —
+  `open()` clears `assist.write.root` after boot (`ControlApi` captured it at construction;
+  `MaterializeTask` re-reads it on the worker thread). Every gate assertion is decided before the run is
+  submitted, so the tests are sound — but it is written into the class doc so nobody reads the green as
+  "materialize works over HTTP".
+  (c) 🔴 **A capability-gated route needs a `CapabilityManifest` entry too, and the guard that says so
+  fails in a DIFFERENT MODULE.** `ApiContext.withCapability` is the enforcement; `CapabilityManifest` is
+  the published declaration, and `CapabilityManifestTest.manifestMatchesTheRegistrationSitesExactly`
+  compares them in both directions. Missing the entry failed the reactor in **`inspecto-processor`** —
+  nowhere near `DatasetRoutes` — and because the reactor is **fail-fast** it left **13 modules SKIPPED,
+  i.e. unverified rather than passing**, including both edition modules the `-Pedition-enterprise` profile
+  exists to reach. ⚠ The `endpoint` skill listed the five gates and the test class and said nothing about
+  the manifest; it now does.
+  ✅ **UI HALF SHIPPED 2026-09-15 — `STUDIO-HALVES-1` is COMPLETE.** A **Materialize** action in the
+  Dataset editor header (`dataset-editor.component`), gated on `lens.canOperateRuns()` and edit mode, opens
+  `MaterializeDatasetDialog` — which asks for the **one thing the action needs now**, the target id, and
+  nothing else. 4 new specs (2981 UI tests green, exit 0); `lint:tokens`, `format:check`, all three
+  tsconfigs and the production build green. Notes worth keeping:
+  - The dialog treats an EXISTING target as a **hint, not a refusal** — materializing over a target is the
+    normal refresh case, and only `target == source` is refused, matching the server.
+  - **No run poller was invented.** This SPA has none, and every other trigger call site reloads and lets
+    the Runs/Jobs views show the outcome; the toast reports the run id instead of claiming a snapshot.
+  - 🔴 **The Query Library "Run" is a FALSE analogue** — it is synchronous and returns rows. The 202+runId
+    idiom to copy is `JobsService.trigger()` / `RunsService.trigger()`.
+  - 🔴 Two spec traps paid for in failures: stubbing `LensService` replaces it **for child components too**,
+    so a one-method stub broke 13 tests with `canAuthorWorkbench is not a function` (a child,
+    `TransferMenuComponent`, calls it); and `TestBed.overrideProvider(MatDialog, …)` — required because
+    the editor's ag-Grid injects the real one — **must run before the TestBed is instantiated**, not inside
+    the test after `createComponent`.
+  🔴 **DRIVING IT LIVE FOUND A REAL DEFECT THAT EVERY GREEN GATE MISSED — see `MATERIALIZE-SPACE-ROOT-1`
+  (P1) above.** Against a live multi-space server the route answered **202** and the run then **FAILED**
+  with `unknown dataset '<the id the route had just resolved>'`, because `MaterializeTask` re-reads the
+  JVM-wide write root while the route resolves the space's. It is pre-existing and wider than materialize.
+  Contained here by a 503 refusal so no 202 is ever issued for a run that cannot succeed; **both directions
+  of that gate are pinned** (`refusedWhenTheTaskCannotReachThisSpacesRegistry` +
+  `acceptedWhenTheTwoWriteRootsAgree` — the second exists because the other tests leave the property unset,
+  which skips the gate for a *different* reason and would hide a broken comparison).
+  ⚠ Also confirmed live, and the reason the example job is trustworthy: the backend logged
+  `Registered maintenance job 'orders_by_region_materialize'` at boot — **a TOON file that merely parses is
+  not a file that loads**, and a `#` comment banner in the first draft would have truncated it silently.
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
@@ -1356,6 +1415,34 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   and silent local writes on the box it ships to. `PathJail.isUri` is now the one definition, enforced by
   both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
   bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
+
+- **P1** · 🔴 **`MATERIALIZE-SPACE-ROOT-1` — every registry-reading JOB TYPE is SPACE-BLIND.** Filed
+  2026-09-15, **found by driving a live multi-space server**, not by any test. `ControlApi.writeRoot()`
+  resolves `currentContext().root().config()` — **this space's** config root (`ControlApi.java:1074-1077`)
+  — while `MaterializeTask.run` re-reads the **JVM-wide** `System.getProperty("assist.write.root")` on the
+  worker thread (`MaterializeTask.java:55-57`) and builds its `ComponentStore` from that. Where a
+  deployment serves more than one space the two disagree, and the run reads **one space's registry while
+  writing another space's data dir**.
+  **Reproduced end to end**: `POST /api/v1/spaces/ucc/datasets/sites_dataset/materialize` answered
+  **202** — the route resolved `sites_dataset` in the ucc registry — and the run then **FAILED** with
+  `unknown dataset 'sites_dataset'`, the very id that had just resolved, because the task looked in the
+  `demo` space's registry. ⛔ **The misleading part is that the 202 is honest at the moment it is sent**;
+  the failure is only visible by polling the run, which is exactly why no gate test catches it.
+  🔴 **It is NOT limited to materialize.** `JobService.java:471` states the same design for `recon.run`
+  — *"Reads the component registry from `-Dassist.write.root` at run time, like the maintenance/report
+  jobs"* — so `report` and `recon.run` carry it too. ⇒ the fix is **a per-space write root threaded into
+  `JobService`**, not a patch in one task; `dataDir` is already space-scoped, which is precisely why the
+  two halves diverge.
+  ⚠ **Why it went unnoticed for so long:** nothing shipped had ever fired `task: materialize` (see
+  `STUDIO-HALVES-1`), and single-space deployments — Personal, and every test — make the JVM property and
+  the space config root **the same path**, so the bug is a no-op there. Adding the first caller exposed it
+  within minutes of a live run.
+  ✅ **Contained, not fixed:** `DatasetRoutes` now refuses with **503** when the two roots differ, so the
+  route never hands out a 202 for a run that cannot succeed (`ControlApiDatasetMaterializeTest`
+  `refusedWhenTheTaskCannotReachThisSpacesRegistry`). ⛔ **That guard is a placeholder — DELETE it when
+  this row lands**, and note it makes materialize unavailable in multi-space rather than broken, which is
+  the honest state but not the desired one. → `inspecto-engine/.../job/MaterializeTask.java:55` ·
+  `JobService.java:471` · `inspecto/.../control/DatasetRoutes.java`
 
 - **P3** · **`AIRGAP-CROSSPLAT-DEADWEIGHT-1` — every zip ships the other platform's DuckDB extensions,
   ~45 MB it can never load.** Filed 2026-09-14, **measured from the built zips' own entry tables**, not

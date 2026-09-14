@@ -1,6 +1,7 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
-import { ComponentsService } from 'app/inspecto/api';
+import { ComponentsService, apiUrl } from 'app/inspecto/api';
 import { CalculatedColumn, Dataset, DatasetColumn, DatasetConfig, DatasetKind, NamedMeasure } from './dataset-types';
 import { isSharedRef } from 'app/inspecto/api/shared-ref';
 
@@ -13,6 +14,7 @@ import { isSharedRef } from 'app/inspecto/api/shared-ref';
 @Injectable({ providedIn: 'root' })
 export class DatasetsService {
     private components = inject(ComponentsService);
+    private http = inject(HttpClient);
 
     list(): Observable<Dataset[]> {
         return this.components.list('dataset').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
@@ -34,6 +36,34 @@ export class DatasetsService {
     remove(id: string): Observable<unknown> {
         return this.components.remove('dataset', id);
     }
+
+    /**
+     * Materialize this dataset into `target` — a Parquet snapshot that registers as a Dataset of its own
+     * (`POST /datasets/{id}/materialize`, STUDIO-HALVES-1).
+     *
+     * ⚠ **Asynchronous.** A 202 means the run was ADMITTED, not that anything was written — the default
+     * snapshot is a million rows. The `runId` is the handle to the run; the server also sends a
+     * `Location` header pointing at it, which this deliberately does not read (no caller in this SPA
+     * observes response headers, and the body already carries the id).
+     *
+     * ⚠ The interesting failures are not 500s: **409** means a materialize of the same target is already
+     * in flight, and **422** an unsafe target or one equal to the source. Both are states to show the
+     * operator, not noise to swallow. ⛔ The 409 is NOT `CONFLICT_STALE_VERSION`, so it must not go
+     * through `isStaleVersionError` and its "reload to get their version" copy — nothing here is stale.
+     */
+    materialize(id: string, target: string): Observable<MaterializeAccepted> {
+        return this.http.post<MaterializeAccepted>(apiUrl(`/datasets/${encodeURIComponent(id)}/materialize`), {
+            target,
+        });
+    }
+}
+
+/** The 202 body of `POST /datasets/{id}/materialize`. */
+export interface MaterializeAccepted {
+    runId: string;
+    dataset: string;
+    target: string;
+    status: string;
 }
 
 function toContent(d: Dataset): Record<string, unknown> {

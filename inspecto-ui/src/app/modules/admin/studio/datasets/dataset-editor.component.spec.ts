@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { Router, provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
@@ -10,6 +11,7 @@ import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { DatasetEditorComponent } from './dataset-editor.component';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
+import { LensService } from 'app/inspecto/api';
 
 /** The rows seam, stubbed: this space's stores, and one page of whichever is picked. */
 function seam(names = ['cdr', 'orders']) {
@@ -33,13 +35,39 @@ function create(
     list: Dataset[] = [],
     existing: Dataset | null = null,
     rowsSeam: unknown = seam(),
+    opts: { canOperateRuns?: boolean; materialize?: unknown; dialog?: unknown } = {},
 ) {
+    // ⚠ LensService is STUBBED, not real: the header now gates Materialize on canOperateRuns(), and the
+    // real service reads SessionService + a localStorage lens that leaks between specs.
+    localStorage.removeItem('inspecto.currentLens');
     TestBed.configureTestingModule({
         imports: [DatasetEditorComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: DatasetsService, useValue: { get: () => of(existing), list: () => of(list), save } },
+            {
+                provide: LensService,
+                // ⚠ Stub EVERY capability this fixture can reach, not just the one under test: replacing
+                // LensService replaces it for the child components too, and `TransferMenuComponent` calls
+                // canAuthorWorkbench() — a one-method stub took out 13 tests with
+                // "canAuthorWorkbench is not a function", which reads like a child-component bug.
+                useValue: {
+                    canOperateRuns: () => opts.canOperateRuns !== false,
+                    canAuthorWorkbench: () => true,
+                    canOfferDatasets: () => true,
+                },
+            },
+            {
+                provide: DatasetsService,
+                useValue: {
+                    get: () => of(existing),
+                    list: () => of(list),
+                    save,
+                    materialize:
+                        opts.materialize ??
+                        vi.fn(() => of({ runId: 'run-1', dataset: 'orders', target: 't', status: 'running' })),
+                },
+            },
             { provide: DatasetRowsService, useValue: rowsSeam },
             {
                 provide: ToastrService,
@@ -48,6 +76,12 @@ function create(
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
+    // ⚠ MatDialog must be overridden HERE — after configureTestingModule, before the first injection.
+    // Two rules collide otherwise: this editor renders an ag-Grid preview that injects the REAL
+    // MatDialog, so a plain {provide: MatDialog} in the providers above is silently ignored; and
+    // overrideProvider throws "test module has already been instantiated" once anything has been
+    // injected, which is what happens if a test tries to override after createComponent.
+    if (opts.dialog) TestBed.overrideProvider(MatDialog, { useValue: opts.dialog });
     return TestBed.createComponent(DatasetEditorComponent);
 }
 
@@ -174,6 +208,93 @@ describe('DatasetEditorComponent', () => {
         fixture.detectChanges();
         await fixture.whenStable();
         expect(fixture.componentInstance.previewProblem()).toBeNull();
+    });
+
+    // ── Materialize (STUDIO-HALVES-1) ────────────────────────────────────────────
+
+    /** A MatDialog whose open() resolves to `target` — `undefined` models Cancel/Esc/backdrop. */
+    function dialogReturning(target: string | undefined) {
+        return { open: () => ({ afterClosed: () => of(target) }) };
+    }
+
+    /** Edit mode over one saved dataset — the only mode the Materialize action exists in. */
+    function editing(opts: { canOperateRuns?: boolean; materialize?: unknown; dialog?: unknown } = {}) {
+        const live: Dataset = {
+            id: 'orders',
+            name: 'orders',
+            kind: 'physical',
+            sourceName: 'orders',
+            query: null,
+            physicalRef: 'orders',
+            columns: [],
+            measures: [],
+            calculated: [],
+            viz: null,
+        };
+        const fixture = create(
+            vi.fn((d: Dataset) => of(d)),
+            [live],
+            live,
+            seam(['orders']),
+            opts,
+        );
+        fixture.componentInstance.id = 'orders';
+        fixture.detectChanges();
+        return fixture;
+    }
+
+    it('offers Materialize only to a lens that can operate runs', async () => {
+        const denied = editing({ canOperateRuns: false });
+        await vi.waitFor(() => expect(denied.componentInstance.editing()).toBe(true));
+        denied.detectChanges();
+        const labels = () =>
+            Array.from(denied.nativeElement.querySelectorAll('button')).map(
+                (b) => (b as HTMLElement).textContent ?? '',
+            );
+        // ⚠ Assert the RENDERED button, not the capability signal — the gate is in the template, so a
+        // spec that only read canOperateRuns() would pass with the button unconditionally visible.
+        expect(labels().some((t) => t.includes('Materialize'))).toBe(false);
+        expect(labels().some((t) => t.includes('History'))).toBe(true);
+    });
+
+    it('materializes into the target the dialog returns, and reports the run id', async () => {
+        const materialize = vi.fn(() =>
+            of({ runId: 'run-77', dataset: 'orders', target: 'orders_by_region', status: 'running' }),
+        );
+        const fixture = editing({ materialize, dialog: dialogReturning('orders_by_region') });
+        await vi.waitFor(() => expect(fixture.componentInstance.editing()).toBe(true));
+        const toastr = TestBed.inject(ToastrService);
+        const success = vi.spyOn(toastr, 'success');
+
+        fixture.componentInstance.materialize();
+        await vi.waitFor(() => expect(materialize).toHaveBeenCalledWith('orders', 'orders_by_region'));
+        expect(success.mock.calls[0][0]).toContain('run-77');
+        expect(fixture.componentInstance.materializing()).toBe(false);
+    });
+
+    it('a dismissed dialog materializes nothing', async () => {
+        const materialize = vi.fn(() => of({ runId: 'x', dataset: 'orders', target: 't', status: 'running' }));
+        const fixture = editing({ materialize, dialog: dialogReturning(undefined) });
+        await vi.waitFor(() => expect(fixture.componentInstance.editing()).toBe(true));
+
+        fixture.componentInstance.materialize();
+        await fixture.whenStable();
+        expect(materialize).not.toHaveBeenCalled();
+    });
+
+    it('names the 409 rather than showing a generic failure', async () => {
+        const materialize = vi.fn(() => throwError(() => ({ status: 409 })));
+        const fixture = editing({ materialize, dialog: dialogReturning('orders_by_region') });
+        await vi.waitFor(() => expect(fixture.componentInstance.editing()).toBe(true));
+        const toastr = TestBed.inject(ToastrService);
+        const error = vi.spyOn(toastr, 'error');
+
+        fixture.componentInstance.materialize();
+        // 409 here is "that target is already being materialized" — NOT a stale-version conflict, so the
+        // message must not tell the operator to reload to get someone else's version.
+        await vi.waitFor(() => expect(error).toHaveBeenCalled());
+        expect(error.mock.calls[0][0]).toContain('already running');
+        expect(fixture.componentInstance.materializing()).toBe(false);
     });
 
     // This editor embeds the query panel + an ag-Grid preview, making it the heaviest a11y

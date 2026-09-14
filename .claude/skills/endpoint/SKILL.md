@@ -22,6 +22,13 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
 ## Rules
 
 - Reuse `ConfigCodec` for (de)serialization — never hand-roll TOON/JSON mapping.
+- 🔴 **A route wrapped in `ApiContext.withCapability(...)` MUST also get an `Entry` in
+  `CapabilityManifest`.** The manifest is the published declaration of what each route is gated on; the
+  code is the enforcement. `CapabilityManifestTest.manifestMatchesTheRegistrationSitesExactly` fails the
+  build in BOTH directions (gated-but-undeclared, declared-but-unregistered), and because the reactor is
+  fail-fast that one failure leaves ~13 later modules SKIPPED — i.e. unverified, not passing. ⚠ It fails in
+  `inspecto-processor`, nowhere near the route you added, so the failure does not look like yours.
+  Entries are grouped by `// XxxRoutes` in rough alphabetical order — add the group, not just the line.
 - Register the route in `ControlApi` following the surrounding pattern (JDK HttpServer, manual DI).
 - **Real-HTTP test class covering every gate**, modeled on `ControlApiConfigWriteTest`
   (ephemeral port, actual requests, one test per gate + the happy path).

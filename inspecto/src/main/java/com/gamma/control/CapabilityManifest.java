@@ -50,6 +50,10 @@ final class CapabilityManifest {
             new Entry("POST", "/connections", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("PUT", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("DELETE", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
+            // DatasetRoutes — materializing writes DATA, never config, so it is an operation and not an
+            // authoring write: the same capability as any job trigger, and the same effect was already
+            // reachable by triggering a `maintenance` job with `task: materialize`.
+            new Entry("POST", "/datasets/([^/]+)/materialize", Roles.CAN_OPERATE_RUNS),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

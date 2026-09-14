@@ -15,6 +15,16 @@
                 [allowedKinds]="['dataset']"
                 label="Import / export dataset"
             />
+            @if (editing() && lens.canOperateRuns()) {
+                <button mat-stroked-button (click)="materialize()" [disabled]="materializing()">
+                    @if (materializing()) {
+                        <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                    } @else {
+                        <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:circle-stack"></mat-icon>
+                    }
+                    <span>Materialize</span>
+                </button>
+            }
             @if (editing()) {
                 <button mat-stroked-button (click)="history()">
                     <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:clock"></mat-icon>

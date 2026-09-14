@@ -65,6 +65,11 @@ guidelines, §4 the decisions); provenance:
 * **Queries (W4)** — the query catalog + `POST /queries/{id}/run`; see [queries](queries.md).
 * **Async runs (W5/W5b)** — job triggers *and* pipeline triggers return **`202` + `{runId, status…}` +
   `Location`**; poll the run by id; `Idempotency-Key` gives at-most-once replay. See [jobs](jobs.md).
+  ⚠ **`POST /datasets/{id}/materialize` joined this shape on 2026-09-14**, and it is the first route to use
+  it for something that is *not* a registered job: the run is synthetic and never enters the registry, so a
+  materialization authors nothing. Gated on `canOperateRuns` like any trigger — it writes data, not config
+  — and refuses with **409** while the same target is in flight, because per-name non-overlap would
+  otherwise hand the caller a `runId` for a run it silently records `SKIPPED`.
 * **AuthN/AuthZ seam (W6)** — the `Authenticator`/`Subject`/`TokenRelay` SPIs gate v1 routes on Standard;
   see [auth & security](../editions/auth-security.md).
 * **Cursor pagination (§7)** — list routes expose opaque keyset cursors via `metadata.pagination`
