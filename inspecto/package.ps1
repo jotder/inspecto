@@ -31,8 +31,8 @@
 #                                      GraalVM jmods cache is present under .graalvm-cache)
 #   (both in the sandbox root, alongside inbox/ and database/)
 #
-# Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/{excel,ducklake}.duckdb_extension
-# when a local DuckDB extension cache is found — neither is statically linked into duckdb_jdbc, so an
+# Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/{excel,ducklake,postgres_scanner}.duckdb_extension
+# when a local DuckDB extension cache is found — none is statically linked into duckdb_jdbc, so an
 # air-gapped deployment needs the files shipped (multiformat X1 for `excel`/frontend: xlsx;
 # AIRGAP-EXTENSIONS-1 for `ducklake`/output.ducklake.enabled). See DuckDbExtension.tryLoad and
 # -DuckdbExtensionCache below. Missing = a warning, never a build failure — serve/run/ura auto-detect
@@ -1449,10 +1449,21 @@ $bundledAnyExt = $false
 # output.ducklake.enabled. ⛔ Do NOT add `httpfs` here on the strength of the old backlog row: nothing in
 # the product loads it, and both SQL guards REFUSE `INSTALL httpfs`/`LOAD httpfs` by name
 # (SqlGuardTest, ConsignmentReaderTest) -- staging it would ship a binary the engine is built to reject.
-# ⛔ Nor `postgres_scanner`: the Postgres DuckLake catalog documented in integrations.md does not
-# currently attach at all (see AIRGAP-DUCKLAKE-PG-1), so bundling for it would be provisioning a path
-# that no deployment can reach. Add a name here ONLY with a run-time LOAD to point at.
-$duckdbExtNames = @('excel', 'ducklake')
+# ✅ `postgres_scanner` ADDED 2026-09-14 (scale-out phase C / D4). This list excluded it on the stated
+# grounds that "the Postgres DuckLake catalog does not currently attach at all, so bundling for it would
+# be provisioning a path that no deployment can reach". 🔴 That premise is now FALSE and the rule it
+# came with -- "add a name here ONLY with a run-time LOAD to point at" -- is now SATISFIED, both measured
+# 2026-09-14 against duckdb_jdbc 1.5.2.1 and a live Postgres:
+#   (a) the catalog attaches with the spelling `postgres:` + libpq keywords (AIRGAP-DUCKLAKE-PG-1 closed;
+#       the old `postgresql://` example was the broken part, not the feature), and
+#   (b) `ATTACH 'ducklake:postgres:...'` AUTO-LOADS postgres_scanner -- observed going loaded=false ->
+#       loaded=true across the attach, with no explicit LOAD anywhere in this repo.
+# ⛔ So without this name an air-gapped Enterprise pod fails EVERY batch: `ducklake` loads from its staged
+# file, the attach then reaches for postgres_scanner, finds no cache, and tries a network INSTALL -- and
+# D10 makes that failure FATAL in a partitioned topology. The air-gap hole AIRGAP-EXTENSIONS-1 closed for
+# `ducklake` reopened one layer down the moment D4 chose a Postgres catalog.
+# ⚠ There is still no explicit LOAD to grep for; the run-time load is DuckLake's own, inside ATTACH.
+$duckdbExtNames = @('excel', 'ducklake', 'postgres_scanner')
 if ($duckdbExtCacheDir) {
     foreach ($plat in @('windows_amd64', 'linux_amd64')) {
         foreach ($extName in $duckdbExtNames) {

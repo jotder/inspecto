@@ -30,13 +30,17 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
      compression: snappy
      ducklake:
        enabled: true
-       # 🔴 MEASURED BROKEN 2026-09-11 (AIRGAP-DUCKLAKE-PG-1) — DO NOT COPY THIS LINE.
-       # DuckLake reads catalog_url as a FILE PATH, so ATTACH 'ducklake:postgresql://…' fails
-       # trying to open a file of that name relative to the CWD, and DuckLakeRegistrar swallows
-       # it as a non-fatal warning — the catalog silently stays empty. A file catalog
-       # (catalog_url: "/opt/adj-lake/catalog.ducklake") was measured working end to end.
-       # The working Postgres-catalog spelling has not been established here; do not guess one.
-       catalog_url: "postgresql://etl_user:password@localhost:5432/ducklake_db"
+       # ✅ MEASURED WORKING 2026-09-14 (AIRGAP-DUCKLAKE-PG-1 CLOSED), duckdb_jdbc 1.5.2.1 against a
+       # live Postgres: DuckLake metadata tables were created IN the Postgres database and a second,
+       # independent connection read the row back through the catalog.
+       # ⛔ The backend prefix is "postgres:" followed by LIBPQ KEYWORDS — not a URL. A
+       # postgresql:// or postgres:// URL carries no recognised backend prefix, so DuckLake reads
+       # the whole string as a FILE PATH; that is what this line used to say and it never worked.
+       # 🔴 And a value with NO prefix does not fail either — it silently creates a LOCAL DuckDB
+       # file catalog named after the whole string, which on several nodes means each one quietly
+       # gets its own private catalog. DuckLakeRegistrar.requireSharedCatalog refuses that when
+       # -Dinspecto.topology=partitioned; on a single node a file catalog is correct and allowed.
+       catalog_url: "postgres:dbname=ducklake_db host=localhost port=5432 user=etl_user password=password"
        data_path: "/opt/adj-lake"
        schema: <data_source>s
        table: <data_source>_data

@@ -11,7 +11,13 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **59 rows: 0 × P1 · 36 × P2 · 23 × P3.**
+> text). **59 rows: 1 × P1 · 35 × P2 · 23 × P3.**
+>
+> ⚠ **The single P1 is `AIRGAP-EXTENSIONS-CI-1`** (§3), filed 2026-09-14: no released bundle has ever
+> carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a local
+> cache and the CI runner has none. It is P1 because D10 makes the resulting failure **fatal** on a
+> partitioned (Enterprise) pod, so it blocks scale-out phase C. The P2 count drops by one in the same
+> move: `AIRGAP-DUCKLAKE-PG-1` closed the same day.
 >
 > ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
@@ -645,18 +651,59 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
 
-- **P2** · **`AIRGAP-DUCKLAKE-PG-1` — the documented DuckLake Postgres catalog cannot attach.**
-  `okf/backend/integrations.md` has shipped `catalog_url: "postgresql://etl_user:…@localhost:5432/ducklake_db"`
-  as *the* DuckLake example. **Measured 2026-09-11** against duckdb_jdbc 1.5.2.1: DuckLake reads `catalog_url`
-  as a **file path**, so `ATTACH 'ducklake:postgresql://…'` fails trying to open a file of that name relative
-  to the CWD. A file catalog (`…/cat.ducklake`) was measured working end to end in the same probe, so the
-  feature is fine and the *documented shape* is not. 🔴 **It fails silently**: registration is best-effort, so
-  the only symptom is one `DuckLake registration failed (non-fatal)` warning per batch and a catalog that
-  never fills. Decide which: establish the working Postgres-catalog spelling (⛔ do not guess one — the
-  probe is `LOAD ducklake` then `ATTACH`, ~20 lines) and fix the doc, **or** drop the Postgres example and
-  document the file catalog. ⚠ Then reconsider whether `postgres_scanner` must be staged — deliberately
-  **not** bundled today precisely because no deployment can reach that path. Found while grounding
-  `AIRGAP-EXTENSIONS-1`. → `okf/backend/integrations.md` · `okf/capabilities/data-plane/data-plane.md` §3.10
+- ✅ **CLOSED 2026-09-14 · `AIRGAP-DUCKLAKE-PG-1` — the working spelling is established and shipped.**
+  The row said "⛔ do not guess one — the probe is `LOAD ducklake` then `ATTACH`". It was probed, against a
+  live Postgres, trying four spellings: **`postgres:` + libpq keywords ATTACHES** (`ducklake:postgres:dbname=…
+  host=… port=… user=… password=…`) — verified properly, i.e. the `ducklake_*` metadata tables were created
+  **in the Postgres database** and a second independent connection read a row back through the catalog, so
+  it is a real shared catalog and not a file that happened to open. `postgresql://` and `postgres://` both
+  fail, confirming the original measurement. `okf/backend/integrations.md` now carries the working line.
+  🔴 **The probe found something the row did not suspect, and it is worse than the failure it was chasing:
+  a `catalog_url` with NO recognised backend prefix does not fail — it silently creates a LOCAL DuckDB file
+  catalog named after the entire connection string** (it wrote a 1.8 MB file into the repo root, password in
+  the filename). ⛔ **D10 does not cover this**: D10 makes an unreachable catalog fatal, and this one is
+  reached, successfully, privately. On N pods that is N private catalogs with every batch green — the exact
+  split-brain the partitioned topology exists to prevent, arriving as SUCCESS. Now refused by
+  `DuckLakeRegistrar.requireSharedCatalog` when partitioned; a file catalog stays correct on one node.
+  🔴 **And the row's own residual turned out to be a live air-gap hole, now closed.** It said "reconsider
+  whether `postgres_scanner` must be staged — deliberately **not** bundled today precisely because no
+  deployment can reach that path". That premise died with the row: a deployment *can* now reach it.
+  **Measured: `ATTACH 'ducklake:postgres:…'` AUTO-LOADS `postgres_scanner`** (observed `loaded=false` →
+  `true` across the attach, with no explicit `LOAD` anywhere in this repo), while `package.ps1` staged only
+  `excel` and `ducklake`. ⛔ So an air-gapped Enterprise pod would have failed **every batch**: `ducklake`
+  loads from its staged file, the attach reaches for `postgres_scanner`, finds no cache, tries a network
+  `INSTALL`, and **D10 makes that fatal when partitioned**. The hole `AIRGAP-EXTENSIONS-1` closed for
+  `ducklake` reopened one layer down the moment D4 chose a Postgres catalog. `postgres_scanner` is now in
+  `$duckdbExtNames` (`package.ps1:~1455`) — which is what that comment's own rule, "add a name here ONLY
+  with a run-time LOAD to point at", required once the LOAD existed.
+  ⚠ **Nothing greps for that LOAD**: it is DuckLake's own, inside `ATTACH`, so the staging list cannot be
+  derived from the source the way a `LOAD` name could be. A future extension with the same shape will be
+  invisible in the same way.
+  → `okf/backend/integrations.md` · `inspecto/package.ps1` · scale-out plan §5.4
+
+- 🔴 **P1** · **`AIRGAP-EXTENSIONS-CI-1` — no released bundle has ever carried a DuckDB extension, on any
+  platform.** Filed 2026-09-14 while staging `postgres_scanner` (above). `package.ps1` stages extensions
+  **best-effort from a LOCAL cache** and prints a yellow warning when it finds none — never a build
+  failure, by design. 🔴 **Measured 2026-09-14: neither `ci.yml` nor `release.yml` populates that cache
+  at all** (no `DUCKDB_EXTENSION_CACHE`, no `-DuckdbExtensionCache`, no `INSTALL` step — grep is empty).
+  So the release path always takes the warning branch and **ships a bundle with an empty
+  `duckdb-extensions/`** — which means `AIRGAP-EXTENSIONS-1`, closed 2026-09-11 to stop `ducklake` needing
+  a network `INSTALL` on an air-gapped install, **is not actually delivered by any release**. The code
+  half is real; the packaging half silently no-ops in the only place that builds a release.
+  ⚠ **Confirmed locally in both directions**: a `-Edition Personal` run on this machine staged all three
+  `windows_amd64` files (the cache has them) and **zero** `linux_amd64` files (it has none), printing the
+  yellow warning for each — the exact branch CI takes for *both* platforms.
+  ⛔ **This blocks scale-out phase C specifically, and hardest.** Enterprise pods are **Linux**, and D10
+  makes a DuckLake registration failure **fatal** when partitioned — so an air-gapped Linux pod with no
+  staged `ducklake` fails **every batch**, not just the DuckLake step. The `postgres_scanner` fix above is
+  correct but inert in a release until this is closed.
+  ⚠ Same shape as `OPS-07`/the jlink fix (`f2dbf0dd`, 2026-09-14): **a packaging capability that works on
+  a developer's machine and silently does nothing on the runner**, because best-effort staging cannot
+  distinguish "not wanted" from "not present". Worth deciding whether the release build should FAIL when
+  an extension the product loads is missing, rather than warn — the same fail-closed call `partition.toon`
+  and the SBOM licence gate already make.
+  → `inspecto/package.ps1` (`$duckdbExtNames`, ~:1455) · `.github/workflows/release.yml` ·
+  `okf/backend/integrations.md`
 - **P2** · **`DEPLOY-SERVICE-WRAPPER-1` residual — the live acceptance is UNRUN.** ✅ **The wrappers
   SHIPPED 2026-09-11** (`SCR-3`): `package.ps1` stages `inspecto.service` + `install-service.sh` (systemd)
   and `install-service.ps1` (Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). 🔴 The

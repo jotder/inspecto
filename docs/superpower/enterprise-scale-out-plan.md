@@ -942,7 +942,28 @@ the phases here are A/B/C while the units are `U1`–`U4` — they are different
 |---|---|---|---|
 | ✅ **A — shared state** (§5.1) — **COMPLETE 2026-09-14** | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling. **Since 2026-09-10: the foundation of Standard's DR tier — ships in the Standard bundle** | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
 | ✅ **B — the lease** (§5.2) — **COMPLETE 2026-09-12** | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step. **Since 2026-09-10 this IS the Standard fault-tolerant-DR deliverable**, so `RunLease` and `PostgresRunLease` live in core or `inspecto-security`-tier modules, ⛔ never behind `inspecto-policy` | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Standard |
-| ⏳ **C — partition + lakehouse** (§5.3, §5.4) — the only phase left, and the only Enterprise one | Space→pod map, inbox ownership, `CatalogCommit` visibility, Helm chart, per-tenant ABAC | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed |
+| ⏳ **C — partition + lakehouse** (~~§5.3~~, §5.4) — the only phase left, and the only Enterprise one | ~~Space→pod map, inbox ownership~~, ~~per-tenant ABAC~~, `CatalogCommit` visibility, Helm chart | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed |
+
+⚠ **This row's §5.3 half is DONE — struck above 2026-09-14.** §5.3 closed 2026-09-12 (C1 static Space→pod
+map, C2 shared-inbox detection, `INBOX-REGISTRY-CROSS-POD-1` 2026-09-13) and per-tenant ABAC had shipped
+back on 2026-07-24. 🔴 The row survived two shifts describing shipped work as pending, which is the same
+staleness §5.3's own preamble warns about for its bullets — **a sequencing table rots exactly like a
+bullet does, and it is read first.** What is left of phase C is §5.4 alone.
+
+**§5.4 status, ground-truthed 2026-09-14** (see that section for the measurements):
+- ✅ The **precondition** is met — `DUCKLAKE-COMMIT-COUNT-1` shipped as `DuckLakeRegistrationSiteContractTest`.
+- ✅ **The Postgres catalog is PROVEN to work**, closing `AIRGAP-DUCKLAKE-PG-1`: the spelling is
+  `postgres:` + libpq keywords, verified by finding the `ducklake_*` tables *in Postgres* and reading a row
+  back from a second independent connection. The `postgresql://` URL this repo documented never worked.
+- ✅ **Two fail-closed guards shipped** — a private file catalog is refused when partitioned (D10 covered
+  the unreachable catalog, never the *privately reachable* one), and data inlining is disabled so the
+  catalog database cannot silently become a data path. Both mutation-verified in both directions.
+- ✅ **The air-gap hole is closed** — `postgres_scanner` auto-loads on attach and was not staged.
+- ❌ **Still NOT built, and all of it needs an object store this sandbox has not got:** the
+  `RenameReveal`/`CatalogCommit` visibility strategy, the read-side shared `ATTACH`, `dirs.database` as an
+  `s3://` URI, and object-store-aware containment in `PathJail`. ⚠ **There is no write-path object-store
+  client in the repo at all** — `S3Connector` is read-side *acquisition* (hand-rolled SigV4), not a sink —
+  so this is a larger piece of work than the remaining bullets make it look.
 
 ⚠ **The Helm chart is the last artefact of phase C, not the first of phase A.** By then Kubernetes is
 packaging, not architecture. Writing the chart first is how a team ends up with `replicas: 4` and
