@@ -171,6 +171,13 @@ public final class PartitionWriter {
         String  outputFileName = baseName + "_out" + fmt.extension();
         boolean partitioned = partitionColumns != null && !partitionColumns.isEmpty();
 
+        // Scale-out §5.4 bullet 1. An object-store target has no staging directory and no reveal: see
+        // writeToObjectStore. Dispatch on the SAME predicate the path jail uses, so "is this a URI" has
+        // one definition in the product rather than a second spelling here.
+        if (com.gamma.config.safety.PathJail.isUri(databaseDir))
+            return writeToObjectStore(conn, projection, databaseDir, fmt, compression,
+                    baseName, partitionColumns, partitioned);
+
         new File(databaseDir).mkdirs();
         String workerTag   = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         Path   stagingPath = Paths.get(databaseDir, ".staging", workerTag);
@@ -214,6 +221,118 @@ public final class PartitionWriter {
             }
         }
         return outputs;
+    }
+
+    /**
+     * Write to an object-store target ({@code s3://…}), where the staging-and-reveal dance does not
+     * exist and must not be imitated.
+     *
+     * <p><b>Why this is not the other lane with a different path string.</b> Measured 2026-09-14 against
+     * MinIO with {@code duckdb_jdbc} 1.5.2.1 — the shape is genuinely different in three ways, and each
+     * one is load-bearing:
+     * <ol>
+     *   <li><b>There is no reveal.</b> A partitioned {@code COPY} writes straight to its final Hive-style
+     *       keys. An object store has no atomic rename to reveal with, and it does not need one: a PUT is
+     *       already all-or-nothing, and <em>cross-node</em> visibility is the DuckLake catalog commit
+     *       (plan §5.4's invariant), not a directory operation.</li>
+     *   <li><b>The outputs must be discovered, not collected.</b> There is no staging tree to walk, so the
+     *       written files come back from {@code glob()} and their sizes from {@code parquet_metadata()}.
+     *       ⚠ {@code total_compressed_size} is the sum of the column chunks, <b>not</b> the object's byte
+     *       length — it understates by the footer and header. Reported as-is rather than with a second
+     *       round trip per file; the registry rows use it for relative weight, not for billing.</li>
+     *   <li>🔴 <b>A repeat write ACCUMULATES; it does not replace.</b> Locally, re-running a batch
+     *       overwrites {@code <baseName>_out.<ext>} in place and is idempotent. Here two runs leave two
+     *       objects unless the names collide exactly. {@code FILENAME_PATTERN} pins the stem, but DuckDB
+     *       appends its own index, so the name is {@code <baseName>_out0.parquet} — close to the local
+     *       lane's, deliberately not claimed to be identical.</li>
+     * </ol>
+     *
+     * <p>⛔ This is reachable only by a caller that already holds a connection configured for the store
+     * (endpoint and credentials are session settings). It is NOT reachable from a pipeline config today:
+     * {@code dirs.database} refuses a URI at the 422 write gate and in the jail. Wiring those together is
+     * the open credentials decision (BACKLOG §1), deliberately not pre-empted here.
+     */
+    private static List<PartitionOutput> writeToObjectStore(Connection conn, String projection,
+                                                            String databaseDir, OutputFormat fmt,
+                                                            String compression, String baseName,
+                                                            List<String> partitionColumns,
+                                                            boolean partitioned) throws Exception {
+        String root = databaseDir.endsWith("/") ? databaseDir.substring(0, databaseDir.length() - 1)
+                                                : databaseDir;
+        String stem = baseName + "_out";
+
+        StringBuilder copyOpts = new StringBuilder("FORMAT ").append(fmt.copyToken());
+        if (partitioned)
+            copyOpts.append(", PARTITION_BY (").append(String.join(", ", partitionColumns))
+                    .append("), OVERWRITE_OR_IGNORE 1, FILENAME_PATTERN ").append(sqlStr(stem));
+        if (fmt.supportsCompression() && compression != null && !compression.isBlank())
+            copyOpts.append(", COMPRESSION ").append(compression);
+
+        // Unpartitioned: COPY names the single object outright, so no pattern and no discovery needed.
+        String target = partitioned ? root : root + "/" + stem + fmt.extension();
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(String.format("COPY (%s) TO %s (%s)", projection, sqlStr(target), copyOpts));
+
+            if (!partitioned)
+                return List.of(new PartitionOutput("", target, objectBytes(stmt, target, fmt)));
+
+            List<PartitionOutput> outputs = new ArrayList<>();
+            String glob = root + "/**/" + stem + "*" + fmt.extension();
+            try (ResultSet rs = stmt.executeQuery("SELECT file FROM glob(" + sqlStr(glob) + ") ORDER BY file")) {
+                while (rs.next()) outputs.add(new PartitionOutput(
+                        partitionOf(rs.getString(1), root), rs.getString(1), -1L));
+            }
+            // One metadata pass over the whole glob rather than one per file.
+            if (fmt.copyToken().equalsIgnoreCase("PARQUET")) applySizes(stmt, glob, outputs);
+            return outputs;
+        }
+    }
+
+    /**
+     * The partition segment of an object key — everything between the root and the file name.
+     *
+     * <p>⚠ Returns {@code ""} for an object written directly under the root, matching the local lane's
+     * contract for an unpartitioned (E1) write rather than inventing a second spelling for "no partition".
+     */
+    private static String partitionOf(String file, String root) {
+        String rest = file.startsWith(root + "/") ? file.substring(root.length() + 1) : file;
+        int lastSlash = rest.lastIndexOf('/');
+        return lastSlash < 0 ? "" : rest.substring(0, lastSlash);
+    }
+
+    /**
+     * Fill in per-file sizes from Parquet metadata, leaving {@code -1} where the store answered nothing.
+     *
+     * <p>⚠ {@code -1} means <b>not measured</b>, which is this repo's existing convention, and is
+     * deliberately not {@code 0} — a zero byte count reads as an empty file and would be a silent lie
+     * about a partition that holds rows.
+     */
+    private static void applySizes(Statement stmt, String glob, List<PartitionOutput> outputs)
+            throws java.sql.SQLException {
+        java.util.Map<String, Long> bytes = new java.util.HashMap<>();
+        try (ResultSet rs = stmt.executeQuery(
+                "SELECT file_name, sum(total_compressed_size) FROM parquet_metadata("
+                        + sqlStr(glob) + ") GROUP BY 1")) {
+            while (rs.next()) bytes.put(rs.getString(1), rs.getLong(2));
+        }
+        outputs.replaceAll(o -> new PartitionOutput(
+                o.partition(), o.outputFile(), bytes.getOrDefault(o.outputFile(), -1L)));
+    }
+
+    /** Byte count for one written object, or {@code -1} when it is not a format we can ask about. */
+    private static long objectBytes(Statement stmt, String file, OutputFormat fmt)
+            throws java.sql.SQLException {
+        if (!fmt.copyToken().equalsIgnoreCase("PARQUET")) return -1L;
+        try (ResultSet rs = stmt.executeQuery(
+                "SELECT sum(total_compressed_size) FROM parquet_metadata(" + sqlStr(file) + ")")) {
+            return rs.next() ? rs.getLong(1) : -1L;
+        }
+    }
+
+    /** A single-quoted SQL literal. Object keys are config-derived, so the quote doubling is not optional. */
+    private static String sqlStr(String s) {
+        return "'" + s.replace("'", "''") + "'";
     }
 
     /**
