@@ -50,11 +50,13 @@ class PerfDeepDiveBenchmark {
         int rowsPerFile  = Integer.getInteger("bench.rows", 150_000);
         int days         = Integer.getInteger("bench.days", 30);
         int maxFiles     = Integer.getInteger("bench.maxfiles", 4);
+        int cols         = Math.max(3, Integer.getInteger("bench.cols", 3));      // ID,AMT,EVENT_DATE + DOUBLE fillers
+        String engine    = System.getProperty("bench.engine", "auto");            // csv_settings.engine
         int cores        = Runtime.getRuntime().availableProcessors();
 
         System.out.printf("%n=== #1 concurrency / auto-derive duckdb_threads ===%n");
-        System.out.printf("cores=%d  files=%d × %,d rows  batch.max_files=%d → %d batches%n",
-                cores, files, rowsPerFile, maxFiles, (files + maxFiles - 1) / maxFiles);
+        System.out.printf("cores=%d  files=%d × %,d rows × %d cols  engine=%s  batch.max_files=%d → %d batches%n",
+                cores, files, rowsPerFile, cols, engine, maxFiles, (files + maxFiles - 1) / maxFiles);
         System.out.printf("%-46s %9s%n", "config", "wall");
 
         // (threads, duckdb_threads, label)
@@ -79,9 +81,9 @@ class PerfDeepDiveBenchmark {
 
         for (int v = 0; v < variants.length; v++) {
             Path dir = root.resolve("c" + v);
-            PipelineConfig cfg = buildConfig(dir, variants[v][0], variants[v][1], maxFiles);
+            PipelineConfig cfg = buildConfig(dir, variants[v][0], variants[v][1], maxFiles, cols, engine);
             Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
-            writeCsvFiles(inbox, files, rowsPerFile, days);
+            writeCsvFiles(inbox, files, rowsPerFile, days, cols);
 
             long t = System.nanoTime();
             try {
@@ -105,7 +107,7 @@ class PerfDeepDiveBenchmark {
 
         for (int threads : new int[]{1, 8}) {
             Path dir = root.resolve("s" + threads);
-            PipelineConfig cfg = buildConfig(dir, threads, 0, 1000);
+            PipelineConfig cfg = buildConfig(dir, threads, 0, 1000, 3, "auto");
             Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
             // Generate k tiny files and pre-mark them all as processed — so the poll cycle is
             // pure scan (walk + k marker stats) with zero batch processing.
@@ -167,44 +169,54 @@ class PerfDeepDiveBenchmark {
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
-    private static void writeCsvFiles(Path inbox, int files, int rowsPerFile, int days) throws Exception {
+    private static void writeCsvFiles(Path inbox, int files, int rowsPerFile, int days, int cols) throws Exception {
+        StringBuilder header = new StringBuilder("ID,AMT,EVENT_DATE");
+        for (int c = 3; c < cols; c++) header.append(",C").append(c);
+        header.append('\n');
         for (int n = 0; n < files; n++) {
             try (BufferedWriter w = Files.newBufferedWriter(inbox.resolve("f" + n + ".csv"))) {
-                w.write("ID,AMT,EVENT_DATE\n");
-                StringBuilder sb = new StringBuilder(48);
+                w.write(header.toString());
+                StringBuilder sb = new StringBuilder(48 + 8 * cols);
                 for (int i = 0; i < rowsPerFile; i++) {
                     int day = (i % days) + 1;
                     sb.setLength(0);
                     sb.append('r').append(n).append('_').append(i).append(',')
                       .append((i % 1000) + 0.5).append(",2020-04-")
-                      .append(day < 10 ? "0" : "").append(day).append('\n');
+                      .append(day < 10 ? "0" : "").append(day);
+                    for (int c = 3; c < cols; c++) sb.append(',').append((i + c) % 997).append(".25");
+                    sb.append('\n');
                     w.write(sb.toString());
                 }
             }
         }
     }
 
-    private static PipelineConfig buildConfig(Path dir, int threads, int duckdbThreads, int maxFiles)
-            throws Exception {
+    private static PipelineConfig buildConfig(Path dir, int threads, int duckdbThreads, int maxFiles,
+                                              int cols, String engine) throws Exception {
         Path schema = dir.resolve("schema.toon");
         Files.createDirectories(dir);
+        StringBuilder fields = new StringBuilder(), rules = new StringBuilder();
+        for (int c = 3; c < cols; c++) {
+            fields.append("    C").append(c).append(",\"").append(c).append("\",DOUBLE\n");
+            rules.append("    C").append(c).append(",C").append(c).append(",DIRECT\n");
+        }
         Files.writeString(schema, """
                 partitionKey: EVENT_DATE
                 raw:
                   name: perf
                   format: CSV
-                  fields[3]{name,selector,type}:
+                  fields[%d]{name,selector,type}:
                     ID,"0",VARCHAR
                     AMT,"1",DOUBLE
                     EVENT_DATE,"2",DATE
-                mapping:
+                %smapping:
                   canonicalName: perf
                   rawName: perf
-                  rules[3]{targetColumn,sourceExpression,transformType}:
+                  rules[%d]{targetColumn,sourceExpression,transformType}:
                     ID,ID,DIRECT
                     AMT,AMT,DIRECT
                     EVENT_DATE,EVENT_DATE,DIRECT
-                """);
+                %s""".formatted(cols, fields, cols, rules));
         Path pipeline = dir.resolve("pipeline.toon");
         Files.writeString(pipeline, """
                 name: PERF_ETL
@@ -234,6 +246,7 @@ class PerfDeepDiveBenchmark {
                     max_files: %d
                     max_bytes: 1073741824
                   csv_settings:
+                    engine: %s
                     delimiter: ","
                     skip_header_lines: 0
                     skip_junk_lines: 0
@@ -241,7 +254,7 @@ class PerfDeepDiveBenchmark {
                     date_formats[1]: "%%Y-%%m-%%d"
                     timestamp_formats[1]: "%%Y-%%m-%%d"
                 """.formatted(dir, dir, dir, dir, dir, dir, dir, dir, dir,
-                        threads, duckdbThreads, schema.toString().replace("\\", "/"), maxFiles));
+                        threads, duckdbThreads, schema.toString().replace("\\", "/"), maxFiles, engine));
         return PipelineConfig.load(pipeline.toString());
     }
 }

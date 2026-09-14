@@ -832,6 +832,23 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
+- **P1** · **`JAVA-INGEST-APPENDER-SERIAL-1` — the Java fallback ingest path does NOT scale with concurrent batches; twelve batches run slower than one.**
+  Filed 2026-09-14 from a full-capacity run on a 6-core/12-thread laptop (`PerfDeepDiveBenchmark#concurrencyAndAutoDerive`,
+  48 files × 250K rows × 100 cols, 24 batches, `processing.threads=12`): **native engine 174 s (69K rows/s, CPU ~71 %
+  while busy) vs Java engine 2,309 s (5.2K rows/s, CPU ~20 %)** — and one Java thread alone does 8K rows/s at 100
+  columns, so concurrency made the Java path 35 % SLOWER than serial. Two `jstack`s 10 min apart showed **all 12
+  workers inside `org.duckdb.DuckDBBindings.duckdb_appender_flush` (RUNNABLE, native)** with heap at 370 MB, disk
+  0.6 % busy, 15 GB RAM free — a native mutex, not CPU, memory or I/O. Each batch has its OWN temp DuckDB file, so
+  the lock is process-wide in the JDBC driver's appender binding, or in `CsvIngester.ingest` (`:226`) flushing per
+  row. ⚠ Interaction: `performance.md` §"Two controllable axes" tells operators to raise `processing.threads` for
+  aggregate throughput — **true for native-path feeds, false for messy files that fall to Java**; until fixed the
+  guidance must say so. Remedies to weigh: (a) batch the appender flush (flush every N rows, not per row);
+  (b) route wide messy files through the native engine's reject-drain instead of the Java appender;
+  (c) a per-JVM cap on concurrent Java-path batches so they never starve native ones. First test: a
+  two-batch Java-path run must take < 1.2× a one-batch run at equal total rows. Measurements are NOT
+  recorded in `performance.md` by operator instruction (2026-09-14); the knobs `-Dbench.threads/-Dbench.cols/
+  -Dbench.engine` on the harness reproduce them.
+
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
   sanctions**, and it is SERVER-side, so it fixes the partial roster for *every* client with no UI union:
