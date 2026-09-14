@@ -120,7 +120,7 @@ pass over every line. Delimited feeds on a clean config take the native lane and
 
 | Knob | Controls | Default |
 |---|---|---|
-| `processing.threads` | how many batches run concurrently (semaphore permits) | 4 |
+| `processing.threads` | how many batches run concurrently (semaphore permits) | **logical cores** (was 4 until 2026-09-14) |
 | `processing.duckdb_threads` | `PRAGMA threads=N` per batch's DuckDB connection | 0 = **auto** (`cores ÷ threads`) |
 
 The inner/outer interaction: each concurrent batch opens its own DuckDB

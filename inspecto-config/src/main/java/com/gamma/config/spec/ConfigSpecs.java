@@ -98,8 +98,10 @@ public final class ConfigSpecs {
                 FieldSpec.of("dirs.temp", "Temp directory", FieldType.FILEPATH, "Scratch space for a run."),
                 FieldSpec.of("dirs.status_dir", "Status directory", FieldType.FILEPATH,
                         "Directory for run audit CSVs; a timestamped status file is created here."),
-                FieldSpec.withDefault("processing.threads", "Consignment concurrency", FieldType.INT, 4,
-                        "Concurrent batches (semaphore permits over a virtual-thread executor)."),
+                FieldSpec.withDefault("processing.threads", "Consignment concurrency", FieldType.INT,
+                        Runtime.getRuntime().availableProcessors(),
+                        "Concurrent batches (semaphore permits over a virtual-thread executor). Default = this "
+                                + "host's logical cores; duckdb_threads=0 divides the cores among them."),
                 FieldSpec.withDefault("processing.duckdb_threads", "DuckDB threads/batch", FieldType.INT, 0,
                         "Per-batch DuckDB parallelism (PRAGMA threads): 0 = auto (cores ÷ threads, avoids "
                                 + "oversubscription), -1 = DuckDB default (all cores per batch), N = exactly N."),

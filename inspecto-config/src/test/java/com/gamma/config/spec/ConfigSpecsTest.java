@@ -55,7 +55,7 @@ class ConfigSpecsTest {
         ConfigSpec p = ConfigSpecs.pipeline();
         Optional<FieldSpec> threads = p.field("processing.threads");
         assertTrue(threads.isPresent());
-        assertEquals(4, threads.get().defaultValue());
+        assertEquals(Runtime.getRuntime().availableProcessors(), threads.get().defaultValue());
         assertTrue(p.field("does.not.exist").isEmpty());
     }
 

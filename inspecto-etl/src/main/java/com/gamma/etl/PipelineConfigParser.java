@@ -200,7 +200,10 @@ final class PipelineConfigParser {
 
         // ── processing ────────────────────────────────────────────────────────
         Map<String, Object> proc = ToonHelper.requireSection(raw, "processing");
-        b.threads       = toInt(proc.getOrDefault("threads", 4));
+        // Default = the host's logical cores (2026-09-14): batches are the parallelism unit and the
+        // per-batch DuckDB threads auto-divide the cores (duckdb_threads=0), so this saturates a box
+        // without oversubscribing it. The old fixed 4 left a 12-thread laptop at ~45 % CPU.
+        b.threads       = toInt(proc.getOrDefault("threads", Runtime.getRuntime().availableProcessors()));
         b.duckdbThreads = toInt(proc.getOrDefault("duckdb_threads", 0));
         b.filePattern   = opt(proc, "file_pattern", "glob:**/*.{csv,csv.gz}");
         // ConcurrencyBroker share weight (Part B). Out-of-range refuses at parse time — a

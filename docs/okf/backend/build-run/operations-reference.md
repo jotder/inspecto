@@ -258,7 +258,7 @@ Add a `batch:` sub-section inside the `processing:` block of the pipeline toon:
 
 ```yaml
 processing:
-  threads: 4              # max batches processed concurrently (see Concurrency below)
+  threads: 4              # max batches processed concurrently; DEFAULT = logical cores since 2026-09-14 (see Concurrency below)
   duckdb_threads: 0       # PRAGMA threads per batch connection (0 = auto: cores ÷ threads)
   file_pattern: "glob:**/*.{csv,csv.gz}"
   batch:

@@ -1778,7 +1778,7 @@ public final class PipelineConfig {
         String logDir;
         String statusFilePath;
         String statusDirToPrepare;
-        int    threads       = 4;
+        int    threads       = Runtime.getRuntime().availableProcessors();   // see PipelineConfigParser
         int    duckdbThreads = 0;
         String filePattern   = "glob:**/*.{csv,csv.gz}";
         int    batchMaxFiles   = 1;

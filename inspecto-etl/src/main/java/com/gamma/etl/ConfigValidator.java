@@ -18,7 +18,6 @@ import java.util.List;
  *   <li>Blank delimiter — a fall-through to the {@code ","} default that
  *       hides explicit-intent typos.</li>
  *   <li>Marker retention shorter than 1 day on a non-trivial pipeline.</li>
- *   <li>{@code threads} set to a value that's inconsistent with batch caps.</li>
  *   <li>CPU oversubscription — {@code sources.max × threads × duckdb_threads}
  *       exceeding the core count (explicit cap), the auto cap's multi-source
  *       blind spot ({@code duckdb_threads=0} ignores {@code sources.max}), or in
@@ -88,13 +87,6 @@ public final class ConfigValidator {
         if (cfg.processing().duplicateCheckEnabled() && cfg.processing().retentionDays() <= 0)
             warn(warnings, "duplicate_check.enabled=true but retention_days=" + cfg.processing().retentionDays() +
                     " — every marker will be deleted on the next cleanup. Set retention_days >= 1.");
-
-        // Threads vs batch caps: threads > 1 on a pipeline whose batch caps force one batch
-        // per file is silently single-threaded (no parallelism on the batch level).
-        if (cfg.processing().threads() > 1 && cfg.processing().batchMaxFiles() == 1)
-            warn(warnings, "processing.threads=" + cfg.processing().threads() + " but batch.max_files=1 — " +
-                    "each batch is a single file, so only " + cfg.processing().threads() + "-way file-level parallelism. " +
-                    "Raise batch.max_files for intra-batch packing.");
 
         // CPU oversubscription: concurrent batches each open a DuckDB connection that,
         // capped by duckdb_threads, fans out to that many threads. The real worker
