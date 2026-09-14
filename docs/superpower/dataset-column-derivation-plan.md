@@ -11,10 +11,17 @@
 > - ✅ **Step 2 — the materialize refresh is a MERGE.** `MaterializeTask` now reads the stored dataset
 >   and restates only its four job-owned provenance keys, so authored `columns`/roles/labels/formats
 >   survive a re-run. Answers §6-Q1 by building it.
-> - ⏳ Steps 3 and 4 (the DuckDB-type → coarse-type mapping, and deriving the columns) remain open,
->   along with **§6-Q2/Q3** — the temporal tie-break and the dropped-column rule.
+> - ⏳ Steps 3 and 4 (the DuckDB-type → coarse-type mapping, and deriving the columns) remain open —
+>   but **as BUILD work only**. ✅ **All four §6 decisions are answered as of 2026-09-14** (Q1 by building
+>   it 2026-09-11; Q2/Q3/Q4 by the operator): several date columns yield **no** `temporal`, a stored column
+>   the derivation stops producing is marked **`hidden`**, and the pinned contract covers **both** the
+>   heuristic and the coarse type vocabulary.
 >
-> **Decision owner:** operator, for what remains.
+> **Decision owner:** nobody — ⛔ **this plan is no longer blocked on a decision.** It was reported blocked
+> in every handoff from 2026-09-11 to 2026-09-14 while its questions sat here and never reached
+> `BACKLOG.md` §1; they were filed there on 2026-09-14 and answered the same day. ⚠ **A plan is where a
+> decision is described, the board is where it is queued** — describing one here again without filing it
+> reproduces exactly that three-day stall.
 
 ## 1. What the row asked for
 
@@ -165,13 +172,27 @@ exactly how the Studio editor already treats it.
   not a field list**: `MaterializeTask` restates only its four job-owned provenance keys (`name`,
   `physicalRef`, `description`, `materialized`) over the stored document, so a newly authored key is
   preserved automatically where a copy-these-fields list would silently start dropping it.
-- **Q2 — Temporal tie-break.** When the heuristic yields several date columns, derive `temporal` for:
-  (a) none — leave every date a `dimension` and let a human elect one; (b) the first by ordinal; or
-  (c) all, and relax `temporalColumn` to pick deterministically instead of throwing.
-  Recommendation: **(a)**. It never manufactures a wrong answer, and it cannot arm the throw in §2.3.
-- **Q3 — A stored column the derivation no longer produces:** keep, drop, or mark `hidden`?
-- **Q4 — Does the contract in step 1 pin only the heuristic, or the coarse type vocabulary too?**
-  Recommendation: **both** — the roles are meaningless without agreement on what `number` and `date` are.
+- ~~**Q2 — Temporal tie-break.**~~ ✅ **DECIDED 2026-09-14 — (a), derive `temporal` for NONE.** When the
+  heuristic yields several date columns every one of them stays a `dimension` and a human elects the
+  temporal column. The operator took the plan's recommendation: it never manufactures a wrong answer, and
+  it cannot arm the throw in §2.3. ⇒ The derivation emits `temporal` **only** when exactly one date column
+  is found; ordinal position is never a tie-break, so column order — an authoring accident — cannot decide
+  a dataset's time axis.
+- ~~**Q3 — A stored column the derivation no longer produces.**~~ ✅ **DECIDED 2026-09-14 — mark
+  `hidden`.** No recommendation existed and the sample tree could not inform it (see §7), so this was put
+  to the operator on the trade alone and answered non-destructively: the authored role **survives** and
+  returns with the column if it comes back, and nothing silently disappears from a dataset a human
+  authored. ⛔ Neither of the other two was chosen for a reason worth keeping: *drop* discards a human's
+  authored role on a transient upstream schema change, and *keep* leaves the dataset advertising a column
+  nothing produces. ⚠ **This creates state with no cleanup story yet** — hidden columns accumulate and
+  nothing prunes them. That is accepted deliberately, not overlooked; file the pruning question when a
+  real tree has enough hidden columns to inform it, which today's eleven dataset documents do not.
+- ~~**Q4 — Scope of the contract pin.**~~ ✅ **DECIDED 2026-09-14 — pin BOTH the heuristic and the coarse
+  type vocabulary.** The operator took the plan's recommendation: the roles are meaningless without
+  agreement on what `number` and `date` are, so pinning the heuristic alone pins half a contract and a
+  type-vocabulary change could silently alter every derived role without breaking the pinned test.
+  ⚠ The consequence is real and is the price of the answer: **the coarse type vocabulary becomes a
+  compatibility surface** and cannot change freely afterwards.
 
 ## 7. Outstanding grounding
 

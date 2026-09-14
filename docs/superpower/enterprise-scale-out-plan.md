@@ -865,7 +865,7 @@ Work under (ii):
 > **Scope after D4a (2026-09-14) — which of the six bullets are live.**
 > | Bullet | Status |
 > |---|---|
-> | 1. `PartitionWriter` visibility strategy (`RenameReveal`/`CatalogCommit`) | ✅ **BUILT 2026-09-14, verified against a live object store.** `PartitionWriter.writeProjected` dispatches on `PathJail.isUri(databaseDir)` to a private `writeToObjectStore`; the local lane is byte-for-byte untouched. ⛔ **Not** an interface — two private call sites, so a strategy type would be the "seam with one implementation" this row warned about, spelled differently. ⚠ It is reachable only by a caller holding a store-configured `Connection`; `dirs.database` still refuses a URI, so nothing in production reaches it until the credentials decision lands |
+> | 1. `PartitionWriter` visibility strategy (`RenameReveal`/`CatalogCommit`) | ✅ **BUILT 2026-09-14, verified against a live object store.** `PartitionWriter.writeProjected` dispatches on `PathJail.isUri(databaseDir)` to a private `writeToObjectStore`; the local lane is byte-for-byte untouched. ⛔ **Not** an interface — two private call sites, so a strategy type would be the "seam with one implementation" this row warned about, spelled differently. ⚠ It is reachable only by a caller holding a store-configured `Connection`; `dirs.database` still refuses a URI, so nothing in production reaches it yet. ✅ **The credentials decision LANDED 2026-09-14 — route (a), a pipeline field naming a `ConnectionProfile` id** (§5.4 bullet 3). ⛔ That unblocks the build, it does not perform it: until that field exists AND the `dirs.*` URI refusal is dispatched on `PathJail.isUri` rather than applied flatly, this code stays unreachable |
 > | 2. Double-registration guard | ✅ **SHIPPED** — `DuckLakeRegistrationSiteContractTest` |
 > | 3. Disable data inlining | ✅ **SHIPPED 2026-09-14** (`038447c2`) — measured with a control pair |
 > | 4. Registrar: sidecar → commit step; `ducklake:postgres:`; failure fatal | ✅ **SHIPPED** — D10 fatal (`dfe773bc`), catalog spelling proven + guarded (`038447c2`), and registration **mandatory when partitioned** (operator 2026-09-14): `enabled: false` or no block at all now fails, because D10 closed the path where registration FAILS and left open the path where it is never ATTEMPTED. 🔴 **Half an invariant — see the graph-lane row below** |
@@ -898,10 +898,28 @@ Work under (ii):
 >    `${FILE:…}` / `${KEYSTORE:…}` indirection with masking on read (`toMap:149`) and omission from
 >    bundles (`toBundleMap:196`). ⛔ But it is **collector-side only** — reached via `source.connection`,
 >    never from a pipeline — and a pipeline has no credential-bearing config of its own. ⇒ the decision is
->    *how a pipeline names a profile*, not *whether to invent secret handling*. Filed in BACKLOG §1.
->    ⚠ There is also **no `SECRET` field type** in the config-spec system (`FieldType` has ten values, none
->    of them secret); the redaction that exists is `ConnectionProfile`-specific, not a capability a new
->    field could declare.
+>    *how a pipeline names a profile*, not *whether to invent secret handling*.
+>    ✅ **DECIDED 2026-09-14 — route (a): a PIPELINE FIELD NAMING AN EXISTING `ConnectionProfile` ID.**
+>    The credential model is reused **whole** — `SecretResolver` indirection, masking on read
+>    (`toMap:149`) and omission from bundles (`toBundleMap:196`) all come along unchanged, and the
+>    pipeline document stores **an id, never a secret**. ⛔ The two rejected routes, with why, so neither
+>    is re-proposed as an improvement:
+>    - **(b) a server-level setting** — credentials as deployment config, never in a pipeline document.
+>      Cleanest secret posture, but **one endpoint per server**: a pipeline could not address two buckets
+>      with different keys, which a multi-tenant partitioned topology is exactly the case for.
+>    - **(c) a new pipeline block** — most expressive, most expensive. ⚠ It needs a **`SECRET` field type
+>      that does not exist** (`FieldType` has ten values, none of them secret) **plus its own redaction
+>      contract**, because today's redaction is `ConnectionProfile`-specific and not a capability a new
+>      field can declare. Route (a) is precisely the choice that avoids inventing both.
+>    ⚠ **The accepted cost, stated once so it is not discovered as a surprise:** this **couples a pipeline
+>    to a collector-side concept**. `ConnectionProfile` lives in `inspecto-acquire` and is reached today
+>    only via `source.connection`; making a pipeline name one crosses that boundary deliberately.
+>    🔴 **The answer does not, by itself, make bullet 1 reachable — one more thing must change with it.**
+>    `dirs.*` refuses **every** object-store URI on every platform since `454d1a6a`, so a pipeline that
+>    names a profile still cannot point at a bucket. ⇒ the build must **carve the exception and dispatch on
+>    `PathJail.isUri`**. ⛔ Do not delete that predicate to "unblock" this: a bucket URI is not containable
+>    by `Path` comparison, and the refusal is what stops `Paths.get("s3://…")` yielding a **local directory
+>    named `s3:`** on Linux. The predicate is the seam, not the obstacle.
 >
 > **📐 The object-store write shape, MEASURED 2026-09-14 against MinIO (`duckdb_jdbc` 1.5.2.1).** This is
 > what bullet 1's second implementation has to be; it is not a guess, and it is not symmetric with the
@@ -1119,7 +1137,10 @@ bullet does, and it is read first.** What is left of phase C is §5.4 alone.
   (a) the inline two-hop `ATOMIC_MOVE` reveal, which has no object-store equivalent and no seam,
   (b) ~10 further `Path.of(dirs.database())` consumers outside `PartitionWriter`, one of them building a
   glob string, and (c) a credentials/endpoint config surface that does not exist. ⇒ **bullet 6 cannot
-  start without bullet 1.** ✅ A fail-closed URI refusal shipped ahead of both — see §5.4 — because the
+  start without bullet 1.** ✅ **(a) is BUILT** (2026-09-14: the object-store lane needs no reveal at all —
+  a partitioned `COPY` writes straight to final paths) and **(c) is DECIDED** (2026-09-14: a pipeline field
+  naming a `ConnectionProfile` id). ⛔ **(b) is untouched and is now the binding piece** — ~10 `Path.of`
+  consumers, one building a glob string, none of them scheme-aware. ✅ A fail-closed URI refusal shipped ahead of both — see §5.4 — because the
   prior behaviour was platform-divergent: a clean throw on Windows, a silent local `s3:` directory on Linux.
 
 ⚠ **The Helm chart is the last artefact of phase C, not the first of phase A.** By then Kubernetes is

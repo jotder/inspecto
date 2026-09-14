@@ -123,60 +123,36 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-⚠ **§1 is NOT empty — SIX decisions are queued here as of 2026-09-14, and none of them is new work.**
-Three had been open in a plan and never filed; three were surfaced by grounding already-decided rows.
-`SBOM-EOIAGENT-LICENCE-1`, the last row that ever reached this section, was decided and closed the day it
-was filed — see the closure note below. The three below are not new questions: they have sat in
-`superpower/dataset-column-derivation-plan.md` §6 since 2026-09-11, which is why every handoff since has
-reported §1 empty while the plan reported itself blocked on decisions. ⛔ **A design plan's open decisions
-are not on the board until someone puts them here** — a plan is where a decision is *described*, this is
-where it is *queued*.
+✅ **EMPTY — all SIX were answered on 2026-09-14, in one sitting, and each answer is recorded on its
+owning row or plan (linked below). Nothing on this board is waiting on the operator.**
 
-- **`TYPEFLOW-DATASET-COLUMNS-1` Q2 — temporal tie-break.** When the role heuristic yields several date
-  columns, derive `temporal` for (a) none, leaving every date a `dimension` for a human to elect;
-  (b) the first by ordinal; or (c) all, relaxing `temporalColumn` to pick deterministically instead of
-  throwing. **Plan recommends (a)** — it never manufactures a wrong answer and cannot arm the throw
-  described in that plan's §2.3. → `superpower/dataset-column-derivation-plan.md` §6
-- **`TYPEFLOW-DATASET-COLUMNS-1` Q3 — a stored column the derivation no longer produces:** keep, drop, or
-  mark `hidden`? No recommendation offered. ⚠ **Grounded 2026-09-14: the sample tree cannot inform this
-  answer.** Exactly one of eleven committed dataset documents carries authored roles
-  (`spaces/ucc/config/registry/datasets/sites_active.toon`), it is `kind: virtual`, and no committed job
-  materializes at all — so "nothing broke in `spaces/`" is not evidence either way.
-- **`TYPEFLOW-DATASET-COLUMNS-1` Q4 — scope of the contract pin:** does it pin only the heuristic, or the
-  coarse type vocabulary too? **Plan recommends both** — the roles are meaningless without agreement on
-  what `number` and `date` are.
+⚠ **Read the closure notes below before re-filing anything**: §1 reported itself empty in every handoff
+from 2026-09-11 to 2026-09-14 while three of these six sat unfiled in a plan that reported itself blocked.
+⛔ **A plan is where a decision is *described*; this section is where it is *queued*.** Describing one in
+`superpower/` and not filing it here is what produced that three-day stall, and it is the only way it can
+happen again.
 
-*(Q1, "is merge-not-replace its own row shipped first", was **answered by building it** on 2026-09-11 and
-is not open. ⚠ Both this board and `INDEX.md` described the pre-fix behaviour in the present tense until
-2026-09-14.)*
+**Answered 2026-09-14 — the six, with where each now lives:**
 
-Two more, surfaced by grounding two **already-decided-BUILD** §3 rows on 2026-09-14. ⚠ Neither reopens the
-build decision; each is a seam the row's one-line description hid, and picking it is not an engineering
-default.
+| Decision | Answer | Recorded in |
+|---|---|---|
+| **Scale-out §5.4 — how does a PIPELINE name object-store credentials?** | **(a) a pipeline field naming an existing `ConnectionProfile` id** | `superpower/enterprise-scale-out-plan.md` §5.4 |
+| **`STUDIO-HALVES-1` — how does a Dataset page invoke a materialization?** | **(a) add a materialize route** | its §3 row |
+| **`AGT-ARTIFACT-1` — which artifact kind carries a draft?** | **(a) add a `draft` kind** | its §3 row |
+| **`TYPEFLOW-DATASET-COLUMNS-1` Q2 — temporal tie-break** | **(a) several date columns ⇒ derive `temporal` for NONE** | `superpower/dataset-column-derivation-plan.md` §6 |
+| **`TYPEFLOW-DATASET-COLUMNS-1` Q3 — a stored column the derivation stops producing** | **mark `hidden`** | same, §6 |
+| **`TYPEFLOW-DATASET-COLUMNS-1` Q4 — scope of the contract pin** | **both the heuristic AND the coarse type vocabulary** | same, §6 |
 
-- **`STUDIO-HALVES-1` — how does a Dataset page invoke a materialization?** There is no materialize route
-  and no `/datasets/*` write route at all; `MaterializeTask` is package-private and reachable only as the
-  `maintenance` job's `task: materialize`. Either (a) add a route, or (b) have the page create and trigger
-  a job through `POST /jobs` + `POST /jobs/{id}/trigger`, supplying the required `dataset` and `target`.
-  ⚠ (b) makes a viewer action write a job document; (a) adds a surface to the next MAJOR's review. → its §3 row
-- **Scale-out §5.4 — how does a PIPELINE name object-store credentials?** (filed 2026-09-14 on the way
-  into bullet 6). ⛔ **Not "design secret handling" — that exists.** `ConnectionProfile` already carries
-  host/port, username, password, region and protocol, and `SecretResolver` already does `${ENV:…}` /
-  `${SYS:…}` / `${FILE:…}` / `${KEYSTORE:…}` indirection with masking on read and omission from bundles.
-  The gap is reach: profiles are **collector-side**, named by `source.connection`, and a pipeline has no
-  credential-bearing config at all. Options: (a) a pipeline field naming an existing
-  `ConnectionProfile` id, reusing resolution and redaction whole; (b) a server-level setting, so
-  credentials are deployment config and never live in a pipeline document; (c) a new pipeline block,
-  which would need its own redaction contract. ⚠ **(c) also needs a `SECRET` field type that does not
-  exist** — `FieldType` has ten values and none is secret; today's redaction is `ConnectionProfile`-
-  specific, not something a new field can declare. ⚠ Whatever is chosen must also carve an exception into
-  the `dirs.*` URI refusal shipped in `454d1a6a`, which currently rejects every object-store path.
-  → `superpower/enterprise-scale-out-plan.md` §5.4
-- **`AGT-ARTIFACT-1` — which artifact kind carries a draft?** The five draft skills emit
-  `{kind:"query"|"expectation"|…, draft:{…}}`, and `parseArtifact` whitelists
-  `ARTIFACT_KINDS = {text, kpi, chart, data-table}`, so a draft is dropped as an unknown kind. Either
-  translate drafts into an existing kind (losing the draft's structure) or add a `draft` kind the SPA's
-  `a2ui` renderer must then handle. ⛔ Until this is picked, "populate the field" is not implementable. → its §3 row
+⚠ **Two of these carry a stated cost that was accepted, not overlooked** — do not treat either as an
+oversight to be "fixed" later without reopening the decision: pinning the coarse type vocabulary (Q4)
+makes it **a compatibility surface that cannot change freely**, and `hidden` (Q3) **accumulates state with
+no pruning story**, deliberately deferred until a real tree has enough hidden columns to inform one.
+
+⚠ **The credentials answer has a prerequisite the answer itself does not carry:** route (a) reuses
+`SecretResolver` and `ConnectionProfile` redaction whole, but it must still **carve an exception into the
+`dirs.*` URI refusal shipped in `454d1a6a`**, which today rejects every object-store path on every
+platform. ⛔ Dispatch on `PathJail.isUri` — do not delete it; a bucket URI is not containable by `Path`
+comparison and needs its own rule.
 
 *(2026-09-14: **`SBOM-EOIAGENT-LICENCE-1` DECIDED, FIXED and CLOSED same day** — the release is
 unblocked. Operator took route (a), **declare the licence upstream**, and stated that `com.eoiagent`
@@ -604,7 +580,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   are different questions, and only the new one proves what a job will execute. **Verified in the running
   app**, which corrected the spec: this route sends the **v1** envelope `{error: {errorCode, message, …}}`,
   not the legacy `{error: '<message>'}` — `apiErrorMessage` reads both, so pinning the wrong one passed
-  while describing a response nobody sends. ⏸ **The materialize half remains blocked on its §1 decision.**
+  while describing a response nobody sends. ✅ **DECIDED 2026-09-14 — the materialize half is UNBLOCKED: route (a), ADD A MATERIALIZE ROUTE.**
+  The operator chose a real surface over route (b) (create-and-trigger a job from the page), because (b)
+  makes a **viewer action write a job document** — an authoring side effect from a page a non-author can
+  open — and that is a worse trade than one more endpoint. ⚠ The accepted cost is stated: **this adds a
+  surface to the next MAJOR's API review**, and it must be built to the `endpoint` skill's contract — the
+  fail-closed gate order (write-root 503 → spec/`ConfigSafetyValidator` 422 → path jail 403 → conflict 409
+  → act atomically) plus a **real-HTTP test class covering every gate**, not a unit test of the handler.
+  ⚠ Two things the grounding above already settled and the build must not re-litigate: `MaterializeTask`
+  is **package-private** (`MaterializeTask.java:46`), so the route needs a deliberate visibility decision
+  rather than an incidental widening; and `target` must differ from `source` (`:63`). ⛔ The row's "ONE
+  committed example job" half is **still zero** and is not discharged by the route — it is the thing that
+  proves the path, so ship it in the same change.
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
@@ -627,6 +614,14 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     `toResult` / the `askStream` override (`:431-448`). ⛔ Do not scope this as "populate a field".
   - ⚠ Not established: whether the external eoiagent SPI auto-promotes a tool return value into an
     `InlineArtifact`. That code is outside this repo. The in-repo evidence makes "no producer" safe regardless.
+  ✅ **DECIDED 2026-09-14 — ADD A `draft` KIND.** The operator chose to widen `ARTIFACT_KINDS`
+  (`InspectoIntelligenceAgent.java:74`) rather than translate drafts into an existing kind. Reason for the
+  record: translating loses the draft's **structure**, and the structure is the whole point — a draft that
+  arrives as `text` or `data-table` can be read but never accepted, so "apply this draft" could not be
+  built later without redoing this. ⚠ The accepted cost: **the SPA's `a2ui` renderer must handle the new
+  kind**, so this row is no longer server-only — it is a producer step in `toResult` / the `askStream`
+  override (`:431-448`), the kind whitelist, **and** UI work. ⛔ Still not "populate a field"; the
+  grounding above stands unchanged.
 - ✅ **CLOSED 2026-09-14 · `RETIRE-HALVES-1` — both server halves are deleted, and the sweep was wider than the row.**
   Decided 2026-09-10, built as a **full sweep** on the operator's 2026-09-14 call. Gone: `GET /bi/datasets`
   (`BiRoutes`), the whole queue family (`QueueRoutes`, `Queue`, `QueueStore`, `InMemoryQueueStore`,
@@ -1302,11 +1297,39 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   guard. (b) `httpfs` was therefore never the phase C blocker it looked like; **staging it is.**
   ✅ **`httpfs` and `aws` added to `$duckdbExtNames` 2026-09-14** on the operator's call; the fetch guard
   reads the list out of `package.ps1` and now verifies 10 files (5 × 2 platforms), every one published.
-  ⚠ **Measured size: httpfs 28 MB + aws 24 MB per platform, and every bundle carries BOTH platforms** —
-  roughly +104 MB on a ~220 MB bundle. ⚠ **`httpfs` ALONE is sufficient for an S3-compatible endpoint with
-  EXPLICIT credentials** (measured against MinIO with `aws` absent); `aws` buys only the AWS credential
-  CHAIN — profiles, environment, IMDS. ⇒ if bundle size ever binds, drop `aws` first and nothing that
-  passes explicit keys notices.
+  ✅ **SIZE SETTLED BY BUILDING IT, 2026-09-14** — `package.ps1 -Edition Enterprise` run to completion,
+  **real exit code 0**, every step green including SBOM, both jlink runtimes and the boot smoke
+  (`the staged Enterprise bundle boots and answers /health`). 🔴 **The estimate this row carried was
+  wrong in BOTH directions and the larger error was the one that mattered.**
+  - ⛔ **The "+104 MB" was ~3× the real shipped cost.** It doubled the *Windows* raw sizes across both
+    platforms; Linux `httpfs` is **19.92 MB**, not 28. Raw for the two new names is **93.32 MB** across
+    both platforms, not 104. But a bundle is a **ZIP**, and `.duckdb_extension` binaries deflate to
+    ~0.34–0.38 — measured from the built zip's own entry table, not assumed. ⇒ the addition costs
+    **+33.5 MB compressed in every zip** (win `httpfs` 10.26 + `aws` 8.60; linux 6.84 + 7.77).
+    ⚠ **Never quote a raw staged size as a bundle cost** — that is the whole 3×.
+  - Per-platform totals for all five, raw → zipped: **windows 121.91 → 45.26 MB**,
+    **linux 125.95 → 43.25 MB**. A release stages both, so each zip carries **~88.5 MB** of extensions.
+  - Measured zips from this run: `inspecto-deploy.zip` **238.86 MB**, `inspecto-deploy-linux.zip`
+    **241.82 MB** — ⚠ **both carrying the WINDOWS extensions only**, because a desk build stages what the
+    local cache holds (see the next bullet). A release build, which stages both platforms, lands at
+    **≈282 / ≈285 MB**.
+  - ⚠ **A desk build stages only the platforms the local `~/.duckdb/extensions` cache happens to hold**,
+    warns per missing file, and still exits 0 — by design, so a developer without a cache can build.
+    ⛔ **This is NOT the released shape and must not be read as one:** all three `release.yml` jobs pass
+    `-RequireExtensions` after a per-platform fetch step, which turns each of those warnings into a
+    refusal. That gate is `AIRGAP-EXTENSIONS-CI-1`, closed 2026-09-14, and it held here.
+  - 🔴 **Found while measuring — every zip carries the OTHER platform's binaries, which its own launcher
+    never probes.** Both platforms stage into the same bundle dir and both zips are cut from it, so
+    `inspecto-deploy-linux.zip` ships `duckdb-extensions/windows_amd64/` while `run.sh` looks only at
+    `duckdb-extensions/linux_amd64/`. `package.ps1` calls this "harmless — like run.sh sitting unused in
+    the Windows zip", and at 27 MB it was. **It is now ~43–45 MB of unreachable payload per zip, ~16 % of
+    the download**, and `httpfs`+`aws` are what moved it. ⇒ Cutting each zip against its own platform dir
+    is the cheapest ~45 MB on the board, but it is a **packaging change, not a measurement** — filed, not
+    taken, see `AIRGAP-CROSSPLAT-DEADWEIGHT-1` below.
+  ⚠ **`httpfs` ALONE is sufficient for an S3-compatible endpoint with EXPLICIT credentials** (measured
+  against MinIO with `aws` absent); `aws` buys only the AWS credential CHAIN — profiles, environment,
+  IMDS. ⇒ if bundle size ever binds, drop `aws` first and nothing that passes explicit keys notices; it
+  is **16.37 MB compressed per bundle** (8.60 windows + 7.77 linux), now measured rather than estimated.
   🔴 **WHAT REMAINS, and it is the half that makes staging mean anything.** A flat
   `duckdb-extensions/<plat>/<name>.duckdb_extension` is reachable ONLY by `DuckDbExtension`'s explicit
   `LOAD '<file>'`. DuckDB's AUTOLOAD ignores `-Dduckdb.extension.dir` and reads its own
@@ -1333,6 +1356,23 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   and silent local writes on the box it ships to. `PathJail.isUri` is now the one definition, enforced by
   both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
   bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
+
+- **P3** · **`AIRGAP-CROSSPLAT-DEADWEIGHT-1` — every zip ships the other platform's DuckDB extensions,
+  ~45 MB it can never load.** Filed 2026-09-14, **measured from the built zips' own entry tables**, not
+  estimated. `package.ps1` stages both platforms into one `$bundleDir` and cuts both zips from it, so
+  `inspecto-deploy-linux.zip` contains `duckdb-extensions/windows_amd64/` while the `run.sh` it ships
+  probes only `duckdb-extensions/linux_amd64/` (and the reverse for the Windows zip + `serve.bat`).
+  The script states the trade — *"harmless — like run.sh sitting unused in the Windows zip"* — and **that
+  judgement was made when the payload was three extensions**. It is now five: windows **45.26 MB**
+  zipped, linux **43.25 MB** zipped, so a release bundle is **~16 % unreachable payload** and
+  `httpfs`+`aws` contributed **33.5 MB** of it. ⇒ Cut each zip against its own platform directory. ⚠ Two
+  things to check before touching it, because the current shape is deliberate: (a) the **launchers are
+  cross-copied on purpose** (`run.sh` in the Windows zip), so "filter by platform" must filter the
+  extension directory **only**, not sweep the launchers out with it; (b) the **boot smoke runs against
+  `$bundleDir`, before zipping** — it will stay green whatever the zips contain, so this change needs its
+  evidence from the zip entry tables, exactly as the measurement did. ⛔ Not urgent and not a correctness
+  defect: every deployment loads what it needs today, it just downloads twice the extensions to do it.
+  → `inspecto/package.ps1` step 6d · `AIRGAP-S3-EXTENSIONS-1` above
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
