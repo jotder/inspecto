@@ -11,8 +11,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **56 rows: 0 × P1 · 33 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
-> `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.)
+> text). **57 rows: 0 × P1 · 34 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
+> `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.
+> `LINKGUARD-CASE-1` filed the same day, §5 — so the P2 count is unchanged at 34, one out and one in.)
 >
 > ✅ **No P1 rows. `AIRGAP-EXTENSIONS-CI-1` was filed AND closed on 2026-09-14** — no released bundle had
 > ever carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a
@@ -26,9 +27,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
 > `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 33 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
+> ⚠ **Only the 34 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 56 as pending work overstates what is owed by roughly 40%.
+> down. Reading all 57 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -1070,6 +1071,18 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   keep-or-delete verdict, not a build. ⛔ Demand-gated: do not "tidy" them without one, because at
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
+
+- **P2** · **`LINKGUARD-CASE-1` — the doc-link guard is CASE-BLIND on Windows, so every local run is a
+  false green for a whole error class.** Found 2026-09-14: five OKF pages pointed their "docs index" link
+  at `../../INDEX.md`, which does not exist — `docs/okf/index.md` does, lowercase, and it is a DIFFERENT
+  document from the `docs/INDEX.md` the phrase means. `fs.existsSync` said true on the
+  Windows sandbox and false on the Linux runner, so the guard was green for every shift that ran it locally
+  and red the moment CI reached it. ⚠ It surfaced only because the processor-board guard, red on master since
+  `PKG-5`, had been failing FIRST and masking it — **a red gate hides every gate behind it.** The five links
+  are fixed (they were also one `../` short, pointing into the OKF tree instead of at the root map); the guard
+  is not. Fix: resolve each link against a case-exact index of tracked paths (`git ls-files`), not against the
+  filesystem. ⛔ Falsify it ON WINDOWS — a case bug that only a Linux runner can see is precisely the shape
+  that got here. → `okf/capabilities/tooling/tooling.md` §3.2
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:

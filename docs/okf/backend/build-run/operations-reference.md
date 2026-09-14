@@ -36,7 +36,7 @@ timestamp: 2026-07-16T00:00:00Z
 > For the curated flag table read [Operations](operations.md); for build, reactor and `package.ps1` read
 > [Build & Test](build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from the retired root-level `operations.md` (docs consolidation, 2026-07-16).)*
 
-> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
+> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../../INDEX.md).
 
 ## Pre-ETL Utility Suite
 

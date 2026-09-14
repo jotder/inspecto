@@ -10,7 +10,7 @@ timestamp: 2026-07-16T00:00:00Z
 # Troubleshooting
 > **Deep reference — the detail tier.** Start at [Build & run section index](index.md) for the summary; this page is the long form it points to. *(Moved from the retired root-level `troubleshooting.md` (docs consolidation, 2026-07-16).)*
 
-> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../INDEX.md).
+> Part of the [Inspecto](../../../../inspecto/README.md) documentation. See the [docs index](../../../INDEX.md).
 
 ## Troubleshooting
 
