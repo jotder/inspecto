@@ -137,6 +137,27 @@ code before filing, not just the board.
   component and the gate never saw one. It is untracked — `NOASSERTION` appears in no doc — and
   `release.yml` fires only on `v*` tags, so nothing has hit it yet: **the next tag fails at the Standard
   step.**
+  ✅ **DECIDED 2026-09-14 (operator): route (a) — declare `<licenses>` upstream; and the two groupIds are
+  the SAME LEGAL ENTITY.** That settles the entity question below and takes (c) off the table as
+  unnecessary rather than indefensible.
+  ✅ **The mechanics are PROVEN and cheap (2026-09-14).** *One* `<licenses>` element in
+  `jotder/inspect-agent`'s **root `pom.xml`** (the `eoiagent-parent` aggregator) fixes **both** violators
+  in **both** editions: `eoiagent-core`/`-model` inherit at 1 level, well inside sbom.mjs's 4-level parent
+  walk. Verified by injecting a placeholder into the cached parent POM and re-running the licence walk —
+  `2 UNLICENSED → 0` for Standard and Enterprise, then restoring the cache and watching the failure return
+  (both controls run, so the result is not a one-sided pass).
+  ✅ **It reaches CI with NO publishing step.** `ci.yml:184-195` and `release.yml:40-47` both *check out*
+  `jotder/inspect-agent` and `mvn install` it into the runner's `~/.m2` — eoiagent is pre-release and
+  published to no repository — so an upstream POM edit flows into the release build on the next tag by
+  itself. ⚠ It does **not** break upstream's own licence gate: that plugin's `<excludedGroups>com\.eoiagent`
+  exempts these modules from its Apache/MIT/BSD whitelist regardless of what they declare.
+  🔴 **BLOCKED ON ONE FACT — the licence identifier itself, which no source in either repo states.**
+  Neither repo has a `LICENSE` file, neither declares `<licenses>` in any POM, and **both are PUBLIC on
+  GitHub with `licenseInfo: null`** — which by copyright default is *all rights reserved*, not permissive.
+  ⛔ An agent must not pick this value: declaring `Apache-2.0` would **grant rights that do not currently
+  exist**, and declaring `Proprietary` asserts commercial terms — either is a legal statement that then
+  ships inside a signed compliance artifact. "Same entity" answers *who owns it*, not *what it is licensed
+  under*. **Operator must supply the exact identifier** (and ideally a `LICENSE` file upstream to match).
   ⛛ **Not fixable by an agent, and deliberately not worked around.** The question is what licence those
   components actually carry, and that is a compliance answer, not a code change: (a) declare `<licenses>`
   upstream in `jotder/inspect-agent` — the correct home, since the metadata belongs to the artifact; or
