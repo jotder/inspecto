@@ -172,7 +172,23 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 `UNAUTHENTICATED` · `PERMISSION_DENIED`. `defaultFor(status)` maps a bare status to a code (`:30-41`).
 Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`, `:370-393`).
 `permissions[]` on an authenticated envelope is `subject.capabilities() ∩ applicable` when a route declares
-`resourcePermissions` — an affordance signal, never the security boundary (`SEC` §3.14). **A client that
+`resourcePermissions` — an affordance signal, never the security boundary (`SEC` §3.14).
+
+⛔ **SPA adoption is RESERVED, not scheduled** (decided 2026-09-10 as `CLIENT-HALVES-1` (b); the row was
+deleted 2026-09-14 once its other halves shipped, so this is the record). The field stays **emitted and
+unread**, deliberately. Three measured facts remove the value: **(i)** `stamped()` is applied to exactly
+three *mutating* routes, and `GET /requirements` — the sole read, with no single-requirement GET at all —
+carries no per-resource set, so it can never gate a list's affordances; **(ii)** the client already holds
+the input the server derives from (`view()` puts `status` on every list row and the server's rule is
+literally `switch (status)`); **(iii)** the pane already implements that exact rule locally and correctly
+(`requirement-decision.dialog.ts:59,69`). ⇒ Adopting it would duplicate a correct local derivation over
+the network and change no behaviour. ⚠ A structural limit worth knowing first: the envelope carries **ONE**
+`permissions` array per response, so it cannot express per-row permissions for a collection — "per-resource"
+only ever works for a single-resource response. Every affordance gate in the SPA today is a
+`LensService.can*` signal fed from a **session-wide** array populated once from `GET /bootstrap`, so
+adopting a per-response field is net-new plumbing at a *narrower* scope.
+✅ **The trigger to reopen:** a route that stamps a set the client **cannot compute from the payload it
+already has** — per-record ownership or an ABAC data scope — *and* is reachable on a **read**. **A client that
 adds the prefix and does not unwrap `data` compiles and fails at runtime** — the trap that caught the
 intelligence module's `ControlPlaneClient`; the SPA's `v1Interceptor` unwraps at one seam (§3.15).
 
