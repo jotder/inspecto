@@ -189,6 +189,43 @@ class CsvIngesterSkipLogicTest {
     }
 
     /**
+     * A continuation line that holds NO quote character must leave the value open.
+     *
+     * <p>⚠ This is the case the two-line test above cannot reach: there the continuation line is
+     * {@code 20",…}, which carries a quote, so a scan that wrongly answered "closed" for a
+     * quote-free line would still pass it. Here the middle line is bare, so truncating the record
+     * at it loses the row — which is what the indexOf fast path in {@code endsInsideQuotedField}
+     * would do if it returned {@code false} instead of the incoming state.
+     */
+    @Test
+    void quoteFreeContinuationLineKeepsTheFieldOpen(@TempDir Path dir) throws Exception {
+        File csv = dir.resolve("threeline.csv").toFile();
+        Files.writeString(csv.toPath(), """
+                ID,AMT,EVENT_DATE
+                1,"10
+                15
+                20",2020-01-01
+                2,30,2020-01-02
+                """);
+        PipelineConfig cfg = TestConfigs.csv(dir, SCHEMA).load();
+
+        File db = DuckDbUtil.tempDbFile("ci_3l_");
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            IngestResult r = CsvIngester.ingest(csv, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(2, r.parsedRows(), "the three-line record is one row");
+            assertEquals(0, r.errorRows(), "no fragment may be rejected as short");
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT AMT FROM raw_f0 WHERE ID = '1'")) {
+                assertTrue(rs.next());
+                assertEquals("10\n15\n20", rs.getString(1),
+                        "the quote-free middle line must stay inside the open value");
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /**
      * A literal quote inside an unquoted field is not a field-opening quote, so it must not start a
      * multi-line value. A naive parity count would merge every following line into one record here.
      */

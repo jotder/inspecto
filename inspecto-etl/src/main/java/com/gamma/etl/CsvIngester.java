@@ -299,6 +299,13 @@ public final class CsvIngester {
      * @param inQuotes whether the line begins inside a quoted value (a continuation line)
      */
     private static boolean endsInsideQuotedField(String s, char delimiter, char quote, boolean inQuotes) {
+        // A line with no quote character at all cannot change the state: the loop below only ever
+        // assigns inQuotes inside a `c == quote` branch. Answering from one indexOf keeps the common
+        // CDR case (no quotes anywhere) off the per-character path, which JFR measured at ~a third of
+        // the Java lane's own CPU. ⚠ Return the INCOMING state, not false — a continuation line that
+        // holds no quote leaves the value still open.
+        if (s.indexOf(quote) < 0) return inQuotes;
+
         boolean atFieldStart = !inQuotes;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
