@@ -40,7 +40,37 @@ Compare against the current baseline, report regressions verbatim before fixing 
 **Never stage `inspecto/pom.xml`.** Prefer the `verify-runner` agent so build logs stay out of the
 main context.
 
-🔴 **Reading the reactor total: FOUR module summaries are logged at `[WARNING]`, not `[INFO]`** — Maven does
+✅ **Don't parse the log at all — SUM THE SUREFIRE REPORTS.** They are the authoritative record, one file
+per test class, and reading them sidesteps every trap below in one step:
+
+```bash
+python - <<'EOF'
+import re, pathlib
+tot=f=e=sk=0; mods={}
+for p in pathlib.Path('.').glob('**/target/surefire-reports/*.txt'):
+    if 'inspecto-deploy' in p.parts: continue
+    m = re.search(r'Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)',
+                  p.read_text(encoding='utf-8', errors='ignore'))
+    if not m: continue
+    a,b,c,d = map(int, m.groups()); tot+=a; f+=b; e+=c; sk+=d
+    x = mods.setdefault(str(p.parent.parent.parent), [0,0,0,0])
+    for i,v in enumerate((a,b,c,d)): x[i]+=v
+for k in sorted(mods): print(f"{k:34s} {mods[k]}")
+print(f"MODULES={len(mods)} TOTAL={tot} failures={f} errors={e} skipped={sk}")
+EOF
+```
+⚠ Use `**/target/…`, not `*/target/…` — the five `asn-*` modules are nested under
+`asn-parser/asn-decoders/`, so a single-level glob silently reports **21 modules / 4429**, which looks
+like a plausible total rather than an obviously broken one. Measured 2026-09-15: the recursive form gives
+**26 / 4501**, agreeing exactly with a correct log read.
+
+🔴 **When a total does not reconcile, SUSPECT THE BASELINE'S PROVENANCE FIRST.** On 2026-09-15 an
+"unexplained +2" was entirely an error in the *briefing*: the baseline had been measured when a test class
+held 9 tests, and the reconciliation was stated against the 11 it held later. ⇒ **Record WHEN a baseline
+was taken and WHAT the changed classes held at that moment**, not just the number — a baseline without
+provenance cannot be reconciled against, only argued with.
+
+🔴 **If you do read the log: FOUR module summaries are logged at `[WARNING]`, not `[INFO]`** — Maven does
 that for any module with a skipped test. A grep of `^\[INFO\] Tests run:` therefore finds **22 modules and
 sums to ~3480** against a real **26 / 4243**, and the shortfall reads like a regression rather than a
 log-parsing bug. ⚠ The mirror image is real too: told to include WARNING lines, a reader then
