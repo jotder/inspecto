@@ -111,10 +111,22 @@ lower thanks to the native engine below).
 that date the Java appender lane got SLOWER under concurrency: every per-batch temp DB ran DuckDB's default
 16 MB WAL auto-checkpoint, a synchronous write per ~10 appender flushes that serialised the batches on a
 laptop SSD (all workers parked in `duckdb_appender_flush`, CPU ~20 %). `ConsignmentIngestStrategy.configure()`
-now sets `checkpoint_threshold='1TB'` on those disposable connections. Two limits remain on that lane
+now sets `checkpoint_threshold='1TB'` on those disposable connections. One limit remains on that lane
 (`BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1`): on Windows the process heap halves 12-way appender
-throughput versus Linux (DuckDB bundles jemalloc on Linux only), and `readRecord`'s quote pre-scan is a second
-pass over every line. Delimited feeds on a clean config take the native lane and are not affected.
+throughput versus Linux, because **DuckDB bundles jemalloc on Linux only**. ⇒ **run the ingest tier on
+Linux**; a Windows host is supported but pays that penalty on wide string appends, and it is an allocator
+difference, not a tuning knob — no `processing.*` setting recovers it. Delimited feeds on a clean config
+take the native lane and are not affected.
+
+⚠ **`readRecord`'s quote pre-scan was the other suspected limit, and measurement REFUTED it as one**
+(2026-09-14). A JFR profile attributed roughly a third of the Java lane's CPU to `endsInsideQuotedField`,
+so it was carried as "fold it into the univocity pass". An `indexOf` fast path now answers quote-free
+lines without the per-character walk, and it is **38× cheaper in isolation** (927 ns → 24 ns on a
+789-char, 100-column line) — yet end-to-end it is worth about **1.7 %** (100 cols, 4 × 100K rows,
+`engine=java`, `threads=1`: three baseline runs 24.29 / 24.42 / 24.45 s against two fixed runs
+23.73 / 24.20 s — consistent in direction, tiny in size). 🔴 **The lesson generalises: a third of the
+*Java* CPU is not a third of the *wall clock* when the lane spends most of its time in a native frame**
+(`duckdb_appender_flush`). ⛔ Do not schedule the larger univocity rework on that profile alone.
 
 **Two controllable axes** (set both to keep the CPU honest):
 

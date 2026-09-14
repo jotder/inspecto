@@ -4,7 +4,7 @@
 The operator will add / remove / prioritise here first; only survivors move to
 `docs/BACKLOG.md` §3. Until then nothing in this file is committed work.
 
-**Source:** [slothflowlabs/duckle](https://github.com/slothflowlabs/duckle) — Rust + DuckDB,
+**Upstream:** [slothflowlabs/duckle](https://github.com/slothflowlabs/duckle) — Rust + DuckDB,
 self-hosted ETL, canvas or SQL authoring, plain-file workspace, headless runner + web console.
 Beta v0.7.2, ~1.5k commits, MIT OR Apache-2.0. Same shape as inspecto; the value is in a
 handful of crisply stated operational rules, not in its surface area.

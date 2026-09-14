@@ -177,9 +177,27 @@ exactly how the Studio editor already treats it.
 
 ✅ The UI consumer list is confirmed and folded into §2.5 / §5. Nothing outstanding blocks a decision.
 
-⚠ One thing deliberately **not** established: whether any *stored* dataset in the sample configs
-actually carries authored `role`s today. §2.2's data loss is real by code inspection, but its blast
-radius in practice is unmeasured — §6-Q1's test should establish it rather than assume it.
+✅ **CLOSED 2026-09-14 — the authored-role blast radius is measured, and it is ZERO in committed
+configs, for two independent reasons.** Of the eleven tracked dataset documents under
+`spaces/*/config/registry/datasets/`, exactly **one** carries authored roles:
+`spaces/ucc/config/registry/datasets/sites_active.toon`, six columns as
+`columns[6]{name,type,role}`. The other ten declare no `columns` block at all — several are a single
+`physicalRef:` line.
+
+Neither of the two paths that could destroy those roles reaches them:
+
+- That one document is `kind: virtual` — a view over `sites`, with `physicalRef: null`. `MaterializeTask`
+  refuses `target.equals(source)` and writes its merge into the **target** document, so a source-shaped
+  virtual dataset is never the thing it rewrites.
+- Nothing committed materializes at all: a repo-wide search for `task: materialize` across tracked
+  `*.toon` returns **zero**. The committed maintenance library declares only `compact`, `db_maintenance`,
+  `ledger_prune` and `cleanup`.
+
+⇒ §2.2's loss stays **real by code inspection and unexercised in-repo**. Two consequences for this plan:
+the merge-not-replace fix shipped under Q1 is protective of a path no committed config exercises, so it
+cannot be regression-tested from the sample tree; and a derivation that fires on refresh would, today,
+have no authored roles anywhere to disagree with. ⚠ That makes the sample tree a **weak** guard for Q3 —
+do not read "nothing broke in `spaces/`" as evidence about stored-column handling.
 
 ## 8. Vocabulary
 

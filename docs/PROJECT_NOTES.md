@@ -192,10 +192,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - ⚠ **A test that asserts a RESOURCE QUANTITY is host-dependent, and CI is the small host.**
   `ConfigSafetyValidator` bounds `processing.threads` by `availableProcessors()` — 12 on this sandbox, 4
   on a GitHub runner — so a test writing `threads: 7` was a 200 here and a 422 there for as long as it
-  existed. Reproduce with `MAVEN_OPTS="-XX:ActiveProcessorCount=4"`. ⛔ But pairing that with
-  `-DforkCount=0` (needed because `-DargLine` does not reliably reach a forked JVM) **hung the reactor**
-  inside `ControlApiPreferencesTest` — so the two variables have to be separated before either is
-  believed (`CORECOUNT-SWEEP-1`).
+  existed. ✅ **Reproduce with `JDK_JAVA_OPTIONS="-XX:ActiveProcessorCount=4"`, which reaches the forked
+  test JVM.** ⛔ The older recipe here — `MAVEN_OPTS` plus `-DforkCount=0` — **hung the reactor** inside
+  `ControlApiPreferencesTest`. The two variables were separated on 2026-09-14 and the verdict is that
+  **`forkCount=0` was the cause and the core count was innocent**: forked at 4 cores the full enterprise
+  reactor completes at **4475/0/0/24**, identical to 12 cores, and `ControlApiPreferencesTest` itself
+  passes in 0.115 s (`CORECOUNT-SWEEP-1`).
 
 - ⚠ **A mutation anchor that is not unique proves nothing, and reports a hole that does not exist.** Twice
   on 2026-09-14 a falsification run flagged the guard as blind when the mutation had simply landed
@@ -207,6 +209,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   brand-new script is exempt from it while untracked — the whole sweep comes back green on a file one
   `git add` away from failing. Worse, its pre-push pass scans the **push RANGE**, so a later fix commit
   does not clear a value introduced earlier in the same push; it takes a range rewrite.
+  🔴 **This is not one guard's quirk — it is how the guards resolve, and it bit twice on 2026-09-14
+  with a single new doc.** `check-vocabulary.mjs` and `check-doc-links.mjs` also work from
+  `git ls-files`, so on a NEW file the pre-commit sweep is **doubly misleading**: the new file's own
+  content is not scanned at all (vocabulary reported 218 docs clean; the same file failed on
+  `[source-acquisition-entity]` the moment it was committed), while a link *to* it from a tracked file
+  is reported BROKEN precisely because it is not yet tracked. ⇒ **a green sweep over an untracked file
+  proves nothing, and a red link-guard pointing at your new file may just mean "not added yet".** Add,
+  then sweep, then commit — and read a failure on a new path as a tracking question first.
 
 - 🔴 **"Fails closed on failure" does not cover "succeeds at the wrong thing."** A `catalog_url` with no
   recognised backend prefix does not make DuckLake fail — it reads the value as a **file path** and
@@ -296,7 +306,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - 🔴 **`-DargLine` does NOT reach the forked surefire JVM.** The parent POM is
   `<argLine>@{argLine} …</argLine>`, and that late-bound property resolves the **project** property — a
   command-line `-D` does not override it. `systemPropertyVariables` is also too late for anything the JVM
-  fixes at startup (the default TimeZone). **`-DforkCount=0` plus `MAVEN_OPTS`** is the working route.
+  fixes at startup (the default TimeZone). ✅ **Use `JDK_JAVA_OPTIONS` — it reaches the FORK, so nothing
+  has to be unforked** (confirmed 2026-09-14 with `-X`: the flag is absent from the forked command line
+  under `-DargLine`, and under `JDK_JAVA_OPTIONS` the JVM prints `NOTE: Picked up JDK_JAVA_OPTIONS`
+  **twice** — Maven's JVM and the fork — with `availableProcessors()` reading 4 inside). ⛔ The route this
+  note used to recommend, **`-DforkCount=0` plus `MAVEN_OPTS`, is the one that HUNG the reactor**; it was
+  never the core count. See `CORECOUNT-SWEEP-1`, settled 2026-09-14: forked at 4 cores the full reactor
+  passes **4475/0/0/24**, identical to 12 cores.
   ⚠ Related: `-Dtest='A+B'` silently runs **nothing** under `failIfNoSpecifiedTests=false` (exit 0, empty
   log) — the separator is a **comma**.
 

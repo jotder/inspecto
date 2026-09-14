@@ -123,8 +123,31 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-**§1 is EMPTY again.** `SBOM-EOIAGENT-LICENCE-1`, the only row here, was decided and closed the day it
-was filed — see the closure note below.
+⚠ **§1 is NOT empty — three decisions were open in a plan and had never been filed here (2026-09-14).**
+`SBOM-EOIAGENT-LICENCE-1`, the last row that ever reached this section, was decided and closed the day it
+was filed — see the closure note below. The three below are not new questions: they have sat in
+`superpower/dataset-column-derivation-plan.md` §6 since 2026-09-11, which is why every handoff since has
+reported §1 empty while the plan reported itself blocked on decisions. ⛔ **A design plan's open decisions
+are not on the board until someone puts them here** — a plan is where a decision is *described*, this is
+where it is *queued*.
+
+- **`TYPEFLOW-DATASET-COLUMNS-1` Q2 — temporal tie-break.** When the role heuristic yields several date
+  columns, derive `temporal` for (a) none, leaving every date a `dimension` for a human to elect;
+  (b) the first by ordinal; or (c) all, relaxing `temporalColumn` to pick deterministically instead of
+  throwing. **Plan recommends (a)** — it never manufactures a wrong answer and cannot arm the throw
+  described in that plan's §2.3. → `superpower/dataset-column-derivation-plan.md` §6
+- **`TYPEFLOW-DATASET-COLUMNS-1` Q3 — a stored column the derivation no longer produces:** keep, drop, or
+  mark `hidden`? No recommendation offered. ⚠ **Grounded 2026-09-14: the sample tree cannot inform this
+  answer.** Exactly one of eleven committed dataset documents carries authored roles
+  (`spaces/ucc/config/registry/datasets/sites_active.toon`), it is `kind: virtual`, and no committed job
+  materializes at all — so "nothing broke in `spaces/`" is not evidence either way.
+- **`TYPEFLOW-DATASET-COLUMNS-1` Q4 — scope of the contract pin:** does it pin only the heuristic, or the
+  coarse type vocabulary too? **Plan recommends both** — the roles are meaningless without agreement on
+  what `number` and `date` are.
+
+*(Q1, "is merge-not-replace its own row shipped first", was **answered by building it** on 2026-09-11 and
+is not open. ⚠ Both this board and `INDEX.md` described the pre-fix behaviour in the present tense until
+2026-09-14.)*
 
 *(2026-09-14: **`SBOM-EOIAGENT-LICENCE-1` DECIDED, FIXED and CLOSED same day** — the release is
 unblocked. Operator took route (a), **declare the licence upstream**, and stated that `com.eoiagent`
@@ -523,10 +546,50 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   calling `POST /queries/{id}/run` with results in the same panel; a **Materialize** action on the Dataset page plus ONE
   committed example job that schedules a materialization, so the path is exercised by something shipped.
   → `okf/capabilities/data-plane/data-plane.md` · `okf/capabilities/studio/studio.md`
+  **⚠ GROUNDED 2026-09-14 — the row is buildable, but its query half is the opposite shape it describes.**
+  - ✅ `POST /queries/([^/]+)/run` EXISTS and is `QueryRoutes.register`'s **only** route (`QueryRoutes.java:43`);
+    it returns the Result Set contract and refuses non-`type:sql` queries with 422 (`:55`).
+  - 🔴 **The route has never been exercised by anything shipped.** The Query Library editor already has a
+    "Run preview" button (`queries.component.html:117`), and it does **not** call that route — `run()`
+    goes through `DatasetRowsService` → `DbBrowserService`, i.e. the `/db/*` browser path
+    (`queries.component.ts:297`). The only mention of `/queries/{id}/run` anywhere in the SPA is a comment
+    in `bi-query.service.ts:32`. ⇒ the work is **re-pointing an existing Run at the shipped route**, not
+    adding a first Run. The missing affordance is the per-row one: list actions are Edit / History / Delete
+    only (`queries.component.html:250,258,267`).
+  - ✅ `<inspecto-query-panel>` exists (`query-panel.component.ts:25`) and the Dataset editor already hosts it.
+  - ⛔ **The Materialize half has no invocation seam and needs a decision before code.** `MaterializeTask`
+    is package-private (`MaterializeTask.java:46`) and reachable only as the `maintenance` job's
+    `task: materialize` (`MaintenanceJob.java:211`); there is **no materialize route and no `/datasets/*`
+    write route at all**. A Dataset-page action must either get a new route or create-and-trigger a job via
+    `POST /jobs` + `POST /jobs/{id}/trigger` (`JobRoutes.java:54,125`), supplying the required `dataset`
+    and `target` keys (`MaterializeTask.java:63`). ⚠ `target` must differ from `source`.
+  - 🔴 **"ONE committed example job" is not a top-up — there are ZERO today.** A repo-wide search for
+    `task: materialize` over tracked `*.toon` returns nothing; the committed maintenance library declares
+    only `compact`, `db_maintenance`, `ledger_prune` and `cleanup`
+    (`inspecto/examples/06-serve/maintenance-library/*.toon:4`). The word `materiali` does not appear
+    anywhere in `inspecto-ui/src/app`.
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
   rather than prose. → `okf/capabilities/assistant/assistant.md` §3
+  **⚠ GROUNDED 2026-09-14 — the skeleton is CONFIRMED, the causal claim is WRONG, and the row understates the work.**
+  - ✅ The field exists: `AgentAskResult(..., Map<String,Object> artifact)` (`AgentAskResult.java:21`), nullable raw map.
+  - ✅ The client consumer is genuinely live, not aspirational: SSE `event: artifact` → `agent.service.ts:244`
+    → `models.ts:610` → `assist-panel.component.ts:142` renders `<inspecto-a2ui-render>` (`.html:43`).
+    The SSE relay `AgentRoutes.java:265` is already generic and needs no change.
+  - ✅ No producer: `InspectoIntelligenceAgent.toResult` (`:698`) is the only construction site, and its own
+    comment records that no eoiagent tool or session can emit an `INLINE_ARTIFACT` today. The only place
+    `AnswerKind.INLINE_ARTIFACT` is constructed is a test (`InspectoIntelligenceAgentTest.java:199`).
+  - ✅ All five skills exist **in this repo**, not upstream — `InspectoTools.java` at `:789` `component_draft`,
+    `:834` `query_author`, `:934` `projection_author`, `:1075` `kpi_report_builder`, `:1449` `pipeline_author`.
+  - 🔴 **"Return their draft as the artifact" does not describe a wiring change.** Those tools return
+    `{kind:"query"|"expectation"|…, draft:{…}}`, and `parseArtifact` whitelists
+    `ARTIFACT_KINDS = {text, kpi, chart, data-table}` (`InspectoIntelligenceAgent.java:74`) — so a draft
+    payload is **dropped as an unknown kind** even if it reached the seam. ⇒ the row needs a **translation
+    layer** from draft shape to a renderable artifact kind (or a new allowed kind), plus a producer step in
+    `toResult` / the `askStream` override (`:431-448`). ⛔ Do not scope this as "populate a field".
+  - ⚠ Not established: whether the external eoiagent SPI auto-promotes a tool return value into an
+    `InlineArtifact`. That code is outside this repo. The in-repo evidence makes "no producer" safe regardless.
 - ✅ **CLOSED 2026-09-14 · `RETIRE-HALVES-1` — both server halves are deleted, and the sweep was wider than the row.**
   Decided 2026-09-10, built as a **full sweep** on the operator's 2026-09-14 call. Gone: `GET /bi/datasets`
   (`BiRoutes`), the whole queue family (`QueueRoutes`, `Queue`, `QueueStore`, `InMemoryQueueStore`,
@@ -850,13 +913,28 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   (`checkpoint_threshold` default 16 MB) firing a synchronous write per ~10 appender flushes on a DISPOSABLE
   temp DB. `configure()` now sets it to 1 TB on every per-batch connection (all four callers pair it with
   `openTempDb`→`deleteTempDb`, so nothing durable was lost). Same laptop, 100 cols: 4 batches 30.3 s → 20.1 s;
-  12 batches now 34.5K rows/s vs 8K for one thread — the path scales again. **Still open:** (1) an isolated
-  12-appender probe does 6.1M cells/s on Windows vs 12.9M in a Linux container on the same box — the Windows
-  process heap under 100-column string appends (DuckDB ships jemalloc on Linux only); document "deploy on
-  Linux" or bundle mimalloc; (2) `CsvIngester.readRecord`'s quote pre-scan (`endsInsideQuotedField`) costs
-  ~⅓ of the Java lane's own CPU per JFR — fold it into the univocity pass. Measurements are NOT
+  12 batches now 34.5K rows/s vs 8K for one thread — the path scales again. Measurements are NOT
   recorded in `performance.md` by operator instruction (2026-09-14); the knobs `-Dbench.threads/-Dbench.cols/
   -Dbench.engine` on the harness reproduce them.
+  ✅ **Residual (1) DISCHARGED as documentation 2026-09-14** — the Windows/Linux gap is an allocator
+  difference (DuckDB bundles jemalloc on Linux only), not a tunable, so `performance.md` now states
+  **run the ingest tier on Linux** rather than carrying it as open work. ⛔ Bundling mimalloc is NOT
+  filed: nobody has shown it recovers the gap, and that claim would need its own measurement.
+  🔴 **Residual (2) REFUTED by measurement 2026-09-14 — the quote pre-scan is not a limit.** The JFR
+  reading ("~⅓ of the Java lane's own CPU") was carried as a reason to fold `endsInsideQuotedField` into
+  the univocity pass. An `indexOf` fast path for quote-free lines shipped instead (one line, provably
+  equivalent — the loop only assigns `inQuotes` inside a `c == quote` branch, so a line with no quote
+  returns the incoming state). It is **38× cheaper in isolation** (927 ns → 24 ns per 789-char 100-column
+  line) and worth **~1.7 % end-to-end** (three baseline runs 24.29/24.42/24.45 s vs two fixed 23.73/24.20 s
+  at 100 cols, 4 × 100K rows, `engine=java`, `threads=1`). ⇒ **the univocity rework is NOT worth scheduling
+  on this evidence** and is not filed. ⚠ **Why the profile misled: a third of the lane's *Java* CPU is not
+  a third of its *wall clock*, because the lane sits in the native `duckdb_appender_flush` frame for most
+  of its wall time.** ⛔ A hot Java method in a native-dominated lane is a share of the wrong denominator.
+  ⚠ Trap hit while measuring: the first A/B ran `-pl inspecto-engine` **without `-am`**, so it resolved a
+  stale installed `inspecto-etl` and compared the fix against itself — it read 25.83 s vs 24.45 s, i.e.
+  the fix looked *slower*. Every `-pl` benchmark that spans modules needs `-am`.
+  ⇒ **With (1) documented and (2) refuted, this row has no open engineering left; it is a candidate to
+  close once an operator agrees the Linux recommendation discharges it.**
 
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
@@ -1135,6 +1213,27 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `forkCount=0`, which is a different claim. ⚠ Two STALE JVMs were found, not one: an earlier probe run had
   also never exited, so check for leftovers before blaming the current run.
   → `okf/capabilities/tooling/tooling.md` §3.2
+  ✅ **SETTLED 2026-09-14 — the two WERE separated, and the core count is exonerated. This row can close.**
+  The suspicion was right: **`forkCount=0` caused the hang, four cores did not.**
+  - **Delivery mechanism, established by measurement.** `-DargLine` genuinely does NOT reach the fork —
+    with `-X`, the forked command line is `java --enable-native-access=ALL-UNNAMED -jar surefirebooter…`
+    and carries no added flag, because the POM pins `<argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>`
+    and `@{argLine}` resolves the *project* property, not a user `-D`. **`JDK_JAVA_OPTIONS` works**: the
+    JVM prints `NOTE: Picked up JDK_JAVA_OPTIONS` **twice**, once for the Maven JVM and once for the fork,
+    and `jshell` under it reports `availableProcessors() == 4`. ⇒ **this, not `MAVEN_OPTS`+`forkCount=0`,
+    is how a JVM flag reaches the test JVM here.**
+  - **Result: `JDK_JAVA_OPTIONS=-XX:ActiveProcessorCount=4 mvn -o test -Pedition-enterprise
+    -Dmaven.test.failure.ignore=true` ran to completion, FORKED, with NO hang** —
+    **4475 tests / 0 failures / 0 errors / 24 skipped over 26 reporting modules, all 32 modules built.**
+    That is **identical** to the 12-core local baseline of the same date (4475/0/0/24), so nothing
+    ordered after `inspecto` fails at CI's core count.
+  - **The two tests the row was built around both pass at 4 cores:** `ControlApiConfigIfMatchTest` 9/9,
+    and `ControlApiPreferencesTest` — *the class the previous attempt froze inside* — in **0.115 s**.
+  - ⚠ **Failure-ignore makes `BUILD SUCCESS` meaningless on its own**; the verdict above is the sum of the
+    26 per-module summary lines, which include `[WARNING]`-level ones. ⛔ Do not read the final line.
+  - ⚠ The 24 skips are the same ones as the 12-core run (16 are `PostgresStateStoreTest`, offline), so the
+    coverage compared is like-for-like. ⚠ Still NOT established: behaviour on a 4-core box with
+    proportionally less RAM — this box kept 32 GB while only the core count was masked.
 
 - **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14 (operator call); the LOADING half is open.**
   Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
