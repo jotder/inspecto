@@ -244,7 +244,7 @@ Run from the bundle:
 
 ```
 run.bat <adapter>                          one-shot ETL (Windows)   |  bash run.sh <adapter>
-set CONTROL_TOKEN=secret && serve.bat      control plane + UI :8080 |  CONTROL_TOKEN=secret bash serve.sh
+serve.bat                                  control plane + UI :8080 |  bash serve.sh
 pwsh examples/run-example.ps1 01-ingest/hello-csv                   |  bash examples/run-example.sh …
 ```
 

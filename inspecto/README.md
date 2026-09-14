@@ -344,7 +344,7 @@ serve.bat                # Windows
 INSPECTO_JAVA_OPTS="-Xmx4g" bash serve.sh
 
 # Dev: run the SPA on :4204 with a live backend (CORS + proxy)
-java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4204 \
+java -Dcontrol.cors=http://localhost:4204 \
      -cp inspecto.jar com.gamma.control.ControlApi config/
 cd inspecto-ui && npm install && npm start  # ng serve, /api proxied to :8080
 ```

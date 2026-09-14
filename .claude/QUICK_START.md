@@ -35,7 +35,7 @@ java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-
 # (the run-*.sh / run-*.bat wrappers were removed 2026-08-26 — this IS the wrapped command)
 
 # Long-running control plane + operator UI (ControlApi, default :8080)
-$env:CONTROL_TOKEN="secret"; .\inspecto-deploy\serve.bat   # then http://localhost:8080/
+.\inspecto-deploy\serve.bat                                # then http://localhost:8080/
 
 # Pre-ETL utility CLI (com.gamma.inspector.MainApp)
 #   commands: search, copy, copy-tars, extract, backup, prepare-inbox,

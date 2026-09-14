@@ -89,10 +89,14 @@ $cp = (($moduleDirs + $entries) -join ';')
 Write-Host "Classpath: $($moduleDirs.Count) module classes dirs + $($entries.Count) jars" -ForegroundColor Green
 
 # ── step 3: launch ────────────────────────────────────────────────────────────
+# ⛔ -Dcontrol.token=dev and -Dassist.read.token=dev were passed here and were REMOVED 2026-09-14
+# (DOC-DEADTOKEN-1): both have ZERO Java readers, so they authenticated nothing while reading exactly
+# as though they did. The core is auth-free by design; Authorization is enforced by the
+# Standard/Enterprise security module via AUTH_OIDC_*. ⛔ Do not re-add them.
+# ⚠ Keep this note ABOVE the call: a `#` line between backtick continuations breaks the parse —
+# the first attempt at this comment did exactly that, and `Parser::ParseFile` caught it.
 & java --enable-native-access=ALL-UNNAMED `
     "-Dcontrol.port=$Port" `
-    "-Dcontrol.token=dev" `
-    "-Dassist.read.token=dev" `
     "-Dassist.write.root=$WriteRoot" `
     "-Dspaces.root=$SpacesRoot" `
     "-Djobs.backend=duckdb" `

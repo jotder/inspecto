@@ -11,7 +11,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.**
+> text). **57 rows: 0 × P1 · 34 × P2 · 23 × P3.**
 >
 > ✅ **No P1 rows. `AIRGAP-EXTENSIONS-CI-1` was filed AND closed on 2026-09-14** — no released bundle had
 > ever carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a
@@ -756,10 +756,34 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   plus the reboot leg — is **unrun**, because it needs a systemd host and an elevated Windows box and this
   checkout is neither. ⛔ Do not mark `SCR-3`'s acceptance met until someone runs both; the installers
   print the exact commands. → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
-- **P2** · **`DOC-DEADTOKEN-1` — the docs still teach an authentication that does nothing.**
-  `-Dcontrol.token` has **zero** Java readers, so `CONTROL_TOKEN=secret bash serve.sh` secures nothing
-  while reading exactly as though it does. `SCR-9` cleaned the generated launchers (2026-09-09) and
-  `operations-reference.md` names its own 3 launch examples + 27 `Authorization: Bearer secret` curls as
+- ✅ **CLOSED 2026-09-14 · `DOC-DEADTOKEN-1` — the docs no longer teach an authentication that does nothing.**
+  Premise re-verified first: `-Dcontrol.token` has **zero** Java readers, in main *and* test.
+  🔴 **The row's scope was THREE files; the sweep found TWELVE — and a SECOND dead flag it never named.**
+  `-Dassist.read.token` is equally dead (zero readers) and travelled in the same examples, so fixing only
+  the flag the row named would have left half of every command still lying. ⚠ The row also said
+  `inspecto/README.md` "is fixed"; it still carried a live `-Dcontrol.token=dev` in a dev example — in the
+  file that **ships inside the bundle**. ⛔ This is the row's own stated lesson landing on the row itself:
+  *a cleanup that names its own scope narrowly leaves everything outside it reading as though it were
+  checked.* Grep the SYMBOL across the tree, never the file list a previous pass wrote down.
+  ✅ **Fixed:** `operations-reference.md` (24 curls retargeted, 2 dead launch flags deleted, the
+  `CONTROL_TOKEN=…` invocations and the Docker `-e` reduced to plain launchers), `inspecto/README.md`,
+  `.claude/QUICK_START.md`, `docs/FEATURE_INVENTORY.md`, and **`tools/run-backend.ps1`** — a dev script
+  nobody had listed, which was passing *both* dead flags on every local run.
+  ✅ **Two further factual errors corrected from the SHIPPED launcher rather than from the page:**
+  `operations-reference.md` claimed `serve.sh` reads `CONTROL_TOKEN/ASSIST_TOKEN/PORT/CORS_ORIGIN`. It
+  reads `PORT`, `SPACES_ROOT`, `CORS_ORIGIN` and `AUTH_OIDC_*` — measured — and the Docker passthrough list
+  named the two dead vars too. One example also carried `-Dui.static.log=DEBUG`, a second dead flag the
+  page's own banner already documented.
+  ⚠ **The curls kept their `Authorization` header** and now send `Bearer $TOKEN`: the header shape was
+  always right for Standard/Enterprise, and only the value's provenance was false. A single note says where
+  `$TOKEN` comes from (an IdP, via `AUTH_OIDC_*`; Personal is auth-free) instead of repeating it 24 times.
+  ⚠ **Every other mention in the tree is a HISTORICAL record and was deliberately left alone** —
+  `security.md`, `control-api.md`, `auth-security.md`, `EDITIONS.md`, `incidents.md` all describe the flag
+  as *removed*, which is true and worth keeping.
+  🔴 **A `#` comment between PowerShell backtick continuations breaks the parse.** My first fix to
+  `run-backend.ps1` put the explanation inline and silently broke the script; `Parser::ParseFile` caught it.
+  ⛔ Parse-check a shell script after editing it — the change looks fine in a diff.
+  → `okf/backend/build-run/operations-reference.md` · `okf/backend/editions/auth-security.md`
   debt — but that note scoped itself to that one page, and 🔴 **`inspecto/README.md`, which SHIPS INSIDE
   THE BUNDLE, still carried two such examples until 2026-09-11**, the worst instance of the set. That one
   is fixed; the rest are not: `operations-reference.md` (3 + 27 + the `serve.sh` env-var line at `:997`

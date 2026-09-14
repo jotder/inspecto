@@ -15,13 +15,15 @@ timestamp: 2026-07-16T00:00:00Z
 > utility suite, output structure, the status log, batch processing, deployment and Collector onboarding.
 > Its *cross-cutting* material has drifted, and a 2026-09-08 sweep verified four defects against source:
 >
-> - ⛔ **`-Dcontrol.token` is a DEAD flag** — **zero** Java readers in the tree. It survives here in 3
->   launch examples, plus 27 `Authorization: Bearer secret` curls and 6 `CONTROL_TOKEN` uses, none of
->   which authenticates anything. ✅ **The LAUNCHERS are clean as of 2026-09-09 (`SCR-9`)** — `package.ps1`
->   no longer emits the flag into `serve.sh`, `serve.bat` or the `Dockerfile`, and no longer prints
->   `CONTROL_TOKEN=secret` as the way to start the service. ⚠ **The examples on THIS page are not**: the
->   3 launch examples and 27 `Authorization: Bearer secret` curls below still show an auth that does
->   nothing, and they are doc debt this row does not cover. For real auth read
+> - ✅ **`-Dcontrol.token` — the dead flag is GONE from this page (2026-09-14, `DOC-DEADTOKEN-1`).** It has
+>   **zero** Java readers, and so does its sibling **`-Dassist.read.token`**, so every example that set them
+>   authenticated nothing while reading exactly as though it did. The launch examples no longer pass them,
+>   the `CONTROL_TOKEN=…` invocations are plain `serve.sh` / `serve.bat`, and the curls now send
+>   `Authorization: Bearer $TOKEN` — the header shape was always right for Standard/Enterprise; only the
+>   value's provenance was a lie.
+>   ⚠ **What `serve.sh` actually reads was ALSO wrong here**, and is corrected from the generated launcher
+>   rather than from this page's memory: `PORT`, `SPACES_ROOT`, `CORS_ORIGIN`, `AUTH_OIDC_*` — never
+>   `CONTROL_TOKEN` or `ASSIST_TOKEN`. For real auth read
 >   [auth & security](../editions/auth-security.md).
 > - ⛔ **`-Dui.static.log=DEBUG` does not exist** — no such key in any Java source, so the two places
 >   that tell you to turn it on to make an abort visible cannot work.
@@ -493,11 +495,17 @@ day. The rollup (counts, percentiles, first/last time) is computed over just the
 (blank = unbounded). Filtering is a lexicographic compare on the audit timestamp, so it works
 identically over the file and DB backends.
 
+> **Where `$TOKEN` comes from, once:** an access token issued by your IdP. `Authorization` is enforced by
+> the **Standard/Enterprise security module** (`ControlApi:356`) — configured through `AUTH_OIDC_*` — so on
+> **Personal** there is nothing to send and the header is simply ignored. ⛔ It is *not* produced by
+> `CONTROL_TOKEN` or `-Dcontrol.token`: those have no readers and never authenticated anything. Every curl
+> below uses the same `$TOKEN`.
+
 ```bash
-curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/status
-curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/pipelines/adjustment_etl/report
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/status
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/pipelines/adjustment_etl/report
 # just last month, with p50/p95/p99 over that window:
-curl -s -H "Authorization: Bearer secret" \
+curl -s -H "Authorization: Bearer $TOKEN" \
   "localhost:8080/api/v1/pipelines/adjustment_etl/report?from=2026-04-01&to=2026-04-30"
 ```
 
@@ -525,8 +533,8 @@ All four require auth and return `404` when no enrichment is registered, or the 
 is unknown.
 
 ```bash
-curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/enrichment
-curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/enrichment/EVENTS_DAILY_KPI/report
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/enrichment
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/enrichment/EVENTS_DAILY_KPI/report
 ```
 
 ### Config-driven jobs — cron / event / manual (`JobService`)
@@ -566,10 +574,10 @@ semantics). Every run is recorded to `jobs_audit/jobs_runs.csv` (override with
 `-Djobs.audit.dir`) and a short in-memory history the API serves.
 
 ```bash
-curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/jobs
 # trigger is async: 202 + {runId}; poll the run by id
-curl -s -X POST -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs/nightly-clean/trigger
-curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs/nightly-clean/runs
+curl -s -X POST -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/jobs/nightly-clean/trigger
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/jobs/nightly-clean/runs
 ```
 
 ### Retention & purging — what each task forgets (operator policy)
@@ -679,7 +687,6 @@ URL given it opens a local file `inspecto-status.db`:
 ```bash
 # DuckDB (default DB backend — embedded, single-process, zero extra deps)
 java -cp inspecto.jar com.gamma.control.ControlApi \
-     -Dcontrol.token=secret \
      -Dstatus.backend=db \
      -Dstatus.db.url="jdbc:duckdb:/var/lib/inspecto/status.db" \
      config/
@@ -712,7 +719,6 @@ engine-neutral JDBC-over-DuckDB pattern as the status backend (no extra dependen
 
 ```bash
 java -cp inspecto.jar com.gamma.control.ControlApi \
-     -Dcontrol.token=secret \
      -Dobjects.backend=db \
      -Dobjects.db.url="jdbc:duckdb:/var/lib/inspecto/ops.db" \
      config/
@@ -725,9 +731,9 @@ event, and every transition emits an `OBJECT_OPENED`/`OBJECT_ACTIVITY` event so 
 the event log. Operate the objects over the Control API (CONTROL scope):
 
 ```bash
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects?type=ALERT&status=OPEN"
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/ack
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/resolve
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects?type=ALERT&status=OPEN"
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/ack
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/resolve
 ```
 
 > **Future / distributed:** like the status backend, point `-Dobjects.db.url` at
@@ -760,7 +766,7 @@ curl -s "localhost:8080/api/v1/objects?type=INCIDENT&status=DIAGNOSING"
 ```
 
 *(Rewritten 2026-09-08: the block used the retired words `issue`/`ISSUE`, the retired `assign` → `start`
-transitions, and `Authorization: Bearer secret` — the token plane was removed 2026-06-16; under Standard the
+transitions, and `Authorization: Bearer $TOKEN` — the token plane was removed 2026-06-16; under Standard the
 header is a real OIDC bearer.)*
 
 **SLA tracking** is opt-in per Incident: set `dueAt` (epoch millis) or `dueInMinutes` at creation. A
@@ -787,15 +793,15 @@ to it. Links follow the same `-Dobjects.backend` toggle (durable in their own Du
 
 ```bash
 # create a case, then link the issue it contains
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects \
   -d '{"type":"CASE","title":"Q2 reconciliation incident","severity":"HIGH"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<caseId>/links \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<caseId>/links \
   -d '{"to":"<issueId>","relationship":"contains","actor":"alice"}'
 # the case's neighbourhood, and a 2-hop correlation subgraph (nodes + edges)
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<caseId>/links"
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<caseId>/graph?depth=2"
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<caseId>/links"
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<caseId>/graph?depth=2"
 # every correlation also lands in the event feed (Standard and above: optional inspecto-events module)
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_LINKED"
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/events/search?type=OBJECT_LINKED"
 ```
 
 > Links are immutable facts (append-only — no edit/delete), like events.
@@ -808,15 +814,15 @@ config paths, listed at `GET /rca/templates`, applied by `{template:"<name>"}`).
 `-Dobjects.backend` toggle (their own DuckDB file `inspecto-ops-notes.db` when durable).
 
 ```bash
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/comments \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/comments \
   -d '{"author":"alice","body":"reproduced on pipeX; investigating the reconciler"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/attachments \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/attachments \
   -d '{"name":"trace.log","uri":"s3://evidence/trace.log","contentType":"text/plain","author":"alice"}'
 # seed an RCA skeleton (one comment per section), then read the thread
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/rca \
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/rca \
   -d '{"sections":["Summary","Timeline","Root cause","Impact","Remediation"],"actor":"alice"}'
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<id>/comments"
-curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<id>/attachments"
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<id>/comments"
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<id>/attachments"
 ```
 
 ### Observability — metrics & structured events
@@ -994,7 +1000,7 @@ inspecto-deploy/
   ui/                         ← built Inspector SPA (present only when inspecto-ui/ was built); served via -Dui.dir=./ui
   run.sh                      ← Linux/Mac ETL launcher  (java -jar ... <adapter>_pipeline.toon)
   run.bat                     ← Windows ETL launcher
-  serve.sh                    ← Linux/Mac control-plane + UI launcher (ControlApi; reads CONTROL_TOKEN/ASSIST_TOKEN/PORT/CORS_ORIGIN)
+  serve.sh                    ← Linux/Mac control-plane + UI launcher (ControlApi; reads PORT/SPACES_ROOT/CORS_ORIGIN/AUTH_OIDC_*)
   serve.bat                   ← Windows control-plane + UI launcher
   ura.sh                      ← Linux/Mac utility CLI   (java -cp ... MainApp <command> ...)
   ura.bat                     ← Windows utility CLI
@@ -1025,8 +1031,9 @@ bash run.sh <data_source>          # or: bash run.sh <data_source>
 run.bat <data_source>
 
 # 6. OR run the always-on control plane + operator console (serves every pipeline under config/)
-CONTROL_TOKEN=secret ASSIST_TOKEN=secret bash serve.sh    # Linux/Mac → http://localhost:8080/
-set CONTROL_TOKEN=secret && serve.bat                     # Windows
+bash serve.sh                                             # Linux/Mac → http://localhost:8080/
+serve.bat                                                 # Windows
+# Auth is an edition feature: Personal serves unauthenticated, Standard/Enterprise take AUTH_OIDC_*.
 ```
 
 ### Containerized deployment (PKG-3, shipped 2026-08-28)
@@ -1034,12 +1041,12 @@ set CONTROL_TOKEN=secret && serve.bat                     # Windows
 The bundle carries a `Dockerfile` + `.dockerignore` (emitted by `package.ps1` step 6b-2, like the
 launcher scripts). It wraps `serve.sh` over **existing seams only** — no configuration surface of its
 own: every serve.sh env var passes straight through `docker run -e` (PORT / SPACES_ROOT /
-CONTROL_TOKEN / ASSIST_TOKEN / CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS …).
+CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS …).
 
 ```bash
 unzip inspecto-deploy-linux.zip && cd inspecto-deploy
 docker build -t inspecto .
-docker run -p 8080:8080 -e CONTROL_TOKEN=secret -v /srv/inspecto/spaces:/app/spaces inspecto
+docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
 As-built decisions:
@@ -1059,7 +1066,7 @@ the spaces root and the auth wiring cannot be clobbered from the environment. Th
 echoes whatever was passed, so a flag that did not land is visible rather than silent.
 
 ```bash
-INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" CONTROL_TOKEN=secret bash serve.sh   # static-serving trace
+INSPECTO_JAVA_OPTS="-Xmx4g" bash serve.sh                                       # bigger heap for the server
 INSPECTO_JAVA_OPTS="-Xmx8g" bash run.sh <data_source>                           # bigger heap for one run
 ```
 
