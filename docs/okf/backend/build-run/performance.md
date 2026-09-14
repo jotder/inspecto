@@ -107,6 +107,15 @@ simultaneously while blocked batches park cheaply instead of pinning platform
 threads. Per-file latency is still fixed by single-threaded ingest (now ~4–5×
 lower thanks to the native engine below).
 
+⚠ **Raising `processing.threads` helps the native lane; it helped the Java lane only after 2026-09-14.** Before
+that date the Java appender lane got SLOWER under concurrency: every per-batch temp DB ran DuckDB's default
+16 MB WAL auto-checkpoint, a synchronous write per ~10 appender flushes that serialised the batches on a
+laptop SSD (all workers parked in `duckdb_appender_flush`, CPU ~20 %). `ConsignmentIngestStrategy.configure()`
+now sets `checkpoint_threshold='1TB'` on those disposable connections. Two limits remain on that lane
+(`BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1`): on Windows the process heap halves 12-way appender
+throughput versus Linux (DuckDB bundles jemalloc on Linux only), and `readRecord`'s quote pre-scan is a second
+pass over every line. Delimited feeds on a clean config take the native lane and are not affected.
+
 **Two controllable axes** (set both to keep the CPU honest):
 
 | Knob | Controls | Default |

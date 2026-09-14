@@ -845,7 +845,16 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   guidance must say so. Remedies to weigh: (a) batch the appender flush (flush every N rows, not per row);
   (b) route wide messy files through the native engine's reject-drain instead of the Java appender;
   (c) a per-JVM cap on concurrent Java-path batches so they never starve native ones. First test: a
-  two-batch Java-path run must take < 1.2× a one-batch run at equal total rows. Measurements are NOT
+  two-batch Java-path run must take < 1.2× a one-batch run at equal total rows.
+  ✅ **Half shipped 2026-09-14 — remedy (d), not on the list above:** the stall was DuckDB's WAL auto-checkpoint
+  (`checkpoint_threshold` default 16 MB) firing a synchronous write per ~10 appender flushes on a DISPOSABLE
+  temp DB. `configure()` now sets it to 1 TB on every per-batch connection (all four callers pair it with
+  `openTempDb`→`deleteTempDb`, so nothing durable was lost). Same laptop, 100 cols: 4 batches 30.3 s → 20.1 s;
+  12 batches now 34.5K rows/s vs 8K for one thread — the path scales again. **Still open:** (1) an isolated
+  12-appender probe does 6.1M cells/s on Windows vs 12.9M in a Linux container on the same box — the Windows
+  process heap under 100-column string appends (DuckDB ships jemalloc on Linux only); document "deploy on
+  Linux" or bundle mimalloc; (2) `CsvIngester.readRecord`'s quote pre-scan (`endsInsideQuotedField`) costs
+  ~⅓ of the Java lane's own CPU per JFR — fold it into the univocity pass. Measurements are NOT
   recorded in `performance.md` by operator instruction (2026-09-14); the knobs `-Dbench.threads/-Dbench.cols/
   -Dbench.engine` on the harness reproduce them.
 

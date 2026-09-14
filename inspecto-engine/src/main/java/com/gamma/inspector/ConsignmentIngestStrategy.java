@@ -644,6 +644,13 @@ interface ConsignmentIngestStrategy {
                 cfg.processing().threads(),
                 Runtime.getRuntime().availableProcessors());
         DuckDbUtil.applyWorkerThreads(conn, effectiveThreads);
+        // Every caller pairs this with a disposable per-batch temp database (openTempDb → deleteTempDb),
+        // so WAL auto-checkpoints buy no durability — they only cost a synchronous write per ~16 MB of
+        // appended rows. Under concurrent batches that write was the Java-lane appender's stall
+        // (JAVA-INGEST-APPENDER-SERIAL-1): 12 appenders at 100 columns went 6.1M → 9.5M cells/s with it off.
+        try (var st = conn.createStatement()) {
+            st.execute("SET checkpoint_threshold='1TB'");
+        }
         // Per-config value wins; else the server configuration's installed memory_limit, else the
         // -Dprocessing.duckdb.* bootstrap default, so one operator knob caps this path uniformly with
         // the (config-less) pipeline-job and enrichment scratch connections.
