@@ -11,7 +11,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
+> text). **59 rows: 0 × P1 · 36 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
 > `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.
 > `LINKGUARD-CASE-1` filed the same day, §5 — so the P2 count is unchanged at 34, one out and one in.)
 >
@@ -27,9 +27,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
 > `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 35 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
+> ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 58 as pending work overstates what is owed by roughly 40%.
+> down. Reading all 59 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -1071,6 +1071,27 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   keep-or-delete verdict, not a build. ⛔ Demand-gated: do not "tidy" them without one, because at
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
+
+- **P2** · **`CORECOUNT-SWEEP-1` — nothing has ever run the suite on a host with as few cores as CI has,
+  and the attempt to HUNG.** Filed 2026-09-14. `ControlApiConfigIfMatchTest` failed on CI and nowhere else
+  because `ConfigSafetyValidator` bounds `processing.threads` by `Runtime.availableProcessors()`: the
+  runner has 4, this sandbox 12. That one test is fixed. ⛔ **What is NOT established is that it was the
+  only one** — Maven stops at the first failing module, so every module ordered after `inspecto` has never
+  executed on a 4-core host, on CI or here.
+  🔴 **The sweep that would settle it hung.** `MAVEN_OPTS=-XX:ActiveProcessorCount=4 … -DforkCount=0
+  -Dmaven.test.failure.ignore=true` froze inside `ControlApiPreferencesTest` immediately after
+  `ControlApi started on port 64700`, and sat there with two idle JVMs at ~2 GB each — +0.03s and +0.17s of
+  CPU over 25 seconds, no `target/` writes for 27 minutes. It had to be killed.
+  ⚠ **`forkCount=0` is the prime suspect, not the core count**: CI runs FORKED on a genuinely 4-vCPU host
+  and terminates normally. `forkCount=0` was only there because `MAVEN_OPTS` is the sole reliable way to
+  get a JVM flag into the test JVM here — `-DargLine` does not reach a forked one. ⇒ **the two have to be
+  separated before either is believed**: re-run forked with the flag delivered another way (a surefire
+  `argLine` property the POM honours, or a JDK_JAVA_OPTIONS export), and bound the run with a timeout so a
+  hang reports instead of parking.
+  ⛔ **Do not conclude the product deadlocks on 4 cores from this run** — it proves a hang under
+  `forkCount=0`, which is a different claim. ⚠ Two STALE JVMs were found, not one: an earlier probe run had
+  also never exited, so check for leftovers before blaming the current run.
+  → `okf/capabilities/tooling/tooling.md` §3.2
 
 - **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14 (operator call); the LOADING half is open.**
   Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
