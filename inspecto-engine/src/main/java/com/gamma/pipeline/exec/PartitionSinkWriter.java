@@ -47,6 +47,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
     private final String producer;
     private final List<PartitionOutput> outputs = new ArrayList<>();
     private final Map<String, Long> rowsByStore = new LinkedHashMap<>();
+    private final Map<String, List<PartitionOutput>> outputsByStore = new LinkedHashMap<>();
     private long totalRows = 0L;
 
     /**
@@ -132,6 +133,8 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         // Per store, not per branch: two sinks may target one store, and a Run Artifact naming that store has
         // to report what the store received rather than what one branch contributed.
         rowsByStore.merge(store, branchRows, Long::sum);
+        // Same merge semantics and the same reason: two sinks may target one store.
+        outputsByStore.computeIfAbsent(store, k -> new ArrayList<>()).addAll(outs);
         if (consignmentId != null)
             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
                     consignmentId, runId, store, outs, rowsByPartition,
@@ -142,6 +145,26 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
 
     /** Partition files written across every sink branch (one entry per file). */
     public List<PartitionOutput> outputs() { return List.copyOf(outputs); }
+
+    /**
+     * The same files, grouped by the store they were written to.
+     *
+     * <p><b>Why grouping is needed at all.</b> {@link PartitionOutput} carries only a partition, a path and
+     * a size — no store — and {@link #outputs()} is flat across every sink branch. A DuckLake registration
+     * needs a TABLE per set of files, and on this lane the table is the store, so a caller working from
+     * {@code outputs()} alone would have to recover the store by parsing {@code <dataDir>/<store>/…} back
+     * out of each path. This writer already knows, at the moment it writes.
+     *
+     * <p>⛔ <b>The registration itself is deliberately NOT done here.</b> This writer serves TWO lanes —
+     * {@code PipelineJobRunner} and {@code ConsignmentGraphRunner} — and the graph ingest lane's outputs
+     * already reach {@code DuckLakeRegistrar} through {@code ConsignmentIngestor.finalizeSource}. Calling
+     * the registrar from this shared class would register that lane TWICE, which is the exact hazard
+     * {@code DuckLakeRegistrationSiteContractTest} exists to catch. Only the job lane, which has no such
+     * tail, registers — and it does so from its own runner.
+     */
+    public Map<String, List<PartitionOutput>> outputsByStore() {
+        return Map.copyOf(outputsByStore);
+    }
 
     /** Total rows written across every sink branch. */
     public long totalRows() { return totalRows; }

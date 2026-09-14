@@ -29,6 +29,10 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import com.gamma.util.LakehouseCatalog;
+import com.gamma.util.Topology;
+import org.junit.jupiter.api.AfterEach;
+
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -1026,5 +1030,88 @@ class PipelineJobRunnerTest {
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
+    }
+
+    // ── DUCKLAKE-GRAPH-LANE-1: the pipeline-job lane registers in the shared lakehouse ────────────
+    //
+    // This lane had NO catalog registration at all. Every other write path reaches DuckLakeRegistrar
+    // through ConsignmentIngestor.finalizeSource — the flat and branch-aware graph INGEST lanes both do,
+    // sharing that tail — but this one drives PipelineExecutor directly with a no-op finalizer, so its
+    // Parquet reached no catalog and no other node could see it.
+    //
+    // ⛔ What is asserted here is the DECISION, not a live catalog write: driving a real ATTACH needs the
+    // ducklake extension or a live Postgres, and a test gated on either SKIPS on most machines — this repo
+    // has already had a skipping test hide a broken classpath for months. The live attach was measured
+    // separately on 2026-09-14. What must not regress is: unconfigured stays a no-op, and partitioned
+    // without a catalog REFUSES rather than silently producing invisible output.
+
+    @AfterEach
+    void clearLakehouseProperties() {
+        System.clearProperty(LakehouseCatalog.CATALOG_PROPERTY);
+        System.clearProperty(LakehouseCatalog.DATA_PROPERTY);
+        System.clearProperty(Topology.PROPERTY);
+    }
+
+    /** The run from `runsFlowFromSourceStoreAndWritesSink`, reused so these tests differ only in topology. */
+    private JobResult runSimplePipeline(String dataDir, String auditDir) throws Exception {
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_rollup", new PipelineGraph("evt_rollup", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
+        JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("flow", "evt_rollup", "data_dir", dataDir));
+        return new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir, auditDir).run();
+    }
+
+    @Test
+    void aPipelineJobRunsUnchangedWhenNoSharedLakehouseIsConfigured() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        JobResult res = runSimplePipeline(dataDir, tmp.resolve("audit").toString());
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of(1, 3), readIds(dataDir, "rollup"),
+                "Personal and single-node Standard have no shared lakehouse; the run must be untouched");
+    }
+
+    @Test
+    void aPartitionedPipelineJobWithNoSharedLakehouseIsREFUSED() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+        String dataDir = tmp.resolve("data").toString();
+
+        // ⚠ The runner PROPAGATES rather than returning a failed JobResult, so this is assertThrows and not
+        // an assertion on res.success() — measured, not assumed; the first version of this test asserted the
+        // latter and errored.
+        Exception boom = assertThrows(Exception.class,
+                () -> runSimplePipeline(dataDir, tmp.resolve("audit").toString()),
+                "several processes share this state, so Parquet registered in no catalog is Parquet no other "
+                        + "node can see — the ingest path already refuses this, and without it here a pipeline "
+                        + "job would be the one remaining way to produce invisible output");
+
+        assertTrue(boom.getMessage().contains(LakehouseCatalog.CATALOG_PROPERTY),
+                "the operator needs to be told WHICH property to set: " + boom.getMessage());
+    }
+
+    // The falsification arm. Without it the test above would pass against a runner that failed whenever the
+    // topology was partitioned, catalog or no catalog — which would break every correctly configured pod.
+    @Test
+    void aPartitionedPipelineJobWITHASharedLakehouseGetsPastTheConfigurationCheck() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+        System.setProperty(LakehouseCatalog.CATALOG_PROPERTY, "postgres:dbname=lake host=db");
+        System.setProperty(LakehouseCatalog.DATA_PROPERTY, tmp.resolve("lake").toString());
+        String dataDir = tmp.resolve("data").toString();
+
+        // A configured catalog is reached and ATTEMPTED; the attach then fails because nothing is listening
+        // on that host, and D10 makes an attach failure fatal when partitioned. So this still throws — what
+        // matters is WHICH refusal. If it were the "no shared lakehouse" one, the catalog was never seen.
+        Exception boom = assertThrows(Exception.class,
+                () -> runSimplePipeline(dataDir, tmp.resolve("audit").toString()));
+
+        assertFalse(boom.getMessage().contains("requires a shared"),
+                "a configured catalog must get PAST the configuration check: " + boom.getMessage());
+        assertTrue(boom.getMessage().contains("DuckLake registration failed"),
+                "and must fail at the ATTACH instead, which is D10's fatal branch: " + boom.getMessage());
     }
 }

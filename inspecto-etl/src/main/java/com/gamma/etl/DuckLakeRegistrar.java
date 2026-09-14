@@ -64,6 +64,33 @@ public final class DuckLakeRegistrar {
         String schema     = (String) dl.getOrDefault("schema", "main");
         String table      = (tableName != null) ? tableName : (String) dl.get("table");
 
+        registerInto(outputPaths, table, catalogUrl, dataPath, schema);
+    }
+
+    /**
+     * Register {@code outputPaths} into an explicitly named catalog — the same work as
+     * {@link #register}, without needing a {@link PipelineConfig}.
+     *
+     * <p><b>Why this overload exists.</b> The at-rest pipeline-job lane
+     * ({@code com.gamma.job.PipelineJobRunner}) has <b>no {@code PipelineConfig} in scope at all</b>: it
+     * loads a {@code PipelineGraph} from the store, and {@code sink.ducklake} is only a UI alias for
+     * {@code sink.persistent} with no execution-time meaning. So that lane could not call the config-shaped
+     * method above however much it wanted to, which is a large part of why it registered nothing
+     * ({@code DUCKLAKE-GRAPH-LANE-1}). Its catalog comes from {@link com.gamma.util.LakehouseCatalog}
+     * instead — the deployment-level property the READ side already reads, so both ends of the lakehouse
+     * name it the same way.
+     *
+     * @param outputPaths absolute paths of Parquet files to register
+     * @param table       target DuckLake table — the sink's store name on the pipeline-job lane
+     * @param catalogUrl  the DuckLake backend spec, e.g. {@code postgres:dbname=lake host=db}
+     * @param dataPath    the catalog's data path
+     * @param schema      target schema; {@code main} when null
+     */
+    public static void registerInto(List<String> outputPaths, String table,
+                                    String catalogUrl, String dataPath, String schemaOrNull) {
+        if (outputPaths.isEmpty()) return;
+        String schema = (schemaOrNull == null || schemaOrNull.isBlank()) ? "main" : schemaOrNull;
+
         requireSharedCatalog(catalogUrl);
 
         log.info("DuckLake: registering {} file(s) into {}.{} ...",

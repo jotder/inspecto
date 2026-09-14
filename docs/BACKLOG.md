@@ -11,14 +11,14 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **60 rows: 1 × P1 · 36 × P2 · 23 × P3.**
+> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.**
 >
-> ⚠ **The single P1 is `AIRGAP-EXTENSIONS-CI-1`** (§3), filed 2026-09-14: no released bundle has ever
-> carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a local
-> cache and the CI runner has none. It is P1 because D10 makes the resulting failure **fatal** on a
-> partitioned (Enterprise) pod, so it blocks scale-out phase C. ⚠ **The P2 count is unchanged at 36 by
-> coincidence, not by inactivity**: `AIRGAP-DUCKLAKE-PG-1` closed on 2026-09-14 and `DUCKLAKE-GRAPH-LANE-1`
-> was filed the same day, in the same work. Both P1 and the new P2 came out of shipping scale-out §5.4.
+> ✅ **No P1 rows. `AIRGAP-EXTENSIONS-CI-1` was filed AND closed on 2026-09-14** — no released bundle had
+> ever carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a
+> local cache and no workflow populated one. Closed by a per-platform fetch step, `-RequireExtensions` on
+> the release path, and a `--check` guard on every push.
+> ⚠ **Three rows opened and closed the same day**, all out of scale-out §5.4: that one, plus
+> `AIRGAP-DUCKLAKE-PG-1` and `DUCKLAKE-GRAPH-LANE-1`. The P2 count therefore moves 36 → 35 on net.
 >
 > ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
@@ -682,8 +682,12 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   invisible in the same way.
   → `okf/backend/integrations.md` · `inspecto/package.ps1` · scale-out plan §5.4
 
-- 🔴 **P2** · **`DUCKLAKE-GRAPH-LANE-1` — the at-rest PIPELINE-JOB lane registers nothing, so its output is
-  invisible across nodes.** Filed 2026-09-14 while shipping §5.4 bullets 4 and 5.
+- ✅ **CLOSED 2026-09-14 · `DUCKLAKE-GRAPH-LANE-1` — the at-rest pipeline-job lane now registers.**
+  Filed, corrected and closed the same day. `PipelineJobRunner.registerInLakehouse` registers each store's
+  Parquet in the shared catalog after every run: one table per store, catalog from `LakehouseCatalog`, and
+  when `-Dinspecto.topology=partitioned` a catalog is **required** — so this lane can no longer be the one
+  remaining way to produce invisible output. Both branches mutation-verified; making the requirement
+  unconditional kills **25** pipeline-job tests, which is the blast radius the single-node arm protects.
   🔴 **CORRECTED the same day, before anything was built on it — the row's own name is wrong.** It was filed
   as "the graph lane registers nothing", copied from the scale-out plan's §5.4, which asserts the same
   thing. **Both are false.** `ConsignmentIngestStrategy.writeAndTrace` forks to `flatWriteAndTrace` or
@@ -695,49 +699,52 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   Job" lane (`job: type: pipeline`). It drives `PipelineExecutor.execute` directly with a **no-op
   finalizer** (`() -> {}`, `:329`), bypassing `ConsignmentIngestor` entirely, and contains **zero** DuckLake
   references. Its batch-complete moment is `:341-350`, where `writer.outputs()` (absolute paths) is in scope.
-  ⚠ **What is new is that the two paths now visibly disagree.** Registration is MANDATORY when partitioned,
-  so a partitioned deployment refuses an unconfigured *ingest* pipeline while *pipeline jobs* carry on
-  writing invisible output — **and the enforcement makes that silence look deliberate**. ⛔ Do not read
-  "registration is mandatory when partitioned" as a system invariant; it is an invariant of the ingest path.
-  🔴 **It is also a hole in the read side**: `QueryExecutor`'s shared-catalog attach can only surface what
-  the write side registered, so `lake.*` is missing exactly the pipeline-job lane's output. Bullet 5 is
+  ⚠ **Why it became urgent rather than merely old.** Making registration MANDATORY when partitioned (earlier
+  the same day) left a partitioned deployment refusing an unconfigured *ingest* pipeline while *pipeline
+  jobs* carried on writing invisible output — **and the new enforcement made that silence look deliberate**.
+  The gap itself predated all of it. ✅ Now closed on both sides, so "registration is mandatory when
+  partitioned" holds for the pipeline-job lane too.
+  ⚠ **It was a hole in the read side as well**, and that reasoning still stands generally:
+  `QueryExecutor`'s shared-catalog attach can only surface what the write side registered. Bullet 5 is
   complete in itself and is **not** a workaround for an unregistered writer.
-  ⛔ **The fix needs a DECISION, not just a call.** `PipelineJobRunner` has **no `PipelineConfig` in scope**
-  on its mainline path — it loads a `PipelineGraph` from `PipelineStore`, and `sink.ducklake` is merely a UI
-  alias for `sink.persistent` with **zero execution-time meaning** (`ProcessorCatalog:167`). So
-  `register(List, String, PipelineConfig)` is not callable there as-is. The catalog half now has an obvious
-  home — **`LakehouseCatalog`** (`-Dinspecto.ducklake.catalog`), already the read side's source — leaving
-  only the TABLE name, derivable from the sink store. ⚠ That would need a config-agnostic
-  `register` overload. **Not built; the shape is an operator call.**
+  ✅ **How it was resolved.** `PipelineJobRunner` has **no `PipelineConfig` in scope** — it loads a
+  `PipelineGraph` from `PipelineStore`, and `sink.ducklake` is merely a UI alias for `sink.persistent` with
+  **zero execution-time meaning** (`ProcessorCatalog:167`) — so `register(List, String, PipelineConfig)` was
+  uncallable there, which is much of why the gap existed. Resolved with a config-agnostic
+  `DuckLakeRegistrar.registerInto(...)`, the catalog taken from **`LakehouseCatalog`** (the same
+  deployment-level property the READ side uses, so both ends name the lakehouse identically) and the table
+  taken from the sink **store**.
+  🔴 **The obvious seam was the wrong one, and taking it would have caused the very defect this row warns
+  about.** `PartitionSinkWriter` has `store` and that sink's outputs in hand and looks like the natural
+  place — but it serves **two** lanes (`PipelineJobRunner` AND `ConsignmentGraphRunner`), and the graph
+  ingest lane already registers through the shared tail. Registering there would have **double-registered
+  the ingest path**. The writer only gained an `outputsByStore()` accessor; the registration lives in the
+  job runner, which has no tail of its own.
   ⚠ `DuckLakeRegistrationSiteContractTest` pins the single call site and must be widened **deliberately**
   in the same change: its `EXPECTED_SITES` is one element AND it asserts `found.get(0)` by index, so a
   second site needs an unordered comparison, not just another entry. The contract exists because a per-file
   registration added alongside the batch-level one would **double-register** the ingest path.
   → `okf/backend/engine/db-layer.md` · scale-out plan §5.4 · `DuckLakeRegistrationSiteContractTest`
 
-- 🔴 **P1** · **`AIRGAP-EXTENSIONS-CI-1` — no released bundle has ever carried a DuckDB extension, on any
-  platform.** Filed 2026-09-14 while staging `postgres_scanner` (above). `package.ps1` stages extensions
-  **best-effort from a LOCAL cache** and prints a yellow warning when it finds none — never a build
-  failure, by design. 🔴 **Measured 2026-09-14: neither `ci.yml` nor `release.yml` populates that cache
-  at all** (no `DUCKDB_EXTENSION_CACHE`, no `-DuckdbExtensionCache`, no `INSTALL` step — grep is empty).
-  So the release path always takes the warning branch and **ships a bundle with an empty
-  `duckdb-extensions/`** — which means `AIRGAP-EXTENSIONS-1`, closed 2026-09-11 to stop `ducklake` needing
-  a network `INSTALL` on an air-gapped install, **is not actually delivered by any release**. The code
-  half is real; the packaging half silently no-ops in the only place that builds a release.
-  ⚠ **Confirmed locally in both directions**: a `-Edition Personal` run on this machine staged all three
-  `windows_amd64` files (the cache has them) and **zero** `linux_amd64` files (it has none), printing the
-  yellow warning for each — the exact branch CI takes for *both* platforms.
-  ⛔ **This blocks scale-out phase C specifically, and hardest.** Enterprise pods are **Linux**, and D10
-  makes a DuckLake registration failure **fatal** when partitioned — so an air-gapped Linux pod with no
-  staged `ducklake` fails **every batch**, not just the DuckLake step. The `postgres_scanner` fix above is
-  correct but inert in a release until this is closed.
-  ⚠ Same shape as `OPS-07`/the jlink fix (`f2dbf0dd`, 2026-09-14): **a packaging capability that works on
-  a developer's machine and silently does nothing on the runner**, because best-effort staging cannot
-  distinguish "not wanted" from "not present". Worth deciding whether the release build should FAIL when
-  an extension the product loads is missing, rather than warn — the same fail-closed call `partition.toon`
-  and the SBOM licence gate already make.
-  → `inspecto/package.ps1` (`$duckdbExtNames`, ~:1455) · `.github/workflows/release.yml` ·
-  `okf/backend/integrations.md`
+- ✅ **CLOSED 2026-09-14 · `AIRGAP-EXTENSIONS-CI-1` — a release now stages its DuckDB extensions.**
+  Filed and closed the same day, while staging `postgres_scanner` (above). Three parts:
+  **(1)** `tools/fetch-duckdb-extensions.mjs` downloads each extension **per platform** before packaging —
+  ⛔ an `INSTALL` would not do, it populates the cache for the RUNNING platform only, and `release.yml` runs
+  on ubuntu while the bundle also ships windows. It reads the list **out of `package.ps1`** rather than
+  repeating it, so a name added there is fetched automatically.
+  **(2)** `package.ps1 -RequireExtensions` turns the warning into a refusal, passed by all three release
+  steps for the same reason they pass `-Sign`: the release path is stricter than the desk path.
+  **(3)** `--check` runs in `ci.yml` on **every push** — because the full fetch runs only on a tag, and "a
+  path that executes only at release time" is the shape of the defect itself. It re-reads the list and HEADs
+  every file the release would fetch, without downloading 160 MB.
+  ✅ **Verified both ways:** a populated cache packages clean with all three extensions in **both** platform
+  directories (the linux ones had never been stageable on a dev machine before); an empty cache **fails**
+  with the reason. The `--check` guard was falsified too — renaming `$duckdbExtNames` makes it exit 2 rather
+  than pass with an empty list.
+  ⚠ Also ignored two packaging artifacts that were not: a **73 MB** jlink runtime left in the working tree by
+  every Linux packaging run, one `git add -A` from being committed, and the new extension cache.
+  → `inspecto/package.ps1` · `tools/fetch-duckdb-extensions.mjs` · `.github/workflows/{ci,release}.yml`
+
 - **P2** · **`DEPLOY-SERVICE-WRAPPER-1` residual — the live acceptance is UNRUN.** ✅ **The wrappers
   SHIPPED 2026-09-11** (`SCR-3`): `package.ps1` stages `inspecto.service` + `install-service.sh` (systemd)
   and `install-service.ps1` (Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). 🔴 The

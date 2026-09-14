@@ -69,11 +69,15 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
      error, it quietly creates a **private file catalog** for that node, so it is refused on shape before
      the attach.
 
-   ⚠ **This is the INGEST path's rule, not the whole system's.** The single registration call site is
-   `ConsignmentIngestor.finalizeSource`, which serves **both** the flat and the branch-aware graph ingest
-   lanes — they share one tail. What registers nothing is the **at-rest pipeline-job lane**
-   (`job: type: pipeline`, `PipelineJobRunner`), on any topology (`DUCKLAKE-GRAPH-LANE-1` — an id that is a
-   misnomer; it was filed believing the graph lane was the gap, and corrected the same day).
+   ⚠ **Two registration sites, and that is the ceiling.** `ConsignmentIngestor.finalizeSource` serves
+   **both** the flat and the branch-aware graph ingest lanes — they share one tail — and
+   `PipelineJobRunner.registerInLakehouse` serves the at-rest pipeline-job lane (`job: type: pipeline`),
+   which has no tail of its own. ⛔ A third site would risk registering the same files twice, which is what
+   `DuckLakeRegistrationSiteContractTest` bounds.
+   ✅ The pipeline-job lane registered **nothing** until 2026-09-14 (`DUCKLAKE-GRAPH-LANE-1` — an id that is
+   a misnomer, filed believing the graph lane was the gap and corrected the same day). It takes its catalog
+   from `-Dinspecto.ducklake.catalog` below rather than from `output.ducklake`, because an authored pipeline
+   has no pipeline config at run time; its table is the sink's **store** name.
 
 4. **Read every node's slices** — set the deployment's shared catalog and any query can reach the whole
    lakehouse, not just what this node wrote:
@@ -90,7 +94,7 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
    The catalog is attached as **`lake`**, so a query reaches it as `lake.<schema>.<table>` — from
    `/bi/query` and the Query Library alike. **Visibility is the catalog commit**: a slice appears exactly
    when its registering transaction committed, never half-written. ⚠ It can only show what the write side
-   registered, so the pipeline-job gap above applies here too.
+   registered — which, since 2026-09-14, is every lane.
 
 ### Remote access via DBeaver
 

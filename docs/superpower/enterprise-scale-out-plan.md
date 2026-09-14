@@ -900,11 +900,22 @@ Work under (ii):
 > `lake.*` will be missing exactly the pipeline-job lane's output. Bullet 5 is correct and complete in
 > itself; it is not a workaround for an unregistered writer.
 >
-> ⛔ **And the fix is not one line.** `PipelineJobRunner` has **no `PipelineConfig` in scope** on its
-> mainline path (it loads a `PipelineGraph` from `PipelineStore`), and `sink.ducklake` is only a UI alias
-> for `sink.persistent` with **no execution-time meaning** — so `register(List, String, PipelineConfig)` is
-> not callable there. The catalog half now has a home (`LakehouseCatalog`), leaving the table name and a
-> config-agnostic overload. **An operator call, not a mechanical edit.**
+> ✅ **CLOSED the same day.** `PipelineJobRunner.registerInLakehouse` registers each store's Parquet after
+> every run — one table per store, catalog from `LakehouseCatalog`, and REQUIRED when partitioned, so this
+> lane can no longer be the one remaining way to produce invisible output. It needed a config-agnostic
+> `DuckLakeRegistrar.registerInto(...)`, because this lane has **no `PipelineConfig` in scope** at all (it
+> loads a `PipelineGraph` from `PipelineStore`, and `sink.ducklake` is only a UI alias for
+> `sink.persistent` with no execution-time meaning) — much of why the gap existed.
+>
+> 🔴 **The obvious seam was the wrong one, and taking it would have caused the hazard this section warns
+> about.** `PartitionSinkWriter` holds `store` and that sink's outputs together and looks like the natural
+> home — but it serves **both** `PipelineJobRunner` and `ConsignmentGraphRunner`, and the graph ingest lane
+> already registers through the shared tail, so registering there would have **double-registered the ingest
+> path**. The writer gained only an `outputsByStore()` accessor.
+> ⚠ `DuckLakeRegistrationSiteContractTest` is widened from one site to two — deliberately, in the same
+> change. Doing so exposed two weaknesses in the guard itself: it matched only `register(` and so would have
+> been **blind to `registerInto(`**, and its `relative()` helper returned an ABSOLUTE path, which the old
+> size-plus-`endsWith` assertion happened to tolerate. Both fixed; the ceiling is two sites, not "any".
 
 - `PartitionWriter` gains a **visibility strategy**: `RenameReveal` (today, local paths) and
   `CatalogCommit` (object-store paths, partitioned mode). ✅ **S2 CONFIRMS the shared seam by reading the

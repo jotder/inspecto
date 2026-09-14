@@ -3,6 +3,7 @@ package com.gamma.job;
 import com.gamma.api.PublicApi;
 import com.gamma.enrich.ReferenceReader;
 import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.DuckLakeRegistrar;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
@@ -31,6 +32,8 @@ import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.query.ViewReaderSql;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.LakehouseCatalog;
+import com.gamma.util.Topology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -342,6 +345,7 @@ public final class PipelineJobRunner implements Job {
             List<String> srcStores = seeds.stream().map(Seed::store).toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
             recordStoreArtifacts(artifacts, g, writer.rowsByStore());
+            registerInLakehouse(writer);                               // DUCKLAKE-GRAPH-LANE-1 (scale-out §5.4)
             bus.publish(new ConsignmentEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
             log.info("[PIPELINEJOB] {} ran pipeline '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
                     cfg.name(), pipelineId, srcStores, writer.outputs().size(), writer.totalRows(),
@@ -395,6 +399,56 @@ public final class PipelineJobRunner implements Job {
      * checked. The watermark is the record time, as every other recorder passes — it is when the artifact was
      * written, not a statement about event time, which is precisely what the registry answers instead.
      */
+    /**
+     * Register this run's output in the deployment's shared DuckLake catalog, one table per store
+     * ({@code DUCKLAKE-GRAPH-LANE-1}, scale-out §5.4).
+     *
+     * <p><b>Why this lane needed its own call.</b> Every other write path reaches
+     * {@code DuckLakeRegistrar} through {@code ConsignmentIngestor.finalizeSource} — the flat and the
+     * branch-aware graph ingest lanes both do, because they share that tail. This lane does not: it drives
+     * {@code PipelineExecutor} directly with a no-op finalizer, so its Parquet reached no catalog at all and
+     * no other node could see it. On a partitioned deployment that is the invisible output D10 refuses on
+     * the ingest side, produced silently here.
+     *
+     * <p><b>Where the catalog comes from.</b> {@link LakehouseCatalog} — the deployment-level property the
+     * READ side already uses, so both ends of the lakehouse name it the same way. ⛔ It could not come from
+     * a {@code PipelineConfig}: this lane has none in scope (it loads a {@code PipelineGraph} from the
+     * store), and {@code sink.ducklake} is only a UI alias for {@code sink.persistent} with no
+     * execution-time meaning. That absence is a large part of why the gap existed.
+     *
+     * <p><b>The table is the store.</b> A run may write several stores, and they are different tables;
+     * registering every file under one name would merge unrelated schemas. {@code outputsByStore()} keeps
+     * the grouping the writer already knew.
+     *
+     * <p>⛔ <b>Deliberately NOT called from {@code PartitionSinkWriter}</b>, which would be the tidier
+     * place: that writer also serves {@code ConsignmentGraphRunner}, whose outputs already register through
+     * the ingest tail, so registering there would register that lane TWICE — the hazard
+     * {@code DuckLakeRegistrationSiteContractTest} exists to catch.
+     *
+     * <p>⚠ Unconfigured is a no-op, as everywhere else: Personal and single-node Standard have no shared
+     * lakehouse. ⛔ But when the topology is {@code partitioned} a catalog is REQUIRED, mirroring the ingest
+     * path's rule — otherwise this lane would stay the one way to produce invisible output on a deployment
+     * that has forbidden it.
+     */
+    private static void registerInLakehouse(PartitionSinkWriter writer) {
+        LakehouseCatalog.Catalog cat = LakehouseCatalog.configured();
+        if (cat == null) {
+            if (Topology.partitioned())
+                throw new IllegalStateException("-D" + Topology.PROPERTY + "=partitioned requires a shared"
+                        + " lakehouse (-D" + LakehouseCatalog.CATALOG_PROPERTY + " and -D"
+                        + LakehouseCatalog.DATA_PROPERTY + ") for a pipeline job: several processes share this"
+                        + " state, so Parquet registered in no catalog is Parquet no other node can see. The"
+                        + " ingest path already refuses this; without it here, a pipeline job would be the one"
+                        + " remaining way to produce invisible output. Configure the catalog, or run this node"
+                        + " with -D" + Topology.PROPERTY + "=single if it owns its lakehouse alone.");
+            return;
+        }
+        writer.outputsByStore().forEach((store, outs) ->
+                DuckLakeRegistrar.registerInto(
+                        outs.stream().map(PartitionOutput::outputFile).toList(),
+                        store, cat.url(), cat.dataPath(), null));
+    }
+
     private static void recordStoreArtifacts(ArtifactRecorder artifacts, PipelineGraph g,
                                              Map<String, Long> rowsByStore) {
         if (artifacts == null) return;
