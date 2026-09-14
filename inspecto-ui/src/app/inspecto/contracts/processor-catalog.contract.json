@@ -864,7 +864,7 @@
     "emoji" : "🏷️",
     "icon" : "heroicons_outline:sparkles",
     "status" : "planned",
-    "note" : "assist/intelligence agents are never bundled (CP-14)",
+    "note" : "still unbuilt; the assist agent now ships Standard+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist",
     "addable" : false
   }, {
     "id" : "ml.embedding.vector",
