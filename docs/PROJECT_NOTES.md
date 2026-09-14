@@ -140,6 +140,40 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **"Fails closed on failure" does not cover "succeeds at the wrong thing."** A `catalog_url` with no
+  recognised backend prefix does not make DuckLake fail — it reads the value as a **file path** and
+  silently creates a private local catalog (measured 2026-09-14: a 1.8 MB DuckDB file in the repo root,
+  named after the whole connection string, **password included**). `D10` already made an *unreachable*
+  catalog fatal; this one is reached, successfully, privately, with every batch green. ⛔ When a guard
+  exists to stop divergence, ask what the WRONG-BUT-SUCCESSFUL path looks like, not just the failing one.
+  Now refused by `LakehouseCatalog.requireShared` when partitioned.
+- 🔴 **A prefix match is not a spelling check.** That same guard first accepted `postgres://…` because it
+  *starts with* `postgres:` — endorsing the exact spelling its own error message told operators to avoid,
+  and which had already been measured failing to attach. ⛔ **When a rule's message enumerates bad values,
+  assert every one of them against the rule** (2026-09-14).
+- 🔴 **Grep the SYMBOL, never the file list a previous pass wrote down.** `DOC-DEADTOKEN-1` named three
+  files carrying a dead `-Dcontrol.token`; a sweep for the symbol found **twelve**, plus a *second* dead
+  flag (`-Dassist.read.token`) the row never mentioned, plus a live instance in a file the row recorded as
+  already fixed — one that **ships inside the bundle**. ⚠ A cleanup that states its own scope narrowly
+  makes everything outside it read as though it had been checked (2026-09-14).
+- 🔴 **Before adding a call to a shared helper, grep every CONSTRUCTION site of that helper.**
+  `PartitionSinkWriter` holds a sink's store and outputs together and looked like the obvious place to
+  register DuckLake output — but it serves **two** lanes, and the other already registers through a shared
+  tail, so the "tidy" placement would have **double-registered** it (2026-09-14).
+- ⛔ **A `#` comment between PowerShell BACKTICK CONTINUATIONS breaks the parse**, and looks correct in a
+  diff. Put such notes ABOVE the call, and parse-check an edited script rather than eyeballing it:
+  `[System.Management.Automation.Language.Parser]::ParseFile(path,[ref]$tokens,[ref]$errors)` (2026-09-14).
+- ⛔ **Confirm another repository's DEFAULT BRANCH before pushing to it.** `jotder/inspect-agent`'s is
+  `main`, not `master`; a `HEAD:master` push silently created a stray branch instead of landing, and the
+  only signal was the words `* [new branch]` in the push output.
+  `gh repo view <owner>/<repo> --json defaultBranchRef -q .defaultBranchRef.name` (2026-09-14).
+- ⚠ **Best-effort staging cannot tell "not wanted" from "not present."** `package.ps1` stages DuckDB
+  extensions from a local cache and only WARNS when it finds none — so with no cache on the runner, every
+  released bundle shipped an empty `duckdb-extensions/` and `AIRGAP-EXTENSIONS-1` was never actually
+  delivered by a release. ⛔ A release path that can silently produce less than intended needs a
+  fail-closed switch (`-RequireExtensions`), and **a step that runs only on a tag needs a cheap variant
+  that runs on every push** — "a path that executes only at release time" is itself the defect shape
+  (2026-09-14, `AIRGAP-EXTENSIONS-CI-1`).
 - 🔴 **`mvn compile` does NOT rebuild a downstream module when you change a SUPERTYPE's API.** Maven's
   incremental compiler looks at each module's own sources, so removing a method from an interface in
   `inspecto-util` produced an all-green `BUILD SUCCESS` in **4.5 seconds**, every module at `0.0x s`,
