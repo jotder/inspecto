@@ -597,6 +597,14 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     only `compact`, `db_maintenance`, `ledger_prune` and `cleanup`
     (`inspecto/examples/06-serve/maintenance-library/*.toon:4`). The word `materiali` does not appear
     anywhere in `inspecto-ui/src/app`.
+  ✅ **QUERY HALF SHIPPED 2026-09-14** — every saved entry has a Run that calls the route and renders the
+  rows in a shared data-table, with a 422 refusal shown in place. ⚠ The action is deliberately OUTSIDE
+  `canAuthor()`: running a stored read-only query is operational, not authoring, and a spec pins that.
+  ⚠ The editor's own Run is unchanged and still previews the **unsaved draft** through `/db/*` — the two
+  are different questions, and only the new one proves what a job will execute. **Verified in the running
+  app**, which corrected the spec: this route sends the **v1** envelope `{error: {errorCode, message, …}}`,
+  not the legacy `{error: '<message>'}` — `apiErrorMessage` reads both, so pinning the wrong one passed
+  while describing a response nobody sends. ⏸ **The materialize half remains blocked on its §1 decision.**
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
