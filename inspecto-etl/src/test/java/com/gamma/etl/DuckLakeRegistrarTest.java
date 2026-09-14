@@ -306,4 +306,88 @@ class DuckLakeRegistrarTest {
                 "the default topology is single — this must not change behaviour for anyone who never set "
                         + "the flag");
     }
+
+    // -- 6. §5.4 bullet 4: registration is MANDATORY when partitioned, not an opt-in sidecar -------------
+    //
+    // D10 closed the path where registration FAILS. It left open the path where registration is never
+    // ATTEMPTED: `enabled: false`, or no ducklake block at all, is a silent no-op on every topology. Across
+    // nodes that produces exactly what D10 refuses — Parquet registered nowhere, visible to no other node —
+    // reached by not trying rather than by failing. Operator decision 2026-09-14.
+    //
+    // 🔴 Only HALF the invariant, deliberately recorded as such: the single call site is the FLAT ingest
+    // lane, and the graph lane registers nothing on any topology. These tests pin the flat lane's rule;
+    // they must not be read as pinning a system-wide one.
+
+    private static Map<String, Object> enabledLake() {
+        Map<String, Object> lake = new LinkedHashMap<>();
+        lake.put("enabled", true);
+        return lake;
+    }
+
+    private static Map<String, Object> disabledLake() {
+        Map<String, Object> lake = new LinkedHashMap<>();
+        lake.put("enabled", false);
+        return lake;
+    }
+
+    @Test
+    void anAbsentDuckLakeBlockIsRefusedWhenPartitioned() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+
+        IllegalStateException boom = assertThrows(IllegalStateException.class,
+                () -> DuckLakeRegistrar.requireRegistrationConfigured(null),
+                "writing Parquet no other node can see is what D10 refuses; not attempting registration "
+                        + "reaches the same place as failing it");
+
+        assertTrue(boom.getMessage().contains("no output.ducklake block"),
+                "the message must distinguish 'no block' from 'disabled' — they are different mistakes: "
+                        + boom.getMessage());
+        assertTrue(boom.getMessage().contains(Topology.PROPERTY),
+                "the message must name the flag that made this fatal, so it can be turned off: "
+                        + boom.getMessage());
+    }
+
+    @Test
+    void anExplicitlyDisabledDuckLakeBlockIsAlsoRefusedWhenPartitioned() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+
+        IllegalStateException boom = assertThrows(IllegalStateException.class,
+                () -> DuckLakeRegistrar.requireRegistrationConfigured(disabledLake()),
+                "opting out is exactly the thing a partitioned deployment may not do");
+
+        assertTrue(boom.getMessage().contains("disabled or unset"),
+                "a present-but-disabled block is a different diagnosis from an absent one: "
+                        + boom.getMessage());
+    }
+
+    @Test
+    void anEnabledDuckLakeBlockPassesWhenPartitioned() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+
+        assertDoesNotThrow(() -> DuckLakeRegistrar.requireRegistrationConfigured(enabledLake()),
+                "a correctly configured partitioned pipeline must pass, or the check forbids the only "
+                        + "correct answer");
+    }
+
+    // The falsification arms. Without these the three above would pass against a method that ALWAYS threw,
+    // which would break every Personal and single-node Standard install that has no DuckLake block at all —
+    // i.e. almost all of them, since the lakehouse is an optional sidecar there.
+    @Test
+    void anAbsentDuckLakeBlockIsPerfectlyFineOnASingleNode() {
+        System.setProperty(Topology.PROPERTY, "single");
+
+        assertDoesNotThrow(() -> DuckLakeRegistrar.requireRegistrationConfigured(null),
+                "on one node the DuckLake step is the optional sidecar its javadoc promises");
+        assertDoesNotThrow(() -> DuckLakeRegistrar.requireRegistrationConfigured(disabledLake()),
+                "opting out on one node stays legitimate");
+    }
+
+    @Test
+    void anUnsetTopologyDoesNotMakeRegistrationMandatory() {
+        System.clearProperty(Topology.PROPERTY);
+
+        assertDoesNotThrow(() -> DuckLakeRegistrar.requireRegistrationConfigured(null),
+                "the default topology is single — this must not change behaviour for anyone who never set "
+                        + "the flag, which is every Personal and Standard install");
+    }
 }

@@ -324,9 +324,18 @@ Query Library's execution path** (§2).
   `LOAD`, then the file `package.ps1` stages under `-Dduckdb.extension.dir`, and reaches `INSTALL` only on a
   networked host. (2) ⛔ **A `postgresql://` `catalog_url` does not attach at all** — DuckLake reads the value
   as a *file path*, so `ATTACH 'ducklake:postgresql://…'` fails trying to open a file of that name relative to
-  the CWD. Because registration is non-fatal, the only symptom is one `DuckLake registration failed` warning
-  per batch and a catalog that stays empty. The documented example in `okf/backend/integrations.md` is that
-  exact shape ⇒ `AIRGAP-DUCKLAKE-PG-1`; a file catalog (`…/cat.ducklake`) was measured working end to end.
+  the CWD. The documented example in `okf/backend/integrations.md` was that exact shape ⇒
+  `AIRGAP-DUCKLAKE-PG-1`; a file catalog (`…/cat.ducklake`) was measured working end to end.
+  ✅ **RESOLVED 2026-09-14 — the working spelling is `postgres:` + LIBPQ KEYWORDS**, e.g.
+  `postgres:dbname=lake host=db port=5432 user=U password=P`, verified by finding the `ducklake_*` tables in
+  the Postgres database and reading a row back from a second independent connection. Both URL forms
+  (`postgresql://` and `postgres://`) fail; the doc now carries the working line.
+  🔴 **And the failure mode above was the *milder* one.** A `catalog_url` with **no** recognised backend
+  prefix does not warn at all — it silently creates a **local DuckDB file catalog** named after the whole
+  string, so each node quietly gets its own private catalog while every batch reports success.
+  `LakehouseCatalog.requireShared` now refuses that under `-Dinspecto.topology=partitioned`, on both the
+  write and the read side, from one definition. ⚠ Registration is also no longer "non-fatal" there: it is
+  fatal (D10) **and** mandatory, so an empty catalog can no longer be the only symptom of anything.
 - **The warehouse query layer** is an **operator runbook** against a customer's PostgreSQL: install
   `pg_duckdb`, run the bundled `warehouse_setup.sql` (repo root; not part of the Maven build), create roles
   and views. No `pg_duckdb` code in the repo; nothing tests it; `integrations.md` carries it without an

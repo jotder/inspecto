@@ -54,7 +54,40 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
    - Create the schema and table if they do not exist
    - `INSERT INTO` the DuckLake table by reading the just-written Parquet files
 
-   DuckLake registration is **non-fatal** — if it fails (e.g. PostgreSQL unreachable), the file is still marked processed and the failure is logged at WARN. The Parquet output on disk is unaffected.
+   On a **single-node** deployment (the default, and every Personal install) DuckLake registration is an
+   **optional, non-fatal sidecar** — if it fails, the file is still marked processed and the failure is
+   logged at WARN, and the Parquet output on disk is unaffected.
+
+   ⛔ **Under `-Dinspecto.topology=partitioned` it is neither optional nor non-fatal.** Two rules apply,
+   for one reason: several processes share this state, so Parquet that reaches no catalog is Parquet no
+   other node can see, and a batch that produces invisible output must not report success.
+   - **A failure is FATAL** (D10, 2026-09-14) — the batch fails rather than logging a warning.
+   - **Registration is MANDATORY** (2026-09-14) — `enabled: false`, or no `output.ducklake` block at all,
+     fails the batch too. D10 closed the path where registration *fails*; this closes the path where it is
+     never *attempted*.
+   - **The catalog must be a shared server**, not a local file. ⛔ A value with no backend prefix does not
+     error, it quietly creates a **private file catalog** for that node, so it is refused on shape before
+     the attach.
+
+   ⚠ **This is one lane's rule, not the system's.** The single registration call site is the flat ingest
+   lane; the graph lane registers nothing on any topology (`DUCKLAKE-GRAPH-LANE-1`).
+
+4. **Read every node's slices** — set the deployment's shared catalog and any query can reach the whole
+   lakehouse, not just what this node wrote:
+
+   ```bash
+   -Dinspecto.ducklake.catalog="postgres:dbname=ducklake_db host=db port=5432 user=etl_user password=..."
+   -Dinspecto.ducklake.data="/mnt/lake"
+   ```
+
+   Both or neither: a catalog with no data path cannot be attached and a data path with no catalog names
+   nothing, so half the pair is refused at the point of use rather than left to return short results.
+   Unset is the normal single-node case and changes nothing.
+
+   The catalog is attached as **`lake`**, so a query reaches it as `lake.<schema>.<table>` — from
+   `/bi/query` and the Query Library alike. **Visibility is the catalog commit**: a slice appears exactly
+   when its registering transaction committed, never half-written. ⚠ It can only show what the write side
+   registered, so the graph-lane gap above applies here too.
 
 ### Remote access via DBeaver
 
@@ -64,7 +97,9 @@ Each remote user installs the **DuckDB JDBC driver** in DBeaver and connects usi
 -- In a DBeaver DuckDB connection
 INSTALL ducklake FROM core;
 LOAD ducklake;
-ATTACH 'ducklake:postgresql://user:password@server:5432/ducklake_db'
+-- The backend prefix is postgres: + libpq KEYWORDS. A postgresql:// or postgres:// URL is read
+-- as a FILE PATH by DuckLake and does not work (measured 2026-09-14).
+ATTACH 'ducklake:postgres:dbname=ducklake_db host=server port=5432 user=user password=password'
     AS lake (DATA_PATH '/mnt/adj-lake');
 
 SELECT * FROM lake.<data_source>s.<data_source>_data

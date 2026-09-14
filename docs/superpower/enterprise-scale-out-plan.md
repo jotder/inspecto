@@ -868,13 +868,25 @@ Work under (ii):
 > | 1. `PartitionWriter` visibility strategy (`RenameReveal`/`CatalogCommit`) | ⏸ **DEFERRED** — it exists to *skip* the rename on object-store paths. With a mounted volume the rename is still correct and still wanted, so building the strategy now would add a seam with one implementation |
 > | 2. Double-registration guard | ✅ **SHIPPED** — `DuckLakeRegistrationSiteContractTest` |
 > | 3. Disable data inlining | ✅ **SHIPPED 2026-09-14** (`038447c2`) — measured with a control pair |
-> | 4. Registrar: sidecar → commit step; `ducklake:postgres:`; failure fatal | 🟡 **PART SHIPPED** — D10 fatal (`dfe773bc`) and the catalog spelling proven + guarded (`038447c2`). ⏳ Live remainder: it is still an **opt-in sidecar** called after every batch regardless of topology |
-> | 5. **Reads attach the shared catalog** | ⏳ **LIVE, and the main remaining value** — needs no object store. This is what the plan calls the difference between a platform and N isolated islands |
+> | 4. Registrar: sidecar → commit step; `ducklake:postgres:`; failure fatal | ✅ **SHIPPED** — D10 fatal (`dfe773bc`), catalog spelling proven + guarded (`038447c2`), and registration **mandatory when partitioned** (operator 2026-09-14): `enabled: false` or no block at all now fails, because D10 closed the path where registration FAILS and left open the path where it is never ATTEMPTED. 🔴 **Half an invariant — see the graph-lane row below** |
+> | 5. **Reads attach the shared catalog** | ✅ **SHIPPED 2026-09-14** — `LakehouseCatalog` (`-Dinspecto.ducklake.catalog` + `-Dinspecto.ducklake.data`) and `QueryExecutor.attachSql`, attaching as `lake` in the trusted registration phase. Serves `/bi/query` and the Query Library both |
 > | 6. `dirs.database` as `s3://` + object-store containment | ⏸ **DEFERRED** — wholly object-store |
 >
-> ⚠ So the live work is **bullet 5, then bullet 4's remainder**. ⛔ Do not start 1 or 6 under this scope;
-> and note bullet 1's `CatalogCommit` name appears nowhere in code — it is this plan's proposal, not a
-> thing to go looking for.
+> ✅ **Both live bullets SHIPPED 2026-09-14.** Under D4a's scope, §5.4 is DONE except the two
+> object-store bullets. ⛔ Do not start 1 or 6 until the object store returns; and note bullet 1's
+> `CatalogCommit` name appears nowhere in code — it is this plan's proposal, not a thing to go looking for.
+>
+> 🔴 **What shipping bullet 4 did NOT fix, stated plainly because the code now looks like it did.**
+> "Registration is mandatory when partitioned" is an invariant of **one lane**. The only call site is the
+> FLAT ingest lane (`ConsignmentIngestor.finalizeSource`); the **GRAPH lane registers nothing, on any
+> topology**. So a partitioned deployment now refuses an unconfigured flat pipeline while its graph
+> pipelines carry on writing Parquet that no other node can see — and the enforcement makes that silence
+> look deliberate. Filed as `DUCKLAKE-GRAPH-LANE-1`. ⚠ It was true before this change too; what is new is
+> that the two lanes now visibly disagree.
+>
+> ⚠ **A read-side attach can only see what the write side registered**, so the graph-lane hole is also a
+> hole in bullet 5: `lake.*` will be missing exactly the slices the graph lane produced. Bullet 5 is
+> correct and complete in itself; it is not a workaround for an unregistered writer.
 
 - `PartitionWriter` gains a **visibility strategy**: `RenameReveal` (today, local paths) and
   `CatalogCommit` (object-store paths, partitioned mode). ✅ **S2 CONFIRMS the shared seam by reading the

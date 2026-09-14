@@ -11,13 +11,14 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **59 rows: 1 × P1 · 35 × P2 · 23 × P3.**
+> text). **60 rows: 1 × P1 · 36 × P2 · 23 × P3.**
 >
 > ⚠ **The single P1 is `AIRGAP-EXTENSIONS-CI-1`** (§3), filed 2026-09-14: no released bundle has ever
 > carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a local
 > cache and the CI runner has none. It is P1 because D10 makes the resulting failure **fatal** on a
-> partitioned (Enterprise) pod, so it blocks scale-out phase C. The P2 count drops by one in the same
-> move: `AIRGAP-DUCKLAKE-PG-1` closed the same day.
+> partitioned (Enterprise) pod, so it blocks scale-out phase C. ⚠ **The P2 count is unchanged at 36 by
+> coincidence, not by inactivity**: `AIRGAP-DUCKLAKE-PG-1` closed on 2026-09-14 and `DUCKLAKE-GRAPH-LANE-1`
+> was filed the same day, in the same work. Both P1 and the new P2 came out of shipping scale-out §5.4.
 >
 > ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
@@ -680,6 +681,25 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   derived from the source the way a `LOAD` name could be. A future extension with the same shape will be
   invisible in the same way.
   → `okf/backend/integrations.md` · `inspecto/package.ps1` · scale-out plan §5.4
+
+- 🔴 **P2** · **`DUCKLAKE-GRAPH-LANE-1` — the graph lane registers NOTHING, so half the lakehouse is
+  invisible across nodes.** Filed 2026-09-14 while shipping §5.4 bullets 4 and 5. `DuckLakeRegistrar.register`
+  has exactly **one** call site in the repo — `ConsignmentIngestor.finalizeSource`, the **flat** ingest lane.
+  The **graph lane registers nothing on any topology**, so the Parquet it writes reaches no catalog and no
+  other node can see it.
+  ⚠ **This predates today's work; what is new is that the two lanes now visibly disagree.** Registration is
+  now MANDATORY when partitioned (a flat pipeline with `enabled: false` or no `output.ducklake` block fails
+  the batch) — so a partitioned deployment refuses an unconfigured flat pipeline while its graph pipelines
+  carry on writing invisible output, **and the enforcement makes that silence look deliberate**. ⛔ Do not
+  read "registration is mandatory when partitioned" as a system invariant; it is an invariant of one lane.
+  🔴 **It is also a hole in the read side**: `QueryExecutor`'s shared-catalog attach can only surface what
+  the write side registered, so `lake.*` is missing exactly the graph lane's slices. Bullet 5 is complete in
+  itself and is **not** a workaround for an unregistered writer.
+  ⚠ The fix is not simply "call register() from the graph lane too" — the plan's own §5.4 warns that wiring
+  a per-file registration while leaving the batch-level call in place would **double-register the flat
+  lane**, and `DuckLakeRegistrationSiteContractTest` pins the single call site precisely to catch that. Any
+  change here must move both lanes in one step and update that contract test deliberately.
+  → `okf/backend/engine/db-layer.md` · scale-out plan §5.4 · `DuckLakeRegistrationSiteContractTest`
 
 - 🔴 **P1** · **`AIRGAP-EXTENSIONS-CI-1` — no released bundle has ever carried a DuckDB extension, on any
   platform.** Filed 2026-09-14 while staging `postgres_scanner` (above). `package.ps1` stages extensions

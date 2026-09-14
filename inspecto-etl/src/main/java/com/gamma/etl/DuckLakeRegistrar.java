@@ -1,6 +1,7 @@
 package com.gamma.etl;
 
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.LakehouseCatalog;
 import com.gamma.util.Topology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +23,14 @@ import java.util.stream.Collectors;
  * cannot reach the shared catalog would write Parquet files no other pod can see, so the batch must fail
  * rather than succeed invisibly. See {@link #onRegistrationFailure}.
  *
- * <p>Activation requires {@code output.ducklake.enabled: true} in the pipeline
- * config.  The method is a no-op otherwise.
+ * <p>Activation requires {@code output.ducklake.enabled: true} in the pipeline config. On a {@code single}
+ * topology the method is a no-op otherwise — the lakehouse is an optional sidecar there.
+ *
+ * <p>⛔ <b>In a {@code partitioned} topology it is MANDATORY, not optional</b> (operator 2026-09-14,
+ * scale-out §5.4). Unregistered Parquet is Parquet no other node can see, which is the same invisible
+ * output D10 refuses when registration fails — so "not configured" can no longer be a quiet no-op either.
+ * See {@link #requireRegistrationConfigured}, whose javadoc also records the half of that invariant this
+ * does NOT cover.
  *
  * <p>Extracted from {@link com.gamma.inspector.CollectorProcessor#registerInDuckLake}.
  */
@@ -45,6 +52,10 @@ public final class DuckLakeRegistrar {
     public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg) {
         if (outputPaths.isEmpty()) return;
         Map<String, Object> dl = cfg.output().duckLake();
+        // ⛔ Checked BEFORE the two early returns below, not after: those returns ARE the hole. On one node
+        // they are the optional-sidecar contract; when partitioned they are how a pipeline writes Parquet
+        // that is registered nowhere and no other node can see.
+        requireRegistrationConfigured(dl);
         if (dl == null) return;
         if (!Boolean.parseBoolean(String.valueOf(dl.getOrDefault("enabled", false)))) return;
 
@@ -98,49 +109,53 @@ public final class DuckLakeRegistrar {
     }
 
     /**
-     * The DuckLake catalog backends that are a SHARED SERVER rather than a local file.
-     *
-     * <p>DuckLake reads whatever follows {@code ducklake:} as a backend spec, and anything without a
-     * recognised backend prefix is a <b>file path</b>. That is the whole hazard below.
-     */
-    private static final List<String> SERVER_BACKENDS = List.of("postgres:", "mysql:");
-
-    /**
      * ⛔ In a {@code partitioned} topology, refuse a catalog that would be a LOCAL FILE (D4, phase C).
      *
-     * <p><b>Why this exists when {@link #onRegistrationFailure} already makes failure fatal.</b> D10
-     * covers the catalog that cannot be reached. It does not cover the catalog that is reached
-     * <b>successfully and privately</b> — and that is the likelier mistake, because it never raises
-     * anything. Measured 2026-09-14 against duckdb_jdbc 1.5.2.1: a {@code catalog_url} with no recognised
-     * backend prefix does not fail, it <b>silently creates a local DuckDB file catalog</b> named after the
-     * whole string. On N pods that is N private catalogs, each pod seeing only its own Parquet, every batch
-     * green — precisely the split-brain D10 exists to prevent, arriving as success rather than as failure.
-     * So the shape of the URL has to be refused up front; there is no later moment at which it looks wrong.
-     *
-     * <p>⚠ <b>Single-node behaviour is deliberately unchanged.</b> A file catalog is the correct and
-     * documented choice when one process owns the lakehouse, which is every Personal and single-node
-     * Standard install. This refuses it only where "one process" is false.
-     *
-     * <p>⚠ <b>{@code postgresql://…} is refused too, and that is not a mis-diagnosis.</b> It reads like a
-     * shared catalog and is what {@code okf/backend/integrations.md} shipped as THE example, but it carries
-     * no recognised prefix, so DuckLake treats it as a path as well — measured failing in the same probe.
-     * The message therefore names the spelling that was measured WORKING rather than only refusing.
+     * <p>The rule itself lives in {@link LakehouseCatalog#requireShared} because the READ side applies the
+     * same one to {@code -Dinspecto.ducklake.catalog}. ⛔ Two copies is how the write and read sides come
+     * to disagree about what "shared" means, and the disagreement would surface as one of them quietly
+     * using a private catalog — the very defect the rule exists to catch.
      */
     static void requireSharedCatalog(String catalogUrl) {
-        if (!Topology.partitioned()) return;
-        String url = catalogUrl == null ? "" : catalogUrl.trim();
-        String lower = url.toLowerCase();
-        if (SERVER_BACKENDS.stream().anyMatch(lower::startsWith)) return;
+        LakehouseCatalog.requireShared(catalogUrl, "output.ducklake.catalog_url");
+    }
 
-        throw new IllegalStateException("output.ducklake.catalog_url=" + (url.isEmpty() ? "(unset)" : url)
-                + " is not a shared catalog, and -D" + Topology.PROPERTY + "=partitioned forbids it. DuckLake"
-                + " reads anything without a backend prefix as a FILE PATH, so this would not fail — it would"
-                + " quietly give this pod its own private catalog, and every pod would see only the Parquet"
-                + " it wrote itself while every batch reported success. Use a server-backed catalog, e.g."
-                + " catalog_url: \"postgres:dbname=lake host=db port=5432 user=U password=P\" (measured"
-                + " working 2026-09-14). ⛔ A postgresql:// or postgres:// URL is NOT that spelling and is"
-                + " read as a path too. Or run this node with -D" + Topology.PROPERTY + "=single if it"
-                + " genuinely owns its lakehouse alone.");
+    /**
+     * ⛔ In a {@code partitioned} topology, registration is MANDATORY — not the opt-in sidecar it is on one
+     * node (operator, 2026-09-14; scale-out §5.4 bullet 4).
+     *
+     * <p><b>Why.</b> {@link #register} is a no-op unless {@code output.ducklake.enabled} is true. On one
+     * node that is exactly right: the lakehouse is optional. Across pods it means a pipeline can write
+     * Parquet that is <b>registered nowhere</b>, so no other pod can see it — the same outcome D10 already
+     * calls fatal when registration FAILS, reached instead by never attempting it. ⛔ D10 closed the
+     * failure path and left the not-configured path open; this closes it.
+     *
+     * <p>⚠ <b>This is a deliberate behaviour change with a real blast radius</b>: a deployment running
+     * {@code partitioned} without a DuckLake block now fails its batches where before they succeeded. That
+     * is the point — those batches were producing invisible output — but it is why the message says which
+     * flag to unset to get the old behaviour back.
+     *
+     * <p>🔴 <b>It is also only HALF the invariant, and the half nobody can see is worse.</b> The single
+     * call site is the flat ingest lane ({@code ConsignmentIngestor.finalizeSource}); the GRAPH lane
+     * registers nothing at all, on any topology. So this makes the flat lane honest and leaves the graph
+     * lane writing unregistered Parquet under {@code partitioned} — invisible to other pods and now
+     * inconsistent with its sibling. ⛔ Do not read "registration is mandatory when partitioned" as an
+     * invariant of the system; it is an invariant of one lane. Tracked as the graph-lane half of §5.4.
+     */
+    static void requireRegistrationConfigured(Map<String, Object> duckLakeCfg) {
+        if (!Topology.partitioned()) return;
+        boolean enabled = duckLakeCfg != null
+                && Boolean.parseBoolean(String.valueOf(duckLakeCfg.getOrDefault("enabled", false)));
+        if (enabled) return;
+
+        throw new IllegalStateException("-D" + Topology.PROPERTY + "=partitioned requires"
+                + " output.ducklake.enabled: true, and this pipeline has "
+                + (duckLakeCfg == null ? "no output.ducklake block" : "it disabled or unset")
+                + ". Several processes share this state, so Parquet that is registered in no catalog is"
+                + " Parquet no other node can see — the same invisible output D10 already refuses when"
+                + " registration FAILS, reached by never attempting it. Configure the shared catalog, or"
+                + " run this node with -D" + Topology.PROPERTY + "=single if it genuinely owns its"
+                + " lakehouse alone.");
     }
 
     /**

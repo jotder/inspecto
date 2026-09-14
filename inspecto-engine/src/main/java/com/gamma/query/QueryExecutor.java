@@ -1,7 +1,9 @@
 package com.gamma.query;
 
+import com.gamma.etl.DuckDbExtension;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
+import com.gamma.util.LakehouseCatalog;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -61,12 +63,75 @@ public final class QueryExecutor {
     public record Result(List<ResultSetDescriptor.Column> columns, List<Map<String, Object>> rows,
                          int rowCount, boolean truncated, long elapsedMs) {}
 
+    /**
+     * Attach the deployment's shared DuckLake catalog as {@code lake}, when one is configured
+     * (scale-out phase C, §5.4 bullet 5, D4/D4a).
+     *
+     * <p><b>What this buys.</b> The Parquet a query reads is normally located by absolute path, which
+     * means a node can only read what is on its own disk. Attaching the shared catalog lets any node read
+     * every slice, including ones another node ingested — the plan's difference between a platform and N
+     * isolated islands. Visibility stays the catalog commit: a file appears here exactly when its
+     * registering transaction committed, never earlier and never half-written.
+     *
+     * <p>⛔ <b>It must run BEFORE {@code seal()}, and there is no way around that.</b> Measured 2026-09-14:
+     * a sealed sandbox refuses with <i>"Attaching Postgres databases is disabled through configuration"</i>,
+     * because sealing sets {@code enable_external_access=false}. This method therefore sits in the trusted
+     * registration phase beside the dataset view — the same place, for the same reason, and the sandbox's
+     * safety story is unchanged: the caller's SQL was {@code SqlGuard}-checked upstream and cannot itself
+     * attach anything.
+     *
+     * <p>⚠ <b>{@code SqlGuard} blocks {@code ATTACH} in USER sql and does not apply here.</b> That is not a
+     * loophole being exploited — the guard is a text filter over caller-authored SQL at named call sites,
+     * never a connection-wide policy, and this statement is framework-built from a {@code -D} property the
+     * operator set. It is the same trust boundary the {@code CREATE VIEW} below already relies on.
+     *
+     * <p>⚠ <b>Unconfigured is the common case and must stay free.</b> Personal and single-node Standard
+     * have no shared catalog; this is then a no-op and reads behave exactly as before.
+     *
+     * <p>⛔ <b>A configured-but-unreachable catalog FAILS the query rather than silently returning less.</b>
+     * Swallowing the error would hand back a result set that is short by however much another node wrote,
+     * with nothing to say so — the read-side twin of the invisible-output problem D10 refuses on the write
+     * side. ⚠ {@code autoload_known_extensions=false} in the sandbox does NOT block this: measured, the
+     * attach still loads {@code postgres_scanner} — provided it is installed, which is what
+     * {@code AIRGAP-EXTENSIONS-CI-1} is about.
+     */
+    private static void attachSharedCatalog(Connection conn) throws SQLException {
+        String sql = attachSql();
+        if (sql == null) return;
+        DuckDbExtension.ensureLoaded(conn, "ducklake", "-D" + LakehouseCatalog.CATALOG_PROPERTY);
+        try (Statement st = conn.createStatement()) {
+            st.execute(sql);
+        }
+    }
+
+    /**
+     * The {@code ATTACH} this node would issue, or {@code null} when no shared catalog is configured.
+     *
+     * <p>Package-private so the DECISION is directly testable, the same idiom
+     * {@code DuckLakeRegistrar.onRegistrationFailure} and {@code attachOptions} already use on the write
+     * side. ⛔ The alternative was a test gated on a live Postgres, which would SKIP on every machine
+     * without one — and this repo has already had a skipping test hide a broken classpath for months. What
+     * is left untested here is one {@code st.execute} of a string this method returns; the string itself,
+     * and every branch choosing it, are pinned.
+     */
+    static String attachSql() {
+        LakehouseCatalog.Catalog cat = LakehouseCatalog.configured();
+        if (cat == null) return null;
+        LakehouseCatalog.requireShared(cat.url(), "-D" + LakehouseCatalog.CATALOG_PROPERTY);
+        return "ATTACH 'ducklake:" + cat.url() + "' AS " + SHARED_CATALOG_ALIAS
+                + " (DATA_PATH '" + cat.dataPath().replace("\\", "/") + "')";
+    }
+
+    /** The schema name a query uses to reach the shared lakehouse, e.g. {@code lake.main.my_table}. */
+    static final String SHARED_CATALOG_ALIAS = "lake";
+
     public static Result run(Request req) throws SQLException, IOException {
         long t0 = System.nanoTime();
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
             Connection conn = sandbox.connection();
             // Trusted registration: the ONLY place file-reading SQL runs (unsealed). The user query below
             // was SqlGuard-checked upstream, so it cannot itself read files.
+            attachSharedCatalog(conn);
             if (req.datasetName() != null && req.relationSql() != null) {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE VIEW " + q(req.datasetName()) + " AS " + req.relationSql());
