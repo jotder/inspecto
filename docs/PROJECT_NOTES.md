@@ -149,6 +149,23 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   claim about one step until the whole pipeline has executed. ⚠ The same shape hides in any ordered
   pipeline: the pre-push hook, `package.ps1`'s staging steps, a reactor that stops at the first module.
 
+- 🔴 **A RED GATE CAN ALSO BE A CONCURRENT BUILD — this checkout is SHARED.** Measured 2026-09-14: a full
+  reactor run died in `inspecto-engine` with `NoClassDefFoundError` for `com.gamma.util.CurrentSpace` and
+  `SingleConnectionSource` — classes that compile fine, declared at **compile scope**, in a module that had
+  reported SUCCESS seconds earlier. Cause: another session ran `mvn clean` in the **same working tree**,
+  deleting `inspecto-util/target/classes` mid-run. ⛔ **Before debugging a classpath error, `ls -la` the
+  missing `.class` and compare its mtime to your run** — a file re-created *during* your build is the tell.
+  Then simply re-run: it did not reproduce, and the suite passed 4475/0. ⚠ The same race can corrupt any
+  measurement taken here; a lone anomalous failure deserves one re-run before it earns a bug report.
+
+- 🔴 **STAGING IS NOT SAFE PARKING — a peer session's stop-hook will commit and push your staged tree.**
+  Twice now (latest 2026-09-14, `519673a7`): 38 staged files of one shift's refactor landed inside another
+  session's commit, under a message describing something else entirely, credited to another model, and were
+  pushed before they could be verified. ⛔ **Commit as soon as a coherent unit exists** rather than holding
+  a large `git add -A` while you verify — and when a shared-trunk commit turns out to misdescribe its own
+  contents, **record the facts forward** (a follow-up doc commit) rather than rewriting pushed history.
+  ⚠ Corollary: a dirty file you did not create belongs to someone else — never sweep it into your commit.
+
 - 🔴 **`existsSync` answers "is this on THIS disk", never "is this in the repository".** It says yes to a
   gitignored file, to build output, and — on a case-insensitive filesystem — to the wrong capitalisation.
   Both halves shipped (`LINKGUARD-CASE-1`, 2026-09-14): five docs linked `docs/okf/INDEX.md`, which does not exist
