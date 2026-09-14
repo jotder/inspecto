@@ -112,10 +112,26 @@ code before filing, not just the board.
   2026-09-14. `package.ps1 -Edition Standard` **throws** at the SBOM licence gate (`package.ps1:598`):
   `com.eoiagent:eoiagent-core` and `com.eoiagent:eoiagent-model` declare **no licence** (`NOASSERTION`),
   and `tools/sbom.mjs` refuses — correctly — to "ship an SBOM that asserts nothing".
-  **Measured 2026-09-14:** Personal `exit 0`; Standard `exit 1`, two violations. ⚠ Enterprise stages the
-  same jars so is expected to fail identically, but that is **not proven** — the probe ran against a
-  bundle directory holding a Standard build, so its failure was a missing `inspecto-policy.jar`, i.e. the
-  probe's own fault, not a finding.
+  **Measured 2026-09-14:** Personal `exit 0`; Standard `exit 1`, two violations.
+  ✅ **Enterprise PROVEN identical (2026-09-14, second measurement).** Not by staging a bundle — the
+  resolve *is* the whole input to the gate, so it can be checked without one. Replaying sbom.mjs's own
+  `dependency:list -DincludeScope=runtime -pl <bundle modules> -am -P<profile>` + POM licence walk:
+  Standard and Enterprise each resolve **the same 48 third-party components with the same 2 unlicensed**
+  (`inspecto-policy` contributes no third-party dependency at all), and **no component other than the two
+  `eoiagent` jars is unlicensed** in either. Both arrive via **`inspecto-agent`** only.
+  ⚠ **The "10-second repro" in a handoff is bundle-state-dependent and will mislead you.** `node
+  tools/sbom.mjs --edition Standard --bundle inspecto-deploy` reports `inspecto-security.jar is not in the
+  bundle` whenever `inspecto-deploy/` last held a *Personal* build — the exact probe-fault this row already
+  records for Enterprise, hit a second time from the other direction. Use the resolve, not the bundle.
+  🔴 **ROOT CAUSE FOUND — upstream's silence is deliberate policy, not an omission.** `eoiagent-parent`
+  (`0.2.0-SNAPSHOT`) declares no `<licenses>` anywhere in its chain and configures `license-maven-plugin`
+  with `<excludedGroups>com\.eoiagent</excludedGroups>` under the comment *"First-party modules carry no
+  POM license; they are not third-party to vet."* That reasoning is sound inside **its** reactor and
+  breaks at the boundary: to `inspecto`, `com.eoiagent` is a different groupId outside the reactor, which
+  is precisely how `sbom.mjs` defines third-party. **Two locally-coherent, mirror-image policies produce
+  the failure** — upstream excludes `com.eoiagent` *as* first-party; inspecto includes it *as* third-party.
+  ⚠ This raises the cost of option (a) below: it is not a missing line, it is a **reversal of a stated
+  upstream policy**, so someone must decide that policy is wrong for external consumers.
   🔴 **This is a regression dated 2026-09-12**, when `PKG-5` began staging the assistant into
   **Standard and above** (`package.ps1` `$modules`). Before that, no bundle carried an `eoiagent`
   component and the gate never saw one. It is untracked — `NOASSERTION` appears in no doc — and
@@ -125,7 +141,15 @@ code before filing, not just the board.
   components actually carry, and that is a compliance answer, not a code change: (a) declare `<licenses>`
   upstream in `jotder/inspect-agent` — the correct home, since the metadata belongs to the artifact; or
   (b) carry a declared mapping in `tools/sbom.mjs` for components whose POM omits it — faster, but this
-  repo would then be asserting a licence for an artifact it does not own. ⚠ Do NOT "fix" it by relaxing
+  repo would then be asserting a licence for an artifact it does not own; or (c) **treat `com.eoiagent` as
+  first-party in the SBOM**, mirroring upstream's own `excludedGroups` stance, which `sbom.mjs` already
+  permits for in-reactor modules (it records them `NOASSERTION` and exits 0). ⚠ (c) is the option to
+  scrutinise, not the easy one: it makes the shipped SBOM assert nothing about two jars that **do** carry
+  third-party transitives, and "first-party" would stop meaning "in this reactor". It is only defensible
+  if `com.eoiagent` and `com.gamma.inspector` are the **same legal entity** — the two repos share a
+  GitHub owner (`jotder/…`) but that is not evidence of that, and nobody has stated it. **Answer that
+  first; it decides between (a)/(b) and (c).**
+  ⚠ Do NOT "fix" it by relaxing
   the gate; the gate is the control (`compliance/controls-matrix.md` CC9) and it just did its job.
   → `okf/capabilities/compliance/compliance.md`, `okf/capabilities/editions/editions.md` §2
 
