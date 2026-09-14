@@ -62,8 +62,7 @@ async function create(
     // ⚠ `promoted` is called on EVERY load (ngOnInit), so the stub must exist or every test in this file
     // fails on an undefined method rather than on what it is asserting.
     const promoted =
-        opts.promoted ??
-        vi.fn(() => of({ reconciliation: current.id, promoted: {}, total: 0, truncated: false }));
+        opts.promoted ?? vi.fn(() => of({ reconciliation: current.id, promoted: {}, total: 0, truncated: false }));
     const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     TestBed.configureTestingModule({
         imports: [ReconciliationDetailComponent],
