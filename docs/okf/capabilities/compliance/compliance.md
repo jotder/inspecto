@@ -361,6 +361,29 @@ something to link.
 | 2026-09-07 | The access-review edition cell is corrected; it had been stale for weeks against its own closed gap | gate sweep |
 | 2026-09-08 | The audit export is **kept in the core** when the events feed becomes optional, precisely so this control stays satisfiable on the edition with no events module | edition gating, cell 6 |
 | 2026-09-08 | This spec: the never-executed signing path recorded; the availability row's staleness against its own gap ledger recorded; the three unmapped mechanisms recorded with their nearest controls; the "Personal has no compliance scope" stance distinguished from a build fact | this file §2, §3.8 |
+| 2026-09-14 | **The assistant's `com.eoiagent` substrate is licensed Apache-2.0, declared upstream** rather than mapped locally — the metadata belongs to the artifact, so asserting it from a consumer's generator was refused. ⚠ A **grant, not a metadata fix**: the upstream repo was public with no licence, i.e. all-rights-reserved, so this conferred rights that did not exist | operator; `jotder/inspect-agent@a24817b` |
+| 2026-09-14 | **A licence gate reads `licenseDeclared`, and the bill of materials must not be judged by counting `NOASSERTION`.** The SPDX document legitimately carries ~192 of them in `downloadLocation` and `licenseConcluded`, which are convention for Maven-resolved dependencies | this file §4.1 |
+
+### 4.1 Why the substrate had no licence — a boundary, not an omission
+
+Worth keeping, because the shape recurs wherever a bill of materials crosses a repository line.
+
+The upstream reactor excluded its **own** group from its **own** licence plugin, reasoning that
+first-party modules are not third-party to vet. That is correct inside that build and stops being
+correct at its edge: to this product, the same group is a different groupId outside this reactor, which
+is exactly what third-party means here. Two locally-coherent policies, pointing opposite ways across one
+boundary, produced a component that declared nothing — and the gate caught it only once `PKG-5` began
+staging the assistant, because until then no bundle carried the component at all.
+
+⛔ **The lesson is not "declare licences".** It is that **"first-party" is relative to a reactor, and a
+bill of materials is read by someone outside it.** A generator that defines first-party as "in my
+reactor" will always disagree with an upstream that defines it as "mine" — and the disagreement surfaces
+as a shipped document asserting nothing, at release time, on a tag.
+
+⚠ **Check the resolve, never a staged directory.** The dependency resolution is the entire input to the
+gate, so licence questions are answerable in seconds without packaging anything. Probing a bundle
+directory instead produced two *false* findings on this row — each time reporting a missing jar from
+whichever edition was staged last, which reads exactly like a real failure.
 
 ## 5. Not built
 

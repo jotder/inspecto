@@ -108,75 +108,51 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-- 🔴 **`SBOM-EOIAGENT-LICENCE-1` — the release pipeline cannot build a Standard bundle.** Filed
-  2026-09-14. `package.ps1 -Edition Standard` **throws** at the SBOM licence gate (`package.ps1:598`):
-  `com.eoiagent:eoiagent-core` and `com.eoiagent:eoiagent-model` declare **no licence** (`NOASSERTION`),
-  and `tools/sbom.mjs` refuses — correctly — to "ship an SBOM that asserts nothing".
-  **Measured 2026-09-14:** Personal `exit 0`; Standard `exit 1`, two violations.
-  ✅ **Enterprise PROVEN identical (2026-09-14, second measurement).** Not by staging a bundle — the
-  resolve *is* the whole input to the gate, so it can be checked without one. Replaying sbom.mjs's own
-  `dependency:list -DincludeScope=runtime -pl <bundle modules> -am -P<profile>` + POM licence walk:
-  Standard and Enterprise each resolve **the same 48 third-party components with the same 2 unlicensed**
-  (`inspecto-policy` contributes no third-party dependency at all), and **no component other than the two
-  `eoiagent` jars is unlicensed** in either. Both arrive via **`inspecto-agent`** only.
-  ⚠ **The "10-second repro" in a handoff is bundle-state-dependent and will mislead you.** `node
-  tools/sbom.mjs --edition Standard --bundle inspecto-deploy` reports `inspecto-security.jar is not in the
-  bundle` whenever `inspecto-deploy/` last held a *Personal* build — the exact probe-fault this row already
-  records for Enterprise, hit a second time from the other direction. Use the resolve, not the bundle.
-  🔴 **ROOT CAUSE FOUND — upstream's silence is deliberate policy, not an omission.** `eoiagent-parent`
-  (`0.2.0-SNAPSHOT`) declares no `<licenses>` anywhere in its chain and configures `license-maven-plugin`
-  with `<excludedGroups>com\.eoiagent</excludedGroups>` under the comment *"First-party modules carry no
-  POM license; they are not third-party to vet."* That reasoning is sound inside **its** reactor and
-  breaks at the boundary: to `inspecto`, `com.eoiagent` is a different groupId outside the reactor, which
-  is precisely how `sbom.mjs` defines third-party. **Two locally-coherent, mirror-image policies produce
-  the failure** — upstream excludes `com.eoiagent` *as* first-party; inspecto includes it *as* third-party.
-  ⚠ This raises the cost of option (a) below: it is not a missing line, it is a **reversal of a stated
-  upstream policy**, so someone must decide that policy is wrong for external consumers.
-  🔴 **This is a regression dated 2026-09-12**, when `PKG-5` began staging the assistant into
-  **Standard and above** (`package.ps1` `$modules`). Before that, no bundle carried an `eoiagent`
-  component and the gate never saw one. It is untracked — `NOASSERTION` appears in no doc — and
-  `release.yml` fires only on `v*` tags, so nothing has hit it yet: **the next tag fails at the Standard
-  step.**
-  ✅ **DECIDED 2026-09-14 (operator): route (a) — declare `<licenses>` upstream; and the two groupIds are
-  the SAME LEGAL ENTITY.** That settles the entity question below and takes (c) off the table as
-  unnecessary rather than indefensible.
-  ✅ **The mechanics are PROVEN and cheap (2026-09-14).** *One* `<licenses>` element in
-  `jotder/inspect-agent`'s **root `pom.xml`** (the `eoiagent-parent` aggregator) fixes **both** violators
-  in **both** editions: `eoiagent-core`/`-model` inherit at 1 level, well inside sbom.mjs's 4-level parent
-  walk. Verified by injecting a placeholder into the cached parent POM and re-running the licence walk —
-  `2 UNLICENSED → 0` for Standard and Enterprise, then restoring the cache and watching the failure return
-  (both controls run, so the result is not a one-sided pass).
-  ✅ **It reaches CI with NO publishing step.** `ci.yml:184-195` and `release.yml:40-47` both *check out*
-  `jotder/inspect-agent` and `mvn install` it into the runner's `~/.m2` — eoiagent is pre-release and
-  published to no repository — so an upstream POM edit flows into the release build on the next tag by
-  itself. ⚠ It does **not** break upstream's own licence gate: that plugin's `<excludedGroups>com\.eoiagent`
-  exempts these modules from its Apache/MIT/BSD whitelist regardless of what they declare.
-  🔴 **BLOCKED ON ONE FACT — the licence identifier itself, which no source in either repo states.**
-  Neither repo has a `LICENSE` file, neither declares `<licenses>` in any POM, and **both are PUBLIC on
-  GitHub with `licenseInfo: null`** — which by copyright default is *all rights reserved*, not permissive.
-  ⛔ An agent must not pick this value: declaring `Apache-2.0` would **grant rights that do not currently
-  exist**, and declaring `Proprietary` asserts commercial terms — either is a legal statement that then
-  ships inside a signed compliance artifact. "Same entity" answers *who owns it*, not *what it is licensed
-  under*. **Operator must supply the exact identifier** (and ideally a `LICENSE` file upstream to match).
-  ⛛ **Not fixable by an agent, and deliberately not worked around.** The question is what licence those
-  components actually carry, and that is a compliance answer, not a code change: (a) declare `<licenses>`
-  upstream in `jotder/inspect-agent` — the correct home, since the metadata belongs to the artifact; or
-  (b) carry a declared mapping in `tools/sbom.mjs` for components whose POM omits it — faster, but this
-  repo would then be asserting a licence for an artifact it does not own; or (c) **treat `com.eoiagent` as
-  first-party in the SBOM**, mirroring upstream's own `excludedGroups` stance, which `sbom.mjs` already
-  permits for in-reactor modules (it records them `NOASSERTION` and exits 0). ⚠ (c) is the option to
-  scrutinise, not the easy one: it makes the shipped SBOM assert nothing about two jars that **do** carry
-  third-party transitives, and "first-party" would stop meaning "in this reactor". It is only defensible
-  if `com.eoiagent` and `com.gamma.inspector` are the **same legal entity** — the two repos share a
-  GitHub owner (`jotder/…`) but that is not evidence of that, and nobody has stated it. **Answer that
-  first; it decides between (a)/(b) and (c).**
-  ⚠ Do NOT "fix" it by relaxing
-  the gate; the gate is the control (`compliance/controls-matrix.md` CC9) and it just did its job.
-  → `okf/capabilities/compliance/compliance.md`, `okf/capabilities/editions/editions.md` §2
+**§1 is EMPTY again.** `SBOM-EOIAGENT-LICENCE-1`, the only row here, was decided and closed the day it
+was filed — see the closure note below.
+
+*(2026-09-14: **`SBOM-EOIAGENT-LICENCE-1` DECIDED, FIXED and CLOSED same day** — the release is
+unblocked. Operator took route (a), **declare the licence upstream**, and stated that `com.eoiagent`
+and `com.gamma.inspector` are the **same legal entity**, which retired option (c) as unnecessary.
+Licence chosen: **Apache-2.0**. Shipped as `jotder/inspect-agent@a24817b` — one `<licenses>` block on
+the `eoiagent-parent` aggregator plus the verbatim 11358-byte `LICENSE` at that repo's root, so the
+grant the POM advertises is actually present in the tree. ⚠ **This was a real grant, not a metadata
+fix**: both repos were public with `licenseInfo: null`, i.e. all-rights-reserved by default, so
+declaring Apache-2.0 conferred rights that did not previously exist. It was put to the operator in
+exactly those terms and chosen twice.
+**Verified end-to-end, not merely written:** `package.ps1 -Edition Standard` now completes, **real exit
+code 0** — fat jar, UI, SBOM, both jlink runtimes, boot smoke (`the staged Standard bundle boots and
+answers /health`), hashes and both zips. The SBOM step reports `48 third-party + 11 first-party
+component(s)`, and `licenseDeclared` is `Apache-2.0` for both `eoiagent-core` and `eoiagent-model`.
+⚠ The SPDX doc still shows ~192 `NOASSERTION` hits: those are `downloadLocation` and
+`licenseConcluded`, which are SPDX convention for Maven-resolved deps — **the gate reads
+`licenseDeclared`**, so do not read that count as a regression.
+🔴 **Three traps recorded from this row, all about probes rather than the finding:**
+(i) the "10-second repro" `node tools/sbom.mjs --edition Standard --bundle inspecto-deploy` is
+**bundle-state-dependent** — it reports `inspecto-security.jar is not in the bundle` whenever
+`inspecto-deploy/` last held a *Personal* build. The row already recorded that exact probe-fault for
+Enterprise and it was then hit again from the other side. ⛔ **The resolve is the whole input to the
+gate; check that, not a staged directory.** Replaying sbom.mjs's own `dependency:list` + POM licence
+walk proved Standard and Enterprise resolve **the same 48 third-party components with the same 2
+unlicensed** — settling, without any packaging, the "expected to fail identically but not proven"
+claim the row carried.
+(ii) **the cause was not an omission but a boundary.** `eoiagent-parent` excluded `com.eoiagent` from
+its *own* licence plugin as "first-party, not third-party to vet" — true inside that reactor, false
+outside it, where the same groupId is third-party by definition. Two locally-coherent policies
+produced the failure, which is why "just add the line" understated it: it reversed a stated upstream
+stance.
+(iii) ⛔ **assume nothing about another repo's default branch.** The upstream push was aimed at
+`master` out of this repo's habit; `jotder/inspect-agent`'s default is `main`, so the first push
+created a stray `master` branch there instead of landing. Neither `ci.yml` nor `release.yml` pins a
+`ref:`, so both take the default branch — the commit only reaches CI because it was re-pushed to
+`main`. ⚠ **A stray `master` branch may still exist on `jotder/inspect-agent`**; deleting it needed a
+permission this shift did not have. Check and remove it.
+The gate itself was left alone throughout — it is `compliance/controls-matrix.md` CC9 and it did its
+job.)*
 
 *(2026-09-12: **`RECON-CARDINALITY-1` DECIDED — BUILD IT.** Operator chose to build one-to-many /
 many-to-many recon matching rather than drop the phrase from whitepaper §4. Moved to §3 as a build row.
-**§1 was EMPTY again** — every operator decision on the board was answered (⚠ no longer true: `SBOM-EOIAGENT-LICENCE-1` was filed 2026-09-14, see the top of §1).
+**§1 was EMPTY again** — every operator decision on the board was answered (⚠ briefly untrue on 2026-09-14, when `SBOM-EOIAGENT-LICENCE-1` was filed; it was decided and closed the same day and §1 is empty once more — see the note above).
 🔴 **CORRECTION, later the same day: this decision was taken on a false premise and its two warnings are
 struck.** The phrase was **already gone** — whitepaper v1.2 (`db11a412`, 2026-09-11) deleted it during a
 market-focused rewrite, a day before the decision was recorded, so "build rather than drop" offered as the
