@@ -41,6 +41,43 @@ public final class PathJail {
 
     private PathJail() {}
 
+    /**
+     * A URI scheme followed by {@code ://} — {@code s3://bucket/x}, {@code gs://…}, {@code file://…}.
+     *
+     * <p>⚠ The scheme is required to be <b>two or more</b> characters so a Windows drive letter
+     * ({@code C:/data}, {@code C:\data}) is not mistaken for one, and {@code ://} is required so an
+     * ordinary POSIX path that merely contains a colon ({@code out/my:file}) stays legal.
+     */
+    private static final java.util.regex.Pattern URI_SCHEME =
+            java.util.regex.Pattern.compile("^[A-Za-z][A-Za-z0-9+.\\-]+://");
+
+    /**
+     * Whether {@code value} is a URI rather than a filesystem path — the one definition, so the
+     * enforcing and advisory surfaces cannot disagree about it.
+     *
+     * <p>🔴 This exists because {@code Paths.get} answers the question <b>differently on different
+     * platforms</b>, and the divergence favours the wrong side on the deployment target. Measured
+     * 2026-09-14 with {@code "s3://bucket/data"}:
+     * <ul>
+     *   <li><b>Windows</b> — {@code InvalidPathException: Illegal char &lt;:&gt; at index 2}, so
+     *       {@link #require} caught it and refused. Fail-closed, by accident.</li>
+     *   <li><b>Linux</b> (JDK 26, the shipped {@code linux_amd64} target) — <b>no throw</b>. It
+     *       yields {@code /s3:/bucket/data}: a real local directory literally named {@code s3:},
+     *       resolved against the working directory. {@link #contains} then returns a confident,
+     *       wrong answer about a path the operator never meant.</li>
+     * </ul>
+     * ⛔ So the pre-existing behaviour was not "object stores are unsupported" — it was "unsupported
+     * on the machine developers probe from, silently accepted on the machine it ships to." That is the
+     * same shape as a connection string with no recognised backend quietly becoming a local file.
+     *
+     * <p>⚠ When object-store paths ARE supported (scale-out plan §5.4 bullets 1 and 6), the fix is to
+     * dispatch on this predicate — <b>not</b> to delete it. A path jail cannot contain a bucket URI by
+     * {@link Path} comparison at all, so an object-store path needs its own containment rule.
+     */
+    public static boolean isUri(String value) {
+        return value != null && URI_SCHEME.matcher(value.trim()).find();
+    }
+
     /** Thrown when a value escapes its root. Callers at an HTTP edge map this to 403. */
     public static final class Escape extends RuntimeException {
         private final String field;
@@ -116,6 +153,12 @@ public final class PathJail {
         if (s.isEmpty()) throw new Escape(field, value == null ? "null" : value, "is blank");
         if (s.startsWith("\\\\") || s.startsWith("//"))
             throw new Escape(field, s, "is a UNC/network path, which is not allowed");
+        // Refused on EVERY platform, because Paths.get does not (see isUri): on Linux this value
+        // becomes a local directory named after the scheme instead of failing.
+        if (isUri(s))
+            throw new Escape(field, s, "is a URI, not a filesystem path — object-store locations "
+                    + "are not supported here, and on Linux this would silently become a local "
+                    + "directory named '" + s.substring(0, s.indexOf(':')) + ":'");
 
         Path candidate;
         try {

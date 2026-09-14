@@ -180,4 +180,47 @@ class PathJailTest {
         Path schema = Files.writeString(spaces.resolve("events_schema.toon"), "x");
         assertDoesNotThrow(() -> PathJail.require(cwdRoot, schema.toString(), "schema_file"));
     }
+
+    /**
+     * 🔴 An object-store URI must be refused on EVERY platform, and this test exists because
+     * {@code Paths.get} does not do that on its own.
+     *
+     * <p>⚠ Measured 2026-09-14 on {@code "s3://bucket/data"}: Windows throws
+     * {@code InvalidPathException}, so the jail refused it by accident; **Linux — the shipped
+     * {@code linux_amd64} target — does not throw at all** and produces {@code /s3:/bucket/data},
+     * a real local directory named {@code s3:} under the working directory, which {@code contains}
+     * then judges confidently and wrongly. ⛔ So this assertion is NOT redundant with the
+     * "unparseable value" case: on the platform that matters the value parses fine.
+     *
+     * <p>⚠ This is a REFUSAL, not a statement that object stores will never be supported. When
+     * scale-out §5.4 bullets 1 and 6 land, dispatch on {@code isUri} — a bucket URI cannot be
+     * contained by {@link Path} comparison, so it needs its own containment rule, not this one.
+     */
+    @Test
+    void objectStoreUriIsRefusedOnEveryPlatform(@TempDir Path root) {
+        for (String uri : new String[] {"s3://bucket/data", "gs://bucket/data",
+                                        "abfss://c@acct.dfs.core.windows.net/data", "file:///etc"}) {
+            PathJail.Escape ex = assertThrows(PathJail.Escape.class,
+                    () -> PathJail.require(root, uri, "dirs.database"), uri);
+            assertEquals("dirs.database", ex.field());
+            assertTrue(ex.getMessage().contains("is a URI"), ex.getMessage());
+        }
+    }
+
+    /**
+     * ⚠ The refusal must not swallow a Windows drive letter or an ordinary POSIX path that merely
+     * contains a colon. A one-character scheme is a drive, and a colon with no {@code //} after it is
+     * just a filename byte — both stay legal, so the guard cannot be "fixed" into rejecting them.
+     */
+    @Test
+    void driveLettersAndColonsInNamesAreNotMistakenForUris() {
+        assertFalse(PathJail.isUri("C:/data"), "a Windows drive letter is not a URI scheme");
+        assertFalse(PathJail.isUri("C:\\data"), "a Windows drive letter is not a URI scheme");
+        assertFalse(PathJail.isUri("out/my:file"), "a colon inside a name is not a URI scheme");
+        // ⚠ Keep this one: it is the case that fails if the `//` requirement is ever dropped from the
+        // pattern. The two above cannot catch that, because their colon is not at the start.
+        assertFalse(PathJail.isUri("my:file"), "a leading name with a colon is not a URI scheme");
+        assertFalse(PathJail.isUri("relative/dir"), "an ordinary relative path is not a URI");
+        assertTrue(PathJail.isUri("s3://bucket"), "s3:// is a URI");
+    }
 }

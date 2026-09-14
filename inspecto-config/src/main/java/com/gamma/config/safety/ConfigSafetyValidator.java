@@ -443,6 +443,14 @@ public final class ConfigSafetyValidator {
             out.add(Finding.error(field, "path '" + s + "' is a UNC/network path, which is not allowed"));
             return;
         }
+        // Same verdict as the enforcing jail, from the SAME predicate — an authored `s3://…` must be
+        // refused here too, or the 422 write gate accepts a config the loader then mishandles. ⚠ On
+        // Linux `Paths.get` does not throw on it; see PathJail.isUri for the measured divergence.
+        if (PathJail.isUri(s)) {
+            out.add(Finding.error(field, "path '" + s + "' is a URI, not a filesystem path — "
+                    + "object-store locations are not supported here"));
+            return;
+        }
         Path norm;
         try {
             norm = resolveRef(s, configDir);

@@ -155,6 +155,24 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "dirs.database"), "an absolute path outside the root must be rejected: " + f);
     }
 
+    /**
+     * 🔴 The 422 write gate must refuse an object-store URI, on every platform.
+     *
+     * <p>⚠ Without an explicit check this passes on Linux: {@code Paths.get("s3://bucket/out")} does
+     * not throw there, it yields {@code /s3:/bucket/out} — a local directory under the working
+     * directory, which lands INSIDE the allowed root often enough to be accepted. Measured
+     * 2026-09-14. ⛔ A save that is accepted here and then mishandled by the loader is the failure
+     * this gate exists to prevent, and scale-out §5.4 bullet 6 is what would tempt an operator to
+     * author this value today.
+     */
+    @Test
+    void objectStoreUriInAPipelineDirIsRejected(@TempDir Path root) {
+        Map<String, Object> dirs = safeDirs(root);
+        dirs.put("database", "s3://inspecto-lakehouse/partitions");
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", pipeline(dirs), SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "dirs.database"), "an s3:// URI must be rejected: " + f);
+    }
+
     /** A clean pipeline whose {@code processing.duckdb.temp_directory} is {@code dir}. */
     private static Map<String, Object> withDuckTempDir(Path root, String dir) {
         Map<String, Object> raw = pipeline(safeDirs(root));
