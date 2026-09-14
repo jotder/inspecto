@@ -459,15 +459,28 @@ Work:
   failure. Not a new flag per store — one switch, `-Dinspecto.topology=partitioned` (name SIGNED as D12,
   2026-09-10; values `single` | `partitioned`, and what `/bootstrap` reports),
   that `ServiceStores` reads once. ⚠ Personal/Standard behaviour is unchanged.
-- **`events.backend=db`** — the one store with no shared backend (§3.3). A Postgres `EventStore`
-  behind the same `EventStore` interface `InMemoryEventStore` and `ParquetEventStore` implement.
-  The Signal ledger must be visible from every pod or Ops sees a different world per replica.
-- **Cover the two untested stores** in `PostgresStateStoreTest` — `DbDeliveryReceiptStore`,
-  `DbDedupLedger` (§3.3). Twelve of twelve, or the plan's own claim is unverified.
-- **Un-park the connection pool** — `postgres-multi-user-plan.md` P1 + P2 (HikariCP behind
-  `JdbcDrivers`; a borrow-scoped `browseConnection()`). One connection per store per pod is fine for
-  one pod and a connection storm for twenty.
-- **`DuckLakeRegistrar` failure becomes fatal** in partitioned mode (D10).
+- ✅ **`events.backend=db` — SHIPPED.** `DbEventStore` (`inspecto-event`) is selected at
+  `ServiceStores.java:275` behind the same `EventStore` interface `InMemoryEventStore` and
+  `ParquetEventStore` implement, so the Signal ledger is visible from every pod. ⚠ Four javadoc sites
+  still advertise the toggle as `memory|parquet` only (`EventStore`, `CollectorService` ×2,
+  `ServiceStores`) — doc drift, not a gap.
+- ✅ **Store coverage — DONE, and the target moved.** `PostgresStateStoreTest` now exercises **15**
+  `Db*` stores (16 tests), `DbDeliveryReceiptStore` and `DbDedupLedger` among them. ⚠ "Twelve of twelve"
+  is stale: the store family grew while this bullet sat. Re-count before quoting it again.
+- ⏳ **Un-park the connection pool** — **the one item of phase A still unbuilt**, now planned in its
+  own file: [`connection-pool-plan.md`](connection-pool-plan.md). HikariCP behind `JdbcDrivers`; a
+  borrow-scoped `browseConnection()`. One connection per store per pod is fine for one pod and a
+  connection storm for twenty. 🔴 It is **15** stores, not the archived plan's eight/ten, and a pool buys
+  nothing until stores stop holding one connection for life. ⛔ DuckDB must stay an effective pool of 1
+  (single-writer file lock); only Postgres pools.
+- ✅ **`DuckLakeRegistrar` failure is fatal in partitioned mode (D10) — SHIPPED 2026-09-14.**
+  🔴 **D10 as written was not implementable:** registration is not a boot-time event. It runs once per
+  batch from `ConsignmentIngestor.finalizeSource:321`, mid-poll-cycle, so "fails boot" cannot apply to
+  it. Built on the **commit-time** reading, which is D10's own rationale and what §5.4 already
+  anticipates: `DuckLakeRegistrar.onRegistrationFailure` rethrows when `Topology.partitioned()`, and is
+  unchanged (warn, non-fatal) otherwise. ⚠ Deliberately **not** routed through `StoreHealth` — that
+  registry records what an *opener* resolved to once at boot, and a per-batch commit would overwrite the
+  entry every batch; it is also keyed by space id, which `PipelineConfig` does not carry.
 
 **Why this ships value with zero pods:** durable restarts, `VER-3` becomes true rather than aspired
 to, and every T2/T3 Postgres-backed deployment gets a pool. It is also the *entire* prerequisite for
@@ -997,7 +1010,7 @@ paragraph above warns about. Nothing in the repo boots two control planes in one
 | **D7** | Connection pool | ✅ **SIGNED 2026-09-10 (operator)** — **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work (spike S3 first) |
 | **D8** | Tier naming | ✅ **DECIDED 2026-09-10 (operator):** **T5 — partitioned scale-out on Kubernetes** = **Enterprise**, added to §3.9; **T4 active/passive DR moves to Standard**. Applied |
 | **D9** | The "zero external runtime services" claim | ✅ **SIGNED 2026-09-10 (operator)** — refined by D8: **Personal — zero. Standard — zero unless DR (T4) is enabled, then Postgres. Enterprise — Postgres + S3-compatible object store.** The 90 MB artifact claim stays true: same artifact, plus YOUR services |
-| **D10** | `DuckLakeRegistrar` failure in partitioned mode | ✅ **SIGNED 2026-09-10 (operator)** — **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see; single-node mode keeps today's opt-in, warn-only behaviour |
+| **D10** | `DuckLakeRegistrar` failure in partitioned mode | ✅ **SIGNED 2026-09-10 (operator)** — **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see; single-node mode keeps today's opt-in, warn-only behaviour. ✅ **SHIPPED 2026-09-14** on the **commit-time** reading — 🔴 "fails boot" was not implementable (registration is per-batch, not boot-time); see §5.1 |
 | **D11** | Dynamic rebalancing | ✅ **SIGNED 2026-09-10 (operator)** — **Deferred to phase C+1**; static Space→pod assignment first |
 | **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Standard's two-pod T4 standby is partitioned without being a cluster |
 | **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4. 🔴 **S5 ANSWERED 2026-09-10 — SELF-MANAGED POSTGRES ONLY.** `pg_duckdb` is installed by **building from source** (`make install`), and it appears on **none** of the curated extension lists of Amazon RDS/Aurora, Google Cloud SQL or Azure Database for PostgreSQL Flexible Server — all three publish a fixed set, so a customer cannot add one that is not on it. ⚠ **Evidence strength, stated so it can be re-checked:** Azure's list was read in full from the primary source (Microsoft Learn, *List of Extensions and Modules by Name*, dated 2026-07-10) and contains **no** extension whose name contains "duck"; RDS/Aurora and Cloud SQL rest on their published lists as surfaced by search rather than a full read. ⇒ Treat Azure as settled and the other two as very likely; **the live half of S5 is what confirms all three.** It supports Postgres 14–18 and reads Parquet/CSV/JSON/Iceberg/Delta from S3, GCS, Azure and R2. ⇒ **The external query surface is NOT general.** It is available to a self-managed Postgres and unavailable to the managed services an Enterprise customer is most likely to already run — so D13 must be sold as an option with a deployment precondition, never as a default. 🔴 **And it needs one more thing to be correct at all:** DuckLake **inlines** small writes into the catalog (S1), so a view over the Hive Parquet prefix would silently omit them unless inlining is disabled — see §3.5. ⚠ The live half of S5 (install it, build the view, query it from `psql`) is still owed; this sandbox has no Postgres and no container daemon. |

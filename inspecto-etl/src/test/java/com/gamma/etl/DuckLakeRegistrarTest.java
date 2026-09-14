@@ -1,6 +1,8 @@
 package com.gamma.etl;
 
 import com.gamma.util.ToonHelper;
+import com.gamma.util.Topology;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,6 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link DuckLakeRegistrar} had no test at all — one of the six Musts filed as {@code SPEC-NOPROOF-1}.
@@ -145,5 +149,56 @@ class DuckLakeRegistrarTest {
      * filed under `SPEC-NOPROOF-1`. It needs a reachable DuckLake catalog, which means a live deployment,
      * which puts it in the same bucket as the SCR-4/5/7 deployment scripts rather than the reactor.
      * ⛔ Do not "fix" this by asserting it with a mock: the promise is about a real driver's real failure.
+     *
+     * ⚠ UNCHANGED by D10 (2026-09-14). D10 makes a failure FATAL when partitioned, and the tests below
+     * cover that DECISION directly via `onRegistrationFailure`. They do not, and cannot, discharge the
+     * owed half above: driving a real driver failure still costs the same network INSTALL. What is
+     * tested here is the branch this repo wrote; what stays owed is the driver's behaviour.
      */
+
+    // -- 3. D10: a failure is FATAL in a partitioned topology, unchanged in a single one -----------------
+
+    @AfterEach
+    void clearTopology() {
+        System.clearProperty(Topology.PROPERTY);
+    }
+
+    @Test
+    void aRegistrationFailureIsFatalWhenPartitioned() {
+        System.setProperty(Topology.PROPERTY, "partitioned");
+
+        IllegalStateException boom = assertThrows(IllegalStateException.class,
+                () -> DuckLakeRegistrar.onRegistrationFailure(new java.sql.SQLException("catalog unreachable"),
+                        "postgres://lake/catalog"),
+                "D10: a pod that cannot reach the shared catalog must fail the batch, not log and continue");
+
+        assertTrue(boom.getMessage().contains("catalog unreachable"),
+                "the operator needs the underlying cause, not just 'registration failed': " + boom.getMessage());
+        assertTrue(boom.getMessage().contains("postgres://lake/catalog"),
+                "the message must name WHICH catalog was unreachable: " + boom.getMessage());
+        assertTrue(boom.getMessage().contains(Topology.PROPERTY),
+                "the message must name the property that made this fatal, so it can be turned off: "
+                        + boom.getMessage());
+    }
+
+    // The falsification arm. Without it the test above would pass against a method that ALWAYS threw,
+    // which would turn every Personal/Standard DuckLake hiccup into a failed batch.
+    @Test
+    void theSameFailureIsToleratedOnASingleNode() {
+        System.setProperty(Topology.PROPERTY, "single");
+
+        assertDoesNotThrow(() -> DuckLakeRegistrar.onRegistrationFailure(
+                        new java.sql.SQLException("catalog unreachable"), "postgres://lake/catalog"),
+                "on one node the DuckLake step stays the optional sidecar its javadoc promises");
+    }
+
+    @Test
+    void anUnsetTopologyIsSingleAndSoStaysNonFatal() {
+        System.clearProperty(Topology.PROPERTY);
+
+        assertDoesNotThrow(() -> DuckLakeRegistrar.onRegistrationFailure(
+                        new java.sql.SQLException("catalog unreachable"), "postgres://lake/catalog"),
+                "the default topology is single — D10 must not change behaviour for anyone who never set "
+                        + "the flag, which is every Personal and Standard install");
+    }
 }
