@@ -1015,7 +1015,7 @@ the phases here are A/B/C while the units are `U1`–`U4` — they are different
 |---|---|---|---|
 | ✅ **A — shared state** (§5.1) — **COMPLETE 2026-09-14** | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling. **Since 2026-09-10: the foundation of Standard's DR tier — ships in the Standard bundle** | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
 | ✅ **B — the lease** (§5.2) — **COMPLETE 2026-09-12** | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step. **Since 2026-09-10 this IS the Standard fault-tolerant-DR deliverable**, so `RunLease` and `PostgresRunLease` live in core or `inspecto-security`-tier modules, ⛔ never behind `inspecto-policy` | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Standard |
-| 🟡 **C — partition + lakehouse** (~~§5.3~~, ~~§5.4 less two bullets~~) — the last phase, and the only Enterprise one | ~~Space→pod map, inbox ownership~~ · ~~per-tenant ABAC~~ · ~~shared Postgres catalog, read-side attach, mandatory registration~~ · **remaining: object-store visibility (`CatalogCommit`) + `s3://` containment + the Helm chart** | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed. ⚠ **The MinIO half of this gate is unrunnable until an object store exists here** — the Postgres half was met 2026-09-14 |
+| 🟡 **C — partition + lakehouse** (~~§5.3~~, ~~§5.4 less two bullets~~) — the last phase, and the only Enterprise one | ~~Space→pod map, inbox ownership~~ · ~~per-tenant ABAC~~ · ~~shared Postgres catalog, read-side attach, mandatory registration~~ · **remaining: object-store visibility (`CatalogCommit`) + `s3://` containment + the Helm chart** | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed. ✅ **The MinIO half of this gate is RUNNABLE as of 2026-09-14** — a `minio` container is up on 127.0.0.1:9000 with bucket `inspecto-lakehouse`, and DuckDB 1.5.2 was measured writing and reading Parquet through it; the Postgres half was met the same day. ⛔ What still blocks bullet 6 is PACKAGING, not infrastructure: no bundle stages `httpfs` or `aws` (`AIRGAP-S3-EXTENSIONS-1`) |
 
 ⚠ **This row's §5.3 half is DONE — struck above 2026-09-14.** §5.3 closed 2026-09-12 (C1 static Space→pod
 map, C2 shared-inbox detection, `INBOX-REGISTRY-CROSS-POD-1` 2026-09-13) and per-tenant ABAC had shipped
@@ -1139,6 +1139,22 @@ and it appeared inside a **signed** plan, in the two places a reader would most 
 ⚠ **What the two owed halves need**, so the next environment can run them unattended: a reachable Postgres
 (any 14–18) and an S3-compatible endpoint (MinIO). This sandbox has the Docker CLI but **no running
 daemon**, and starting one is outside a spike's remit.
+
+✅ **BOTH NOW EXIST — 2026-09-14, on the operator's instruction.** Docker is up; `postgres` has been
+running for two days and **`minio` was started this shift** (`quay.io/minio/minio`, `--restart
+unless-stopped`, bound to **127.0.0.1**:9000 API / :9001 console, volume `minio-data`, bucket
+**`inspecto-lakehouse`**). ⛔ The Docker Hub repo `minio/minio` is **gone** — it must be pulled from
+`quay.io/minio/minio`, and `quay.io/minio/mc`'s entrypoint is `mc`, so a shell needs `--entrypoint sh`.
+**S1's load-bearing assumption is no longer documentation-only**: a `COPY … TO 's3://…' (FORMAT PARQUET)`
+and a read back both succeeded against this MinIO from DuckDB 1.5.2, with `s3_url_style='path'` and
+`s3_use_ssl=false`.
+🔴 **And the probe found the real blocker, which is NOT what this plan assumed.** Neither statement needed
+`LOAD httpfs` — DuckDB **autoloaded** it, so the SQL guard's refusal of that statement (pinned by
+`SqlGuardTest`) never applies and was never the obstacle. The obstacle is packaging: `$duckdbExtNames` in
+`inspecto/package.ps1` stages `excel`, `ducklake`, `postgres_scanner` and **not `httpfs` or `aws`**, both of
+which an `s3://` DATA_PATH needs. The probe passed only because a developer workstation carries them in
+`~/.duckdb/extensions`. Filed as `AIRGAP-S3-EXTENSIONS-1` (`BACKLOG.md` §5). ⛔ **Bullet 6 is blocked on
+that, not on infrastructure.**
 
 
 - **S1** — `ATTACH 'ducklake:postgres:…'` from two DuckDB processes writing to one MinIO bucket:

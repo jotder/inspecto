@@ -11,7 +11,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **57 rows: 0 × P1 · 34 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
+> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
 > `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.
 > `LINKGUARD-CASE-1` filed the same day, §5 — so the P2 count is unchanged at 34, one out and one in.)
 >
@@ -27,9 +27,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
 > `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 34 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
+> ⚠ **Only the 35 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 57 as pending work overstates what is owed by roughly 40%.
+> down. Reading all 58 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -1071,6 +1071,23 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   keep-or-delete verdict, not a build. ⛔ Demand-gated: do not "tidy" them without one, because at
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
+
+- **P2** · **`AIRGAP-S3-EXTENSIONS-1` — no bundle stages the two extensions an `s3://` DATA_PATH needs.**
+  Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
+  is `excel`, `ducklake`, `postgres_scanner` — **`httpfs` and `aws` are absent**, and scale-out phase C
+  bullet 6 turns `dirs.database` into an `s3://` URI, which needs both. This is the SAME defect class as
+  `AIRGAP-EXTENSIONS-CI-1`, closed hours earlier: a release that stages no extension fails only on the
+  air-gapped host nobody tests on.
+  🔴 **Why it will not be caught by a probe on a dev box.** A measured `COPY … TO 's3://…'` plus a read back
+  BOTH SUCCEEDED here with **no `LOAD httpfs` statement at all** — DuckDB 1.5.2 AUTOLOADED it from the
+  developer's own `~/.duckdb/extensions`, which this box has and a bundle does not. ⛔ So the local green is
+  an artifact of the workstation, exactly the trap `AIRGAP-EXTENSIONS-CI-1` recorded one layer down.
+  ⚠ **Two corrections to assumptions this finding overturns**, both worth keeping:
+  (a) the SQL guard's refusal of `LOAD httpfs` (pinned by `SqlGuardTest`) does **not** keep httpfs out —
+  autoload emits no statement for a guard to see, so the real control is `enable_external_access`, not the
+  guard. (b) `httpfs` was therefore never the phase C blocker it looked like; **staging it is.**
+  ⛔ Do not just add two names: each is a per-platform binary on every bundle, so the size cost is a
+  packaging call. → `superpower/enterprise-scale-out-plan.md` §5.4 bullet 6
 
 - **P2** · **`LINKGUARD-CASE-1` — the doc-link guard is CASE-BLIND on Windows, so every local run is a
   false green for a whole error class.** Found 2026-09-14: five OKF pages pointed their "docs index" link
