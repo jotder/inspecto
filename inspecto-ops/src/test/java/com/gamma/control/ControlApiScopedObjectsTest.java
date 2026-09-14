@@ -101,14 +101,15 @@ class ControlApiScopedObjectsTest {
             String billing = s.billing().id();
             assertEquals(404, get(c.port, "/objects/" + billing, "fraud").statusCode(),
                     "direct read: indistinguishable from absence");
-            assertEquals(404, post(c.port, "/objects/" + billing + "/watch", "{\"user\":\"ana\"}", "fraud").statusCode(),
+            // RETIRE-HALVES-1 deleted /watch, which used to be this test's representative mutation;
+            // /assign carries that role now — it is the live scoped mutation on the same guard.
+            assertEquals(404, post(c.port, "/objects/" + billing + "/assign", "{\"assignee\":\"ana\"}", "fraud").statusCode(),
                     "mutation gated too — defense in depth");
-            assertEquals(404, post(c.port, "/objects/" + billing + "/assign", "{\"assignee\":\"ana\"}", "fraud").statusCode());
 
             // the same object answers normally in scope and for the unscoped subject
             assertEquals(200, get(c.port, "/objects/" + s.fraud().id(), "fraud").statusCode());
             assertEquals(200, get(c.port, "/objects/" + billing, "all").statusCode());
-            assertEquals(200, post(c.port, "/objects/" + s.fraud().id() + "/watch", "{\"user\":\"ana\"}", "fraud").statusCode());
+            assertEquals(200, post(c.port, "/objects/" + s.fraud().id() + "/assign", "{\"assignee\":\"ana\"}", "fraud").statusCode());
         }
     }
 

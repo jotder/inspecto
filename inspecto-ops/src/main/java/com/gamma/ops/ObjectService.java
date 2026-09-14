@@ -795,7 +795,14 @@ public final class ObjectService {
         return updated;
     }
 
-    /** Add {@code user} to an object's watcher list (idempotent); returns the updated object. Unknown id → 404. */
+    /**
+     * Add {@code user} to an object's watcher list (idempotent); returns the updated object. Unknown id → 404.
+     *
+     * <p>⚠ RETIRE-HALVES-1 deleted the {@code /objects/{id}/watch|unwatch|watchers} routes, so this and
+     * {@link #unwatch} have no production caller. They are RETAINED deliberately: the {@code watchers}
+     * attribute is still live — {@code mergeCases} unions it, reached by {@code POST /objects/{id}/merge} —
+     * and this is the only seam that can seed a watcher to test that union. ⛔ Do not delete as dead code.
+     */
     public OperationalObject watch(String id, String user) {
         return mutateWatchers(id, user, true);
     }
