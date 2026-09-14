@@ -74,7 +74,8 @@ This checkout is a **shared team sandbox** (shift work, one account). All Claude
 in repo `.claude/` — skills, agents, hooks, settings. Nothing project-related goes in the user profile.
 
 - **Session-per-shift:** start each shift with a fresh session (context rehydrates from
-  `SESSION_STATUS.local.md` + `.claude/sessions/snapshot.md`, auto-written on every stop); end
+  `SESSION_STATUS.local.md` + `.claude/sessions/snapshot.md`, which does not exist in a fresh
+  checkout — both are gitignored and a hook writes them on every stop); end
   your shift with `/handoff`, then close the session. Avoid marathon sessions — compaction
   loses file state and degrades quality.
 - **Model routing:** prefer `/model opusplan` (Opus plans, Sonnet executes) for build work; top

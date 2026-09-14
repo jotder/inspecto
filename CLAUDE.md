@@ -118,8 +118,9 @@ This checkout is shared by a team working in shifts under one account. **All Cla
 skills, agents, hooks, settings — lives in repo `.claude/`, never in the user profile**, so every
 shift gets the identical environment.
 
-- **Session-per-shift.** Resume from `SESSION_STATUS.local.md` and `.claude/sessions/snapshot.md`
-  (auto-written on every stop), not from old conversations. At shift end apply the `handoff` skill
+- **Session-per-shift.** Resume from `.claude/sessions/snapshot.md` — it does not exist in a fresh
+  checkout: both it and `SESSION_STATUS.local.md` are gitignored, written by a hook on every stop in this
+  working tree. Resume from those two, not from old conversations. At shift end apply the `handoff` skill
   and end the session. Mid-task compaction is the failure mode — externalize state instead.
 - Commits use the shared identity; work lands on `master` per the `release-workflow` skill — no
   per-user branches or PRs.

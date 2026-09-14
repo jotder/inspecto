@@ -1082,7 +1082,18 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   are fixed (they were also one `../` short, pointing into the OKF tree instead of at the root map); the guard
   is not. Fix: resolve each link against a case-exact index of tracked paths (`git ls-files`), not against the
   filesystem. ⛔ Falsify it ON WINDOWS — a case bug that only a Linux runner can see is precisely the shape
-  that got here. → `okf/capabilities/tooling/tooling.md` §3.2
+  that got here.
+  🔴 **The id UNDERSTATES the row — this is one root cause with two manifestations, and it is not only the
+  LINK guard.** Both `check-doc-links.mjs` and `check-doc-citations.mjs` resolve against the FILESYSTEM,
+  so a local run is green for (a) a path that differs only by CASE and (b) a path that is GITIGNORED and
+  therefore absent from a checkout. (b) landed the same day, immediately behind (a):
+  `.claude/sessions/snapshot.md` is cited by `CLAUDE.md` and `.claude/QUICK_START.md`, exists in every
+  working tree because a hook writes it on stop, and exists in no checkout. Both citations now state the
+  absence on their own line, which is the guard's own sanctioned hatch. ⚠ A THIRD gap is visible from the
+  same finding and is NOT fixed: the citation guard ignores a path with no `/` in it, which is why the
+  sibling `SESSION_STATUS.local.md` — equally gitignored, equally cited — was never flagged at all.
+  ⇒ the fix is one seam for both guards: resolve every citation against `git ls-files`, case-exact.
+  → `okf/capabilities/tooling/tooling.md` §3.2
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
