@@ -175,18 +175,6 @@ class ControlApiComponentSharesTest {
         }
     }
 
-    @Test
-    void biDatasetSurfaceHonoursTheEnvelope(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir, true)) {
-            assertEquals(200, send(c.port, "POST", "/components/dataset",
-                    "{\"id\":\"fraud_ds\",\"label\":\"fraud\",\"shares\":[{\"subjectType\":\"user\",\"subjectId\":\"bob\",\"access\":\"view\"}]}",
-                    "alice").statusCode());
-            assertEquals(1, json(send(c.port, "GET", "/bi/datasets", null, "bob")).size());
-            assertEquals(0, json(send(c.port, "GET", "/bi/datasets", null, "olly")).size(),
-                    "shared-away dataset filtered from /bi/datasets");
-        }
-    }
-
     // ── Personal edition (fail-open) ────────────────────────────────────────────────
 
     @Test

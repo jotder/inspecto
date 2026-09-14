@@ -92,7 +92,7 @@ class ObjectServiceCaseGroupTest {
             svc.link(original.id(), i.id(), LinkRelationship.CONTAINS, null);
 
         ObjectService.SplitResult result = svc.splitCase(original.id(), "part B",
-                List.of(i1.id(), i2.id()), "dana", null, "op");
+                List.of(i1.id(), i2.id()), "dana", "op");
 
         assertEquals(2, result.membersMoved());
         OperationalObject part = result.part();
@@ -109,14 +109,14 @@ class ObjectServiceCaseGroupTest {
 
         // guard rails
         assertThrows(IllegalStateException.class,
-                () -> svc.splitCase(original.id(), "x", List.of(i1.id()), null, null, null),
+                () -> svc.splitCase(original.id(), "x", List.of(i1.id()), null, null),
                 "a member already moved out is foreign now");
         assertThrows(IllegalArgumentException.class,
-                () -> svc.splitCase(original.id(), " ", List.of(i3.id()), null, null, null));
+                () -> svc.splitCase(original.id(), " ", List.of(i3.id()), null, null));
         assertThrows(IllegalArgumentException.class,
-                () -> svc.splitCase(original.id(), "x", List.of(), null, null, null));
+                () -> svc.splitCase(original.id(), "x", List.of(), null, null));
         assertThrows(IllegalStateException.class,
-                () -> svc.splitCase(i3.id(), "x", List.of(i3.id()), null, null, null), "only CASEs split");
+                () -> svc.splitCase(i3.id(), "x", List.of(i3.id()), null, null), "only CASEs split");
     }
 
     @Test

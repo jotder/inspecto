@@ -37,9 +37,6 @@ final class AbsentObjectRoutes implements RouteModule {
             {"POST",   "/objects/([^/]+)/resolve"},
             {"POST",   "/objects/([^/]+)/transition"},
             {"POST",   "/objects/([^/]+)/assign"},
-            {"POST",   "/objects/([^/]+)/watch"},
-            {"POST",   "/objects/([^/]+)/unwatch"},
-            {"GET",    "/objects/([^/]+)/watchers"},
             {"POST",   "/objects/([^/]+)/links"},
             {"GET",    "/objects/([^/]+)/links"},
             {"DELETE", "/objects/([^/]+)/links"},
@@ -65,10 +62,6 @@ final class AbsentObjectRoutes implements RouteModule {
             {"GET",    "/notes/([^/]+)/([^/]+)/attachments"},
             {"POST",   "/notes/([^/]+)/([^/]+)/comments"},
             {"POST",   "/notes/([^/]+)/([^/]+)/attachments"},
-            // ── QueueRoutes ─────────────────────────────────────────────────────────────────────
-            {"GET",    "/queues"},
-            {"GET",    "/queues/([^/]+)"},
-            {"POST",   "/queues"},
             // ── TagRoutes ───────────────────────────────────────────────────────────────────────
             {"GET",    "/tags"},
             {"POST",   "/tags"},

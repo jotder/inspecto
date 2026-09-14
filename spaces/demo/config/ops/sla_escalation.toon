@@ -1,4 +1,0 @@
-escalation:
-  severity: critical
-  reassign_queue: demo-ops
-  renotify: true

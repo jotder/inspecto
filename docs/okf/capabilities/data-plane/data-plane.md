@@ -206,8 +206,9 @@ three parameter namespaces are deliberately distinct and each resolver ignores t
 
 ### 3.5 `POST /bi/query` — the spec-compiled path, and where the structured boundary really is
 
-`BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java`): `GET /bi/datasets`, **`POST /bi/query`**,
-`GET|POST /bi/templates` (+ apply, capability-gated). `/bi/query` takes a **spec** — measures, dimensions,
+`BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java`): **`POST /bi/query`**,
+`GET|POST /bi/templates` (+ apply, capability-gated). ⛔ `GET /bi/datasets` was **retired 2026-09-14**
+(`RETIRE-HALVES-1`) — no client ever listed Datasets through it. `/bi/query` takes a **spec** — measures, dimensions,
 filters, an optional `grains` map — and **`MeasureCompiler`** (`inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`)
 compiles it over the Dataset's trusted relation: `AGGS` = `count · countDistinct · sum · avg · min · max`,
 `GRAINS` = `day · week · month`. **Time grain travels on the wire** (2026-08-14): a grain naming a column that is

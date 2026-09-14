@@ -16,10 +16,6 @@ import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.NoteService;
 import com.gamma.ops.note.NoteStore;
 import com.gamma.ops.note.ObjectNote;
-import com.gamma.ops.queue.InMemoryQueueStore;
-import com.gamma.ops.queue.Queue;
-import com.gamma.ops.queue.QueueRouter;
-import com.gamma.ops.queue.QueueStore;
 import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
@@ -123,8 +119,6 @@ public final class ObjectService {
     /** D7: the truth for object tags. {@link #ATTR_TAGS} is a projection of this, never the reverse. */
     private final com.gamma.ops.tag.TagAssignmentStore tagAssignments;
     private final NoteService noteService;                          // D10: kind-agnostic note path
-    private final QueueStore queues = new InMemoryQueueStore();     // INC-4: work queues (config-authored)
-    private volatile EscalationPolicy escalationPolicy;             // INC-4: applied on SLA breach; null = breach-only
     private final Map<ObjectType, Workflow> workflows = new EnumMap<>(ObjectType.class);
     private final Map<String, Tag> tags = new ConcurrentHashMap<>();          // user-created tag registry
     private final Map<String, TagRule> tagRules = new ConcurrentHashMap<>();  // Gmail-filter Tag Rules, by name
@@ -420,22 +414,7 @@ public final class ObjectService {
         }
     }
 
-    // ── queues, assignment, watchers (INC-4) ─────────────────────────────────────────
-
-    /** Register (create or replace) a work {@link Queue}; loaded from {@code *_queue.toon} at boot or {@code POST /queues}. */
-    public Queue registerQueue(Queue queue) {
-        return queues.put(queue);
-    }
-
-    /** The queue with this id, or empty. */
-    public Optional<Queue> queue(String id) {
-        return queues.get(id);
-    }
-
-    /** Every registered queue. */
-    public List<Queue> queues() {
-        return queues.all();
-    }
+    // ── assignment, watchers ─────────────────────────────────────────────────────────
 
     // ── tags & Tag Rules (GLOSSARY §9) ────────────────────────────────────────────────
 
@@ -779,30 +758,19 @@ public final class ObjectService {
                 .findFirst().orElse(null);
     }
 
-    /** Install the SLA {@link EscalationPolicy} the sweep applies on breach; {@code null} = breach-event only. */
-    public void escalationPolicy(EscalationPolicy policy) {
-        this.escalationPolicy = policy;
-    }
-
-    /** The installed escalation policy, or empty. */
-    public Optional<EscalationPolicy> escalationPolicy() {
-        return Optional.ofNullable(escalationPolicy);
-    }
 
     /**
-     * Assign an object to a person or route it through a queue (INC-4). Exactly one of {@code assignee} /
-     * {@code queueId} drives the target: an explicit {@code assignee} wins; otherwise {@link QueueRouter}
-     * picks a member of {@code queueId} per its {@link Queue.Routing}. Sets the assignee, records an
-     * {@link EventType#OBJECT_ASSIGNED} event (the assignment history), and — when the current state has a
-     * legal {@code assign} action (e.g. INCIDENT {@code OPEN → ASSIGNED}) — also advances the workflow.
+     * Assign an object to a person. Sets the assignee, records an {@link EventType#OBJECT_ASSIGNED}
+     * event (the assignment history), and — when the current state has a legal {@code assign} action
+     * (e.g. INCIDENT {@code OPEN → ASSIGNED}) — also advances the workflow.
      *
-     * @throws NoSuchElementException  unknown object or queue id
-     * @throws IllegalArgumentException neither an assignee nor a queue was supplied
-     * @throws IllegalStateException    the queue can't yield an assignee (empty, or MANUAL with no explicit assignee)
+     * @throws NoSuchElementException   unknown object id
+     * @throws IllegalArgumentException no assignee was supplied
      */
-    public OperationalObject assign(String id, String assignee, String queueId, String actor) {
+    public OperationalObject assign(String id, String assignee, String actor) {
         OperationalObject obj = require(id);
-        String target = resolveAssignee(assignee, queueId);
+        if (assignee == null || assignee.isBlank()) throw new IllegalArgumentException("assign needs an 'assignee'");
+        String target = assignee.trim();
         long now = System.currentTimeMillis();
         String from = obj.assignee();
         OperationalObject updated = store.update(obj.withAssignee(target, now));
@@ -811,14 +779,12 @@ public final class ObjectService {
                 .source(SOURCE)
                 .correlationId(obj.correlationId())
                 .message(obj.objectType() + " " + id + " assigned to " + target
-                        + (queueId != null ? " via queue " + queueId : "")
                         + (from == null || from.isBlank() ? "" : " (was " + from + ")")
                         + (actor == null ? "" : " by " + actor))
                 .attr("objectId", id)
                 .attr("objectType", obj.objectType().name())
                 .attr("from", from)
                 .attr("to", target)
-                .attr("queue", queueId)
                 .attr("actor", actor));
         // Unify assignment with the workflow: if the current state legally accepts an `assign` action
         // (INCIDENT OPEN → ASSIGNED), advance it too so status tracks reality. Absent such a transition
@@ -827,22 +793,6 @@ public final class ObjectService {
         if (wf.apply(updated.status(), "assign").isPresent())
             return commit(updated, wf, wf.apply(updated.status(), "assign").get(), "assign", actor);
         return updated;
-    }
-
-    /** Resolve the concrete assignee: explicit name wins, else route through the queue. */
-    private String resolveAssignee(String assignee, String queueId) {
-        if (assignee != null && !assignee.isBlank()) return assignee.trim();
-        if (queueId == null || queueId.isBlank())
-            throw new IllegalArgumentException("assign needs an 'assignee' or a 'queue'");
-        Queue q = queues.get(queueId).orElseThrow(() -> new NoSuchElementException("no queue with id '" + queueId + "'"));
-        return QueueRouter.pick(q, queues, this::openLoadOf).orElseThrow(() -> new IllegalStateException(
-                "queue '" + queueId + "' cannot pick an assignee (empty members, or manual routing needs an explicit assignee)"));
-    }
-
-    /** Open (non-closed) objects currently assigned to {@code member} — the load metric for least-loaded routing. */
-    private int openLoadOf(String member) {
-        return (int) store.query(ObjectQuery.builder().assignee(member).limit(ObjectQuery.MAX_LIMIT).build())
-                .stream().filter(o -> !o.isClosed()).count();
     }
 
     /** Add {@code user} to an object's watcher list (idempotent); returns the updated object. Unknown id → 404. */
@@ -905,51 +855,9 @@ public final class ObjectService {
                     .attr("assignee", marked.assignee())
                     .attr("dueAt", dueAt)
                     .attr("overdueMs", now - dueAt));
-            escalate(marked, now);   // INC-4: apply the escalation policy (no-op when none is installed)
             breached++;
         }
         return breached;
-    }
-
-    /**
-     * Apply the installed {@link EscalationPolicy} to a just-breached incident (INC-4): bump severity and/or
-     * re-route to a queue, then emit an {@link EventType#OBJECT_ESCALATED} event so the notify chain re-alerts.
-     * A no-op when no policy is installed (the sweep then behaves exactly as before — breach event only).
-     */
-    private void escalate(OperationalObject breached, long now) {
-        EscalationPolicy policy = this.escalationPolicy;
-        if (policy == null) return;
-        OperationalObject obj = breached;
-        String newSeverity = obj.severity();
-        if (policy.severity() != null && !policy.severity().isBlank()) {
-            newSeverity = policy.severity().trim();
-            obj = obj.withSeverity(newSeverity, now);
-        }
-        String newAssignee = obj.assignee();
-        String queueId = policy.reassignQueue();
-        if (queueId != null && !queueId.isBlank()) {
-            Optional<Queue> q = queues.get(queueId);
-            if (q.isPresent()) {
-                Optional<String> picked = QueueRouter.pick(q.get(), queues, this::openLoadOf);
-                if (picked.isPresent()) { newAssignee = picked.get(); obj = obj.withAssignee(newAssignee, now); }
-            } else {
-                log.warn("escalation policy names unknown queue '{}' — skipping reassignment of {}", queueId, obj.id());
-            }
-        }
-        if (policy.mutates()) store.update(obj);   // one persist for severity + assignee
-        if (policy.renotify() || policy.mutates())
-            EventLog.current().emit(Event.builder(EventType.OBJECT_ESCALATED)
-                    .level(EventLevel.WARN)
-                    .source(SOURCE)
-                    .correlationId(obj.correlationId())
-                    .message("INCIDENT " + obj.id() + " escalated after SLA breach"
-                            + (policy.severity() != null ? " → severity " + newSeverity : "")
-                            + (queueId != null ? " → queue " + queueId + " (" + newAssignee + ")" : ""))
-                    .attr("objectId", obj.id())
-                    .attr("objectType", obj.objectType().name())
-                    .attr("severity", newSeverity)
-                    .attr("queue", queueId)
-                    .attr("assignee", newAssignee));
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ObjectService.class);
@@ -1091,14 +999,14 @@ public final class ObjectService {
      * titled {@code title}, managed individually from here on. The new part inherits the original's
      * category + tags, the members' {@code CONTAINS} links move over, a {@code SPLIT_FROM} trace link
      * + comments record the split, and the original stays active with its remaining members. An
-     * optional {@code assignee}/{@code queueId} routes the new part.
+     * optional {@code assignee} routes the new part.
      *
      * @throws NoSuchElementException   unknown case id
      * @throws IllegalArgumentException blank title / empty members
      * @throws IllegalStateException    a non-CASE or closed case, or a member the case does not contain
      */
     public SplitResult splitCase(String caseId, String title, List<String> members,
-                                 String assignee, String queueId, String actor) {
+                                 String assignee, String actor) {
         if (title == null || title.isBlank()) throw new IllegalArgumentException("split needs a 'title' for the new case");
         if (members == null || members.isEmpty()) throw new IllegalArgumentException("split needs at least one member");
         OperationalObject original = requireActiveCase(caseId, "split");
@@ -1124,8 +1032,7 @@ public final class ObjectService {
         comment(caseId, actor, "Split " + moved + " member(s) out into " + part.id() + " (\"" + title + "\")"
                 + (actor == null ? "" : " by " + actor) + ".");
         comment(part.id(), actor, "Split from " + caseId + (actor == null ? "" : " by " + actor) + ".");
-        if ((assignee != null && !assignee.isBlank()) || (queueId != null && !queueId.isBlank()))
-            assign(part.id(), assignee, queueId, actor);
+        if (assignee != null && !assignee.isBlank()) assign(part.id(), assignee, actor);
         EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
                 .level(EventLevel.INFO)
                 .source(SOURCE)

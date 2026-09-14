@@ -69,7 +69,7 @@ components), `query/` (query catalog), `job/`, `signal/`, `enrich/`, `catalog/`,
 access + I/O helpers) → `inspecto-util`, `config/` → `inspecto-config`, the SQL sandbox → `inspecto-sql`.
 ⚠ **`ops/` is no longer in `inspecto-engine`**: EDG-01 cell 7 (2026-09-08) moved the whole `com.gamma.ops`
 domain into the optional **`inspecto-ops`** module, reached from core through the `ObjectAccess` SPI plus a
-host-declared `ObjectEngineProvider` — which is why Personal 503s the `/objects|/notes|/queues|/tags`
+host-declared `ObjectEngineProvider` — which is why Personal 503s the `/objects|/notes|/tags`
 families ([editions model](./editions/editions-model.md)). `notify/` is likewise split: the core interfaces
 stay in `inspecto-engine`, the channels ship in `inspecto-notify-channels`.
 

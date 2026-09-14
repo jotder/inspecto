@@ -156,7 +156,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
     that doesn't match the pattern is left alone.
   * **Read path needed zero new code** — `DatasetRelation.relationSql` already resolves
     `physicalRef → read_parquet('<dataRoot>/ops_analytics/**/*.parquet')`, so the dataset shows up in Studio
-    pickers, `/db/query`, `/bi/datasets`, widgets and Alert Rules for free. `ObjectsAnalyticsJobTest` reads
+    pickers, `/db/query`, widgets and Alert Rules for free. `ObjectsAnalyticsJobTest` reads
     back through that real seam rather than a hand-written glob — that is what proves the binding.
   * **Cadence is operator-authored** (the deferred product question dissolved rather than answered): the
     built-in registers only the *type*; a space schedules it with its own `cron:` in a `*_job.toon`. Demo seed:

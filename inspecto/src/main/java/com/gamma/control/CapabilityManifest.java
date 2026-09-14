@@ -117,8 +117,6 @@ final class CapabilityManifest {
             // fires a production run — hence author, unlike its /trigger sibling below.
             new Entry("POST", "/pipelines/authored/([^/]+)/run", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
-            // QueueRoutes
-            new Entry("POST", "/queues", Roles.CAN_AUTHOR_WORKBENCH),
             // RequirementRoutes
             new Entry("POST", "/requirements/([^/]+)/decision", Roles.CAN_TRIAGE_REQUIREMENTS),
             new Entry("POST", "/requirements/([^/]+)/deliver", Roles.CAN_TRIAGE_REQUIREMENTS),

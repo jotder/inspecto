@@ -350,6 +350,28 @@ figure. Transform and write are never the bottleneck.
 | Daily volume, 100 % utilisation | 3.5–8.6 billion rows |
 | **Quotable, sized to peak (3–5× daily mean) with headroom** | **~1 billion rows per day per node** |
 
+### Scaling up the node — 8, 16 and 32 cores
+*Projected linearly from the 8-core line above. Inspecto scales by running batches concurrently
+(`processing.threads`), each on its own DuckDB connection; since v3.12.0 the engine divides the cores
+between concurrent batches automatically, so a bigger box is a configuration change, not a redesign.*
+
+| Node | Processing density | 100-column rows/s | 12-column rows/s | 100-column rows/day at 100 % | **Quotable, sized to peak** |
+|---|---|---|---|---|---|
+| **8 cores** | 4–10 M cells/s | 40–100 K | 330–830 K | 3.5–8.6 billion | **~1 billion/day** |
+| **16 cores** | 8–20 M cells/s | 80–200 K | 0.7–1.7 M | 7–17 billion | **~2 billion/day** |
+| **32 cores** | 16–40 M cells/s | 160–400 K | 1.3–3.3 M | 14–35 billion | **~4 billion/day** |
+
+Three conditions make the projection hold, and a sizing engagement checks all three:
+* **Enough concurrent batches.** A single file ingests on one thread; the node is busy only when at
+  least as many batches are in flight as it has cores. Many medium files scale; one giant file does not.
+* **Storage that keeps up.** At 32 cores the node writes on the order of 20–110 MB/s of Parquet at
+  peak, plus the raw-file reads — NVMe territory, not a network share.
+* **Headroom for the console.** Dashboard queries, reconciliations and the assistant share the same
+  cores; the "sized to peak" column already leaves that room, the "100 %" column does not.
+
+Above 32 cores the honest answer is a **measurement on your feeds**, or Enterprise partitioning across
+nodes, which scales the same arithmetic without the single-box ceiling.
+
 > **The rule.** One 8-core node runs the daily CDR volume of a mid-sized operator or the clearing ledger
 > of a retail bank — no cluster. A trillion rows a day is real, and it is an **Enterprise** conversation:
 > a partitioned cluster of the same artifact writing on the order of 100–270 TB of Parquet daily.
@@ -420,8 +442,8 @@ figure. Transform and write are never the bottleneck.
 * **Feed freshness.** Sequence continuity and watermarks are tracked per Collector; a missing file trips a
   `SEQUENCE_GAP` Signal immediately.
 * **Incident SLAs.** Every Incident may carry a deadline; a sweep runs every 60 seconds; a breach stamps
-  the Incident, emits `OBJECT_SLA_BREACH`, escalates priority per `*_escalation.toon`, and routes to the
-  configured notification channels (webhook, email).
+  the Incident, emits `OBJECT_SLA_BREACH`, and routes to the configured notification channels (webhook,
+  email).
 * **Executive visibility.** KPI reports with MTTR, MTTD and Incident aging.
 
 ### 9.2 Compliance posture

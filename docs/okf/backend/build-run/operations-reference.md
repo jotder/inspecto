@@ -773,7 +773,9 @@ header is a real OIDC bearer.)*
 scheduled sweep then breaches any Incident that passes its deadline while still being worked (i.e. not
 yet `RESOLVED`/`ARCHIVED`); each breach stamps a `slaBreachedAt` marker on the object (so it fires once)
 and emits an **`OBJECT_SLA_BREACH`** event into the event log, where it surfaces in `/events`
-alongside the Incident's activity; an `*_escalation.toon` policy, if present, is applied on breach. The cadence is `-Dobjects.sla.sweep.seconds` (default `60`; set `0`
+alongside the Incident's activity. ⛔ The `*_escalation.toon` policy that was once applied on breach is
+**retired** (`RETIRE-HALVES-1`, 2026-09-14) — a breach emits its event and notifies; it no longer mutates
+the Incident. The cadence is `-Dobjects.sla.sweep.seconds` (default `60`; set `0`
 to disable):
 
 ```bash

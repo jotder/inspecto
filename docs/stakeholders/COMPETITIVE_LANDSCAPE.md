@@ -71,6 +71,12 @@ columns), so capacity is a cells-per-second figure divided by width.
 billion rows/day at 100 % utilisation → **~2–4 billion/day with 50 % headroom** → **~1 billion/day sized to
 peak** (real feeds run 3–5× their daily mean at peak). That last figure is the one to quote.
 
+**Bigger nodes (linear projection from the same line):** 16 cores → 8–20M cells/s → 80–200K rows/s at 100
+columns → **~2 billion/day sized to peak**; 32 cores → 16–40M cells/s → 160–400K rows/s → **~4 billion/day**.
+Linear holds only with ≥ cores concurrent batches (`processing.threads`; ingest is single-threaded per file,
+`performance.md` §"Two controllable axes"), NVMe-class storage (~20–110 MB/s Parquet at 32-core peak) and
+the console's share of the cores left in the peak headroom. Above 32 cores: measure, or partition (Enterprise).
+
 **What 1 trillion rows/day would take at 100 columns:** 11.6M rows/s sustained = 1.16 billion cells/s =
 **115–290 nodes**, writing **100–270 TB/day** of Parquet. It is an Enterprise cluster-design conversation,
 never a single-node claim.
@@ -191,6 +197,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | One config file onboards a feed | the `.toon` model; `PRODUCT_CAPABILITIES.md` |
 | Native ingest ~500K rows/s at 12 columns; transforms >1M rows/s | `performance.md`, measured |
 | ~1 billion 100-column rows/day per 8-core node, sized to peak | §1.3 derivation |
+| ~2 / ~4 billion 100-column rows/day per 16- / 32-core node, sized to peak | §1.3 linear projection; conditions stated (concurrent batches, NVMe, console headroom) |
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
 | Fault-tolerant DR at Standard; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |

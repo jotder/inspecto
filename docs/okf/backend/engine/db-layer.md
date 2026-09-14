@@ -107,7 +107,6 @@ unaffected because the database, not the monitor, decides them.
 | Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
 | Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
 | Fleet-wide inbox registry (`INBOX-REGISTRY-CROSS-POD-1`) | *(class is the API)* | [`DbInboxRegistry`](../../../../inspecto/src/main/java/com/gamma/service/DbInboxRegistry.java) | `inbox.registry.backend=none\|duckdb\|postgres\|jdbc:…` | `none` — off, the inbox audit compares only the Spaces this pod hosts, exactly as before |
-| Ops escalation queues | `ops/queue/QueueStore` | **none** — in-memory only | — | — |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
 > **`ALERT`s are not their own table.** Alerts, incidents, cases and tasks are all rows in

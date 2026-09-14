@@ -1,4 +1,3 @@
 com.gamma.opsapi.ObjectRoutes
 com.gamma.opsapi.NoteRoutes
-com.gamma.opsapi.QueueRoutes
 com.gamma.opsapi.TagRoutes

@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tags + Tag Rules over real HTTP (GLOSSARY §9): the tag registry and rule CRUD behind the
  * fail-closed write gates (write-root 503 → unsafe/invalid 422 → duplicate 409), atomic
  * {@code *_tag.toon}/{@code *_tagrule.toon} persistence, bulk apply, and the create-time
- * auto-apply hook. Modeled on {@code ControlApiQueueRoutesTest} / {@code ControlApiConfigWriteTest}.
+ * auto-apply hook. Modeled on {@code ControlApiConfigWriteTest}.
  */
 class ControlApiTagRoutesTest {
 

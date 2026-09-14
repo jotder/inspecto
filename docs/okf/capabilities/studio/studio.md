@@ -88,7 +88,7 @@ CORRECTION the board was wrong on 2026-09-08 and has been amended in the same co
 | **BI-4** | Scheduled report/export delivery | Should | ✅ SHIPPED. **CORRECTION:** the cell says "a timestamped JSON/CSV artifact" — the code dispatches **four** formats (`json`, `csv`, `png`, `pdf`); `csv`/`png`/`pdf` each **require `scope: dataset`** and a rollup report renders as `json`. The SMTP caveat in the cell is **true and confirmed in code**: the mail carries the artifact *path*, not an attachment | **S/E as a product decision the code does not apply** — see the note below this table |
 | **BI-5** | Alerting on **Measures** | Could | ✅ SHIPPED. The "v1 = whole-dataset measures, no per-rule filters" caveat is **enforced, not merely intended**: a measure rule's constructor requires `when`, `window` and the legacy metric field to be absent | All |
 | **BI-6** | Public/embedded Dashboard sharing | Could | ✅ SHIPPED, backend and UI. Fail-closed as described: inert without `-Dbi.share.secret` (and it must be ≥16 chars), expiring, and **every** failure — bad signature, malformed, expired, unknown — returns the *same* `404` ⚠ **Named for grep:** the share dialog is `ShareDashboardDialog` (`share-dashboard.dialog.spec.ts` pins it). | 🔴 **the row says `S/E`, not `All`** — and the code is ungated (`ShareRoutes`/`ShareTokens` are core). See the note below this table |
-| **BI-7** | Semantic / headless BI API | Could | ✅ SHIPPED. **CORRECTION (two):** (a) the cell's "Open follow-up: swapping the UI viz layer onto it" is **done** — `DatasetResultService`'s live path *is* `POST /bi/query`, and every Widget renders through it. (b) `GET /bi/datasets`, which the cell also claims, has **no client consumer**: Dataset listing goes through the generic component registry | **S/E as a product decision the code does not apply** — see the note below this table |
+| **BI-7** | Semantic / headless BI API | Could | ✅ SHIPPED. **CORRECTION (two):** (a) the cell's "Open follow-up: swapping the UI viz layer onto it" is **done** — `DatasetResultService`'s live path *is* `POST /bi/query`, and every Widget renders through it. (b) `GET /bi/datasets`, which the cell also claimed, is ⛔ **RETIRED 2026-09-14** (`RETIRE-HALVES-1`) — it never had a client consumer; Dataset listing goes through the generic component registry | **S/E as a product decision the code does not apply** — see the note below this table |
 | **BI-8** | Widget/Dashboard template marketplace | Could | ✅ SHIPPED as a **curated seed pack**, not a marketplace. Exactly three ids ship (`kpi-overview`, `quality-monitor`, `trend-monitor`), the corpus is a Java constant, and apply is all-or-nothing with a `409` on any id collision. An external marketplace is out of scope by design (§6) | All |
 | **INV-1** | **Link Analysis Studio**: Entity Projection over a Dataset, shared G6 host, 11 layouts, communities, pattern matching, saved **Link-Analysis Views** | Should | ✅ SHIPPED. **CORRECTIONS (three):** (a) the cell's "Open per design §7: `attrCols` mapping surface + the schema-relationship model" — **both shipped**, `attrCols` on both sides and the relationship inference on 2026-07-20; the concept page had already flagged that note stale. (b) "with the offline sample fold as fallback" is **gone**: since the mock backend was deleted a backend failure **surfaces**. (c) The counts are pinnable — 11 layouts, 6 pattern packs, two community methods | **S/E** — `inspecto-geo-link` (see `INV-2`) |
 | **INV-2** | **Geo Map Analysis Studio**: offline MapLibre basemap, GeoSource/GeoQuery, heatmap, od-routes, time slider + playback, intelligence toolbox, measure/radius/polygon/notes tools, layer manager + GeoJSON overlays, saved **Geo Views** | Should | ✅ SHIPPED. **CORRECTIONS (two):** (a) "DuckDB-spatial backend = Phase 4" mislabels both halves — the **Phase 4 server-side projection shipped** (`POST /geo/projection`, `POST /geo/routes`), and the DuckDB `spatial` extension is a **deliberate refusal**, not a pending phase (no geometry op is needed and the hardened sandbox disables extension loading). (b) The client-side fallback is gone, as for `INV-1`. (c) 🔴 **The basemap is not PMTiles**: `inspecto-ui/src/assets/basemap/` ships four slimmed Natural Earth GeoJSON layers plus glyph fonts (~2.7 MB), and **zero `.pmtiles` files exist in the tree** — no code references the protocol either. A planet extract would have been ~100 MB, so it was refused at bundling time (D2, 2026-07-05); the word survived in this row, in `geo-map.md`, and in this file's own first draft | **S/E** — ✅ **GATED 2026-09-07** (EDG-01 cell 3b: `GeoRoutes` + `InvRoutes` moved into `inspecto-geo-link`; Personal gets a core `503` stub). ~~code is core and ungated, EDG-01~~ — stale from 2026-09-07 until 2026-09-08 |
@@ -166,7 +166,7 @@ than silently degrading. ⚠ `run` takes its rows as a thunk: the live branch ne
 ten-tile Dashboard would fetch and discard ten pages.
 
 Server side, `BiRoutes` (`inspecto/src/main/java/com/gamma/control/BiRoutes.java`) registers
-`GET /bi/datasets`, `POST /bi/query`, `GET /bi/templates` and the capability-gated
+`POST /bi/query`, `GET /bi/templates` and the capability-gated
 `POST /bi/templates/{id}/apply`. A query is compiled by **`MeasureCompiler`**
 (`inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`) from
 `Spec(dataset, measures, groupBy, grains, filters, orderBy, limit)` into **one** SELECT built only from
@@ -200,7 +200,8 @@ editor feature, which is a live client-side capability `DAT` documents — not a
 ### 3.4 Datasets, Measures and the Query Library
 
 **Datasets are `MET`/`DAT`'s.** Studio lists them through the generic component registry
-(`DatasetsService.list()` → `ComponentsService.list('dataset')`), *not* through `GET /bi/datasets`.
+(`DatasetsService.list()` → `ComponentsService.list('dataset')`). ⛔ `GET /bi/datasets` was **retired
+2026-09-14** (`RETIRE-HALVES-1`) precisely because this is the only listing path anything uses.
 Two Dataset rules Studio depends on, both dated 2026-08-14: the editor's store picker offers **real
 catalogued stores** from `/db/catalog`, business groups only, keeping a saved Dataset's own source in the
 list even when the catalog stops naming it (a `mat-select` whose value is absent renders blank); and a
@@ -474,9 +475,9 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
    commit fixes the Studio-owned pages; the other pages belong to `PIP`, `MET`, `ACQ` and `OPS` and need
    one sweep with a board row, because every one of them can send a reader to a dead path. The `SPC`
    spec had already recorded the deletion date, which is how this was noticed.
-2. **`GET /bi/datasets` has no client consumer** — the seventh instance of a shipped server half with no
-   caller, and the second inside `BI-7` alone. Either the SPA should list Datasets through it or the
-   route should be retired in favour of the component registry.
+2. ~~**`GET /bi/datasets` has no client consumer**~~ ✅ **CLOSED by retirement 2026-09-14**
+   (`RETIRE-HALVES-1`) — the seventh instance of a shipped server half with no caller, and the second
+   inside `BI-7` alone. Of the two options, the operator took the route's deletion over adopting it.
 3. **`POST /queries/{id}/run` still has no client consumer**, and `studio.md` named it as Studio's
    execution path. `DAT` §5 already carries this as a Must; Studio is the area that was documented as
    its consumer, so the two records should be filed together.

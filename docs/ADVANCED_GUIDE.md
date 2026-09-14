@@ -527,7 +527,7 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
   `GET /jobs`, `GET /events`.
 
 _Not yet re-verified against code in this pass (surfaced by a route scan, worth a follow-up spot-check before relying on
-exact gating): `/bi/*`, `/access/*`, `/datasources*`, `/export`/`/import*`, `/lineage`, `/queues*`, `/requirements*`,
+exact gating): `/bi/*`, `/access/*`, `/datasources*`, `/export`/`/import*`, `/lineage`, `/requirements*`,
 `/settings/branding|geo`, `/dashboards/{id}/share` + `/public/dashboards/*`, `/spaces*`, `/tags*`, `/cases/rules*`,
 `/provenance*`._
 

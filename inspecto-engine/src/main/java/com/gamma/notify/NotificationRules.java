@@ -72,10 +72,6 @@ public final class NotificationRules {
                         "SLA breach",
                         "{{message}}",
                         "sla:{{correlationId}}", true),
-                new NotificationRule("builtin-object-escalated", EventType.OBJECT_ESCALATED, null, "ops",
-                        "Incident escalated: {{attributes.objectId}}",
-                        "{{message}}",
-                        "escalated:{{attributes.objectId}}", true),
                 // A provenance conservation breach already opens an ALERT object (both kinds); surface it
                 // to the operator's feed too. minLevel WARN catches AMPLIFICATION (WARN) as well as LOSS
                 // (ERROR) — matching that the ALERT bridge fires for both.

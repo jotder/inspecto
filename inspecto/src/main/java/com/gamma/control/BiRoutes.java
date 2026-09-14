@@ -25,7 +25,6 @@ import java.util.Map;
  * consumer (or the UI itself, later) can evaluate measures server-side over the at-rest data.
  *
  * <ul>
- *   <li>{@code GET /bi/datasets} — the queryable Dataset components (id + binding summary).</li>
  *   <li>{@code POST /bi/query} — {@code {dataset, measures[{agg,field}], groupBy[], filters[],
  *       orderBy[], limit}} → compiled by {@link MeasureCompiler} (validated identifiers + typed
  *       literals only), SqlGuard-checked, executed in the same ephemeral DuckDB sandbox as
@@ -42,32 +41,12 @@ final class BiRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/bi/datasets", (e, m) -> listDatasets(api, e));
         api.post("/bi/query", (e, m) -> biQuery(api, e, api.body(e)));
         // BI-8 template gallery: curated starter widget/dashboard sets, parameterized by dataset and
         // applied server-side into the component store (cross-space sharing stays BundleRoutes' job).
         api.get("/bi/templates", (e, m) -> BiTemplates.list());
         api.post("/bi/templates/([^/]+)/apply", ApiContext.withCapability("canAuthorWorkbench", (e, m) ->
                 BiTemplates.apply(api, ApiContext.name(m), api.body(e))));
-    }
-
-    /** {@code GET /bi/datasets} — every persisted dataset component with its binding kind (datasets
-     *  shared away from this subject are filtered out, R3 — same contract as {@code /components}). */
-    private Object listDatasets(ApiContext api, HttpExchange ex) throws IOException {
-        Path writeRoot = WriteGates.requireWriteRoot(api, "BI dataset listing");
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (ComponentRegistry.Component c : store.list("dataset")) {
-            if (!ComponentAccess.canView(ex, c.content())) continue;
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", c.name());
-            Map<String, Object> cfg = c.content();
-            m.put("binding", cfg.containsKey("view") ? "view" : cfg.containsKey("physicalRef") ? "physicalRef" : "unbound");
-            Object label = cfg.get("label");
-            if (label != null) m.put("label", label);
-            out.add(m);
-        }
-        return out;
     }
 
     /** {@code POST /bi/query} — compile + execute one measure spec (see class doc). */

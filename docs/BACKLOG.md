@@ -527,10 +527,26 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
   rather than prose. → `okf/capabilities/assistant/assistant.md` §3
-- **P2** · **`RETIRE-HALVES-1` — delete two server halves with no consumer** (decided 2026-09-10): **`GET /bi/datasets`**
-  (Studio keeps its own discovery) and the **`INC-4` queue / watcher / escalation-policy** route families — routes, TOON,
-  tests and OpenAPI entries; `INC-4` (a Should) is WITHDRAWN in its spec. ⚠ Pagination is NOT retired: kept as API surface,
-  the SPA adopts a cursor when a list outgrows a page. → `studio.md` · `okf/capabilities/incidents/incidents.md` §2 `INC-4`
+- ✅ **CLOSED 2026-09-14 · `RETIRE-HALVES-1` — both server halves are deleted, and the sweep was wider than the row.**
+  Decided 2026-09-10, built as a **full sweep** on the operator's 2026-09-14 call. Gone: `GET /bi/datasets`
+  (`BiRoutes`), the whole queue family (`QueueRoutes`, `Queue`, `QueueStore`, `InMemoryQueueStore`,
+  `QueueRouter`, `*_queue.toon`), the three `watch|unwatch|watchers` routes, and the escalation engine
+  (`EscalationPolicy`, `*_escalation.toon`, `ObjectService.escalate`). `INC-4` is WITHDRAWN in its spec.
+  🔴 **THREE of the row's own claims were wrong, found by grounding before building:**
+  (a) there is **no escalation-policy *route family*** — escalation was `*_escalation.toon` applied
+  internally by the SLA sweep, so "retiring the routes" would have deleted nothing and left the behaviour;
+  the operator chose to retire the **capability**, which is a product change, not a cleanup.
+  (b) the **watcher *model* is not dead** — `POST /objects/{id}/merge` unions `OperationalObject.watchers()`
+  and `merge-cases.dialog.ts` calls it, so only the three routes went; the attribute is live with no reader.
+  (c) **"and OpenAPI entries" is moot** — `openapi-v1.json` documented none of these paths.
+  ⚠ **Two live seams the row never mentioned had to change**: `POST /objects/{id}/assign` and
+  `POST /objects/{id}/split` both accepted a `queue` parameter, so both are now person-only
+  (`assign` needs an `assignee`, 400 otherwise). The UI only ever sent `assignee`, verified before cutting.
+  ⚠ **`OBJECT_ESCALATED` is kept** as an `@PublicApi` constant with nothing emitting it — removing a
+  published constant is a breaking change, and stored events still carry the type; its builtin
+  notification rule is deleted, since it could never fire again.
+  ⚠ Pagination is NOT retired: kept as API surface, the SPA adopts a cursor when a list outgrows a page.
+  → `studio.md` · `okf/capabilities/incidents/incidents.md` §2 `INC-4`
 
 - **P2** · **API v1** — adopt the cursor-pagination seam on further list families as demanded (4 adopters live); adopt `ETags.respond` on further singleton reads as demanded; Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed). → `okf/backend/control-plane/api-v1.md`
 - **P2** · **Bundle / Exchange** — `requires` present-but-different classification; per-editor "load as draft" import — design first, likely multi-session (`BundleTransferService.write` commits straight through; no generic draft seam). ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/exchange-sharing.md`

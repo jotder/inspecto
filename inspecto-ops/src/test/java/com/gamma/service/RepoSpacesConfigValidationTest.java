@@ -4,8 +4,6 @@ import com.gamma.alert.AlertRule;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.job.JobConfig;
-import com.gamma.ops.EscalationPolicy;
-import com.gamma.ops.queue.Queue;
 import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
@@ -71,8 +69,6 @@ class RepoSpacesConfigValidationTest {
         if (name.endsWith("_tag.toon"))             { Tag.load(f); return; }
         if (name.endsWith("_tagrule.toon"))         { TagRule.load(f); return; }
         if (name.endsWith("_caserule.toon"))        { CaseRule.load(f); return; }
-        if (name.endsWith("_queue.toon"))           { Queue.load(f); return; }
-        if (name.endsWith("_escalation.toon"))      { EscalationPolicy.load(f); return; }
         if (name.endsWith("_rca.toon"))             { RcaTemplate.load(f); return; }
         if (name.endsWith("_job.toon")) {
             Map<String, Object> raw = ConfigCodec.toMap(Files.readString(f));

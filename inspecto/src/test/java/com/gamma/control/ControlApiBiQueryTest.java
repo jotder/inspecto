@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Real-HTTP + real-DuckDB tests for the headless BI API (BI-7): {@code POST /bi/query} aggregates a
- * Dataset server-side from a measure spec (no authored query component), {@code GET /bi/datasets}
- * lists the queryable datasets, and the surface fails closed (404 unknown dataset, 422 bad spec).
+ * Dataset server-side from a measure spec (no authored query component), and the surface fails closed
+ * (404 unknown dataset, 422 bad spec).
  * Mirrors {@link ControlApiQueryRunV1Test}'s setup.
  */
 class ControlApiBiQueryTest {
@@ -128,18 +128,16 @@ class ControlApiBiQueryTest {
         }
     }
 
+    /** RETIRE-HALVES-1: {@code GET /bi/datasets} is retired — Studio discovers datasets through the
+     *  component registry ({@code /components?type=dataset}), so the BI twin had no consumer. */
     @Test
-    void listsDatasets(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void theRetiredDatasetListingIsGone(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seedSales(c);
             HttpResponse<String> r = client.send(HttpRequest.newBuilder(
                             URI.create("http://localhost:" + c.port + "/api/v1/bi/datasets")).GET().build(),
                     BodyHandlers.ofString());
-            assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = V1Body.of(r.body());
-            assertEquals(1, data.size());
-            assertEquals("sales_ds", data.get(0).get("id").asText());
-            assertEquals("view", data.get(0).get("binding").asText());
+            assertEquals(404, r.statusCode(), r.body());
         }
     }
 

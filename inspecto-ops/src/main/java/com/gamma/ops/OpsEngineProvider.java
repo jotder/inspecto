@@ -7,7 +7,6 @@ import com.gamma.ops.link.LinkStore;
 import com.gamma.ops.note.DbNoteStore;
 import com.gamma.ops.note.InMemoryNoteStore;
 import com.gamma.ops.note.NoteStore;
-import com.gamma.ops.queue.Queue;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.DbTagAssignmentStore;
 import com.gamma.ops.tag.InMemoryTagAssignmentStore;
@@ -215,12 +214,6 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
 
         @Override
         public void loadConfigs(List<Path> configPaths) {
-            for (Queue q : load(configPaths, "_queue.toon", Queue::load, "queue")) service.registerQueue(q);
-            // At most one escalation policy applies — FIRST valid wins, as before the move.
-            for (EscalationPolicy p : load(configPaths, "_escalation.toon", EscalationPolicy::load, "escalation policy")) {
-                service.escalationPolicy(p);
-                break;
-            }
             for (Tag t : load(configPaths, "_tag.toon", Tag::load, "tag")) service.registerTag(t);
             for (TagRule r : load(configPaths, "_tagrule.toon", TagRule::load, "tag rule")) service.registerTagRule(r);
             for (CaseRule r : load(configPaths, "_caserule.toon", CaseRule::load, "case rule")) service.registerCaseRule(r);

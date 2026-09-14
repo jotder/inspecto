@@ -49,7 +49,7 @@ export class NavigationService {
     /**
      * The operational-object screens, whose whole backend is the optional `inspecto-ops` module
      * (EDITIONS CP-11, EDG-01 cell 7). Hidden — not disabled — when `/bootstrap` reports it absent:
-     * every `/objects*`, `/notes*`, `/queues*` and `/tags*` path 503s on a Personal build.
+     * every `/objects*`, `/notes*` and `/tags*` path 503s on a Personal build.
      *
      * ⛔ `alerts` is deliberately NOT in this set. That pane reads `AlertsService` over config-authored
      * alert RULES, which every edition serves. It is the adjacent nav id and shares the word "alert"

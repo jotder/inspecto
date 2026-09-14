@@ -68,25 +68,25 @@ out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but
 | `INC-1` | **Alert Rules** watch Metrics (and, since 2026-09-06, Measures); fired **Alerts** with severity | Must | ✅ SHIPPED — ⚠ the authoring form cannot express a Measure rule (§5) | All (the *feed*); ALERT **objects** S/E |
 | `INC-2` | **Alert → Incident → Case** lifecycle, object-link graph, SLA, comments | Must | ✅ SHIPPED | **S/E** — was `All`; `inspecto-ops` since 2026-09-08 (CP-11) |
 | `INC-3` | **Notification** delivery channels (email / webhook) + per-user preferences | Must | 🟡 PARTIAL — feed + rules + receipts shipped; channels S/E; **preferences are one global set**; `mail.send` reports success when no channel exists (§5) | Feed All (CP-12) · channels **S/E** (CP-15) |
-| `INC-4` | Incident workflow depth: queues, escalation, watchers | Should | 🟡 **backend SHIPPED 2026-07-08, no UI** — queues, assignment, watchers and escalation are routes and TOON only; the queue store is in-memory only | **S/E** — was `All` ⛔ **WITHDRAWN 2026-09-10 (`CONSUMER-PAIRS-1`, operator):** the queue / watcher / escalation-policy route families are **RETIRED** — no client ever called them; the Incident object, assignment and triage stay. Re-file when a customer names on-call escalation → `BACKLOG.md` §3 `RETIRE-HALVES-1`. |
+| `INC-4` | Incident workflow depth: queues, escalation, watchers | ⛔ **WITHDRAWN** | ⛔ **RETIRED 2026-09-14 (`RETIRE-HALVES-1`)** — the queue family, the three watcher routes and the escalation engine are **deleted from the code**, not merely undocumented. Assignment is now person-only (`POST /objects/{id}/assign` takes `assignee`); the Incident object, the SLA breach sweep and triage stay. ⚠ `watchers` survives as an object **attribute** (the merge union feeds it) with no route. Re-file when a customer names on-call escalation | **n/a** — withdrawn, not gated |
 | `INC-5` | **Diagnosis**: AI-assisted RCA of a failing Run/Collector **producing an Incident** | Should | 🟡 **PARTIAL** — the RCA ships (`FailureReactor` → `DiagnosisStore`, `GET /assist/diagnoses`); **nothing creates an Incident from a Diagnosis** — the only bridge is a drafted Alert Rule (§3.9) | All |
 
 **Corrections this table makes to its predecessor**, each verified against source:
 
-- **`INC-2` and `INC-4` read `All`.** The whole `com.gamma.ops` domain — 31 files, `/objects*`, `/notes*`,
-  `/queues*`, `/tags*`, `/workflows/{type}`, `/findings/{type}`, `/cases/rules*`, `/rca/templates` — is the
-  optional `inspecto-ops` module since EDG-01 cell 7. A Personal bundle answers **49 paths `503`** naming
+- **`INC-2` and `INC-4` read `All`.** The whole `com.gamma.ops` domain — `/objects*`, `/notes*`,
+  `/tags*`, `/workflows/{type}`, `/findings/{type}`, `/cases/rules*`, `/rca/templates` — is the
+  optional `inspecto-ops` module since EDG-01 cell 7 (⛔ `/queues*` was in this list until
+  `RETIRE-HALVES-1` retired it, 2026-09-14). A Personal bundle answers **46 paths `503`** naming
   the module (`AbsentObjectRoutes`), reports `features.ops = false`, and hides the Incidents, Case Manager
   and Tags navigation. `EDITIONS.md` CP-11 recorded this on the day; `OPS-01` and `SP-CTL-02` were amended
   on the day; these two rows were not. `BACKLOG.md` §5 lists `INC-3` as an edition-column mismatch and
   misses the two larger ones.
-- **`INC-4` read a flat `SHIPPED`.** Every mechanism it names exists as a route (`POST /queues`,
-  `POST /objects/{id}/assign|watch|unwatch`, `GET /objects/{id}/watchers`, `*_escalation.toon` applied by
-  the SLA sweep) and **none has a UI**: the SPA has a single direct `assignee`, an `escalated` boolean and
-  the Case `ESCALATED` state — no queue, watcher or escalation-policy surface. `QueueStore` has no Db
-  implementation (`db-layer.md` says so; `REQUIREMENTS.md` called it "a noted follow-on" and no board row
-  exists). A Should recorded green over a backend-only delivery is the shape that makes a register
-  untrustworthy.
+- **`INC-4` read a flat `SHIPPED`** over a backend-only delivery whose every mechanism had **no UI** —
+  the shape that makes a register untrustworthy. ⛔ **Resolved by deletion 2026-09-14 (`RETIRE-HALVES-1`):**
+  rather than build the missing UI, the operator retired the capability. `POST /queues`, the three
+  `watch|unwatch|watchers` routes, `QueueStore`/`QueueRouter` and `EscalationPolicy` are gone, so the
+  `QueueStore` Db-parity follow-on `REQUIREMENTS.md` noted in July is moot. What the SPA always had —
+  a direct `assignee`, an `escalated` boolean and the Case `ESCALATED` state — is now the whole truth.
 - **`INC-5` read `SHIPPED`** for a requirement whose defining clause is "producing an Incident". The
   diagnoser subscribes to failed consignments, stores read-only `Diagnosis` records in a 256-entry ring, and
   the UI's detail dialog offers a copyable `suggestedAlertRuleToon`. No code path in `com.gamma.agent.diagnose`
@@ -263,15 +263,15 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   the backend gate "a follow-up"; it shipped.
 - **SLA and escalation.** `dueAt` / `dueInMinutes` at creation; the sweep (`sweepIncidentSla`,
   `ObjectService.java:830-905`, cadence `-Dobjects.sla.sweep.seconds`, default 60, `0` disables) stamps
-  `slaBreachedAt` once and emits `OBJECT_SLA_BREACH`; an **`EscalationPolicy`** (`*_escalation.toon`, 1
-  committed example `spaces/demo/config/ops/sla_escalation.toon`) applied on breach bumps severity,
-  re-routes to a queue and emits `OBJECT_ESCALATED`. The Case `targetDate` is a **loose** SLA — overdue hint
-  only, no sweep.
-- **Queues and watchers** (INC-4): `*_queue.toon` / `POST /queues`, members, routing `round_robin |
-  least_loaded | manual` (`QueueRouter.pick`); `POST /objects/{id}/assign` (person or queue-routed) emits
-  `OBJECT_ASSIGNED`; `POST /objects/{id}/watch|unwatch`, `GET /objects/{id}/watchers`. **`InMemoryQueueStore`
-  is the only implementation** — "the lean default (INC-4)"; no `DbQueueStore` exists. **No UI** for any of
-  it (§2, §5).
+  `slaBreachedAt` once and emits `OBJECT_SLA_BREACH`. ⛔ **The `EscalationPolicy` that once ran on breach
+  is RETIRED (`RETIRE-HALVES-1`, 2026-09-14)** — a breach now emits its event and nothing else; no severity
+  bump, no re-routing, and `OBJECT_ESCALATED` is emitted by nothing (the `@PublicApi` constant stays for
+  stored events). The Case `targetDate` is a **loose** SLA — overdue hint only, no sweep.
+- ⛔ **Queues and watcher routes are RETIRED** (`RETIRE-HALVES-1`, 2026-09-14). `*_queue.toon`,
+  `POST /queues`, `QueueRouter` and the three `watch|unwatch|watchers` routes are deleted; nothing had ever
+  called them. `POST /objects/{id}/assign` survives **person-only** (body `{assignee, actor?}`) and still
+  emits `OBJECT_ASSIGNED`. ⚠ The `watchers` **attribute** is NOT retired — `POST /objects/{id}/merge`
+  unions the watchers of the merged cases, so the field is live with no route to read it.
 - **RCA templates** (`RcaTemplate`, `RcaTemplateRegistry`, `GET /rca/templates`, 1 committed example
   `orders_rca.toon`) seed the postmortem's cause-analysis structure; the **Postmortem** is the Incident's
   resolution artifact, the **Findings** are the Case's (§3.5).
@@ -494,8 +494,8 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Evidence | Why it matters |
 |---|---|---|
 | **Diagnosis → Incident** — the defining clause of `INC-5` | no `INCIDENT` / `IncidentAccess` reference under `com.gamma.agent.diagnose` or `com.gamma.assist` | A Should recorded shipped; the only bridge is a copyable drafted Alert Rule. Needs a product call: auto-open (deduped per consignment, through `IncidentAccess`) or retitle the requirement |
-| **Queue / watcher / escalation-policy UI** — `INC-4`'s user half | no `/queues`, `/watch` or escalation-policy consumer in `inspecto-ui/src/app` | Routes and TOON exist; an operator cannot see a queue, a watcher list or a policy in the product |
-| **`QueueStore` Db parity** | `InMemoryQueueStore` is the only implementation; `db-layer.md` row "none" | Queues and their membership vanish on restart; `REQUIREMENTS.md` called this "a noted follow-on" in July and nothing filed it |
+| ~~**Queue / watcher / escalation-policy UI**~~ ✅ **CLOSED by deletion 2026-09-14** | `RETIRE-HALVES-1` | The gap was a backend with no user half. Retiring the backend closes it — the alternative was building a UI for a capability nobody asked for |
+| ~~**`QueueStore` Db parity**~~ ✅ **MOOT 2026-09-14** | `RETIRE-HALVES-1` | There is no `QueueStore` to give Db parity to |
 | **Measure rules in the authoring form** | `AlertRule` has `dataset` + `measure`; `ALERT_RULE_ATTRIBUTES` has neither | The 2026-09-06 widening is TOON-only; the pane cannot express the glossary's own definition |
 | **`JOB-01` / `JOB-03` promise Personal three ops jobs** | `OpsJobTypes`, `OpsMaintenanceTasks` in `inspecto-ops` | Corrected in `EDITIONS.md` with this spec (notes on both rows) — recorded here because it is the cell-7 miss class, and the next gating cell will hit it again |
 | **`ChannelConfig.template`** — a destination cannot override the rule-level template | `events-metrics.md` "still open"; the plan it rode is archived | The slice's home (`event-signal-backbone-plan` S2) is in the archive and no row survived it |
@@ -669,9 +669,9 @@ contents, merge, create contract, linking, postmortem, tagging); `alerts.compone
 ### 8.5 Runnable examples
 
 Committed config exercising the chain, all under `spaces/demo/config/` (mirrored in `inspecto-deploy/`):
-two Alert Rules (`orders/orders_stream_failures_alert.toon`, `orders_volume_alert.toon`), one queue
-(`ops/demo_ops_queue.toon`), one escalation policy (`ops/sla_escalation.toon`), one RCA template
-(`ops/orders_rca.toon`). ⚠ **Zero committed Case Rules, Tag Rules, notification rules or channel
+two Alert Rules (`orders/orders_stream_failures_alert.toon`, `orders_volume_alert.toon`), one RCA
+template (`ops/orders_rca.toon`). ⛔ `ops/demo_ops_queue.toon` no longer exists — deleted 2026-09-14 with the capability (`RETIRE-HALVES-1`).
+⛔ `ops/sla_escalation.toon` no longer exists either, deleted in the same change. ⚠ **Zero committed Case Rules, Tag Rules, notification rules or channel
 destinations**, and — by decision — no scheduled `incident_purge`.
 
 ### 8.6 Guards
@@ -687,7 +687,6 @@ baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guard
 | Gap | Evidence |
 |---|---|
 | **No test exercises Diagnosis → Incident** | there is no such path to test (§3.9) |
-| **No queue-store parity test** | `InMemoryQueueStore` is the only implementation |
 | **No test that a Personal bundle answers all 49 object paths `503`** | `AbsentObjectRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
 | **`mail.send` on a transport-less bundle has no failing test** | its success is the recorded behaviour |
 | **No end-to-end SMTP or webhook delivery against a real endpoint** | both transports are tested against in-process fakes; delivery-status webhooks against synthetic signatures |

@@ -144,10 +144,11 @@ public final class EventType {
     public static final String OBJECT_LINKED = "OBJECT_LINKED";
     /** A note was added to an object — a comment or an attachment reference ({@code noteKind} attr) (Phase 4). */
     public static final String OBJECT_NOTE = "OBJECT_NOTE";
-    /** An object was (re)assigned to a person or routed through a queue (INC-4); {@code from}/{@code to}/
-     *  {@code queue} attrs carry the change — the assignment history parallel to {@link #OBJECT_ACTIVITY}. */
+    /** An object was (re)assigned to a person; {@code from}/{@code to} attrs carry the change — the
+     *  assignment history parallel to {@link #OBJECT_ACTIVITY}. */
     public static final String OBJECT_ASSIGNED = "OBJECT_ASSIGNED";
-    /** An SLA-breached INCIDENT was escalated per an {@code *_escalation.toon} policy (INC-4) — severity
-     *  bumped and/or re-routed to a queue; {@code severity}/{@code queue}/{@code assignee} carry the result. */
+    /** An SLA-breached INCIDENT was escalated. ⛔ RETIRE-HALVES-1 retired the escalation engine, so
+     *  nothing emits this any more; the constant stays because {@code EventType} is {@code @PublicApi}
+     *  and stored events from before the retirement still carry the type. */
     public static final String OBJECT_ESCALATED = "OBJECT_ESCALATED";
 }

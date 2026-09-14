@@ -98,7 +98,7 @@ column**; this table mirrors it.
 1. ⚠ **`CP-01` (Control API v1) is ✅ for Personal, and five route families answer `503` there.** Both are
    true: the *transport* — envelope, errors, correlation, gzip, ETags, cursors — is edition-neutral core;
    the *route inventory* is not. Geo/link (5 paths), exchange (11), `/metrics` exposition, `/events*` and
-   ~49 `/objects|/notes|/queues|/tags` paths are optional modules since EDG-01 (2026-09-07/08) and answer
+   ~46 `/objects|/notes|/tags` paths are optional modules since EDG-01 (2026-09-07/08) and answer
    `503 CAPABILITY_UNAVAILABLE` naming the module — never `404`. A gateway handed `openapi-v1.json` is
    handed neither the stubs nor the module paths (§5).
 2. ⚠ **The contract's own rules and the pending MAJOR disagree on what "breaking" means.** `docs/api/README.md`

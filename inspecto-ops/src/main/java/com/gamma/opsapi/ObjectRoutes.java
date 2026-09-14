@@ -59,9 +59,6 @@ public final class ObjectRoutes implements RouteModule {
         api.post("/objects/([^/]+)/resolve", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, api.body(e))));
         api.post("/objects/([^/]+)/transition", scoped(api, (e, m) -> transitionFromBody(api, ApiContext.name(m), api.body(e))));
         api.post("/objects/([^/]+)/assign", scoped(api, (e, m) -> assign(api, ApiContext.name(m), api.body(e))));
-        api.post("/objects/([^/]+)/watch", scoped(api, (e, m) -> setWatch(api, ApiContext.name(m), api.body(e), true)));
-        api.post("/objects/([^/]+)/unwatch", scoped(api, (e, m) -> setWatch(api, ApiContext.name(m), api.body(e), false)));
-        api.get("/objects/([^/]+)/watchers", scoped(api, (e, m) -> watchersOf(api, ApiContext.name(m))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/links", scoped(api, (e, m) -> toLinkMaps(OpsEngine.of(api).linksOf(ApiContext.name(m)))));
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
@@ -509,7 +506,7 @@ public final class ObjectRoutes implements RouteModule {
         for (String member : members) requireVisible(api, ex, member);
         return RouteErrors.mapCaseErrors(() -> {
             var result = OpsEngine.of(api).splitCase(caseId, title, members,
-                    ApiContext.str(body, "assignee"), ApiContext.str(body, "queue"), ApiContext.str(body, "actor"));
+                    ApiContext.str(body, "assignee"), ApiContext.str(body, "actor"));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("case", result.part().toMap());
             out.put("membersMoved", result.membersMoved());
@@ -625,18 +622,14 @@ public final class ObjectRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /objects/{id}/assign} (INC-4) — assign to a person or route through a queue: body
-     * {@code {assignee?|queue?, actor?}}. An explicit {@code assignee} wins; else the {@code queue}'s router
-     * picks a member. Missing both → 400; unknown object/queue → 404; an unroutable queue (empty / manual
-     * without an assignee) → 422.
+     * {@code POST /objects/{id}/assign} — assign to a person: body {@code {assignee, actor?}}.
+     * A missing assignee → 400; an unknown object → 404.
      */
     private Object assign(ApiContext api, String id, Map<String, Object> body) {
         String assignee = ApiContext.str(body, "assignee");
-        String queue = ApiContext.str(body, "queue");
-        if (assignee == null && queue == null)
-            throw new ApiException(400, "body must include 'assignee' or 'queue'");
+        if (assignee == null) throw new ApiException(400, "body must include 'assignee'");
         return RouteErrors.mapCaseErrors(
-                () -> OpsEngine.of(api).assign(id, assignee, queue, ApiContext.str(body, "actor")).toMap());
+                () -> OpsEngine.of(api).assign(id, assignee, ApiContext.str(body, "actor")).toMap());
     }
 
     /**
@@ -685,24 +678,6 @@ public final class ObjectRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, bad.getMessage());
         }
-    }
-
-    /** {@code POST /objects/{id}/watch|unwatch} (INC-4) — subscribe/unsubscribe a watcher; body {@code {user}}. */
-    private Object setWatch(ApiContext api, String id, Map<String, Object> body, boolean add) {
-        String user = ApiContext.str(body, "user");
-        if (user == null) throw new ApiException(400, "body must include 'user'");
-        try {
-            return (add ? OpsEngine.of(api).watch(id, user)
-                        : OpsEngine.of(api).unwatch(id, user)).toMap();
-        } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
-        }
-    }
-
-    /** {@code GET /objects/{id}/watchers} (INC-4) — the object's watcher list. */
-    private Object watchersOf(ApiContext api, String id) {
-        return OpsEngine.of(api).get(id).map(OperationalObject::watchers)
-                .orElseThrow(() -> new ApiException(404, "no object with id '" + id + "'"));
     }
 
     /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} from the body. */
