@@ -865,7 +865,7 @@ Work under (ii):
 > **Scope after D4a (2026-09-14) — which of the six bullets are live.**
 > | Bullet | Status |
 > |---|---|
-> | 1. `PartitionWriter` visibility strategy (`RenameReveal`/`CatalogCommit`) | ⏸ **DEFERRED** — it exists to *skip* the rename on object-store paths. With a mounted volume the rename is still correct and still wanted, so building the strategy now would add a seam with one implementation |
+> | 1. `PartitionWriter` visibility strategy (`RenameReveal`/`CatalogCommit`) | ✅ **BUILT 2026-09-14, verified against a live object store.** `PartitionWriter.writeProjected` dispatches on `PathJail.isUri(databaseDir)` to a private `writeToObjectStore`; the local lane is byte-for-byte untouched. ⛔ **Not** an interface — two private call sites, so a strategy type would be the "seam with one implementation" this row warned about, spelled differently. ⚠ It is reachable only by a caller holding a store-configured `Connection`; `dirs.database` still refuses a URI, so nothing in production reaches it until the credentials decision lands |
 > | 2. Double-registration guard | ✅ **SHIPPED** — `DuckLakeRegistrationSiteContractTest` |
 > | 3. Disable data inlining | ✅ **SHIPPED 2026-09-14** (`038447c2`) — measured with a control pair |
 > | 4. Registrar: sidecar → commit step; `ducklake:postgres:`; failure fatal | ✅ **SHIPPED** — D10 fatal (`dfe773bc`), catalog spelling proven + guarded (`038447c2`), and registration **mandatory when partitioned** (operator 2026-09-14): `enabled: false` or no block at all now fails, because D10 closed the path where registration FAILS and left open the path where it is never ATTEMPTED. 🔴 **Half an invariant — see the graph-lane row below** |
@@ -920,8 +920,19 @@ Work under (ii):
 >   the local lane's stable `<baseName>_out.<ext>` name**. ⛔ That is a semantic difference, not a naming
 >   detail: re-running a batch is idempotent locally and additive on the object store.
 > ⚠ **Every one of these figures came from a MinIO started ad hoc on one workstation.** It is declared in
-> `dev-infra/docker-compose.yml` as of 2026-09-14 so the next shift can reproduce them; nothing in the
-> test suite exercises it yet.
+> `dev-infra/docker-compose.yml` as of 2026-09-14 so the next shift can reproduce them.
+>
+> ✅ **And they are now pinned by an executable test, not just written down.**
+> `PartitionWriterObjectStoreTest` (4 tests) ran **green against the live MinIO** — a partitioned write
+> reporting one sized `PartitionOutput` per object with all rows readable back, the accumulate-not-replace
+> behaviour, the unpartitioned E1 shape, and the absence of any `.staging`/`.tmp` debris. It **SKIPS**
+> without `INSPECTO_TEST_S3_ENDPOINT`/`_KEY`/`_SECRET`, like `PostgresStateStoreTest` does without
+> Postgres. 🔴 **A skip is not a pass** — this repo has had a suite skip for months while hiding a broken
+> classpath, so the class was run green before it was committed, and a shift that has only seen it skip
+> has learned nothing from it. Mutation-verified: disabling the dispatch turns all four red.
+> ⚠ The mutant's failure *mode* is platform-dependent even though its verdict is not — on Windows the
+> local lane throws `InvalidPathException`, on Linux it would quietly write to a local `s3:` directory and
+> fail on the assertions instead. Same divergence the URI refusal exists for.
 >
 > ✅ **What DID ship from this grounding — a fail-closed refusal, because the status quo was worse than
 > "unsupported".** 🔴 `Paths.get` answers this **differently per platform**, and the divergence favours the

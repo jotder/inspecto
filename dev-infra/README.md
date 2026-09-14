@@ -1,6 +1,6 @@
 # `dev-infra/` — the local services the skipping test suites need
 
-Two suites in this repo **skip** unless a real backing service is running, and a skip is not a pass. This
+Three suites in this repo **skip** unless a real backing service is running, and a skip is not a pass. This
 directory exists so each shift gets the same services instead of re-deriving them, and so the commands
 that turn those suites on are written down — several are not guessable and cost a run each to find.
 
@@ -31,7 +31,7 @@ Three traps, each of which cost a run on 2026-09-12:
    `TimeZone.getDefault().getID()` as a startup parameter, so the handshake dies with *invalid value for
    parameter "TimeZone"*. ⚠ The fix must preserve the **offset** — `Asia/Kolkata`, never `UTC`, which
    would move `record_day` boundaries and change what the assertions mean.
-3. 🔴 **`-DforkCount=0` is load-bearing** *for the `MAVEN_OPTS` route. The parent POM's surefire config is
+3. 🔴 **`-DforkCount=0` is load-bearing** for the `MAVEN_OPTS` route. The parent POM's surefire config is
    `<argLine>@{argLine} …</argLine>`, and that late-bound `@{argLine}` resolves the *project* property —
    a command-line `-DargLine` does not override it, so nothing you pass that way reaches a forked JVM.
    Running in the Maven JVM is what lets `MAVEN_OPTS` apply.
@@ -132,13 +132,26 @@ Console: <https://localhost:9443/console> (`admin` / `admin`).
 
 ---
 
-## MinIO — the object store for scale-out phase C
+## MinIO — `PartitionWriterObjectStoreTest` (4 tests)
 
-⚠ **No test uses this yet, and that is the point of writing it down.** Every object-store measurement in
-the scale-out plan §5.4 was taken against a MinIO started ad hoc with `docker run`, on one workstation,
-with no compose project label and no mention in this repo. It is declared in `docker-compose.yml` as of
-2026-09-14 so the numbers are reproducible; ⛔ **treat any earlier object-store figure as unreplicated
-until it has been re-taken against this service.**
+```bash
+docker exec minio mc alias set local http://127.0.0.1:9000 minioadmin minioadmin
+docker exec minio mc mb -p local/inspecto-lakehouse
+
+INSPECTO_TEST_S3_ENDPOINT=127.0.0.1:9000 \
+INSPECTO_TEST_S3_KEY=minioadmin INSPECTO_TEST_S3_SECRET=minioadmin \
+mvn -o -B test -pl inspecto-etl -am \
+    -Dtest=PartitionWriterObjectStoreTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+⚠ **Create the bucket first — DuckDB will not**, and the failure reads as a credentials problem.
+⚠ The suite SKIPS all 4 without those three variables, and **a skip is not a pass**: it was run green
+on 2026-09-14 against this service.
+
+⚠ Every object-store measurement in the scale-out plan §5.4 was originally taken against a MinIO started
+ad hoc with `docker run`, on one workstation, with no compose project label and no mention in this repo.
+It is declared in `docker-compose.yml` as of 2026-09-14 so the numbers are reproducible; ⛔ **treat any
+earlier object-store figure as unreplicated until it has been re-taken against this service.**
 
 Console: <http://localhost:9001> (`minioadmin` / `minioadmin`). S3 API on `127.0.0.1:9000`, loopback only.
 
