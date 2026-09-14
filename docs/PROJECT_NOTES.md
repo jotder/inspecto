@@ -481,8 +481,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   never through aggregation, and `asn-parser/asn-decoders/pom.xml` is a separate root the reactor merely
   aggregates. A tenth of the codebase sat outside a "repo-wide" number while `mvn -Pcoverage` exited 0.
 
-  ⚠ **`node tools/check-sbom-modules.mjs` joined 2026-09-09** (`f2eaeec8`), bringing `ci.yml` to **six**
-  pure-Node guards that run before the JDK is even set up, plus the two Maven-dependent ones above. It
+  ⚠ **`node tools/check-sbom-modules.mjs` joined 2026-09-09** (`f2eaeec8`). 🔴 **This sentence said it
+  brought `ci.yml` to "six" pure-Node guards; it was wrong when written** — there were ten, and the number
+  had simply not been recounted. Measured 2026-09-14 by listing the steps: **twelve** pure-Node guard steps
+  run before the JDK is even set up, plus the two Maven-dependent ones above, plus the `launchers-windows`
+  job. ⛔ Never increment a count in prose — list the steps and count them, which is the same rule
+  `check-doc-counts.mjs` enforces on product counts and cannot enforce here. It
   holds the shipped bill of materials' first-party module set against `inspecto/package.ps1` — which
   enumerates the staged jars **three** times (`$modules`, the `Copy-Item` staging steps, the boot-smoke
   classpath) — and fails if any two disagree. It exists because the generator's table said four artifacts

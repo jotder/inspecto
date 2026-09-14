@@ -105,17 +105,20 @@ sentence this whole area turns on: **a clean run says nothing about what it decl
 
 ### 3.2 The guard roster
 
-This is the inventory that existed nowhere. **Twelve guard scripts, plus two inline pipeline checks** —
-ten under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
+This is the inventory that existed nowhere. **Fourteen guard scripts, plus two inline pipeline checks** —
+eleven under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
 `check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-coverage` · `check-dependencies` ·
-`check-sbom-modules`), one under the client tree (`inspecto-ui/tools/check-design-tokens.mjs`), and the
-processor board's `--check` mode (`tools/render-processor-board.mjs`).
+`check-sbom-modules` · `check-launchers`), one under the client tree
+(`inspecto-ui/tools/check-design-tokens.mjs`), and two `--check` modes of scripts that are not themselves
+guards (`tools/render-processor-board.mjs`, `tools/fetch-duckdb-extensions.mjs`).
 
 🔴 **This count read "nine scripts" until 2026-09-10 and the roster was already missing two of them** —
 the **citation** and **doc-count** guards, both wired in *both* pipelines and both absent from the table
 below. An inventory whose own purpose is to end "the roster existed nowhere" had drifted within a day of
 being written, which is the reason the count is now spelled out artifact by artifact rather than
-summarised.
+summarised. ⚠ **And it drifted again**: it read "twelve" until 2026-09-14, having missed the DuckDB
+extension guard wired on 2026-09-14 (`fetch-duckdb-extensions --check`). ⛔ Wiring a `ci.yml` guard step
+is not done until it has a row here — the roster is the artifact, not the wiring.
 
 | Guard | Reads | Deliberately does not read | Waivers | Exit discipline | Wired |
 |---|---|---|---|---|---|
@@ -131,6 +134,8 @@ summarised.
 | **Citations** | Every path and renamed type named in current markdown | The archive tier and the in-flight plan tier **as sources**; 🔴 **all source files** — a javadoc may cite a moved path freely (§3.3) | Absence stated on the citing line; a rename recorded with its replacement on the same line | 0 / 1 | pipeline + hook |
 | **Doc counts** | Marked count statements against the contract that derives each number | Anything unmarked | **None by construction** | 0 / 1, with a per-id floor | pipeline + hook |
 | **NUL bytes** | Every tracked file whose extension is text (3,693 of them) | Tracked non-text extensions; untracked files | None | 0 / 1, naming file and line | pipeline + hook |
+| **DuckDB extensions** | `$duckdbExtNames` and the platform list, read out of `package.ps1`; a HEAD per file the release would fetch | Whether the fetched binary loads; every other staged artifact | None. An unreadable variable **aborts** rather than passing with an empty list | 0 / 1 / **2 when it cannot read the list** | pipeline only |
+| **Launchers** | The `$serveShContent` / `$serveBatContent` here-strings, **executed** over stub jars with a stub `java` first on PATH — five edition scenarios, argv asserted | `run.sh`/`run.bat`/`ura.sh`/`ura.bat` (no edition branch, no auth flags); whether the server then *enforces* what the flag declares | None. A renamed here-string **aborts**; there is no skip path — absent `bash` is a hard error | 0 / 1 / **2 when it cannot run** | pipeline (Linux: `serve.sh` executed, `serve.bat` static) **+ a second Windows job where `serve.bat` is executed** |
 | Lean-core boundary | Source grep **and** the resolved dependency tree | — | None | fails on either | pipeline | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
 | Retired branches + commit subjects | The event payload; the push or request range | — | None | fails per offending subject | branch policy |
 

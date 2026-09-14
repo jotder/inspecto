@@ -11,18 +11,24 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **57 rows: 0 × P1 · 34 × P2 · 23 × P3.**
+> text). **56 rows: 0 × P1 · 33 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
+> `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.)
 >
 > ✅ **No P1 rows. `AIRGAP-EXTENSIONS-CI-1` was filed AND closed on 2026-09-14** — no released bundle had
 > ever carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a
 > local cache and no workflow populated one. Closed by a per-platform fetch step, `-RequireExtensions` on
 > the release path, and a `--check` guard on every push.
 > ⚠ **Three rows opened and closed the same day**, all out of scale-out §5.4: that one, plus
-> `AIRGAP-DUCKLAKE-PG-1` and `DUCKLAKE-GRAPH-LANE-1`. The P2 count therefore moves 36 → 35 on net.
+> `AIRGAP-DUCKLAKE-PG-1` and `DUCKLAKE-GRAPH-LANE-1`, so the P2 count moved far less than the activity did.
+> 🔴 **The surrounding prose said "36 → 35" and "the 36 P2 rows" while the header said 34** — three numbers
+> for one count, none recounted. ⛔ **Count the rows, do not carry a number forward**: the P2/P3 totals are
+> `grep -cE '^- \*\*P2\*\*'` / `grep -cE '^- \*\*P3( |\*)'` between the §3 and §6 headings, and nothing else
+> is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
+> `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
+> ⚠ **Only the 33 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 59 as pending work overstates what is owed by roughly 40%.
+> down. Reading all 56 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -542,17 +548,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first install where hand-edited policy TOON goes wrong. ⚠ The
   read-only Policies tab and the "why denied?" endpoint already make such a mistake diagnosable, which is what
   bounds the cost of waiting. · **Security: policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility, "why denied?" endpoint and read-only Policies tab already shipped). Non-blocking. → `okf/backend/editions/auth-security.md`
-- **P2** · **`LAUNCHER-GUARD-1` — nothing executes an emitted launcher, and that is how `SERVEBAT-OPTS-1`
-  shipped.** `serve.bat` spent its life dropping `-Dauth.mode=oidc` on every Windows Standard/Enterprise
-  bundle (cmd.exe expands `%OPTS%` in a parenthesised block at PARSE time, so five of six `set` statements
-  were discarded) — the service booted **auth-free** while printing `edition: Enterprise`. Fixed 2026-09-11;
-  the *gap* is not. `security.md` §8.7 has listed "`authMode` ↔ enforcement coupling has no test" for
-  months, and the only evidence today is a by-hand `cmd.exe` run, so an identical regression would be just
-  as silent — on the platform CI never exercises. Fix: a guard that extracts the `$serveShContent` /
-  `$serveBatContent` here-strings from `inspecto/package.ps1`, runs each over stub jars with the launch line
-  stubbed, and asserts the emitted flag set per edition (Personal: no `auth.mode`, no `events.backend`;
-  Standard+: both). ⚠ The `.bat` half only proves anything on a Windows runner. Filed 2026-09-11.
-  → `okf/capabilities/security/security.md` §2.2, §8.7
 - **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first operator who promotes two Breaks on one key and
   finds only one Incident. · **`BREAK-DEDUPE-GRAIN-1` — the server dedupes promotion on `key` alone, but a
   Break's identity includes its COLUMN** (filed 2026-09-13 while shipping `BREAK-INCIDENT-RESOLVE-1`;
