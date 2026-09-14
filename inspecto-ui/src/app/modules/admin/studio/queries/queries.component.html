@@ -215,6 +215,35 @@
     }
 
     @if (!editing()) {
+        <!-- Result of running a SAVED query server-side. Distinct from the editor's draft preview above:
+             this is what the stored query actually does, parameters resolved and SQL gated by the engine. -->
+        @if (savedRun(); as r) {
+            <div class="bg-card mt-6 flex flex-col gap-3 rounded-2xl p-5 shadow">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-lg font-semibold">
+                        Ran <span class="font-mono">{{ r.id }}</span> on the server
+                    </h2>
+                    <button mat-icon-button (click)="clearSavedRun()" matTooltip="Close" aria-label="Close result">
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+                @if (r.error) {
+                    <inspecto-alert variant="error" icon="heroicons_outline:exclamation-triangle">{{
+                        r.error
+                    }}</inspecto-alert>
+                } @else {
+                    <div class="text-secondary flex flex-wrap items-center gap-2 text-sm">
+                        <span class="text-default font-medium">{{ r.rowCount }} rows</span>
+                        <span>· {{ r.elapsedMs }} ms</span>
+                        @if (r.truncated) {
+                            <span>· first page only — the result was truncated</span>
+                        }
+                    </div>
+                    <inspecto-data-table tier="standard" [rows]="r.rows" stateKey="query-run" />
+                }
+            </div>
+        }
+
         @if (!loading() && queries().length === 0) {
             <inspecto-empty-state
                 class="mt-8 block"
@@ -244,6 +273,24 @@
                                     <span>· {{ q.parameters.length }} params</span>
                                 }
                             </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1">
+                            <!-- Running a STORED query is an operational read, not authoring, so it is
+                                 deliberately outside the canAuthor() gate below: a Business-lens user may
+                                 run a query they may not edit. -->
+                            <button
+                                mat-icon-button
+                                (click)="runSaved(q)"
+                                [disabled]="runningSaved() === q.id"
+                                matTooltip="Run on the server"
+                                [attr.aria-label]="'Run query ' + q.id + ' on the server'"
+                            >
+                                @if (runningSaved() === q.id) {
+                                    <mat-spinner diameter="18" />
+                                } @else {
+                                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
+                                }
+                            </button>
                         </div>
                         @if (canAuthor()) {
                             <div class="flex flex-wrap items-center gap-1">

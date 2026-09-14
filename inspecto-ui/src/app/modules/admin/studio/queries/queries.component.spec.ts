@@ -1,11 +1,14 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { LensService } from 'app/inspecto/api';
+import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
@@ -40,17 +43,30 @@ function rowsSeam() {
     return { rows, sql };
 }
 
-function create(queries: Query[] = [Q], dialogResult: unknown = true, seam = rowsSeam()) {
+/** One server-run result in the shape `POST /queries/{id}/run` returns. */
+const RUN_RESULT = {
+    resultSet: { columns: [{ name: 'cost_usd', type: 'number' }], rowCount: 2 },
+    rows: [{ cost_usd: 4 }, { cost_usd: 9 }],
+    statistics: { rowCount: 2, elapsedMs: 7, truncated: false },
+};
+
+function create(
+    queries: Query[] = [Q],
+    dialogResult: unknown = true,
+    seam = rowsSeam(),
+    opts: { run?: ReturnType<typeof vi.fn>; canAuthor?: boolean } = {},
+) {
     const save = vi.fn((q: Query) => of(q));
     const remove = vi.fn(() => of(null));
     const list = vi.fn(() => of(queries));
+    const run = opts.run ?? vi.fn(() => of(RUN_RESULT));
     const dialogOpen = vi.fn(() => ({ afterClosed: () => of(dialogResult) }));
     TestBed.configureTestingModule({
         imports: [QueriesComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: QueriesService, useValue: { list, get: () => of(Q), save, remove } },
+            { provide: QueriesService, useValue: { list, get: () => of(Q), save, remove, run } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: DatasetRowsService, useValue: seam },
             {
@@ -58,12 +74,20 @@ function create(queries: Query[] = [Q], dialogResult: unknown = true, seam = row
                 useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
             },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
+            // The server-run result mounts a real <inspecto-data-table>, whose theme service walks up to
+            // GAMMA_APP_CONFIG — absent in a TestBed. Stub the theme, as the data-table's own spec does.
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+            // Only stubbed when a test cares: the component reads `canAuthorWorkbench` as a signal, so a
+            // plain callable is enough and avoids pulling SessionService's authMode/capabilities in.
+            ...(opts.canAuthor === undefined
+                ? []
+                : [{ provide: LensService, useValue: { canAuthorWorkbench: () => opts.canAuthor } }]),
         ],
     });
     // The embedded `<inspecto-query-panel>` mounts `<inspecto-data-table>`, which injects the real
     // MatDialog — a plain `{provide: MatDialog, ...}` above is silently ignored, so it must be overridden.
     TestBed.overrideProvider(MatDialog, { useValue: { open: dialogOpen } });
-    return { fixture: TestBed.createComponent(QueriesComponent), save, remove, list, dialogOpen, seam };
+    return { fixture: TestBed.createComponent(QueriesComponent), save, remove, list, dialogOpen, seam, run };
 }
 
 describe('QueriesComponent (R3)', () => {
@@ -271,6 +295,79 @@ describe('QueriesComponent (R3)', () => {
         expect(c.form.controls.text.value).toContain('cost_usd > 100');
         // Nothing saved — the operator still presses the existing Save (D2).
         expect(save).not.toHaveBeenCalled();
+    });
+
+    it('runs a SAVED query through the server route and renders its rows', async () => {
+        const { fixture, run } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+
+        c.runSaved(Q);
+        fixture.detectChanges();
+
+        // The id is what addresses the stored query — the draft preview seam must not be involved.
+        expect(run).toHaveBeenCalledWith('recent');
+        expect(c.savedRun()?.rowCount).toBe(2);
+        expect(c.savedRun()?.elapsedMs).toBe(7);
+        expect(c.runningSaved()).toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-data-table')).toBeTruthy();
+        // The result panel is a whole new region on the page — cover it, not just the empty list.
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    /**
+     * ⚠ A 422 here is a REFUSAL with a reason — a non-sql query, a failed SQL safety check, an
+     * unresolvable parameter — and the operator has to read it. A toast that scrolls away, or a silent
+     * empty grid, both lose the one thing the server took the trouble to say.
+     */
+    it('renders a refusal in place instead of an empty result', () => {
+        // ⚠ A real HttpErrorResponse — `apiErrorMessage` returns the fallback for a plain object, so a
+        // hand-rolled stub silently asserts the wrong string (it did, first time round).
+        // ⚠ And the v1 envelope this route ACTUALLY sends, captured from the live backend on
+        // 2026-09-14: `{error: {errorCode, message, recoverable, correlationId}}`. ⛔ Not the legacy
+        // `{error: '<message>'}` that `ControlApi`'s raw error boundary constructs — `apiErrorMessage`
+        // happens to read both, so pinning the wrong one passes while describing a response nobody
+        // sends.
+        const err = new HttpErrorResponse({
+            status: 422,
+            error: {
+                error: {
+                    errorCode: 'CONFIG_VALIDATION_FAILED',
+                    message: "only type:sql queries run server-side today (got 'structured')",
+                },
+            },
+        });
+        const { fixture } = create([Q], true, rowsSeam(), { run: vi.fn(() => throwError(() => err)) });
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+
+        c.runSaved(Q);
+        fixture.detectChanges();
+
+        expect(c.savedRun()?.error).toContain('only type:sql');
+        expect(c.savedRun()?.rows).toEqual([]);
+        expect(c.runningSaved()).toBeNull();
+        // The reason is on screen, not just in the signal.
+        expect(fixture.nativeElement.querySelector('inspecto-alert')?.textContent).toContain('only type:sql');
+        expect(fixture.nativeElement.querySelector('inspecto-data-table')).toBeFalsy();
+    });
+
+    /**
+     * 🔴 Running a stored, read-only query is an OPERATIONAL action, so it must survive the authoring
+     * gate — the skill's rule is to gate config authoring only. ⛔ This is the assertion that fails if
+     * someone "tidies" the Run button inside the neighbouring `@if (canAuthor())` block, which is where
+     * every other action on the row lives.
+     */
+    it('offers Run without authoring capability, while Edit and Delete disappear', () => {
+        const { fixture } = create([Q], true, rowsSeam(), { canAuthor: false });
+        fixture.detectChanges();
+
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('button[aria-label]')).map((b) =>
+            (b as HTMLElement).getAttribute('aria-label'),
+        );
+        expect(labels).toContain('Run query recent on the server');
+        expect(labels).not.toContain('Edit query');
+        expect(labels).not.toContain('Delete query');
     });
 
     it('ignores a draft with no SQL text', () => {

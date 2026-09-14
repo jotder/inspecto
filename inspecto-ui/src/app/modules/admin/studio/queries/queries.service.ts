@@ -1,8 +1,24 @@
 import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
-import { ComponentsService } from 'app/inspecto/api';
+import { ComponentsService, apiUrl } from 'app/inspecto/api';
 import { ParameterDef, QueryModel } from 'app/inspecto/query';
 import { Query, QueryConfig, QueryType } from './query-types';
+
+/**
+ * The Result Set contract `POST /queries/{id}/run` shares with `POST /bi/query`.
+ *
+ * <p>⚠ Deliberately NOT reusing `BiQueryResult`: that one carries a `sql` field this route does not
+ * return, and the columns here carry `cardinality`. Declaring the shape a route actually sends beats
+ * borrowing a near-neighbour and reading a field that is always undefined.
+ */
+export interface QueryRunResult {
+    resultSet: { columns: { name: string; type: string; role?: string; cardinality?: number }[]; rowCount: number };
+    rows: Record<string, unknown>[];
+    statistics: { rowCount: number; elapsedMs: number; truncated: boolean };
+    renderings?: unknown;
+    exportOptions?: string[];
+}
 
 /**
  * Query store — persists {@link Query}s through the component registry as the `query` component type
@@ -12,6 +28,27 @@ import { Query, QueryConfig, QueryType } from './query-types';
 @Injectable({ providedIn: 'root' })
 export class QueriesService {
     private components = inject(ComponentsService);
+    private http = inject(HttpClient);
+
+    /**
+     * Run a SAVED query server-side — the engine resolves its declared `$params`, safety-gates the SQL
+     * and executes it against the dataset's trusted relation.
+     *
+     * <p>⚠ This is a different thing from the editor's Run, and the difference is not cosmetic. The
+     * editor previews an **unsaved draft** through `DatasetRowsService`, resolving parameters in the
+     * browser — it has to, because a draft has no id to address. This runs **what is stored**, so it is
+     * the only path that proves what the query will do when a job or a dashboard runs it.
+     *
+     * <p>⚠ Refusals are 422 and meaningful: a non-`sql` query, a query with no `text`, a failed SQL
+     * safety check (carrying `findings`), or an unresolvable parameter. Surface the message; do not
+     * retry.
+     */
+    run(
+        id: string,
+        body?: { limit?: number; offset?: number; parameters?: Record<string, unknown> },
+    ): Observable<QueryRunResult> {
+        return this.http.post<QueryRunResult>(apiUrl(`/queries/${encodeURIComponent(id)}/run`), body ?? {});
+    }
 
     list(): Observable<Query[]> {
         return this.components.list('query').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));

@@ -40,6 +40,7 @@ import { Query, QueryType, buildQuery } from './query-types';
 import { QueriesService } from './queries.service';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import './query.kind'; // ensure the query kind is registered
 
 /** The default (empty) structured model — a fresh Query Core builder state. */
@@ -50,6 +51,23 @@ function emptyModel(): QueryModel {
 // The Show-Me recommender (used in the preview) scores against the registered viz plugins; register the
 // built-ins here so the Query Library works standalone (guarded — no-op if the widgets feature loaded first).
 registerBuiltinViz();
+
+/**
+ * The outcome of running a SAVED query on the server.
+ *
+ * <p>⚠ Deliberately not folded into {@link PreviewState}. That one describes a draft the browser
+ * resolved and holds a `resolvedSql` this route never returns — reusing it would mean rendering a
+ * "Resolved SQL" line carrying the STORED text, which is not what ran once the server substituted
+ * parameters. Saying less is better than showing a plausible wrong thing.
+ */
+interface SavedRunState {
+    id: string;
+    rows: Record<string, unknown>[];
+    rowCount: number;
+    elapsedMs: number;
+    truncated: boolean;
+    error?: string;
+}
 
 /** The outcome of a preview run — the resolved SQL, plus (on success) the described result set. */
 interface PreviewState {
@@ -97,6 +115,7 @@ function tokenName(raw: string): string {
         StatusBadgeComponent,
         QueryPanelComponent,
         AiAssistComponent,
+        DataTableComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './queries.component.html',
@@ -125,6 +144,10 @@ export class QueriesComponent implements OnInit {
     readonly writesDisabled = signal(false);
     readonly running = signal(false);
     readonly preview = signal<PreviewState | null>(null);
+
+    /** The id currently running server-side, so only that row's button shows a spinner. */
+    readonly runningSaved = signal<string | null>(null);
+    readonly savedRun = signal<SavedRunState | null>(null);
 
     readonly form = this.fb.group({
         name: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],
@@ -250,6 +273,56 @@ export class QueriesComponent implements OnInit {
     cancel(): void {
         this.editing.set(false);
         this.preview.set(null);
+    }
+
+    /**
+     * Run a SAVED query through `POST /queries/{id}/run` and show its rows.
+     *
+     * <p>⚠ This is the ONLY path in the app that exercises what is stored. The editor's Run previews an
+     * unsaved draft through the `/db/*` browser and resolves `$params` in the browser, so a query could
+     * preview green and still fail the moment a job ran it — the server gates the SQL and resolves the
+     * parameters itself. Until this existed the route had no client at all.
+     *
+     * <p>⚠ Deliberately NOT gated on {@link canAuthor}: running a stored read-only query is an
+     * operational action, and the skill's rule is to gate config authoring only. A Business-lens user
+     * may run one and may not edit it.
+     *
+     * <p>⚠ A 422 is a refusal with a reason — a non-`sql` query, a failed safety check, an unresolvable
+     * parameter — so it is rendered in place rather than toasted away.
+     */
+    runSaved(q: Query): void {
+        this.runningSaved.set(q.id);
+        this.queriesApi
+            .run(q.id)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (res) => {
+                    this.savedRun.set({
+                        id: q.id,
+                        rows: res.rows ?? [],
+                        rowCount: res.statistics?.rowCount ?? res.rows?.length ?? 0,
+                        elapsedMs: res.statistics?.elapsedMs ?? 0,
+                        truncated: res.statistics?.truncated ?? false,
+                    });
+                    this.runningSaved.set(null);
+                },
+                error: (err: unknown) => {
+                    this.savedRun.set({
+                        id: q.id,
+                        rows: [],
+                        rowCount: 0,
+                        elapsedMs: 0,
+                        truncated: false,
+                        error: apiErrorMessage(err, 'The query did not run'),
+                    });
+                    this.runningSaved.set(null);
+                },
+            });
+    }
+
+    /** Dismiss the server-run result panel. */
+    clearSavedRun(): void {
+        this.savedRun.set(null);
     }
 
     /** Show version history for a saved query; reload the list after a restore (MET-5). If that query is
