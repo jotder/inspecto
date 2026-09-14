@@ -1472,7 +1472,23 @@ $bundledAnyExt = $false
 # D10 makes that failure FATAL in a partitioned topology. The air-gap hole AIRGAP-EXTENSIONS-1 closed for
 # `ducklake` reopened one layer down the moment D4 chose a Postgres catalog.
 # ⚠ There is still no explicit LOAD to grep for; the run-time load is DuckLake's own, inside ATTACH.
-$duckdbExtNames = @('excel', 'ducklake', 'postgres_scanner')
+# `httpfs` + `aws` added 2026-09-14 (AIRGAP-S3-EXTENSIONS-1, operator call) for scale-out phase C
+# bullet 6, which turns `dirs.database` into an `s3://` URI. Measured against a live MinIO the same day:
+#   • an `s3://` COPY and read-back need `httpfs`, and DuckDB AUTOLOADS it -- there is no `LOAD httpfs`
+#     in this repo to grep for, and the SQL guard's refusal of that statement never fires, because
+#     autoload emits no statement. Staging is therefore the ONLY control.
+#   • `httpfs` ALONE is sufficient for an S3-compatible endpoint with EXPLICIT credentials (measured:
+#     `SET s3_access_key_id`/`s3_secret_access_key` against MinIO works with `aws` absent). `aws` buys
+#     the AWS CREDENTIAL CHAIN -- profiles, environment, IMDS -- which a real AWS deployment wants and a
+#     MinIO/on-prem one does not. ⚠ It costs 24 MB per platform on EVERY bundle; drop it first if bundle
+#     size ever becomes the binding constraint, and nothing that passes explicit keys will notice.
+# ⛔ Staging is NECESSARY, NOT SUFFICIENT, and the difference is invisible: a flat
+# `duckdb-extensions/<plat>/<name>.duckdb_extension` is reachable ONLY by `DuckDbExtension`'s explicit
+# `LOAD '<file>'`. DuckDB's AUTOLOAD ignores `-Dduckdb.extension.dir` entirely and reads its own
+# `extension_directory`, which this product never sets -- measured: autoload against the flat staged dir
+# FAILS, against a `<version>/<platform>` tree it succeeds. So every autoloaded extension needs a named
+# call site calling `DuckDbExtension.ensureLoaded`, or its staged file is dead weight.
+$duckdbExtNames = @('excel', 'ducklake', 'postgres_scanner', 'httpfs', 'aws')
 if ($duckdbExtCacheDir) {
     foreach ($plat in @('windows_amd64', 'linux_amd64')) {
         foreach ($extName in $duckdbExtNames) {
