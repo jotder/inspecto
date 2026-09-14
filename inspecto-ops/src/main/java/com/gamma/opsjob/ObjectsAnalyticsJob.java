@@ -91,13 +91,17 @@ public final class ObjectsAnalyticsJob implements Job {
         if (svc == null) svc = OpsJobTypes.engineFor(ctx);
         if (svc == null)
             throw new IllegalStateException("objects.analytics needs the space Object Engine (the inspecto-ops module's ObjectEngineProvider is not installed)");
-        String writeRoot = System.getProperty("assist.write.root");
+        // ⛔ Not the JVM-wide -Dassist.write.root: this job already knows its space (it resolves dataDir
+        // from ctx.spaceId() two lines down), and reading a server-wide registry beside a per-space data
+        // dir is exactly MATERIALIZE-SPACE-ROOT-1.
+        Path writeRoot = com.gamma.pipeline.SpaceConfigRoot.forSpace(ctx.spaceId());
         String root = dataDir == null || dataDir.isBlank()
                 ? com.gamma.ops.OpsEngineProvider.dataDirFor(ctx.spaceId()) : dataDir;
         if (root == null || root.isBlank())
             throw new IllegalStateException("objects.analytics needs a space data directory");
-        if (writeRoot == null || writeRoot.isBlank())
-            throw new IllegalStateException("objects.analytics needs -Dassist.write.root (the component registry root)");
+        if (writeRoot == null)
+            throw new IllegalStateException("objects.analytics needs a component registry for space '"
+                    + ctx.spaceId() + "'");
 
         List<ObjectType> types = types(cfg.opt("types", null));
         int retentionDays = retentionDays();
@@ -118,7 +122,7 @@ public final class ObjectsAnalyticsJob implements Job {
             parquet = storeDir.resolve("analytics_" + now.toEpochMilli() + "_out.parquet");
             writeParquet(parquet, now, rows);
             com.gamma.pipeline.ComponentStore store =
-                    new com.gamma.pipeline.ComponentStore(Path.of(writeRoot).resolve("registry"));
+                    new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
             Map<String, Object> content = new LinkedHashMap<>();
             content.put("name", CATALOG);
             content.put("physicalRef", CATALOG);

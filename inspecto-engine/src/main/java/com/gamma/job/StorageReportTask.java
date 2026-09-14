@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.config.safety.PathJail;
 import com.gamma.signal.Severity;
 import org.slf4j.Logger;
@@ -104,9 +105,10 @@ final class StorageReportTask {
      * the report.
      */
     private static void storageCatalog(JobContext ctx, String dataDir, Map<String, long[]> axes) {
-        String writeRoot = System.getProperty("assist.write.root");
-        if (dataDir == null || dataDir.isBlank() || writeRoot == null || writeRoot.isBlank()) {
-            ctx.log().info("storage_report catalog skipped (no data root / write root configured)");
+        // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
+        Path writeRoot = SpaceConfigRoot.current();
+        if (dataDir == null || dataDir.isBlank() || writeRoot == null) {
+            ctx.log().info("storage_report catalog skipped (no data root / config root for this space)");
             return;
         }
         try {
@@ -138,7 +140,7 @@ final class StorageReportTask {
                 }
             }
             com.gamma.pipeline.ComponentStore store =
-                    new com.gamma.pipeline.ComponentStore(Path.of(writeRoot).resolve("registry"));
+                    new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
             Map<String, Object> content = new LinkedHashMap<>();
             content.put("name", STORAGE_CATALOG);
             content.put("physicalRef", STORAGE_CATALOG);

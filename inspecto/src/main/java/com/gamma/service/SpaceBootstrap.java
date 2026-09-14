@@ -39,7 +39,10 @@ final class SpaceBootstrap {
         AcquisitionLedgers.register(id.value(), AcquisitionLedgers.build(ledgerUrl, id.value()));
         // Publish the component-registry root so the static ingest path can load this space's
         // Decision Rules per batch (DecisionRuleApplier).
-        com.gamma.pipeline.DecisionRules.register(id.value(), root.config().resolve("registry"));
+        // Publishes THIS space's config root for every run-time registry reader — Decision Rules and
+        // every registry-reading job type alike (MATERIALIZE-SPACE-ROOT-1). Before this, jobs read the
+        // JVM-wide -Dassist.write.root and a multi-space deployment crossed the wires.
+        com.gamma.pipeline.SpaceConfigRoot.register(id.value(), root.config());
 
         log.info("Space '{}' loaded ({} pipeline(s)) from {}",
                 id, service.pipelines().size(), root.config());

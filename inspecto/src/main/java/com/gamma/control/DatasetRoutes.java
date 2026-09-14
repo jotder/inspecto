@@ -53,21 +53,6 @@ final class DatasetRoutes implements RouteModule {
         // INSIDE the run, i.e. after a 202 had already promised the caller something.
         Path writeRoot = WriteGates.requireWriteRoot(api, "dataset materialize");
 
-        // 🔴 Gate 1b — the task cannot reach THIS space's registry. Found by driving a live multi-space
-        // server, and invisible to every unit test: `MaterializeTask` re-reads the JVM-wide
-        // `-Dassist.write.root` on the worker thread, while this route (like every control-plane route)
-        // resolves the CURRENT SPACE's config root. Where those differ the run reads one space's registry
-        // and writes the other's data dir, failing with "unknown dataset <the very id this route just
-        // resolved>" — AFTER a 202 has promised the caller a run. ⛔ Refuse instead: a 202 for a run that
-        // cannot succeed is worse than an honest refusal.
-        // ⚠ This is NOT a defect of this route. It is pre-existing and wider — `JobService:471` records
-        // that `report` and `recon.run` read the registry the same way, so every registry-reading job type
-        // is space-blind. Filed as MATERIALIZE-SPACE-ROOT-1; when that lands, DELETE this gate.
-        String jvmWriteRoot = System.getProperty("assist.write.root");
-        if (jvmWriteRoot != null && !jvmWriteRoot.isBlank()
-                && !Path.of(jvmWriteRoot).toAbsolutePath().normalize().equals(writeRoot.toAbsolutePath().normalize()))
-            throw new ApiException(503, "materialize cannot reach this space's component registry — the task "
-                    + "reads the server-wide write root, not this space's config root");
 
         // 404 — the source Dataset must exist. The task looks it up in this same store and throws at run
         // time; checking here turns that into an answer the caller can act on.

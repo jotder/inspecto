@@ -96,6 +96,16 @@ Entry points: `com.gamma.inspector.CollectorProcessor` (one-shot ETL) · `com.ga
 - **Records + sealed types**, explicit object graphs, no reflection magic. Match the surrounding style.
 - **New ControlApi route** → reuse the existing handler/scope pattern; thread `actor` through any
   state-changing action into the event/audit store; keep CORS locked to the UI origin via `-Dcontrol.cors`.
+- 🔴 **Reading the component registry at run time → `SpaceConfigRoot`, NEVER
+  `System.getProperty("assist.write.root")`.** The property is a single **JVM-wide** value; a Space's
+  config root is per-Space, and a job's `dataDir` already is. Mixing them means a run reads one Space's
+  registry while writing another's data — it fails far away, as `unknown dataset '<an id that plainly
+  exists>'`. `SpaceConfigRoot.current()` keys on the space MDC (set by both `JobService` submit paths);
+  `forSpace(id)` is for a caller that already holds an id, and is preferred there because an explicit id
+  cannot be wrong the way an unset MDC silently can. The **default** Space alone falls back to the
+  property, which is why single-Space deployments — Personal, and nearly every test — cannot expose a
+  mistake here. ⇒ **This class of bug is invisible to the whole test suite; only a multi-Space run shows
+  it** (`MATERIALIZE-SPACE-ROOT-1`, 2026-09-15: nine readers, seven migrated).
 - **Secrets** go through the `SecretsProvider` seam — never hard-code, never log. No plaintext secrets
   in `.toon` or in committed UI config.
 

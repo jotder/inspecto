@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -44,11 +45,13 @@ final class MetadataValidateTask {
 
     static JobResult run(JobContext ctx, String dataDir) {
         long t0 = System.nanoTime();
-        String writeRoot = System.getProperty("assist.write.root");
-        if (writeRoot == null || writeRoot.isBlank()) {
-            return JobResult.ok("metadata_validate: no component registry configured (-Dassist.write.root) — nothing to validate", 0L);
+        // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1). Still a no-op (not a failure)
+        // when this space has no registry: validating nothing is the honest result, as before.
+        Path writeRoot = SpaceConfigRoot.current();
+        if (writeRoot == null) {
+            return JobResult.ok("metadata_validate: no component registry for this space — nothing to validate", 0L);
         }
-        ComponentStore store = new ComponentStore(Path.of(writeRoot).resolve("registry"));
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         Map<String, List<ComponentRegistry.Component>> byType = new LinkedHashMap<>();
         int total = 0;
         // Sweep whatever this build's store manages — never a hard-coded list, so a newly widened
@@ -62,10 +65,10 @@ final class MetadataValidateTask {
         findings.addAll(com.gamma.pipeline.ComponentIntegrity.brokenRefs(byType));
         findings.addAll(com.gamma.pipeline.ComponentIntegrity.duplicates(byType));
         missingPhysical(byType.get("dataset"), dataDir, findings);
-        Set<String> pipelines = pipelineIds(Path.of(writeRoot));
+        Set<String> pipelines = pipelineIds(writeRoot);
         if (!pipelines.isEmpty()) {
             findings.addAll(com.gamma.pipeline.ComponentIntegrity.brokenPipelineRefs(byType, pipelines));
-            brokenEnrichmentRefs(Path.of(writeRoot), pipelines, findings);
+            brokenEnrichmentRefs(writeRoot, pipelines, findings);
         }
         if (ctx != null) {
             for (String f : findings) ctx.log().warn(f);

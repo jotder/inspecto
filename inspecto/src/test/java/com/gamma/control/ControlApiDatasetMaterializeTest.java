@@ -124,31 +124,12 @@ class ControlApiDatasetMaterializeTest {
     }
 
     @Test
-    void refusedWhenTheTaskCannotReachThisSpacesRegistry(@TempDir Path cfg, @TempDir Path root,
-                                                         @TempDir Path elsewhere) throws Exception {
-        try (Ctx c = open(cfg, root)) {
-            // The route resolves the SPACE's config root; MaterializeTask re-reads this JVM-wide property
-            // on the worker thread. Point them at different trees and the run could only fail — after a
-            // 202. Found by driving a live multi-space server, where the two differ by construction.
-            System.setProperty("assist.write.root", elsewhere.toString());
-            try {
-                HttpResponse<String> r = materialize(c.port, "orders", """
-                        {"target":"orders_daily"}""");
-                assertEquals(503, r.statusCode(), r.body());
-                assertTrue(r.body().contains("component registry"), r.body());
-            } finally {
-                System.clearProperty("assist.write.root");
-            }
-        }
-    }
-
-    @Test
     void acceptedWhenTheTwoWriteRootsAgree(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             // The single-space case, which is EVERY Personal deployment: the JVM property and the space's
-            // config root are the same directory, so gate 1b must stay silent. Pinned explicitly because
-            // the other tests leave the property UNSET, which skips the gate for a different reason and
-            // would let a broken comparison pass unnoticed.
+            // config root are the same directory, and MaterializeTask resolves through SpaceConfigRoot's
+            // default-space fallback to exactly that. Pinned because the other tests leave the property
+            // UNSET, so this is the only one that exercises the fallback actually resolving something.
             System.setProperty("assist.write.root", root.toString());
             try {
                 HttpResponse<String> r = materialize(c.port, "orders", """

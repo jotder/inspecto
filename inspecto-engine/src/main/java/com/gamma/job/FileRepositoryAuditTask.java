@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.signal.Severity;
 
 import java.io.IOException;
@@ -37,10 +38,11 @@ final class FileRepositoryAuditTask {
         long minAgeDays = Long.parseLong(cfg.opt("min_age_days", "1"));
         Instant cutoff = Instant.now().minus(Duration.ofDays(minAgeDays));
         List<String> findings = new ArrayList<>();
-        String writeRoot = System.getProperty("assist.write.root");
-        if (writeRoot != null && !writeRoot.isBlank()) {
+        // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
+        Path registry = SpaceConfigRoot.currentRegistry();
+        if (registry != null) {
             Set<String> refs = new HashSet<>();
-            var store = new com.gamma.pipeline.ComponentStore(Path.of(writeRoot).resolve("registry"));
+            var store = new com.gamma.pipeline.ComponentStore(registry);
             for (var d : store.list("dataset")) {
                 Object ref = d.content().get("physicalRef");
                 if (ref != null) refs.add(String.valueOf(ref));

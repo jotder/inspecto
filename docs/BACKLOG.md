@@ -1416,8 +1416,8 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
   bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
 
-- **P1** · 🔴 **`MATERIALIZE-SPACE-ROOT-1` — every registry-reading JOB TYPE is SPACE-BLIND.** Filed
-  2026-09-15, **found by driving a live multi-space server**, not by any test. `ControlApi.writeRoot()`
+- ✅ **CLOSED 2026-09-15 · `MATERIALIZE-SPACE-ROOT-1` — every registry-reading JOB TYPE was SPACE-BLIND.**
+  Filed and fixed the same day; **found by driving a live multi-space server**, not by any test. `ControlApi.writeRoot()`
   resolves `currentContext().root().config()` — **this space's** config root (`ControlApi.java:1074-1077`)
   — while `MaterializeTask.run` re-reads the **JVM-wide** `System.getProperty("assist.write.root")` on the
   worker thread (`MaterializeTask.java:55-57`) and builds its `ComponentStore` from that. Where a
@@ -1437,12 +1437,47 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `STUDIO-HALVES-1`), and single-space deployments — Personal, and every test — make the JVM property and
   the space config root **the same path**, so the bug is a no-op there. Adding the first caller exposed it
   within minutes of a live run.
-  ✅ **Contained, not fixed:** `DatasetRoutes` now refuses with **503** when the two roots differ, so the
-  route never hands out a 202 for a run that cannot succeed (`ControlApiDatasetMaterializeTest`
-  `refusedWhenTheTaskCannotReachThisSpacesRegistry`). ⛔ **That guard is a placeholder — DELETE it when
-  this row lands**, and note it makes materialize unavailable in multi-space rather than broken, which is
-  the honest state but not the desired one. → `inspecto-engine/.../job/MaterializeTask.java:55` ·
-  `JobService.java:471` · `inspecto/.../control/DatasetRoutes.java`
+  🔴 **The blast radius was WIDER than this row first said — NINE run-time readers, not three.** The row
+  named `materialize`, `report` and `recon.run` from `JobService:471`'s comment; grepping the property
+  found `MetadataValidateTask`, `StorageReportTask`, `FileRepositoryAuditTask`, `ObjectsAnalyticsJob`
+  (inspecto-ops), `DatasetCollectorConnectorFactory` and `DecisionRules` as well. ⚠ **A row's cause is a
+  hypothesis** — grep the mechanism, not the row's list.
+  ✅ **FIXED by making the per-Space root the single map, not by threading a new parameter.** The seam
+  already existed and was hiding in plain sight: `DecisionRules` had a `spaceId -> registry root` map,
+  published by `SpaceBootstrap`, resolved by `EventLog.currentSpaceId()`, with the JVM property as a
+  **default-space-only** fallback — i.e. the correct design, applied to exactly one consumer.
+  `com.gamma.pipeline.SpaceConfigRoot` is now that map (holding **config** roots), `DecisionRules` forwards
+  to it, and **seven** job types resolve through it: `MaterializeTask`, `ReconRunJob`, `ReportJob`,
+  `MetadataValidateTask`, `StorageReportTask`, `FileRepositoryAuditTask`, `ObjectsAnalyticsJob`.
+  ⛔ **A named Space deliberately does NOT fall back to the JVM property** — falling back is what caused
+  the defect: it hands back *another* Space's registry, which fails far away and reads as missing data
+  rather than misconfiguration. The default Space still falls back, so every single-Space deployment is
+  byte-identical.
+  ✅ **The precondition was verified before building on it:** both `JobService` submit paths
+  (`submitRun` + `submitAdhocRun`) set the space MDC on the worker thread, so `currentSpaceId()` is
+  correct inside a run and not only on the request thread. `forSpace(id)` exists for a caller that already
+  holds an id (`ObjectsAnalyticsJob` does) — an explicit id cannot be wrong the way an unset MDC silently can.
+  ✅ **PROVEN END TO END on the live multi-space server that exposed it**: the same call that first
+  returned *202-then-FAILED* now returns **202 → SUCCESS, 7 rows**, writes
+  `spaces/ucc/data/sites_by_region/matrix-*.parquet`, and registers `sites_by_region` as a Dataset in the
+  **ucc** space. `SpaceConfigRootTest` (8) pins all three resolution rules plus the `DecisionRules`
+  forwarding; the placeholder 503 guard in `DatasetRoutes` and its test are **deleted**.
+  ⚠ **Left alone deliberately:** `DatasetCollectorConnectorFactory:66` still reads the property. It runs in
+  the **collector** lane, not the job lane, and this shift did not establish that the space MDC is set
+  there — migrating it on the assumption that it is would be the same class of unverified reasoning that
+  produced this defect. → `SpaceConfigRoot.java` · `DecisionRules.java` · `SpaceBootstrap.java:42`
+
+- **P3** · **`COLLECTOR-SPACE-ROOT-1` — the last JVM-wide write-root reader, in the COLLECTOR lane.**
+  Filed 2026-09-15 as the deliberate remainder of `MATERIALIZE-SPACE-ROOT-1` (closed above).
+  `DatasetCollectorConnectorFactory:66` still reads `System.getProperty("assist.write.root")` while its
+  sibling `-Ddata.dir` is per-space — the identical shape, in the acquisition lane rather than the job
+  lane. ⛔ **Do NOT just swap in `SpaceConfigRoot.current()`.** That resolver keys on
+  `EventLog.currentSpaceId()`, which is the space MDC, and **this shift did not establish that the MDC is
+  set on the collector thread** — `JobService`'s two submit paths were read and confirmed, the collector's
+  were not. Migrating on the assumption would be the same unverified reasoning that produced the original
+  defect. ⇒ **First establish where the collector lane sets the space MDC**; if it does not, the connector
+  factory needs an explicit id and `SpaceConfigRoot.forSpace(id)`, which exists for exactly that case.
+  → `inspecto-engine/.../inspector/DatasetCollectorConnectorFactory.java:66`
 
 - **P3** · **`AIRGAP-CROSSPLAT-DEADWEIGHT-1` — every zip ships the other platform's DuckDB extensions,
   ~45 MB it can never load.** Filed 2026-09-14, **measured from the built zips' own entry tables**, not

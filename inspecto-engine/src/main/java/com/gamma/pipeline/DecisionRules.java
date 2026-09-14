@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Process-wide map of each space's component-registry root, so the <em>static</em> ETL ingest path
@@ -29,25 +28,31 @@ public final class DecisionRules {
 
     private static final String TYPE = "decision-rule";
 
-    /** {@code space -> registry root}; keyed by {@link EventLog#currentSpaceId()}. */
-    private static final Map<String, Path> ROOTS = new ConcurrentHashMap<>();
-
     private DecisionRules() {
     }
 
-    /** Publish (or replace) a space's component-registry root; {@code null}s are ignored. */
+    /**
+     * Publish (or replace) a space's component-registry root; {@code null}s are ignored.
+     *
+     * <p>⚠ Since {@code MATERIALIZE-SPACE-ROOT-1} (2026-09-15) this no longer owns a map of its own — it
+     * forwards to {@link SpaceConfigRoot}, which every registry-reading job type now resolves through.
+     * Two parallel maps would be a split-brain: whoever registered one and not the other would leave
+     * either the rules or the jobs silently reading nothing. The argument is a <i>registry</i> root and
+     * the shared map holds <i>config</i> roots, hence the {@code getParent()}; every caller passes
+     * {@code <config>/registry}.
+     */
     public static void register(String spaceId, Path registryRoot) {
-        if (spaceId != null && registryRoot != null) ROOTS.put(spaceId, registryRoot);
+        if (spaceId != null && registryRoot != null) SpaceConfigRoot.register(spaceId, registryRoot.getParent());
     }
 
     /** Drop a space's registration (on space deletion), mirroring {@code ConnectionRegistry.forget}. */
     public static void forget(String spaceId) {
-        if (spaceId != null) ROOTS.remove(spaceId);
+        SpaceConfigRoot.forget(spaceId);
     }
 
     /** Clear the registry across all spaces (tests). */
     public static void clear() {
-        ROOTS.clear();
+        SpaceConfigRoot.clear();
     }
 
     /**
@@ -68,11 +73,7 @@ public final class DecisionRules {
      * rule holds across every recompute trigger).
      */
     public static List<Map<String, Object>> forTarget(String targetType, String... names) {
-        Path root = ROOTS.get(EventLog.currentSpaceId());
-        if (root == null && EventLog.DEFAULT_SPACE_ID.equals(EventLog.currentSpaceId())) {
-            String wr = System.getProperty("assist.write.root");
-            if (wr != null && !wr.isBlank()) root = Path.of(wr.trim()).resolve("registry");
-        }
+        Path root = SpaceConfigRoot.currentRegistry();
         if (root == null || !Files.isDirectory(root)) return List.of();
         return new ComponentStore(root).list(TYPE).stream()
                 .map(ComponentRegistry.Component::content)

@@ -255,14 +255,21 @@ was reachable in principle and never taken in practice:
 - **A UI action:** Materialize in the Dataset editor header, gated on `canOperateRuns`, asking only for
   the target id.
 
-🔴 **`MaterializeTask` IS SPACE-BLIND, and the first live run proved it** (`MATERIALIZE-SPACE-ROOT-1`).
-It re-reads the JVM-wide `-Dassist.write.root` on the worker thread (`:55-57`), while every control-plane
-route resolves the **current space's** config root. In a multi-space deployment the run therefore reads one
-space's registry while writing another's data dir, and fails with `unknown dataset <the id the route just
-resolved>` — after a 202. ⚠ **`JobService:471` states the same design for `report` and `recon.run`**, so
-this is a property of every registry-reading job type, not of materialize. The route refuses with 503 when
-the two roots differ; that containment is a placeholder for a per-space write root threaded into
-`JobService`. ⇒ **single-space deployments make the two paths identical, which is why no test ever saw it.**
+✅ **`MaterializeTask` WAS space-blind; fixed 2026-09-15** (`MATERIALIZE-SPACE-ROOT-1`, found and closed
+the same day). It re-read the JVM-wide `-Dassist.write.root` on the worker thread while every control-plane
+route resolves the **current space's** config root, so a multi-space run read one space's registry while
+writing another's data dir and failed with `unknown dataset <the id the route had just resolved>` — after a
+202. ⚠ It was never only materialize: **nine** run-time readers had the same shape.
+
+**`com.gamma.pipeline.SpaceConfigRoot` is now the single per-Space config-root map** — published by
+`SpaceBootstrap`, keyed by `EventLog.currentSpaceId()` (the space MDC, which both `JobService` submit paths
+set on the worker thread), with `forSpace(id)` for a caller that already holds an id. Seven job types
+resolve through it (`materialize`, `recon.run`, `report`, `metadata_validate`, `storage_report`,
+`file_repository_audit`, `objects.analytics`), and `DecisionRules` — which had this design all along, for
+one consumer — forwards to it rather than keeping a second map.
+⛔ **A named Space does not fall back to the JVM property**; falling back is what caused the defect.
+⇒ **single-space deployments make the two paths identical, which is why no test ever saw it** — and why
+the proof is a live multi-space run: 202 → SUCCESS, 7 rows, Parquet written, Dataset registered in `ucc`.
 
 🔴 **Found while wiring it: `materialize`'s five parameters were UNDECLARED on the `maintenance` job type**
 (`JobService`'s `JobTypeDescriptor`), so the authoring form could offer the task and not one parameter that

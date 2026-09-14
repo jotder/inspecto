@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
@@ -52,12 +53,12 @@ final class MaterializeTask {
 
     static JobResult run(JobConfig cfg, String dataDir) throws Exception {
         long t0 = System.nanoTime();
-        String wr = System.getProperty("assist.write.root");
-        if (wr == null || wr.isBlank())
-            throw new IllegalStateException("materialize needs -Dassist.write.root (the component registry)");
+        // ⛔ NOT System.getProperty("assist.write.root") — that is JVM-wide, while dataDir below is
+        // per-space, so the two crossed in any multi-space deployment and this task read one space's
+        // registry while writing another's data (MATERIALIZE-SPACE-ROOT-1, found by a live run).
         if (dataDir == null || dataDir.isBlank())
             throw new IllegalStateException("materialize needs a data root (-Ddata.dir / space dataDir)");
-        Path writeRoot = Path.of(wr);
+        Path writeRoot = SpaceConfigRoot.requireCurrent("materialize");
         Path dataRoot = Path.of(dataDir);
 
         String source = cfg.require("dataset");

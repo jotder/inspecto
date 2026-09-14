@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.config.safety.PathJail;
 import com.gamma.event.Event;
@@ -155,10 +156,8 @@ final class ReportJob implements Job {
 
     /** The dataset-scope export rows: a headless BI query compiled from this job's params (BI-4/BI-7). */
     private List<Map<String, Object>> datasetRows() throws Exception {
-        String wr = System.getProperty("assist.write.root");
-        if (wr == null || wr.isBlank())
-            throw new IllegalStateException("scope dataset needs -Dassist.write.root (the component registry)");
-        Path writeRoot = Path.of(wr);
+        // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
+        Path writeRoot = SpaceConfigRoot.requireCurrent("scope dataset");
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("dataset", cfg.require("dataset"));

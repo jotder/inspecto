@@ -468,7 +468,7 @@ public final class SpaceManager implements AutoCloseable {
         com.gamma.acquire.GapTracker.forgetSpace(id.value());     // dimension 2026-09-10, so both must be dropped here
         com.gamma.etl.IngestProgress.forgetSpace(id.value());     // the two live progress snapshots gained the
         com.gamma.etl.StepProgress.forgetSpace(id.value());       // same dimension via CurrentSpace
-        com.gamma.pipeline.DecisionRules.forget(id.value());   // drop the space's decision-rule registry root
+        com.gamma.pipeline.SpaceConfigRoot.forget(id.value());   // drop the space's config root (rules + jobs)
         // CollectorService.close() already releases this, but per the S7 note above a hung close must not leak
         // it: the registry's DuckDB file lives under the space dir, so on Windows a retained handle would make
         // the purge below fail outright. unregister is idempotent, so the double call is free.

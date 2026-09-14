@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.objects.ObjectType;
 import com.gamma.pipeline.ComponentRegistry;
@@ -30,7 +31,8 @@ import java.util.function.Supplier;
  * built-in is constructed); a {@code null} supplier value leaves the Job signal-only.
  *
  * <p>Follows the built-in convention of constructor-injected {@code dataDir} plus reading the component
- * registry from {@code -Dassist.write.root} at run time (as {@link MaterializeTask}/{@code ReportJob}).
+ * registry from {@link com.gamma.pipeline.SpaceConfigRoot} at run time — THIS space's config root, not
+ * the JVM-wide {@code -Dassist.write.root} it used to read (as {@link MaterializeTask}/{@code ReportJob}).
  */
 final class ReconRunJob implements Job {
 
@@ -60,12 +62,10 @@ final class ReconRunJob implements Job {
     @Override
     public JobResult run(JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
-        String wr = System.getProperty("assist.write.root");
-        if (wr == null || wr.isBlank())
-            throw new IllegalStateException("recon.run needs -Dassist.write.root (the component registry)");
+        // Space-scoped, matching dataDir below — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
         if (dataDir == null || dataDir.isBlank())
             throw new IllegalStateException("recon.run needs a data root (-Ddata.dir / space dataDir)");
-        Path writeRoot = Path.of(wr);
+        Path writeRoot = SpaceConfigRoot.requireCurrent("recon.run");
         Path dataRoot = Path.of(dataDir);
         String reconId = cfg.require("reconciliation");
 
