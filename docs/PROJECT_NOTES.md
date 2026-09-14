@@ -140,6 +140,57 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **A RED GATE HIDES EVERY GATE BEHIND IT.** CI stops at the first failing step, so a single red guard
+  makes every later one unobservable. Measured 2026-09-14: `master` was carrying **four independent
+  pre-existing failures stacked in one file** — a stale generated table, then five broken doc links, then
+  two dead citations, then a genuinely host-dependent Maven test. Each became visible only when the one
+  ahead of it went green, and the last two had been invisible for as long as the first was red.
+  ⛔ **After fixing a CI gate, re-run rather than declaring victory** — "the build is green now" is a
+  claim about one step until the whole pipeline has executed. ⚠ The same shape hides in any ordered
+  pipeline: the pre-push hook, `package.ps1`'s staging steps, a reactor that stops at the first module.
+
+- 🔴 **`existsSync` answers "is this on THIS disk", never "is this in the repository".** It says yes to a
+  gitignored file, to build output, and — on a case-insensitive filesystem — to the wrong capitalisation.
+  Both halves shipped (`LINKGUARD-CASE-1`, 2026-09-14): five docs linked `docs/okf/INDEX.md`, which does not exist
+  (the tracked file is `index.md`), and two instruction files cited `.claude/sessions/snapshot.md`, which does not exist
+  in a checkout either — a hook writes it into every working tree instead. Every local run was green and
+  the runner was red. The seam is now `tools/tracked-paths.mjs` — `git ls-files`, case-exact, with implied
+  directories. ⛔ Never fold case "to be safe" and never add an `existsSync` fallback: either restores the
+  bug while staying green on Linux, where nothing would notice.
+  ⇒ **Verify docs against a CLEAN EXPORT, not the working tree:** `git archive` HEAD into a temp dir, copy
+  the uncommitted files over it, **`git init` + commit there** (the guards call git, and a guard that
+  cannot run is not a pass), then run them from that directory.
+
+- 🔴 **STAGED is not LOADABLE.** Shipping a file next to the jar only helps if something explicitly loads
+  it from there. DuckDB's **autoload** resolves against its own `extension_directory` and ignores
+  `-Dduckdb.extension.dir`, which only `DuckDbExtension` reads. Measured four ways 2026-09-14 against
+  duckdb_jdbc 1.5.2.1: autoload over an empty directory fails (correct), **over the flat staged directory
+  also fails**, over a `<version>/<platform>` tree works, and an explicit `LOAD '<file>'` works. So
+  `postgres_scanner` was staged in the morning and still could not load in the afternoon — an air-gapped
+  attach reached for a network `INSTALL` anyway. ⛔ **An extension that arrives by AUTOLOAD needs a named
+  call site, or its staged file is dead weight** — and there is no `LOAD` in the source to grep for, which
+  is exactly what makes it invisible. ⚠ No test caught it because every developer machine already carries
+  the extension in `~/.duckdb/extensions`, where autoload does find it.
+
+- ⚠ **A test that asserts a RESOURCE QUANTITY is host-dependent, and CI is the small host.**
+  `ConfigSafetyValidator` bounds `processing.threads` by `availableProcessors()` — 12 on this sandbox, 4
+  on a GitHub runner — so a test writing `threads: 7` was a 200 here and a 422 there for as long as it
+  existed. Reproduce with `MAVEN_OPTS="-XX:ActiveProcessorCount=4"`. ⛔ But pairing that with
+  `-DforkCount=0` (needed because `-DargLine` does not reliably reach a forked JVM) **hung the reactor**
+  inside `ControlApiPreferencesTest` — so the two variables have to be separated before either is
+  believed (`CORECOUNT-SWEEP-1`).
+
+- ⚠ **A mutation anchor that is not unique proves nothing, and reports a hole that does not exist.** Twice
+  on 2026-09-14 a falsification run flagged the guard as blind when the mutation had simply landed
+  somewhere else — one anchor matched `run.bat` instead of `serve.bat` (the two carry identical lines),
+  another was absent from the file entirely. ⛔ **Assert the anchor's occurrence count before believing
+  either a red or a green**; a probe that cannot report "I did not apply" is not a probe.
+
+- ⚠ **Run the guard sweep AFTER `git add`, not before.** `check-secrets.mjs` scans TRACKED files, so a
+  brand-new script is exempt from it while untracked — the whole sweep comes back green on a file one
+  `git add` away from failing. Worse, its pre-push pass scans the **push RANGE**, so a later fix commit
+  does not clear a value introduced earlier in the same push; it takes a range rewrite.
+
 - 🔴 **"Fails closed on failure" does not cover "succeeds at the wrong thing."** A `catalog_url` with no
   recognised backend prefix does not make DuckLake fail — it reads the value as a **file path** and
   silently creates a private local catalog (measured 2026-09-14: a 1.8 MB DuckDB file in the repo root,
