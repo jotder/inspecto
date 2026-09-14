@@ -81,6 +81,25 @@ above the generated commit list.
   output Parquet/CSV → `__consignment_id` (output-schema break, documented); the `.toon` key `batch_id` → `consignment_id`
   with the old key accepted on read for the major. All three ride this MAJOR, none earlier.
 
+**Breaking — HTTP routes REMOVED (`RETIRE-HALVES-1`, 2026-09-14)**
+- `GET /bi/datasets` is **gone**. Dataset listing is the generic component registry
+  (`GET /components?type=dataset`), which is the only path any client ever used.
+- The work-queue family is **gone**: `GET /queues`, `GET /queues/{id}`, `POST /queues`, the
+  `*_queue.toon` config kind, and `QueueStore`/`QueueRouter`. Nothing ever called them.
+- `POST /objects/{id}/watch`, `POST /objects/{id}/unwatch` and `GET /objects/{id}/watchers` are **gone**.
+  ⚠ The `watchers` **attribute** survives — `POST /objects/{id}/merge` unions it — so the data is still
+  there with no route to read it.
+- `POST /objects/{id}/assign` and `POST /objects/{id}/split` **no longer accept a `queue` parameter**;
+  `assign` now requires `assignee` and answers **400** without one (it previously accepted either).
+- The **SLA escalation engine is retired**: the `*_escalation.toon` config kind and the policy applied on
+  breach are deleted. A breach still stamps the Incident and emits `OBJECT_SLA_BREACH`, but no longer
+  bumps severity or re-routes. `OBJECT_ESCALATED` is **emitted by nothing** (the `@PublicApi` constant
+  stays, since stored events carry the type); its builtin notification rule is deleted.
+- ⚠ **Provenance note:** these removals are commit `519673a7`, whose message describes only a whitepaper
+  change — a concurrent session committed the staged tree under its own heading, so the commit is typed
+  `docs:` and carries **no SemVer signal for a breaking change**. Tests followed in `ba51a27b`. This entry
+  is the record; ⛔ do not conclude from `git log` alone that this MAJOR has no route removals.
+
 **Breaking — Java `@PublicApi` (binds only within a released major; none of this was published in 3.x)**
 - Three store interfaces gained abstract methods for `incident_purge` (MNT-14, 2026-07-27).
 - `com.gamma.ops.NoteTargets` → `com.gamma.ops.AnnotationKinds` (no alias). ⚠ Relocated again in EDG-01 cell 7 (2026-09-08) to **`com.gamma.objects.AnnotationKinds`** — it is core vocabulary with no store coupling, so it stayed in the mandatory build when `com.gamma.ops` became an optional module.
