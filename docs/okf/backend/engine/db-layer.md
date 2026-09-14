@@ -457,6 +457,20 @@ deliberately: a stage is an immutable fact about a point in time, an output row 
 ⚠ `state` is in the SET list too — a re-revealed file is LIVE again, and leaving a `COMPACTED_AWAY` flag
 standing over content that now exists is the same stale-row defect from the other direction.
 
+🔴 **That reasoning is filesystem-specific, and the object-store lane does not satisfy it** (added
+2026-09-14 with scale-out §5.4 bullet 1, `PartitionWriter.writeToObjectStore`). On an `s3://` target
+there is no staging and **no reveal at all** — a partitioned `COPY` writes straight to its final keys —
+and a repeat write **ACCUMULATES rather than overwrites**: measured against MinIO, two runs left **6**
+objects where the local lane's atomic reveal leaves 3. `FILENAME_PATTERN` pins the stem but DuckDB
+appends its own index, so the object lane **cannot reproduce the stable `<baseName>_out.<ext>` name**.
+⇒ the premise above — *"the file on disk really was overwritten, so last-writer-wins matches the
+filesystem"* — is **false there**: each run writes a **new `path`**, so `DO UPDATE` never fires for it
+and every run inserts its own row. ⛔ Do not "unify" the two lanes on the strength of the local one's
+idempotence: re-running a batch is idempotent locally and additive on an object store, which is a
+semantic difference, not a naming detail. ⚠ Nothing in production reaches that lane yet —
+`dirs.database` refuses a URI at both the jail and the 422 gate until the credentials decision
+(`BACKLOG.md` §1) lands — so this is a property to preserve when it does, not a live behaviour.
+
 ⚠ **`run_id` is deliberately still nullable**, even though every production path has supplied one since
 slice 3. `NULL ≠ NULL` in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is **exempt**
 from the key — but `NOT NULL` would be strictly worse than the exemption: `record` is fail-open, so a
