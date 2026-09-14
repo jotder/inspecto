@@ -892,6 +892,36 @@ Work under (ii):
 >    a **glob string**). It is a raw `String` end-to-end with no scheme dispatch anywhere.
 > 3. **There is no credentials surface.** Nothing in config carries an endpoint, key or region, and the
 >    probe needed five `SET s3_*` statements. ⛔ That is a config-and-secrets design, not a code edit.
+>    ✅ **Regrounded: the credential MODEL exists and should be reused, but it is not reachable from here.**
+>    `ConnectionProfile` (`inspecto-acquire`, record at `:38`) already carries host/port, username,
+>    password, region and protocol, and `SecretResolver` (`:28-97`) already does `${ENV:…}` / `${SYS:…}` /
+>    `${FILE:…}` / `${KEYSTORE:…}` indirection with masking on read (`toMap:149`) and omission from
+>    bundles (`toBundleMap:196`). ⛔ But it is **collector-side only** — reached via `source.connection`,
+>    never from a pipeline — and a pipeline has no credential-bearing config of its own. ⇒ the decision is
+>    *how a pipeline names a profile*, not *whether to invent secret handling*. Filed in BACKLOG §1.
+>    ⚠ There is also **no `SECRET` field type** in the config-spec system (`FieldType` has ten values, none
+>    of them secret); the redaction that exists is `ConnectionProfile`-specific, not a capability a new
+>    field could declare.
+>
+> **📐 The object-store write shape, MEASURED 2026-09-14 against MinIO (`duckdb_jdbc` 1.5.2.1).** This is
+> what bullet 1's second implementation has to be; it is not a guess, and it is not symmetric with the
+> local lane:
+> - ✅ **A partitioned `COPY` writes straight to final Hive-style paths** — `part=p0/data_0.parquet`. There
+>   is no staging directory and **no reveal at all**: the object appears when the PUT completes, and
+>   cross-node visibility is the catalog commit, which is D4's invariant restated.
+> - ✅ **`PartitionOutput(partition, file, bytes)` is still producible.** `glob('s3://…/**/*.parquet')`
+>   enumerates what was written and `parquet_metadata(…)` gives per-file sizes — replacing the local
+>   lane's `Files.walk` + `Files.size`. ⚠ `total_compressed_size` is the **column-chunk sum, not the
+>   object length**, so it is an approximation; decide deliberately whether that is acceptable for the
+>   registry rows or whether it warrants a HEAD.
+> - 🔴 **A repeat write ACCUMULATES rather than replaces.** Two partitioned writes left **6** files where
+>   the local lane's atomic reveal leaves 3. `FILENAME_PATTERN 'batch42_out'` controls the name but yields
+>   `batch42_out0.parquet` — DuckDB appends its own index — so the object-store lane **cannot reproduce
+>   the local lane's stable `<baseName>_out.<ext>` name**. ⛔ That is a semantic difference, not a naming
+>   detail: re-running a batch is idempotent locally and additive on the object store.
+> ⚠ **Every one of these figures came from a MinIO started ad hoc on one workstation.** It is declared in
+> `dev-infra/docker-compose.yml` as of 2026-09-14 so the next shift can reproduce them; nothing in the
+> test suite exercises it yet.
 >
 > ✅ **What DID ship from this grounding — a fail-closed refusal, because the status quo was worse than
 > "unsupported".** 🔴 `Paths.get` answers this **differently per platform**, and the divergence favours the

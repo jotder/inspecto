@@ -42,5 +42,37 @@ services:
       retries: 20
       start_period: 60s
 
+  # S3-compatible object store for the scale-out phase C work (plan §5.4). Every object-store
+  # measurement recorded on 2026-09-14 — the `COPY … TO 's3://…'` write, the read-back, `glob()`
+  # enumeration and `parquet_metadata()` sizes — was taken against a MinIO container that had been
+  # started ad hoc with `docker run` and existed ONLY on one workstation: it carried no compose
+  # project label, and this file did not mention it. ⛔ A measurement nobody else can reproduce is a
+  # claim, not evidence, and this repo has already recorded that exact trap once
+  # (`AIRGAP-S3-EXTENSIONS-1`, "an artifact of the workstation"). Declared here so the next shift
+  # gets the same endpoint instead of re-deriving it.
+  #
+  # ⚠ `httpfs` ALONE is enough to reach this with explicit keys — the `aws` extension is only for the
+  # AWS credential chain, which a MinIO endpoint never uses.
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin   # dev-only, and deliberately not a secret worth protecting
+    ports:
+      - "127.0.0.1:9000:9000"           # S3 API — bound to loopback, not 0.0.0.0
+      - "127.0.0.1:9001:9001"           # web console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
   pgdata:
+  miniodata:

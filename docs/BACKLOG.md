@@ -123,8 +123,8 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-⚠ **§1 is NOT empty — FIVE decisions are queued here as of 2026-09-14, and none of them is new work.**
-Three had been open in a plan and never filed; two were surfaced by grounding already-decided rows.
+⚠ **§1 is NOT empty — SIX decisions are queued here as of 2026-09-14, and none of them is new work.**
+Three had been open in a plan and never filed; three were surfaced by grounding already-decided rows.
 `SBOM-EOIAGENT-LICENCE-1`, the last row that ever reached this section, was decided and closed the day it
 was filed — see the closure note below. The three below are not new questions: they have sat in
 `superpower/dataset-column-derivation-plan.md` §6 since 2026-09-11, which is why every handoff since has
@@ -159,6 +159,19 @@ default.
   `maintenance` job's `task: materialize`. Either (a) add a route, or (b) have the page create and trigger
   a job through `POST /jobs` + `POST /jobs/{id}/trigger`, supplying the required `dataset` and `target`.
   ⚠ (b) makes a viewer action write a job document; (a) adds a surface to the next MAJOR's review. → its §3 row
+- **Scale-out §5.4 — how does a PIPELINE name object-store credentials?** (filed 2026-09-14 on the way
+  into bullet 6). ⛔ **Not "design secret handling" — that exists.** `ConnectionProfile` already carries
+  host/port, username, password, region and protocol, and `SecretResolver` already does `${ENV:…}` /
+  `${SYS:…}` / `${FILE:…}` / `${KEYSTORE:…}` indirection with masking on read and omission from bundles.
+  The gap is reach: profiles are **collector-side**, named by `source.connection`, and a pipeline has no
+  credential-bearing config at all. Options: (a) a pipeline field naming an existing
+  `ConnectionProfile` id, reusing resolution and redaction whole; (b) a server-level setting, so
+  credentials are deployment config and never live in a pipeline document; (c) a new pipeline block,
+  which would need its own redaction contract. ⚠ **(c) also needs a `SECRET` field type that does not
+  exist** — `FieldType` has ten values and none is secret; today's redaction is `ConnectionProfile`-
+  specific, not something a new field can declare. ⚠ Whatever is chosen must also carve an exception into
+  the `dirs.*` URI refusal shipped in `454d1a6a`, which currently rejects every object-store path.
+  → `superpower/enterprise-scale-out-plan.md` §5.4
 - **`AGT-ARTIFACT-1` — which artifact kind carries a draft?** The five draft skills emit
   `{kind:"query"|"expectation"|…, draft:{…}}`, and `parseArtifact` whitelists
   `ARTIFACT_KINDS = {text, kpi, chart, data-table}`, so a draft is dropped as an unknown kind. Either

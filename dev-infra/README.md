@@ -31,10 +31,14 @@ Three traps, each of which cost a run on 2026-09-12:
    `TimeZone.getDefault().getID()` as a startup parameter, so the handshake dies with *invalid value for
    parameter "TimeZone"*. ⚠ The fix must preserve the **offset** — `Asia/Kolkata`, never `UTC`, which
    would move `record_day` boundaries and change what the assertions mean.
-3. 🔴 **`-DforkCount=0` is load-bearing.** The parent POM's surefire config is
+3. 🔴 **`-DforkCount=0` is load-bearing** *for the `MAVEN_OPTS` route. The parent POM's surefire config is
    `<argLine>@{argLine} …</argLine>`, and that late-bound `@{argLine}` resolves the *project* property —
    a command-line `-DargLine` does not override it, so nothing you pass that way reaches a forked JVM.
    Running in the Maven JVM is what lets `MAVEN_OPTS` apply.
+   ✅ **There is a better route, measured 2026-09-14: `JDK_JAVA_OPTIONS` reaches the FORK**, so the run
+   stays forked and nothing has to be unforked. The JVM prints `NOTE: Picked up JDK_JAVA_OPTIONS` twice,
+   once for Maven and once for the fork. ⛔ Prefer it — `-DforkCount=0` is what **hung** the reactor in
+   `CORECOUNT-SWEEP-1`, and the core count it was blamed on turned out to be innocent.
 
 ## WSO2 Identity Server — `OidcAgainstRealProviderTest` (2 tests)
 
@@ -125,3 +129,53 @@ Verified 2026-09-13: a user in group `pipeline-developer` authenticates with `CA
 `OidcAgainstRealProviderTest.aRealUsersGroupBecomesRealCapabilities`.
 
 Console: <https://localhost:9443/console> (`admin` / `admin`).
+
+---
+
+## MinIO — the object store for scale-out phase C
+
+⚠ **No test uses this yet, and that is the point of writing it down.** Every object-store measurement in
+the scale-out plan §5.4 was taken against a MinIO started ad hoc with `docker run`, on one workstation,
+with no compose project label and no mention in this repo. It is declared in `docker-compose.yml` as of
+2026-09-14 so the numbers are reproducible; ⛔ **treat any earlier object-store figure as unreplicated
+until it has been re-taken against this service.**
+
+Console: <http://localhost:9001> (`minioadmin` / `minioadmin`). S3 API on `127.0.0.1:9000`, loopback only.
+
+⛔ **Adopting this service on a machine that already runs the ad-hoc container is a DESTRUCTIVE step, so
+it was not done for you.** The compose file was validated (`docker compose config`) but not brought up:
+the running container holds the `inspecto-lakehouse` bucket in its own storage, and `docker rm`-ing it to
+let compose create the `miniodata` volume **discards that bucket**. Either mirror the contents out first
+(`mc mirror local/inspecto-lakehouse …`) or accept the loss deliberately — do not let a later shift
+discover it by finding an empty bucket.
+
+Create a bucket before writing to it — DuckDB will not create one:
+
+```bash
+docker exec minio mc alias set local http://127.0.0.1:9000 minioadmin minioadmin
+docker exec minio mc mb -p local/inspecto-lakehouse
+```
+
+What was measured against it on 2026-09-14, with `duckdb_jdbc` 1.5.2.1 and **no** `LOAD` statement
+anywhere (`httpfs` autoloads; `aws` never loaded at all):
+
+```sql
+SET s3_endpoint='127.0.0.1:9000'; SET s3_use_ssl=false; SET s3_url_style='path';
+SET s3_access_key_id='minioadmin'; SET s3_secret_access_key='minioadmin';
+COPY t TO 's3://inspecto-lakehouse/parts' (FORMAT PARQUET, PARTITION_BY (part), OVERWRITE_OR_IGNORE 1);
+SELECT file FROM glob('s3://inspecto-lakehouse/parts/**/*.parquet');
+SELECT file_name, sum(total_compressed_size) FROM parquet_metadata('s3://…/**/*.parquet') GROUP BY 1;
+```
+
+Three findings that shape the write path, recorded in the plan's §5.4 bullet 1:
+
+1. ⚠ **Five `SET s3_*` statements are required** and nothing in the Java source issues any of them —
+   there is no DuckDB S3 wiring in the product at all.
+2. ✅ **The outputs are enumerable after the fact** — `glob()` lists them and `parquet_metadata()` gives
+   per-file compressed sizes — which is what lets an object-store lane still produce the
+   `PartitionOutput(partition, file, bytes)` rows the local lane produces by walking a staging dir.
+   ⚠ `total_compressed_size` is the column-chunk sum, **not** the object's byte length.
+3. 🔴 **A repeat write ACCUMULATES, it does not replace.** Two partitioned writes with different
+   `FILENAME_PATTERN` values left 6 files where the local lane's atomic reveal would have left 3.
+   `FILENAME_PATTERN 'batch42_out'` yields `batch42_out0.parquet` — DuckDB appends its own index, so the
+   name is controllable but not identical to the local lane's `<baseName>_out.parquet`.
