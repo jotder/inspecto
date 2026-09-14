@@ -63,6 +63,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { checkoutIndex, trackedPaths as checkoutPaths } from './tracked-paths.mjs';
 
 /** Trees scanned. Root-level `*.md` (CLAUDE.md, README) is added separately. */
 const ROOTS = ['docs', 'compliance', '.claude'];
@@ -79,6 +80,21 @@ const EXEMPT_TIERS = ['docs/archived-documents/', 'docs/superpower/'];
  * skill cite components as `inspecto/api/foo.service.ts`, which is that app's own in-tree prefix.
  */
 const BASES = ['.', 'docs', 'inspecto-ui/src/app'];
+
+/**
+ * What a fresh CHECKOUT holds, case-exact. ⚠ Rooted at the WORKING DIRECTORY on purpose: every
+ * citation is resolved with `resolve()` against relative BASES, and `git ls-files` reads the repository
+ * containing the cwd, so the two must agree. Rooting it at this script's own location would disagree the
+ * moment the guard runs over a copy of the tree — which is exactly how it gets checked against a clean
+ * export before a push.
+ */
+let checkout;
+try {
+    checkout = checkoutIndex(process.cwd());
+} catch (e) {
+    console.error(`✗ Citation guard could not run: ${e.message}`);
+    process.exit(2);
+}
 
 /** The codemod whose MAP is check B's source of truth. Parsed, never mirrored. */
 const RENAME_CODEMOD = 'tools/rename-batch-to-consignment.mjs';
@@ -174,21 +190,14 @@ function loadRenames() {
  * repository CONTAINS, and a walk would also see build output and this machine's untracked scratch.
  */
 function trackedPaths() {
-    let out;
     try {
-        out = execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 1 << 28 });
+        return checkoutPaths();
     } catch (e) {
-        fail(`cannot run \`git ls-files\` (${e.message}). Check A needs it for the tail rule.`);
+        // ⛔ CANNOT-RUN, not a violation: an index built from nothing would report every citation in
+        // the repository dead. Exit 2 says "do not believe this run" rather than "everything is broken".
+        console.error(`✗ Citation guard could not run: ${e.message}`);
+        process.exit(2);
     }
-    const paths = out.split('\n').filter(Boolean).map((p) => p.trim().replace(/^"|"$/g, ''));
-    if (paths.length < 1000) {
-        fail(
-            `\`git ls-files\` returned only ${paths.length} path(s). This repository has thousands — ` +
-                `something is wrong with the checkout, and a tail rule over almost nothing would ` +
-                `report every citation dead.`,
-        );
-    }
-    return paths;
 }
 
 function collect(dir, out) {
@@ -282,11 +291,16 @@ function scanLine(file, rel, line, lineNo) {
         if (!rooted && !cited.startsWith('..')) continue;
 
         pathCitations++;
+        // ⛔ The CHECKOUT index, case-exact — never existsSync. This working tree holds gitignored
+        // and uncommitted files a checkout does not (`.claude/sessions/snapshot.md` is written by a hook
+        // on every stop), and on a case-insensitive filesystem existsSync also answers to the wrong
+        // spelling. Both shipped as dead citations that were green here and red on the runner
+        // (`LINKGUARD-CASE-1`); see tools/tracked-paths.mjs.
         const found = [dirname(file), ...BASES].some((base) => {
             try {
-                return existsSync(resolve(base, decodeURIComponent(target)));
+                return checkout.exists(resolve(base, decodeURIComponent(target)));
             } catch {
-                return existsSync(resolve(base, target));
+                return checkout.exists(resolve(base, target));
             }
         });
         if (found || matchesTrackedTail(target)) continue;

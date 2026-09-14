@@ -11,9 +11,10 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **59 rows: 0 × P1 · 36 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
+> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
 > `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.
-> `LINKGUARD-CASE-1` filed the same day, §5 — so the P2 count is unchanged at 34, one out and one in.)
+> `LINKGUARD-CASE-1` was filed AND closed the same day — both doc guards now resolve against `git ls-files`,
+> case-exact, so a path that is gitignored or miscapitalised is caught on Windows instead of only on CI.)
 >
 > ✅ **No P1 rows. `AIRGAP-EXTENSIONS-CI-1` was filed AND closed on 2026-09-14** — no released bundle had
 > ever carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a
@@ -27,9 +28,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
 > `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
+> ⚠ **Only the 35 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 59 as pending work overstates what is owed by roughly 40%.
+> down. Reading all 58 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -1125,34 +1126,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   shipped in exactly that inert state and is now loaded by name at both attach sites, so the pattern
   `httpfs` must follow already exists: `LakehouseCatalog.backendExtension` +
   `DuckDbExtension.ensureLoaded`. → `superpower/enterprise-scale-out-plan.md` §5.4 bullet 6
-
-- **P2** · **`LINKGUARD-CASE-1` — the doc-link guard is CASE-BLIND on Windows, so every local run is a
-  false green for a whole error class.** Found 2026-09-14: five OKF pages pointed their "docs index" link
-  at `../../INDEX.md`, which does not exist — `docs/okf/index.md` does, lowercase, and it is a DIFFERENT
-  document from the `docs/INDEX.md` the phrase means. `fs.existsSync` said true on the
-  Windows sandbox and false on the Linux runner, so the guard was green for every shift that ran it locally
-  and red the moment CI reached it. ⚠ It surfaced only because the processor-board guard, red on master since
-  `PKG-5`, had been failing FIRST and masking it — **a red gate hides every gate behind it.** The five links
-  are fixed (they were also one `../` short, pointing into the OKF tree instead of at the root map); the guard
-  is not. Fix: resolve each link against a case-exact index of tracked paths (`git ls-files`), not against the
-  filesystem. ⛔ Falsify it ON WINDOWS — a case bug that only a Linux runner can see is precisely the shape
-  that got here.
-  🔴 **The id UNDERSTATES the row — this is one root cause with two manifestations, and it is not only the
-  LINK guard.** Both `check-doc-links.mjs` and `check-doc-citations.mjs` resolve against the FILESYSTEM,
-  so a local run is green for (a) a path that differs only by CASE and (b) a path that is GITIGNORED and
-  therefore absent from a checkout. (b) landed the same day, immediately behind (a):
-  `.claude/sessions/snapshot.md` does not exist in a checkout, yet is cited by `CLAUDE.md` and
-  `.claude/QUICK_START.md` and present in every working tree (a hook writes it on stop). Both state the
-  absence on their own line, which is the guard's own sanctioned hatch. ⚠ A THIRD gap is visible from the
-  same finding and is NOT fixed: the citation guard ignores a path with no `/` in it, which is why the
-  sibling `SESSION_STATUS.local.md` — equally gitignored, equally cited — was never flagged at all.
-  ⇒ the fix is one seam for both guards: resolve every citation against `git ls-files`, case-exact.
-  ⚠ **Until that lands, verify doc guards against a CLEAN EXPORT, never the working tree**: `git archive`
-  HEAD into a temp dir, copy the uncommitted files over it, `git init` + commit there (the guards call
-  git, and a guard that cannot run is not a pass), then run them from that directory. That reproduces the
-  runner's view of both gaps. 🔴 This row's own first draft was caught by its own bug — it cited the
-  snapshot path with no absence marker, passed here, and failed on CI.
-  → `okf/capabilities/tooling/tooling.md` §3.2
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:

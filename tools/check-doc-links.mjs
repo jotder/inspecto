@@ -55,6 +55,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
+import { checkoutIndex } from './tracked-paths.mjs';
 
 /** Trees scanned for links. Root-level `*.md` (CLAUDE.md, README) is added separately. */
 const ROOTS = ['docs', 'compliance', '.claude'];
@@ -84,6 +85,36 @@ const slash = (p) => p.split(sep).join('/');
 function fail(message) {
     console.error(`✗ Doc-link guard: ${message}`);
     process.exit(1);
+}
+
+/**
+ * ⛔ CANNOT-RUN is exit 2, distinct from a violation.
+ *
+ * <p>Until 2026-09-14 this guard had no such path, and the omission was the same mistake as resolving
+ * against the working tree: an index it could not build would otherwise report every link in the
+ * repository dead, which reads as a catastrophe rather than as a broken checkout.
+ */
+function cannotRun(message) {
+    console.error(`✗ Doc-link guard could not run: ${message}`);
+    process.exit(2);
+}
+
+/**
+ * What a fresh CHECKOUT contains, case-exact — not what this working tree happens to hold.
+ * See `tools/tracked-paths.mjs` for the two bugs that made the difference load-bearing.
+ *
+ * ⚠ Rooted at the WORKING DIRECTORY, deliberately: every link here is resolved with `resolve()`, which
+ * is relative to the cwd, and `git ls-files` reads the repository containing it. The two must agree, so
+ * the index cannot be rooted at this script's own location — that would silently disagree the moment the
+ * guard is run over a copy of the tree, which is exactly how it gets checked against a clean export.
+ * (The guard already requires the cwd to be the repo root: `ROOTS` are relative.)
+ */
+const ROOT = process.cwd();
+let checkout;
+try {
+    checkout = checkoutIndex(ROOT);
+} catch (e) {
+    cannotRun(e.message);
 }
 
 function collect(dir, out) {
@@ -143,10 +174,13 @@ for (const file of files) {
             } catch {
                 abs = resolve(dirname(file), target);
             }
-            if (existsSync(abs)) continue;
+            // ⛔ The index, NOT existsSync. This working tree holds gitignored and uncommitted files a
+            // checkout does not, and on a case-insensitive filesystem it answers to the wrong spelling
+            // as well. Both shipped (LINKGUARD-CASE-1); see tools/tracked-paths.mjs.
+            if (checkout.exists(abs)) continue;
 
             if (fromArchive) archiveSourceBroken++;
-            else broken.push({ file: rel, line: i + 1, target: raw });
+            else broken.push({ file: rel, line: i + 1, target: raw, caseHint: checkout.caseOnlyMismatch(abs) });
         }
     });
 }
@@ -168,12 +202,19 @@ const scopeNote =
 if (broken.length) {
     console.error(`✗ Doc-link guard: ${broken.length} broken link(s) in current docs\n`);
     for (const b of broken) {
-        console.error(`  ${b.file}:${b.line}  ->  ${b.target}`);
+        // Naming the correct spelling matters more here than anywhere else: a case-only miss is
+        // invisible on this filesystem, so without the hint the reader sees a path that plainly DOES
+        // exist and concludes the guard is broken.
+        const hint = b.caseHint ? `   ⚠ CASE ONLY — the tracked path is ${b.caseHint}` : '';
+        console.error(`  ${b.file}:${b.line}  ->  ${b.target}${hint}`);
     }
     console.error(`\n  ${scopeNote}`);
     console.error(
         `\n  Fix the LINK, not this guard. A target that moved needs its new path; a target that was ` +
-            `\n  archived needs the ${ARCHIVE_PREFIX}… path; a target that is gone needs the link removed.`,
+            `\n  archived needs the ${ARCHIVE_PREFIX}… path; a target that is gone needs the link removed.` +
+            `\n  ⚠ Resolution is against \`git ls-files\`, CASE-EXACT — what a fresh checkout holds, not this` +
+            `\n  working tree. A path that is gitignored, uncommitted, or spelled with the wrong case is` +
+            `\n  BROKEN even though it opens fine on a case-insensitive filesystem here.`,
     );
     process.exit(1);
 }
