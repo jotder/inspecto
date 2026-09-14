@@ -140,6 +140,20 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **`mvn compile` does NOT rebuild a downstream module when you change a SUPERTYPE's API.** Maven's
+  incremental compiler looks at each module's own sources, so removing a method from an interface in
+  `inspecto-util` produced an all-green `BUILD SUCCESS` in **4.5 seconds**, every module at `0.0x s`,
+  while fifteen callers were still broken. ⛔ Use `clean` for any cross-module signature change, and treat
+  a suspiciously fast green build as a no-op until proven otherwise (2026-09-14, `OPS-03`).
+- ⚠ **`tee` masks the exit code of the command feeding it.** A `package.ps1` run that threw was reported
+  as `exit 0` because the wrapper read `tee`'s status. Read the output for the exception; the code is the
+  pipe's, not the program's (2026-09-14).
+- ⚠ **Operational stores no longer serialise on their own monitor when backed by Postgres.** Since
+  `OPS-03` (2026-09-14) each `Db*Store` borrows a connection per operation, so two operations on one
+  store can interleave on a pooled source; DuckDB is unchanged. ⛔ New read-then-write code needs ONE
+  borrow **and** a DB predicate (`ON CONFLICT`, a fenced `WHERE`) — `synchronized` will not save it.
+  Full account, including the two audited exceptions: `okf/backend/engine/db-layer.md` §2.
+
 - 🔴 **An SPI whose absence removes a safety property must be fail-CLOSED, and two were not.**
   `SpiSlot` routes discovery through `OptionalSpi`, which catches `ServiceConfigurationError` so an
   unloadable **optional** module is an absence rather than a boot failure (PKG-5 — right for the assistant
