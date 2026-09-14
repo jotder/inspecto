@@ -137,12 +137,20 @@ class ControlApiConfigIfMatchTest {
     @Test
     void aStalePreconditionIsRefusedWith409RatherThanClobbering(@TempDir Path dir, @TempDir Path root) throws Exception {
         try (Ctx c = open(dir, root)) {
+            // ⛔ Keep every threads value at or below 3. It is only a value that has to CHANGE between
+            // writes, but ConfigSafetyValidator bounds processing.threads by SafetyPolicy.maxThreads,
+            // which is Runtime.availableProcessors() with no property to pin it — so a large value is
+            // valid on a developer box and a 422 on a small CI runner. This test used 7 and 9 and
+            // therefore failed on every 4-vCPU runner while passing on every 12-core sandbox; it is an
+            // If-Match test and must not depend on the host's core count.
+            // Reproduce that class of failure locally with -XX:ActiveProcessorCount=4 in MAVEN_OPTS
+            // (plus -DforkCount=0, or the flag never reaches the JVM running the tests).
             assertEquals(200, write(c.port, pipeline("p3", 1), null).statusCode());
             String held = etagOf(c.port, "pipeline", "p3");        // editor A reads
 
-            assertEquals(200, write(c.port, pipeline("p3", 7), held).statusCode());   // editor B saves first
+            assertEquals(200, write(c.port, pipeline("p3", 3), held).statusCode());   // editor B saves first
 
-            HttpResponse<String> stale = write(c.port, pipeline("p3", 9), held);      // A saves on a stale read
+            HttpResponse<String> stale = write(c.port, pipeline("p3", 2), held);      // A saves on a stale read
             assertEquals(409, stale.statusCode(), "⚠ NOT 412 — this codebase has no 412; the code is the payload");
             assertEquals("CONFLICT_STALE_VERSION",
                     JSON.readTree(stale.body()).get("error").get("errorCode").asText(),
@@ -150,7 +158,7 @@ class ControlApiConfigIfMatchTest {
 
             // And the refusal must be a refusal: B's value survives, A's is not applied.
             JsonNode after = JSON.readTree(read(c.port, "pipeline", "p3").body()).get("data").get("config");
-            assertEquals(7, after.get("processing").get("threads").asInt(),
+            assertEquals(3, after.get("processing").get("threads").asInt(),
                     "the earlier save must still be on disk — a 409 that wrote anyway would be the worse bug");
         }
     }
