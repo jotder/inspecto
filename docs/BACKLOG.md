@@ -1087,12 +1087,17 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   LINK guard.** Both `check-doc-links.mjs` and `check-doc-citations.mjs` resolve against the FILESYSTEM,
   so a local run is green for (a) a path that differs only by CASE and (b) a path that is GITIGNORED and
   therefore absent from a checkout. (b) landed the same day, immediately behind (a):
-  `.claude/sessions/snapshot.md` is cited by `CLAUDE.md` and `.claude/QUICK_START.md`, exists in every
-  working tree because a hook writes it on stop, and exists in no checkout. Both citations now state the
+  `.claude/sessions/snapshot.md` does not exist in a checkout, yet is cited by `CLAUDE.md` and
+  `.claude/QUICK_START.md` and present in every working tree (a hook writes it on stop). Both state the
   absence on their own line, which is the guard's own sanctioned hatch. ⚠ A THIRD gap is visible from the
   same finding and is NOT fixed: the citation guard ignores a path with no `/` in it, which is why the
   sibling `SESSION_STATUS.local.md` — equally gitignored, equally cited — was never flagged at all.
   ⇒ the fix is one seam for both guards: resolve every citation against `git ls-files`, case-exact.
+  ⚠ **Until that lands, verify doc guards against a CLEAN EXPORT, never the working tree**: `git archive`
+  HEAD into a temp dir, copy the uncommitted files over it, `git init` + commit there (the guards call
+  git, and a guard that cannot run is not a pass), then run them from that directory. That reproduces the
+  runner's view of both gaps. 🔴 This row's own first draft was caught by its own bug — it cited the
+  snapshot path with no absence marker, passed here, and failed on CI.
   → `okf/capabilities/tooling/tooling.md` §3.2
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
