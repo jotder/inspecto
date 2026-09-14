@@ -876,6 +876,38 @@ Work under (ii):
 > object-store bullets. ⛔ Do not start 1 or 6 until the object store returns; and note bullet 1's
 > `CatalogCommit` name appears nowhere in code — it is this plan's proposal, not a thing to go looking for.
 >
+> 🔴 **Grounded 2026-09-14 when the operator proposed starting bullet 6: BULLET 6 IS NOT INDEPENDENTLY
+> STARTABLE, and the sandbox is no longer the constraint.** MinIO, Postgres and the staged `httpfs`/`aws`
+> extensions are all present, and a DuckDB `COPY … TO 's3://…'` plus read-back against MinIO was measured
+> working (`httpfs` autoloaded, `aws` never loaded). What blocks bullet 6 is the code, in three parts:
+> 1. **The reveal, i.e. bullet 1, is a hard prerequisite — not a parallel item.** `PartitionWriter` writes
+>    through DuckDB `COPY` (`:192`), which *could* address `s3://` unchanged, but everything around it is
+>    `java.nio.file`: `new File(databaseDir).mkdirs()` (`:174`), the `.staging` dir (`:176-177`), `Files.walk`
+>    (`:201,212`) and the two-hop `Files.move` … `ATOMIC_MOVE` reveal (`:229-236`). ⇒ **the write itself is
+>    the easy half.** ⚠ The reveal is inline and private, with no strategy seam to extend.
+> 2. **`dirs.database` has ~10 direct `Path.of`/`Paths.get` consumers beyond `PartitionWriter`**, across
+>    `inspecto`, `inspecto-engine` and `inspecto-etl` (`CollectorService:1259`, `DbBrowserRoutes:273`,
+>    `UnionModeIngester:152`, `PipelineTestRun:104`, `IngestSinkWriter:69`, `DuckDbRecordSink:119`,
+>    `ConsignmentIngestStrategy:269,574`, `MetadataGraphBuilder:54`, `ReferenceReader:55` — the last builds
+>    a **glob string**). It is a raw `String` end-to-end with no scheme dispatch anywhere.
+> 3. **There is no credentials surface.** Nothing in config carries an endpoint, key or region, and the
+>    probe needed five `SET s3_*` statements. ⛔ That is a config-and-secrets design, not a code edit.
+>
+> ✅ **What DID ship from this grounding — a fail-closed refusal, because the status quo was worse than
+> "unsupported".** 🔴 `Paths.get` answers this **differently per platform**, and the divergence favours the
+> wrong side on the deployment target. Measured with `s3://bucket/data`: **Windows throws**
+> `InvalidPathException`, so the jail refused by accident; **Linux does not throw** and yields
+> `/s3:/bucket/data` — a real local directory named `s3:` under the CWD, which `PathJail.contains` then
+> judges confidently and wrongly. ⇒ an operator authoring `dirs.database: s3://…` today gets a clean
+> refusal on the box they probe from and **silent local writes on the box it ships to**. `PathJail.isUri`
+> is now the one definition, refused by both the enforcing jail and the 422 write gate, mutation-verified
+> in both directions. ⚠ **When bullets 1 and 6 land, dispatch on that predicate — do not delete it**: a
+> bucket URI cannot be contained by `Path` comparison at all and needs its own containment rule.
+> ⚠ Also corrected here: this plan says there is *"no write-path object-store client in the repo … so when
+> those resume they are a larger piece than they look."* The first half is true (`S3Connector` is read-side
+> acquisition with only copy/tag writes) but **the conclusion does not follow for the data write** — DuckDB
+> is the writer, and it already speaks S3. The larger piece is the reveal and the credentials, not a client.
+>
 > 🔴 **What shipping bullet 4 did NOT fix, stated plainly because the code now looks like it did.**
 > "Registration is mandatory when partitioned" is an invariant of **one path** — but ⛔ **NOT the one this
 > plan has been claiming, and this block first repeated.** §5.4's own text below says *"The graph lane
@@ -1040,7 +1072,14 @@ bullet does, and it is read first.** What is left of phase C is §5.4 alone.
 - ⏸ **DEFERRED with the object store:** the `RenameReveal`/`CatalogCommit` visibility strategy and
   `dirs.database` as an `s3://` URI with object-store-aware containment in `PathJail`. ⚠ **There is no
   write-path object-store client in the repo at all** — `S3Connector` is read-side *acquisition*
-  (hand-rolled SigV4), not a sink — so when those resume they are a larger piece than they look.
+  (hand-rolled SigV4), not a sink. 🔴 **But that is NOT why they are a larger piece than they look, and
+  the difference matters (regrounded 2026-09-14).** The data write needs no such client: `PartitionWriter`
+  writes through DuckDB `COPY`, and DuckDB speaks S3 — measured against MinIO. The real weight is
+  (a) the inline two-hop `ATOMIC_MOVE` reveal, which has no object-store equivalent and no seam,
+  (b) ~10 further `Path.of(dirs.database())` consumers outside `PartitionWriter`, one of them building a
+  glob string, and (c) a credentials/endpoint config surface that does not exist. ⇒ **bullet 6 cannot
+  start without bullet 1.** ✅ A fail-closed URI refusal shipped ahead of both — see §5.4 — because the
+  prior behaviour was platform-divergent: a clean throw on Windows, a silent local `s3:` directory on Linux.
 
 ⚠ **The Helm chart is the last artefact of phase C, not the first of phase A.** By then Kubernetes is
 packaging, not architecture. Writing the chart first is how a team ends up with `replicas: 4` and

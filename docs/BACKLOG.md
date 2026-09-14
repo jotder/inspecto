@@ -1283,6 +1283,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   shipped in exactly that inert state and is now loaded by name at both attach sites, so the pattern
   `httpfs` must follow already exists: `LakehouseCatalog.backendExtension` +
   `DuckDbExtension.ensureLoaded`. → `superpower/enterprise-scale-out-plan.md` §5.4 bullet 6
+  🔴 **Regrounded 2026-09-14 when starting bullet 6 was proposed: there is no `s3://` seam to attach that
+  `ensureLoaded` call to yet, and bullet 6 cannot start without bullet 1.** `PartitionWriter` writes via
+  DuckDB `COPY` (`:192`), which already speaks S3 — measured end to end against the live MinIO, `httpfs`
+  autoloading and `aws` never loading. But the staging dir, the `Files.walk` cleanup and the two-hop
+  `ATOMIC_MOVE` reveal around it (`:174,176-177,201,212,229-236`) are `java.nio.file` with no object-store
+  equivalent and no strategy seam, `dirs.database` has ~10 further `Path.of` consumers outside that class,
+  and **no config surface carries an endpoint, key or region** (the probe needed five `SET s3_*`
+  statements). ⇒ three pieces, and only the first is bullet 6's own.
+  ✅ **What shipped instead, ahead of all of it: a fail-closed URI refusal.** 🔴 The status quo was worse
+  than unsupported — `Paths.get("s3://bucket/data")` **throws on Windows and does not on Linux**, where it
+  yields `/s3:/bucket/data`, a local directory named `s3:` under the CWD that `PathJail.contains` then
+  judges confidently and wrongly. An operator authoring that value got a refusal on the box they probe from
+  and silent local writes on the box it ships to. `PathJail.isUri` is now the one definition, enforced by
+  both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
+  bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:

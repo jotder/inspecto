@@ -225,6 +225,18 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   catalog fatal; this one is reached, successfully, privately, with every batch green. ⛔ When a guard
   exists to stop divergence, ask what the WRONG-BUT-SUCCESSFUL path looks like, not just the failing one.
   Now refused by `LakehouseCatalog.requireShared` when partitioned.
+
+- 🔴 **`Paths.get` DISAGREES ACROSS PLATFORMS about a URI, and it fails closed on the box you probe from
+  and fails silent on the box you ship to.** Measured 2026-09-14 with `s3://bucket/data`: **Windows**
+  throws `InvalidPathException: Illegal char <:> at index 2`; **Linux** (JDK 26, the shipped
+  `linux_amd64` target) does **not** throw and returns `/s3:/bucket/data` — a real local directory
+  literally named `s3:`, resolved against the working directory. So `dirs.database: s3://…` used to be
+  refused here and **silently written to local disk in production**, with `PathJail.contains` giving a
+  confident wrong answer about it. ⛔ **Never conclude "that value is rejected" from a Windows probe of
+  path code.** Same family as the `catalog_url` note above: the failure mode is success at the wrong
+  thing. Now one predicate, `PathJail.isUri`, refused by both the enforcing jail and the 422 write gate;
+  ⚠ when object-store paths land (scale-out §5.4 bullets 1 and 6) **dispatch on it, do not delete it** —
+  a bucket URI is not containable by `Path` comparison and needs its own rule.
 - 🔴 **A prefix match is not a spelling check.** That same guard first accepted `postgres://…` because it
   *starts with* `postgres:` — endorsing the exact spelling its own error message told operators to avoid,
   and which had already been measured failing to attach. ⛔ **When a rule's message enumerates bad values,
