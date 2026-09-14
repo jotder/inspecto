@@ -94,12 +94,20 @@ jobs:
           fi
           gpg --batch --list-secret-keys "$KEY_ID" > /dev/null
 
-      # Every edition, signed. -NoRuntime: the jlink runtime needs the GraalVM jmods cache this runner
-      # does not carry; the bundle then requires Java 24+ on the target (documented in package.ps1).
+      # Every edition, signed, each WITH an embedded trimmed runtime (OPS-07, 2026-09-14).
+      # These steps used to pass -NoRuntime "because the jlink runtime needs the GraalVM jmods cache this
+      # runner does not carry", so no published bundle ever contained a runtime. That cause was wrong: the
+      # blocker was package.ps1 hardcoding `jlink.exe`, which cannot exist on this ubuntu runner. Measured
+      # in eclipse-temurin:25-jdk (what setup-java installs here): jlink is at $JAVA_HOME/bin/jlink, the
+      # image ships ZERO jmods, and jlink still links a working ~64 MB runtime from the run-time image
+      # itself (JEP 493). Both launchers are conditional, so a Linux-built runtime serves Linux targets
+      # while Windows targets keep falling back to system java.
+      # ⛔ If a release ever fails at "Embedding trimmed Java runtime", re-add -NoRuntime to unblock the
+      # cut and reopen OPS-07 — do NOT provision a jmods cache, which is not what was missing.
       - name: Package + SBOM + sign — Personal
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal -NoRuntime -Sign
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Personal -Sign
       # Examples smoke (EXAMPLES-STEPS-1): run one bundled example through the bundle's OWN runner against the
       # packaged jar, so a runner that stops declaring -Dassist.safety.roots ("no allowed roots configured")
       # fails the release instead of shipping. hello-csv is the minimum pipeline: CSV -> Parquet, 4 typed columns.
@@ -128,7 +136,7 @@ jobs:
       - name: Package + SBOM + sign — Standard
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Standard -NoRuntime -Sign
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Standard -Sign
       - name: Collect Standard artifacts
         run: |
           set -euo pipefail
@@ -144,7 +152,7 @@ jobs:
       - name: Package + SBOM + sign — Enterprise
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
-        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Enterprise -NoRuntime -Sign
+        run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Enterprise -Sign
       - name: Collect Enterprise artifacts
         run: |
           set -euo pipefail

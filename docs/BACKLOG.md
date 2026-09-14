@@ -108,9 +108,30 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
+- 🔴 **`SBOM-EOIAGENT-LICENCE-1` — the release pipeline cannot build a Standard bundle.** Filed
+  2026-09-14. `package.ps1 -Edition Standard` **throws** at the SBOM licence gate (`package.ps1:598`):
+  `com.eoiagent:eoiagent-core` and `com.eoiagent:eoiagent-model` declare **no licence** (`NOASSERTION`),
+  and `tools/sbom.mjs` refuses — correctly — to "ship an SBOM that asserts nothing".
+  **Measured 2026-09-14:** Personal `exit 0`; Standard `exit 1`, two violations. ⚠ Enterprise stages the
+  same jars so is expected to fail identically, but that is **not proven** — the probe ran against a
+  bundle directory holding a Standard build, so its failure was a missing `inspecto-policy.jar`, i.e. the
+  probe's own fault, not a finding.
+  🔴 **This is a regression dated 2026-09-12**, when `PKG-5` began staging the assistant into
+  **Standard and above** (`package.ps1` `$modules`). Before that, no bundle carried an `eoiagent`
+  component and the gate never saw one. It is untracked — `NOASSERTION` appears in no doc — and
+  `release.yml` fires only on `v*` tags, so nothing has hit it yet: **the next tag fails at the Standard
+  step.**
+  ⛛ **Not fixable by an agent, and deliberately not worked around.** The question is what licence those
+  components actually carry, and that is a compliance answer, not a code change: (a) declare `<licenses>`
+  upstream in `jotder/inspect-agent` — the correct home, since the metadata belongs to the artifact; or
+  (b) carry a declared mapping in `tools/sbom.mjs` for components whose POM omits it — faster, but this
+  repo would then be asserting a licence for an artifact it does not own. ⚠ Do NOT "fix" it by relaxing
+  the gate; the gate is the control (`compliance/controls-matrix.md` CC9) and it just did its job.
+  → `okf/capabilities/compliance/compliance.md`, `okf/capabilities/editions/editions.md` §2
+
 *(2026-09-12: **`RECON-CARDINALITY-1` DECIDED — BUILD IT.** Operator chose to build one-to-many /
 many-to-many recon matching rather than drop the phrase from whitepaper §4. Moved to §3 as a build row.
-**§1 is EMPTY again** — every operator decision on the board is answered.
+**§1 was EMPTY again** — every operator decision on the board was answered (⚠ no longer true: `SBOM-EOIAGENT-LICENCE-1` was filed 2026-09-14, see the top of §1).
 🔴 **CORRECTION, later the same day: this decision was taken on a false premise and its two warnings are
 struck.** The phrase was **already gone** — whitepaper v1.2 (`db11a412`, 2026-09-11) deleted it during a
 market-focused rewrite, a day before the decision was recorded, so "build rather than drop" offered as the

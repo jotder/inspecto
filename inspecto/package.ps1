@@ -21,8 +21,9 @@
 # 2026-07-07): jdeps on inspecto-security.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
 # java.base/java.sql/java.net.http/jdk.httpserver, and RS256/ES256 resolve via SunRsaSign/SunEC
 # (jdk.crypto.ec) on a jlink image built from exactly this list — Standard bundles may embed the
-# runtime. jlink can target either platform from this Windows host by pointing --module-path at
-# the target JDK's jmods (the invoked jlink.exe is always the Windows one; -NoRuntime skips both).
+# runtime. jlink can target either platform from a Windows host by pointing --module-path at the
+# target JDK's jmods; -NoRuntime skips both. ⚠ The invoked tool is the HOST's (`jlink.exe` on Windows,
+# `jlink` elsewhere) — hardcoding the `.exe` is what kept CI from ever embedding a runtime (OPS-07).
 #
 # Output:
 #   inspecto-deploy.zip        (Windows target, embedded Windows JVM)
@@ -1374,19 +1375,39 @@ if (-not $NoRuntime) {
     # (sun.misc.Unsafe), java.net.http (HttpClient), jdk.zipfs (.zip via NIO), java.management (JMX).
     $runtimeModules = 'java.base,java.compiler,java.desktop,java.naming,java.scripting,java.sql,jdk.httpserver,jdk.crypto.ec,jdk.unsupported,java.net.http,jdk.zipfs,java.management'
 
-    # Locate a jlink: prefer the resolved GraalVM cache, then JAVA_HOME, then PATH. This must be
-    # the Windows jlink.exe (the host-executable tool) regardless of which target(s) we build.
+    # Locate a jlink: prefer the resolved GraalVM cache, then JAVA_HOME, then PATH.
+    # 🔴 OPS-07 (2026-09-14): all three probes used to hardcode `jlink.exe`, and the JAVA_HOME one a
+    # Windows separator. The tool is `jlink` (no extension) on Linux/macOS, so on a non-Windows HOST this
+    # step could only ever throw — which is the real reason `release.yml` passed -NoRuntime on every step
+    # and no published bundle ever carried a runtime. ⛔ The recorded cause ("the runner has no GraalVM
+    # jmods cache") was a hypothesis and is wrong. Measured 2026-09-14 inside eclipse-temurin:25-jdk, the
+    # image `setup-java` gives the runner: that JDK ships **zero** jmods, and jlink STILL links a working
+    # 64 MB image, because a modern JDK links from the run-time image itself (JEP 493). ⚠ So do not "fix"
+    # this by provisioning a jmods cache in CI — a cache is needed only to CROSS-build (below), never to
+    # build for the host. (This sandbox does have one, at the SIBLING path `C:\sandbox\.graalvm-cache`,
+    # which is what a local run resolves; that is why a Windows run also emits the Linux image.)
+    # ⚠ The host's jlink builds a HOST-platform image unless --module-path points at another platform's
+    # jmods; that cross-build still needs the cache, and is still Windows-host-only below.
+    $jlinkName  = if ($env:OS -eq 'Windows_NT') { 'jlink.exe' } else { 'jlink' }
+    $hostLabel  = if ($env:OS -eq 'Windows_NT') { 'Windows' }   else { 'Linux' }
     $jlink = $null
     if ($graalvmCacheDir) {
-        $jlink = Get-ChildItem -Path $graalvmCacheDir -Filter 'jlink.exe' -Recurse -ErrorAction SilentlyContinue |
+        $jlink = Get-ChildItem -Path $graalvmCacheDir -Filter $jlinkName -Recurse -ErrorAction SilentlyContinue |
                  Select-Object -First 1 -ExpandProperty FullName
     }
-    if (-not $jlink -and $env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\jlink.exe")) { $jlink = "$env:JAVA_HOME\bin\jlink.exe" }
-    if (-not $jlink) { $jlink = (Get-Command jlink.exe -ErrorAction SilentlyContinue).Source }
-    if (-not $jlink) { throw "jlink.exe not found (looked in .graalvm-cache ($graalvmCacheDir), JAVA_HOME, PATH). Re-run with -NoRuntime to skip embedding a JVM." }
+    if (-not $jlink -and $env:JAVA_HOME) {
+        $fromJavaHome = Join-Path $env:JAVA_HOME (Join-Path 'bin' $jlinkName)
+        if (Test-Path $fromJavaHome) { $jlink = $fromJavaHome }
+    }
+    if (-not $jlink) { $jlink = (Get-Command $jlinkName -ErrorAction SilentlyContinue).Source }
+    if (-not $jlink) { throw "$jlinkName not found (looked in .graalvm-cache ($graalvmCacheDir), JAVA_HOME, PATH). Re-run with -NoRuntime to skip embedding a JVM." }
 
+    # ⚠ The image lands in bundle/runtime/ whatever the host platform, and that is safe because BOTH
+    # launchers are conditional: serve.sh takes runtime/bin/java only when it is executable, serve.bat
+    # takes runtime\bin\java.exe only when it exists. So a Linux-built bundle gives Linux targets an
+    # embedded JVM while Windows targets fall back to system java exactly as they do today.
     $runtimeOut = Join-Path $bundleDir 'runtime'
-    New-JlinkRuntime -JlinkExe $jlink -Modules $runtimeModules -OutputDir $runtimeOut -PlatformLabel 'Windows'
+    New-JlinkRuntime -JlinkExe $jlink -Modules $runtimeModules -OutputDir $runtimeOut -PlatformLabel $hostLabel
 
     # Linux jmods dir: glob for it (don't pin the version string) so a cache refresh doesn't break this.
     $linuxJmods = $null
