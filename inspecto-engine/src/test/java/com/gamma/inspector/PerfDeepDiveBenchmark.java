@@ -69,6 +69,14 @@ class PerfDeepDiveBenchmark {
                 "threads=4, duckdb=-1 (opt-out→" + cores + "/batch = " + (4 * cores) + " on " + cores + ")",
         };
 
+        // -Dbench.threads=N replaces the three fixed variants with one: N concurrent batches, auto-derived
+        // duckdb_threads — for saturating a box whose core count the fixed variants under-use.
+        int only = Integer.getInteger("bench.threads", 0);
+        if (only > 0) {
+            variants = new int[][] {{only, 0}};
+            labels = new String[] {"threads=" + only + ", duckdb=0 (auto→" + Math.max(1, cores / only) + "/batch)"};
+        }
+
         for (int v = 0; v < variants.length; v++) {
             Path dir = root.resolve("c" + v);
             PipelineConfig cfg = buildConfig(dir, variants[v][0], variants[v][1], maxFiles);
