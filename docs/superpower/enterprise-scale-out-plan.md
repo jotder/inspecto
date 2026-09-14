@@ -819,6 +819,23 @@ Work:
 ### 5.4 The shared lakehouse — visibility is the catalog commit
 
 
+> ✅ **D4a — SCOPE NARROWED 2026-09-14 (operator): the OBJECT STORE is POSTPONED; build on local,
+> mounted storage for now.** ⛔ **This is NOT a reversal of D4 and must not be read as electing option
+> (i).** What is deferred is the **storage substrate only** (`s3://` paths, an object-store client,
+> object-store-aware containment). What STANDS is D4's actual invariant — **visibility is the catalog
+> commit** — because the DuckLake catalog still lives on Postgres. The shipped shape is therefore a
+> deliberate hybrid: **catalog on Postgres (D4 option (ii)), `DATA_PATH` on a shared mounted volume.**
+> ✅ **Measured working 2026-09-14** — that is exactly the shape the probe ran: a Postgres catalog with a
+> local data path, with a second independent connection reading a row back through the catalog.
+> ⚠ **What this changes about §3.6:** nothing, and the reason matters. On a mounted POSIX volume the
+> same-directory `ATOMIC_MOVE` stays correct, and it is doing **local write atomicity** while the catalog
+> commit governs **cross-node visibility** — two different jobs. The §3.6 fork ("keep the rename or retire
+> it") is therefore **not live** under this scope; it becomes live again only when `s3://` paths arrive,
+> which is precisely when a same-directory atomic rename stops existing.
+> ⚠ **What it does NOT buy back:** option (i)'s refusal still stands on its own terms — a shared POSIX
+> filer's cross-node rename/locking behaviour is not being relied on for visibility here, and must not
+> quietly become the mechanism.
+>
 > ✅ **D4 SIGNED 2026-09-12 (operator): option (ii) — object store + DuckLake catalog on Postgres.**
 > A Parquet file becomes visible to every pod exactly when its catalog transaction commits. ⛔ Option (i)
 > (shared POSIX volume) is REFUSED: it keeps `PartitionWriter`'s rename-reveal untouched and is the smaller
@@ -844,6 +861,21 @@ The fork (D4):
   skipped on object-store paths. DuckLake's documented multi-client mode is exactly this.
 
 Work under (ii):
+
+> **Scope after D4a (2026-09-14) — which of the six bullets are live.**
+> | Bullet | Status |
+> |---|---|
+> | 1. `PartitionWriter` visibility strategy (`RenameReveal`/`CatalogCommit`) | ⏸ **DEFERRED** — it exists to *skip* the rename on object-store paths. With a mounted volume the rename is still correct and still wanted, so building the strategy now would add a seam with one implementation |
+> | 2. Double-registration guard | ✅ **SHIPPED** — `DuckLakeRegistrationSiteContractTest` |
+> | 3. Disable data inlining | ✅ **SHIPPED 2026-09-14** (`038447c2`) — measured with a control pair |
+> | 4. Registrar: sidecar → commit step; `ducklake:postgres:`; failure fatal | 🟡 **PART SHIPPED** — D10 fatal (`dfe773bc`) and the catalog spelling proven + guarded (`038447c2`). ⏳ Live remainder: it is still an **opt-in sidecar** called after every batch regardless of topology |
+> | 5. **Reads attach the shared catalog** | ⏳ **LIVE, and the main remaining value** — needs no object store. This is what the plan calls the difference between a platform and N isolated islands |
+> | 6. `dirs.database` as `s3://` + object-store containment | ⏸ **DEFERRED** — wholly object-store |
+>
+> ⚠ So the live work is **bullet 5, then bullet 4's remainder**. ⛔ Do not start 1 or 6 under this scope;
+> and note bullet 1's `CatalogCommit` name appears nowhere in code — it is this plan's proposal, not a
+> thing to go looking for.
+
 - `PartitionWriter` gains a **visibility strategy**: `RenameReveal` (today, local paths) and
   `CatalogCommit` (object-store paths, partitioned mode). ✅ **S2 CONFIRMS the shared seam by reading the
   code, not the javadoc** (2026-09-10): `PartitionSinkWriter` makes **no filesystem call of its own** — it
@@ -959,11 +991,15 @@ bullet does, and it is read first.** What is left of phase C is §5.4 alone.
   the unreachable catalog, never the *privately reachable* one), and data inlining is disabled so the
   catalog database cannot silently become a data path. Both mutation-verified in both directions.
 - ✅ **The air-gap hole is closed** — `postgres_scanner` auto-loads on attach and was not staged.
-- ❌ **Still NOT built, and all of it needs an object store this sandbox has not got:** the
-  `RenameReveal`/`CatalogCommit` visibility strategy, the read-side shared `ATTACH`, `dirs.database` as an
-  `s3://` URI, and object-store-aware containment in `PathJail`. ⚠ **There is no write-path object-store
-  client in the repo at all** — `S3Connector` is read-side *acquisition* (hand-rolled SigV4), not a sink —
-  so this is a larger piece of work than the remaining bullets make it look.
+- ⏳ **LIVE under D4a** (operator narrowed the scope 2026-09-14 — object store postponed, build on local
+  mounted storage): the **read-side shared `ATTACH`** (bullet 5) and the registrar's *sidecar → commit
+  step* remainder (bullet 4). 🔴 **Correcting a claim written earlier the same day**: this list first said
+  the read-side attach needed an object store. It does not — a Postgres catalog over a mounted `DATA_PATH`
+  is enough, and that exact shape was measured working. Only bullets 1 and 6 are object-store-bound.
+- ⏸ **DEFERRED with the object store:** the `RenameReveal`/`CatalogCommit` visibility strategy and
+  `dirs.database` as an `s3://` URI with object-store-aware containment in `PathJail`. ⚠ **There is no
+  write-path object-store client in the repo at all** — `S3Connector` is read-side *acquisition*
+  (hand-rolled SigV4), not a sink — so when those resume they are a larger piece than they look.
 
 ⚠ **The Helm chart is the last artefact of phase C, not the first of phase A.** By then Kubernetes is
 packaging, not architecture. Writing the chart first is how a team ends up with `replicas: 4` and
