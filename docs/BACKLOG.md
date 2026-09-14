@@ -123,7 +123,8 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-⚠ **§1 is NOT empty — three decisions were open in a plan and had never been filed here (2026-09-14).**
+⚠ **§1 is NOT empty — FIVE decisions are queued here as of 2026-09-14, and none of them is new work.**
+Three had been open in a plan and never filed; two were surfaced by grounding already-decided rows.
 `SBOM-EOIAGENT-LICENCE-1`, the last row that ever reached this section, was decided and closed the day it
 was filed — see the closure note below. The three below are not new questions: they have sat in
 `superpower/dataset-column-derivation-plan.md` §6 since 2026-09-11, which is why every handoff since has
@@ -148,6 +149,21 @@ where it is *queued*.
 *(Q1, "is merge-not-replace its own row shipped first", was **answered by building it** on 2026-09-11 and
 is not open. ⚠ Both this board and `INDEX.md` described the pre-fix behaviour in the present tense until
 2026-09-14.)*
+
+Two more, surfaced by grounding two **already-decided-BUILD** §3 rows on 2026-09-14. ⚠ Neither reopens the
+build decision; each is a seam the row's one-line description hid, and picking it is not an engineering
+default.
+
+- **`STUDIO-HALVES-1` — how does a Dataset page invoke a materialization?** There is no materialize route
+  and no `/datasets/*` write route at all; `MaterializeTask` is package-private and reachable only as the
+  `maintenance` job's `task: materialize`. Either (a) add a route, or (b) have the page create and trigger
+  a job through `POST /jobs` + `POST /jobs/{id}/trigger`, supplying the required `dataset` and `target`.
+  ⚠ (b) makes a viewer action write a job document; (a) adds a surface to the next MAJOR's review. → its §3 row
+- **`AGT-ARTIFACT-1` — which artifact kind carries a draft?** The five draft skills emit
+  `{kind:"query"|"expectation"|…, draft:{…}}`, and `parseArtifact` whitelists
+  `ARTIFACT_KINDS = {text, kpi, chart, data-table}`, so a draft is dropped as an unknown kind. Either
+  translate drafts into an existing kind (losing the draft's structure) or add a `draft` kind the SPA's
+  `a2ui` renderer must then handle. ⛔ Until this is picked, "populate the field" is not implementable. → its §3 row
 
 *(2026-09-14: **`SBOM-EOIAGENT-LICENCE-1` DECIDED, FIXED and CLOSED same day** — the release is
 unblocked. Operator took route (a), **declare the licence upstream**, and stated that `com.eoiagent`
