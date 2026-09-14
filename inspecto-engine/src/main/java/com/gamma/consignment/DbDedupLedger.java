@@ -1,6 +1,7 @@
 package com.gamma.consignment;
 
 import com.gamma.api.PublicApi;
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,8 +27,8 @@ import java.util.Set;
  * one DuckDB connection, with no cross-run state.
  *
  * <p>Mirrors {@link DbConsignmentOutputStore}/{@link DbFileStageStore}: plain JDBC over the bundled
- * DuckDB engine, one shared {@link Connection}, schema created on open, every mutator
- * {@code synchronized}.
+ * DuckDB engine, a {@link ConnectionSource} each operation borrows a {@link Connection} from and
+ * returns, schema created on open.
  *
  * <h3>The three answers D8 required before this could return to the board</h3>
  * <ul>
@@ -81,18 +82,25 @@ public final class DbDedupLedger implements AutoCloseable {
     /** ASCII unit separator — see {@link #hash}. Cannot occur in a parsed field value. */
     private static final String SEP = "\u001f";
 
-    private final Connection conn;
+    private final ConnectionSource src;
 
     public DbDedupLedger(String jdbcUrl) throws SQLException {
-        this(JdbcDrivers.connect(jdbcUrl));
+        this(JdbcDrivers.source(jdbcUrl, null, null, "dedup"));
     }
 
     /** Test/embedder seam: bring your own connection (an in-memory DuckDB, typically). */
     public DbDedupLedger(Connection conn) throws SQLException {
-        this.conn = conn;
-        try (Statement st = conn.createStatement()) {
-            st.execute(DDL);
-        }
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbDedupLedger(ConnectionSource src) throws SQLException {
+        this.src = src;
+        src.run(conn -> {
+            try (Statement st = conn.createStatement()) {
+                st.execute(DDL);
+            }
+        });
         log.info("[DEDUP] ledger open");
     }
 
@@ -122,22 +130,25 @@ public final class DbDedupLedger implements AutoCloseable {
      * <p>The insert is {@code ON CONFLICT DO NOTHING}, so a concurrent claim of the same key resolves in
      * the database rather than in a race between two reads.
      */
-    public synchronized Set<String> claim(String pipeline, java.time.LocalDate windowStart,
-                                          String consignmentId, List<String> keyHashes) throws SQLException {
+    public Set<String> claim(String pipeline, java.time.LocalDate windowStart,
+                             String consignmentId, List<String> keyHashes) throws SQLException {
         Set<String> won = new LinkedHashSet<>();
         if (keyHashes.isEmpty()) return won;
         String sql = "INSERT INTO inspecto_dedup_keys "
                 + "(pipeline, key_hash, window_start, consignment_id, first_seen) "
                 + "VALUES (?, ?, ?, ?, now()) ON CONFLICT DO NOTHING";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (String h : keyHashes) {
-                ps.setString(1, pipeline);
-                ps.setString(2, h);
-                ps.setObject(3, windowStart);
-                ps.setString(4, consignmentId);
-                if (ps.executeUpdate() == 1) won.add(h);
+        // ⚠ Every hash of one claim shares ONE borrow: the whole set is a single admission decision.
+        src.run(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (String h : keyHashes) {
+                    ps.setString(1, pipeline);
+                    ps.setString(2, h);
+                    ps.setObject(3, windowStart);
+                    ps.setString(4, consignmentId);
+                    if (ps.executeUpdate() == 1) won.add(h);
+                }
             }
-        }
+        });
         return won;
     }
 
@@ -145,12 +156,14 @@ public final class DbDedupLedger implements AutoCloseable {
      * Drop every claim made by {@code consignmentId} — the reprocess path. Returns the row count, so a
      * caller can log that a supersede actually released something rather than assuming it did.
      */
-    public synchronized int retract(String consignmentId) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM inspecto_dedup_keys WHERE consignment_id = ?")) {
-            ps.setString(1, consignmentId);
-            return ps.executeUpdate();
-        }
+    public int retract(String consignmentId) throws SQLException {
+        return src.with(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM inspecto_dedup_keys WHERE consignment_id = ?")) {
+                ps.setString(1, consignmentId);
+                return ps.executeUpdate();
+            }
+        });
     }
 
     /**
@@ -159,38 +172,44 @@ public final class DbDedupLedger implements AutoCloseable {
      * <p>⚠ Aged by the record's own <b>event time</b> (the window it was filed under), never by file
      * mtime — a late-arriving file must not evict keys that are still inside the declared window.
      */
-    public synchronized int prune(java.time.LocalDate cutoff) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "DELETE FROM inspecto_dedup_keys WHERE window_start < ?")) {
-            ps.setObject(1, cutoff);
-            return ps.executeUpdate();
-        }
+    public int prune(java.time.LocalDate cutoff) throws SQLException {
+        return src.with(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM inspecto_dedup_keys WHERE window_start < ?")) {
+                ps.setObject(1, cutoff);
+                return ps.executeUpdate();
+            }
+        });
     }
 
     /** Rows currently held, for tests and the ops surface. */
-    public synchronized long size() throws SQLException {
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT count(*) FROM inspecto_dedup_keys")) {
-            return rs.next() ? rs.getLong(1) : 0L;
-        }
+    public long size() throws SQLException {
+        return src.with(conn -> {
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT count(*) FROM inspecto_dedup_keys")) {
+                return rs.next() ? rs.getLong(1) : 0L;
+            }
+        });
     }
 
     /** The Consignments holding claims, newest window first — the ops answer to "who owns these keys". */
-    public synchronized List<String> claimants() throws SQLException {
+    public List<String> claimants() throws SQLException {
         List<String> out = new ArrayList<>();
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(
-                     "SELECT DISTINCT consignment_id FROM inspecto_dedup_keys ORDER BY consignment_id")) {
-            while (rs.next()) out.add(rs.getString(1));
-        }
+        src.run(conn -> {
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery(
+                         "SELECT DISTINCT consignment_id FROM inspecto_dedup_keys ORDER BY consignment_id")) {
+                while (rs.next()) out.add(rs.getString(1));
+            }
+        });
         return out;
     }
 
     @Override
-    public synchronized void close() {
+    public void close() {
         try {
-            conn.close();
-        } catch (SQLException e) {
+            src.close();
+        } catch (RuntimeException e) {
             log.warn("[DEDUP] closing the ledger failed: {}", e.toString());
         }
     }

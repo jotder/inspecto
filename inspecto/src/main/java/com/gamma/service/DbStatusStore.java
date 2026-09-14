@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,22 +73,27 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     private static final String T_QUARANTINE = "inspecto_status_quarantine";
     private static final String T_UNPACK     = "inspecto_status_unpack";
 
-    private final Connection conn;
+    private final ConnectionSource src;
 
-    // ── raw table browser seam (BrowsableStore) — read-only, synchronized(this) ──
+    // ── raw table browser seam (BrowsableStore) — read-only, borrowed per operation ──
     @Override public String browseId() { return "status"; }
     @Override public String browseLabel() { return "Ingest Status"; }
     @Override public java.util.List<String> browseTables() {
         return java.util.List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK);
     }
-    @Override public Connection browseConnection() { return conn; }
+    @Override public ConnectionSource browseSource() { return src; }
 
     /**
      * Wrap an already-open JDBC connection (any engine). The schema is created if absent.
      * The store takes ownership of the connection and closes it in {@link #close()}.
      */
     public DbStatusStore(Connection conn) {
-        this.conn = conn;
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbStatusStore(ConnectionSource src) {
+        this.src = src;
         initSchema();
     }
 
@@ -102,21 +108,25 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
      * @param pass password, or {@code null}
      */
     public static DbStatusStore open(String url, String user, String pass) throws SQLException {
-        return new DbStatusStore(JdbcDrivers.connect(url, user, pass));
+        return new DbStatusStore(JdbcDrivers.source(url, user, pass, "status"));
     }
 
     // ── reads (StatusStore) ──────────────────────────────────────────────────────
 
     @Override
-    public synchronized Set<String> committedBatches(PipelineConfig cfg) {
+    public Set<String> committedBatches(PipelineConfig cfg) {
         Set<String> ids = new LinkedHashSet<>();
         String p = name(cfg);
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT batch_id FROM " + T_COMMITS + " WHERE pipeline = ?")) {
-            ps.setString(1, p);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) ids.add(rs.getString(1));
-            }
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT batch_id FROM " + T_COMMITS + " WHERE pipeline = ?")) {
+                    ps.setString(1, p);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) ids.add(rs.getString(1));
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("committedBatches query failed for {}: {}", p, e.getMessage());
         }
@@ -150,16 +160,20 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     }
 
     /** Read a table's payload rows for one pipeline (ordered by seq), optionally filtered by batch_id. */
-    private synchronized List<Map<String, String>> readRows(String table, String pipeline, String batchId) {
+    private List<Map<String, String>> readRows(String table, String pipeline, String batchId) {
         List<Map<String, String>> out = new ArrayList<>();
         String sql = "SELECT payload FROM " + table + " WHERE pipeline = ?"
                 + (batchId != null ? " AND batch_id = ?" : "") + " ORDER BY seq";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, pipeline);
-            if (batchId != null) ps.setString(2, batchId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) out.add(parse(rs.getString(1)));
-            }
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, pipeline);
+                    if (batchId != null) ps.setString(2, batchId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(parse(rs.getString(1)));
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("{} query failed for {}: {}", table, pipeline, e.getMessage());
         }
@@ -174,27 +188,36 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
      * — DELETE the pipeline's existing rows, then INSERT the source's current rows — so the
      * operation is idempotent and a partially-applied sync never leaves a torn pipeline.
      */
-    public synchronized void sync(StatusStore source, Collection<PipelineConfig> cfgs) {
-        boolean autoCommit = true;
+    public void sync(StatusStore source, Collection<PipelineConfig> cfgs) {
         try {
-            autoCommit = conn.getAutoCommit();
-            conn.setAutoCommit(false);
-            for (PipelineConfig cfg : cfgs) {
-                String p = name(cfg);
-                deletePipeline(p);
-                insertCommits(p, source.committedBatches(cfg));
-                insertRows(T_BATCHES, p, source.batches(cfg), null);
-                insertRows(T_LINEAGE, p, source.lineage(cfg, null), "consignment_id");
-                insertRows(T_FILES, p, source.files(cfg), null);
-                insertRows(T_QUARANTINE, p, source.quarantine(cfg), null);
-                insertRows(T_UNPACK, p, source.unpack(cfg), null);
-            }
-            conn.commit();
+            // ⚠ ONE borrow for the whole transaction: the DELETEs, the INSERTs and the commit must land on
+            // the same connection, so every helper below is handed this conn rather than borrowing its own.
+            src.run(conn -> {
+                boolean autoCommit = true;
+                try {
+                    autoCommit = conn.getAutoCommit();
+                    conn.setAutoCommit(false);
+                    for (PipelineConfig cfg : cfgs) {
+                        String p = name(cfg);
+                        deletePipeline(conn, p);
+                        insertCommits(conn, p, source.committedBatches(cfg));
+                        insertRows(conn, T_BATCHES, p, source.batches(cfg), null);
+                        insertRows(conn, T_LINEAGE, p, source.lineage(cfg, null), "consignment_id");
+                        insertRows(conn, T_FILES, p, source.files(cfg), null);
+                        insertRows(conn, T_QUARANTINE, p, source.quarantine(cfg), null);
+                        insertRows(conn, T_UNPACK, p, source.unpack(cfg), null);
+                    }
+                    conn.commit();
+                } catch (SQLException e) {
+                    log.warn("Status DB sync failed, rolling back: {}", e.getMessage());
+                    try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+                } finally {
+                    try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
+                }
+            });
         } catch (SQLException e) {
-            log.warn("Status DB sync failed, rolling back: {}", e.getMessage());
-            try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
-        } finally {
-            try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
+            // Only a failed BORROW reaches here — there is no connection to roll back on.
+            log.warn("Status DB sync failed, no connection: {}", e.getMessage());
         }
     }
 
@@ -203,30 +226,38 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
      * rename's identity migration, S4) — one transaction across all five tables so a crash mid-rename
      * never leaves some tables renamed and others not.
      */
-    public synchronized void renamePipeline(String oldName, String newName) {
-        boolean autoCommit = true;
+    public void renamePipeline(String oldName, String newName) {
         try {
-            autoCommit = conn.getAutoCommit();
-            conn.setAutoCommit(false);
-            for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK)) {
-                try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE " + t + " SET pipeline = ? WHERE pipeline = ?")) {
-                    ps.setString(1, newName);
-                    ps.setString(2, oldName);
-                    ps.executeUpdate();
+            // ⚠ ONE borrow: the five UPDATEs and the commit are the transaction this method promises.
+            src.run(conn -> {
+                boolean autoCommit = true;
+                try {
+                    autoCommit = conn.getAutoCommit();
+                    conn.setAutoCommit(false);
+                    for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK)) {
+                        try (PreparedStatement ps = conn.prepareStatement(
+                                "UPDATE " + t + " SET pipeline = ? WHERE pipeline = ?")) {
+                            ps.setString(1, newName);
+                            ps.setString(2, oldName);
+                            ps.executeUpdate();
+                        }
+                    }
+                    conn.commit();
+                } catch (SQLException e) {
+                    log.warn("Status DB rename failed, rolling back: {}", e.getMessage());
+                    try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+                    throw new IllegalStateException("could not rename status rows " + oldName + " -> " + newName + ": " + e.getMessage(), e);
+                } finally {
+                    try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
                 }
-            }
-            conn.commit();
+            });
         } catch (SQLException e) {
-            log.warn("Status DB rename failed, rolling back: {}", e.getMessage());
-            try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+            // Only a failed BORROW reaches here — nothing was rewritten, and the caller must still be told.
             throw new IllegalStateException("could not rename status rows " + oldName + " -> " + newName + ": " + e.getMessage(), e);
-        } finally {
-            try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
         }
     }
 
-    private void deletePipeline(String pipeline) throws SQLException {
+    private void deletePipeline(Connection conn, String pipeline) throws SQLException {
         for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK)) {
             try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + t + " WHERE pipeline = ?")) {
                 ps.setString(1, pipeline);
@@ -235,7 +266,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         }
     }
 
-    private void insertCommits(String pipeline, Set<String> ids) throws SQLException {
+    private void insertCommits(Connection conn, String pipeline, Set<String> ids) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT INTO " + T_COMMITS + " (pipeline, batch_id) VALUES (?, ?)")) {
             for (String id : ids) {
@@ -257,7 +288,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
      * <b>DDL column stays {@code batch_id}</b> — renaming a column in existing {@code .duckdb} files needs a
      * real {@code ALTER TABLE} migration, which is scoped out of the §11.3 slice that renamed the ledgers.
      */
-    private void insertRows(String table, String pipeline,
+    private void insertRows(Connection conn, String table, String pipeline,
                             List<Map<String, String>> rows, String batchIdKey) throws SQLException {
         boolean withBatchId = batchIdKey != null;
         String sql = withBatchId
@@ -281,20 +312,24 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
 
     private void initSchema() {
         migrateLegacyTables();
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + T_COMMITS
-                    + " (pipeline VARCHAR, batch_id VARCHAR)");
-            st.execute("CREATE TABLE IF NOT EXISTS " + T_BATCHES
-                    + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
-            st.execute("CREATE TABLE IF NOT EXISTS " + T_FILES
-                    + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
-            st.execute("CREATE TABLE IF NOT EXISTS " + T_LINEAGE
-                    + " (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR)");
-            st.execute("CREATE TABLE IF NOT EXISTS " + T_QUARANTINE
-                    + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
-            // No legacy migration for this one: no ucc_status_unpack ever existed.
-            st.execute("CREATE TABLE IF NOT EXISTS " + T_UNPACK
-                    + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+        try {
+            src.run(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE IF NOT EXISTS " + T_COMMITS
+                            + " (pipeline VARCHAR, batch_id VARCHAR)");
+                    st.execute("CREATE TABLE IF NOT EXISTS " + T_BATCHES
+                            + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+                    st.execute("CREATE TABLE IF NOT EXISTS " + T_FILES
+                            + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+                    st.execute("CREATE TABLE IF NOT EXISTS " + T_LINEAGE
+                            + " (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR)");
+                    st.execute("CREATE TABLE IF NOT EXISTS " + T_QUARANTINE
+                            + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+                    // No legacy migration for this one: no ucc_status_unpack ever existed.
+                    st.execute("CREATE TABLE IF NOT EXISTS " + T_UNPACK
+                            + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise status DB schema", e);
         }
@@ -306,21 +341,27 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
      */
     private void migrateLegacyTables() {
         String[] suffixes = {"commits", "batches", "files", "lineage", "quarantine"};
-        try (Statement st = conn.createStatement()) {
-            for (String s : suffixes) {
-                String legacy = "ucc_status_" + s;
-                String current = "inspecto_status_" + s;
-                if (tableExists(legacy) && !tableExists(current)) {
-                    st.execute("ALTER TABLE " + legacy + " RENAME TO " + current);
-                    log.info("Status DB: renamed legacy table {} -> {}", legacy, current);
+        try {
+            // ⚠ ONE borrow: each existence probe decides whether the very next RENAME runs, so both have to
+            // see the same catalog.
+            src.run(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    for (String s : suffixes) {
+                        String legacy = "ucc_status_" + s;
+                        String current = "inspecto_status_" + s;
+                        if (tableExists(conn, legacy) && !tableExists(conn, current)) {
+                            st.execute("ALTER TABLE " + legacy + " RENAME TO " + current);
+                            log.info("Status DB: renamed legacy table {} -> {}", legacy, current);
+                        }
+                    }
                 }
-            }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not migrate legacy status tables", e);
         }
     }
 
-    private boolean tableExists(String table) throws SQLException {
+    private boolean tableExists(Connection conn, String table) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT 1 FROM information_schema.tables WHERE table_name = ?")) {
             ps.setString(1, table);
@@ -354,8 +395,8 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     @Override
     public void close() {
         try {
-            conn.close();
-        } catch (SQLException e) {
+            src.close();
+        } catch (RuntimeException e) {
             log.warn("Error closing status DB connection: {}", e.getMessage());
         }
     }

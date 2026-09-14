@@ -1,6 +1,8 @@
 # Connection pooling — scale-out phase A, the last unbuilt item
 
-**Status:** IN FLIGHT (started 2026-09-14). Owning workstream: `enterprise-scale-out-plan.md` §5.1,
+**Status:** ✅ **SHIPPED 2026-09-14 — phase A is COMPLETE.** Durable as-built facts are distilled into
+[`okf/backend/engine/db-layer.md`](../okf/backend/engine/db-layer.md) §2 (sizing, the two `-D` flags, and
+the concurrency narrowing); this file is kept for provenance only. Nothing remains open. Owning workstream: `enterprise-scale-out-plan.md` §5.1,
 bullet *"Un-park the connection pool"*. Source of the original design:
 `archived-documents/plans-archive/postgres-multi-user-plan.md` P1/P2 — **archive tier, provenance only,
 and its store counts are stale** (see §2).
@@ -106,7 +108,18 @@ Openers that must pass a source instead of a connection: `ServiceStores` (10 fam
 `OpsEngineProvider` (4), `AcquisitionLedgers` (1) — the same 13 sites that already call
 `StoreHealth.degraded`, plus `DbEventStore`'s two.
 
-## 6. Exit criteria
+## 6. Exit criteria — ALL MET 2026-09-14
+
+| Criterion | Result |
+|---|---|
+| `mvn -o clean test -Pedition-enterprise` green | ✅ 4444 tests, 0 failures, 0 errors, 24 skipped; 32/32 modules |
+| `PostgresStateStoreTest` still green | ✅ **16/16, 0 skipped, against a LIVE Postgres** — and 14 of the 15 stores build via `.open(url,…)`, so this ran them through a real **pool**, incl. `DbRunLease`'s fenced CAS across two simulated pods |
+| Pool saturation test (phase A's owed gate) | ✅ `ConnectionSourceTest`, 9 tests, offline, 0 skipped |
+| `jdbc:duckdb:` is an effective pool of 1 | ✅ pinned, and mutation-proven (routing DuckDB to the pool turns it red) |
+| Personal/Standard behaviour unchanged | ✅ DuckDB source is one connection behind one monitor |
+| `dependencies.lock` regenerated, one added line | ✅ `com.zaxxer:HikariCP:jar:6.3.0:compile`, no transitives |
+
+### Original criteria
 
 - `mvn -o clean test -Pedition-enterprise` green, and `PostgresStateStoreTest` still 15/15 (16 tests).
 - A **pool saturation test** — phase A's last owed gate.

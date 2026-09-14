@@ -36,8 +36,16 @@ public abstract class AbstractJdbcStore implements BrowsableStore {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractJdbcStore.class);
 
-    /** The single shared JDBC connection; all subclass access is serialised on the store's monitor. */
-    protected final Connection conn;
+    /**
+     * Where this store borrows a connection for each operation.
+     *
+     * <p>⚠ <b>This was a {@code protected final Connection conn} held for the store's whole life</b>
+     * until scale-out phase A ({@code OPS-03}). Fifteen stores each pinning a connection is fine on one
+     * node and a connection storm on twenty pods. Subclasses now wrap each operation in
+     * {@link #withConn}. ⛔ Never stash the borrowed {@link Connection} in a field — it is valid only
+     * for the duration of the callback.
+     */
+    protected final ConnectionSource src;
 
     private final String browseId;
     private final String browseLabel;
@@ -45,32 +53,45 @@ public abstract class AbstractJdbcStore implements BrowsableStore {
     private final String what;
 
     /**
-     * @param conn        the already-open connection this store owns and closes
+     * @param src         the connection source this store owns and closes
      * @param browseId    stable id for the raw-table browser
      * @param browseLabel human-readable name for the raw-table browser
      * @param table       the one table this store owns
      * @param what        the noun used in the close-failure warning (e.g. {@code "link"})
      */
-    protected AbstractJdbcStore(Connection conn, String browseId, String browseLabel,
+    protected AbstractJdbcStore(ConnectionSource src, String browseId, String browseLabel,
                                 String table, String what) {
-        this.conn = conn;
+        this.src = src;
         this.browseId = browseId;
         this.browseLabel = browseLabel;
         this.table = table;
         this.what = what;
     }
 
+    /**
+     * Run {@code body} against a borrowed connection — the replacement for the old {@code conn} field.
+     * Reentrant, so one store method may call another (see {@link ConnectionSource}).
+     */
+    protected final <T> T withConn(ConnectionSource.SqlFunction<T> body) throws SQLException {
+        return src.with(body);
+    }
+
+    /** {@link #withConn} for a body with no result. */
+    protected final void runConn(ConnectionSource.SqlAction body) throws SQLException {
+        src.run(body);
+    }
+
     @Override public String browseId() { return browseId; }
     @Override public String browseLabel() { return browseLabel; }
     @Override public List<String> browseTables() { return List.of(table); }
-    @Override public Connection browseConnection() { return conn; }
+    @Override public ConnectionSource browseSource() { return src; }
 
-    /** Close the shared connection. A close failure is logged, never thrown — shutdown must not fail. */
+    /** Close the source. A close failure is logged, never thrown — shutdown must not fail. */
     public void close() {
         try {
-            conn.close();
-        } catch (SQLException e) {
-            log.warn("Error closing {} DB connection: {}", what, e.getMessage());
+            src.close();
+        } catch (RuntimeException e) {
+            log.warn("Error closing {} DB connection source: {}", what, e.getMessage());
         }
     }
 }

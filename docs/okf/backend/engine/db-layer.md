@@ -71,8 +71,27 @@ Dataset, which is a product decision, not a bug fix.
 ## 2. Operational store inventory
 
 Each capability owns its own interface + implementations (no shared root interface). All DB
-implementations are **plain JDBC over a single shared `Connection`**, with hand-rolled DDL created
-**lazily on first open** — there is no migration tool.
+implementations are **plain JDBC**, with hand-rolled DDL created **lazily on first open** — there is no
+migration tool.
+
+⚠ **They borrow per operation, they do not hold a connection** (changed 2026-09-14, scale-out phase A /
+`OPS-03`). Each store owns a `ConnectionSource` (`inspecto-util`) and wraps every operation in
+`withConn(…)`. Sizing is derived from the **URL scheme**, not configured per store: ⛔ a `jdbc:duckdb:`
+URL gets **exactly one** connection — each store owns a single-writer-locked file, so a second concurrent
+connection cannot take the lock, and `-Ddb.pool.size` does NOT apply to it — while `jdbc:postgresql:`
+gets a HikariCP pool (`-Ddb.pool.size`, default 10; `-Ddb.pool.timeoutMs`, default 30s). Fifteen stores
+each pinning one connection is fine on one node and a connection storm on twenty pods.
+
+🔴 **What this narrowed.** Every store method used to be `synchronized` on the store, so two operations
+on one store could not interleave *inside a JVM*. On a pooled (Postgres) source they now can. ⚠ That
+guarantee never spanned pods, so this makes the one-JVM case match what the N-pod case always was; DuckDB
+is unchanged, because its source is one connection behind one monitor. Audited 2026-09-14: exactly two
+read-then-write methods are affected, both maintenance-path and both bounded —
+`DbEventStore.prune` (its `DELETE` covers everything under the cutoff regardless, so only the returned
+day *count* can drift) and `DbConsignmentOutputStore.markCompactedAway` (a row inserted mid-method could
+be missed). Left as-is deliberately rather than wrapped in transactions: both were already racy across
+pods, and the DB-decided paths (`ON CONFLICT`, the fenced `UPDATE … WHERE owner = ? AND epoch = ?`) are
+unaffected because the database, not the monitor, decides them.
 
 | Domain | Interface | DB impl | Backend toggle (`-D…`) | Default |
 |---|---|---|---|---|
@@ -953,10 +972,13 @@ The **Data Browser** pane (a per-space DB client) browses these stores live. Bac
 [`archived-documents/plans-archive/db-browser-design.md`](../../../archived-documents/plans-archive/db-browser-design.md).
 
 - **Business-data stores** (§1) read via an ephemeral DuckDB sandbox (`read_parquet`/`read_csv`).
-- **Operational tables** (§3) browse through each store's *live* connection via
+- **Operational tables** (§3) browse through each store's own `ConnectionSource` via
   [`util/BrowsableStore.java`](../../../../inspecto-util/src/main/java/com/gamma/util/BrowsableStore.java) —
-  reads are `synchronized` on the store (single-writer lock) and appear only when that capability runs on
-  a `db`/`postgres` backend. Every `Db*Store` in §2/§3 implements this seam.
+  a browse read borrows like any other operation and appears only when that capability runs on
+  a `db`/`postgres` backend. ⚠ `browseConnection()` and `browseMonitor()` were **removed** 2026-09-14
+  (`OPS-03`): a pooled store has no single long-lived connection to hand back, and exclusion moved onto
+  the source — for DuckDB that is still one connection behind one monitor, so browse reads serialise
+  against the store's writes exactly as before. Every `Db*Store` in §2/§3 implements this seam.
 
 ## Why `__consignment_id` is on the row, not just in the registry
 

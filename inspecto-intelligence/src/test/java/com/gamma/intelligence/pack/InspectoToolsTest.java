@@ -14,6 +14,8 @@ import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
 import com.gamma.util.BrowsableStore;
+import com.gamma.util.ConnectionSource;
+import com.gamma.util.JdbcDrivers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -316,7 +318,7 @@ class InspectoToolsTest {
                 @Override public String browseId() { return "test"; }
                 @Override public String browseLabel() { return "Test"; }
                 @Override public List<String> browseTables() { return List.of("metrics"); }
-                @Override public Connection browseConnection() { return conn; }
+                @Override public ConnectionSource browseSource() { return JdbcDrivers.source(conn); }
             };
             Tool scan = tool(InspectoTools.tools(seeded(), null, () -> List.of(store)), "anomaly_scan");
 
@@ -635,7 +637,7 @@ class InspectoToolsTest {
                 @Override public String browseId() { return "test"; }
                 @Override public String browseLabel() { return "Test"; }
                 @Override public List<String> browseTables() { return List.of("people"); }
-                @Override public Connection browseConnection() { return conn; }
+                @Override public ConnectionSource browseSource() { return JdbcDrivers.source(conn); }
             };
             List<Tool> belt = InspectoTools.tools(seeded(), null, () -> List.of(store));
             Tool suggest = tool(belt, "suggest_expectations");

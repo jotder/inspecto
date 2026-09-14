@@ -1,5 +1,6 @@
 package com.gamma.service;
 
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +95,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
      */
     static final String SCOPE_AUTHORED = "authored";
 
-    private final Connection conn;
+    private final ConnectionSource src;
     private final String space;
     /** Which activity this lease gates — see the class note on why it is part of the key. */
     private final String scope;
@@ -105,7 +106,11 @@ final class DbRunLease implements RunLease, AutoCloseable {
     private final ScheduledExecutorService heartbeat;
 
     DbRunLease(Connection conn, String space, String scope, String owner, Duration ttl) {
-        this.conn = conn;
+        this(JdbcDrivers.source(conn), space, scope, owner, ttl);
+    }
+
+    DbRunLease(ConnectionSource src, String space, String scope, String owner, Duration ttl) {
+        this.src = src;
         this.space = space;
         this.scope = scope;
         this.owner = owner;
@@ -123,7 +128,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
     /** Open a lease over {@code url}. {@code owner} defaults to a per-process id when null. */
     static DbRunLease open(String url, String user, String pass, String space, String scope,
                           String owner, Duration ttl) throws SQLException {
-        return new DbRunLease(JdbcDrivers.connect(url, user, pass), space, scope,
+        return new DbRunLease(JdbcDrivers.source(url, user, pass, "run-lease"), space, scope,
                 owner == null || owner.isBlank() ? defaultOwner() : owner, ttl);
     }
 
@@ -136,29 +141,38 @@ final class DbRunLease implements RunLease, AutoCloseable {
     // ── acquire / release ───────────────────────────────────────────────────────────
 
     @Override
-    public synchronized Claim tryAcquire(String pipeline) {
+    public Claim tryAcquire(String pipeline) {
         // Already ours in THIS process: a claim is not reentrant, so this is a refusal, not a re-grant.
         if (held.containsKey(pipeline)) return null;
         long now = System.currentTimeMillis();
         try {
-            insertIfAbsent(pipeline);
-            // The one statement that decides it. Wins only when the row is free or its lease has expired;
-            // the epoch bump is what makes the previous holder's token stale the instant we take over.
-            String sql = "UPDATE " + TABLE + " SET owner = ?, epoch = epoch + 1, acquired_at = ?, expires_at = ? "
-                    + "WHERE space = ? AND scope = ? AND pipeline = ? AND (owner IS NULL OR expires_at < ?)";
-            int won;
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, owner);
-                ps.setLong(2, now);
-                ps.setLong(3, now + ttlMs);
-                ps.setString(4, space);
-                ps.setString(5, scope);
-                ps.setString(6, pipeline);
-                ps.setLong(7, now);
-                won = ps.executeUpdate();
-            }
-            if (won == 0) return null;
-            long epoch = readEpoch(pipeline);
+            // 🔴 The insert-if-absent, the conditional UPDATE that decides the lease, and the epoch read are
+            // ONE borrow. On a pool they would otherwise be three separate connections, and the fencing token
+            // we record could then belong to a LATER acquisition than the one we just won — a stale token on a
+            // lease we really hold, which is exactly the split-brain the epoch exists to rule out.
+            Long acquired = src.with(conn -> {
+                insertIfAbsent(conn, pipeline);
+                // The one statement that decides it. Wins only when the row is free or its lease has expired;
+                // the epoch bump is what makes the previous holder's token stale the instant we take over.
+                String sql = "UPDATE " + TABLE + " SET owner = ?, epoch = epoch + 1, acquired_at = ?, expires_at = ? "
+                        + "WHERE space = ? AND scope = ? AND pipeline = ? AND (owner IS NULL OR expires_at < ?)";
+                int changed;
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, owner);
+                    ps.setLong(2, now);
+                    ps.setLong(3, now + ttlMs);
+                    ps.setString(4, space);
+                    ps.setString(5, scope);
+                    ps.setString(6, pipeline);
+                    ps.setLong(7, now);
+                    changed = ps.executeUpdate();
+                }
+                if (changed == 0) return null;
+                return readEpoch(conn, pipeline);
+            });
+            // null means the conditional UPDATE matched no row — someone else holds an unexpired lease.
+            if (acquired == null) return null;
+            long epoch = acquired;
             held.put(pipeline, epoch);
             return claimOf(pipeline, epoch);
         } catch (SQLException e) {
@@ -225,19 +239,25 @@ final class DbRunLease implements RunLease, AutoCloseable {
     private void release(String pipeline, long epoch) {
         String sql = "UPDATE " + TABLE + " SET owner = NULL, expires_at = 0 "
                 + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, space);
-            ps.setString(2, scope);
-            ps.setString(3, pipeline);
-            ps.setString(4, owner);
-            ps.setLong(5, epoch);
-            if (ps.executeUpdate() == 0) {
-                // Not an error: it means we no longer held it. Worth a line, because it is the observable
-                // symptom of this process having been paused past its TTL.
-                log.warn("Run lease for '{}' was no longer ours at release (epoch {}) — it had been taken "
-                        + "over; the fencing predicate refused a release that would have freed another "
-                        + "owner's lease", pipeline, epoch);
-            }
+        try {
+            // One statement, so one borrow: the owner+epoch predicate IS the compare-and-set — the database
+            // decides, never a read this code performs first.
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, space);
+                    ps.setString(2, scope);
+                    ps.setString(3, pipeline);
+                    ps.setString(4, owner);
+                    ps.setLong(5, epoch);
+                    if (ps.executeUpdate() == 0) {
+                        // Not an error: it means we no longer held it. Worth a line, because it is the observable
+                        // symptom of this process having been paused past its TTL.
+                        log.warn("Run lease for '{}' was no longer ours at release (epoch {}) — it had been taken "
+                                + "over; the fencing predicate refused a release that would have freed another "
+                                + "owner's lease", pipeline, epoch);
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not release the run lease for '{}': {} — it will expire in {}ms",
                     pipeline, e.getMessage(), ttlMs);
@@ -251,18 +271,24 @@ final class DbRunLease implements RunLease, AutoCloseable {
         String sql = "UPDATE " + TABLE + " SET expires_at = ? "
                 + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
         for (Map.Entry<String, Long> e : held.entrySet()) {
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setLong(1, until);
-                ps.setString(2, space);
-                ps.setString(3, scope);
-                ps.setString(4, e.getKey());
-                ps.setString(5, owner);
-                ps.setLong(6, e.getValue());
-                if (ps.executeUpdate() == 0) {
-                    log.warn("Run lease for '{}' was stolen while we still believed we held it (epoch {}) "
-                            + "— this process was paused or partitioned for longer than the {}ms TTL",
-                            e.getKey(), e.getValue(), ttlMs);
-                }
+            // One borrow per entry: each renewal is its own fenced compare-and-set and shares no state with
+            // the next, so a failure on one must not abandon the rest — as before.
+            try {
+                src.run(conn -> {
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setLong(1, until);
+                        ps.setString(2, space);
+                        ps.setString(3, scope);
+                        ps.setString(4, e.getKey());
+                        ps.setString(5, owner);
+                        ps.setLong(6, e.getValue());
+                        if (ps.executeUpdate() == 0) {
+                            log.warn("Run lease for '{}' was stolen while we still believed we held it (epoch {}) "
+                                    + "— this process was paused or partitioned for longer than the {}ms TTL",
+                                    e.getKey(), e.getValue(), ttlMs);
+                        }
+                    }
+                });
             } catch (SQLException ex) {
                 log.warn("Could not renew the run lease for '{}': {}", e.getKey(), ex.getMessage());
             }
@@ -272,18 +298,22 @@ final class DbRunLease implements RunLease, AutoCloseable {
     // ── diagnostics ─────────────────────────────────────────────────────────────────
 
     @Override
-    public synchronized boolean isRunning(String pipeline) {
+    public boolean isRunning(String pipeline) {
         String sql = "SELECT owner, expires_at FROM " + TABLE
                 + " WHERE space = ? AND scope = ? AND pipeline = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, space);
-            ps.setString(2, scope);
-            ps.setString(3, pipeline);
-            try (ResultSet rs = ps.executeQuery()) {
-                // An EXPIRED lease is not running: the holder is gone and the row is merely stale.
-                return rs.next() && rs.getString("owner") != null
-                        && rs.getLong("expires_at") >= System.currentTimeMillis();
-            }
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, space);
+                    ps.setString(2, scope);
+                    ps.setString(3, pipeline);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        // An EXPIRED lease is not running: the holder is gone and the row is merely stale.
+                        return rs.next() && rs.getString("owner") != null
+                                && rs.getLong("expires_at") >= System.currentTimeMillis();
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not read the run lease for '{}': {}", pipeline, e.getMessage());
             return false;
@@ -300,15 +330,19 @@ final class DbRunLease implements RunLease, AutoCloseable {
      * questions. ⛔ Do not add an {@code owner}/{@code expires_at} predicate here.
      */
     @Override
-    public synchronized long lastRunAt(String pipeline) {
+    public long lastRunAt(String pipeline) {
         String sql = "SELECT last_run_at FROM " + TABLE + " WHERE space = ? AND scope = ? AND pipeline = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, space);
-            ps.setString(2, scope);
-            ps.setString(3, pipeline);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getLong(1) : 0L;   // absent row / SQL NULL both read as 0 = "never"
-            }
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, space);
+                    ps.setString(2, scope);
+                    ps.setString(3, pipeline);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() ? rs.getLong(1) : 0L;   // absent row / SQL NULL both read as 0 = "never"
+                    }
+                }
+            });
         } catch (SQLException e) {
             // ⚠ Fail to "never ran", which makes a cadence-gated pipeline due. The opposite default would
             // silently freeze a pipeline for as long as the database were unreachable; a spurious run is
@@ -324,7 +358,7 @@ final class DbRunLease implements RunLease, AutoCloseable {
      * push that pipeline's next run out by a full interval.
      */
     @Override
-    public synchronized void recordRun(String pipeline, long epochMs) {
+    public void recordRun(String pipeline, long epochMs) {
         Long epoch = held.get(pipeline);
         if (epoch == null) {
             // Not ours to stamp. Per the interface contract this is refused, not an error.
@@ -333,18 +367,24 @@ final class DbRunLease implements RunLease, AutoCloseable {
         }
         String sql = "UPDATE " + TABLE + " SET last_run_at = ? "
                 + "WHERE space = ? AND scope = ? AND pipeline = ? AND owner = ? AND epoch = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, epochMs);
-            ps.setString(2, space);
-            ps.setString(3, scope);
-            ps.setString(4, pipeline);
-            ps.setString(5, owner);
-            ps.setLong(6, epoch);
-            if (ps.executeUpdate() == 0) {
-                log.warn("Run cadence for '{}' not stamped (epoch {}) — the lease had been taken over; the "
-                        + "fencing predicate refused a write that would have moved another owner's cadence",
-                        pipeline, epoch);
-            }
+        try {
+            // The token comes from the in-heap `held` map, not from a database read, so there is nothing to
+            // keep consistent across statements: one statement, one borrow, and the predicate decides.
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setLong(1, epochMs);
+                    ps.setString(2, space);
+                    ps.setString(3, scope);
+                    ps.setString(4, pipeline);
+                    ps.setString(5, owner);
+                    ps.setLong(6, epoch);
+                    if (ps.executeUpdate() == 0) {
+                        log.warn("Run cadence for '{}' not stamped (epoch {}) — the lease had been taken over; the "
+                                + "fencing predicate refused a write that would have moved another owner's cadence",
+                                pipeline, epoch);
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not record the run cadence for '{}': {}", pipeline, e.getMessage());
         }
@@ -365,15 +405,16 @@ final class DbRunLease implements RunLease, AutoCloseable {
     public void close() {
         heartbeat.shutdownNow();
         try {
-            conn.close();
-        } catch (SQLException e) {
+            src.close();
+        } catch (RuntimeException e) {
             log.warn("Error closing run-lease DB connection: {}", e.getMessage());
         }
     }
 
     // ── schema ──────────────────────────────────────────────────────────────────────
 
-    private void insertIfAbsent(String pipeline) throws SQLException {
+    /** ⛔ Takes the caller's borrowed connection: it must run inside {@link #tryAcquire}'s single borrow. */
+    private void insertIfAbsent(Connection conn, String pipeline) throws SQLException {
         // The DbDedupLedger idiom: let the database resolve the race rather than a read-then-write.
         String sql = "INSERT INTO " + TABLE
                 + " (space, scope, pipeline, owner, epoch, acquired_at, expires_at, last_run_at) "
@@ -386,7 +427,9 @@ final class DbRunLease implements RunLease, AutoCloseable {
         }
     }
 
-    private long readEpoch(String pipeline) throws SQLException {
+    /** ⛔ Takes the caller's borrowed connection: the epoch read must ride the same borrow as the UPDATE
+     *  that bumped it, or the token recorded could belong to a later acquisition. */
+    private long readEpoch(Connection conn, String pipeline) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT epoch FROM " + TABLE + " WHERE space = ? AND scope = ? AND pipeline = ?")) {
             ps.setString(1, space);
@@ -399,24 +442,29 @@ final class DbRunLease implements RunLease, AutoCloseable {
     }
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            // ⚠ PRIMARY KEY (space, scope, pipeline) — all three, and each earns its place:
-            //   space    — a pipeline id is unique only WITHIN a Space; keyed on the id alone two Spaces
-            //              running an `orders` pipeline share one lease and each blocks the other.
-            //   scope    — runs and remote acquisition are DELIBERATELY independent activities (operator
-            //              decision 2026-09-12). Without this column, pointing both guards at one lease
-            //              would make a remote fetch block a run of the same pipeline.
-            //   pipeline — the exclusion is per pipeline, never global.
-            st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "space VARCHAR, scope VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT, "
-                    + "acquired_at BIGINT, expires_at BIGINT, last_run_at BIGINT, "
-                    + "PRIMARY KEY (space, scope, pipeline))");
-            // 🔴 `CREATE TABLE IF NOT EXISTS` is a no-op against a table B0/B1 already created, so a pod
-            // upgrading over an existing lease table would find NO `last_run_at` column and fail on the
-            // first cadence read — a fault that cannot appear on a fresh install and therefore only ever
-            // in production. Both backends behind Family.RUN_LEASE (DuckDB, Postgres) support the guarded
-            // ALTER, so this is the whole migration. ⛔ Do not drop it once fresh installs have the column.
-            st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS last_run_at BIGINT");
+        try {
+            // ONE borrow: the guarded ALTER below is the migration for the CREATE above it.
+            src.run(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    // ⚠ PRIMARY KEY (space, scope, pipeline) — all three, and each earns its place:
+                    //   space    — a pipeline id is unique only WITHIN a Space; keyed on the id alone two Spaces
+                    //              running an `orders` pipeline share one lease and each blocks the other.
+                    //   scope    — runs and remote acquisition are DELIBERATELY independent activities (operator
+                    //              decision 2026-09-12). Without this column, pointing both guards at one lease
+                    //              would make a remote fetch block a run of the same pipeline.
+                    //   pipeline — the exclusion is per pipeline, never global.
+                    st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
+                            + "space VARCHAR, scope VARCHAR, pipeline VARCHAR, owner VARCHAR, epoch BIGINT, "
+                            + "acquired_at BIGINT, expires_at BIGINT, last_run_at BIGINT, "
+                            + "PRIMARY KEY (space, scope, pipeline))");
+                    // 🔴 `CREATE TABLE IF NOT EXISTS` is a no-op against a table B0/B1 already created, so a pod
+                    // upgrading over an existing lease table would find NO `last_run_at` column and fail on the
+                    // first cadence read — a fault that cannot appear on a fresh install and therefore only ever
+                    // in production. Both backends behind Family.RUN_LEASE (DuckDB, Postgres) support the guarded
+                    // ALTER, so this is the whole migration. ⛔ Do not drop it once fresh installs have the column.
+                    st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS last_run_at BIGINT");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise the run-lease schema", e);
         }

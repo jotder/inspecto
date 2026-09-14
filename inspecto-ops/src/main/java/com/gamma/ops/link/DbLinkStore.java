@@ -3,6 +3,7 @@ package com.gamma.ops.link;
 import com.gamma.util.AbstractJdbcStore;
 
 import com.gamma.objects.ObjectType;
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +23,9 @@ import java.util.List;
  * distributed deployment. Pick the engine by JDBC URL via {@link #open(String, String, String)}.
  *
  * <p>Links are append-only facts, so — unlike the object store — there is no {@code UPDATE}; the table
- * just grows and ages out with its objects. All access is serialised on a single shared
- * {@link Connection} (low-volume; a JDBC connection is not thread-safe); {@link #close()} closes it.
+ * just grows and ages out with its objects. Each operation borrows a {@link Connection} from a
+ * {@link ConnectionSource} for its duration and returns it (a JDBC connection is not thread-safe);
+ * {@link #close()} closes the source.
  *
  * @since 4.0.0
  */
@@ -37,7 +39,12 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
 
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbLinkStore(Connection conn) {
-        super(conn, "links", "Correlation Links", TABLE, "link");
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbLinkStore(ConnectionSource src) {
+        super(src, "links", "Correlation Links", TABLE, "link");
         initSchema();
     }
 
@@ -46,21 +53,25 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
      * registers the bundled driver matching the scheme ({@code jdbc:duckdb:} primary, {@code jdbc:postgresql:}).
      */
     public static DbLinkStore open(String url, String user, String pass) throws SQLException {
-        return new DbLinkStore(JdbcDrivers.connect(url, user, pass));
+        return new DbLinkStore(JdbcDrivers.source(url, user, pass, "links"));
     }
 
     @Override
-    public synchronized ObjectLink add(ObjectLink link) {
+    public ObjectLink add(ObjectLink link) {
         String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, link.fromId());
-            ps.setString(2, link.fromType().name());
-            ps.setString(3, link.toId());
-            ps.setString(4, link.toType().name());
-            ps.setString(5, link.relationship());
-            ps.setLong(6, link.createdAt());
-            ps.executeUpdate();
-            return link;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, link.fromId());
+                    ps.setString(2, link.fromType().name());
+                    ps.setString(3, link.toId());
+                    ps.setString(4, link.toType().name());
+                    ps.setString(5, link.relationship());
+                    ps.setLong(6, link.createdAt());
+                    ps.executeUpdate();
+                    return link;
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not insert link " + link.fromId() + "->" + link.toId()
                     + ": " + e.getMessage(), e);
@@ -68,13 +79,17 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
     }
 
     @Override
-    public synchronized boolean remove(String from, String to, String relationship) {
+    public boolean remove(String from, String to, String relationship) {
         String sql = "DELETE FROM " + TABLE + " WHERE from_id = ? AND to_id = ? AND UPPER(relationship) = UPPER(?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, from);
-            ps.setString(2, to);
-            ps.setString(3, relationship);
-            return ps.executeUpdate() > 0;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, from);
+                    ps.setString(2, to);
+                    ps.setString(3, relationship);
+                    return ps.executeUpdate() > 0;
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not remove link " + from + "->" + to
                     + ": " + e.getMessage(), e);
@@ -82,12 +97,16 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
     }
 
     @Override
-    public synchronized int removeAllIncident(String objectId) {
+    public int removeAllIncident(String objectId) {
         String sql = "DELETE FROM " + TABLE + " WHERE from_id = ? OR to_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, objectId);
-            ps.setString(2, objectId);
-            return ps.executeUpdate();
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, objectId);
+                    ps.setString(2, objectId);
+                    return ps.executeUpdate();
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not remove links incident to " + objectId
                     + ": " + e.getMessage(), e);
@@ -95,13 +114,17 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
     }
 
     @Override
-    public synchronized List<ObjectLink> incident(String objectId) {
+    public List<ObjectLink> incident(String objectId) {
         String sql = "SELECT " + COLS + " FROM " + TABLE
                 + " WHERE from_id = ? OR to_id = ? ORDER BY created_at DESC";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, objectId);
-            ps.setString(2, objectId);
-            return readAll(ps);
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, objectId);
+                    ps.setString(2, objectId);
+                    return readAll(ps);
+                }
+            });
         } catch (SQLException e) {
             log.warn("link incident query failed for {}: {}", objectId, e.getMessage());
             return List.of();
@@ -109,11 +132,15 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
     }
 
     @Override
-    public synchronized List<ObjectLink> all(int limit) {
+    public List<ObjectLink> all(int limit) {
         String sql = "SELECT " + COLS + " FROM " + TABLE + " ORDER BY created_at DESC LIMIT ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, Math.max(0, limit));
-            return readAll(ps);
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setInt(1, Math.max(0, limit));
+                    return readAll(ps);
+                }
+            });
         } catch (SQLException e) {
             log.warn("link query failed: {}", e.getMessage());
             return List.of();
@@ -123,10 +150,14 @@ public final class DbLinkStore extends AbstractJdbcStore implements LinkStore {
     // ── schema + helpers ─────────────────────────────────────────────────────────
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "from_id VARCHAR, from_type VARCHAR, to_id VARCHAR, to_type VARCHAR, "
-                    + "relationship VARCHAR, created_at BIGINT)");
+        try {
+            runConn(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
+                            + "from_id VARCHAR, from_type VARCHAR, to_id VARCHAR, to_type VARCHAR, "
+                            + "relationship VARCHAR, created_at BIGINT)");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise link DB schema", e);
         }

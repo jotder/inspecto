@@ -1,5 +1,6 @@
 package com.gamma.service;
 
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,18 +50,22 @@ final class DbInboxRegistry implements AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(DbInboxRegistry.class);
     private static final String TABLE = "inbox_registry";
 
-    private final Connection conn;
+    private final ConnectionSource src;
     private final String pod;
 
     DbInboxRegistry(Connection conn, String pod) {
-        this.conn = conn;
+        this(JdbcDrivers.source(conn), pod);
+    }
+
+    DbInboxRegistry(ConnectionSource src, String pod) {
+        this.src = src;
         this.pod = pod;
         initSchema();
     }
 
     /** Open the registry over {@code url}. {@code pod} names the publisher, for diagnosis only. */
     static DbInboxRegistry open(String url, String user, String pass, String pod) throws SQLException {
-        return new DbInboxRegistry(JdbcDrivers.connect(url, user, pass),
+        return new DbInboxRegistry(JdbcDrivers.source(url, user, pass, "inbox-registry"),
                 pod == null || pod.isBlank() ? defaultPod() : pod);
     }
 
@@ -77,41 +82,52 @@ final class DbInboxRegistry implements AutoCloseable {
      * <p>⚠ Must be called for a hosted Space even when it declares <b>nothing</b> — that is precisely when
      * the delete matters, because a pipeline whose {@code dirs.poll} was removed must stop being reported.
      */
-    synchronized void publish(String space, List<SpaceInboxAudit.InboxDecl> declarations) {
-        boolean auto = true;
+    void publish(String space, List<SpaceInboxAudit.InboxDecl> declarations) {
         try {
-            auto = conn.getAutoCommit();
-            conn.setAutoCommit(false);
-            try (PreparedStatement del = conn.prepareStatement(
-                    "DELETE FROM " + TABLE + " WHERE space = ?")) {
-                del.setString(1, space);
-                del.executeUpdate();
-            }
-            try (PreparedStatement ins = conn.prepareStatement("INSERT INTO " + TABLE
-                    + " (space, pipeline, poll_dir, pod, declared_at) VALUES (?,?,?,?,?)")) {
-                long now = System.currentTimeMillis();
-                for (SpaceInboxAudit.InboxDecl d : declarations) {
-                    if (d.pollDir() == null || d.pollDir().isBlank()) continue;
-                    ins.setString(1, space);
-                    ins.setString(2, d.pipeline());
-                    ins.setString(3, d.pollDir());
-                    ins.setString(4, pod);
-                    ins.setLong(5, now);
-                    ins.addBatch();
+            // ⚠ ONE borrow: the DELETE, the INSERTs and the commit are the replace-in-place this method
+            // promises — on a pool, split across borrows they would be separate transactions and a failed
+            // INSERT half would leave the Space with NO rows at all.
+            src.run(conn -> {
+                boolean auto = true;
+                try {
+                    auto = conn.getAutoCommit();
+                    conn.setAutoCommit(false);
+                    try (PreparedStatement del = conn.prepareStatement(
+                            "DELETE FROM " + TABLE + " WHERE space = ?")) {
+                        del.setString(1, space);
+                        del.executeUpdate();
+                    }
+                    try (PreparedStatement ins = conn.prepareStatement("INSERT INTO " + TABLE
+                            + " (space, pipeline, poll_dir, pod, declared_at) VALUES (?,?,?,?,?)")) {
+                        long now = System.currentTimeMillis();
+                        for (SpaceInboxAudit.InboxDecl d : declarations) {
+                            if (d.pollDir() == null || d.pollDir().isBlank()) continue;
+                            ins.setString(1, space);
+                            ins.setString(2, d.pipeline());
+                            ins.setString(3, d.pollDir());
+                            ins.setString(4, pod);
+                            ins.setLong(5, now);
+                            ins.addBatch();
+                        }
+                        ins.executeBatch();
+                    }
+                    conn.commit();
+                } catch (SQLException e) {
+                    rollbackQuietly(conn);
+                    log.warn("Could not publish space '{}' to the shared inbox registry — other pods will not see "
+                            + "its inboxes: {}", space, e.getMessage());
+                } finally {
+                    try {
+                        conn.setAutoCommit(auto);
+                    } catch (SQLException ignored) {
+                        // the connection is already unusable; the next call logs it
+                    }
                 }
-                ins.executeBatch();
-            }
-            conn.commit();
+            });
         } catch (SQLException e) {
-            rollbackQuietly();
+            // Only a failed BORROW reaches here — there is no connection to roll back on.
             log.warn("Could not publish space '{}' to the shared inbox registry — other pods will not see "
                     + "its inboxes: {}", space, e.getMessage());
-        } finally {
-            try {
-                conn.setAutoCommit(auto);
-            } catch (SQLException ignored) {
-                // the connection is already unusable; the next call logs it
-            }
         }
     }
 
@@ -121,14 +137,18 @@ final class DbInboxRegistry implements AutoCloseable {
      * @return the roster, or an empty list if it cannot be read — the caller then audits what it hosts, which
      *         is the pre-registry behaviour and never a claim that the fleet is healthy
      */
-    synchronized List<SpaceInboxAudit.InboxDecl> declarations() {
+    List<SpaceInboxAudit.InboxDecl> declarations() {
         List<SpaceInboxAudit.InboxDecl> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT space, pipeline, poll_dir FROM " + TABLE + " ORDER BY space, pipeline");
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next())
-                out.add(new SpaceInboxAudit.InboxDecl(
-                        rs.getString("space"), rs.getString("pipeline"), rs.getString("poll_dir")));
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT space, pipeline, poll_dir FROM " + TABLE + " ORDER BY space, pipeline");
+                     ResultSet rs = ps.executeQuery()) {
+                    while (rs.next())
+                        out.add(new SpaceInboxAudit.InboxDecl(
+                                rs.getString("space"), rs.getString("pipeline"), rs.getString("poll_dir")));
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not read the shared inbox registry — auditing only the Spaces this pod hosts: {}",
                     e.getMessage());
@@ -137,7 +157,7 @@ final class DbInboxRegistry implements AutoCloseable {
         return out;
     }
 
-    private void rollbackQuietly() {
+    private void rollbackQuietly(Connection conn) {
         try {
             conn.rollback();
         } catch (SQLException ignored) {
@@ -146,13 +166,17 @@ final class DbInboxRegistry implements AutoCloseable {
     }
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            // ⚠ PRIMARY KEY (space, pipeline): a pipeline declares exactly one inbox, and a pipeline name is
-            // unique only WITHIN a Space. ⛔ NOT keyed on poll_dir — two Spaces sharing a directory is the
-            // very thing this table exists to record, so the key must let that row pair exist.
-            st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "space VARCHAR, pipeline VARCHAR, poll_dir VARCHAR, pod VARCHAR, declared_at BIGINT, "
-                    + "PRIMARY KEY (space, pipeline))");
+        try {
+            src.run(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    // ⚠ PRIMARY KEY (space, pipeline): a pipeline declares exactly one inbox, and a pipeline name is
+                    // unique only WITHIN a Space. ⛔ NOT keyed on poll_dir — two Spaces sharing a directory is the
+                    // very thing this table exists to record, so the key must let that row pair exist.
+                    st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
+                            + "space VARCHAR, pipeline VARCHAR, poll_dir VARCHAR, pod VARCHAR, declared_at BIGINT, "
+                            + "PRIMARY KEY (space, pipeline))");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise the inbox-registry schema", e);
         }
@@ -161,8 +185,8 @@ final class DbInboxRegistry implements AutoCloseable {
     @Override
     public void close() {
         try {
-            conn.close();
-        } catch (SQLException e) {
+            src.close();
+        } catch (RuntimeException e) {
             log.warn("Error closing the inbox-registry connection: {}", e.getMessage());
         }
     }

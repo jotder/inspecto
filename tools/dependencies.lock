@@ -13,7 +13,7 @@
 #   and both lines are kept so the split stays visible instead of being silently collapsed.
 # ⚠ SNAPSHOT entries are weakly pinned by construction: content can move under a fixed version.
 #
-# 95 third-party artifacts across 25 reactor modules.
+# 96 third-party artifacts across 32 reactor modules.
 ai.djl.huggingface:tokenizers:jar:0.36.0:compile
 ai.djl:api:jar:0.36.0:compile
 at.yawk.lz4:lz4-java:jar:1.10.1:runtime
@@ -54,6 +54,7 @@ com.squareup.okio:okio-jvm:jar:3.6.0:compile
 com.squareup.okio:okio:jar:3.6.0:compile
 com.sun.mail:javax.mail:jar:1.6.2:compile
 com.univocity:univocity-parsers:jar:2.9.1:compile
+com.zaxxer:HikariCP:jar:6.3.0:compile
 commons-beanutils:commons-beanutils:jar:1.9.4:compile
 commons-codec:commons-codec:jar:1.19.0:compile
 commons-collections:commons-collections:jar:3.2.2:compile

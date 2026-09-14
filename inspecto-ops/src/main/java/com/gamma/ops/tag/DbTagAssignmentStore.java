@@ -5,6 +5,7 @@ import com.gamma.objects.TagAssignment;
 import com.gamma.util.AbstractJdbcStore;
 
 import com.gamma.objects.AnnotationKinds;
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,8 +21,9 @@ import java.util.List;
 /**
  * Database-backed {@link TagAssignmentStore} — the durable cross-entity tag graph (BACKLOG D7). The twin
  * of {@code DbNoteStore}: plain JDBC over the already-bundled DuckDB (no new dependency), or a
- * {@code jdbc:postgresql://…} URL for a distributed deployment. All access is serialised on a single
- * shared {@link Connection}; {@link #close()} closes it.
+ * {@code jdbc:postgresql://…} URL for a distributed deployment. Each operation borrows a
+ * {@link Connection} from a {@link ConnectionSource} for its duration and returns it;
+ * {@link #close()} closes the source.
  *
  * <p>The composite primary key {@code (tag, target_kind, target_id)} is what makes {@link #add}
  * idempotent and {@link #rename} self-merging — the database enforces edge identity rather than the
@@ -39,17 +41,22 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
 
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbTagAssignmentStore(Connection conn) {
-        super(conn, "tag-assignments", "Tag assignments", TABLE, "tag");
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbTagAssignmentStore(ConnectionSource src) {
+        super(src, "tag-assignments", "Tag assignments", TABLE, "tag");
         initSchema();
     }
 
     /** Open by JDBC URL via {@link JdbcDrivers#connect(String, String, String)}. */
     public static DbTagAssignmentStore open(String url, String user, String pass) throws SQLException {
-        return new DbTagAssignmentStore(JdbcDrivers.connect(url, user, pass));
+        return new DbTagAssignmentStore(JdbcDrivers.source(url, user, pass, "tags"));
     }
 
     @Override
-    public synchronized TagAssignment add(TagAssignment a) {
+    public TagAssignment add(TagAssignment a) {
         // Idempotent by the primary key. Checked-then-inserted rather than relying on a dialect-specific
         // upsert: DuckDB and Postgres spell ON CONFLICT compatibly today, but the read is needed anyway
         // to return the ALREADY-STORED edge (with its original createdAt and actor) rather than the
@@ -57,14 +64,18 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
         TagAssignment existing = find(a.tag(), a.targetKind(), a.targetId());
         if (existing != null) return existing;
         String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, a.tag());
-            ps.setString(2, a.targetKind());
-            ps.setString(3, a.targetId());
-            ps.setString(4, a.actor());
-            ps.setLong(5, a.createdAt());
-            ps.executeUpdate();
-            return a;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, a.tag());
+                    ps.setString(2, a.targetKind());
+                    ps.setString(3, a.targetId());
+                    ps.setString(4, a.actor());
+                    ps.setLong(5, a.createdAt());
+                    ps.executeUpdate();
+                    return a;
+                }
+            });
         } catch (SQLException e) {
             // A concurrent insert of the same edge loses the race on the primary key. That is the
             // idempotent outcome, not a failure — return whatever is stored.
@@ -75,32 +86,40 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
     }
 
     @Override
-    public synchronized boolean remove(String tag, String targetKind, String targetId) {
+    public boolean remove(String tag, String targetKind, String targetId) {
         String tk = AnnotationKinds.require(targetKind);
         String sql = "DELETE FROM " + TABLE + " WHERE tag = ? AND target_kind = ? AND target_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tag == null ? null : tag.trim());
-            ps.setString(2, tk);
-            ps.setString(3, targetId == null ? null : targetId.trim());
-            return ps.executeUpdate() > 0;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tag == null ? null : tag.trim());
+                    ps.setString(2, tk);
+                    ps.setString(3, targetId == null ? null : targetId.trim());
+                    return ps.executeUpdate() > 0;
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not remove tag " + tag + ": " + e.getMessage(), e);
         }
     }
 
     @Override
-    public synchronized List<String> tagsOf(String targetKind, String targetId) {
+    public List<String> tagsOf(String targetKind, String targetId) {
         String tk = AnnotationKinds.require(targetKind);
         String sql = "SELECT DISTINCT tag FROM " + TABLE
                 + " WHERE target_kind = ? AND target_id = ? ORDER BY tag";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tk);
-            ps.setString(2, targetId == null ? null : targetId.trim());
-            List<String> out = new ArrayList<>();
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) out.add(rs.getString(1));
-            }
-            return out;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tk);
+                    ps.setString(2, targetId == null ? null : targetId.trim());
+                    List<String> out = new ArrayList<>();
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(rs.getString(1));
+                    }
+                    return out;
+                }
+            });
         } catch (SQLException e) {
             log.warn("tag lookup failed for {}/{}: {}", tk, targetId, e.getMessage());
             return List.of();
@@ -108,11 +127,15 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
     }
 
     @Override
-    public synchronized List<TagAssignment> forTag(String tag) {
+    public List<TagAssignment> forTag(String tag) {
         String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE tag = ? ORDER BY created_at DESC";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tag == null ? null : tag.trim());
-            return query(ps);
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tag == null ? null : tag.trim());
+                    return query(ps);
+                }
+            });
         } catch (SQLException e) {
             log.warn("tag member query failed for {}: {}", tag, e.getMessage());
             return List.of();
@@ -120,10 +143,14 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
     }
 
     @Override
-    public synchronized List<TagAssignment> all() {
+    public List<TagAssignment> all() {
         String sql = "SELECT " + COLS + " FROM " + TABLE + " ORDER BY created_at DESC";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            return query(ps);
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    return query(ps);
+                }
+            });
         } catch (SQLException e) {
             log.warn("tag assignment scan failed: {}", e.getMessage());
             return List.of();
@@ -131,56 +158,69 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
     }
 
     @Override
-    public synchronized int rename(String from, String to) {
+    public int rename(String from, String to) {
         String f = from == null ? null : from.trim();
         String t = to == null ? null : to.trim();
         if (f == null || t == null || f.isBlank() || t.isBlank() || f.equals(t)) return 0;
-        List<TagAssignment> moving = forTag(f);
-        if (moving.isEmpty()) return 0;
-        // Delete-then-insert rather than a bulk UPDATE: an UPDATE would violate the primary key for any
-        // target already carrying `to`, failing the whole rename. Merging is the correct outcome there
-        // (the triple is the edge identity), and add() already merges.
-        // One transaction: the delete and the re-inserts are a single rename. Run as separate
-        // auto-commit statements, a failure between them (connection loss, disk) leaves the
-        // assignments deleted and never re-added — the rename would silently destroy every edge
-        // carrying the old tag rather than moving it.
+        // ⚠ The read of the moving edges, the delete and the re-inserts share ONE borrow — the nested
+        // forTag/removeTag/add calls are reentrant and reuse it. On a pool separate borrows are separate
+        // connections, so the rename would neither be one transaction nor see one consistent set.
         try {
-            conn.setAutoCommit(false);
-            try {
-                removeTag(f);
-                for (TagAssignment e : moving)
-                    add(new TagAssignment(t, e.targetKind(), e.targetId(), e.actor(), e.createdAt()));
-                conn.commit();
-            } catch (RuntimeException | SQLException ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
-            }
+            return withConn(conn -> {
+                List<TagAssignment> moving = forTag(f);
+                if (moving.isEmpty()) return 0;
+                // Delete-then-insert rather than a bulk UPDATE: an UPDATE would violate the primary key for any
+                // target already carrying `to`, failing the whole rename. Merging is the correct outcome there
+                // (the triple is the edge identity), and add() already merges.
+                // One transaction: the delete and the re-inserts are a single rename. Run as separate
+                // auto-commit statements, a failure between them (connection loss, disk) leaves the
+                // assignments deleted and never re-added — the rename would silently destroy every edge
+                // carrying the old tag rather than moving it.
+                conn.setAutoCommit(false);
+                try {
+                    removeTag(f);
+                    for (TagAssignment e : moving)
+                        add(new TagAssignment(t, e.targetKind(), e.targetId(), e.actor(), e.createdAt()));
+                    conn.commit();
+                } catch (RuntimeException | SQLException ex) {
+                    conn.rollback();
+                    throw ex;
+                } finally {
+                    conn.setAutoCommit(true);
+                }
+                return moving.size();
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not rename tag " + f + " to " + t + ": " + e.getMessage(), e);
         }
-        return moving.size();
     }
 
     @Override
-    public synchronized int removeTag(String tag) {
-        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE tag = ?")) {
-            ps.setString(1, tag == null ? null : tag.trim());
-            return ps.executeUpdate();
+    public int removeTag(String tag) {
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE tag = ?")) {
+                    ps.setString(1, tag == null ? null : tag.trim());
+                    return ps.executeUpdate();
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not clear tag " + tag + ": " + e.getMessage(), e);
         }
     }
 
     @Override
-    public synchronized int removeAllForTarget(String targetKind, String targetId) {
+    public int removeAllForTarget(String targetKind, String targetId) {
         String tk = AnnotationKinds.require(targetKind);
         String sql = "DELETE FROM " + TABLE + " WHERE target_kind = ? AND target_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tk);
-            ps.setString(2, targetId == null ? null : targetId.trim());
-            return ps.executeUpdate();
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tk);
+                    ps.setString(2, targetId == null ? null : targetId.trim());
+                    return ps.executeUpdate();
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not clear tags on " + tk + "/" + targetId
                     + ": " + e.getMessage(), e);
@@ -190,10 +230,14 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
     // ── schema + helpers ─────────────────────────────────────────────────────────
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "tag VARCHAR, target_kind VARCHAR, target_id VARCHAR, actor VARCHAR, "
-                    + "created_at BIGINT, PRIMARY KEY (tag, target_kind, target_id))");
+        try {
+            runConn(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
+                            + "tag VARCHAR, target_kind VARCHAR, target_id VARCHAR, actor VARCHAR, "
+                            + "created_at BIGINT, PRIMARY KEY (tag, target_kind, target_id))");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise tag assignment DB schema", e);
         }
@@ -202,12 +246,16 @@ public final class DbTagAssignmentStore extends AbstractJdbcStore implements Tag
     private TagAssignment find(String tag, String targetKind, String targetId) {
         String sql = "SELECT " + COLS + " FROM " + TABLE
                 + " WHERE tag = ? AND target_kind = ? AND target_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tag);
-            ps.setString(2, targetKind);
-            ps.setString(3, targetId);
-            List<TagAssignment> hit = query(ps);
-            return hit.isEmpty() ? null : hit.getFirst();
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tag);
+                    ps.setString(2, targetKind);
+                    ps.setString(3, targetId);
+                    List<TagAssignment> hit = query(ps);
+                    return hit.isEmpty() ? null : hit.getFirst();
+                }
+            });
         } catch (SQLException e) {
             return null;
         }

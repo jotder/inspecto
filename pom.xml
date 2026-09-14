@@ -174,6 +174,7 @@
         <langchain4j.version>1.16.3</langchain4j.version>
         <eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>
         <postgresql.version>42.7.4</postgresql.version>
+        <hikaricp.version>6.3.0</hikaricp.version>
         <!-- Shared by core + fp-config since the S5 split (TOON codec / spec-model annotations). -->
         <jtoon.version>1.0.9</jtoon.version>
         <jackson.version>2.21.3</jackson.version>
@@ -359,6 +360,16 @@
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>${postgresql.version}</version>
+            </dependency>
+            <!-- Connection pool behind JdbcDrivers (scale-out phase A / OPS-03). Deliberately small:
+                 a 170 KB jar whose only NON-optional transitive dependency is slf4j-api, which is
+                 already here — `javassist` and `micrometer-core` are declared <optional>true</optional>
+                 upstream and so do not travel. Measured 2026-09-14, not assumed; a small SBOM is a
+                 FedRAMP asset, so re-check this if the version moves. -->
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikaricp.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -1,6 +1,7 @@
 package com.gamma.consignment;
 
 import com.gamma.api.PublicApi;
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,23 +88,28 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                     + "event_time_min = excluded.event_time_min, event_time_max = excluded.event_time_max, "
                     + "event_time_spread_ms = excluded.event_time_spread_ms, producer = excluded.producer";
 
-    private final Connection conn;
+    private final ConnectionSource src;
 
-    // ── raw table browser seam (BrowsableStore) — read-only, synchronized(this) ──
+    // ── raw table browser seam (BrowsableStore) — read-only, borrowed per operation ──
     @Override public String browseId() { return "consignment-outputs"; }
     @Override public String browseLabel() { return "Consignment Outputs"; }
     @Override public List<String> browseTables() { return List.of(T); }
-    @Override public Connection browseConnection() { return conn; }
+    @Override public ConnectionSource browseSource() { return src; }
 
     /** Wrap an already-open JDBC connection; the schema is created if absent. Takes ownership (closed in {@link #close()}). */
     public DbConsignmentOutputStore(Connection conn) {
-        this.conn = conn;
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbConsignmentOutputStore(ConnectionSource src) {
+        this.src = src;
         initSchema();
     }
 
     /** Open a registry by JDBC URL (DuckDB primary, e.g. {@code jdbc:duckdb:consignment-outputs.duckdb}). */
     public static DbConsignmentOutputStore open(String url) throws SQLException {
-        return new DbConsignmentOutputStore(JdbcDrivers.connect(url));
+        return new DbConsignmentOutputStore(JdbcDrivers.source(url, null, null, "consignment-outputs"));
     }
 
     private static final String CREATE = "CREATE TABLE IF NOT EXISTS " + T + " ("
@@ -116,21 +122,27 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             + "UNIQUE (consignment_id, path, run_id))";
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            st.execute(CREATE);
-            // §3.4.3 additive migration: CREATE TABLE IF NOT EXISTS never widens a pre-existing table, so a
-            // registry created before the column existed gets it added here; existing rows read back NULL.
-            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS schema_fingerprint VARCHAR");
-            // §3.1 addressing columns, same additive rule. A pre-existing registry keeps every row it has and
-            // reads NULL bounds for them — which the Selector must read as "unknown, cannot prune", never as
-            // "no rows in range" (see ConsignmentOutput#bounds).
-            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_min VARCHAR");
-            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_max VARCHAR");
-            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_spread_ms BIGINT");
-            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS producer VARCHAR");
-            // ⚠ The constraint is added LAST, after the widening above: the rebuild copies every column by
-            // name, so it can only run once a pre-constraint registry has them all.
-            if (!hasUniqueConstraint(st)) rebuildWithConstraint(st);
+        try {
+            // ⚠ The whole DDL + migration is ONE borrow: rebuildWithConstraint runs a transaction, so every
+            // statement here has to land on the same connection.
+            src.run(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    st.execute(CREATE);
+                    // §3.4.3 additive migration: CREATE TABLE IF NOT EXISTS never widens a pre-existing table, so a
+                    // registry created before the column existed gets it added here; existing rows read back NULL.
+                    st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS schema_fingerprint VARCHAR");
+                    // §3.1 addressing columns, same additive rule. A pre-existing registry keeps every row it has and
+                    // reads NULL bounds for them — which the Selector must read as "unknown, cannot prune", never as
+                    // "no rows in range" (see ConsignmentOutput#bounds).
+                    st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_min VARCHAR");
+                    st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_max VARCHAR");
+                    st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_spread_ms BIGINT");
+                    st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS producer VARCHAR");
+                    // ⚠ The constraint is added LAST, after the widening above: the rebuild copies every column by
+                    // name, so it can only run once a pre-constraint registry has them all.
+                    if (!hasUniqueConstraint(st)) rebuildWithConstraint(conn, st);
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise consignment-outputs schema", e);
         }
@@ -159,7 +171,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * exists to avoid, arriving through the migration instead of the constraint. ⛔ Do not merge these two
      * inserts back together.
      */
-    private void rebuildWithConstraint(Statement st) throws SQLException {
+    private void rebuildWithConstraint(Connection conn, Statement st) throws SQLException {
         String legacy = T + "_v1";
         boolean auto = conn.getAutoCommit();
         conn.setAutoCommit(false);
@@ -183,10 +195,14 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
 
     /** CHECKPOINT + VACUUM over the live connection, each best-effort — the {@code db_maintenance} task.
      *  DuckDB is single-writer, so maintenance must ride this store's own connection, never a second one. */
-    public synchronized void maintenance() {
+    public void maintenance() {
         for (String stmt : new String[]{"CHECKPOINT", "VACUUM"}) {
-            try (Statement st = conn.createStatement()) {
-                st.execute(stmt);
+            try {
+                src.run(conn -> {
+                    try (Statement st = conn.createStatement()) {
+                        st.execute(stmt);
+                    }
+                });
             } catch (SQLException e) {
                 log.warn("consignment-outputs maintenance: {} failed (continuing): {}", stmt, e.getMessage());
             }
@@ -200,34 +216,38 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * the registry is an index beside the manifest, so losing a row must not fail a Consignment that has
      * already landed its data. §5.4's commit discipline stays the thing that guarantees visibility.
      */
-    public synchronized void record(List<ConsignmentOutput> outputs) {
+    public void record(List<ConsignmentOutput> outputs) {
         if (outputs == null || outputs.isEmpty()) return;
-        try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
-                        + "ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET " + UPSERT_SET)) {
-            for (ConsignmentOutput o : outputs) {
-                EventTimeBounds b = o.bounds();
-                ps.setString(1, o.consignmentId());
-                ps.setString(2, o.runId());
-                ps.setString(3, o.tableName());
-                ps.setString(4, o.partitionKey());
-                ps.setString(5, o.recordDay());
-                ps.setString(6, o.path());
-                ps.setLong(7, o.rows());
-                ps.setLong(8, o.bytes());
-                ps.setString(9, o.writtenAt());
-                ps.setInt(10, o.generation());
-                ps.setString(11, o.state().name());
-                ps.setString(12, o.schemaFingerprint());
-                ps.setString(13, b == null ? null : b.min());
-                ps.setString(14, b == null ? null : b.max());
-                // null, not 0: a spread of 0 is a real value (one event time in the file), so an absent
-                // bound has to read back as absent rather than as an instantaneous file.
-                if (b == null) ps.setNull(15, java.sql.Types.BIGINT); else ps.setLong(15, b.spreadMs());
-                ps.setString(16, o.producer());
-                ps.addBatch();
-            }
-            ps.executeBatch();
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                                + "ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET " + UPSERT_SET)) {
+                    for (ConsignmentOutput o : outputs) {
+                        EventTimeBounds b = o.bounds();
+                        ps.setString(1, o.consignmentId());
+                        ps.setString(2, o.runId());
+                        ps.setString(3, o.tableName());
+                        ps.setString(4, o.partitionKey());
+                        ps.setString(5, o.recordDay());
+                        ps.setString(6, o.path());
+                        ps.setLong(7, o.rows());
+                        ps.setLong(8, o.bytes());
+                        ps.setString(9, o.writtenAt());
+                        ps.setInt(10, o.generation());
+                        ps.setString(11, o.state().name());
+                        ps.setString(12, o.schemaFingerprint());
+                        ps.setString(13, b == null ? null : b.min());
+                        ps.setString(14, b == null ? null : b.max());
+                        // null, not 0: a spread of 0 is a real value (one event time in the file), so an absent
+                        // bound has to read back as absent rather than as an instantaneous file.
+                        if (b == null) ps.setNull(15, java.sql.Types.BIGINT); else ps.setLong(15, b.spreadMs());
+                        ps.setString(16, o.producer());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not register {} output file(s) for consignment {}: {}",
                     outputs.size(), outputs.get(0).consignmentId(), e.getMessage());
@@ -276,7 +296,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * @throws IllegalArgumentException if {@code producer} is blank — a KPI must never silently aggregate
      *                                  across every pipeline when it meant to scope to one.
      */
-    public synchronized List<DailyVolume> dailyVolume(String producer, String fromDay, String toDay) {
+    public List<DailyVolume> dailyVolume(String producer, String fromDay, String toDay) {
         if (producer == null || producer.isBlank())
             throw new IllegalArgumentException("dailyVolume requires a producer (pipeline) — refusing to "
                     + "aggregate across every pipeline");
@@ -287,14 +307,18 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 + "   AND (record_day IS NULL OR (record_day >= ? AND record_day <= ?))"
                 + " GROUP BY record_day ORDER BY record_day NULLS LAST";
         List<DailyVolume> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, producer);
-            ps.setString(2, fromDay);
-            ps.setString(3, toDay);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next())
-                    out.add(new DailyVolume(rs.getString("record_day"), rs.getLong("files"), rs.getLong("rows_total")));
-            }
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, producer);
+                    ps.setString(2, fromDay);
+                    ps.setString(3, toDay);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next())
+                            out.add(new DailyVolume(rs.getString("record_day"), rs.getLong("files"), rs.getLong("rows_total")));
+                    }
+                }
+            });
         } catch (SQLException e) {
             // ⛔ Deliberately NOT the fail-open warn-and-return-empty of record(): an empty list here is
             // indistinguishable from "the pipeline received nothing", which is a breach the KPI would report
@@ -305,15 +329,19 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         return out;
     }
 
-    public synchronized List<ConsignmentOutput> outputs(String consignmentId) {
+    public List<ConsignmentOutput> outputs(String consignmentId) {
         String sql = "SELECT " + COLS + " FROM " + T
                 + " WHERE consignment_id = ? ORDER BY written_at DESC, path";
         List<ConsignmentOutput> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, consignmentId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) out.add(map(rs));
-            }
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, consignmentId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(map(rs));
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("consignment-outputs query failed for {}: {}", consignmentId, e.getMessage());
         }
@@ -362,7 +390,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * "this run derived from nothing". {@code null}/empty {@code readPaths} ⇒ empty result; the caller
      * decides what an unknown file set means (it must not be recorded as "no sources").
      */
-    public synchronized List<ConsignmentSource> sourcesForPaths(String tableName, java.util.Collection<String> readPaths) {
+    public List<ConsignmentSource> sourcesForPaths(String tableName, java.util.Collection<String> readPaths) {
         List<ConsignmentSource> out = new ArrayList<>();
         if (tableName == null || readPaths == null || readPaths.isEmpty()) return out;
         java.util.Set<String> wanted = new java.util.HashSet<>();
@@ -370,15 +398,19 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         String sql = "SELECT consignment_id, producer, path FROM " + T
                 + " WHERE table_name = ? AND coalesce(state, 'LIVE') = 'LIVE'";
         java.util.LinkedHashMap<String, ConsignmentSource> byId = new java.util.LinkedHashMap<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tableName);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    if (!wanted.contains(norm(rs.getString(3)))) continue;
-                    byId.putIfAbsent(rs.getString(1),
-                            new ConsignmentSource(rs.getString(1), rs.getString(2), tableName));
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tableName);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            if (!wanted.contains(norm(rs.getString(3)))) continue;
+                            byId.putIfAbsent(rs.getString(1),
+                                    new ConsignmentSource(rs.getString(1), rs.getString(2), tableName));
+                        }
+                    }
                 }
-            }
+            });
         } catch (SQLException e) {
             log.warn("[CONSIGNMENT-OUTPUTS] source lookup failed for {}: {}", tableName, e.getMessage());
         }
@@ -386,30 +418,38 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         return out;
     }
 
-    public synchronized boolean isReadable(String path) {
+    public boolean isReadable(String path) {
         if (path == null || path.isBlank()) return false;
         String sql = "SELECT 1 FROM " + T + " WHERE path = ? AND coalesce(state, 'LIVE') = 'LIVE' LIMIT 1";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, path);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, path);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next();
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("[CONSIGNMENT-OUTPUTS] readability check failed for {}: {}", path, e.getMessage());
             return false;   // fail closed: an unanswerable question is not a yes
         }
     }
 
-    public synchronized List<String> unreadablePaths() {
+    public List<String> unreadablePaths() {
         String sql = "SELECT DISTINCT t.path FROM " + T + " t WHERE coalesce(t.state, 'LIVE') <> 'LIVE' "
                 + "AND NOT EXISTS (SELECT 1 FROM " + T + " l WHERE l.path = t.path "
                 + "AND coalesce(l.state, 'LIVE') = 'LIVE')";
         List<String> out = new ArrayList<>();
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                String path = rs.getString(1);
-                if (path != null) out.add(path);
-            }
+        try {
+            src.run(conn -> {
+                try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+                    while (rs.next()) {
+                        String path = rs.getString(1);
+                        if (path != null) out.add(path);
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("consignment-outputs unreadable-path query failed: {}", e.getMessage());
         }
@@ -437,23 +477,27 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * fold treats as in-horizon. {@code event_time_max} is safe to {@code max()} as text only because §3.1 writes
      * it in a fixed-width format where the two orders coincide.
      */
-    public synchronized List<ProducerHighWater> producerHighWater(String tableName) {
+    public List<ProducerHighWater> producerHighWater(String tableName) {
         String sql = "SELECT producer, max(event_time_max) AS event_time_max, "
                 + "epoch_ms(max(TRY_CAST(written_at AS TIMESTAMPTZ))) AS last_seen_ms FROM " + T
                 + " WHERE table_name = ? AND coalesce(state, 'LIVE') <> 'SUPERSEDED' GROUP BY producer";
         List<ProducerHighWater> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tableName);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    // wasNull() reports on the most recent get*, so it has to be read immediately — asking after
-                    // the other columns would answer for one of those and turn an absent instant into the epoch.
-                    long ms = rs.getLong("last_seen_ms");
-                    java.time.Instant lastSeen = rs.wasNull() ? null : java.time.Instant.ofEpochMilli(ms);
-                    out.add(new ProducerHighWater(rs.getString("producer"), rs.getString("event_time_max"),
-                            lastSeen));
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tableName);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            // wasNull() reports on the most recent get*, so it has to be read immediately — asking after
+                            // the other columns would answer for one of those and turn an absent instant into the epoch.
+                            long ms = rs.getLong("last_seen_ms");
+                            java.time.Instant lastSeen = rs.wasNull() ? null : java.time.Instant.ofEpochMilli(ms);
+                            out.add(new ProducerHighWater(rs.getString("producer"), rs.getString("event_time_max"),
+                                    lastSeen));
+                        }
+                    }
                 }
-            }
+            });
         } catch (SQLException e) {
             log.warn("consignment-outputs producer high water failed for {}: {}", tableName, e.getMessage());
         }
@@ -481,24 +525,28 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * end of time. {@code spreadMs} is computed rather than summed from the stored per-file spreads, which
      * measure single files and do not compose.
      */
-    public synchronized Optional<EventTimeBounds> bounds(String tableName) {
+    public Optional<EventTimeBounds> bounds(String tableName) {
         String sql = "SELECT min(event_time_min) AS lo, max(event_time_max) AS hi, "
                 + "epoch_ms(TRY_CAST(max(event_time_max) AS TIMESTAMP)) "
                 + "- epoch_ms(TRY_CAST(min(event_time_min) AS TIMESTAMP)) AS spread_ms FROM " + T
                 + " WHERE table_name = ? AND coalesce(state, 'LIVE') <> 'SUPERSEDED'";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, tableName);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) return Optional.empty();
-                String lo = rs.getString("lo");
-                String hi = rs.getString("hi");
-                // wasNull() answers for the most recent get*, so the spread has to be read and tested here —
-                // asking after another column would report on that one and turn an unknown spread into 0.
-                long spread = rs.getLong("spread_ms");
-                long spreadMs = rs.wasNull() ? 0L : spread;
-                if (lo == null || hi == null) return Optional.empty();
-                return Optional.of(new EventTimeBounds(lo, hi, spreadMs));
-            }
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, tableName);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) return Optional.empty();
+                        String lo = rs.getString("lo");
+                        String hi = rs.getString("hi");
+                        // wasNull() answers for the most recent get*, so the spread has to be read and tested here —
+                        // asking after another column would report on that one and turn an unknown spread into 0.
+                        long spread = rs.getLong("spread_ms");
+                        long spreadMs = rs.wasNull() ? 0L : spread;
+                        if (lo == null || hi == null) return Optional.empty();
+                        return Optional.of(new EventTimeBounds(lo, hi, spreadMs));
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("consignment-outputs bounds query failed for {}: {}", tableName, e.getMessage());
             return Optional.empty();
@@ -522,7 +570,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * @return how many rows changed state; {@code 0} is normal when the registry is default-off or the
      *         Consignment predates it, and is never an error.
      */
-    public synchronized int supersede(String consignmentId) {
+    public int supersede(String consignmentId) {
         return update("UPDATE " + T + " SET state = 'SUPERSEDED' WHERE consignment_id = ? AND state = 'LIVE'",
                 consignmentId, "supersede consignment " + consignmentId);
     }
@@ -545,15 +593,19 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      *
      * @return how many rows changed state; {@code 0} is normal for a table's first recompute under the registry.
      */
-    public synchronized int supersedeOtherRevisions(String tableName, String keepConsignmentId) {
+    public int supersedeOtherRevisions(String tableName, String keepConsignmentId) {
         if (tableName == null || keepConsignmentId == null)
             throw new IllegalArgumentException("supersedeOtherRevisions needs both a table and the "
                     + "consignment to keep — a null keep would supersede the revision that just landed");
-        try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T + " SET state = 'SUPERSEDED' "
-                + "WHERE table_name = ? AND consignment_id <> ? AND coalesce(state, 'LIVE') = 'LIVE'")) {
-            ps.setString(1, tableName);
-            ps.setString(2, keepConsignmentId);
-            return ps.executeUpdate();
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T + " SET state = 'SUPERSEDED' "
+                        + "WHERE table_name = ? AND consignment_id <> ? AND coalesce(state, 'LIVE') = 'LIVE'")) {
+                    ps.setString(1, tableName);
+                    ps.setString(2, keepConsignmentId);
+                    return ps.executeUpdate();
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not supersede earlier revisions of {}: {}", tableName, e.getMessage());
             return 0;
@@ -573,35 +625,42 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      *              ignored, since compaction legitimately merges files older than the registry itself.
      * @return how many rows changed state.
      */
-    public synchronized int markCompactedAway(List<String> paths) {
+    public int markCompactedAway(List<String> paths) {
         if (paths == null || paths.isEmpty()) return 0;
         java.util.Set<String> wanted = new java.util.HashSet<>();
         for (String p : paths) wanted.add(norm(p));
 
-        int changed = 0;
+        // ⚠ A holder, not a local, so a partial count survives a failure half-way through the UPDATEs —
+        // the pre-borrow code returned what it had already changed, and so does this.
+        int[] changed = {0};
         try {
-            // Resolve stored spellings to the same normalised form before comparing — see norm(). Matching in
-            // SQL cannot work in both directions, because the column would have to be normalised too.
-            List<String> matches = new ArrayList<>();
-            try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery(
-                         "SELECT DISTINCT path FROM " + T + " WHERE state <> 'COMPACTED_AWAY'")) {
-                while (rs.next()) {
-                    String stored = rs.getString("path");
-                    if (stored != null && wanted.contains(norm(stored))) matches.add(stored);
+            // ⚠ The SELECT of stored spellings and the UPDATEs that act on them share ONE borrow: on a pool
+            // they would otherwise land on different connections, and a path revealed between them would be
+            // read as unmatched while the UPDATE could still touch it.
+            src.run(conn -> {
+                // Resolve stored spellings to the same normalised form before comparing — see norm(). Matching in
+                // SQL cannot work in both directions, because the column would have to be normalised too.
+                List<String> matches = new ArrayList<>();
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery(
+                             "SELECT DISTINCT path FROM " + T + " WHERE state <> 'COMPACTED_AWAY'")) {
+                    while (rs.next()) {
+                        String stored = rs.getString("path");
+                        if (stored != null && wanted.contains(norm(stored))) matches.add(stored);
+                    }
                 }
-            }
-            try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T
-                    + " SET state = 'COMPACTED_AWAY' WHERE path = ? AND state <> 'COMPACTED_AWAY'")) {
-                for (String stored : matches) {
-                    ps.setString(1, stored);
-                    changed += ps.executeUpdate();
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T
+                        + " SET state = 'COMPACTED_AWAY' WHERE path = ? AND state <> 'COMPACTED_AWAY'")) {
+                    for (String stored : matches) {
+                        ps.setString(1, stored);
+                        changed[0] += ps.executeUpdate();
+                    }
                 }
-            }
+            });
         } catch (SQLException e) {
             log.warn("Could not mark {} path(s) compacted away: {}", paths.size(), e.getMessage());
         }
-        return changed;
+        return changed[0];
     }
 
     /**
@@ -632,9 +691,13 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     /** Best-effort single-parameter {@code UPDATE}: a failed state flip is logged, never thrown — same
      *  fail-open contract as {@link #record}, since this table is an index and not the record of existence. */
     private int update(String sql, String param, String what) {
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, param);
-            return ps.executeUpdate();
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, param);
+                    return ps.executeUpdate();
+                }
+            });
         } catch (SQLException e) {
             log.warn("Could not {}: {}", what, e.getMessage());
             return 0;
@@ -681,10 +744,10 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     @Override
-    public synchronized void close() {
+    public void close() {
         try {
-            conn.close();
-        } catch (SQLException e) {
+            src.close();
+        } catch (RuntimeException e) {
             log.warn("Error closing consignment-outputs DB: {}", e.getMessage());
         }
     }

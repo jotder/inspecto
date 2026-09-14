@@ -4,6 +4,7 @@ import com.gamma.objects.ObjectType;
 
 import com.gamma.util.AbstractJdbcStore;
 
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JsonAttributes;
 import org.slf4j.Logger;
@@ -30,8 +31,8 @@ import java.util.Optional;
  *
  * <p>Unlike the status store (a DELETE-then-INSERT projection of immutable audit), objects are the
  * source of truth and they <b>mutate</b>, so this store does a real {@code UPDATE} on a status change.
- * All access is serialised on a single shared {@link Connection} (low-volume traffic; a JDBC
- * connection is not thread-safe); {@link #close()} closes it.
+ * Each operation borrows a {@link Connection} from a {@link ConnectionSource} for its duration and
+ * returns it (a JDBC connection is not thread-safe); {@link #close()} closes the source.
  *
  * @since 4.0.0
  */
@@ -47,7 +48,12 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
 
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbObjectStore(Connection conn) {
-        super(conn, "objects", "Objects", TABLE, "object");
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbObjectStore(ConnectionSource src) {
+        super(src, "objects", "Objects", TABLE, "object");
         initSchema();
     }
 
@@ -61,16 +67,20 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
      * @param pass password, or {@code null}
      */
     public static DbObjectStore open(String url, String user, String pass) throws SQLException {
-        return new DbObjectStore(JdbcDrivers.connect(url, user, pass));
+        return new DbObjectStore(JdbcDrivers.source(url, user, pass, "objects"));
     }
 
     @Override
-    public synchronized OperationalObject create(OperationalObject obj) {
+    public OperationalObject create(OperationalObject obj) {
         String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            bindAll(ps, obj);
-            ps.executeUpdate();
-            return obj;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    bindAll(ps, obj);
+                    ps.executeUpdate();
+                    return obj;
+                }
+            });
         } catch (SQLException e) {
             // A duplicate id trips the primary-key constraint — surface it as the SPI's contract type.
             if (get(obj.id()).isPresent())
@@ -80,13 +90,17 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     }
 
     @Override
-    public synchronized Optional<OperationalObject> get(String id) {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT " + COLS + " FROM " + TABLE + " WHERE id = ?")) {
-            ps.setString(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
-            }
+    public Optional<OperationalObject> get(String id) {
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT " + COLS + " FROM " + TABLE + " WHERE id = ?")) {
+                    ps.setString(1, id);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() ? Optional.of(mapRow(rs)) : Optional.<OperationalObject>empty();
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("object get failed for {}: {}", id, e.getMessage());
             return Optional.empty();
@@ -94,47 +108,55 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     }
 
     @Override
-    public synchronized OperationalObject update(OperationalObject obj) {
+    public OperationalObject update(OperationalObject obj) {
         String sql = "UPDATE " + TABLE + " SET object_type=?, title=?, description=?, status=?, "
                 + "severity=?, priority=?, \"owner\"=?, assignee=?, correlation_id=?, attributes=?, "
                 + "created_at=?, updated_at=?, closed_at=? WHERE id=?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            // Same column order as bindAll minus the leading id, then id as the WHERE param last.
-            ps.setString(1, obj.objectType().name());
-            ps.setString(2, obj.title());
-            ps.setString(3, obj.description());
-            ps.setString(4, obj.status());
-            ps.setString(5, obj.severity());
-            ps.setString(6, obj.priority());
-            ps.setString(7, obj.owner());
-            ps.setString(8, obj.assignee());
-            ps.setString(9, obj.correlationId());
-            ps.setString(10, JsonAttributes.toJson(obj.attributes()));
-            ps.setLong(11, obj.createdAt());
-            ps.setLong(12, obj.updatedAt());
-            ps.setLong(13, obj.closedAt());
-            ps.setString(14, obj.id());
-            if (ps.executeUpdate() == 0)
-                throw new NoSuchElementException("no object with id '" + obj.id() + "'");
-            return obj;
+        try {
+            return withConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    // Same column order as bindAll minus the leading id, then id as the WHERE param last.
+                    ps.setString(1, obj.objectType().name());
+                    ps.setString(2, obj.title());
+                    ps.setString(3, obj.description());
+                    ps.setString(4, obj.status());
+                    ps.setString(5, obj.severity());
+                    ps.setString(6, obj.priority());
+                    ps.setString(7, obj.owner());
+                    ps.setString(8, obj.assignee());
+                    ps.setString(9, obj.correlationId());
+                    ps.setString(10, JsonAttributes.toJson(obj.attributes()));
+                    ps.setLong(11, obj.createdAt());
+                    ps.setLong(12, obj.updatedAt());
+                    ps.setLong(13, obj.closedAt());
+                    ps.setString(14, obj.id());
+                    if (ps.executeUpdate() == 0)
+                        throw new NoSuchElementException("no object with id '" + obj.id() + "'");
+                    return obj;
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not update object " + obj.id() + ": " + e.getMessage(), e);
         }
     }
 
     @Override
-    public synchronized void delete(String id) {
-        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE id = ?")) {
-            ps.setString(1, id);
-            if (ps.executeUpdate() == 0)
-                throw new NoSuchElementException("no object with id '" + id + "'");
+    public void delete(String id) {
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE id = ?")) {
+                    ps.setString(1, id);
+                    if (ps.executeUpdate() == 0)
+                        throw new NoSuchElementException("no object with id '" + id + "'");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("could not delete object " + id + ": " + e.getMessage(), e);
         }
     }
 
     @Override
-    public synchronized List<OperationalObject> query(ObjectQuery q) {
+    public List<OperationalObject> query(ObjectQuery q) {
         List<String> where = new ArrayList<>();
         List<Object> params = new ArrayList<>();
         if (q.objectType() != null) { where.add("object_type = ?"); params.add(q.objectType().name()); }
@@ -155,14 +177,18 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
                 + (where.isEmpty() ? "" : " WHERE " + String.join(" AND ", where))
                 + " ORDER BY created_at " + (q.oldestFirst() ? "ASC" : "DESC") + " LIMIT ? OFFSET ?";
         List<OperationalObject> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int i = 1;
-            for (Object p : params) ps.setObject(i++, p);
-            ps.setInt(i++, q.limit());
-            ps.setInt(i, q.offset());
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) out.add(mapRow(rs));
-            }
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    int i = 1;
+                    for (Object p : params) ps.setObject(i++, p);
+                    ps.setInt(i++, q.limit());
+                    ps.setInt(i, q.offset());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(mapRow(rs));
+                    }
+                }
+            });
         } catch (SQLException e) {
             log.warn("object query failed: {}", e.getMessage());
         }
@@ -172,12 +198,16 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
     // ── schema + helpers ─────────────────────────────────────────────────────────
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "id VARCHAR PRIMARY KEY, object_type VARCHAR, title VARCHAR, description VARCHAR, "
-                    + "status VARCHAR, severity VARCHAR, priority VARCHAR, \"owner\" VARCHAR, "
-                    + "assignee VARCHAR, correlation_id VARCHAR, attributes VARCHAR, "
-                    + "created_at BIGINT, updated_at BIGINT, closed_at BIGINT)");
+        try {
+            runConn(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
+                            + "id VARCHAR PRIMARY KEY, object_type VARCHAR, title VARCHAR, description VARCHAR, "
+                            + "status VARCHAR, severity VARCHAR, priority VARCHAR, \"owner\" VARCHAR, "
+                            + "assignee VARCHAR, correlation_id VARCHAR, attributes VARCHAR, "
+                            + "created_at BIGINT, updated_at BIGINT, closed_at BIGINT)");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise object DB schema", e);
         }

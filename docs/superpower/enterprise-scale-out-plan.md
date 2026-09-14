@@ -467,8 +467,8 @@ Work:
 - ✅ **Store coverage — DONE, and the target moved.** `PostgresStateStoreTest` now exercises **15**
   `Db*` stores (16 tests), `DbDeliveryReceiptStore` and `DbDedupLedger` among them. ⚠ "Twelve of twelve"
   is stale: the store family grew while this bullet sat. Re-count before quoting it again.
-- ⏳ **Un-park the connection pool** — **the one item of phase A still unbuilt**, now planned in its
-  own file: [`connection-pool-plan.md`](connection-pool-plan.md). HikariCP behind `JdbcDrivers`; a
+- ✅ **Un-park the connection pool — SHIPPED 2026-09-14**, the last item of phase A. Design +
+  as-built: [`connection-pool-plan.md`](../archived-documents/plans-archive/connection-pool-plan.md). HikariCP behind `JdbcDrivers`; a
   borrow-scoped `browseConnection()`. One connection per store per pod is fine for one pod and a
   connection storm for twenty. 🔴 It is **15** stores, not the archived plan's eight/ten, and a pool buys
   nothing until stores stop holding one connection for life. ⛔ DuckDB must stay an effective pool of 1

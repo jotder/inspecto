@@ -1,6 +1,7 @@
 package com.gamma.event;
 
 import com.gamma.util.AbstractJdbcStore;
+import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JsonAttributes;
 import org.slf4j.Logger;
@@ -55,9 +56,14 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
     private static final String COLS = "event_id, ts_ms, level, type, source, pipeline, "
             + "correlation_id, message, attributes, payload";
 
-    /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
+    /** Wrap an already-open JDBC connection (any engine); the store owns and closes it. */
     public DbEventStore(Connection conn) {
-        super(conn, "events", "Operational Events", TABLE, "event");
+        this(JdbcDrivers.source(conn));
+    }
+
+    /** Borrow from {@code src} per operation; the schema is created if absent. */
+    public DbEventStore(ConnectionSource src) {
+        super(src, "events", "Operational Events", TABLE, "event");
         initSchema();
     }
 
@@ -67,27 +73,31 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
      * {@code jdbc:postgresql:}).
      */
     public static DbEventStore open(String url, String user, String pass) throws SQLException {
-        return new DbEventStore(JdbcDrivers.connect(url, user, pass));
+        return new DbEventStore(JdbcDrivers.source(url, user, pass, "events"));
     }
 
     // ── append ──────────────────────────────────────────────────────────────────────
 
     @Override
-    public synchronized void append(Event event) {
+    public void append(Event event) {
         if (event == null) return;
         String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, event.eventId());
-            ps.setLong(2, event.ts());
-            ps.setString(3, event.level().name());
-            ps.setString(4, event.type());
-            ps.setString(5, event.source());
-            ps.setString(6, event.pipeline());
-            ps.setString(7, event.correlationId());
-            ps.setString(8, event.message());
-            ps.setString(9, JsonAttributes.toJson(event.attributes()));
-            ps.setString(10, JsonAttributes.toPayloadJson(event.payload()));
-            ps.executeUpdate();
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, event.eventId());
+                    ps.setLong(2, event.ts());
+                    ps.setString(3, event.level().name());
+                    ps.setString(4, event.type());
+                    ps.setString(5, event.source());
+                    ps.setString(6, event.pipeline());
+                    ps.setString(7, event.correlationId());
+                    ps.setString(8, event.message());
+                    ps.setString(9, JsonAttributes.toJson(event.attributes()));
+                    ps.setString(10, JsonAttributes.toPayloadJson(event.payload()));
+                    ps.executeUpdate();
+                }
+            });
         } catch (SQLException e) {
             // ⚠ Logged, never thrown. Observability must not break the path it observes — the same
             // stance ParquetEventStore takes on a failed flush. An emitter is usually mid-ingest.
@@ -98,7 +108,7 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
     // ── query ───────────────────────────────────────────────────────────────────────
 
     @Override
-    public synchronized List<Event> query(EventQuery q) {
+    public List<Event> query(EventQuery q) {
         List<Object> params = new ArrayList<>();
         String where = whereFor(q, params);
         // OFFSET is applied in SQL here (the Parquet store cannot — it merges an unflushed buffer first).
@@ -110,7 +120,7 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
     }
 
     @Override
-    public synchronized List<Event> recent(int limit) {
+    public List<Event> recent(int limit) {
         return query(EventQuery.recent(limit));
     }
 
@@ -120,7 +130,7 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
      * {@code MAX_LIMIT} and sort in memory).
      */
     @Override
-    public synchronized List<Event> page(int limit, Long afterTs, String afterId) {
+    public List<Event> page(int limit, Long afterTs, String afterId) {
         List<Object> params = new ArrayList<>();
         String where = "";
         if (afterTs != null) {
@@ -139,10 +149,14 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
 
     /** Exact count — the {@code metadata.pagination.total} companion of {@link #page}. */
     @Override
-    public synchronized long count() {
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + TABLE)) {
-            return rs.next() ? rs.getLong(1) : 0L;
+    public long count() {
+        try {
+            return withConn(conn -> {
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + TABLE)) {
+                    return rs.next() ? rs.getLong(1) : 0L;
+                }
+            });
         } catch (SQLException e) {
             log.warn("Event count failed: {}", e.getMessage());
             return 0L;
@@ -159,25 +173,29 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
      * the window is touched.
      */
     @Override
-    public synchronized int prune(LocalDate before, boolean dryRun) {
+    public int prune(LocalDate before, boolean dryRun) {
         long cutoff = before.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
         try {
-            int days;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT COUNT(DISTINCT CAST(ts_ms / 86400000 AS BIGINT)) FROM " + TABLE + " WHERE ts_ms < ?")) {
-                ps.setLong(1, cutoff);
-                try (ResultSet rs = ps.executeQuery()) {
-                    days = rs.next() ? rs.getInt(1) : 0;
-                }
-            }
-            if (!dryRun && days > 0) {
+            // ⚠ Count and delete share ONE borrow: on a pool they would otherwise land on different
+            // connections, so a concurrent append between them could be counted and not deleted.
+            return withConn(conn -> {
+                int days;
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "DELETE FROM " + TABLE + " WHERE ts_ms < ?")) {
+                        "SELECT COUNT(DISTINCT CAST(ts_ms / 86400000 AS BIGINT)) FROM " + TABLE + " WHERE ts_ms < ?")) {
                     ps.setLong(1, cutoff);
-                    ps.executeUpdate();
+                    try (ResultSet rs = ps.executeQuery()) {
+                        days = rs.next() ? rs.getInt(1) : 0;
+                    }
                 }
-            }
-            return days;
+                if (!dryRun && days > 0) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "DELETE FROM " + TABLE + " WHERE ts_ms < ?")) {
+                        ps.setLong(1, cutoff);
+                        ps.executeUpdate();
+                    }
+                }
+                return days;
+            });
         } catch (SQLException e) {
             log.warn("Event prune failed: {}", e.getMessage());
             return -1;
@@ -193,13 +211,17 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
     // ── schema + helpers ────────────────────────────────────────────────────────────
 
     private void initSchema() {
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
-                    + "event_id VARCHAR, ts_ms BIGINT, level VARCHAR, type VARCHAR, source VARCHAR, "
-                    + "pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR, "
-                    + "attributes VARCHAR, payload VARCHAR)");
-            // The one access path that is not a full scan. Both engines accept this form.
-            st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_ts ON " + TABLE + " (ts_ms)");
+        try {
+            runConn(conn -> {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
+                            + "event_id VARCHAR, ts_ms BIGINT, level VARCHAR, type VARCHAR, source VARCHAR, "
+                            + "pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR, "
+                            + "attributes VARCHAR, payload VARCHAR)");
+                    // The one access path that is not a full scan. Both engines accept this form.
+                    st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_ts ON " + TABLE + " (ts_ms)");
+                }
+            });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise event DB schema", e);
         }
@@ -261,22 +283,26 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
     /** Run {@code sql} with {@code params} bound in order and map every row to an {@link Event}. */
     private List<Event> read(String sql, List<Object> params) {
         List<Event> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < params.size(); i++) {
-                Object p = params.get(i);
-                if (p instanceof Long l) ps.setLong(i + 1, l);
-                else ps.setString(i + 1, String.valueOf(p));
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
-                            EventLevel.parse(rs.getString("level")), rs.getString("type"),
-                            rs.getString("source"), rs.getString("pipeline"),
-                            rs.getString("correlation_id"), rs.getString("message"),
-                            JsonAttributes.fromJson(rs.getString("attributes")),
-                            JsonAttributes.fromPayloadJson(rs.getString("payload"))));
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    for (int i = 0; i < params.size(); i++) {
+                        Object p = params.get(i);
+                        if (p instanceof Long l) ps.setLong(i + 1, l);
+                        else ps.setString(i + 1, String.valueOf(p));
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
+                                    EventLevel.parse(rs.getString("level")), rs.getString("type"),
+                                    rs.getString("source"), rs.getString("pipeline"),
+                                    rs.getString("correlation_id"), rs.getString("message"),
+                                    JsonAttributes.fromJson(rs.getString("attributes")),
+                                    JsonAttributes.fromPayloadJson(rs.getString("payload"))));
+                        }
+                    }
                 }
-            }
+            });
         } catch (SQLException e) {
             log.warn("Event DB query failed: {}", e.getMessage());
         }

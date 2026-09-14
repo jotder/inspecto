@@ -1,5 +1,8 @@
 package com.gamma.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -12,6 +15,8 @@ import java.util.Locale;
  * {@code open(...)} factory used to copy-paste.
  */
 public final class JdbcDrivers {
+
+    private static final Logger log = LoggerFactory.getLogger(JdbcDrivers.class);
 
     private JdbcDrivers() {}
 
@@ -52,6 +57,66 @@ public final class JdbcDrivers {
             return product != null && product.toLowerCase(Locale.ROOT).contains("postgres");
         } catch (SQLException e) {
             return false;
+        }
+    }
+
+    /** {@code -Ddb.pool.size} — max pooled connections per Postgres-backed store. */
+    public static final String POOL_SIZE_PROPERTY = "db.pool.size";
+    /** {@code -Ddb.pool.timeoutMs} — how long a borrow waits before failing. */
+    public static final String POOL_TIMEOUT_PROPERTY = "db.pool.timeoutMs";
+
+    private static final int DEFAULT_POOL_SIZE = 10;
+    private static final long DEFAULT_BORROW_TIMEOUT_MS = 30_000L;
+
+    /**
+     * Open a {@link ConnectionSource} for {@code url} — the seam every DB-backed store should use
+     * (scale-out phase A / {@code OPS-03}).
+     *
+     * <p><b>Sizing is derived from the URL scheme, not configured per store</b>, because it is a property
+     * of the engine rather than of the operator's taste:
+     * <ul>
+     *   <li>⛔ {@code jdbc:duckdb:} → <b>exactly one</b> connection ({@link SingleConnectionSource}). Each
+     *       store owns a single-writer-locked DuckDB file; a second concurrent connection to it fails to
+     *       take the lock. This is not a tuning choice and {@code -Ddb.pool.size} does NOT apply.</li>
+     *   <li>{@code jdbc:postgresql:} → a HikariCP pool, {@code -Ddb.pool.size} (default
+     *       {@value #DEFAULT_POOL_SIZE}). This is the case the pool exists for: many pods, each bounded
+     *       by its pool rather than by how many stores it happens to open.</li>
+     *   <li>anything else → one connection, the conservative shape.</li>
+     * </ul>
+     *
+     * @param label a short name for the pool, so a stuck borrow names the store in a thread dump
+     * @throws SQLException if the driver is missing or the first connection fails
+     */
+    public static ConnectionSource source(String url, String user, String pass, String label)
+            throws SQLException {
+        if (url != null && url.startsWith("jdbc:postgresql:"))
+            return new PooledConnectionSource(url, user, pass, poolSize(), "inspecto-" + label);
+        return new SingleConnectionSource(connect(url, user, pass));
+    }
+
+    /** Wrap an already-open connection as a source — for callers handed a connection they own. */
+    public static ConnectionSource source(Connection conn) {
+        return new SingleConnectionSource(conn);
+    }
+
+    /** {@code -Ddb.pool.size}, clamped to at least 1; invalid values fall back to the default. */
+    static int poolSize() {
+        return Math.max(1, intProperty(POOL_SIZE_PROPERTY, DEFAULT_POOL_SIZE));
+    }
+
+    /** {@code -Ddb.pool.timeoutMs}; a borrow that cannot be satisfied fails rather than hanging forever. */
+    static long poolBorrowTimeoutMs() {
+        return Math.max(250L, intProperty(POOL_TIMEOUT_PROPERTY, (int) DEFAULT_BORROW_TIMEOUT_MS));
+    }
+
+    private static int intProperty(String key, int fallback) {
+        String raw = System.getProperty(key);
+        if (raw == null || raw.isBlank()) return fallback;
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            log.warn("-D{}={} is not a number — using {}", key, raw, fallback);
+            return fallback;
         }
     }
 

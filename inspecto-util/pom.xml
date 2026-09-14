@@ -95,6 +95,12 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
+        <!-- Connection pool behind JdbcDrivers (OPS-03). Version managed by the parent. -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+        </dependency>
+
         <!-- JUnit 5 — unit tests (version managed by the parent, M1). -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

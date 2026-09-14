@@ -238,18 +238,20 @@ class DbConsignmentOutputStoreTest {
     @Test
     void unknownStateDegradesToLiveRatherThanThrowing() throws Exception {
         try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
-            Connection raw = db.browseConnection();   // borrowed, NOT owned — closing it would close the store
-            try (Statement st = raw.createStatement()) {
-                // Columns named, not positional: this row exists to exercise `state`, and an unrelated
-                // additive migration must not turn it into an arity error.
-                st.execute("INSERT INTO consignment_outputs (consignment_id, run_id, table_name, "
-                        + "partition_key, record_day, path, row_count, bytes, written_at, generation, "
-                        + "state, schema_fingerprint) VALUES "
-                        + "('c1','run-1','cdr','dt=2026-08-04','2026-08-04','/w/x.parquet',1,100,"
-                        + "'2026-08-04T10:00:00Z',1,'QUARANTINED_BY_A_FUTURE_BUILD',NULL)");
-            } catch (SQLException e) {
-                fail("raw insert should succeed: " + e.getMessage());
-            }
+            // Borrowed for the duration of the callback, NOT owned: the store closes its own source.
+            db.browseSource().run(raw -> {
+                try (Statement st = raw.createStatement()) {
+                    // Columns named, not positional: this row exists to exercise `state`, and an unrelated
+                    // additive migration must not turn it into an arity error.
+                    st.execute("INSERT INTO consignment_outputs (consignment_id, run_id, table_name, "
+                            + "partition_key, record_day, path, row_count, bytes, written_at, generation, "
+                            + "state, schema_fingerprint) VALUES "
+                            + "('c1','run-1','cdr','dt=2026-08-04','2026-08-04','/w/x.parquet',1,100,"
+                            + "'2026-08-04T10:00:00Z',1,'QUARANTINED_BY_A_FUTURE_BUILD',NULL)");
+                } catch (SQLException e) {
+                    fail("raw insert should succeed: " + e.getMessage());
+                }
+            });
             List<ConsignmentOutput> rows = db.outputs("c1");
             assertEquals(1, rows.size());
             assertEquals(State.LIVE, rows.get(0).state());
