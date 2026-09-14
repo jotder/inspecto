@@ -314,9 +314,13 @@ class DuckLakeRegistrarTest {
     // nodes that produces exactly what D10 refuses — Parquet registered nowhere, visible to no other node —
     // reached by not trying rather than by failing. Operator decision 2026-09-14.
     //
-    // 🔴 Only HALF the invariant, deliberately recorded as such: the single call site is the FLAT ingest
-    // lane, and the graph lane registers nothing on any topology. These tests pin the flat lane's rule;
-    // they must not be read as pinning a system-wide one.
+    // 🔴 Only HALF the invariant, deliberately recorded as such — but NOT the half first written here.
+    // This comment used to say the uncovered half was "the graph lane". ⛔ That was WRONG. The single call
+    // site, ConsignmentIngestor.finalizeSource, serves BOTH ingest lanes: writeAndTrace forks to
+    // flatWriteAndTrace or graphWriteAndTrace and both return the same Written, so the graph lane registers
+    // too. The genuinely uncovered path is the at-rest PIPELINE-JOB lane (com.gamma.job.PipelineJobRunner),
+    // which drives PipelineExecutor directly with a no-op finalizer and holds zero DuckLake references.
+    // These tests pin the INGEST path's rule; they must not be read as pinning a system-wide one.
 
     private static Map<String, Object> enabledLake() {
         Map<String, Object> lake = new LinkedHashMap<>();

@@ -69,8 +69,11 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
      error, it quietly creates a **private file catalog** for that node, so it is refused on shape before
      the attach.
 
-   ⚠ **This is one lane's rule, not the system's.** The single registration call site is the flat ingest
-   lane; the graph lane registers nothing on any topology (`DUCKLAKE-GRAPH-LANE-1`).
+   ⚠ **This is the INGEST path's rule, not the whole system's.** The single registration call site is
+   `ConsignmentIngestor.finalizeSource`, which serves **both** the flat and the branch-aware graph ingest
+   lanes — they share one tail. What registers nothing is the **at-rest pipeline-job lane**
+   (`job: type: pipeline`, `PipelineJobRunner`), on any topology (`DUCKLAKE-GRAPH-LANE-1` — an id that is a
+   misnomer; it was filed believing the graph lane was the gap, and corrected the same day).
 
 4. **Read every node's slices** — set the deployment's shared catalog and any query can reach the whole
    lakehouse, not just what this node wrote:
@@ -87,7 +90,7 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
    The catalog is attached as **`lake`**, so a query reaches it as `lake.<schema>.<table>` — from
    `/bi/query` and the Query Library alike. **Visibility is the catalog commit**: a slice appears exactly
    when its registering transaction committed, never half-written. ⚠ It can only show what the write side
-   registered, so the graph-lane gap above applies here too.
+   registered, so the pipeline-job gap above applies here too.
 
 ### Remote access via DBeaver
 

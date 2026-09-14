@@ -47,6 +47,12 @@
 /inspecto-deploy*.zip.asc
 /inspecto-deploy/
 /inspecto-deploy-old/
+# The jlink runtime package.ps1 stages for the LINUX bundle (OPS-07, 2026-09-14). 73 MB of binaries,
+# left in the working tree by any packaging run and NOT covered by the patterns above — one `git add -A`
+# from being committed. Found 2026-09-14 when a package run left it untracked.
+/inspecto-deploy-linux-runtime/
+# The DuckDB extension cache tools/fetch-duckdb-extensions.mjs writes by default (~160 MB, six binaries).
+/.duckdb-extension-cache/
 /.graalvm-cache/
 # Angular CLI's build cache — regenerated on every `ng build`/`ng serve`.
 /.angular/

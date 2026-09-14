@@ -682,23 +682,37 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   invisible in the same way.
   → `okf/backend/integrations.md` · `inspecto/package.ps1` · scale-out plan §5.4
 
-- 🔴 **P2** · **`DUCKLAKE-GRAPH-LANE-1` — the graph lane registers NOTHING, so half the lakehouse is
-  invisible across nodes.** Filed 2026-09-14 while shipping §5.4 bullets 4 and 5. `DuckLakeRegistrar.register`
-  has exactly **one** call site in the repo — `ConsignmentIngestor.finalizeSource`, the **flat** ingest lane.
-  The **graph lane registers nothing on any topology**, so the Parquet it writes reaches no catalog and no
-  other node can see it.
-  ⚠ **This predates today's work; what is new is that the two lanes now visibly disagree.** Registration is
-  now MANDATORY when partitioned (a flat pipeline with `enabled: false` or no `output.ducklake` block fails
-  the batch) — so a partitioned deployment refuses an unconfigured flat pipeline while its graph pipelines
-  carry on writing invisible output, **and the enforcement makes that silence look deliberate**. ⛔ Do not
-  read "registration is mandatory when partitioned" as a system invariant; it is an invariant of one lane.
+- 🔴 **P2** · **`DUCKLAKE-GRAPH-LANE-1` — the at-rest PIPELINE-JOB lane registers nothing, so its output is
+  invisible across nodes.** Filed 2026-09-14 while shipping §5.4 bullets 4 and 5.
+  🔴 **CORRECTED the same day, before anything was built on it — the row's own name is wrong.** It was filed
+  as "the graph lane registers nothing", copied from the scale-out plan's §5.4, which asserts the same
+  thing. **Both are false.** `ConsignmentIngestStrategy.writeAndTrace` forks to `flatWriteAndTrace` or
+  `graphWriteAndTrace` and **both return the same `Written`** (`:294`, `:374`), whose outputs flow through
+  `IngestOutcome` into the one shared tail `ConsignmentIngestor.finalizeSource`, which registers at `:321`.
+  ⛔ **So the branch-aware graph lane DOES register.** Verified by reading the fork, not by trusting the
+  plan — and the id is kept only because a shipped commit already cites it.
+  ✅ **The genuinely unregistered path is `com.gamma.job.PipelineJobRunner`** — the at-rest "Pipeline as a
+  Job" lane (`job: type: pipeline`). It drives `PipelineExecutor.execute` directly with a **no-op
+  finalizer** (`() -> {}`, `:329`), bypassing `ConsignmentIngestor` entirely, and contains **zero** DuckLake
+  references. Its batch-complete moment is `:341-350`, where `writer.outputs()` (absolute paths) is in scope.
+  ⚠ **What is new is that the two paths now visibly disagree.** Registration is MANDATORY when partitioned,
+  so a partitioned deployment refuses an unconfigured *ingest* pipeline while *pipeline jobs* carry on
+  writing invisible output — **and the enforcement makes that silence look deliberate**. ⛔ Do not read
+  "registration is mandatory when partitioned" as a system invariant; it is an invariant of the ingest path.
   🔴 **It is also a hole in the read side**: `QueryExecutor`'s shared-catalog attach can only surface what
-  the write side registered, so `lake.*` is missing exactly the graph lane's slices. Bullet 5 is complete in
-  itself and is **not** a workaround for an unregistered writer.
-  ⚠ The fix is not simply "call register() from the graph lane too" — the plan's own §5.4 warns that wiring
-  a per-file registration while leaving the batch-level call in place would **double-register the flat
-  lane**, and `DuckLakeRegistrationSiteContractTest` pins the single call site precisely to catch that. Any
-  change here must move both lanes in one step and update that contract test deliberately.
+  the write side registered, so `lake.*` is missing exactly the pipeline-job lane's output. Bullet 5 is
+  complete in itself and is **not** a workaround for an unregistered writer.
+  ⛔ **The fix needs a DECISION, not just a call.** `PipelineJobRunner` has **no `PipelineConfig` in scope**
+  on its mainline path — it loads a `PipelineGraph` from `PipelineStore`, and `sink.ducklake` is merely a UI
+  alias for `sink.persistent` with **zero execution-time meaning** (`ProcessorCatalog:167`). So
+  `register(List, String, PipelineConfig)` is not callable there as-is. The catalog half now has an obvious
+  home — **`LakehouseCatalog`** (`-Dinspecto.ducklake.catalog`), already the read side's source — leaving
+  only the TABLE name, derivable from the sink store. ⚠ That would need a config-agnostic
+  `register` overload. **Not built; the shape is an operator call.**
+  ⚠ `DuckLakeRegistrationSiteContractTest` pins the single call site and must be widened **deliberately**
+  in the same change: its `EXPECTED_SITES` is one element AND it asserts `found.get(0)` by index, so a
+  second site needs an unordered comparison, not just another entry. The contract exists because a per-file
+  registration added alongside the batch-level one would **double-register** the ingest path.
   → `okf/backend/engine/db-layer.md` · scale-out plan §5.4 · `DuckLakeRegistrationSiteContractTest`
 
 - 🔴 **P1** · **`AIRGAP-EXTENSIONS-CI-1` — no released bundle has ever carried a DuckDB extension, on any

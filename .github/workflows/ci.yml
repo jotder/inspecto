@@ -167,6 +167,21 @@ jobs:
       - name: Guard — the shipped SBOM declares the jars the bundle stages
         run: node tools/check-sbom-modules.mjs
 
+      # DuckDB extension guard (AIRGAP-EXTENSIONS-CI-1, 2026-09-14). Sibling of the guard above, and filed
+      # for the same reason one layer down: package.ps1 stages extensions best-effort from a local cache and
+      # only WARNS when it finds none, and nothing in CI populated one — so every released bundle, on every
+      # platform, shipped an empty duckdb-extensions/, and AIRGAP-EXTENSIONS-1 was never actually delivered
+      # by a release.
+      # release.yml now populates the cache before packaging. ⛔ But that step runs ONLY on a `v*` tag, and
+      # "a path that executes only at release time" is precisely the defect being fixed — so --check runs
+      # here on every push: it re-reads $duckdbExtNames and the platform list OUT of package.ps1 and HEADs
+      # every file the release would fetch. No download; the full fetch is ~160 MB and belongs on the tag.
+      # Catches a drifted list, a renamed variable, and a duckdb bump whose extensions are not published for
+      # that ABI — each of which would otherwise surface during a release. Falsified before wiring: renaming
+      # $duckdbExtNames makes it exit 2 with the reason, not pass with an empty list.
+      - name: Guard — every DuckDB extension the bundle stages is published for every platform
+        run: node tools/fetch-duckdb-extensions.mjs --check
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:

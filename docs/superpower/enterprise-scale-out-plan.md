@@ -877,16 +877,34 @@ Work under (ii):
 > `CatalogCommit` name appears nowhere in code — it is this plan's proposal, not a thing to go looking for.
 >
 > 🔴 **What shipping bullet 4 did NOT fix, stated plainly because the code now looks like it did.**
-> "Registration is mandatory when partitioned" is an invariant of **one lane**. The only call site is the
-> FLAT ingest lane (`ConsignmentIngestor.finalizeSource`); the **GRAPH lane registers nothing, on any
-> topology**. So a partitioned deployment now refuses an unconfigured flat pipeline while its graph
-> pipelines carry on writing Parquet that no other node can see — and the enforcement makes that silence
-> look deliberate. Filed as `DUCKLAKE-GRAPH-LANE-1`. ⚠ It was true before this change too; what is new is
-> that the two lanes now visibly disagree.
+> "Registration is mandatory when partitioned" is an invariant of **one path** — but ⛔ **NOT the one this
+> plan has been claiming, and this block first repeated.** §5.4's own text below says *"The graph lane
+> registers nothing today"*; **that is false**, and it was copied from here into a board row, a javadoc and
+> two docs before being caught the same day.
 >
-> ⚠ **A read-side attach can only see what the write side registered**, so the graph-lane hole is also a
-> hole in bullet 5: `lake.*` will be missing exactly the slices the graph lane produced. Bullet 5 is
-> correct and complete in itself; it is not a workaround for an unregistered writer.
+> ✅ **Ground truth, read from the fork rather than from this plan (2026-09-14):**
+> `ConsignmentIngestStrategy.writeAndTrace` forks to `flatWriteAndTrace` (`:294`) or `graphWriteAndTrace`
+> (`:374`) and **both return the same `Written`**, whose outputs travel through `IngestOutcome` into the one
+> shared tail `ConsignmentIngestor.finalizeSource`, which registers at `:321`. **The branch-aware graph lane
+> registers.** The genuinely unregistered path is the **at-rest pipeline-job lane**,
+> `com.gamma.job.PipelineJobRunner` (`job: type: pipeline`): it drives `PipelineExecutor.execute` directly
+> with a **no-op finalizer** (`() -> {}`, `:329`), bypassing `ConsignmentIngestor` entirely, and holds
+> **zero** DuckLake references.
+>
+> So a partitioned deployment now refuses an unconfigured **ingest** pipeline while **pipeline jobs** carry
+> on writing Parquet no other node can see — and the enforcement makes that silence look deliberate. Filed
+> as `DUCKLAKE-GRAPH-LANE-1` (⚠ an id that is itself a misnomer, kept because a shipped commit cites it).
+> ⚠ The gap predates this change; what is new is that the two paths now visibly disagree.
+>
+> ⚠ **A read-side attach can only see what the write side registered**, so this is also a hole in bullet 5:
+> `lake.*` will be missing exactly the pipeline-job lane's output. Bullet 5 is correct and complete in
+> itself; it is not a workaround for an unregistered writer.
+>
+> ⛔ **And the fix is not one line.** `PipelineJobRunner` has **no `PipelineConfig` in scope** on its
+> mainline path (it loads a `PipelineGraph` from `PipelineStore`), and `sink.ducklake` is only a UI alias
+> for `sink.persistent` with **no execution-time meaning** — so `register(List, String, PipelineConfig)` is
+> not callable there. The catalog half now has a home (`LakehouseCatalog`), leaving the table name and a
+> config-agnostic overload. **An operator call, not a mechanical edit.**
 
 - `PartitionWriter` gains a **visibility strategy**: `RenameReveal` (today, local paths) and
   `CatalogCommit` (object-store paths, partitioned mode). ✅ **S2 CONFIRMS the shared seam by reading the
@@ -896,7 +914,7 @@ Work under (ii):
 - ⚠ **S2 also found the spike's own question is ill-posed today: `CatalogCommit` does not exist in code.**
   It is this plan's proposed name. What exists is `DuckLakeRegistrar.register`, with **one call site in the
   whole repo** (`ConsignmentIngestor.finalizeSource`), on the **flat ingest lane only**, once per batch,
-  **after** every file's reveal. The graph lane registers **nothing** today. So per logical write it is 1
+  **after** every file's reveal. 🔴 **This next sentence used to read "The graph lane registers nothing today" and is FALSE — corrected 2026-09-14, see the boxed note above.** The branch-aware graph lane DOES register: it shares one tail with the flat lane. The path that registers nothing is the at-rest **pipeline-job** lane (`PipelineJobRunner`). So per logical write it is 1
   registration on the flat lane and 0 on the graph lane, and *"lands twice"* is not a present defect.
   🔴 **It becomes one on a specific implementation order:** wiring `CatalogCommit` *inside* `reveal()` (per
   file, both lanes) while leaving that batch-level `register` call in place would double-register the flat

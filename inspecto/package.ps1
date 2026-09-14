@@ -86,7 +86,16 @@ param(
     # nested/sibling pair as -GraalvmCache). Best-effort per platform: a missing extension for one or
     # both platforms is a warning, never a build failure — ExcelExtension itself still falls back to
     # a networked INSTALL at runtime if the operator's deployment has network access.
-    [string]$DuckdbExtensionCache = ''
+    [string]$DuckdbExtensionCache = '',
+    # Turn the best-effort extension staging above into a FAIL-CLOSED gate (AIRGAP-EXTENSIONS-CI-1).
+    #
+    # ⛔ Why this is a switch and not the default: a developer with no cache must still be able to build,
+    # which is exactly why the warning exists. But a RELEASE that quietly ships an empty
+    # duckdb-extensions/ is the defect this flag was filed for — measured 2026-09-14, EVERY released
+    # bundle had shipped that way on every platform, because CI populated no cache and nothing failed.
+    # release.yml passes this for the same reason it passes -Sign: the release path is stricter than the
+    # desk path, and the difference is stated rather than assumed.
+    [switch]$RequireExtensions
 )
 
 Set-StrictMode -Version Latest
@@ -1476,11 +1485,15 @@ if ($duckdbExtCacheDir) {
                 Copy-Item $found.FullName -Destination (Join-Path $dest $extFile) -Force
                 Write-Host "Bundled DuckDB $extName extension ($plat) -> duckdb-extensions/$plat/" -ForegroundColor Green
                 $bundledAnyExt = $true
+            } elseif ($RequireExtensions) {
+                throw "-RequireExtensions: no cached $extFile for $plat under $duckdbExtCacheDir. This bundle would ship without it, and an air-gapped install would reach for a network INSTALL at run time — which is FATAL on a partitioned topology (D10). Populate the cache first: node tools/fetch-duckdb-extensions.mjs"
             } else {
                 Write-Host "  (no cached $extFile for $plat under $duckdbExtCacheDir — that feature needs network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
             }
         }
     }
+} elseif ($RequireExtensions) {
+    throw "-RequireExtensions: no DuckDB extension cache resolved, so NOTHING would be staged. Tried: $($duckdbExtCandidates -join ', '). Populate one first: node tools/fetch-duckdb-extensions.mjs"
 } else {
     Write-Host "  (skipping DuckDB extension bundling — no cache resolved; xlsx and DuckLake pipelines need network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
 }

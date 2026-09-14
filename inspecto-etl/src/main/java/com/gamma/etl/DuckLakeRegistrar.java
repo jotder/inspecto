@@ -135,12 +135,23 @@ public final class DuckLakeRegistrar {
      * is the point — those batches were producing invisible output — but it is why the message says which
      * flag to unset to get the old behaviour back.
      *
-     * <p>🔴 <b>It is also only HALF the invariant, and the half nobody can see is worse.</b> The single
-     * call site is the flat ingest lane ({@code ConsignmentIngestor.finalizeSource}); the GRAPH lane
-     * registers nothing at all, on any topology. So this makes the flat lane honest and leaves the graph
-     * lane writing unregistered Parquet under {@code partitioned} — invisible to other pods and now
-     * inconsistent with its sibling. ⛔ Do not read "registration is mandatory when partitioned" as an
-     * invariant of the system; it is an invariant of one lane. Tracked as the graph-lane half of §5.4.
+     * <p>🔴 <b>It is only HALF the invariant — but NOT the half first recorded here.</b> The single call
+     * site is {@code ConsignmentIngestor.finalizeSource}, and this javadoc first said the uncovered half
+     * was "the GRAPH lane". ⛔ <b>That was wrong, and is corrected here rather than quietly deleted.</b>
+     * The branch-aware graph lane <i>does</i> register: {@code ConsignmentIngestStrategy.writeAndTrace}
+     * forks to {@code flatWriteAndTrace} or {@code graphWriteAndTrace} and <b>both return the same
+     * {@code Written}</b>, whose outputs flow through {@code IngestOutcome} into that one shared tail.
+     * Verified by reading the fork, not the plan — the scale-out plan asserts the same falsehood, which is
+     * where it came from.
+     *
+     * <p>The genuinely unregistered path is the <b>at-rest pipeline-job lane</b>,
+     * {@code com.gamma.job.PipelineJobRunner}: it drives {@code PipelineExecutor.execute} directly with a
+     * no-op finalizer ({@code () -> {}}), bypassing {@code ConsignmentIngestor} entirely, and contains
+     * <b>zero</b> DuckLake references. So a partitioned deployment now refuses an unconfigured ingest
+     * pipeline while pipeline JOBS keep writing Parquet no other node can see. ⛔ Do not read
+     * "registration is mandatory when partitioned" as a system invariant; it is an invariant of the ingest
+     * path. Tracked as {@code DUCKLAKE-GRAPH-LANE-1} — ⚠ an id that is itself a misnomer, kept because a
+     * shipped commit already cites it.
      */
     static void requireRegistrationConfigured(Map<String, Object> duckLakeCfg) {
         if (!Topology.partitioned()) return;
