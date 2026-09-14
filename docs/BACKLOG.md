@@ -1230,6 +1230,20 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
 
+- ✅ **CLOSED 2026-09-14 · `CORECOUNT-SWEEP-1` — the sweep RAN and the core count is exonerated.** The
+  row's own suspicion was right and is now measured rather than argued: **`forkCount=0` caused the hang,
+  four cores did not.** The delivery mechanism it asked for exists —
+  `JDK_JAVA_OPTIONS=-XX:ActiveProcessorCount=4` reaches the **forked** test JVM (the JVM prints
+  `NOTE: Picked up JDK_JAVA_OPTIONS` twice, for Maven and for the fork), where `-DargLine` provably does
+  not. Forked at four cores the full enterprise reactor ran to completion with **no hang**:
+  **4475 tests / 0 failures / 0 errors / 24 skipped over 26 reporting modules**, identical to the
+  same-day 12-core baseline, with `ControlApiPreferencesTest` — the class the previous attempt froze
+  inside — passing in **0.115 s**. ⇒ nothing ordered after `inspecto` fails at CI's core count, which is
+  the question the row existed to answer. ⚠ Still NOT established, and deliberately not carried as an
+  open row: behaviour on a 4-core box with proportionally **less RAM** — only the core count was masked
+  here. ⚠ The recipe is recorded in `dev-infra/README.md` and `PROJECT_NOTES.md`; ⛔ the `MAVEN_OPTS` +
+  `-DforkCount=0` route it replaces is the one that hung.
+  *(original row follows)*
 - **P2** · **`CORECOUNT-SWEEP-1` — nothing has ever run the suite on a host with as few cores as CI has,
   and the attempt to HUNG.** Filed 2026-09-14. `ControlApiConfigIfMatchTest` failed on CI and nowhere else
   because `ConfigSafetyValidator` bounds `processing.threads` by `Runtime.availableProcessors()`: the
