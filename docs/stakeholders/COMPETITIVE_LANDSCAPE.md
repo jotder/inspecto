@@ -104,8 +104,11 @@ target hardware with a CI floor is still the single highest-value piece of evide
 
 ### 1.4 The extension surface — what "plugins for the rest" rests on
 
-19 `ServiceLoader`-loaded extension points (counted 2026-09-10:
-`grep -rhoE "ServiceLoader\.load\(\s*[A-Za-z]+\.class" inspecto*/src/main`). The ones that matter in a
+**19**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
+from every `ServiceLoader.load(X.class)`, `OptionalSpi.all(X.class)` and `SpiSlot(X.class)` call site in
+`inspecto*/src/main` (re-counted 2026-09-14: the 2026-09-10 grep counted call sites of ONE loader and landed on
+the same number by coincidence — three security seams go through `SpiSlot`, and `TransformFunctionProvider`
+in the ASN.1 subsystem is a 20th outside the core). The ones that matter in a
 bespoke engagement are where estates differ: `ParserPlugin` and `DecompressorPlugin` (proprietary
 formats — the ASN.1 vendor functions already ship through this surface), `CollectorConnectorFactory` (their
 feeds), `JobTypeProvider` and `MaintenanceTaskProvider` (their scheduled work), `NotificationChannel`,
@@ -217,7 +220,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
 | Fault-tolerant DR at Standard; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |
-| 19 extension points; the ASN.1 vendor functions ship through one | §1.4 |
+| **19**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
 | A distinct Standard bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
 
 ### 4.2 We MUST NOT claim yet — and what unlocks each

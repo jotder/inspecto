@@ -499,7 +499,7 @@ A structural comparison. Put your own figures against each line — the shape is
 | Engineering | platform/DevOps engineers to keep the seams alive | a fraction of one data-operations role |
 | Compliance | one review, pen-test and SBOM per vendor | one artifact, one SBOM, one review |
 | Time to first feed | a sprint of integration | one configuration file |
-| Extension | bespoke code at every seam | **19 extension points** plus a services model |
+| Extension | bespoke code at every seam | **19**<!--count:spi-extension-points--> **extension points** plus a services model |
 
 ### 10.2 Editions — one codebase, three build flavours
 
@@ -529,12 +529,51 @@ A structural comparison. Put your own figures against each line — the shape is
 a Break needs an owner, an audit export or a second team, you are in Standard — because that is where
 those modules live. Enterprise adds nothing you must learn twice: the same artifact, as a pod, N times.
 
-### 10.3 Extend it, or have it extended
-Nineteen `ServiceLoader` extension points cover the places estates differ: parsers and decompressors for
-proprietary formats (the ASN.1 vendor functions ship through this seam), connectors, job types, maintenance
-tasks, notification channels, pipeline node types and executors, a secrets provider, and route modules.
-What falls outside both product and plugin is built for you as a service. **One vendor, one config, one
-bill.**
+### 10.3 Extend it, or have it extended — what happens when the shelf runs out
+No packaged product covers every estate. Inspecto is built so that what it does not do out of the box is
+reached through **one of three lanes, in order of cost**, with no fork and no integration project:
+
+```
+   LANE 1 · CONFIGURE            LANE 2 · PLUG IN                    LANE 3 · HAVE IT BUILT
+   .toon pipelines · SQL in the   a jar on the classpath implementing  Gamma Analytics builds the
+   Query Library · Space          one of 19 extension points —         plugin or the bespoke feature,
+   Templates · /api/v1            discovered at start-up, no rebuild   ships it in the same artifact
+   ─────────────────────────────  ─────────────────────────────────── ────────────────────────────────
+   hours · your team              days · your team or ours             weeks · ours, one contract
+```
+
+**Lane 1 — configuration.** Most gaps are not gaps. A new feed is a `.toon` file; a new measure, KPI or report
+is a query in the Query Library; a new department is a Space started from a template; a system that needs the
+data pulls it over the versioned `/api/v1`. Nothing is compiled.
+
+**Lane 2 — the 19**<!--count:spi-extension-points--> **extension points.** Every seam where estates differ is a
+Java interface the platform discovers on the classpath at start-up. A plugin jar dropped beside the artifact
+is live on the next start, versioned and audited like the product itself. Grouped by what you would need:
+
+| You need to… | Extension point | What it lets you add |
+|---|---|---|
+| **Bring your own feed** | `CollectorConnectorFactory` | a source protocol beyond SFTP, FTPS, FTP, S3, GCS and JDBC — a message queue, a vendor API, a mainframe transfer |
+| | `DecompressorPlugin` | a proprietary or encrypted archive format in the unpack stage |
+| | `ParserPlugin` | a file format the ten built-in frontends do not read — the ASN.1 vendor decoders already ship through this seam |
+| **Bring your own processing** | `PipelineNodeType` + `PipelineNodeExecutor` | a new pipeline node — a scoring model, a lookup against an external system, a custom transform — with its own attributes in the editor |
+| | `StepKindRegistry` | a new step kind for the flat `steps:` recipe |
+| | `ConsignmentProcessor` | a whole-batch processor for work that does not fit the row model |
+| | `JobTypeProvider` · `MaintenanceTaskProvider` | scheduled jobs and maintenance tasks with declared parameters and Signals, so they appear in the console like built-ins |
+| | `ExpressionProvider` | new words in the job-parameter and trigger vocabulary |
+| **Bring your own operations** | `NotificationChannel` · `DeliveryStatusAdapter` | a delivery channel beyond webhook and email (SMS gateway, a ticketing system) and its delivery-status callback |
+| | `DescriptionProvider` | column and table descriptions from your data catalogue, filled into the metadata graph |
+| | `HostedProviderPlugin` | a model provider for the embedded assistant beyond the bundled local runtimes |
+| **Bring your own security** | `SecretsProvider` | your vault or key-management service as the credential scheme |
+| | `Authenticator` · `AccessDecider` · `TokenRelay` | your identity provider's token shape, your authorisation policy, your gateway's assertion relay |
+| | `RouteModule` | your own authenticated routes under the same `/api/v1`, write gate and audit trail |
+
+Plugins keep the platform's guarantees: they resolve secrets through the same seam, their writes pass the same
+four-stage gate, and their actions land in the same audit trail. A plugin cannot bypass what a human cannot.
+
+**Lane 3 — have it built.** What falls outside both configuration and plugin is built for you: as a plugin
+where the seam exists, as a product feature where it should. It ships inside the same artifact, under the
+same test gates, and where it is generic it joins the product roadmap so you are not the only one carrying it.
+**One vendor, one config, one bill.**
 
 ### 10.4 The 60-minute evaluation
 ```

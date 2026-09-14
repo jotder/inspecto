@@ -136,6 +136,25 @@ const MANIFEST = {
     // A FIFTH set, found while placing the markers above: the frontends the UI ships its OWN schema-form
     // specs for (plugin parsers render the served `grammarSchema` instead). The union type is the owner;
     // its neighbouring comment and `duckdb.md` both said "four" — stale since `xlsx` gained an arm.
+    'spi-extension-points': {
+        floor: 1,
+        what: 'distinct SPI interfaces a plugin jar can implement — every class the core discovers through '
+            + 'ServiceLoader.load(X.class), OptionalSpi.all(X.class) or a SpiSlot(X.class) in inspecto*/src/main',
+        derive: () => {
+            const re = /(?:ServiceLoader\s*\.\s*load|OptionalSpi\s*\.\s*all|SpiSlot\s*(?:\.\s*\w+)?\s*(?:<[^>]*>)?)\s*\(\s*([A-Za-z_][\w.]*)\s*\.class/g;
+            const names = new Set();
+            for (const f of javaMainFiles()) {
+                const src = read(f);
+                for (const m of src.matchAll(re)) {
+                    const n = m[1].split('.').pop();
+                    if (n.length > 1) names.add(n);          // `X.class` in a generic helper is not a seam
+                }
+            }
+            if (names.size === 0) throw new Error('spi-extension-points: no loader call sites found — re-anchor this parse');
+            return names.size;
+        },
+        source: 'inspecto*/src/main (ServiceLoader / OptionalSpi / SpiSlot call sites)',
+    },
     'ui-specced-frontends': {
         floor: 1,
         what: 'built-in frontends the UI carries its own schema-form specs for (the ParsingFrontend union)',
@@ -148,6 +167,24 @@ const MANIFEST = {
         source: 'inspecto-ui/src/app/inspecto/grammar/parsing-attributes.ts',
     },
 };
+
+/** Every .java under an inspecto* module's src/main, repo-relative. */
+function javaMainFiles(out = []) {
+    for (const mod of readdirSync(ROOT)) {
+        if (!mod.startsWith('inspecto')) continue;
+        const main = join(ROOT, mod, 'src', 'main');
+        (function rec(d) {
+            let es; try { es = readdirSync(d); } catch { return; }
+            for (const e of es) {
+                const p = join(d, e);
+                let st; try { st = statSync(p); } catch { continue; }
+                if (st.isDirectory()) rec(p);
+                else if (e.endsWith('.java')) out.push(relative(ROOT, p).split(sep).join('/'));
+            }
+        })(main);
+    }
+    return out;
+}
 
 /** Count the string literals in a Java `Set.of("a", "b", …)` field. Re-anchor here if the field moves. */
 function javaSetOf(rel, field) {
