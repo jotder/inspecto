@@ -122,7 +122,11 @@ When the work ships: distil the durable as-built facts into the matching OKF con
 to [`BACKLOG.md`](BACKLOG.md), then `git mv` the plan to `archived-documents/plans-archive/` and add its row
 to the table below — all in the same change.
 
-✅ **2026-09-11: the in-flight tier is TWO plans** (it was exactly one from 2026-09-10 until `dataset-column-derivation-plan.md` was written). Sprint 7 closed the documentation programme and
+✅ **2026-09-14: the in-flight tier is THREE files** — two plans plus one triage list
+(`duckle-concepts-candidates.md`, which leaves as soon as the operator has struck and ranked it). ⚠ This
+line said TWO from 2026-09-11, when `dataset-column-derivation-plan.md` was written, and it was one from
+2026-09-10 before that. ⛔ **A count in prose goes stale the moment a file lands** — the table below is the
+record; this sentence is a summary of it and must be re-read against it, not trusted. Sprint 7 closed the documentation programme and
 archived its two driving plans (`post-consolidation-sprints.md`, `docs-consolidation-plan.md`) along with the
 three release-gated pipeline plans. ⛔ **A plan is archived when its durable content is distilled, not when
 its last release gate clears** — the earlier rule, stated in five places, is superseded. What remains under
