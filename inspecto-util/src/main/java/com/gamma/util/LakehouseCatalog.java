@@ -114,6 +114,42 @@ public final class LakehouseCatalog {
     }
 
     /**
+     * The DuckDB extension that {@code ATTACH 'ducklake:<catalogUrl>'} will need to reach this backend,
+     * or {@code null} for a local file catalog, which needs none.
+     *
+     * <p>🔴 <b>Why a caller has to ask, when the ATTACH loads it by itself.</b> DuckLake AUTOLOADS the
+     * scanner from inside the attach — so there is no {@code LOAD} statement anywhere in this repository
+     * to grep for, and it looks like nothing needs doing. But autoload resolves against DuckDB's own
+     * {@code extension_directory}, <b>never</b> against {@code -Dduckdb.extension.dir}, which only
+     * {@code DuckDbExtension} consults (in {@code inspecto-etl}, which depends on this module and so
+     * cannot be linked from here). This product never sets {@code extension_directory},
+     * so on an air-gapped host the file {@code package.ps1} staged is skipped and the attach reaches for a
+     * network {@code INSTALL} — fatal under D10 in a partitioned topology. Measured 2026-09-14 against
+     * duckdb_jdbc 1.5.2.1: autoload over an empty extension directory fails, over the FLAT staged
+     * directory <b>also fails</b>, and only a {@code <version>/<platform>} tree or an explicit
+     * {@code LOAD '<file>'} succeeds.
+     *
+     * <p>⛔ So every call site that attaches a shared catalog must load this by name FIRST, through
+     * {@code DuckDbExtension.ensureLoaded}, which tries the cached load, then the staged file, and only
+     * then the network. ⚠ It is <b>staged</b> that must not be mistaken for <b>loadable</b>: staging
+     * {@code postgres_scanner} was shipped on 2026-09-14 and changed nothing until this was wired
+     * ({@code AIRGAP-PGSCANNER-LOAD-1}).
+     *
+     * <p>⚠ Returns {@code null} for the {@code postgres://} URL spellings too, because {@link #isShared}
+     * refuses them: DuckLake reads those as a file path, so no scanner is involved in what it actually
+     * does. The spelling is refused on its own terms by {@link #requireShared}.
+     */
+    public static String backendExtension(String catalogUrl) {
+        if (!isShared(catalogUrl)) return null;
+        String lower = catalogUrl.trim().toLowerCase();
+        for (String backend : SERVER_BACKENDS) {
+            // "postgres:" -> "postgres_scanner", "mysql:" -> "mysql_scanner" — DuckDB's own naming.
+            if (lower.startsWith(backend)) return backend.substring(0, backend.length() - 1) + "_scanner";
+        }
+        return null;
+    }
+
+    /**
      * ⛔ In a {@code partitioned} topology, refuse a catalog that would be a LOCAL FILE.
      *
      * <p><b>Why this exists when a registration failure is already fatal (D10).</b> D10 covers the catalog

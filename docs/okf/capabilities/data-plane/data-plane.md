@@ -322,7 +322,23 @@ Query Library's execution path** (§2).
   core`** — a network fetch on every registration, so an air-gapped install egressed the moment a pipeline
   enabled DuckLake (`AIRGAP-EXTENSIONS-1`). It now goes through `DuckDbExtension`, which tries the cached
   `LOAD`, then the file `package.ps1` stages under `-Dduckdb.extension.dir`, and reaches `INSTALL` only on a
-  networked host. (2) ⛔ **A `postgresql://` `catalog_url` does not attach at all** — DuckLake reads the value
+  networked host.
+  🔴 **That ladder covered `ducklake` and NOT the catalog backend's scanner, and the gap survived until
+  2026-09-14 (`AIRGAP-PGSCANNER-LOAD-1`).** `ATTACH 'ducklake:postgres:…'` **autoloads** `postgres_scanner`
+  from inside DuckLake, so no `LOAD` for it existed anywhere to grep for — and DuckDB's autoload resolves
+  against its own `extension_directory`, **never** against `-Dduckdb.extension.dir`, which only
+  `DuckDbExtension` reads. This product sets `extension_directory` nowhere, so the staged file was invisible
+  to autoload and an air-gapped attach reached for a network `INSTALL` anyway — fatal under D10 in a
+  partitioned topology, i.e. the very failure the staging was added to prevent. Measured four ways against
+  duckdb_jdbc 1.5.2.1: autoload over an empty extension directory fails (correct), **over the flat staged
+  directory also fails**, over a `<version>/<platform>` tree succeeds, and an explicit `LOAD '<file>'`
+  succeeds. Fixed by naming it: `LakehouseCatalog.backendExtension` maps `postgres:`→`postgres_scanner` and
+  `mysql:`→`mysql_scanner`, and **both** attach sites — `DuckLakeRegistrar` (write) and
+  `QueryExecutor.attachSharedCatalog` (read) — load it through the same ladder before attaching.
+  ⛔ **The durable rule: a STAGED extension is not a LOADABLE one.** Any extension that arrives by autoload
+  needs a named call site, or its staged file is dead weight. ⚠ No test caught this because every test host
+  already carries the extension in `~/.duckdb/extensions`, where autoload does find it.
+  (2) ⛔ **A `postgresql://` `catalog_url` does not attach at all** — DuckLake reads the value
   as a *file path*, so `ATTACH 'ducklake:postgresql://…'` fails trying to open a file of that name relative to
   the CWD. The documented example in `okf/backend/integrations.md` was that exact shape ⇒
   `AIRGAP-DUCKLAKE-PG-1`; a file catalog (`…/cat.ducklake`) was measured working end to end.

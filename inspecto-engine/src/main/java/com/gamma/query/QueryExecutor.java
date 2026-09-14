@@ -92,16 +92,47 @@ public final class QueryExecutor {
      * Swallowing the error would hand back a result set that is short by however much another node wrote,
      * with nothing to say so — the read-side twin of the invisible-output problem D10 refuses on the write
      * side. ⚠ {@code autoload_known_extensions=false} in the sandbox does NOT block this: measured, the
-     * attach still loads {@code postgres_scanner} — provided it is installed, which is what
-     * {@code AIRGAP-EXTENSIONS-CI-1} is about.
+     * attach still loads {@code postgres_scanner} — provided it is installed.
+     *
+     * <p>🔴 <b>"Provided it is installed" was doing far more work than it looked.</b> Autoload treats only
+     * DuckDB's own {@code extension_directory} as installed, so the file {@code package.ps1} stages under
+     * {@code -Dduckdb.extension.dir} did NOT satisfy it and an air-gapped read reached for a network
+     * {@code INSTALL} anyway ({@code AIRGAP-PGSCANNER-LOAD-1}). The scanner is now loaded BY NAME below,
+     * through the same cached → staged-file → network ladder as {@code ducklake}.
      */
     private static void attachSharedCatalog(Connection conn) throws SQLException {
         String sql = attachSql();
         if (sql == null) return;
         DuckDbExtension.ensureLoaded(conn, "ducklake", "-D" + LakehouseCatalog.CATALOG_PROPERTY);
+        // AIRGAP-PGSCANNER-LOAD-1 (2026-09-14): see attachBackendExtension — the ATTACH autoloads the
+        // backend scanner, and autoload cannot see the file package.ps1 stages, so it must be loaded by
+        // name or an air-gapped read reaches for a network INSTALL.
+        String backend = attachBackendExtension();
+        if (backend != null) {
+            DuckDbExtension.ensureLoaded(conn, backend, "-D" + LakehouseCatalog.CATALOG_PROPERTY);
+        }
         try (Statement st = conn.createStatement()) {
             st.execute(sql);
         }
+    }
+
+    /**
+     * The backend scanner extension this node's {@code ATTACH} needs, or {@code null} when no shared
+     * catalog is configured or it is a local file.
+     *
+     * <p>Package-private for the same reason {@link #attachSql()} is: the DECISION is then directly
+     * testable without a live Postgres, which would make the test SKIP on every machine without one —
+     * and this repository has already had a skipping test hide a broken classpath for months.
+     *
+     * <p>🔴 The javadoc above claimed {@code autoload_known_extensions=false} "does NOT block this ...
+     * provided it is installed, which is what AIRGAP-EXTENSIONS-CI-1 is about". That was right about
+     * autoload and wrong about what installed means: the staged file is NOT installed as far as autoload
+     * is concerned, because autoload reads DuckDB's {@code extension_directory} and never
+     * {@code -Dduckdb.extension.dir}.
+     */
+    static String attachBackendExtension() {
+        LakehouseCatalog.Catalog cat = LakehouseCatalog.configured();
+        return cat == null ? null : LakehouseCatalog.backendExtension(cat.url());
     }
 
     /**

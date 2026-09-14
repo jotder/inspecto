@@ -107,6 +107,17 @@ public final class DuckLakeRegistrar {
                 // the file staged by package.ps1 under -Dduckdb.extension.dir, and reaches INSTALL
                 // only on a deployment that actually has a network.
                 DuckDbExtension.ensureLoaded(conn, "ducklake", "output.ducklake.enabled");
+                // AIRGAP-PGSCANNER-LOAD-1 (2026-09-14): the ATTACH below AUTOLOADS the catalog backend's
+                // scanner, and autoload reads DuckDB's own extension_directory -- never
+                // -Dduckdb.extension.dir. So staging postgres_scanner (shipped hours earlier) did nothing
+                // on an air-gapped host: the staged file was skipped and the attach reached for a network
+                // INSTALL, which D10 makes FATAL in a partitioned topology. Loading it BY NAME first takes
+                // the same cached -> staged-file -> network ladder `ducklake` above already takes.
+                // ⛔ There is still no LOAD inside the ATTACH to grep for; this line is the only evidence.
+                String backend = LakehouseCatalog.backendExtension(catalogUrl);
+                if (backend != null) {
+                    DuckDbExtension.ensureLoaded(conn, backend, "the DuckLake catalog backend in catalog_url");
+                }
                 stmt.execute(String.format(
                         "ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s'%s)",
                         catalogUrl, dataPath.replace("\\", "/"), attachOptions()));

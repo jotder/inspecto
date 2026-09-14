@@ -11,7 +11,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **59 rows: 0 × P1 · 36 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
+> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
 > `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.
 > `LINKGUARD-CASE-1` filed the same day, §5 — so the P2 count is unchanged at 34, one out and one in.)
 >
@@ -27,9 +27,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
 > `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 36 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
+> ⚠ **Only the 35 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
 > asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 59 as pending work overstates what is owed by roughly 40%.
+> down. Reading all 58 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -1072,26 +1072,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
 
-- **P2** · 🔴 **`AIRGAP-PGSCANNER-LOAD-1` — the extension a release started staging today CANNOT be loaded
-  by the code that needs it.** Filed 2026-09-14, hours after `cd9fc498` staged it. `postgres_scanner` is
-  loaded by NOTHING explicit: `ATTACH 'ducklake:postgres:…`x27` autoloads it, and autoload reads DuckDB's own
-  `extension_directory` — never `-Dduckdb.extension.dir`, which only `DuckDbExtension.tryLoad` consults.
-  `extension_directory` is set nowhere in this repo, so on an air-gapped host the staged file is skipped
-  and the ATTACH reaches for a network INSTALL. ⛔ **D10 makes that FATAL on a partitioned topology** —
-  which is the exact failure `AIRGAP-DUCKLAKE-PG-1` was filed to prevent, still live one layer down.
-  ⚠ **The staging work was not wasted and must not be reverted**: the file has to be there either way.
-  What is missing is the named call site. Two shapes, measured: (a) `DuckDbExtension.ensureLoaded(conn,
-  "postgres_scanner", …)` before each ATTACH — smallest, uses the tested explicit-LOAD path, and matches
-  `DuckDbExtension`'s own doctrine that no call site may rely on a bare INSTALL; or (b) stage into a
-  `<version>/<platform>` tree and `SET extension_directory`, which fixes every autoloaded extension at
-  once, including `httpfs`. ⚠ **Two ATTACH sites, not one**: `DuckLakeRegistrar` (write) and
-  `QueryExecutor.attachSql` (read) — the read side builds the SQL in one method and executes it in
-  another, so the load belongs with the connection, not with the string.
-  ⛔ **Why no test caught it:** every test runs on a workstation whose `~/.duckdb/extensions` already
-  holds the extension, so autoload succeeds locally for a reason no deployment has. A test has to pin
-  `extension_directory` to an empty dir and `autoinstall_known_extensions=false` to see the air gap.
-  → `okf/backend/engine/db-layer.md` · `superpower/enterprise-scale-out-plan.md` §5.4
-
 - **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14 (operator call); the LOADING half is open.**
   Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
   is `excel`, `ducklake`, `postgres_scanner` — **`httpfs` and `aws` are absent**, and scale-out phase C
@@ -1120,8 +1100,10 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   FAILS (correct), autoload over the FLAT staged dir FAILS, autoload over a `<version>/<platform>` tree
   WORKS, explicit `LOAD '<flat file>'` WORKS. ⇒ `httpfs`/`aws` are staged but INERT until phase C's
   `s3://` seam calls `DuckDbExtension.ensureLoaded` by name.
-  ⛔ **Filed separately and worse: `AIRGAP-PGSCANNER-LOAD-1`** — `postgres_scanner` is ALREADY shipped in
-  exactly that inert state. → `superpower/enterprise-scale-out-plan.md` §5.4 bullet 6
+  ✅ **The sibling defect `AIRGAP-PGSCANNER-LOAD-1` is CLOSED 2026-09-14** — `postgres_scanner` was
+  shipped in exactly that inert state and is now loaded by name at both attach sites, so the pattern
+  `httpfs` must follow already exists: `LakehouseCatalog.backendExtension` +
+  `DuckDbExtension.ensureLoaded`. → `superpower/enterprise-scale-out-plan.md` §5.4 bullet 6
 
 - **P2** · **`LINKGUARD-CASE-1` — the doc-link guard is CASE-BLIND on Windows, so every local run is a
   false green for a whole error class.** Found 2026-09-14: five OKF pages pointed their "docs index" link

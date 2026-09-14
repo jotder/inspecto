@@ -151,4 +151,47 @@ class LakehouseCatalogTest {
                 "the default topology is single — this must not change behaviour for anyone who never set "
                         + "the flag");
     }
+
+    // ---- backendExtension: the scanner an ATTACH will autoload, named so it can be loaded FIRST ----
+    // AIRGAP-PGSCANNER-LOAD-1. These pin a MAPPING, not a DuckDB behaviour, on purpose: the air-gap
+    // behaviour itself needs an empty extension_directory and is pinned in inspecto-etl, where the
+    // loader lives. What can go wrong here is the mapping going silently null, which would restore the
+    // exact defect — a staged extension that nothing loads.
+
+    @Test
+    void backendExtensionNamesTheScannerAPostgresCatalogWillAutoload() {
+        assertEquals("postgres_scanner",
+                LakehouseCatalog.backendExtension("postgres:dbname=lake host=db port=5432 user=u password=p"),
+                "the ATTACH autoloads this from inside DuckLake, so nothing in this repo LOADs it by name "
+                        + "unless a caller asks for the name first");
+    }
+
+    @Test
+    void backendExtensionNamesTheMysqlScannerToo() {
+        assertEquals("mysql_scanner", LakehouseCatalog.backendExtension("mysql:db=lake host=db"),
+                "both SERVER_BACKENDS must map, or adding one silently reopens the hole for that backend");
+    }
+
+    @Test
+    void backendExtensionIsNullForAFileCatalog() {
+        assertNull(LakehouseCatalog.backendExtension("lake.ducklake"),
+                "a local file catalog attaches with no scanner at all — loading one would be a pointless "
+                        + "failure on every single-node install");
+        assertNull(LakehouseCatalog.backendExtension(null));
+        assertNull(LakehouseCatalog.backendExtension("   "));
+    }
+
+    // The URL spellings are refused by requireShared as file paths. They must not map to a scanner
+    // either, or this method would quietly endorse the spelling the rest of the class exists to reject.
+    @Test
+    void backendExtensionIsNullForTheUrlSpellingsThatAreReallyFilePaths() {
+        assertNull(LakehouseCatalog.backendExtension("postgres://host/db"));
+        assertNull(LakehouseCatalog.backendExtension("postgresql://host/db"));
+    }
+
+    @Test
+    void backendExtensionIgnoresCaseAndSurroundingSpace() {
+        assertEquals("postgres_scanner", LakehouseCatalog.backendExtension("  POSTGRES:dbname=lake  "),
+                "isShared already lower-cases and trims; the two must agree or a legal value maps to null");
+    }
 }

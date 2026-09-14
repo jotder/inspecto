@@ -124,4 +124,38 @@ class QueryExecutorSharedCatalogTest {
                 "authored queries reference this by name (lake.main.<table>); changing it silently breaks "
                         + "every saved query that reaches the lakehouse");
     }
+
+    // ── 5. the backend scanner must be loaded BY NAME, or an air-gapped read egresses ─────────────
+    // AIRGAP-PGSCANNER-LOAD-1 (2026-09-14). The ATTACH autoloads the scanner, and autoload consults
+    // DuckDB's own extension_directory -- never -Dduckdb.extension.dir. So the file package.ps1 stages
+    // is invisible to it, and the attach reaches for a network INSTALL on a host that has none, which
+    // D10 makes FATAL in a partitioned topology. Naming the extension is what lets attachSharedCatalog
+    // load it through the cached -> staged-file -> network ladder instead.
+
+    @Test
+    void aPostgresCatalogNamesTheScannerItsAttachWouldOtherwiseAutoload() {
+        configure("postgres:dbname=lake host=db port=5432 user=u password=p", "/srv/lake");
+
+        assertEquals("postgres_scanner", QueryExecutor.attachBackendExtension(),
+                "without this the read side stages an extension nothing loads -- the defect shipped on "
+                        + "the write side hours before this was found");
+    }
+
+    // The falsification arm. Without it this would pass against a method that ALWAYS returned
+    // postgres_scanner, which would fail every unconfigured Personal read on a host that has no
+    // extension at all.
+    @Test
+    void anUnconfiguredNodeNamesNoExtension() {
+        assertNull(QueryExecutor.attachBackendExtension(),
+                "no shared catalog means no attach, so there is nothing to load");
+    }
+
+    @Test
+    void aFileCatalogNamesNoExtension() {
+        configure("lake.ducklake", "/srv/lake");
+
+        assertNull(QueryExecutor.attachBackendExtension(),
+                "a single-node file catalog attaches with no scanner; loading one would turn a working "
+                        + "install into a failure for nothing");
+    }
 }
