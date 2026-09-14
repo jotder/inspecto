@@ -67,24 +67,40 @@ columns), so capacity is a cells-per-second figure divided by width.
 | Transform / write (DuckDB vectorised) | 1.4M / 1.1M rows/s at 12 columns — never the bottleneck |
 | Footprint | ~90 MB artifact, zero external services (Personal) |
 
-**Worked example — 8-core node, 100-column average:** 4–10M cells/s per node → 40–100K rows/s → 3.5–8.6
-billion rows/day at 100 % utilisation → **~2–4 billion/day with 50 % headroom** → **~1 billion/day sized to
-peak** (real feeds run 3–5× their daily mean at peak). That last figure is the one to quote.
+**End-to-end measurement (2026-09-14, the base for every sizing figure below):** the whole Collector path —
+acquire, parse, tag, transform, partitioned write, lineage — on a six-core / twelve-thread 2019 mobile i7
+(Windows, JDK 26, other services idle), 48 files × 250K rows × 100 columns as 24 batches with
+`processing.threads=12` on the native lane: **174 s = 69K rows/s = 6.9M cells/s**; a 24 × 100K rerun after the
+2026-09-14 checkpoint fix gave **81K rows/s = 8.1M cells/s** at ~78 % CPU while busy. Twelve batches ran
+**3.4× one batch** (same files, `threads=1`: 30 s vs 8.9 s at 3 columns). Per physical core that is
+**~1.35M cells/s end to end**. Single-thread stage figures on the same box reproduced the `performance.md`
+table within 5 % at 12 and 40 columns; at 100 columns per-cell cost is 0.28 µs native (1.8× the 12-column
+figure — ingest is NOT perfectly linear in cells at wide schemas). Reproduce with
+`PerfDeepDiveBenchmark#concurrencyAndAutoDerive -Dbench.threads/-Dbench.cols/-Dbench.engine`; the raw
+laptop numbers are deliberately NOT in `performance.md` (operator, 2026-09-14) — this paragraph is their home.
 
-**Bigger nodes (linear projection from the same line):** 16 cores → 8–20M cells/s → 80–200K rows/s at 100
-columns → **~2 billion/day sized to peak**; 32 cores → 16–40M cells/s → 160–400K rows/s → **~4 billion/day**.
-Linear holds only with ≥ cores concurrent batches (`processing.threads`; ingest is single-threaded per file,
-`performance.md` §"Two controllable axes"), NVMe-class storage (~20–110 MB/s Parquet at 32-core peak) and
-the console's share of the cores left in the peak headroom. Above 32 cores: measure, or partition (Enterprise).
+**Server factor (estimate, the one unmeasured input):** a current Linux server core sustains ×1.3–1.6 a 2019
+mobile core (clocks, no thermal throttling) and the Linux allocator adds ×1.0–1.3 (measured ×2.1 on the
+Java appender lane in a Linux container on the same box; assumed small for the native lane) →
+**~1.8–2.8M cells/s per physical server core, end to end.** ⚠ Confirm with one run on the target hardware;
+until then this is the factor a challenge would land on.
+
+**Worked example — 8-core Linux node, 100-column average:** 14–22M cells/s → 140–220K rows/s → 12–19
+billion rows/day at 100 % → 50 % headroom → ÷ 3–5 peak-to-mean → **~2.5 billion/day sized to peak**. That
+last figure is the one to quote. 16 cores → **~5 billion/day**; 32 cores → **~10 billion/day**. Linear holds
+only with ≥ cores concurrent batches (`processing.threads`, default = cores since 2026-09-14; ingest is
+single-threaded per file), NVMe-class storage (~60–250 MB/s Parquet at 32-core peak, from 1.0–2.7 bytes/cell)
+and the console's share of the cores left in the peak headroom. Above 32 cores: measure, or partition.
 
 **What 1 trillion rows/day would take at 100 columns:** 11.6M rows/s sustained = 1.16 billion cells/s =
-**115–290 nodes**, writing **100–270 TB/day** of Parquet. It is an Enterprise cluster-design conversation,
-never a single-node claim.
+**13–20 partitioned 32-core nodes** (was 115–290 8-core-equivalents on the old stage-benchmark base), writing
+**100–270 TB/day** of Parquet. An Enterprise cluster-design conversation, never a single-node claim.
 
-⚠ **Caveats that bound every figure above:** stage micro-benchmarks on one file — no sustained run, no
-concurrent dashboard queries, no inbox churn; the benchmark machine's core count is unrecorded; 100 columns
-extrapolates a slope measured at 3, 12 and 40; messy files fall to the slower Java path. **A sustained
-benchmark with a CI floor is the single highest-value piece of evidence we do not yet have** (§6, A3).
+⚠ **Caveats that bound every figure above:** one end-to-end run on one machine, synthetic clean files, no
+concurrent dashboard queries, no inbox churn, no thermal soak; the server-core factor is an estimate; wide
+schemas cost more per cell than the 12-column slope predicts; messy files fall to the Java lane at roughly a
+third of the native rate (`BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1`). **A sustained benchmark on the
+target hardware with a CI floor is still the single highest-value piece of evidence we do not have** (§6, A3).
 
 ### 1.4 The extension surface — what "plugins for the rest" rests on
 
@@ -196,8 +212,8 @@ at once. This is structural, not a failing — Palantir loses it too.
 | One ~90 MB artifact, zero external runtime services (Personal; Standard without DR) | `NFR-2`; signed D9 |
 | One config file onboards a feed | the `.toon` model; `PRODUCT_CAPABILITIES.md` |
 | Native ingest ~500K rows/s at 12 columns; transforms >1M rows/s | `performance.md`, measured |
-| ~1 billion 100-column rows/day per 8-core node, sized to peak | §1.3 derivation |
-| ~2 / ~4 billion 100-column rows/day per 16- / 32-core node, sized to peak | §1.3 linear projection; conditions stated (concurrent batches, NVMe, console headroom) |
+| ~2.5 / ~5 / ~10 billion 100-column rows/day per 8- / 16- / 32-core Linux node, sized to peak | §1.3: measured end to end on six cores (8.1M cells/s) × a stated server-core factor; conditions stated (concurrent batches, NVMe, console headroom, native lane). Operator decision 2026-09-14: publish without hardware specifics |
+| "~1.35M cells/s per physical core end to end, measured; ~1.8–2.8M on a current Linux server core" | §1.3 — say "measured" only of the first half |
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
 | Fault-tolerant DR at Standard; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |

@@ -337,35 +337,48 @@ files, re-measured with no regression at v3.9.0.*
 | **Vectorised SQL transform** | **1,400,000 rows/s** | — |
 | **Parquet write** | **1,100,000 rows/s** | — |
 
-Ingest cost is linear in **cells** (rows × columns), so capacity at any width follows from the per-cell
-figure. Transform and write are never the bottleneck.
+Ingest cost is roughly linear in **cells** (rows × columns) — wide schemas cost somewhat more per cell —
+so capacity at any width follows from the per-cell figure. Transform and write are never the bottleneck.
 
-### Sizing — one 8-core commodity node, 100-column records
-*Projected from the stage benchmarks above.*
+### Measured end to end — the whole path under load
+*Full Collector path — acquire, parse, tag, transform, partitioned Parquet write, lineage — with every
+core busy on concurrent batches, 100-column records. Measured 2026-09-14 on a six-core development
+machine; the first line below is the measurement, the rest is arithmetic.*
 
 | | |
 |---|---|
-| Processing density | 4–10 million cells/s |
-| Throughput at 100 columns | 40,000–100,000 rows/s |
-| Daily volume, 100 % utilisation | 3.5–8.6 billion rows |
-| **Quotable, sized to peak (3–5× daily mean) with headroom** | **~1 billion rows per day per node** |
+| End-to-end density on six cores | 8.1 million cells/s (81,000 rows/s at 100 columns) |
+| **Per physical core, end to end** | **~1.35 million cells/s** on a 2019 mobile core |
+| Per physical core, current Linux server | **~1.8–2.8 million cells/s** (×1.3–1.6 server core, ×1.0–1.3 Linux allocator) |
+
+### Sizing — one 8-core Linux node, 100-column records
+
+| | |
+|---|---|
+| Processing density | 14–22 million cells/s |
+| Throughput at 100 columns | 140,000–220,000 rows/s |
+| Daily volume, 100 % utilisation | 12–19 billion rows |
+| **Quotable, sized to peak (3–5× daily mean) with 50 % headroom** | **~2.5 billion rows per day per node** |
 
 ### Scaling up the node — 8, 16 and 32 cores
-*Projected linearly from the 8-core line above. Inspecto scales by running batches concurrently
-(`processing.threads`), each on its own DuckDB connection; since v3.12.0 the engine divides the cores
-between concurrent batches automatically, so a bigger box is a configuration change, not a redesign.*
+*Projected linearly from the per-core figure above. Inspecto scales by running batches concurrently
+(`processing.threads`, which now defaults to the host's cores), each on its own DuckDB connection; the
+engine divides the cores between concurrent batches automatically, so a bigger box is a configuration
+change, not a redesign. Measured scaling on the development machine: 12 batches gave 3.4× one batch.*
 
 | Node | Processing density | 100-column rows/s | 12-column rows/s | 100-column rows/day at 100 % | **Quotable, sized to peak** |
 |---|---|---|---|---|---|
-| **8 cores** | 4–10 M cells/s | 40–100 K | 330–830 K | 3.5–8.6 billion | **~1 billion/day** |
-| **16 cores** | 8–20 M cells/s | 80–200 K | 0.7–1.7 M | 7–17 billion | **~2 billion/day** |
-| **32 cores** | 16–40 M cells/s | 160–400 K | 1.3–3.3 M | 14–35 billion | **~4 billion/day** |
+| **8 cores** | 14–22 M cells/s | 140–220 K | 1.2–1.8 M | 12–19 billion | **~2.5 billion/day** |
+| **16 cores** | 29–45 M cells/s | 290–450 K | 2.4–3.7 M | 25–39 billion | **~5 billion/day** |
+| **32 cores** | 58–90 M cells/s | 580–900 K | 4.8–7.5 M | 50–78 billion | **~10 billion/day** |
 
 Three conditions make the projection hold, and a sizing engagement checks all three:
 * **Enough concurrent batches.** A single file ingests on one thread; the node is busy only when at
   least as many batches are in flight as it has cores. Many medium files scale; one giant file does not.
-* **Storage that keeps up.** At 32 cores the node writes on the order of 20–110 MB/s of Parquet at
+* **Storage that keeps up.** At 32 cores the node writes on the order of 60–250 MB/s of Parquet at
   peak, plus the raw-file reads — NVMe territory, not a network share.
+* **Clean delimited files.** These rates are the native lane. A file that needs footer-dropping or
+  fails a schema resolution falls to a Java lane that runs at roughly a third of them.
 * **Headroom for the console.** Dashboard queries, reconciliations and the assistant share the same
   cores; the "sized to peak" column already leaves that room, the "100 %" column does not.
 
@@ -374,7 +387,7 @@ nodes, which scales the same arithmetic without the single-box ceiling.
 
 > **The rule.** One 8-core node runs the daily CDR volume of a mid-sized operator or the clearing ledger
 > of a retail bank — no cluster. A trillion rows a day is real, and it is an **Enterprise** conversation:
-> a partitioned cluster of the same artifact writing on the order of 100–270 TB of Parquet daily.
+> on the order of 15–20 partitioned 32-core nodes of the same artifact, writing 100–270 TB of Parquet daily.
 
 ---
 
