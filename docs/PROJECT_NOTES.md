@@ -140,6 +140,18 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **"THE UPSTREAM SEAM HAS SHIPPED" WAS CHECKED ON THE TYPE, NOT THE SEAM** (2026-09-16). `AGT-5`'s
+  external gate was discharged on 2026-09-08 because `DryRunProvider.class` is in the pinned eoiagent jar. It
+  is — but `javap -public` on `eoiagent-platform`'s `PlatformBuilder` shows no `dryRunProvider(...)`; the only
+  setter is on a gate builder the platform constructs internally, so the host can never supply one. A week of
+  "actionable" that was not. Before discharging an external gate, check the ENTRY POINT the host would call.
+- 🔴 **A GATE THAT HAS NEVER BEEN RUN IS NOT "UNVERIFIED", IT IS UNKNOWN — AND IT MAY BE ONE FLAG FROM RUNNABLE**
+  (2026-09-16). The ELT §6 step-2 parity gate ("the whole suite executing through the compiled-recipe path")
+  sat for months as prose. Passing `-Dingest.lane` through the root pom to surefire made it
+  `mvn -Dingest.lane=graph test`; the first run turned 13 engine tests red for two reasons the lane itself
+  names (sink-count mismatch on multi-schema fixtures; a Decision Rule routing rows). Parity does not hold.
+  A projection round-trip test (`RecipeConverterTest`) is not an execution gate.
+
 - 🔴 **REACHABILITY OF A FILE IS NOT REACHABILITY OF A METHOD** (2026-09-15). A P1 was filed, reported as
   confirmed, and refuted the same day on this exact gap. The claim: the graph ingest lane writes
   `run_id = null` into `consignment_outputs` and so escapes its UNIQUE key. Everything checked was true —
