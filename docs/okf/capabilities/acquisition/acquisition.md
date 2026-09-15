@@ -566,7 +566,7 @@ tunnel's local endpoint, which a proxy must not carry, and the SSH hop itself is
 
 | Route | Notes |
 |---|---|
-| `GET /collectors` | flat view of every pipeline's acquisition config (`AcquisitionRoutes.java:23`) |
+| `GET /collectors` | flat view of every pipeline's acquisition config (`AcquisitionRoutes.java:23`); since 2026-09-15 each row also carries the pipeline's **polling session** — `lastPollAt`, `pollCount`, `lastPollError`, `lastPollErrorAt` (`PipelineScheduler.pollStates`, `DUCKLE-C9-WATCHER-NOT-A-RUN-1`). ⚠ IN-MEMORY and lossy across restart by design: this is liveness ("is this collector alive, when did it last look, what did it last say?"), not an audit trail — the durable record of work is the Run/Consignment ledger. ⛔ It corrects no miscount: a quiet poll never minted a Run (`CollectorProcessor.ingest` returns before `RunIds.next()`, fixed `1fda46d5`), which is why the row was rescoped to observability before it was built. `lastError` is a message, not a metric, because a Prometheus gauge cannot say *what* failed. |
 | `POST /collectors/{id}/notify` | ACQ-6 push discovery; `canOperateRuns`; `202`+`Location` under v1; audited `collector.notified` |
 | `GET /metrics/acquisition` | JSON snapshot of the nine acquisition metrics, complementing the text-only Prometheus `/metrics` |
 | `GET /connections`, `GET /connections/{id}` | profiles, **secret-masked** |

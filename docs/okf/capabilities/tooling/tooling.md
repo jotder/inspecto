@@ -120,6 +120,21 @@ summarised. ⚠ **And it drifted again**: it read "twelve" until 2026-09-14, hav
 extension guard wired on 2026-09-14 (`fetch-duckdb-extensions --check`). ⛔ Wiring a `ci.yml` guard step
 is not done until it has a row here — the roster is the artifact, not the wiring.
 
+🔴 **Each deployment zip carries ONLY its own platform's DuckDB extensions** (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`,
+built and closed 2026-09-15). `package.ps1` step 8 cuts each zip through `Compress-BundleForPlatform`, which
+parks the *other* platform's `duckdb-extensions/<plat>/` directory, zips, and restores it in a `finally` — so
+`$bundleDir` is a **superset** of either zip, not a mirror of `inspecto-deploy.zip`. ⛔ The launchers stay
+cross-copied on purpose (`run.sh` in the Windows zip, `serve.bat` in the Linux one); the filter touches the
+extension directory only. **Evidence, from the zips' own entry tables** (a desk build on 2026-09-15, Windows
+cache only): `inspecto-deploy.zip` 250.58 MB, 1446 entries, `duckdb-extensions/windows_amd64/` = 5 files,
+127.83 MB raw → **47.45 MB compressed**, *no* `linux_amd64` entries; `inspecto-deploy-linux.zip` 206.23 MB,
+1393 entries, **zero** extension files under either platform (the cache had none for Linux — five
+"no cached … for linux_amd64" warnings, exit 0, by design for a desk build); all seven launchers present in
+both. ⚠ The boot smoke runs against `$bundleDir` *before* zipping and cannot witness this in either direction
+— read the entry tables, never the smoke, when this changes again. ⚠ The Windows-side compressed figure
+(47.45 MB) is what `inspecto-deploy-linux.zip` used to carry unreachably; a release build stages both
+platforms, so each release zip now sheds roughly that much.
+
 | Guard | Reads | Deliberately does not read | Waivers | Exit discipline | Wired |
 |---|---|---|---|---|---|
 | **Vocabulary** | Four passes: one curated user-facing file; committed configuration keys; nine knowledge trees plus nine named canon files; source identifiers and operator-visible messages | The archive (permanent, reasoned); **the instruction tree and the root instruction file**; two module documentation directories; test sources; resources; the guard scripts themselves | Three path-and-rule allowlists (8 + 3 + 14 entries) whose **reason is structurally load-bearing** — a falsy reason does not suppress. **A stale entry fails the build.** Per-line hatch needs no reason | 0 / 1 / **2 when it cannot reach git** | pipeline + hook |

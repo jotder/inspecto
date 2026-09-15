@@ -84,7 +84,14 @@ NOT registered: POST /assist/settings"*); the other seven assist tests stayed gr
 
 ---
 
-## 2. Step 2 — Decide the remainder, so that "ungated" becomes a recorded state (OPERATOR + BUILD)
+## 2. Step 2 — Decide the remainder, so that "ungated" becomes a recorded state (OPERATOR + BUILD) — 2b + 2c ✅ SHIPPED 2026-09-15, 2a OPEN (four calls)
+
+> ✅ **As-built 2026-09-15:** `CapabilityManifest.EXEMPTIONS` (60) + `PENDING_OPERATOR_CALLS` (4) exist and
+> `CapabilityManifestTest.everyMutatingRouteIsGatedExemptOrPending` enforces "exactly one state" over every
+> module's source — the 3d scan landed early, as the belt; 3a/3c (the runtime inventory and the boot refusal)
+> still wait for 2a. Triage classified per route (8 gated on `canAdminister`, 7 `collaboration`); `POST /objects`
+> joined the pending calls — it is the `/recon/promote` question again. `/cases/rules/{id}/evaluate` moved from
+> the audit's read-shaped bucket to GATED (it opens a Case). Details: `route-gating-audit.md` §"Step 2 as-built".
 
 **Compliance purpose:** an auditor asks *"why is this one open?"* about every mutating route. Today the
 answer exists for 49 + 34 + 3 routes as prose in the audit and as code comments. **Every route must end this
@@ -273,7 +280,8 @@ Step 2 assist/(.+) bucket ───┘                   │
 Step 4a/4b (capability on events) ───────────────┘  (independent of 3; land with 1 or 3)
 ```
 
-Step 1 and 4a/4b can ship this shift. Step 2a is blocked on the operator; 2b/2c are classification work.
+Step 1 and 4a/4b shipped 2026-09-15; so did 2b/2c (and the 3d scan as their enforcement). Step 2a is blocked on
+the operator — **four** calls now, `POST /objects` having joined the three.
 Step 3 lands the moment 2 completes, and 4c–4g land with it. **Then** open the observation window.
 
 ## 7. Open items owed by the operator (also filed in `BACKLOG.md` §1)

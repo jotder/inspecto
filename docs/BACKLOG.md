@@ -1,6 +1,6 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-15 — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+**Updated:** 2026-09-15 (§5 sweep, later) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
 every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
 `DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
 `ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
@@ -247,9 +247,11 @@ nothing, which is the shape that kept `DEPLOY-SERVICE-WRAPPER-1` looking open fo
 | **A spreadsheet library** | `D-8` XLSX export (§3) | There is **no spreadsheet dependency in any pom**. Picking one IS the gate — the row was deliberately written so the new-dependency question gets answered when someone needs the feature, not in advance |
 | **Access details** — MinIO endpoint/key/secret, the systemd host, the elevated Windows box | `AIRGAP-S3-EXTENSIONS-1` (§5) · `DEPLOY-SERVICE-WRAPPER-1` (§3) | ✅ Operator confirmed 2026-09-15 that all three EXIST. Both rows are **code-complete and evidence-blocked** — neither needs a build, only a run |
 | **Delete the stray `master` branch** on `jotder/inspect-agent` | nothing directly — it is a live trap | Needs a permission no shift has had. ⚠ Neither `ci.yml` nor `release.yml` pins a `ref:`, so both follow that repo's **default** branch; a commit pushed to the stray branch reaches no CI and looks landed |
-| **Three route calls** — `POST /spaces/import` (does the `POST /spaces` "additive, recovery route" decision extend to bundle import?) · `POST /tags/rules/{id}/apply` (operate action → `canOperateRuns`, or collaboration act → open, like assignments?) · `POST /recon/promote` (which family owns *manually opening an Incident*? — `canAuthorWorkbench` has no precedent, `DecisionRoutes` uses `canOperateRuns`, `ExpectationRoutes` is ungated, no Incident capability exists) | `ROUTE-UNGATED-DEFAULT-1` step 2 → **step 3 (the fail-closed default) cannot land until these are decided** | Each was grounded 2026-09-15 and is a genuine question, not a formality — the handler, the comment and the tests point different ways. ⚠ `/recon/promote`'s dedupe lines are the same ones the `(type, key, column)` decision rewrites; do both in one change. → `superpower/route-gating-compliance-plan.md` §2a |
+| **FOUR route calls** (was three — `POST /objects` added 2026-09-15 when step 2b found manual Incident/Case creation is the `/recon/promote` question again; all four sit in `CapabilityManifest.PENDING_OPERATOR_CALLS`, and step 3 waits on them) — `POST /spaces/import` (does the `POST /spaces` "additive, recovery route" decision extend to bundle import?) · `POST /tags/rules/{id}/apply` (operate action → `canOperateRuns`, or collaboration act → open, like assignments?) · `POST /recon/promote` (which family owns *manually opening an Incident*? — `canAuthorWorkbench` has no precedent, `DecisionRoutes` uses `canOperateRuns`, `ExpectationRoutes` is ungated, no Incident capability exists) | `ROUTE-UNGATED-DEFAULT-1` step 2 → **step 3 (the fail-closed default) cannot land until these are decided** | Each was grounded 2026-09-15 and is a genuine question, not a formality — the handler, the comment and the tests point different ways. ⚠ `/recon/promote`'s dedupe lines are the same ones the `(type, key, column)` decision rewrites; do both in one change. → `superpower/route-gating-compliance-plan.md` §2a |
 | **Confirm reads-open-by-policy as the COMPLIANCE position** | the plan's §3e, `controls-matrix.md` CC6 | Decided 2026-09-15 as engineering ("confidentiality sits at the Space/ABAC layer"); §3e turns it into a claim an auditor reads. It should be re-affirmed knowing that |
 | **Which framework(s) the evidence is written against** | the route-gating evidence report under `compliance/evidence/` (step 4e, not yet written) · the `controls-matrix.md` row mapping | SOC 2 Type II is assumed throughout the plan; ISO 27001 A.9 maps onto the same evidence but the matrix rows differ |
+| **Job path semantics** — should a job's relative `dir` / `data_dir` / `backup_dir` / `archive` / `target_dir` resolve against the **Space root** instead of the JVM's working directory? | `JOB-DIR-CWD-CONTAINMENT-1` (§5) | 🔴 Regrounded 2026-09-15: the row's own fix (pass `configDir`) is a no-op for jobs, and the gate and the run-time tasks BOTH resolve against the CWD today, so they agree. Moving only the gate splits them; moving both changes what every existing job's relative path means. That is a semantics call, not a bug fix. |
+| **Eager or deferred resolution of an `s3://` `dirs.database`** — validate a profile at PARSE time (forces the deployment-root / pipeline-field split, because `CollectorService` parses every pipeline before `loadConnections` runs) or resolve at FIRST WRITE-TIME USE (no split; `dirs.database` is a plain `String` nothing resolves at parse) | scale-out phase C §5.4 bullet 6 (the credential surface that `AIRGAP-S3-EXTENSIONS-1` left behind when it closed 2026-09-15) | The bootstrap order is measured (`ServiceBootstrap.buildFrom:69` vs `:73-74`); which side of it to build on is a design posture only the operator sets. |
 | **Approve or decline pinning a `ref:`** in `ci.yml` / `release.yml` | nothing yet — filed here so the question is not lost | 🔴 The 2026-09-15 decision to keep building eoiagent from its upstream tree makes the unpinned `ref:` **permanent rather than temporary**, which changes it from a tolerable shortcut into a standing exposure. Offered at the sitting; not answered |
 
 ✅ **Every DECISION is answered.** The six queued on 2026-09-14 were answered that day; the duckle triage
@@ -286,7 +288,7 @@ from thirty-eight separate rows.
 | 12 | What does a ✅ cell mean? | **"Present and usable"** — gating is documented in `security.md`'s capability vocabulary, so Personal's ✅ is correct as written and no cell changes | ✅ SHIPPED: `EDITIONS.md` §Matrix legend |
 | 13 | The `.docx` generator | **Delete it; convert from the committed `.md`** — check its styling first so nothing is silently lost — ⚠ **amended on that check**, see the note below the table | ✅ SHIPPED: `scripts/generate_whitepaper_docx.py` |
 | 14 | Has the stale `.docx` been distributed? | **No — it never left the team.** No corrective action; the row is purely the generator change | same |
-| 15 | ~45 MB of cross-platform deadweight per zip | **Approved — filter the EXTENSION directory only**; launchers stay cross-copied; evidence from the zip entry tables | `AIRGAP-CROSSPLAT-DEADWEIGHT-1` (§5) |
+| 15 | ~45 MB of cross-platform deadweight per zip | ✅ BUILT + EVIDENCED 2026-09-15 from the zip entry tables (as-built: `okf/capabilities/tooling/tooling.md`); row closed. **Approved — filter the EXTENSION directory only**; launchers stay cross-copied; evidence from the zip entry tables | `AIRGAP-CROSSPLAT-DEADWEIGHT-1` (§5) |
 | 16 | Where do S3 endpoint/key/region live? | ⚠ CAVEAT FIRED 2026-09-15 — profiles resolve AFTER pipeline parse, so parse-time validation forces the split; deferred resolution avoids it. Operator's call. **`ConnectionProfile` for BOTH** the pipeline field and `dirs.database`. ⚠ Bootstrap ordering to be verified — if profiles cannot resolve early enough, the split is forced | `AIRGAP-S3-EXTENSIONS-1` (§5) |
 | 17 | Which Step Processor partial? | ✅ SHIPPED 2026-09-15 as `transform.profile`. RE-TAKEN: **Profiler STANDS** on its own merit, the double-duty reason having been refuted (DUCKLE-C8 is an Expectation kind templated on `FileSequenceGaps`; no Profiler code exists at all). **Profiler** — it is also `DUCKLE-C8`'s prerequisite, so it does double duty | Step Processor catalog (§3) |
 | 18 | Four dead seams | 🔴 REFUTED 2026-09-15 — THREE of the four are ALIVE (vendor plugin is called by production tx configs; `ExpressionProvider` IS the expression engine; `temporalColumn` is cited by an active plan). Only `AssistDialog` deleted. ~~**DELETE all four.**~~ ⚠ The vendor plugin is grounded for out-of-repo references before removal — it is the irreversible one | `SPEC-DEADSEAM-1` (§4) |
@@ -673,8 +675,10 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   copy is committed — a dry run that reaches it would **delete a customer's source file** while
   reporting that it wrote nothing. This is the single worst failure this feature can have.
   (b) **Signals, events and notifications must not escape.** A dry run that emits a `dataset.write`
-  triggers downstream pipelines — and per `DATASET-SELF-TRIGGER-1` that path can already re-trigger the
-  *running* pipeline, so a dry run could start a real hot loop.
+  triggers downstream pipelines — and until 2026-09-15 (`DATASET-SELF-TRIGGER-1`, now closed; as-built in
+  `okf/capabilities/pipeline-execution/pipeline-execution.md` §self-loop guard) that path could re-trigger the
+  *running* pipeline; the guard now exists, and both emit sites sit behind their callers' dry-run gates, so a dry
+  run is fenced structurally rather than by an asserted flag.
   ⇒ the design question is **which seam the mode is enforced at**: every sink honouring a flag is the
   shape that misses one, so prefer a single interception point every write already funnels through.
   ⚠ `X4` is scoped against this row and ⛔ must not pick its replay default first. → `X4` above ·
@@ -765,6 +769,23 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⛔ do not assume the component is finished merely because it compiles and has a spec.
   ✅ Keeping the endpoint also preserves the natural consumer for `TYPEFLOW-DATASET-COLUMNS-1`
   steps 3+4, which is now live work rather than a hypothetical.
+
+  ✅ **SHIPPED 2026-09-15 — the panel is mounted; `GET /config/schema/derived` has a reachable consumer.**
+  `pipeline` now threads pipeline-editor → `GrammarEditorDialogData` → `SchemaEditorData` → the panel.
+  ⚠ **“The schema authoring pane” was ambiguous and the decision did not say which.** Two dialogs qualify;
+  `SchemaEditorDialog` was chosen because the panel's OWN docblock targets it (“beside the authored one
+  (step-workbench S5)”) and `okf/frontend/features/schema-mapping-authoring.md` names it as the surface.
+  🔴 **It was not a template edit: no dialog in the chain knew a pipeline.** The panel needs the
+  REGISTERED identity (`pipelineId()`), which `GET /config/schema/derived` resolves via `configFor` — so
+  the value had to be threaded through THREE levels. `SchemaEditorData` gained `pipeline?` beside its
+  existing `home`/`subdir`, which exist for the same reason (the two openers genuinely differ).
+  ⛔ **Hidden for `home: 'registry'`, deliberately.** A registry schema is shared and attached to no
+  pipeline, so the panel is ABSENT there rather than present-and-empty — an empty panel would invite
+  “this pipeline writes nothing”. A test pins each direction.
+  ⚠ **Labelled “last saved”, and that label is load-bearing.** The route derives from the SAVED config
+  (“every schema a *saved* pipeline declares”) while the dialog edits an in-memory draft — so mid-edit it
+  shows the schema BEFORE the current edit. Unlabelled it would read as live feedback on the unsaved
+  edit, which is the one way this panel could mislead an author rather than help them.
 - **P2** · **`TYPEFLOW-DATASET-COLUMNS-1` — a Dataset's columns are never derived from the pipeline that
   fills it** (filed 2026-09-11, split out of `TYPEFLOW-CONSUMERS-1` (b)). A `DatasetColumn` is
   `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic lives
@@ -1355,132 +1376,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   unwired reader (temporal), and document a live-but-undocumented plugin (vendor).
 ## 5. Docs & hygiene
 
-- **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14; the LOAD CALL now exists (2026-09-15);
-  what remains is EXECUTING it once.**
-  🔴 **BOOTSTRAP ORDERING VERIFIED 2026-09-15 — the decision's own caveat FIRES.** §1 row 16 said
-  “`ConnectionProfile` for BOTH … if profiles cannot resolve early enough, the split is forced”. They
-  cannot, for a parse-time reference: `ServiceBootstrap.buildFrom` constructs `CollectorService` (`:69`),
-  whose constructor's FIRST statement is `requireDistinctPipelineIds(registry)` — that calls
-  `PipelineConfig.load` for every pipeline and so requires `dirs.database` — while `loadConnections` /
-  `registerConnection` run only at `:73-74`. ⇒ **every pipeline's `dirs.database` is parsed before any
-  `ConnectionProfile` exists.**
-  ✅ **But there is a third option the decision did not consider, and it avoids the split:** `dirs.database`
-  is typed as a plain `String` and is NOT resolved at parse time — nothing in `PipelineConfigParser` looks
-  a profile up. Physical use (`PartitionWriter`, `MetadataGraphBuilder`, `ReferenceReader`) happens long
-  after both steps. ⇒ **eager/parse-time validation forces the split; DEFERRED resolution at first
-  write-time use does not.** That is the real choice, and it is the operator's.
-  ⚠ **Two framing corrections to the decision text:** (a) `ConnectionProfile` has **no S3-specific**
-  fields — endpoint/region/key would ride its free-form `options` map, which is workable but unspecified;
-  (b) there is **no deployment-level `dirs.database`** — it is a required PER-PIPELINE field. The real
-  space-level data root is `SpaceRoot.dataDir()`, which has no S3 awareness at all. So “BOTH” names one
-  config surface plus one that does not exist in that form.
-  ⚠ Precedent check: `source.connection: <id>` already resolves a PIPELINE field through
-  `ConnectionRegistry` — so the pipeline half has a template. There is **no precedent** for a
-  deployment-level field resolving through a profile.
-  ✅ **2026-09-15: `httpfs` is now named at its call site** — `PartitionWriter.writeToObjectStore` opens with
-  `DuckDbExtension.ensureLoaded(conn, "httpfs", …)`, so an air-gapped install fails with the remedy message
-  instead of at the `COPY` with a raw DuckDB error. Both the `COPY` and the `glob()` discovery below it go
-  through `httpfs`. Staging was verified already: `package.ps1:1491` lists `httpfs` and `aws`.
-  🔴 **⚠ THIS CHANGE IS COMPILED, NOT EXECUTED — do not read the green reactor as proof.** The only test
-  over that path, `PartitionWriterObjectStoreTest`, is `assumeTrue`-gated on a live S3 endpoint + key +
-  secret, so all **4** of its tests SKIP here and in CI; the full `-Pedition-enterprise` run
-  (4513/0/0/28) never entered the method. ⇒ **The remaining acceptance is one run against a live object
-  store** (MinIO, as on 2026-09-14) confirming the lane still writes with the explicit load in place.
-  ⛔ Do not close this row on a passing build — a skipping test is the precise shape that has hidden a
-  broken path in this repo before, and this row's own premise is that a dev box autoloads what a bundle
-  does not. ⚠ Still separately open: there is **no S3 credential/endpoint config surface** in `src/main` at
-  all — the five `SET s3_*` statements live only in that skipped test, which is what keeps the lane
-  unusable outside it.
-  Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
-  is `excel`, `ducklake`, `postgres_scanner` — **`httpfs` and `aws` are absent**, and scale-out phase C
-  bullet 6 turns `dirs.database` into an `s3://` URI, which needs both. This is the SAME defect class as
-  `AIRGAP-EXTENSIONS-CI-1`, closed hours earlier: a release that stages no extension fails only on the
-  air-gapped host nobody tests on.
-  🔴 **Why it will not be caught by a probe on a dev box.** A measured `COPY … TO 's3://…'` plus a read back
-  BOTH SUCCEEDED here with **no `LOAD httpfs` statement at all** — DuckDB 1.5.2 AUTOLOADED it from the
-  developer's own `~/.duckdb/extensions`, which this box has and a bundle does not. ⛔ So the local green is
-  an artifact of the workstation, exactly the trap `AIRGAP-EXTENSIONS-CI-1` recorded one layer down.
-  ⚠ **Two corrections to assumptions this finding overturns**, both worth keeping:
-  (a) the SQL guard's refusal of `LOAD httpfs` (pinned by `SqlGuardTest`) does **not** keep httpfs out —
-  autoload emits no statement for a guard to see, so the real control is `enable_external_access`, not the
-  guard. (b) `httpfs` was therefore never the phase C blocker it looked like; **staging it is.**
-  ✅ **`httpfs` and `aws` added to `$duckdbExtNames` 2026-09-14** on the operator's call; the fetch guard
-  reads the list out of `package.ps1` and now verifies 10 files (5 × 2 platforms), every one published.
-  ✅ **SIZE SETTLED BY BUILDING IT, 2026-09-14** — `package.ps1 -Edition Enterprise` run to completion,
-  **real exit code 0**, every step green including SBOM, both jlink runtimes and the boot smoke
-  (`the staged Enterprise bundle boots and answers /health`). 🔴 **The estimate this row carried was
-  wrong in BOTH directions and the larger error was the one that mattered.**
-  - ⛔ **The "+104 MB" was ~3× the real shipped cost.** It doubled the *Windows* raw sizes across both
-    platforms; Linux `httpfs` is **19.92 MB**, not 28. Raw for the two new names is **93.32 MB** across
-    both platforms, not 104. But a bundle is a **ZIP**, and `.duckdb_extension` binaries deflate to
-    ~0.34–0.38 — measured from the built zip's own entry table, not assumed. ⇒ the addition costs
-    **+33.5 MB compressed in every zip** (win `httpfs` 10.26 + `aws` 8.60; linux 6.84 + 7.77).
-    ⚠ **Never quote a raw staged size as a bundle cost** — that is the whole 3×.
-  - Per-platform totals for all five, raw → zipped: **windows 121.91 → 45.26 MB**,
-    **linux 125.95 → 43.25 MB**. A release stages both, so each zip carries **~88.5 MB** of extensions.
-  - Measured zips from this run: `inspecto-deploy.zip` **238.86 MB**, `inspecto-deploy-linux.zip`
-    **241.82 MB** — ⚠ **both carrying the WINDOWS extensions only**, because a desk build stages what the
-    local cache holds (see the next bullet). A release build, which stages both platforms, lands at
-    **≈282 / ≈285 MB**.
-  - ⚠ **A desk build stages only the platforms the local `~/.duckdb/extensions` cache happens to hold**,
-    warns per missing file, and still exits 0 — by design, so a developer without a cache can build.
-    ⛔ **This is NOT the released shape and must not be read as one:** all three `release.yml` jobs pass
-    `-RequireExtensions` after a per-platform fetch step, which turns each of those warnings into a
-    refusal. That gate is `AIRGAP-EXTENSIONS-CI-1`, closed 2026-09-14, and it held here.
-  - 🔴 **Found while measuring — every zip carries the OTHER platform's binaries, which its own launcher
-    never probes.** Both platforms stage into the same bundle dir and both zips are cut from it, so
-    `inspecto-deploy-linux.zip` ships `duckdb-extensions/windows_amd64/` while `run.sh` looks only at
-    `duckdb-extensions/linux_amd64/`. `package.ps1` calls this "harmless — like run.sh sitting unused in
-    the Windows zip", and at 27 MB it was. **It is now ~43–45 MB of unreachable payload per zip, ~16 % of
-    the download**, and `httpfs`+`aws` are what moved it. ⇒ Cutting each zip against its own platform dir
-    is the cheapest ~45 MB on the board, but it is a **packaging change, not a measurement** — filed, not
-    taken, see `AIRGAP-CROSSPLAT-DEADWEIGHT-1` below.
-  ⚠ **`httpfs` ALONE is sufficient for an S3-compatible endpoint with EXPLICIT credentials** (measured
-  against MinIO with `aws` absent); `aws` buys only the AWS credential CHAIN — profiles, environment,
-  IMDS. ⇒ if bundle size ever binds, drop `aws` first and nothing that passes explicit keys notices; it
-  is **16.37 MB compressed per bundle** (8.60 windows + 7.77 linux), now measured rather than estimated.
-  🔴 **WHAT REMAINS, and it is the half that makes staging mean anything.** A flat
-  `duckdb-extensions/<plat>/<name>.duckdb_extension` is reachable ONLY by `DuckDbExtension`'s explicit
-  `LOAD '<file>'`. DuckDB's AUTOLOAD ignores `-Dduckdb.extension.dir` and reads its own
-  `extension_directory`, which this product never sets. Measured four ways: autoload over an empty dir
-  FAILS (correct), autoload over the FLAT staged dir FAILS, autoload over a `<version>/<platform>` tree
-  WORKS, explicit `LOAD '<flat file>'` WORKS. ⇒ `httpfs`/`aws` are staged but INERT until phase C's
-  `s3://` seam calls `DuckDbExtension.ensureLoaded` by name.
-  ✅ **The sibling defect `AIRGAP-PGSCANNER-LOAD-1` is CLOSED 2026-09-14** — `postgres_scanner` was
-  shipped in exactly that inert state and is now loaded by name at both attach sites, so the pattern
-  `httpfs` must follow already exists: `LakehouseCatalog.backendExtension` +
-  `DuckDbExtension.ensureLoaded`. → `superpower/enterprise-scale-out-plan.md` §5.4 bullet 6
-  🔴 **Regrounded 2026-09-14 when starting bullet 6 was proposed: there is no `s3://` seam to attach that
-  `ensureLoaded` call to yet, and bullet 6 cannot start without bullet 1.** `PartitionWriter` writes via
-  DuckDB `COPY` (`:192`), which already speaks S3 — measured end to end against the live MinIO, `httpfs`
-  autoloading and `aws` never loading. But the staging dir, the `Files.walk` cleanup and the two-hop
-  `ATOMIC_MOVE` reveal around it (`:174,176-177,201,212,229-236`) are `java.nio.file` with no object-store
-  equivalent and no strategy seam, `dirs.database` has ~10 further `Path.of` consumers outside that class,
-  and **no config surface carries an endpoint, key or region** (the probe needed five `SET s3_*`
-  statements). ⇒ three pieces, and only the first is bullet 6's own.
-  ✅ **What shipped instead, ahead of all of it: a fail-closed URI refusal.** 🔴 The status quo was worse
-  than unsupported — `Paths.get("s3://bucket/data")` **throws on Windows and does not on Linux**, where it
-  yields `/s3:/bucket/data`, a local directory named `s3:` under the CWD that `PathJail.contains` then
-  judges confidently and wrongly. An operator authoring that value got a refusal on the box they probe from
-  and silent local writes on the box it ships to. `PathJail.isUri` is now the one definition, enforced by
-  both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
-  bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
-
-  ✅ **TWO ANSWERS 2026-09-15, and together they unblock this row completely.**
-  **(1) Where credentials live — `ConnectionProfile` for BOTH** the pipeline field (already decided §5.4) **and
-  the deployment-level `dirs.database` URI.** One credential mechanism, one secret path,
-  `SecretResolver` and redaction reused whole rather than a second surface with its own story.
-  ⚠ **One thing to verify before committing to it**: the storage root must resolve at boot, so
-  profiles have to be resolvable early enough to supply it. ⛔ If the bootstrap order forbids that,
-  the split (deployment properties for the root, profiles for pipelines) is FORCED — report back
-  rather than working around it silently.
-  **(2) A live S3/MinIO endpoint IS available** — so the remaining acceptance (one run confirming the
-  lane still writes with the explicit `httpfs` load in place) can finally be executed. ⛔ Do not close
-  this row on the green reactor: all 4 `PartitionWriterObjectStoreTest` tests still SKIP.
-  ⚠ Unchanged: ⛔ dispatch on `PathJail.isUri`, do **not** delete the URI refusal — a bucket URI is
-  not containable by `Path` comparison, and `Paths.get("s3://…")` throws on Windows while silently
-  making a local `s3:` directory on Linux.
-
 - **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down.**
   ✅ **The blocking half is BUILT 2026-09-15.** `Roles.CAN_ADMINISTER` exists — **one** coarse capability per
   the operator's call, not three per-family ones — so duckle's "unlisted ⇒ admin" rule is **expressible for
@@ -1571,6 +1466,36 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⇒ **Remaining order:** ground the 10 → gate them → classify and gate the ~15 triage routes →
   record the 49 exemptions → **the ratchet LAST**, over mutating routes only.
 
+  ✅ **STEPS 2b + 2c SHIPPED 2026-09-15 — "ungated" is now a RECORDED state, and the build fails on a mutating
+  route in no state.** `CapabilityManifest` gained `record Exemption(method, pattern, category, reason)` +
+  `EXEMPTIONS` (**60** rows, categories = the audit's own bucket taxonomy plus `collaboration`, the word the
+  plan's 2b used) and `record Pending(method, pattern, question)` + `PENDING_OPERATOR_CALLS` (**4** rows).
+  `CapabilityManifestTest.everyMutatingRouteIsGatedExemptOrPending` scans every `api.post|put|patch|delete`
+  registration in every reactor module (**77** ungated + the gated ones) and asserts each is in EXACTLY one of
+  ENTRIES / EXEMPTIONS / PENDING, that nothing exempt or pending is unregistered, and that PENDING can only
+  shrink (≤ 4). Mutation-verified: a never-registered exemption turns it red on the stale-route assertion.
+  **2b, the triage classification (`ObjectRoutes`, `NoteRoutes`)**: 8 routes now take `canAdminister` — `ack`,
+  `resolve`, `transition`, `assign`, `merge`, `split`, `PATCH /objects/{id}` (it edits priority / severity /
+  assignee — disposition) and **`POST /cases/rules/{id}/evaluate`**; 7 stay open as `collaboration` —
+  comments, attachments, links (POST + DELETE), RCA seed, and the two `/notes/…` routes.
+  🔴 **Two findings from reading the handlers rather than the audit:** (1) `/cases/rules/{id}/evaluate` was
+  in the audit's §4 "read-shaped" bucket; it **opens a Case** (`ObjectService.CaseRuleEvaluation.opened`), so
+  that bucket was wrong for it and it is gated, not exempt. (2) `/expectations/evaluate` and
+  `/expectations/{id}/evaluate` are exempt as read-shaped **with the caveat written into the reason**: a breach
+  may open an Incident, so they are re-classified together with the pending Incident-creation call.
+  ⚠ **`POST /objects` (create) joined PENDING** — it is the same question as `POST /recon/promote` (*which
+  family does manually opening an Incident belong to?*); gating it under `canAdminister` would have decided
+  an operator question by side effect. ⇒ PENDING is now **four**, not three, and §1's owed-input row says so.
+  ⚠ `ControlApiScopedObjectsTest`'s Subjects gained `canAdminister`: that class tests the data-scope guard
+  BENEATH the new gate, and the gate wraps the guard (403 before the existence-hiding 404).
+  `ControlApiTriageGateTest` (new, real HTTP) pins both halves against a Subject that HOLDS a capability but
+  not this one — an open route proven open with no Subject at all proves nothing, since no check runs then.
+  ⇒ **What remains: 2a (four operator calls, §1) → step 3 (the fail-closed default: `Gated` handler marker +
+  boot refusal + `absent-module-stub`) → 4c/4d/4e.** ⛔ Step 3 cannot land while PENDING is non-empty — a
+  boot refusal over four undecided routes either bricks them or forces them into the table unreviewed.
+  → `CapabilityManifest.java` · `CapabilityManifestTest.java` · `ObjectRoutes.java:56-75` ·
+  `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
+
 - **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.** Adopted
   by the operator 2026-09-15 from duckle §1 C3. Stable error code + near-name suggestion (no suggestion
   when nothing is close); strict at validate, warning at run; `x-` keys round-trip untouched; and the
@@ -1581,56 +1506,22 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   drops. ⇒ the value is turning a silent loss into a refusal. → `ConfigSafetyValidator` · node attribute
   specs / `step-types.contract.json`
 
-- **P2** · **`DUCKLE-C9-WATCHER-NOT-A-RUN-1` — a polling session is not a Run.** Adopted 2026-09-15 from
-  duckle §1 C9. A polling session gets its own identity (`lastPollAt`, `pollCount`, `lastError`); **only a
-  poll that moves rows or fails mints a Run**, naming the session as parent; `pollCount − runCount` is
-  quiet time; a killed watcher reconciles to `interrupted` on next start, like a receipt.
-  ⚠ The grounding called this "cheap to separate" — the collector loop currently conflates polls and runs,
-  which makes run counts misleading in exactly the place operators read them. → Collector / Consignment
-  scheduler
-
-  ✅ **DECIDED 2026-09-15:** **this is the FIRST of the adopted duckle rows to build.** Chosen over C3
-  (dead config keys), C10 (pool rules) and C1 (Dataset freshness). ⚠ Reason for the record: it fixes
-  run counts **where operators actually read them**, and the grounding already called it cheap to
-  separate. ⛔ It touches the live collector loop, so "cheap" describes the design, not the care.
-
-  ✅ **SHIPPED 2026-09-15 — the panel is mounted; `GET /config/schema/derived` has a reachable consumer.**
-  `pipeline` now threads pipeline-editor → `GrammarEditorDialogData` → `SchemaEditorData` → the panel.
-  ⚠ **“The schema authoring pane” was ambiguous and the decision did not say which.** Two dialogs qualify;
-  `SchemaEditorDialog` was chosen because the panel's OWN docblock targets it (“beside the authored one
-  (step-workbench S5)”) and `okf/frontend/features/schema-mapping-authoring.md` names it as the surface.
-  🔴 **It was not a template edit: no dialog in the chain knew a pipeline.** The panel needs the
-  REGISTERED identity (`pipelineId()`), which `GET /config/schema/derived` resolves via `configFor` — so
-  the value had to be threaded through THREE levels. `SchemaEditorData` gained `pipeline?` beside its
-  existing `home`/`subdir`, which exist for the same reason (the two openers genuinely differ).
-  ⛔ **Hidden for `home: 'registry'`, deliberately.** A registry schema is shared and attached to no
-  pipeline, so the panel is ABSENT there rather than present-and-empty — an empty panel would invite
-  “this pipeline writes nothing”. A test pins each direction.
-  ⚠ **Labelled “last saved”, and that label is load-bearing.** The route derives from the SAVED config
-  (“every schema a *saved* pipeline declares”) while the dialog edits an in-memory draft — so mid-edit it
-  shows the schema BEFORE the current edit. Unlabelled it would read as live feedback on the unsaved
-  edit, which is the one way this panel could mislead an author rather than help them.
-
-  🔴 **GROUNDED 2026-09-15 — the PREMISE IS STALE; there is no conflation left to fix.** The row says
-  the collector loop “conflates polls and runs, which makes run counts misleading in exactly the place
-  operators read them”. It does not. `CollectorProcessor.ingest` returns on `candidates.isEmpty()`
-  **before** `RunIds.next()` is ever called, so a quiet poll mints no Run id and writes no run-scoped row.
-  ⚠ **The fix landed 2026-09-13 in `1fda46d5`** (“the Collector's ingest path stops writing a NULL
-  run_id”) — i.e. BEFORE this row was adopted on 2026-09-15 from a 2026-09-14 grounding note. The row was
-  born describing a defect that had already been repaired two days earlier.
-  ⚠ The nearest live wrinkle is terminology, not counts: `PipelineScheduler.runOne` moves
-  `inspecto_active_runs`/`inspecto_poll_cycles_total` per dispatched source per tick — but code and the
-  published metric table both already call those **poll cycles / source runs**, distinct from capital-R
-  Run. Nothing an operator reads is inflated by quiet polls.
-  ✅ **What is genuinely absent is the OBSERVABILITY half, and only that:** no watcher/session identity
-  exists anywhere (`lastPollAt` / `pollCount` / `lastError` return zero hits in main sources), and there is
-  no `interrupted` reconciliation. That is **additive instrumentation, not a bug fix** — and
-  `pollCount − runCount` as “quiet time” is largely moot once quiet polls are known not to touch the Run
-  counter at all.
-  ⇒ **RESCOPE before building.** It was picked FIRST because it “fixes run counts where operators read
-  them”; that rationale is gone, so the ordering decision (§1 row 32) rests on a premise that no longer
-  holds and is the operator's to re-take. ⛔ Nothing was built against it.
-
+  🔴 **GROUNDED 2026-09-15 (not built) — there is NO enforcement point today, and the "same map the checker
+  enforces" does not exist yet either.** `ConfigSafetyValidator.check` inspects a fixed list of dangerous
+  fields and never iterates `raw.keySet()`; `NodeAttributes` (mirrored 1:1 into
+  `node-attributes.contract.json`, drift-pinned by `NodeAttributesContractTest`) IS a type → accepted-keys
+  table but is advisory/UI-only — its javadoc says an absent type *"falls back to the dialog's free-form
+  key/value editor"*; `ConfigSpecs` validates envelopes with explicit open-map escape hatches (viz channels).
+  `ComponentStore.encode` (`:186-230`) is the one place that already does this row's job — allow-lists +
+  `IllegalArgumentException("… cannot persist key(s) …")` — but only for CSV-backed component kinds, and it
+  frames itself as fixing *"this repo's recurring loss mode"*. No `x-` convention and no edit-distance helper
+  exist anywhere. ⇒ **The seams:** strict = a new `Finding` producer in `ConfigWriteRoutes` (write `:69-84`,
+  patch `:364+`), the list every ERROR→422 finding already rides; warning = `RecipeCompiler` at compile.
+  ⛔ `RecipeCompiler:254-260` explicitly REFUSED a blanket unknown-key refusal on `collect:` blocks because
+  `RecipeConverter` round-trips arbitrary collector keys — so the accepted-names map must be per node type
+  and must include the converter's pass-through keys, or the gate breaks the flat→graph round trip.
+  ⚠ `Finding` already carries an optional stable `code` (`FindingCodes`, `ERR_`/`WARN_`), so "stable error
+  code" is infrastructure, not new design. Size: a §3 feature (new map, generator, two seams), not hygiene.
 
 - **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` — Dataset freshness on a CLOCK, not on failures.** Adopted
   2026-09-15 from duckle §1 C1.
@@ -1724,6 +1615,13 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   whose `RunLease` (fenced db lease) is already the seam. The deadlock rule in particular is cheap to
   honour up front and expensive to retrofit. → `superpower/enterprise-scale-out-plan.md` phase B
 
+  ✅ **RULE SET RECORDED 2026-09-15** in `superpower/enterprise-scale-out-plan.md` §4.1 (under U2, beside the
+  `ConcurrencyBroker` seam it constrains) — the row's actionable half. ⚠ The FEATURE (named pools, durable
+  queued-run ids with `queueReason`/`queueMs`, the free-permits metric) is NOT built and this row stays P3
+  for it. 🔴 One grounding note recorded with the rules: the "supervisor takes no slot" rule is already
+  honoured by accident, not by design — `ConcurrencyBroker` admits Consignments, not the pipeline-level
+  dispatcher, so nothing today holds a slot while waiting on a child. The rule exists to keep it that way.
+
 - **P3** · **`DUCKLE-C2-RUN-DIFF-1` — diff two Runs from recorded facts, with rule-derived explanations.**
   Adopted 2026-09-15 from duckle §1 C2. Compare two Run receipts **by kind** (code, runtime, invocation,
   inputs, execution, output); **every explanation line traces to a listed difference** — no generated
@@ -1759,158 +1657,30 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ Lineage/impact code already exists (42 Java / 25 TS hits); **what is absent is the gate over a diff**.
   → Lineage · `docs/api` breaking-change record · CI
 
-- **P2** · 🔴 **`DATASET-SELF-TRIGGER-1` — a pipeline can trigger itself through `on: dataset`, and the
-  javadoc says it cannot.** Filed 2026-09-15 from duckle candidate S3 ("no self-subscription").
-  `PipelineScheduler.onUpstreamCommit` has an explicit self-loop guard (`:445`); **`onDatasetWrite`
-  (`:469`) has none**, and its javadoc (`:465-467`) states one is unnecessary because *"the producer is a
-  Dataset write (a job/materialize), never the triggered pipeline's own commit."*
-  ⛔ **That claim is false for the consignment path**: `ConsignmentProcessJobType:412` emits
-  `DatasetWriteSignal.emit(store, n, processorId)` **from inside a pipeline's own run**. A pipeline whose
-  processor writes store `S` and declares `{on: dataset, from: datasets/S}` re-triggers itself —
-  coalesced, so it degrades to a hot loop rather than a stack overflow.
-  🔴 **DO NOT ship the obvious one-line guard — it CANNOT FIRE.** The natural fix (pass `producer` through
-  and skip when it equals the pipeline name) fails precisely on the case that needs it, because
-  **`producer` is not a pipeline name and is not even consistent**: `MaterializeTask:132` passes
-  `cfg.name()` (a JOB name) while `ConsignmentProcessJobType:412` passes `chain.get(i)` (a **processor
-  component id**). ⚠ `CollectorService:1026` also drops `producer` entirely before calling
-  `onDatasetWrite`, so today the value never even reaches the scheduler. ⇒ the real work is **deciding
-  what `producer` identifies** and populating it consistently; the guard is downstream of that.
-  → `PipelineScheduler.java:469` · `CollectorService.java:1026` · `ConsignmentProcessJobType.java:412`
-
-  ✅ **DECIDED 2026-09-15:** **`producer` becomes a structured `Ref` — `{kind, id}` plus the OWNING PIPELINE.**
-  ⇒ the guard compares owning pipelines and can therefore actually fire on the consignment case,
-  which is the one the current javadoc wrongly claims is impossible.
-  ⛔ **The three emit sites must all be corrected, and one of them currently sends nothing**:
-  `MaterializeTask:132` passes a JOB name, `ConsignmentProcessJobType:412` a **processor component
-  id**, and `CollectorService:1026` **drops `producer` entirely** before calling `onDatasetWrite`.
-  ⚠ Chosen over "just pass the pipeline name" so the finer provenance (which job, which processor)
-  survives rather than being flattened away — and ✅ the same structured `Ref` is what
-  `STALE-TILES-PRECISION-1` needs on a Signal's `subject`. ⇒ **build the `Ref` vocabulary once.**
-  ⚠ And it interacts with `PIPELINE-DRYRUN-1`: a dry run must not emit these at all.
-
-  ✅ **SHIPPED 2026-09-15.** `DatasetWriteSignal.emit(dataset, rows, Ref producer, String owningPipeline)`:
-  the producer rides the Signal's `actor` slot (a `Ref`, previously always `null`) and the owning pipeline
-  is a separate payload key, `PAYLOAD_PIPELINE`. All three emit sites corrected — `MaterializeTask` now
-  says `Ref.of("job", …)`, `ConsignmentProcessJobType` says `Ref.of("processor", …)`, and
-  `CollectorService` **reads the owning pipeline through** instead of dropping it. The guard exists and
-  fires: `PipelineScheduler.onDatasetWrite(dataset, producerPipeline)` skips the producing pipeline.
-  ✅ **The existing `Ref {kind, id, rel, via}` was reused, not duplicated** (`com.gamma.signal.Ref`,
-  `@PublicApi since 4.0.0`) — so `STALE-TILES-PRECISION-1` inherits the same vocabulary as intended.
-  🔴 **`null` owning pipeline means "suppress NOTHING", and that is load-bearing.** A cron or manually
-  fired job genuinely has no owning pipeline (`ctx.trigger()` carries one only for `event:<pipeline>`), so
-  reading absence as "suppress" would have silently killed the ordinary materialize-then-trigger path that
-  predates the guard. A test pins each direction: self suppressed, another pipeline still fires, unowned
-  still fires.
-  ⚠ **The wiring was the defect, not the comparison** — a guard unit-tested only on `PipelineScheduler`
-  would have passed while the shipped path stayed broken, because `CollectorService` never delivered the
-  value. `aDatasetWriteOwnedByTheSubscriberItselfDoesNotRetriggerIt` drives the real subscriber end to end.
-  ✅ `PIPELINE-DRYRUN-1`'s half is already satisfied **structurally**: both emit sites sit behind their
-  callers' existing dry-run gates (`MaintenanceJob` short-circuits to `noPreview`; `persistSummaries`
-  returns before populating `pending`), so no new flag was added. ⚠ That is a caller-level guarantee, not
-  an asserted one — if the dry-run gates move, the emission moves with them silently.
-  ⚠ `MaterializeTask.run` gained a `JobContext` parameter to reach the trigger.
-  → `PipelineSchedulerEventTriggerTest` (3 new) · `CollectorServiceTriggerTest` (1 new) ·
-  `DatasetWriteSignalTest` (extended)
-
-- **P2** · **`LEDGER-PRUNE-EATS-RESUME-STATE-1` — retention deletes resume position, not just history.**
-  Filed 2026-09-15 from duckle candidate S1 ("saved state — watermarks, resume positions — is NEVER
-  touched by retention"). `AcquisitionLedger.highWatermark()` is **derived from the fingerprints the
-  ledger holds — there is no separate watermark column** (`AcquisitionLedger.java:22-41`), and
-  `ledger_prune` deletes those fingerprints (`LedgerPruneTask.java:11-27`). So pruning deletes the
-  source's resume state; the task's own doc that a pruned file *"re-ingests as NEW"* is that loss, stated
-  as deliberate forgetting. ⚠ Partial, not total: the row-level DB-export watermark
-  (`DbAcquisitionLedger.java:200-221`) is a separate table and is **not** touched by `prune()`.
-  ⇒ The call to make is whether "deliberate forgetting" should be **opt-in per category** rather than a
-  consequence of an age-based sweep. → `AcquisitionLedger.java:64` · `LedgerPruneTask.java:11`
-
-  ✅ **DECIDED 2026-09-15:** **never prune below the high watermark — floor the sweep.** Retention stays
-  age-based and history still shrinks, but it stops at whatever the resume position needs.
-  ⚠ Chosen over giving the watermark its own column: **no schema change and no migration** for
-  existing ledgers. ⛔ The consequence is accepted, not overlooked — the repo keeps **two designs for
-  one idea** (file acquisition derives its watermark from fingerprints; `DbAcquisitionLedger:200-221`
-  holds a separate row-level export watermark that `prune()` already never touches). A future sweep
-  that "unifies" them is reopening this decision, not tidying.
-  ⚠ A pruned-then-reappearing old file still re-ingests as NEW under this answer, which is arguably
-  correct rather than a loss — the defect was losing the *position*, not forgetting the *history*.
-
-  ✅ **SHIPPED 2026-09-15.** The floor is a correlated `MAX(last_modified)` **per source**, applied in
-  `DbAcquisitionLedger` (SQL) and `InMemoryAcquisitionLedger` (a per-source floor map). No schema change,
-  as decided. 🔴 **The decision's own words hid a trap: prune ages on `processed_at`, but the watermark
-  derives from `last_modified`** — two different clocks on one row. "Never prune below the high watermark"
-  therefore means *keep the row(s) holding `MAX(last_modified)`*, not *keep recent rows*; a floor written
-  against `processed_at` would compile, pass a naive test, and still delete the resume position.
-  ⚠ A **global** sweep (`source = null`) floors each source **independently** — one shared floor would let
-  a busy source's frontier protect a quiet source's rows.
-  ✅ **One PAIR of `PRUNE-PREVIEW-DRIFT-1` (below) is closed in passing — not the row.** `prune` and
-  `countPrunable` are now two call sites of ONE predicate in each ledger implementation, and a test pins
-  that the preview and the sweep agree. ⛔ Do not re-split them. ⚠ **The row stays OPEN**: it also covers
-  `ReceiptPruneTask`, `NotificationPruneTask` and `DedupPruneTask` (whose dry run reports the ledger's
-  total size rather than a plan), none of which this touched.
-  → `AcquisitionLedgerPruneTest` (10 tests, incl. the single-row source that is *entirely* resume state).
-
 - **P3** · **`JOB-DIR-CWD-CONTAINMENT-1` — a job's `dir` containment resolves against the JVM's CWD, not the Space root, and is decided by a process-wide static set.** Filed 2026-09-15 after `ControlApiJobCrudTest.snakeCaseTriggersAndFlatParamsRoundTrip` failed (422 expected, 200 returned) in every clean worktree created under `%TEMP%` — at `41aa5267`, `87a4d97c` AND `a831172f`, i.e. it predates all of that day's work.
   🔴 **It is NOT a flaky test and NOT a live containment defect — it is a real seam worth fixing.** `JobRoutes.parseJob` calls `ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy())` with **no `configDir`**, so `ConfigSafetyValidator.resolveRef` (`:489-495`) resolves a relative `dir` via `toAbsolutePath()` — against the **process working directory**. The candidate is then tested against `SafetyPolicy.defaultPolicy()`'s allowed roots, which include `DiscoveredRoots` — a **process-wide static set** every test's `SpaceManager` populates with space bases under `java.io.tmpdir`. When the checkout (hence surefire's CWD) is itself under `%TEMP%`, `../../outside` normalises to a path that can share a prefix with another test's leaked `%TEMP%` root ⇒ **accepted**. Under `C:\sandbox` it cannot ⇒ refused.
   ✅ **Proven by relocation, not by argument:** a worktree at the *same* commit with *zero* uncommitted changes PASSES when created under `C:\sandbox` and FAILS under `%TEMP%`. ✅ GitHub CI at `6770d031` refuses correctly, so **the shipped-shape path is sound — P3, not a security regression**.
   ⇒ **The durable fix is passing the Space root as `configDir` at that call site**, which makes the check independent of BOTH the CWD and `DiscoveredRoots`. ⛔ Do not "fix" this by making the test robust to its own location — that hides the seam the test is accidentally reporting.
   ⚠ **Method lesson, for anyone verifying in a worktree:** isolate the CONTENT but keep the checkout under the SAME parent path, or a path-containment test legitimately reads a `%TEMP%` checkout as "outside". → `JobRoutes.java:369` · `inspecto-config/.../safety/ConfigSafetyValidator.java:489` · `inspecto-config/.../safety/DiscoveredRoots.java:41`
 
-- **P3** · **`PRUNE-PREVIEW-DRIFT-1` — dry-run and the real prune are two different predicates.**
-  Filed 2026-09-15 from duckle candidate S1 ("`--dry-run` and the real prune share one planning
-  function"). ✅ The file-partition tasks already do it right — `ParquetEventStore.prune(before, dryRun)`
-  (`:349`) and `PartitionPruneTask.run` (`:38-64`) walk one loop and branch only at the delete
-  (`if (dryRun) continue;`). 🔴 The store-backed tasks do not: preview calls `countPrunable(cutoff)` and
-  the act calls `prune(cutoff)`, **each with its own independently written WHERE clause**
-  (`AcquisitionLedger.java:72-83`, `DbAcquisitionLedger.java:225-258`; same shape in `ReceiptPruneTask` /
-  `NotificationPruneTask`) — two definitions of "what is prunable" that can drift.
-  ✅ **The ACQUISITION-LEDGER pair is unified (2026-09-15)**, as a side effect of shipping the watermark
-  floor on `LEDGER-PRUNE-EATS-RESUME-STATE-1` — both impls now share one predicate and a test pins the
-  agreement. ⚠ The row remains open for `ReceiptPruneTask`, `NotificationPruneTask` and `DedupPruneTask`.
-  ⛔ Worst case found: **`DedupPruneTask`'s dry run does not count matching rows at all** — it reports the
-  ledger's *total* size as the preview, which is not a plan. ⇒ unify each pair onto one predicate; the
-  partition tasks are the template. → `AcquisitionLedger.java:72` · `DedupPruneTask.java`
-
-- **P2** · **`AIRGAP-CROSSPLAT-DEADWEIGHT-1` — every zip ships the other platform's DuckDB extensions,
-  ~45 MB it can never load.** Filed 2026-09-14, **measured from the built zips' own entry tables**, not
-  estimated. `package.ps1` stages both platforms into one `$bundleDir` and cuts both zips from it, so
-  `inspecto-deploy-linux.zip` contains `duckdb-extensions/windows_amd64/` while the `run.sh` it ships
-  probes only `duckdb-extensions/linux_amd64/` (and the reverse for the Windows zip + `serve.bat`).
-  The script states the trade — *"harmless — like run.sh sitting unused in the Windows zip"* — and **that
-  judgement was made when the payload was three extensions**. It is now five: windows **45.26 MB**
-  zipped, linux **43.25 MB** zipped, so a release bundle is **~16 % unreachable payload** and
-  `httpfs`+`aws` contributed **33.5 MB** of it. ⇒ Cut each zip against its own platform directory. ⚠ Two
-  things to check before touching it, because the current shape is deliberate: (a) the **launchers are
-  cross-copied on purpose** (`run.sh` in the Windows zip), so "filter by platform" must filter the
-  extension directory **only**, not sweep the launchers out with it; (b) the **boot smoke runs against
-  `$bundleDir`, before zipping** — it will stay green whatever the zips contain, so this change needs its
-  evidence from the zip entry tables, exactly as the measurement did. ⛔ Not urgent and not a correctness
-  defect: every deployment loads what it needs today, it just downloads twice the extensions to do it.
-  → `inspecto/package.ps1` step 6d · `AIRGAP-S3-EXTENSIONS-1` above
-
-  ✅ **DECIDED 2026-09-15:** **APPROVED — cut each zip against its own platform directory.** Re-ranked P2: it is
-  commissioned work, not a filed measurement.
-  ⛔ **Filter the EXTENSION directory ONLY.** The launchers are cross-copied **on purpose** (`run.sh`
-  in the Windows zip), so a platform filter that sweeps them out with the binaries breaks a
-  deliberate convenience — the row flagged this precisely because the naive change does both.
-  ⛔ **Take the evidence from the zip entry tables, not the boot smoke.** The smoke runs against
-  `$bundleDir` *before* zipping and will stay green whatever the zips contain — so it cannot
-  witness this change in either direction.
-  ⚠ Rejected alternative, recorded so it is not re-proposed as a shortcut: dropping `aws` saves only
-  16.37 MB and **removes a capability** (the AWS credential chain) rather than deadweight.
-
-  ✅ **BUILT 2026-09-15 — and deliberately NOT closed: the evidence this row demands has not been
-  produced.** `package.ps1` step 8 now cuts each zip through `Compress-BundleForPlatform`, which parks
-  the other platform's `duckdb-extensions/<plat>/` directory, zips, and restores it in a `finally` (a
-  throwing `Compress-Archive` would otherwise leave a half-stripped `$bundleDir` and silently produce a
-  SECOND zip missing extensions it was supposed to carry). It follows the move-aside/re-zip idiom the
-  script already uses for `runtime/` rather than inventing a second pattern.
-  ⛔ **The extension directory only** — the launchers stay cross-copied, as the row required.
-  🔴 **What is still owed is the zip entry tables**, and ⛔ nothing else substitutes: the boot smoke runs
-  against `$bundleDir` *before* zipping and stays green whatever the zips contain, so it cannot witness
-  this change in either direction. ⚠ Note `$bundleDir` is now a **superset** of either zip — it holds
-  both platforms while each zip holds one — so anything comparing the two must stop treating the
-  directory as a mirror of `inspecto-deploy.zip`. Verified so far only that `package.ps1` parses clean
-  (0 errors, decoded as UTF-8 — ⚠ a BOM-less file parsed as ANSI reports 43 phantom errors on the
-  PRISTINE file too, so check a probe against HEAD before believing it).
+  🔴 **REGROUNDED 2026-09-15 — the row's "durable fix" CANNOT WORK, and the seam is a semantics choice, not a
+  call-site edit.** *"Pass the Space root as `configDir` at that call site"* was checked against the code:
+  (a) `checkJob` (`ConfigSafetyValidator.java:124-126`) validates its six path keys through `checkPath`, which
+  **ignores `configDir` entirely** — the 4-arg overload's own javadoc says `configDir` is *"used ONLY for config
+  refs… `dirs.*` are data directories and stay working-directory-relative"*; (b) even routed through
+  `resolveRef` (`:489-497`), a config-relative candidate wins only when it `startsWith(base) && Files.exists`,
+  and `../../outside` satisfies neither — so it would fall straight back to `toAbsolutePath()` against the CWD,
+  the very resolution the row objects to. ⇒ **Passing `configDir` changes nothing for a job.**
+  ⚠ **And the run-time side resolves the same way**: `CleanupTask:35`, `PartitionPruneTask:39` and
+  `StorageReportTask:45` go through `PathJail.requireUnderAny` → `PathJail.require` (`PathJail.java:165`),
+  which is `Paths.get(s).toAbsolutePath()` — CWD-relative. The 422 gate and the run-time jail therefore
+  AGREE today; a validator that resolved job paths against the Space root while the tasks kept resolving
+  against the CWD would pass a draft the run then jails (or the reverse) — the exact split `resolveRef`'s
+  javadoc was written to end. ⛔ So the fix is not one call site: it is **making job path values
+  Space-root-relative at BOTH the gate and every task**, which changes what every existing job's relative
+  `dir` means. That is a config-semantics decision → filed in §1.
+  ✅ What stays true: the trigger is `DiscoveredRoots` being a process-wide static set (the
+  `SPACE-UNKEYED-STATICS-1` family), and the shipped-shape path is sound (CI refuses correctly). P3 holds.
 
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
@@ -2011,69 +1781,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   never tell you this** — both read `0.9.53`.
 
 
-### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
 
-- **P3** · **`SPEC-ORPHANPAGE-1` — shipped surfaces with no concept page.** 🔴 **The "roughly twenty" was
-  wrong and contradicted the row's OWN enumeration, which sums to 33** (re-grounded 2026-09-13). A recount
-  against `docs/okf/frontend/**` and the `resource:` front-matter map measured **≈44**: 17 routed admin panes,
-  4 unrouted shell surfaces, 12 shared components, 11 shared libraries. ✅ **GATE (operator, 2026-09-13): confirm the ≈44 before building anything from it** — so the next person
-  sizes from a real number instead of re-litigating the estimate. ⚠ Treat ≈44 as a measurement needing
-  its own confirmation pass before anyone sizes the work from it — ⛔ but never carry "roughly twenty" forward
-  again. The enumerated areas: panes in the shell tier (two of them the very rows that area owns), shared
-  components and shared libraries, three Ops Lens screens (audit log, processing status, the scheduler), the
-  Notification Center, the operational objects domain, and a guarantees panel whose own docblock cites a plan
-  its page does not link.
-  ⛔ **One listed item is FALSE and is struck:** ~~the Catalog read model (`com.gamma.catalog`) is "owned by
-  none"~~ — it is a declared `resource:` of
-  [`okf/capabilities/metamodel/metamodel.md`](okf/capabilities/metamodel/metamodel.md) (front matter, line 5). ⚠ Filed
-  as P3 deliberately — an undocumented pane is a smaller problem than a *wrongly* documented one, and
-  `SPEC-STALEREF-1` is the same budget better spent.
-
-  ✅ **DECIDED 2026-09-15:** **run the confirmation pass — and ALSO re-derive what `SPEC-STALEREF-1` was.**
-  ⛔ **The confirmation pass is commissioned; the ~44 concept pages are NOT.** This row stays P3
-  because writing the pages was never approved — only measuring them honestly was. ⚠ Do not read the
-  authorized count as authorization to document.
-  🔴 **And the row defers its own budget to a row that DOES NOT EXIST.** `SPEC-STALEREF-1` appears
-  exactly once in this file — inside this row's own closing sentence — so it either closed or was
-  never filed, and "the same budget better spent" currently points at nothing. ⇒ establish what it
-  referred to; ⚠ if it names work that was dropped rather than done, that is a finding in its own
-  right. ⛔ Never carry "roughly twenty" forward again — this count has been wrong three times.
-
-  🔴 **CONFIRMATION PASS RUN 2026-09-15 — ≈44 is NOT confirmed. The measurement is 57.**
-  Per population (claim → measured): routed admin panes **17 → 24**, unrouted shell surfaces **4 → 11**,
-  shared components **12 → 10**, shared libraries **11 → 12**. Totals **44 → 57**.
-  ✅ The **shared tier corroborates**: 23 claimed vs 22 measured, so the earlier pass used the same
-  per-directory rule and only the component/library boundary moved. The pane and shell halves each run
-  **+7**, consistent with surfaces added since (`home`, `session/sign-in`, `session/callback`,
-  `share-viewer`, `agent-chat`, `autonomy`, `learning` are all recent).
-  🔴 **The METHOD dominates the answer, which is why this count keeps moving — state the rule with any
-  future number.** Two normalisations decide it: (a) `okf/frontend/architecture.md` declares
-  `resource: inspecto-ui/src/app/` and `overview.md` declares `inspecto-ui/` — taken literally these
-  umbrellas cover every surface and the orphan count is **0**; they must be excluded. (b) A feature page
-  names its `X.routes.ts`, not the pane component — letting that stand for its directory gives 24 panes;
-  not letting it gives **44**, and a grand total of 76. ⚠ The reappearance of 44 there is coincidence, not
-  provenance.
-  🔴 **A material slice is LINKAGE debt, not missing pages — so this number must not be used to size
-  writing work.** Of five orphans spot-checked, **two are already documented in prose** and lack only the
-  front-matter pointer: `processing-status.component.ts` has a full table row in
-  `okf/capabilities/observability/observability.md:419` (file, endpoints, row action), and
-  `notification-center.component.ts` is described across `okf/capabilities/incidents/incidents.md:349/397/399`
-  — which **already files its own missing page as a known gap**. Adding a `resource:` entry is far cheaper
-  than authoring a concept page. ⇒ Any future sizing must split ORPHAN into *undocumented* vs *unlinked*.
-
-  ✅ **`SPEC-STALEREF-1` RE-DERIVED — it CLOSED, it was not dropped.** It was **23 stale paths and dead
-  citations**, the largest family the docs consolidation found, filed as a Sprint 2 board row
-  (`1800ae6f`) and **closed 2026-09-09** by `tools/check-doc-citations.mjs` (`bd4293f9` repaired 152
-  citations). The guard is live in BOTH `.githooks/pre-push:184` and `.github/workflows/ci.yml:98`, and
-  runs on every push.
-  ⚠ **Why it appears nowhere:** its row was swept off the board with every other closed row in
-  `37f5b297`, while its CITATIONS survived in five capability-page footers (`assistant.md:411`,
-  `metamodel.md:403`, `observability.md:538`, `pipeline-authoring.md:443`, `surfaces.md:397`). The trail
-  was intact; only the row was gone.
-  ⇒ **So “the same budget better spent” points at COMPLETED work.** That sentence should be struck rather
-  than honoured — it currently defers this row's budget to a row that finished six days earlier.
-  ⚠ The row's own worry (“if it names work that was dropped rather than done, that is a finding in its own
-  right”) resolves the benign way: done, guarded, and still enforced.
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 
 One line each; the reasoning is in the pointer. Reopen only on the stated trigger.

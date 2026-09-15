@@ -46,3 +46,24 @@ store), everything reduces to the S3 column — reuse `AwsSigV4`, never take a H
 Sequence: **operator sync first** to prove the consumption pattern, then build the **push
 post-action** only if it earns a place. The full-space-on-S3 idea is recommended *against* for
 the semantic reasons in fact 3, not effort.
+
+## The object-store lane, ACCEPTED against a live MinIO (2026-09-15)
+
+`AIRGAP-S3-EXTENSIONS-1` closed on this run. `PartitionWriter.writeToObjectStore` opens with
+`DuckDbExtension.ensureLoaded(conn, "httpfs", …)` (`PartitionWriter.java:280`), and `PartitionWriterObjectStoreTest`
+(**4/4 green, 1.15 s**) drove that method against the sandbox's MinIO (`127.0.0.1:9000`, bucket
+`inspecto-lakehouse`) with the explicit load in place — the acceptance the row refused to take from a green
+reactor, because all four tests `assumeTrue`-skip without an endpoint and had never entered the method since
+the load call was added.
+
+* ⚠ **`INSPECTO_TEST_S3_ENDPOINT` is `host:port`, NOT a URL.** The test feeds it straight into
+  `SET s3_endpoint=…` and derives `s3_use_ssl` from a `https` prefix; passing `http://127.0.0.1:9000` produced
+  `Could not resolve hostname … 'http://http://127.0.0.1%3A9000/…'` and **four 45-second timeouts** that read
+  like a dead MinIO. The first run of the day was red for exactly this reason; the code was never at fault.
+* What the run does NOT prove: that an **air-gapped** bundle loads `httpfs` from `duckdb-extensions/<plat>/`.
+  On this box `ensureLoaded`'s first step (`LOAD httpfs`) succeeds from the developer cache, so the flat-file
+  fallback (`-Dduckdb.extension.dir`) was not exercised. That half is packaging's, measured separately
+  (`AIRGAP-EXTENSIONS-CI-1`, the staged 10 files; autoload over the flat dir FAILS, explicit `LOAD '<file>'` WORKS).
+* Still open, and NOT this row's: there is **no S3 credential/endpoint config surface in `src/main`** — the five
+  `SET s3_*` statements live only in the test. Scale-out phase C §5.4 bullet 6 owns it, and its eager-vs-deferred
+  resolution posture is a §1 operator call (`BACKLOG.md`).

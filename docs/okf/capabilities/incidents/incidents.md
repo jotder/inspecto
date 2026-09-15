@@ -2,7 +2,7 @@
 type: Capability
 title: Alerts & Incidents (INC)
 description: The Alert → Incident → Case chain — Alert Rules and fired Alerts, promotion into managed Incidents, the operational-objects domain (lifecycle, SLA, escalation, queues, Cases, Findings, annotations, retention), notifications, and Diagnosis. The requirement of record for the INC area, its specification, its decisions, and what was refused.
-resource: inspecto-ops/, inspecto-engine/src/main/java/com/gamma/alert, inspecto-engine/src/main/java/com/gamma/notify
+resource: inspecto-ops/, inspecto-engine/src/main/java/com/gamma/alert, inspecto-engine/src/main/java/com/gamma/notify, inspecto-ui/src/app/modules/admin/notification-center/
 tags: [inc, capability, alerts, alert-rules, incidents, cases, queues, escalation, sla, notifications, diagnosis, findings, retention]
 timestamp: 2026-09-08T00:00:00Z
 ---

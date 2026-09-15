@@ -278,3 +278,43 @@ document would not.
 ⚠ **Reachability caveat on §6c:** `/agent/*` answers 503 in every bundle today, because no packaging step
 stages `inspecto-intelligence`. The gate is correct but unreached until that changes; it is not evidence
 that agent governance is protected in a shipped product.
+
+### Step 2 as-built — 2026-09-15 (compliance plan 2b + 2c)
+
+**Every mutating registration in every reactor module is now in exactly one recorded state**, and
+`CapabilityManifestTest.everyMutatingRouteIsGatedExemptOrPending` fails the build otherwise (mutation-verified
+with a never-registered exemption). The three tables live in `CapabilityManifest`:
+
+| State | Count | Where |
+|---|---|---|
+| Gated (`ENTRIES`) | 110 registrations | `withCapability` sites, bidirectionally pinned as before |
+| Exempt (`EXEMPTIONS`) | **60** | `record Exemption(method, pattern, category, reason)` |
+| Pending operator call (`PENDING_OPERATOR_CALLS`) | **4** | `record Pending(method, pattern, question)` — may only shrink |
+
+Exemption categories are this audit's buckets — `identity-flow` (3) · `self-verifying-public` (2) ·
+`self-service` (5, incl. `POST /requirements`) · `read-shaped` (33) · `self-limiting` (6) · `recovery-route` (1) ·
+`stateless-compute` (1) · `target-visibility-gated` (2) — plus **`collaboration` (7)**, the word the plan's 2b
+used for the open half of triage.
+
+**§6(b) Incident/Case triage, classified per route from the handlers:**
+
+| Route | Verdict | Why |
+|---|---|---|
+| `POST /objects/{id}/ack` · `/resolve` · `/transition` · `/assign` · `/merge` · `/split` | **`canAdminister`** | change the disposition (operator decision 1) |
+| `PATCH /objects/{id}` | **`canAdminister`** | edits priority / severity / assignee — disposition, not annotation (`patchObject`) |
+| `POST /cases/rules/{id}/evaluate` | **`canAdminister`** | 🔴 was in §4 "read-shaped" here — it **opens a Case** (`CaseRuleEvaluation.opened`); its own comment says "like transition", and a transition is now administrative |
+| `POST /objects/{id}/comments` · `/attachments` · `/links` · `DELETE /links` · `/rca` · `POST /notes/{k}/{id}/comments` · `/attachments` | exempt `collaboration` | add to the record, disposition untouched |
+| `POST /objects` (create) | **PENDING** | the same question as `POST /recon/promote`: which family does manually opening an Incident belong to? Deciding it under `canAdminister` by side effect would have answered an operator question silently |
+
+⚠ **Two §4 rows carry a caveat in their recorded reason**: `POST /expectations/evaluate` and
+`/expectations/{id}/evaluate` are exempt as read-shaped, but a breach may open an Incident (the plan's 2a table
+already noted `ExpectationRoutes` opens Incidents ungated). They are to be re-classified together with the
+pending Incident-creation call, not before it.
+
+⚠ `ControlApiScopedObjectsTest`'s Subjects gained `canAdminister` — the class tests the data-scope guard
+beneath the gate, and the gate wraps the guard (a caller without the capability gets 403 before existence-hiding
+can answer 404). `ControlApiTriageGateTest` pins both halves against a Subject that holds `canOperateRuns` but
+not `canAdminister`: proving an open route open with **no** Subject proves nothing, since no check runs then.
+
+**What remains: 2a (four operator calls, `BACKLOG.md` §1) → step 3 → 4c/4d/4e.** ⛔ Step 3's boot refusal
+cannot land while `PENDING_OPERATOR_CALLS` is non-empty.

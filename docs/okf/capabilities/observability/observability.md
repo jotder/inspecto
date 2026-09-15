@@ -3,6 +3,7 @@ type: Capability
 area: OPS
 title: Observability & maintenance (OPS) — capability spec
 description: The requirement-of-record and as-built specification for the signal ledger, metrics, the three-layer audit, provenance & conservation, run reporting, and the maintenance task library with its retention policy — one file, eight sections, machine-verified pointers.
+resource: inspecto-ui/src/app/modules/admin/processing-status/
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.7 OPS-1..OPS-6 (this file corrects them, see §2)

@@ -397,6 +397,15 @@ for Alert Rules.
 
 * **Dry run (MNT-1)** — `POST /jobs/{name}/trigger?dryRun=true` (v1 202 body echoes it); `JobContext.dryRun()`;
   tasks with no preview do nothing on a dry run (fail-closed).
+  🔴 **A dry run and its sweep are two call sites of ONE predicate** (`PRUNE-PREVIEW-DRIFT-1`, closed
+  2026-09-15). Every store-backed prune pair — `AcquisitionLedger` (both impls), `DbDeliveryReceiptStore`,
+  `InMemoryDeliveryReceiptStore`, `InMemoryNotificationStore`, `DbDedupLedger` — now names its "prunable"
+  rule once (`PRUNABLE` / `prunable(...)`) and both `countPrunable` and `prune` call it; the partition tasks
+  were already one loop branching only at the delete. ⛔ Do not re-split them. ⚠ The worst case fixed:
+  `dedup_prune`'s dry run reported the ledger's **total size** as its preview — `DbDedupLedger` had no
+  `countPrunable` at all — so a preview of "holds 3" could precede a sweep that removed 1. Pinned by
+  `DbDedupLedgerTest.previewMatchesTheSweep`, `AcquisitionLedgerPruneTest.previewMatchesTheSweep*` and
+  `DbDeliveryReceiptStoreTest.countPrunablePreviewsAndPruneDeletes`.
 * **Nightly chain (MNT-13)** — pure config: each link `on_signal: job.run.completed` +
   `when: "$signal.job == <prev> && $signal.outcome == SUCCESS"` (halt-on-failure by guard); shipped as a
   parameterized Job Template + `spaces/demo` instance.

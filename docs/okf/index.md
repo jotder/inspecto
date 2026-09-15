@@ -57,6 +57,16 @@ makes a batch write **nothing**. Several are recorded precisely because the repo
 violating them. A trap here is not an open item — open work lives in [`BACKLOG.md`](../BACKLOG.md).
 *(Distilled 2026-09-07 from `gate-register.md` §6 when that register was archived.)*
 
+**Counting "orphan" surfaces — state the rule with the number** (`SPEC-ORPHANPAGE-1`, closed 2026-09-15 after
+its count had been wrong three times: "roughly twenty" → 33 → ≈44 → **57**). Two normalisations decide the
+answer and must be stated with it: (a) the umbrella `resource:` declarations (`okf/frontend/architecture.md`
+→ `inspecto-ui/src/app/`, `overview.md` → `inspecto-ui/`) are excluded, or every surface is covered and the
+count is 0; (b) a feature page that names its `X.routes.ts` is taken to cover that directory (24 routed
+admin panes orphaned) — not taking it gives 44 and a total of 76. ⛔ And the number must never be used to
+size *writing*: of five orphans spot-checked, two were fully documented in prose and lacked only the
+front-matter pointer (fixed: `processing-status` → `observability.md`, `notification-center` →
+`incidents.md`). Split ORPHAN into *unlinked* (a one-line `resource:` fix) and *undocumented* before sizing.
+
 ## Companions
 
 * Cross-area rollup — scope, conventions, NFRs, MoSCoW, sequencing, risks, traceability, and the index
