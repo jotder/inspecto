@@ -34,7 +34,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // category this node sits under already renders "Collector". "Source" is banned outright.
     ACQUISITION("acquisition", NodeCategory.SOURCE, "Collect",
             "Collects files (poll/listing); the pipeline entry.",
-            Set.of(), Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), false),
+            Set.of(), Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), false, FlatHome.BLOCK),
     ADAPTER("adapter", NodeCategory.SOURCE, "Adapter",
             "Windows a stream/push source into intermediate files (by time/count/size), then lands them.",
             Set.of(), Set.of(PipelineRel.DATA), false),
@@ -43,7 +43,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // A parser may be a plain reader (data) or a selector/segment dispatcher (named routes + unmatched).
     PARSER("parser", NodeCategory.PARSE, "Parser",
             "Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     // Per-format parser family (B6, decided 2026-08-13): each parse format is its own node type — no
     // generic parser node with format tabs. Delimited first; fixed-width / ASN.1 / plugin follow, each
     // isolated. A config whose parsing: block says `frontend: delimited` EXPLICITLY lifts to this type;
@@ -51,7 +51,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // its author opts in, so nothing already deployed changes shape on a read.
     PARSER_DELIMITED("parser.delimited", NodeCategory.PARSE, "Delimited",
             "Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     // Fixed width (P3b). Unlike delimited, this frontend is NEVER implicit — a config is fixed-width
     // only by saying so — so the "explicit only" caveat above is moot here and every fixed-width file
     // lifts. Both spellings the parser accepts (`fixedwidth` / `fixed_width`, see
@@ -61,14 +61,14 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // serves only the text mode — binary keeps the dialog — but the node TYPE spans the format.
     PARSER_FIXEDWIDTH("parser.fixedwidth", NodeCategory.PARSE, "Fixed-Width",
             "Reads a fixed-width landed file into rows; positional slices carved from each record.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     // ASN.1 (P3c). One spelling, never implicit. `frontend: asn1` is first-class in the parser
     // (PipelineConfigParser#asn1PluginBlock synthesizes the Asn1RecordIngester binding), and the
     // grammar rides INLINE in the asn1: block — X.680 text, root_type, strictness, header lengths,
     // segments — so lift/lower carries the block verbatim and reads nothing inside it.
     PARSER_ASN1("parser.asn1", NodeCategory.PARSE, "ASN.1",
             "Decodes BER/DER records against an X.680 grammar and flattens them onto segment schemas.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     // JSON and text/regex (P3d). The plan's icon table always listed six formats while B6 named only
     // four types, so until now these two lifted to the plain PARSER and could only be defined in the
     // grammar dialog. Like fixed width and ASN.1 they are never implicit — a config is JSON or
@@ -76,10 +76,10 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // what's deployed" caveat is delimited's alone.
     PARSER_JSON("parser.json", NodeCategory.PARSE, "JSON",
             "Reads an NDJSON or JSON-array landed file into rows; top-level keys become the columns.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     PARSER_TEXT_REGEX("parser.text_regex", NodeCategory.PARSE, "Regex",
             "Reads matching lines into rows via named capture groups; non-matching lines are dropped.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     // MS Excel (multiformat X3). Never implicit — a config is xlsx only by saying so — and, like the
     // others, both accepted spellings (`xlsx` / `excel`, see PipelineConfigParser#parseXlsx) name this
     // type; `xlsx` is what lower stamps back. read_xlsx runs via the DuckDB excel extension, loaded
@@ -87,7 +87,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // pure authoring surface and carries the xlsx: block verbatim.
     PARSER_XLSX("parser.xlsx", NodeCategory.PARSE, "Excel",
             "Reads an .xlsx workbook sheet into rows via DuckDB read_xlsx; header cells name the columns.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
     // The custom-plugin subtype (P3d slice D): a deployed ParserPlugin the four built-ins and ASN.1
     // don't cover, wired through the existing `parsing.plugin` machinery (ingester/ingester_config/
     // segments) that framework already had before this family existed. Never implicit, like every
@@ -97,7 +97,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // to it becomes unsaveable the moment it is opened (the P3c ASN.1 lesson, same cause).
     PARSER_PLUGIN("parser.plugin", NodeCategory.PARSE, "Custom",
             "Decodes records through a deployed custom ParserPlugin, loaded via its StreamingFileIngester.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true, FlatHome.BLOCK),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
     // transform.map was DELETED 2026-09-05: the projection slot is always a Record Transformer
@@ -105,10 +105,10 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // RecordTransform.fromMappingRules, so old schemas still load — they just never execute as "Map".
     TRANSFORM_FILTER("transform.filter", NodeCategory.TRANSFORM, "Filter",
             "Keeps/drops rows by predicate; index-anchored CSV row-filter (G1).",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DROPPED), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DROPPED), false, FlatHome.STEP, "filter"),
     TRANSFORM_LOOKUP("transform.lookup", NodeCategory.TRANSFORM, "Lookup",
             "Transcodes one column's values through an inline static map (a CASE); unmatched values pass through or take a default.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "lookup"),
     TRANSFORM_SELECT("transform.select", NodeCategory.TRANSFORM, "Select",
             "Projects a subset / reorder of columns.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
@@ -120,25 +120,25 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // `data` relation, never a split (filtering stays transform.filter, D3).
     TRANSFORM_SQL("transform.sql", NodeCategory.TRANSFORM, "SQL",
             "Transforms rows with one author SELECT over the typed input (FROM input).",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "sql"),
     TRANSFORM_VALIDATE("transform.validate", NodeCategory.TRANSFORM, "Validate",
             "Splits rows into valid / invalid by rule.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.INVALID), false),
     TRANSFORM_DEDUP_MARKER("transform.dedup.marker", NodeCategory.TRANSFORM, "Dedup (marker)",
             "File-level dedup via marker files (MarkerManager) — a distinct subsystem (G2).",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false, FlatHome.BLOCK),
     // Record-grain dedup (ELT amendment §2.4: business-key dedup IS a Step, unlike file dedup).
     // RowShaper already executed the "transform.dedup" type string ad hoc; this constant makes it a
     // declared kind so it can join LOWERABLE (flat home: processing.dedup {keys, order_by}).
     TRANSFORM_DEDUP("transform.dedup", NodeCategory.TRANSFORM, "Dedup (record)",
             "Record-grain dedup by business key (QUALIFY); duplicates are a counted reject stream.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false, FlatHome.STEP, "dedup"),
     // transform.dedup.fingerprint was REMOVED 2026-08-04: content-fingerprint dedup executes inside
     // the CollectorProcessor poll cycle (ledgerFilter reads collector.duplicate), so the separate
     // node had no runtime of its own — the policy is authored on the acquisition node now.
     TRANSFORM_ROUTE("transform.route", NodeCategory.TRANSFORM, "Route",
             "Content-based routing into operator-defined branches (case / clone).",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), true),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), true, FlatHome.STEP, "route"),
     // Reference join (ELT amendment D-4/Phase 3 S2: the join is a transform concern — no enrich verb).
     // Flat home: processing.join {reference, on}. Distinct from ENRICHMENT below: that node is the
     // companion-persisted post-commit stage (truth = *_enrich.toon, ignored by lower); this one IS
@@ -147,7 +147,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // pipeline that carries it stays gated by prepare() until a production route supplies a resolver.
     TRANSFORM_JOIN("transform.join", NodeCategory.TRANSFORM, "Join",
             "Joins against a Reference Dataset by key.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "join"),
     // Group-by rollup (ELT amendment §2.4/Phase 3: summarize IS a Step). Flat home: processing.summarize
     // {group_by, measures} — measures reuse MaterializeTask's shorthand grammar (count, sum(amount), …).
     // Executes in RowShaper.summarize (2026-08-11) via MeasureCompiler — one measure grammar across
@@ -155,14 +155,14 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // stays gated by prepare(), unchanged.
     TRANSFORM_SUMMARIZE("transform.summarize", NodeCategory.TRANSFORM, "Summarize",
             "Group-by rollup with algebraically-composable measures.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "summarize"),
     // Per-column profile (catalog `transform.profiler.inline`, operator pick 2026-09-15). Flat home:
     // processing.profile {columns} — omit columns to profile every one. Executes in RowShaper.profile.
     // ⛔ The output columns are declared HERE, not taken from DuckDB's own SUMMARIZE: a node whose output
     // SCHEMA changes with the engine version is a downstream break waiting for an upgrade.
     TRANSFORM_PROFILE("transform.profile", NodeCategory.TRANSFORM, "Profile",
             "Per-column row/null/distinct counts and min/max over the inbound data.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "profile"),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
@@ -173,12 +173,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // ── enrich ─────────────────────────────────────────────────────────────────────
     ENRICHMENT("enrichment", NodeCategory.TRANSFORM, "Enrichment",
             "Joins against reference data (post-commit stage-2 join).",
-            Set.of(PipelineRel.DATA, PipelineRel.ON_COMMIT), Set.of(PipelineRel.DATA, PipelineRel.ON_COMMIT), false),
+            Set.of(PipelineRel.DATA, PipelineRel.ON_COMMIT), Set.of(PipelineRel.DATA, PipelineRel.ON_COMMIT), false, FlatHome.BLOCK),
 
     // ── sink family — where data may rest, materialise, or be exposed (§3.1) ────────
     SINK_PERSISTENT("sink.persistent", NodeCategory.SINK, "Sink (persistent)",
             "Writes the batch to a resting store — a Parquet file / DuckDB table.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.ON_COMMIT), false),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.ON_COMMIT), false, FlatHome.BLOCK),
     SINK_MATERIALIZED("sink.materialized", NodeCategory.SINK, "Sink (materialized)",
             "Maintains a managed/temp table, upserted per batch — an incremental rollup / summary.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.ON_COMMIT), false),
@@ -192,10 +192,34 @@ public enum BuiltinNodeType implements PipelineNodeType {
             Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), Set.of(), false),
     GAP("gap", NodeCategory.CONTROL, "Gap detection",
             "Reports sequence gaps as SEQUENCE_GAP events.",
-            Set.of(PipelineRel.GAP), Set.of(), false),
+            Set.of(PipelineRel.GAP), Set.of(), false, FlatHome.BLOCK),
     EVENT("event", NodeCategory.CONTROL, "Event",
             "Emits a notification / event.",
             Set.of(PipelineRel.DATA, PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.GAP), Set.of(), false);
+
+    /**
+     * How the flat {@code *_pipeline.toon} can carry an authored node of this type — the fact
+     * {@code PipelineEditable} used to keep in two hand-maintained mirrors ({@code LOWERABLE} and
+     * {@code STEP_KIND}) beside this roster, until {@code NODE-TYPE-MIRRORS-1} (2026-09-15) moved it here.
+     * A type declares its home ONCE, on its own case; the editor derives both sets from it.
+     *
+     * <ul>
+     *   <li>{@link #NONE} — no home: the editor refuses the save with {@code UNSUPPORTED_NODE}. Several
+     *       executable built-ins are here by decision ({@code transform.split} / {@code select} /
+     *       {@code derive} / {@code validate} / {@code merge}), not by omission.</li>
+     *   <li>{@link #BLOCK} — a singular block or section of its own ({@code collector:}, {@code parsing:},
+     *       {@code output:}, {@code processing.dedup}, …); the lift/lower pair for it lives in
+     *       {@code PipelineLift} / {@code PipelineEditable.lower}.</li>
+     *   <li>{@link #STEP} — one entry of the {@code steps:} chain, under the kind {@link #stepKind()} names,
+     *       which must be one of {@code PipelineConfig.Step}'s constants (pinned by
+     *       {@code BuiltinNodeTypeFlatHomeTest}).</li>
+     * </ul>
+     *
+     * <p>⚠ Declaring a home here is a CLAIM that the lift/lower code exists for it; the enum cannot check
+     * that, and a claim with no code behind it is exactly the {@code LOWERABLE} trap the row recorded. The
+     * one guard that would catch it is the round trip in {@code NodeConfigNameContractTest}.
+     */
+    public enum FlatHome { NONE, BLOCK, STEP }
 
     private final String type;
     private final NodeCategory category;
@@ -204,9 +228,24 @@ public enum BuiltinNodeType implements PipelineNodeType {
     private final Set<String> accepts;
     private final Set<String> emits;
     private final boolean emitsNamedRoutes;
+    private final FlatHome flatHome;
+    private final String stepKind;
 
     BuiltinNodeType(String type, NodeCategory category, String label, String description,
                     Set<String> accepts, Set<String> emits, boolean emitsNamedRoutes) {
+        this(type, category, label, description, accepts, emits, emitsNamedRoutes, FlatHome.NONE, null);
+    }
+
+    BuiltinNodeType(String type, NodeCategory category, String label, String description,
+                    Set<String> accepts, Set<String> emits, boolean emitsNamedRoutes, FlatHome flatHome) {
+        this(type, category, label, description, accepts, emits, emitsNamedRoutes, flatHome, null);
+    }
+
+    BuiltinNodeType(String type, NodeCategory category, String label, String description,
+                    Set<String> accepts, Set<String> emits, boolean emitsNamedRoutes,
+                    FlatHome flatHome, String stepKind) {
+        if ((flatHome == FlatHome.STEP) != (stepKind != null))
+            throw new IllegalArgumentException(type + ": a steps: home needs a kind, and only a steps: home has one");
         this.type = type;
         this.category = category;
         this.label = label;
@@ -214,7 +253,15 @@ public enum BuiltinNodeType implements PipelineNodeType {
         this.accepts = accepts;
         this.emits = emits;
         this.emitsNamedRoutes = emitsNamedRoutes;
+        this.flatHome = flatHome;
+        this.stepKind = stepKind;
     }
+
+    /** Where the flat config carries an authored node of this type — see {@link FlatHome}. */
+    public FlatHome flatHome() { return flatHome; }
+
+    /** The {@code steps:} kind this type lowers to, or {@code null} unless {@link #flatHome()} is {@code STEP}. */
+    public String stepKind() { return stepKind; }
 
     @Override public String type() { return type; }
     @Override public NodeCategory category() { return category; }

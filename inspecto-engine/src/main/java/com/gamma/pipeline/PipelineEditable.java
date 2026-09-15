@@ -152,33 +152,27 @@ public final class PipelineEditable {
      */
     static final Set<String> MAP_DERIVED = Set.of("schema", "csv");
 
-    /** Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE. */
-    private static final Set<String> LOWERABLE = Set.of(
-            BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(),
-            BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.PARSER_FIXEDWIDTH.type(),
-            BuiltinNodeType.PARSER_ASN1.type(),
-            BuiltinNodeType.PARSER_JSON.type(), BuiltinNodeType.PARSER_TEXT_REGEX.type(),
-            BuiltinNodeType.PARSER_XLSX.type(),
-            BuiltinNodeType.PARSER_PLUGIN.type(),
-            BuiltinNodeType.GAP.type(),
-            // read-compat only since P5-a: never emitted, still accepted (see PipelineLift.markerHome)
-            BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
-            BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
-            BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
-            BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
-            BuiltinNodeType.TRANSFORM_PROFILE.type(),   // per-column profile → processing.profile
-            BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
-            BuiltinNodeType.TRANSFORM_FILTER.type(),
-            BuiltinNodeType.TRANSFORM_LOOKUP.type(),    // inline static map → steps: kind lookup (2026-09-06)
-            BuiltinNodeType.TRANSFORM_SQL.type(),       // one SELECT over the typed input → steps: kind sql
-            BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
+    /**
+     * Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE.
+     *
+     * <p>DERIVED from {@link BuiltinNodeType#flatHome()} since {@code NODE-TYPE-MIRRORS-1} (2026-09-15) —
+     * this used to be a hand-kept literal set beside the roster, and a type could be listed here with no
+     * flat home at all while every test stayed green. The claim now sits on the enum case itself, next
+     * to the type it describes. ⚠ Still a claim, not a proof: see {@link BuiltinNodeType.FlatHome}.
+     */
+    private static final Set<String> LOWERABLE = java.util.Arrays.stream(BuiltinNodeType.values())
+            .filter(t -> t.flatHome() != BuiltinNodeType.FlatHome.NONE)
+            .map(BuiltinNodeType::type)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /**
-     * Node type → the {@code steps:} kind it lowers to: the six kinds the flat file's transform chain
-     * can hold. {@code transform.sql} is a real chain step like filter — it has no singular block, so a
-     * chain carrying one always lowers to {@code steps:} (see {@link #isLegacyShaped}). {@code transform.map} is deliberately absent — the lift emits it as the schema
-     * projection between parser and sink, so it never enters the chain, and giving it a {@code steps:}
-     * entry would change <b>when {@code steps:} is emitted at all</b> (AUTHOR-1's ⛔).
+     * Node type → the {@code steps:} kind it lowers to: the kinds the flat file's transform chain can
+     * hold. DERIVED from {@link BuiltinNodeType#stepKind()} ({@code NODE-TYPE-MIRRORS-1}). {@code transform.sql}
+     * is a real chain step like filter — it has no singular block, so a chain carrying one always lowers
+     * to {@code steps:} (see {@link #isLegacyShaped}). {@code transform.map} is deliberately absent — the
+     * lift emits it as the schema projection between parser and sink, so it never enters the chain, and
+     * giving it a {@code steps:} entry would change <b>when {@code steps:} is emitted at all</b>
+     * (AUTHOR-1's ⛔).
      *
      * <p>⚠ Do not read that as "a map node is never author-configurable" — an earlier version of this
      * comment did, and it is not true: {@code RowShaper.columnsOf} honours an authored {@code columns}
@@ -186,15 +180,9 @@ public final class PipelineEditable {
      * an authored mapping in {@code processing.mapping_file}. What the map node has no home for is a
      * {@code use:} component ref — see {@link #unhomedBinding}.
      */
-    private static final Map<String, String> STEP_KIND = Map.of(
-            BuiltinNodeType.TRANSFORM_FILTER.type(),    PipelineConfig.Step.FILTER,
-            BuiltinNodeType.TRANSFORM_JOIN.type(),      PipelineConfig.Step.JOIN,
-            BuiltinNodeType.TRANSFORM_DEDUP.type(),     PipelineConfig.Step.DEDUP,
-            BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), PipelineConfig.Step.SUMMARIZE,
-            BuiltinNodeType.TRANSFORM_PROFILE.type(),   PipelineConfig.Step.PROFILE,
-            BuiltinNodeType.TRANSFORM_ROUTE.type(),     PipelineConfig.Step.ROUTE,
-            BuiltinNodeType.TRANSFORM_LOOKUP.type(),    PipelineConfig.Step.LOOKUP,
-            BuiltinNodeType.TRANSFORM_SQL.type(),       PipelineConfig.Step.SQL);
+    private static final Map<String, String> STEP_KIND = java.util.Arrays.stream(BuiltinNodeType.values())
+            .filter(t -> t.flatHome() == BuiltinNodeType.FlatHome.STEP)
+            .collect(java.util.stream.Collectors.toUnmodifiableMap(BuiltinNodeType::type, BuiltinNodeType::stepKind));
 
     /**
      * Whether a save can lower this node type back to the flat config. The palette reads this so a
