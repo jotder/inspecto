@@ -43,7 +43,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > `JobService` then fans out. ⚠ **Fixing it at the message source closed all four** — ⛔ had it been
 > patched at the sinks instead, that would have been four patches and a fifth sink waiting.
 > ➖ **One gate LEFT §2**: `EOI-7b` is a standing refusal in §6, so §2 is **14** rows, not 15.
-> ⚠ **§1 IS NOT EMPTY** — it now carries six **owed operator inputs**, which is a kind of pending item that
+> ⚠ **§1 IS NOT EMPTY** — it now carries nine **owed operator inputs**, which is a kind of pending item that
 > section has never carried before. ⛔ An owed input stops work exactly as a pending decision does.
 >
 > ✅ **Two defects BUILT and closed 2026-09-15**, both found by the sweep and both proven red before being
@@ -233,7 +233,8 @@ gating turned the build red, and one of those two produced no red at all.
 ## 1. Operator decisions pending
 
 ⛔ **NOT EMPTY as of 2026-09-15 (second sitting).** Thirty-eight decisions were answered in one pass — the
-table further down — but the same sitting produced **six operator INPUTS that are owed and not supplied**.
+table further down — but the same sitting produced **six operator INPUTS that are owed and not supplied**,
+and the route-gating grounding later that day added **three more** (the route calls the compliance plan needs).
 ⚠ **An owed input is a pending item exactly like a decision**: work stops on it just the same, and the only
 reason §1 has never carried one is that nobody thought to file one here. Four of the six block rows whose
 CODE IS ALREADY COMPLETE — ⛔ so a shift reading those rows will look for something to build and find
@@ -246,6 +247,9 @@ nothing, which is the shape that kept `DEPLOY-SERVICE-WRAPPER-1` looking open fo
 | **A spreadsheet library** | `D-8` XLSX export (§3) | There is **no spreadsheet dependency in any pom**. Picking one IS the gate — the row was deliberately written so the new-dependency question gets answered when someone needs the feature, not in advance |
 | **Access details** — MinIO endpoint/key/secret, the systemd host, the elevated Windows box | `AIRGAP-S3-EXTENSIONS-1` (§5) · `DEPLOY-SERVICE-WRAPPER-1` (§3) | ✅ Operator confirmed 2026-09-15 that all three EXIST. Both rows are **code-complete and evidence-blocked** — neither needs a build, only a run |
 | **Delete the stray `master` branch** on `jotder/inspect-agent` | nothing directly — it is a live trap | Needs a permission no shift has had. ⚠ Neither `ci.yml` nor `release.yml` pins a `ref:`, so both follow that repo's **default** branch; a commit pushed to the stray branch reaches no CI and looks landed |
+| **Three route calls** — `POST /spaces/import` (does the `POST /spaces` "additive, recovery route" decision extend to bundle import?) · `POST /tags/rules/{id}/apply` (operate action → `canOperateRuns`, or collaboration act → open, like assignments?) · `POST /recon/promote` (which family owns *manually opening an Incident*? — `canAuthorWorkbench` has no precedent, `DecisionRoutes` uses `canOperateRuns`, `ExpectationRoutes` is ungated, no Incident capability exists) | `ROUTE-UNGATED-DEFAULT-1` step 2 → **step 3 (the fail-closed default) cannot land until these are decided** | Each was grounded 2026-09-15 and is a genuine question, not a formality — the handler, the comment and the tests point different ways. ⚠ `/recon/promote`'s dedupe lines are the same ones the `(type, key, column)` decision rewrites; do both in one change. → `superpower/route-gating-compliance-plan.md` §2a |
+| **Confirm reads-open-by-policy as the COMPLIANCE position** | the plan's §3e, `controls-matrix.md` CC6 | Decided 2026-09-15 as engineering ("confidentiality sits at the Space/ABAC layer"); §3e turns it into a claim an auditor reads. It should be re-affirmed knowing that |
+| **Which framework(s) the evidence is written against** | the route-gating evidence report under `compliance/evidence/` (step 4e, not yet written) · the `controls-matrix.md` row mapping | SOC 2 Type II is assumed throughout the plan; ISO 27001 A.9 maps onto the same evidence but the matrix rows differ |
 | **Approve or decline pinning a `ref:`** in `ci.yml` / `release.yml` | nothing yet — filed here so the question is not lost | 🔴 The 2026-09-15 decision to keep building eoiagent from its upstream tree makes the unpinned `ref:` **permanent rather than temporary**, which changes it from a tolerable shortcut into a standing exposure. Offered at the sitting; not answered |
 
 ✅ **Every DECISION is answered.** The six queued on 2026-09-14 were answered that day; the duckle triage
@@ -1283,7 +1287,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   **What remains:** (a) the other ~19 inexpressible routes — Incident/Case triage (~15, in the optional
   `inspecto-ops` module) and agent governance (4, `AgentRoutes`); ⚠ **the audit itself says the triage
   family needs a product decision first** — whether Incident triage should stay open even now that
-  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) ~~the 10 unverified gateable routes~~ ✅ **GROUNDED 2026-09-15 — and there were ELEVEN, not ten** (`POST /spaces` was §6(a), not §5, so the refutation was subtracted from the wrong bucket). **Result: 5 GATE · 3 deliberate exemptions · 3 operator calls** — per-route verdicts in the audit's §5 GROUNDED table. 🔴 Two of the five are a **request-forgery-shaped pair** (`POST /assist/settings` writes a server-wide `baseUrl`, `POST /assist/settings/test` calls out to it) and ⛔ must be gated in ONE commit; `inspecto-agent` IS staged, so unlike §6(c) this one is live in shipped bundles;
+  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) ~~the 10 unverified gateable routes~~ ✅ **GROUNDED 2026-09-15 — and there were ELEVEN, not ten** (`POST /spaces` was §6(a), not §5, so the refutation was subtracted from the wrong bucket). **Result: 5 GATE · 3 deliberate exemptions · 3 operator calls** — per-route verdicts in the audit's §5 GROUNDED table. 🔴 Two of the five are a **request-forgery-shaped pair** (`POST /assist/settings` writes a server-wide `baseUrl`, `POST /assist/settings/test` calls out to it) and ⛔ must be gated in ONE commit; `inspecto-agent` IS staged, so unlike §6(c) this one is live in shipped bundles. 🔴 **And the grounding produced a REFRAMING that outranks the five: the enforcement model is fail-OPEN** — `withCapability` is opt-in and an undeclared route is simply open, so fixing routes one by one passes a point-in-time review and fails a Type II window. ⇒ the P1's remaining work is now **`superpower/route-gating-compliance-plan.md`** (2026-09-15, operator: *"goal is to pass compliance"*): step 1 gate the five · step 2 every mutating route ends as a capability OR a categorized exemption · **step 3 flip the default** (a marked `Gated` handler gives the router the capability with zero call-site changes; undeclared mutating ⇒ refuse at boot AND fail CI) · step 4 capability on audit events, one inventory event per boot, and a **derived, CI-enforced** evidence report. ⛔ Step 3 waits for step 2 — *ratchet last* still holds;
   (c) ✅ **operator decided 2026-09-15: record the exemption reasoning for the 49 correctly-ungated routes**
   in the audit doc, so the ratchet starts from a reviewed baseline; (d) the ratchet itself, **last**.
   → `superpower/route-gating-audit.md` · `okf/capabilities/security/security.md`
