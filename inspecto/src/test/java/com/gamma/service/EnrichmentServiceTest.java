@@ -126,6 +126,45 @@ class EnrichmentServiceTest {
         }
     }
 
+    /**
+     * ENRICH-SILENT-FULL-RECOMPUTE-1: an event whose partition columns share nothing with the job's must
+     * NOT quietly become a full-window recompute. It is refused, and the refusal is an audit row.
+     */
+    @Test
+    void eventWhosePartitionsMatchNoJobColumnIsRefusedNotWidenedToFull(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        EnrichmentConfig job = dailyKpi("DAILY", in, out, new Triggers("EVENTS", 0));
+
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        List<ConsignmentEvent> seen = Collections.synchronizedList(new ArrayList<>());
+        bus.subscribe(seen::add);
+        Scheduler sched = new Scheduler();
+        EnrichmentService es = new EnrichmentService(List.of(job), bus, sched);
+        try {
+            es.start();
+            // The producer partitions by a column this job does not know at all.
+            bus.publish(new ConsignmentEvent("EVENTS", "b1", "SUCCESS",
+                    List.of("region=EU/tenant=acme"), 2, 100L, 0));
+
+            assertFalse(await(seen, "DAILY", 1_500), "a refused recompute announces no commit");
+            assertFalse(java.nio.file.Files.exists(out) && java.nio.file.Files.list(out).findAny().isPresent(),
+                    "nothing may be written — the old behaviour recomputed the FULL window here");
+            List<Map<String, String>> runs = es.runs("DAILY");
+            assertEquals(1, runs.size(), "the refusal is recorded as a run row, not lost: " + runs);
+            assertEquals("FAILED", runs.get(0).get("status"));
+            assertEquals("refused", runs.get(0).get("scope"));
+            assertTrue(runs.get(0).get("error").contains("no column in common"), runs.get(0).get("error"));
+
+            // ...while a genuinely unscoped commit (no partitions at all) still recomputes fully.
+            bus.publish(new ConsignmentEvent("EVENTS", "b2", "SUCCESS", List.of(), 2, 100L, 0));
+            assertTrue(await(seen, "DAILY", 10_000), "an unscoped commit is a full recompute, as before");
+        } finally {
+            sched.close();
+            es.close();
+        }
+    }
+
     // ── T2.2 scheduled trigger: completeness, full window recompute ──────────────────
 
     @Test

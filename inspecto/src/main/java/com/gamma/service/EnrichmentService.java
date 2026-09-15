@@ -176,8 +176,23 @@ public final class EnrichmentService implements AutoCloseable {
             if (!t.onPipeline().equals(event.pipeline())) continue;
             if (job.name().equals(event.pipeline())) continue;   // self-loop guard
             List<Map<String, String>> filter = toFilter(job, event.partitions());
+            String reason = "event:" + event.pipeline();
+            // ENRICH-SILENT-FULL-RECOMPUTE-1: "no partitions requested" and "requested partitions matched
+            // nothing" are different states. The first is a legitimately unscoped commit and recomputes
+            // fully; the second means the producer partitions by columns this job does not, and running
+            // a FULL recompute in its place silently widens a triggered job's blast radius. Refuse it —
+            // as RowShaper.windowedDedup refuses a windowed dedup with no ledger rather than running
+            // unwindowed — and leave the refusal in the same audit the operator reads for every run.
+            if (!event.partitions().isEmpty() && filter.isEmpty()) {
+                String why = "event committed partition(s) " + event.partitions() + " but this job "
+                        + "partitions its input by " + job.input().partitions() + " — no column in "
+                        + "common, so the recompute cannot be scoped; refusing rather than silently "
+                        + "recomputing the full window";
+                workers.submit(() -> runner.runExclusive(job.name(), () -> refuse(job, reason, why)));
+                continue;
+            }
             // hand off — never block the publishing (ingest) thread on DuckDB work
-            workers.submit(() -> recompute(job, filter, "event:" + event.pipeline()));
+            workers.submit(() -> recompute(job, filter, reason));
         }
     }
 
@@ -187,6 +202,27 @@ public final class EnrichmentService implements AutoCloseable {
      */
     private void recompute(EnrichmentConfig job, List<Map<String, String>> filter, String reason) {
         runner.runExclusive(job.name(), () -> doRecompute(job, filter, reason));
+    }
+
+    /**
+     * Record a recompute that was REFUSED before it ran — a {@code FAILED} audit row with scope
+     * {@code refused}, the failure metric, and a log line — so the refusal is visible exactly where a
+     * failed run would be, and never looks like a run that quietly did nothing.
+     */
+    private void refuse(EnrichmentConfig job, String reason, String why) {
+        log.error("[ENRICH] {} recompute REFUSED ({}): {}", job.name(), reason, why);
+        MetricRegistry.global().inc("inspecto_enrichment_failures_total",
+                "Stage-2 enrichment recompute failures", Map.of("job", job.name()));
+        String runId = job.name().toLowerCase().replace(' ', '_')
+                + "-" + EnrichmentAuditWriter.runStamp() + "-" + seq.incrementAndGet();
+        String now = EnrichmentAuditWriter.now();
+        try {
+            auditFor(job).record(new EnrichmentAuditWriter.RunRow(
+                    runId, job.name(), "event", reason, "refused", 0,
+                    now, now, "FAILED", 0, 0, 0L, 0L, 0L, why), List.of());
+        } catch (Exception ae) {
+            log.warn("[ENRICH] could not write audit for refused run {}: {}", job.name(), ae.getMessage());
+        }
     }
 
     /** The recompute body, already serialised per job by {@link #recompute}. */
@@ -301,8 +337,10 @@ public final class EnrichmentService implements AutoCloseable {
     /**
      * Translate committed partition paths ({@code col=val/col=val/...}) into the engine's
      * filter form, keeping only columns this job partitions its input by. If a path shares
-     * no partition column with the job it is dropped; an empty result means "recompute
-     * fully" — the safe fallback when the event can't be scoped.
+     * no partition column with the job it is dropped. ⚠ An empty result is therefore ambiguous —
+     * "nothing was requested" or "nothing requested matched" — and the CALLER must tell them apart:
+     * {@link #onConsignmentEvent} refuses the second instead of letting it read as "recompute fully"
+     * (ENRICH-SILENT-FULL-RECOMPUTE-1, 2026-09-15; this comment used to call that a "safe fallback").
      */
     private static List<Map<String, String>> toFilter(EnrichmentConfig job, List<String> partitionPaths) {
         Set<String> cols = new HashSet<>(job.input().partitions());
