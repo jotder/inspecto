@@ -140,6 +140,51 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **A PER-SPACE FACT READ FROM A JVM-WIDE PROPERTY IS INVISIBLE TO THE WHOLE TEST SUITE.**
+  Until 2026-09-15, nine engine call sites read `System.getProperty("assist.write.root")` for the component
+  registry while their sibling `dataDir` was per-Space and every control-plane route resolved
+  `currentContext().root().config()`. In a multi-Space deployment the two crossed: a run read **one Space's
+  registry while writing another Space's data**, failing with `unknown dataset '<an id the route had just
+  resolved>'` — *after* a 202 had promised a run. ⛔ **Single-Space deployments make the two paths the same
+  directory** — Personal, and every test — so the defect was a no-op everywhere it was ever exercised, and
+  only a live multi-Space run exposed it. ⇒ resolve through `com.gamma.pipeline.SpaceConfigRoot`
+  (`current()` keys on the space MDC, which both `JobService` submit paths set on the worker thread;
+  `forSpace(id)` for a caller holding an id). ⚠ **Move the registry root and the DATA root TOGETHER** — a
+  per-Space registry beside a JVM-wide `-Ddata.dir` *is* the defect, so half a migration is worse than none.
+  ⚠ Their precedence is deliberately **opposite** and must not be harmonised: `-Ddata.dir` **overrides** a
+  Space's data dir (`CollectorService`'s rule), while the config root lets the **Space win** and falls back
+  to the property for the default Space only (`ControlApi.writeRoot()`'s rule). A test pins the asymmetry.
+
+- 🔴 **CHECK THAT A GUARD'S COMPARANDS CAN EVER BE EQUAL BEFORE WRITING IT.** A proposed one-line self-loop
+  guard for the `on: dataset` trigger — compare the signal's `producer` to the pipeline name — **could not
+  fire**: `producer` is `cfg.name()` (a JOB name) at `MaterializeTask:132` and `chain.get(i)` (a **processor
+  component id**) at `ConsignmentProcessJobType:412`, never a pipeline name. It would have looked correct,
+  passed review, and done nothing on the exact case it targeted. ⚠ Same family as *a guard I wrote could not
+  fire* (2026-09-13) — the tell is a comparison between two values that were never defined as the same kind.
+
+- ⚠ **COUNT THE REACTOR BY SUMMING SUREFIRE REPORTS, NOT BY PARSING THE LOG** — `**/target/surefire-reports/
+  *.txt`, one file per class, is authoritative and sidesteps the `[WARNING]`-level-module trap entirely. Use
+  `**`, not `*`: the five `asn-*` modules are nested under `asn-parser/asn-decoders/`, so a single-level glob
+  reports **21 modules / 4429** — a plausible-looking total rather than an obviously broken one (true: 26 /
+  4508). ⚠ And when a total does not reconcile, **suspect the BASELINE'S PROVENANCE first**: an "unexplained
+  +2" on 2026-09-15 was entirely a briefing error — the baseline had been measured when a test class held 9
+  tests and the reconciliation was stated against the 11 it held later. ⇒ record *when* a baseline was taken
+  and *what the changed classes held then*, not just the number.
+
+- ⚠ **A ZONE WITH NO DST CANNOT TEST DST.** Every `CronExpression` test ran in **UTC** and the one
+  cross-midnight case in **Asia/Kolkata** — neither shifts — so the one behaviour a civil-zone cron exists to
+  get right was unverified for as long as the feature existed. The mechanism turned out correct; the gap was
+  the fixture's constants. ⇒ check what a fixture actually *exercises*, not that it exists. Pinned
+  2026-09-15 in `CronExpressionTest`: spring-forward **skips** the hour that does not exist (a daily 02:30
+  job does not run on 2026-03-08 — a real operational consequence), autumn-back fires **once, not twice**.
+
+- ⚠ **A CAPABILITY-GATED ROUTE NEEDS A `CapabilityManifest` ENTRY TOO**, and the guard that says so fails in
+  a **different module** (`inspecto-processor`), nowhere near the route. Because the reactor is fail-fast,
+  that one failure left **13 modules SKIPPED — unverified, not passing**, including both edition modules the
+  `-Pedition-enterprise` profile exists to reach. ⛔ `CapabilityManifestTest` compares the manifest against
+  the `withCapability` sites **bidirectionally** — a route in NEITHER is a third case it cannot see, which is
+  how 83 ungated mutating routes accumulated (`ROUTE-UNGATED-DEFAULT-1`).
+
 - 🔴 **A RED GATE HIDES EVERY GATE BEHIND IT.** CI stops at the first failing step, so a single red guard
   makes every later one unobservable. Measured 2026-09-14: `master` was carrying **four independent
   pre-existing failures stacked in one file** — a stale generated table, then five broken doc links, then
