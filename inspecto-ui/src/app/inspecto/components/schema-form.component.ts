@@ -311,6 +311,19 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                             </inspecto-chip>
                                         }
                                     </div>
+                                } @else if (!spec.required) {
+                                    <!-- SCHEMA-FORM-EMPTY-LIST-1: an empty list has TWO meanings and the control
+                                         must keep them apart. Cleared (null) = "unset, the default applies";
+                                         explicitly none ([]) = "deliberately no entries" — the key[0]:
+                                         opt-out a hand-authored TOON can already express. -->
+                                    <mat-slide-toggle
+                                        class="pb-1 text-xs"
+                                        [checked]="isExplicitlyNone(spec.key)"
+                                        [attr.aria-label]="'Explicitly none for ' + spec.label"
+                                        (change)="setExplicitlyNone(spec, $event.checked)"
+                                    >
+                                        Explicitly none (the default does not apply)
+                                    </mat-slide-toggle>
                                 }
                             </div>
                         }
@@ -947,11 +960,34 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         this.writeList(spec.key, next);
     }
 
-    /** Empty ⇒ null, so a cleared list reads as blank to `required` and to the host's delete-on-clear. */
+    /**
+     * Removing the last entry ⇒ null ("unset": blank to `required`, delete-on-clear for the host). An
+     * explicit empty list is a DIFFERENT state, authored only through {@link #setExplicitlyNone} — so a
+     * cleared list never silently turns into an opt-out (SCHEMA-FORM-EMPTY-LIST-1).
+     */
     private writeList(key: string, items: string[]): void {
         const control = this.form.get(key);
         if (!control) return;
         control.setValue(items.length ? items : null);
+        control.markAsDirty();
+        control.markAsTouched();
+    }
+
+    /** True when the control holds an EXPLICIT empty list (`[]`), as opposed to null / unset. */
+    isExplicitlyNone(key: string): boolean {
+        const v = this.form.get(key)?.value;
+        return Array.isArray(v) && v.length === 0;
+    }
+
+    /**
+     * SCHEMA-FORM-EMPTY-LIST-1: author "deliberately no entries" (`[]`, the TOON `key[0]:` opt-out) or return
+     * the field to "unset" (null). Only offered on a non-required list — a required list that is empty is
+     * simply invalid, and `[]` would not make it less so.
+     */
+    setExplicitlyNone(spec: AttributeSpec, on: boolean): void {
+        const control = this.form.get(spec.key);
+        if (!control) return;
+        control.setValue(on ? [] : null);
         control.markAsDirty();
         control.markAsTouched();
     }

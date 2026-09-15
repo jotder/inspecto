@@ -248,6 +248,40 @@ describe('InspectoSchemaFormComponent', () => {
         expect(c.form.get('patterns')?.value).toBeNull(); // emptied ⇒ null, not []
     });
 
+    /**
+     * SCHEMA-FORM-EMPTY-LIST-1: "cleared" (null, the default applies) and "explicitly none" ([], the
+     * `key[0]:` opt-out) are two states, and only a deliberate act produces the second.
+     */
+    it('keeps an explicit empty list distinct from a cleared one', () => {
+        const fixture = create(LIST_SPECS);
+        const c = fixture.componentInstance;
+        const spec = LIST_SPECS[0];
+
+        expect(c.isExplicitlyNone('patterns')).toBe(false); // untouched ⇒ unset, not none
+
+        c.setExplicitlyNone(spec, true);
+        expect(c.form.get('patterns')?.value).toEqual([]); // the opt-out survives as []
+        expect(c.isExplicitlyNone('patterns')).toBe(true);
+        expect(c.value()['patterns']).toEqual([]);
+
+        c.setListDraft('patterns', '^CALL');
+        c.addListItem(spec); // adding an entry leaves the none state
+        expect(c.isExplicitlyNone('patterns')).toBe(false);
+        c.removeListItem(spec, 0);
+        expect(c.form.get('patterns')?.value).toBeNull(); // removing the last entry is still "unset"
+        expect(c.isExplicitlyNone('patterns')).toBe(false);
+
+        c.setExplicitlyNone(spec, true);
+        c.setExplicitlyNone(spec, false);
+        expect(c.form.get('patterns')?.value).toBeNull(); // toggling off returns to unset
+    });
+
+    it('reads a stored explicit empty list back as explicitly none', () => {
+        const fixture = create(LIST_SPECS, { patterns: [] });
+        expect(fixture.componentInstance.isExplicitlyNone('patterns')).toBe(true);
+        expect(fixture.componentInstance.listValue('patterns')).toEqual([]);
+    });
+
     it('renders committed list entries as removable chips and loads initial arrays', async () => {
         const fixture = create(LIST_SPECS, { patterns: ['^CALL', '^SMS'] });
         fixture.detectChanges();
