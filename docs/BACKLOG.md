@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-15 (FOURTH pass, after the thirty-eight-decision sitting).**
-> **72 rows: 1 × P1 · 56 × P2 · 15 × P3.**
+> **71 rows: 1 × P1 · 55 × P2 · 15 × P3.**
 >
 > 🔴 **The headline is not any single answer: SIXTEEN P3 rows stopped being demand-gated in one sitting.**
 > §0 defines P3 as *demand-gated — build only when someone asks by name*. On 2026-09-15 the operator was
@@ -29,9 +29,19 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > ⚠ **Only TWO demand gates did not fire** — xz/zstd codecs and `D-11` relations. The demand-gated tier is
 > now genuinely small, and the next shift's constraint is **capacity, not permission**.
 >
-> ➕ **Two rows FILED**: `PARAM-SECRET-LEAK-1` (§5 — split out of `DUCKLE-C4-PARAM-PROVENANCE-1`, where a
-> live secret leak was riding underneath a provenance feature and would have shipped at that feature's
-> pace) and `PIPELINE-DRYRUN-1` (§3 — new scope, operator-asked, and the thing `X4` is now scoped against).
+> ➕ **Two rows FILED, and one of them SHIPPED the same day.** ✅ `PARAM-SECRET-LEAK-1` — filed out of
+> `DUCKLE-C4-PARAM-PROVENANCE-1`, where a live secret leak was riding underneath a provenance feature and
+> would have shipped at that feature's pace — is **BUILT and its row is retired**; the as-built lives in
+> `okf/backend/control-plane/jobs.md` §ParameterDecl. ⛔ **The split is the whole lesson**: the leak was
+> two call sites routed through a masker that already existed, and joining it to a feature that needs a
+> receipt `JobRun` does not have would have held a cleartext credential in the logs for as long as the
+> feature took. `PIPELINE-DRYRUN-1` (§3 — new scope, operator-asked) stays open as the thing `X4` is
+> scoped against.
+> 🔴 **And the leak was WIDER than the row said, in both directions.** It was filed as "a log line and a
+> rejection message"; the rejection message alone feeds **four** sinks (run log, `job.run.rejected`
+> Signal, persisted `JobRun.reason`, run-detail API), because `ParameterResolver` builds one string that
+> `JobService` then fans out. ⚠ **Fixing it at the message source closed all four** — ⛔ had it been
+> patched at the sinks instead, that would have been four patches and a fifth sink waiting.
 > ➖ **One gate LEFT §2**: `EOI-7b` is a standing refusal in §6, so §2 is **14** rows, not 15.
 > ⚠ **§1 IS NOT EMPTY** — it now carries six **owed operator inputs**, which is a kind of pending item that
 > section has never carried before. ⛔ An owed input stops work exactly as a pending decision does.
@@ -212,7 +222,7 @@ missing, the *work* was not. ⛔ A decision that "unblocks" a row does not mean 
 code before filing, not just the board.
 
 ✅ **SEQUENCE SET 2026-09-15 (operator): the secret-masking fix FIRST, then the P1.**
-`PARAM-SECRET-LEAK-1` (§5) goes before `ROUTE-UNGATED-DEFAULT-1` — not because it outranks a P1, but
+`PARAM-SECRET-LEAK-1` went before `ROUTE-UNGATED-DEFAULT-1` — not because it outranked a P1, but
 because it is two call sites routed through a masker that already exists, and secrets are reaching log
 files *today*. ⚠ **This is a deliberate exception to §0's own ordering, made with the P1 in view**, so
 ⛔ do not read it as a precedent that small work jumps a P1 in general.
@@ -288,7 +298,7 @@ from thirty-eight separate rows.
 | 28 | Data/format demand gates | **XLSX export** and **a real delete-feed** fired. ⛔ xz/zstd and `D-11` did **not** | §3 rows |
 | 29 | Ops/analytics demand gates | **ALL FOUR FIRED** — recon pairing · space-to-space comparison · MTTD · false-stale | four §3 rows |
 | 30 | Scale/cross-space demand gates | **ALL FOUR FIRED** — cross-Space consequence · multi-operator install · a second code-registered dataset producer · a quarantine-replay driver | §3 rows |
-| 31 | Secrets reaching logs unmasked | **SPLIT OUT and fix both paths now** — filed as `PARAM-SECRET-LEAK-1` | new §5 row |
+| 31 | Secrets reaching logs unmasked | **SPLIT OUT and fix both paths now** — filed as `PARAM-SECRET-LEAK-1`, ✅ **BUILT and retired the same day** | as-built: `okf/backend/control-plane/jobs.md` §ParameterDecl |
 | 32 | Which adopted duckle row first? | **`DUCKLE-C9-WATCHER-NOT-A-RUN-1`** | its §5 row |
 | 33 | The unmeasured Java-lane ratio | **Soften to a qualitative statement** — no benchmark run, and the dead citation goes with it | `SPEC-JAVALANE-RATIO-1` (§4) |
 | 34 | D8 notification residuals | **Soft-bounce retry ONLY**; the SES/SNS adapter stays filed with its own review | Notifications (§3) · `D8-SUPPRESS-1` (§3) |
@@ -1463,8 +1473,8 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   by duckle S8), so this is additive at one seam. ⚠ It needs a `secret` ParamType, which does not exist —
   the same missing type the scale-out credentials decision ran into. → Job parameter contract · Run receipt
 
-  ✅ **SPLIT 2026-09-15 — the secret-masking half left this row and is now `PARAM-SECRET-LEAK-1`
-  (below), which goes FIRST in the shift order.** ⇒ ⛔ **do not rebuild masking here**; this row is
+  ✅ **SPLIT 2026-09-15 — the secret-masking half left this row as `PARAM-SECRET-LEAK-1`, which was
+  BUILT and retired the same day** (as-built: `okf/backend/control-plane/jobs.md` §ParameterDecl). ⇒ ⛔ **do not rebuild masking here**; this row is
   now the provenance work only.
   ⚠ Reason for the split: the leak is two call sites routed through a masker that already exists,
   while provenance needs a receipt that does not (`JobRun` carries no params field) — so leaving them
@@ -1475,23 +1485,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   computed in `ParameterResolver.value():160-192` and then **discarded**, and `ParameterResolver.
   resolve` really is the single boundary (exactly two production callers).
 
-- **P2** · ➕ 🔴 **`PARAM-SECRET-LEAK-1` — a job parameter marked `secret` reaches the LOG and the
-  rejection message in cleartext.** **FILED 2026-09-15**, split out of `DUCKLE-C4-PARAM-PROVENANCE-1`,
-  where a live leak was riding underneath a provenance feature and would have shipped at that feature's
-  pace. ⛔ **Operator set it FIRST in the shift order** (§0), ahead of the P1.
-  **Grounded, not assumed.** `ParameterDecl.java:30-38` already carries a `secret` **boolean** —
-  orthogonal to type, which is the better design — and `JobRoutes.maskSecrets:207-222` is a working
-  masker. 🔴 **It is consulted on the job-detail GET and nowhere else.** Two paths bypass it:
-  (a) `JobService.java:1236` logs the **fully resolved, unmasked** parameter map;
-  (b) `ParameterResolver.itemViolation:117-134` embeds **raw values** in rejection messages.
-  ⇒ **Fix: route both through the existing masker.** ⛔ Do not invent a `secret` ParamType — the row this
-  was split from claimed one was needed and that claim is REFUTED; the boolean already exists and works.
-  ⚠ A log file persists and is copied around, so (a) is the sharper of the two — but (b) was fixed with
-  it rather than deferred, because a rejection message is screenshotted and forwarded just as readily.
-  ⚠ Worth checking while in there, per the board's own rule that *a capability with no committed example
-  is a capability nobody has ever run*: whether any committed job actually declares a `secret` parameter.
-  That changes the urgency, not the fix. → `JobService.java:1236` · `ParameterResolver.java:117` ·
-  `JobRoutes.java:207` · `DUCKLE-C4-PARAM-PROVENANCE-1` above
 - **P3** · **`DUCKLE-C10-ADMISSION-POOLS-1` — named execution pools are ADMISSION ONLY.** Adopted
   2026-09-15 from duckle §1 C10. A pool answers "may this start now" and **never widens thread or memory
   caps**; a Pipeline may *choose* a pool but never define one the server lacks (unknown ⇒ `default`); a

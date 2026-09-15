@@ -204,8 +204,30 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
 * **`ParameterDecl` carries the whole rendering + validation contract** (eleven components: `label`,
   `tier`, `options`, `pattern`, `min`/`max`, `placeholder`, `group`, `multi`, `secret`, `expressions`, …),
   and `JobTypeDescriptor.toMap()` serves it. A 6-arg delegating constructor kept all 16 raw call sites
-  compiling. `secret` is masked at the **response boundary** (`JobRoutes.maskSecrets`), so `JobConfig.toMap()`
-  — and therefore bundle export — is untouched.
+  compiling. `secret` masking has **one definition**, `com.gamma.job.SecretMasking` — a literal becomes
+  `***`, a `${ENV:…}` reference stays visible (the reference is not itself sensitive, and hiding it leaves
+  an operator unable to see how the secret is wired; house precedent is `ConnectionProfile`).
+  `JobConfig.toMap()` — and therefore bundle export — is untouched, so masking still happens on the way
+  out, never in the stored config.
+  🔴 **It applies at THREE surfaces, and until 2026-09-15 it applied at only one** (`PARAM-SECRET-LEAK-1`).
+  The response boundary (`JobRoutes.maskSecrets`) was masked; the other two were not:
+  `JobService`'s `"run started"` log wrote the fully resolved map in cleartext for **every** Job, and
+  `ParameterResolver`'s rejection messages embedded the offending value — which is not one leak but four
+  sinks, because `invalidType` flows into the run log, the `job.run.rejected` Signal, the persisted
+  `JobRun.reason`, and the run-detail API.
+  ⚠ **The rule lives in `inspecto-engine`, not beside `JobRoutes` where it was written**, because two of
+  its three callers are engine-side and the engine cannot depend on the control plane. ⛔ Do not copy the
+  predicate back up to the boundary — a second definition of *"what is a secret worth hiding"* is exactly
+  how this surface fell out of step in the first place.
+  ⚠ **A declaration's own terms are deliberately NOT masked** in a rejection message — `type`, `options`,
+  `pattern`, `min`/`max` are what the author wrote, not what the operator supplied, and hiding them would
+  leave a rejection that says nothing. Only the value is hidden.
+  ⚠ Two other things in the tree spell `"***"` and are **not** the same rule:
+  `PipelineBundleRoutes.maskSecrets` masks by *key-name pattern* over a nested config tree (a different
+  question), and `SampleHelloJob` masks its own echo by hardcoding the literal name `"api_token"`.
+  🔴 That last one is how the leak was proven reachable rather than theoretical: `sample.hello` is a
+  **shipped built-in that declares a `secret` parameter**, its body takes care not to log the value — and
+  `JobService` logged it one line earlier anyway, defeating the Job's own caution before it ran.
 * **Provenance is assembled by the REGISTRY, not the descriptor** (`implClass`/`source`/`version`): a
   provider cannot know its own provenance.
 * **`GET /jobs/expressions`** serves the catalog **generated from the registry**, so it stays correct as

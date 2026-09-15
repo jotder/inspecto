@@ -1241,8 +1241,13 @@ public final class JobService implements AutoCloseable {
             // S1-3/S1-4 dry-run contract (§3.4): mutating services record instead of act.
             ctx.services(firing.dryRun() ? DryRunServices.wrap(granted, ctx.log()) : granted);
         }
-        ctx.log().info("run started", "trigger", trigger, "params", pr.resolved(),
-                "dryRun", firing.dryRun());   // resolved Parameter Context (R2/R5)
+        // resolved Parameter Context (R2/R5) — with declared `secret` values hidden. ⛔ The masking is
+        // NOT cosmetic and must not be dropped as noise: this line runs for every Job, before the Job's
+        // own body, so an unmasked map here defeats whatever care the Job itself takes. `SampleHelloJob`
+        // masks its own echo of the same map and was being undone by this line (PARAM-SECRET-LEAK-1).
+        ctx.log().info("run started", "trigger", trigger,
+                "params", SecretMasking.mask(pr.resolved(), SecretMasking.names(decls)),
+                "dryRun", firing.dryRun());
         ctx.signals().emit("job.run.started", Severity.INFO,
                 Map.of("job", name, "run", runId, "trigger", trigger));
         JobResult res;
@@ -1521,9 +1526,7 @@ public final class JobService implements AutoCloseable {
     /** The parameter names a Job's type declares {@code secret} — the route boundary masks these on read
      *  (§7.2). Never masked in {@link JobConfig#toMap()}, which also feeds bundle export/import. */
     public Set<String> secretParams(JobConfig cfg) {
-        return registry.parameters(cfg.type(), cfg).stream()
-                .filter(ParameterDecl::secret).map(ParameterDecl::name)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return SecretMasking.names(registry.parameters(cfg.type(), cfg));
     }
 
     /** The Expression vocabulary as the authoring UI sees it ({@code GET /jobs/expressions},

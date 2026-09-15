@@ -13,6 +13,7 @@ import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
 import com.gamma.job.RunArtifact;
+import com.gamma.job.SecretMasking;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -214,14 +215,12 @@ final class JobRoutes implements RouteModule {
      *  {@code type}/{@code cron} — so masking matches parameter names at the top level. Package-private and
      *  pure so the rule is testable without a Job Type that happens to declare a secret. */
     static Map<String, Object> maskSecrets(Map<String, Object> view, Set<String> secrets) {
-        if (secrets.isEmpty()) return view;
-        Map<String, Object> out = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> en : view.entrySet()) {
-            Object v = en.getValue();
-            boolean mask = secrets.contains(en.getKey()) && v instanceof String s && !s.startsWith("${");
-            out.put(en.getKey(), mask ? "***" : v);
-        }
-        return out;
+        // ⛔ The rule itself moved to com.gamma.job.SecretMasking and is NOT reimplemented here. Two of
+        // its callers are engine-side (the run log and the resolver's rejection messages) and the engine
+        // cannot depend on this module, so a copy at this boundary would have been the second definition
+        // of one rule — PARAM-SECRET-LEAK-1 exists because the rule was only ever applied at this one.
+        // The empty short-circuit stays local: the export-path test asserts the SAME instance returns.
+        return secrets.isEmpty() ? view : SecretMasking.mask(view, secrets);
     }
 
     /** {@code GET /jobs/{name}/runs/{runId}/logs} — the Run Log re-shaped for the UI's live-tail panel:

@@ -69,7 +69,11 @@ final class ParameterResolver {
         for (ParameterDecl d : decls) {
             Layered l = value(d, args, bind, config, expressions, ctx);
             if (l.unknownExpr() != null) {
-                unknown.add(d.name() + " (unknown expression '" + l.unknownExpr() + "')");
+                // ⚠ The unregistered token here IS the authored value. A `secret` literal that merely
+                // happens to start with `$` (a password like `$ecret1`) is read as an expression, so this
+                // message would otherwise print it verbatim — masked for the same reason as a violation.
+                unknown.add(d.name() + " (unknown expression '"
+                        + SecretMasking.shown(d, l.unknownExpr()) + "')");
                 continue;
             }
             String v = l.value();
@@ -106,29 +110,40 @@ final class ParameterResolver {
         String[] items = v.split(",", -1);
         for (String raw : items) {
             String item = raw.trim();
-            if (item.isEmpty()) return "(empty item in list '" + v + "')";
+            // The whole CSV is echoed here, so it is masked for the same reason each item is.
+            if (item.isEmpty()) return "(empty item in list '" + SecretMasking.shown(d, v) + "')";
             String bad = itemViolation(d, item);
             if (bad != null) return bad;
         }
         return null;
     }
 
-    /** One value — or one item of a {@code multi} list — against type + options + pattern + bounds. */
+    /** One value — or one item of a {@code multi} list — against type + options + pattern + bounds.
+     *
+     *  <p>⛔ <b>Every {@code got '…'} here shows {@code got}, never {@code v}</b> (PARAM-SECRET-LEAK-1).
+     *  For a declaration marked {@code secret} the offending value is a credential, and these strings do
+     *  not stay local: {@code resolve} collects them into {@code invalidType}, which {@code JobService}
+     *  then writes to the run log, to the {@code job.run.rejected} Signal, and into the persisted
+     *  {@code JobRun.reason} that the UI shows — four sinks from one concatenation.
+     *  ⚠ The declaration's own terms ({@code type}, {@code options}, {@code pattern}, bounds) are NOT
+     *  masked: they are what the author wrote, not what the operator supplied, and hiding them would
+     *  leave a rejection message that says nothing at all. */
     private static String itemViolation(ParameterDecl d, String v) {
-        if (!matchesType(d.type(), v)) return "(expected " + d.type() + ", got '" + v + "')";
+        String got = SecretMasking.shown(d, v);
+        if (!matchesType(d.type(), v)) return "(expected " + d.type() + ", got '" + got + "')";
         if (!d.options().isEmpty() && !d.options().contains(v))
-            return "(expected one of " + d.options() + ", got '" + v + "')";
+            return "(expected one of " + d.options() + ", got '" + got + "')";
         if (d.pattern() != null && !v.matches(d.pattern()))
-            return "(does not match " + d.pattern() + ", got '" + v + "')";
+            return "(does not match " + d.pattern() + ", got '" + got + "')";
         if (d.min() != null || d.max() != null) {
             double n;
             try {
                 n = Double.parseDouble(v);
             } catch (NumberFormatException notNumeric) {
-                return "(bounded parameter is not numeric, got '" + v + "')";
+                return "(bounded parameter is not numeric, got '" + got + "')";
             }
-            if (d.min() != null && n < d.min()) return "(below minimum " + d.min() + ", got '" + v + "')";
-            if (d.max() != null && n > d.max()) return "(above maximum " + d.max() + ", got '" + v + "')";
+            if (d.min() != null && n < d.min()) return "(below minimum " + d.min() + ", got '" + got + "')";
+            if (d.max() != null && n > d.max()) return "(above maximum " + d.max() + ", got '" + got + "')";
         }
         return null;
     }
