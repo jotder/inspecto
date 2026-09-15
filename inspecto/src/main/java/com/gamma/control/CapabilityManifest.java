@@ -129,6 +129,17 @@ final class CapabilityManifest {
             // ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen.
             new Entry("POST", "/requirements/([^/]+)/decision", Roles.CAN_TRIAGE_REQUIREMENTS),
             new Entry("POST", "/requirements/([^/]+)/deliver", Roles.CAN_TRIAGE_REQUIREMENTS),
+            // AgentRoutes — agent GOVERNANCE, gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`). These decide
+            // what the assistant is allowed to do and who signed off on it: the autonomy policy, the kill
+            // switch, the approval decision that releases a mutating action, and the Case feedback that
+            // feeds per-skill tuning. ⚠ Installation policy, not day-to-day work — which is why they take
+            // the coarse capability without the product question the Incident-triage family needs.
+            // ⚠ Reachability caveat: `/agent/*` answers 503 in every bundle today (no packaging stages
+            // `inspecto-intelligence`), so this gate is correct-but-unreached until that changes.
+            new Entry("POST", "/agent/cases/(.+)/feedback", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/agent/approvals/(.+)/decision", Roles.CAN_ADMINISTER),
+            new Entry("PUT", "/agent/policy", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/agent/policy/kill-switch", Roles.CAN_ADMINISTER),
             // SpaceRoutes — installation administration, gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`).
             // ⛔ These were reachable by ANY authenticated caller: `DELETE /spaces/{id}` checked only that
             // more than one Space existed. They were not merely un-gated but INEXPRESSIBLE — no capability

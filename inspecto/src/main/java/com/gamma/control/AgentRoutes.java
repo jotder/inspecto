@@ -147,7 +147,7 @@ final class AgentRoutes implements RouteModule {
 
         // AGT-5 P5 (Learning): operator feedback on an investigation Case — the raw signal the learning
         // tier turns into eval growth + per-skill tuning. The write is audited by ControlApi.dispatch.
-        api.post("/agent/cases/(.+)/feedback", (e, m) -> {
+        api.post("/agent/cases/(.+)/feedback", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             if (ApiContext.str(body, "rating") == null) throw new ApiException(400, "rating is required");
             try {
@@ -156,7 +156,7 @@ final class AgentRoutes implements RouteModule {
             } catch (IllegalArgumentException bad) {   // unrecognized rating value → reject at the edge
                 throw new ApiException(400, bad.getMessage());
             }
-        });
+        }));
         api.get("/agent/feedback", (e, m) -> Map.of("feedback",
                 agentOr503(api).recentCaseFeedback(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100))));
 
@@ -174,7 +174,7 @@ final class AgentRoutes implements RouteModule {
         api.get("/agent/approvals/(.+)", (e, m) ->
                 agentOr503(api).approvalById(ApiContext.name(m))
                         .orElseThrow(() -> new ApiException(404, "unknown approval: '" + ApiContext.name(m) + "'")));
-        api.post("/agent/approvals/(.+)/decision", (e, m) -> {
+        api.post("/agent/approvals/(.+)/decision", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             Boolean approve = parseDecision(ApiContext.str(body, "decision"));
             if (approve == null) throw new ApiException(400, "decision is required and must be 'approve' or 'decline'");
@@ -183,7 +183,7 @@ final class AgentRoutes implements RouteModule {
                             decidedBy == null || decidedBy.isBlank() ? "operator" : decidedBy.trim())
                     .orElseThrow(() -> new ApiException(404,
                             "unknown or already-decided approval: '" + ApiContext.name(m) + "'"));
-        });
+        }));
 
         // AGT-5 P4 (autonomy L3): the bounded-autonomy policy — kill switch + per-action-class
         // mode/budget that gate the ops_monitor loop. Absent when there is no autonomy tier (→ 503, a
@@ -191,18 +191,18 @@ final class AgentRoutes implements RouteModule {
         // prepends the agent.admin capability gate at the ApiContext/WriteGates seam (plan §1, §6, L3).
         api.get("/agent/policy", (e, m) -> agentOr503(api).autonomyPolicy()
                 .orElseThrow(() -> new ApiException(503, "autonomy policy not available (no L3 tier)")));
-        api.put("/agent/policy", (e, m) -> {
+        api.put("/agent/policy", ApiContext.withCapability("canAdminister", (e, m) -> {
             String by = actorOrOperator(e);
             return agentOr503(api).updateAutonomyPolicy(api.body(e), by)
                     .orElseThrow(() -> new ApiException(503, "autonomy policy not available (no L3 tier)"));
-        });
-        api.post("/agent/policy/kill-switch", (e, m) -> {
+        }));
+        api.post("/agent/policy/kill-switch", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             Boolean engaged = parseEngaged(body.get("engaged"));
             if (engaged == null) throw new ApiException(400, "engaged is required and must be a boolean");
             return agentOr503(api).setAutonomyKillSwitch(engaged, actorOrOperator(e))
                     .orElseThrow(() -> new ApiException(503, "autonomy policy not available (no L3 tier)"));
-        });
+        }));
 
         // AGT-5 P4 (autonomy L3): the autonomy ledger — what the ops_monitor loop did, why, and spend.
         // 503s when the intelligence module is absent, like every other agent route (the previous

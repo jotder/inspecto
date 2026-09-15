@@ -176,4 +176,50 @@ test. If that refusal ever weakens, six routes change bucket silently.
 
 ⚠ **This audit did not test authorization-by-ownership** — whether a caller can address *another user's*
 notification, note, or object by id. That is a different question from capability gating and is filed
-separately (`ROUTE-OWNERSHIP-SCOPE-1`).
+separately. ✅ **That row was filed and then REFUTED on 2026-09-15**: the per-row owner check it called missing already exists for objects (`ObjectRoutes.java:195-243` — `visibleTo` over `Subject.dataScopes()`, with out-of-scope reading as 404), notes route through the same gate, and notifications have no owner field at all — the feed is one shared per-space inbox, so there is no per-user feed to address across. What survives is a product question about whether the feed should ever be per-user, which lands on the platform's absent ownership model, not on route gating.
+
+
+---
+
+## As-built and decisions — 2026-09-15
+
+**Operator decisions taken on this audit:**
+
+1. ✅ **ONE `canAdminister` capability**, not three per-family ones. Rationale recorded on
+   `Roles.CAN_ADMINISTER`: three capabilities would have been least-privilege-cleaner but left **no
+   catch-all for the next unlisted route**, which is the hole this audit opened on. ⚠ Accepted
+   consequence: whoever can delete a Space can also govern the agent.
+2. ✅ **Audit all first, ratchet last.** Building the ratchet first would have frozen 83 unreviewed
+   exemptions into a baseline nobody reviewed.
+3. ✅ **Record the exemption reasoning** for the correctly-ungated routes (§1-§4, §7) rather than gating
+   them — this section is that record, and it is what makes a later ratchet trustworthy.
+
+**Shipped:** `Roles.CAN_ADMINISTER` (the vocabulary is now eleven, `security.md` owns the table), and
+**six** routes gated on it — `PUT /spaces/{id}`, `DELETE /spaces/{id}` (§6a), and all four of §6c agent
+governance. Each carries a `CapabilityManifest` entry; `CapabilityManifestTest` pins registration and
+manifest to each other in both directions, and was proven red by un-gating one.
+
+🔴 **§5's list of 12 is now 10 — two of its entries were WRONG, and gating them turned the build red.**
+
+| Route | §5 said | Ground truth |
+|---|---|---|
+| `POST /requirements` | *"an inconsistency, not a judgement call"* — both siblings gated | **SEC-7(c), deliberate.** Anyone may raise a requirement; only a triager decides. Pinned by `ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen`. |
+| `POST /spaces` | gateable | **The RECOVERY route.** Deleting the last Space leaves a server hosting none; a gate here bricks it exactly as the old `writeRoot()` resolution did — every route failing, including the one that would recover it. Pinned by `ControlApiSpacesTest`. |
+
+⛔ **Re-ground the remaining 10 one at a time before gating them.** This audit reviewed its *correctly
+ungated* buckets carefully and evidently did not review its *should be gated* bucket to the same standard.
+⛔ **A route being an outlier among its siblings is not evidence that the outlier is the mistake** — it is
+equally often the sibling set that is wrong, or an asymmetry someone chose on purpose and wrote a test for.
+
+**Still open:**
+
+- **§6b Incident / Case triage (16 routes) — needs a PRODUCT decision first**, and it is not the same call
+  as §6a. Triage is day-to-day support work, `canAdminister` is deliberately coarse, and the routes live in
+  the optional `inspecto-ops` module. Three options: require `canAdminister`, give triage its own
+  capability after all, or leave it open by design and say so.
+- The 10 unverified §5 routes.
+- The ratchet — **last**, once the above are settled.
+
+⚠ **Reachability caveat on §6c:** `/agent/*` answers 503 in every bundle today, because no packaging step
+stages `inspecto-intelligence`. The gate is correct but unreached until that changes; it is not evidence
+that agent governance is protected in a shipped product.
