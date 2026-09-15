@@ -604,6 +604,10 @@ no-ops when the store is absent so no call site branches on default-off:
 | Pipeline sinks | `PartitionSinkWriter.write` | `ConsignmentOutputs.countByPartition` (replaced its old whole-table `COUNT(*)`) |
 | §7.3 summaries | `ConsignmentProcessJobType` after `SummaryWriter` reveals the files | the number of summary rows in that partition |
 
+🔴 **`table_name` is the SCHEMA that wrote the file on a segmented ingest, not the batch's single table** (`batches` vs a per-schema row set, decided 2026-09-15). A segmented pipeline writes one output set PER SCHEMA, but `ConsignmentIngestor` pools them into one flat `outputs` list and used to stamp every row with `batch.table()` — so this table, which already IS the per-Consignment child table, could not answer *which schema wrote what*; a file's segment survived only inside its PATH. `IngestOutcome.schemaByOutput` (output file → segment key) now carries the attribution the write already knew.
+⚠ It is collected in **two** places because the segmented ingesters are not alike: `UnionModeIngester` has the segment key in its own write loop, while `GenerationModeIngester` writes per MEMBER through `DuckDbRecordSink`, which fans out to segments internally — there the pairing exists only inside `generationFlush(Seg)`. Miss either and that path silently keeps the flattened value.
+⚠ A file with no attribution keeps the batch's table, which is every file on a single-schema path — so the default ingest is unchanged. ⛔ And `batches` itself is untouched: it stays **one row per ingest** by decision, with the per-schema detail here rather than in a second ledger.
+
 ⚠ **Summary rows use `table_name = "<target>__summary"`, and the suffix is load-bearing.**
 `GuardedSummaryEmitter.reconcile` sums detail `row_count` **by table name**, so registering a summary under the
 target's own name would inflate the detail total and silently break §7.2's reconciliation. Filter on the suffix to

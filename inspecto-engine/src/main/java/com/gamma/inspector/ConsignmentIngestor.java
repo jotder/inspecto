@@ -93,7 +93,7 @@ public final class ConsignmentIngestor {
             } else {
                 try {
                     commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
-                            outcome.bounds(), outcome.memberAudits(), runId);
+                            outcome.bounds(), outcome.schemaByOutput(), outcome.memberAudits(), runId);
                 } catch (Exception e) {
                     // Output was written, but a side effect (backup/manifest/markers) failed. Demote
                     // to FAILED so the batch stays visible to audit/lineage/recovery instead of
@@ -142,14 +142,15 @@ public final class ConsignmentIngestor {
 
     private static void commit(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
-                               Map<String, EventTimeBounds> bounds, List<MemberAudit> audits, String runId)
+                               Map<String, EventTimeBounds> bounds, Map<String, String> schemaByOutput,
+                               List<MemberAudit> audits, String runId)
             throws IOException {
         // lineage is persisted by writeAudit (from the outcome); it is passed on here too because it is the
         // only place a per-output-file row count exists (§11.3). The durable side effects —
         // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
         // the branch-aware graph path (ConsignmentGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
-        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits, runId);
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits, runId, schemaByOutput);
 
         // S4-pre (elt-s4-park-drain-plan): the per-batch branch commit log has served its purpose once
         // the source is finalised — a fully committed batch never replays. A FAILED batch keeps its
@@ -304,6 +305,29 @@ public final class ConsignmentIngestor {
                                List<PartitionOutput> outputs, List<LineageRow> lineage,
                                Map<String, EventTimeBounds> bounds,
                                List<MemberAudit> audits, String runId) throws IOException {
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, audits, runId, Map.of());
+    }
+
+    /**
+     * As above, carrying the <b>per-output schema attribution</b> — output file → the segment/schema key
+     * that wrote it ({@code batches} vs a per-schema row set, decided 2026-09-15).
+     *
+     * <p>🔴 <b>Why the registry needs it.</b> A segmented ingest writes one output set per schema, but this
+     * method receives them pooled into one flat {@code outputs} list and stamps every §11.3 registry row with
+     * {@code batch.table()} — the Consignment's SINGLE configured table. So "which schemas did this ingest
+     * write, and how much to each" was unanswerable from the registry; the segment identity survived only
+     * inside each file's PATH, recoverable by string-parsing and nothing else.
+     *
+     * <p>⚠ Empty on a single-schema path, which reads as "every output belongs to {@code batch.table()}" —
+     * the pre-existing behaviour, unchanged. The {@code batches} audit row is deliberately untouched: it
+     * stays ONE row per ingest, and the per-schema detail lives here, in the existing child table, rather
+     * than in a second ledger.
+     */
+    static void finalizeSource(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
+                               List<PartitionOutput> outputs, List<LineageRow> lineage,
+                               Map<String, EventTimeBounds> bounds,
+                               List<MemberAudit> audits, String runId,
+                               Map<String, String> schemaByOutput) throws IOException {
 
         // ── ordering rationale ────────────────────────────────────────────────
         // Markers signal "already processed; skip on next poll." If a crash leaves
@@ -472,7 +496,7 @@ public final class ConsignmentIngestor {
         if (lineage != null && !lineage.isEmpty()) {
             ConsignmentOutputStores.record(ConsignmentOutputs.fromLineage(
                     batch.batchId(), runId, batch.table(), outputs, lineage, schemaFingerprint,
-                    bounds, cfg.identity().pipelineName()));
+                    bounds, cfg.identity().pipelineName(), schemaByOutput));
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.OUTPUT_REGISTERED);
         }
 

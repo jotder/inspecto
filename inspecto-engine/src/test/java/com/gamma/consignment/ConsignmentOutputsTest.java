@@ -28,6 +28,66 @@ class ConsignmentOutputsTest {
         return new LineageRow("c1", 1, "in.csv", outputFile, partition, rows);
     }
 
+    // ── per-schema attribution (`batches` vs a per-schema row set, 2026-09-15) ───────
+
+    /**
+     * 🔴 A segmented ingest writes one output set PER SCHEMA, but every caller pools them into one flat
+     * {@code outputs} list and passes the Consignment's SINGLE configured table. Without the attribution map
+     * every registry row is stamped with that one name, so this table — which already IS the per-Consignment
+     * child table — cannot answer which schema wrote what, and a file's segment survives only inside its path.
+     */
+    @Test
+    void stampsEachOutputWithTheSchemaThatWroteIt() {
+        List<PartitionOutput> outputs = List.of(
+                out("day=01", "/db/calls/a.parquet", 10),
+                out("day=01", "/db/sms/b.parquet", 20));
+        List<LineageRow> lineage = List.of(
+                lineage("/db/calls/a.parquet", "day=01", 3),
+                lineage("/db/sms/b.parquet", "day=01", 7));
+
+        List<ConsignmentOutput> rows = ConsignmentOutputs.fromLineage("c1", "r1", "the_batch_table",
+                outputs, lineage, null, Map.of(), "p1",
+                Map.of("/db/calls/a.parquet", "calls", "/db/sms/b.parquet", "sms"));
+
+        assertEquals(java.util.Set.of("calls", "sms"),
+                rows.stream().map(ConsignmentOutput::tableName).collect(java.util.stream.Collectors.toSet()),
+                "each file names the schema that wrote it, not the batch's single table");
+        assertEquals(3, rows.stream().filter(r -> "calls".equals(r.tableName())).findFirst().orElseThrow().rows());
+        assertEquals(7, rows.stream().filter(r -> "sms".equals(r.tableName())).findFirst().orElseThrow().rows());
+    }
+
+    /**
+     * ⚠ A file with no attribution keeps the batch's table — which is EVERY file on a single-schema path.
+     * An absent entry must never blank the name, or the default ingest path would silently lose it.
+     */
+    @Test
+    void anUnattributedOutputKeepsTheBatchTable() {
+        List<PartitionOutput> outputs = List.of(
+                out("day=01", "/db/one.parquet", 10),
+                out("day=01", "/db/two.parquet", 20));
+        List<LineageRow> lineage = List.of(
+                lineage("/db/one.parquet", "day=01", 1),
+                lineage("/db/two.parquet", "day=01", 1));
+
+        List<ConsignmentOutput> rows = ConsignmentOutputs.fromLineage("c1", "r1", "the_batch_table",
+                outputs, lineage, null, Map.of(), "p1", Map.of("/db/one.parquet", "calls"));
+
+        assertEquals("calls", rows.stream()
+                .filter(r -> r.path().endsWith("one.parquet")).findFirst().orElseThrow().tableName());
+        assertEquals("the_batch_table", rows.stream()
+                .filter(r -> r.path().endsWith("two.parquet")).findFirst().orElseThrow().tableName());
+    }
+
+    /** The no-map overload is byte-identical to before: every row keeps the batch's table. */
+    @Test
+    void theOverloadWithoutAttributionIsUnchanged() {
+        List<PartitionOutput> outputs = List.of(out("day=01", "/db/a.parquet", 10));
+        List<ConsignmentOutput> rows = ConsignmentOutputs.fromLineage("c1", "r1", "the_batch_table",
+                outputs, List.of(lineage("/db/a.parquet", "day=01", 5)), null, Map.of(), "p1");
+        assertEquals("the_batch_table", rows.get(0).tableName());
+        assertEquals(5, rows.get(0).rows());
+    }
+
     // ── row_count from the lineage matrix (the ingest path) ──────────────────────
 
     /**

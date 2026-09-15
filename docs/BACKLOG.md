@@ -279,7 +279,7 @@ from thirty-eight separate rows.
 | 5 | A Break's Incident identity | ✅ SHIPPED 2026-09-15. **`(type, key, column)` — full parity** with the client's `breakId`. ⚠ Accepted cost: a value Break and a missing-row Break on one key+column become separate Incidents | `BREAK-DEDUPE-GRAIN-1` (§3) |
 | 6 | What does `producer` identify? | ✅ SHIPPED 2026-09-15. **A structured `Ref` `{kind, id}` plus the owning pipeline** — all three emit sites corrected | `DATASET-SELF-TRIGGER-1` (§5) |
 | 7 | May retention prune resume state? | ✅ SHIPPED 2026-09-15. **Never prune below the high watermark** — floor the sweep; no schema change | `LEDGER-PRUNE-EATS-RESUME-STATE-1` (§5) |
-| 8 | `batches` vs a per-schema row set | **A child table** for per-schema outputs; `batches` stays one row per ingest | Consignment ELT (§3) |
+| 8 | `batches` vs a per-schema row set | ✅ SHIPPED 2026-09-15. **A child table** for per-schema outputs; `batches` stays one row per ingest | Consignment ELT (§3) |
 | 9 | Execute an intervening node at rest? | **YES — `EXECUTED` nodes anywhere**; fusion may break mid-graph | Platform Services Stage 2 (§3) · §2 Row 15 |
 | 10 | ELT Phase 6 prerequisites | **Converter + parity gate NOW; the release is a SEPARATE call** — ⚠ including the `v3.12.0` name collision | §2 Row 15 |
 | 11 | Intake caps ✅✅✅ but off by default | **Fix the CELL now**, soak separately, flip the default only on the soak result | ✅ cell fixed: `EDITIONS.md` `JOB-04`; the soak stays open on §3 Pipeline graph |
@@ -678,6 +678,22 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ `PartitionOutput` is the wrong place to carry it — ~14 construction sites across two modules. The
   established idiom is `IngestOutcome`'s existing `bounds` map, keyed by output file, built in that same
   loop.
+
+  ✅ **SHIPPED 2026-09-15 — the EXISTING child table made per-schema accurate; no new ledger.**
+  `IngestOutcome.schemaByOutput` (output file → segment key) threads from the ingesters through
+  `commit`/`finalizeSource` into `ConsignmentOutputs.fromLineage`, which stamps each registry row with the
+  schema that wrote it instead of the batch's single `batch.table()`. **`batches` is untouched — still one
+  row per ingest**, exactly as decided.
+  ⚠ Collected in **two** places, because the two segmented ingesters are not alike: `UnionModeIngester`
+  has `segKey` in its own write loop; `GenerationModeIngester` writes per MEMBER through `DuckDbRecordSink`
+  and the pairing exists only inside `generationFlush(Seg)`, so the sink now exposes it. Missing either
+  leaves that path silently flattened.
+  ⚠ A file with no attribution keeps `batch.table()` — which is every file on a single-schema path — so the
+  default ingest is byte-identical. The no-map overloads are kept for exactly that reason.
+  ⛔ **What this does NOT do:** no route, no UI, and no per-schema `member_count`/`rejected_count`. Those
+  are per-BATCH facts that were never computed per segment, and inventing them would need new aggregation
+  in `writeAudit`, not a new sink. Row-, byte- and file-counts per schema ARE answerable now, by grouping
+  `consignment_outputs` on `table_name`.
 - **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built; ⚠ **"needs `SeqScope`" is STALE as a blocker — regrounded 2026-09-15: `SeqScope` already ships** as a nested enum at `FileSequenceGaps.java:74-79` (`PER_BUCKET`/`CONTINUOUS`). The type exists; only the wiring does not. ⚠ **K1 is unwired too**, which this row never said: `DbConsignmentOutputStore.dailyVolume()` has zero call sites, same as `VolumeBaseline`/`FileSequenceGaps`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (🔴 **"do not grow the `EventType` enum" is wrong in KIND — corrected 2026-09-15: there is no enum.** `EventType.java:19` is a class of `public static final String` constants, deliberately open per its own javadoc, and no `kpi.*` entry exists. The constants-class guidance still applies; the thing it warns about does not exist), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
 - **P2** · ✅ **TRIGGER (operator, 2026-09-13):** an author needs to declare "this Collector takes NO data
   extensions". · **`SCHEMA-FORM-EMPTY-LIST-1` — the UI cannot author an explicit empty list** (filed 2026-09-13,

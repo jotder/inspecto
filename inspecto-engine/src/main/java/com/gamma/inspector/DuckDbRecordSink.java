@@ -66,6 +66,8 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
 
     private final List<PartitionOutput> outputs = new ArrayList<>();
     private final List<LineageRow>       lineage = new ArrayList<>();
+    /** Output file -> the segment key that wrote it; see the note at the {@code generationFlush} put. */
+    private final Map<String, String>    schemaByOutput = new LinkedHashMap<>();
     private long parsed;
     private long errors;
     private long junk;
@@ -192,6 +194,8 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
 
     List<PartitionOutput> outputs() { return outputs; }
     List<LineageRow>      lineage() { return lineage; }
+    /** Output file -> the segment/schema key that wrote it, for the per-schema output registry rows. */
+    Map<String, String>   schemaByOutput() { return schemaByOutput; }
     long parsedRows() { return parsed; }
     long errorRows()  { return errors; }
     long junkRows()   { return junk; }
@@ -277,6 +281,10 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
             List<LineageRow> lin = LineageCollector.collect(conn, dest, batchId,
                     Map.of(srcId, lineageName), outs, s.partCols);
             outputs.addAll(outs);
+            // Attribute each file to the segment that wrote it while we still know. `outputs` is pooled flat
+            // across every segment and generation, and the caller pools it again across members, so this is
+            // the ONLY point where the pairing exists (`batches` vs a per-schema row set, 2026-09-15).
+            for (PartitionOutput o : outs) schemaByOutput.put(o.outputFile(), s.key);
             lineage.addAll(lin);
             dropTable(conn, dest);
         } catch (SinkFlushException e) {

@@ -45,6 +45,10 @@ final class UnionModeIngester {
         List<PartitionOutput> allOutputs = new ArrayList<>();
         List<LineageRow>      allLineage = new ArrayList<>();
         Map<String, EventTimeBounds> allBounds = new java.util.HashMap<>();
+        // output file -> the segment/schema key that wrote it. The three collections above are pooled FLAT
+        // across segments and the audit row collapses the schemas into one comma-joined label, so without
+        // this the only surviving trace of which schema wrote a file is the file's own path.
+        Map<String, String> allSchemas = new java.util.HashMap<>();
         long totalInputRows = 0;
 
         Map<Integer, String> srcIdToFile = new LinkedHashMap<>();
@@ -156,6 +160,8 @@ final class UnionModeIngester {
                         allOutputs.addAll(written.outputs());
                         allLineage.addAll(written.lineage());
                         allBounds.putAll(written.bounds());
+                        // Capture THIS segment's attribution while it is still in hand (see allSchemas).
+                        for (PartitionOutput o : written.outputs()) allSchemas.put(o.outputFile(), segKey);
 
                         dropView(conn, unionTable);
                         for (String mt : memberTables) dropTable(conn, mt);
@@ -173,7 +179,7 @@ final class UnionModeIngester {
 
         String schemaNames = String.join(",", cfg.schemas().segments().keySet());
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
-                allOutputs, allLineage, totalInputRows, schemaNames, allBounds);
+                allOutputs, allLineage, totalInputRows, schemaNames, allBounds, allSchemas);
     }
 
     private static StreamingFileIngester instantiate(PipelineConfig cfg) {

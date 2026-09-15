@@ -41,6 +41,8 @@ final class GenerationModeIngester {
         List<MemberAudit>  memberAudits = new ArrayList<>();
         List<PartitionOutput> allOutputs = new ArrayList<>();
         List<LineageRow>      allLineage = new ArrayList<>();
+        // Output file -> the segment/schema key that wrote it, pooled across members from each sink.
+        java.util.Map<String, String> allSchemas = new java.util.LinkedHashMap<>();
         long totalInputRows = 0;
 
         File tempDb = null;
@@ -85,6 +87,10 @@ final class GenerationModeIngester {
                         survivors.add(m);
                         totalInputRows += memberParsed;
                         allOutputs.addAll(sink.outputs());
+                        // ⚠ Unlike the union path, the segment key is NOT in scope here — this loop is per
+                        // MEMBER and the sink fans out to segments internally, so the attribution has to come
+                        // back from the sink rather than be built here.
+                        allSchemas.putAll(sink.schemaByOutput());
                         allLineage.addAll(sink.lineage());
                         memberAudits.add(MemberAudit.accepted(m, memberParsed, memberErrors, mStart));
                         log.info("[INGEST] [{}] streamed {} row(s) → {} output file(s){}",
@@ -106,7 +112,7 @@ final class GenerationModeIngester {
 
         String schemaNames = String.join(",", cfg.schemas().segments().keySet());
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
-                allOutputs, allLineage, totalInputRows, schemaNames);
+                allOutputs, allLineage, totalInputRows, schemaNames, java.util.Map.of(), allSchemas);
     }
 
     /**

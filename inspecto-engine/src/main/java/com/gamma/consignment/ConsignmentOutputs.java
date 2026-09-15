@@ -80,6 +80,29 @@ public final class ConsignmentOutputs {
                                                       List<PartitionOutput> outputs, List<LineageRow> lineage,
                                                       String schemaFingerprint,
                                                       Map<String, EventTimeBounds> bounds, String producer) {
+        return fromLineage(consignmentId, runId, tableName, outputs, lineage, schemaFingerprint,
+                bounds, producer, Map.of());
+    }
+
+    /**
+     * As above, with the <b>per-output schema attribution</b> {@code schemaByOutput} — output file → the
+     * segment/schema key that wrote it ({@code batches} vs a per-schema row set, decided 2026-09-15).
+     *
+     * <p>🔴 <b>Why one {@code tableName} was not enough.</b> A segmented ingest writes one output set PER
+     * SCHEMA, but every caller pools them into one flat {@code outputs} list and passes the Consignment's
+     * SINGLE configured table. Every registry row was therefore stamped with the same name, so this table —
+     * which already IS the per-Consignment child table, on every edition — could not answer which schema
+     * wrote what. A file's segment survived only inside its path.
+     *
+     * <p>⚠ A file absent from the map keeps {@code tableName}, so a single-schema path is byte-identical to
+     * before; the map is empty there. ⛔ This does NOT change {@code batches}, which stays one row per
+     * ingest by decision — the per-schema detail belongs in this child table, not in a second ledger.
+     */
+    public static List<ConsignmentOutput> fromLineage(String consignmentId, String runId, String tableName,
+                                                      List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                                      String schemaFingerprint,
+                                                      Map<String, EventTimeBounds> bounds, String producer,
+                                                      Map<String, String> schemaByOutput) {
         Map<String, Long> byPath = new HashMap<>();
         if (lineage != null)
             for (LineageRow r : lineage) {
@@ -87,7 +110,8 @@ public final class ConsignmentOutputs {
                 byPath.merge(r.outputFile(), r.rowCount(), Long::sum);
             }
         return build(consignmentId, runId, tableName, outputs,
-                o -> byPath.getOrDefault(o.outputFile(), 0L), schemaFingerprint, bounds, producer);
+                o -> byPath.getOrDefault(o.outputFile(), 0L), schemaFingerprint, bounds, producer,
+                schemaByOutput);
     }
 
     /**
@@ -327,10 +351,25 @@ public final class ConsignmentOutputs {
                                                  ToLongFunction<PartitionOutput> rows,
                                                  String schemaFingerprint,
                                                  Map<String, EventTimeBounds> bounds, String producer) {
+        return build(consignmentId, runId, tableName, outputs, rows, schemaFingerprint, bounds, producer,
+                Map.of());
+    }
+
+    /** {@link #build} with the per-output schema attribution — see the {@code fromLineage} overload. */
+    private static List<ConsignmentOutput> build(String consignmentId, String runId, String tableName,
+                                                 List<PartitionOutput> outputs,
+                                                 ToLongFunction<PartitionOutput> rows,
+                                                 String schemaFingerprint,
+                                                 Map<String, EventTimeBounds> bounds, String producer,
+                                                 Map<String, String> schemaByOutput) {
         if (outputs == null || outputs.isEmpty()) return List.of();
+        Map<String, String> byOutput = schemaByOutput == null ? Map.of() : schemaByOutput;
         String writtenAt = Instant.now().toString();
         return outputs.stream()
-                .map(o -> new ConsignmentOutput(consignmentId, runId, tableName, o.partition(),
+                // ⚠ getOrDefault, not get: a file with no attribution belongs to the batch's one table, which
+                // is every file on a single-schema path. An absent entry must never blank the name.
+                .map(o -> new ConsignmentOutput(consignmentId, runId,
+                        byOutput.getOrDefault(o.outputFile(), tableName), o.partition(),
                         recordDay(o.partition(), bounds == null ? null : bounds.get(o.outputFile())),
                         o.outputFile(), rows.applyAsLong(o), o.bytes(),
                         writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint,
