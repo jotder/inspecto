@@ -168,6 +168,37 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   OKF concept's job and git's. ⚠ The board's census had also been carried forward rather than recounted
   and was wrong by 17 rows — **recount on the way out of any shift that files one.**
 
+- 🔴 **A RED REACTOR IN THE SHARED TREE IS NOT EVIDENCE UNTIL `git status` SAYS WHOSE CHANGES IT COMPILED**
+  (2026-09-15, eleventh shift). A full `-Pedition-enterprise` run went red in 41 tests across
+  `DbStatusStoreTest`, `CollectorServiceTest`, `RunLeaseContractTest`, `ControlApiTest` — none touched by the
+  change under test. No concurrent build, no contention in the log. `git status` showed **nine uncommitted
+  engine files belonging to the other session**: half-finished work on three board rows, compiled and tested
+  with mine. The same patch on a clean base was 4530/0/0/28. ⇒ **Verify in a detached worktree at a PINNED
+  SHA** (`git worktree add --detach <path> $(git rev-parse HEAD)` — `HEAD` moved under the peer mid-run and
+  their "isolated" green turned out to contain my code), apply only your patch, and **assert a fact that
+  differs between base and patch** before building (a per-class `@Test` count caught what a total could
+  not). ⚠ **Keep the worktree under `C:\sandbox\`**: `ControlApiJobCrudTest`'s save-time containment
+  assertion fails in a `%TEMP%` checkout and passes under `C:\sandbox` and on the CI runner — path-sensitive,
+  not red. ⛔ Never `git stash` in the shared tree to isolate; ⛔ never `git checkout -- <file>` inside the
+  worktree to undo a mutation (it reverts to base and loses the patch — copy aside/back). ⚠ Two verify
+  agents' aggregate sums were wrong the same day (by 226 and by 1): recount from the per-module `Results:`
+  blocks yourself, and beware per-class + per-module lines summed together (≈2×).
+- 🔴 **STAGING A SHARED FILE BY PATH SWEEPS THE OTHER SESSION'S HUNKS INTO YOUR COMMIT** (2026-09-15).
+  `87a4d97c` was staged by explicit path — the standing rule — and still carries the peer's three
+  `BACKLOG.md` rows, because both sessions were editing the same file. "Never `git add -A`" protects
+  against other FILES, not against a collision inside one. For `BACKLOG.md`, `INDEX.md`, `PROJECT_NOTES.md`:
+  `git diff -U0 -- <file> | grep -c '^@@'` must equal the hunks you wrote, and each must be yours, before the
+  file is staged. The content landed correctly; only the attribution is wrong, and `6770d031` says so.
+- 🔴 **ROUTE AUTHORIZATION IS OPT-IN — AN UNDECLARED ROUTE IS OPEN** (2026-09-15). `ApiContext.withCapability`
+  is a wrapper a route chooses to use; `CapabilityManifest.capabilityFor` documents `null` = "ungated" as a
+  legitimate outcome; the router never sees the capability (erased into an opaque `Handler`), and
+  `CapabilityManifestTest` sees only registrations that already wrap. Two whole route classes
+  (`EventRoutes`, `AssistRoutes`) had no gate and no manifest entry — a *file nobody opened*, not a *route
+  nobody listed*. For compliance that is a **mechanism** finding: per-route fixes pass a point-in-time review
+  and fail a Type II window. The fix is a fail-closed default (`docs/superpower/route-gating-compliance-plan.md`
+  step 3), ⛔ landed only after every mutating route is a capability or a categorized exemption — a ratchet
+  over an unreviewed list freezes the wrong baseline. ⚠ The audit's "sibling is gated ⇒ this one was
+  forgotten" inference failed **six** times; read the handler, the comment and the tests, every time.
 - 🔴 **THREE WAYS A BUILD VERDICT LIED IN ONE SHIFT** (2026-09-15) — all three produced confident,
   specific, wrong answers:
   1. **A stale `build.log` in a reused scratchpad path.** A delegated verification reported two failures
