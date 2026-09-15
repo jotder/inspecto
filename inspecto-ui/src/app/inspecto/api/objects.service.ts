@@ -149,6 +149,12 @@ export interface ObjectAnalytics {
     cycleTime: { count: number; avgMs: number; definition?: string };
     /** MTTR (`INCIDENT-KPI-MTTR-1`) — created → most recent RESOLVED transition; see `definition`. */
     mttr: { count: number; avgMs: number; definition?: string };
+    /**
+     * MTTD (`INCIDENT-KPI-MTTD-1`) — the triggering event's own time → created. Only objects the event
+     * bridge promoted carry an occurrence time, so `count` is often smaller than `total`; optional because
+     * an older backend does not send it.
+     */
+    mttd?: { count: number; avgMs: number; definition?: string };
     impact: { impactAmount: number; recordsAffected: number };
 }
 

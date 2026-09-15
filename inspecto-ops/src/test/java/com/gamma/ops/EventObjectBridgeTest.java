@@ -52,6 +52,26 @@ class EventObjectBridgeTest {
         assertEquals(EventObjectBridge.GAP_RULE, a.attributes().get("rule"));
         assertEquals("cdr_{yyyyMMddHH}.csv", a.attributes().get("sequence"));
         assertTrue(a.title().contains("cdr_2026061402.csv"));
+        // INCIDENT-KPI-MTTD-1: the triggering event's own time is the occurrence time the KPI needs.
+        assertNotNull(a.attributes().get(ObjectService.ATTR_OCCURRED_AT), "occurredAt is stamped at promotion");
+        assertTrue(Long.parseLong(a.attributes().get(ObjectService.ATTR_OCCURRED_AT)) <= a.createdAt(),
+                "the condition occurred no later than the object was opened");
+    }
+
+    /** INCIDENT-KPI-MTTD-1: analytics computes MTTD only over objects that carry an occurrence time. */
+    @Test
+    void analyticsReportsMttdOverStampedObjectsOnly() throws Exception {
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        EventObjectBridge bridge = new EventObjectBridge(objects);
+        bridge.onEvent(gap("gap_src", "cdr_2026061402.csv"));                 // stamped by the bridge
+        bridge.onEvent(imbalance("imb_src", "n1", "LOSS", 10, 7));           // stamped by the bridge
+        objects.open(ObjectType.ALERT, "by hand", "no occurrence time", "low", "x", java.util.Map.of()); // not stamped
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> mttd = (java.util.Map<String, Object>) objects.analytics(ObjectType.ALERT).get("mttd");
+        assertEquals(2, mttd.get("count"), "the hand-opened object is EXCLUDED, not counted as zero");
+        assertTrue(((Number) mttd.get("avgMs")).longValue() >= 0);
+        assertTrue(String.valueOf(mttd.get("definition")).contains("excluded"));
     }
 
     @Test

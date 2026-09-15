@@ -81,6 +81,7 @@ public final class EventObjectBridge {
         putIfPresent(attrs, "recordsIn", e.attributes().get("recordsIn"));
         putIfPresent(attrs, "recordsOut", e.attributes().get("recordsOut"));
         if (e.eventId() != null) attrs.put("causedByEvent", e.eventId());
+        if (e.ts() > 0) attrs.put(ObjectService.ATTR_OCCURRED_AT, Long.toString(e.ts()));   // MTTD numerator
 
         String kind = e.attributes().getOrDefault("kind", "imbalance");
         String title = ("LOSS".equals(kind) ? "Data loss" : "Record amplification")
@@ -105,6 +106,7 @@ public final class EventObjectBridge {
         putIfPresent(attrs, "sequence", e.attributes().get("sequence"));
         putIfPresent(attrs, "unit", e.attributes().get("unit"));
         if (e.eventId() != null) attrs.put("causedByEvent", e.eventId());
+        if (e.ts() > 0) attrs.put(ObjectService.ATTR_OCCURRED_AT, Long.toString(e.ts()));   // MTTD numerator
 
         String title = "Missing file in sequence: " + expected + (pipeline != null ? " on " + pipeline : "");
         objects.open(ObjectType.ALERT, title, e.message(), "high", pipeline, attrs);

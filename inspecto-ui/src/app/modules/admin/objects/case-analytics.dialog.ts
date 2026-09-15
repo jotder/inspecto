@@ -132,6 +132,13 @@ export class CaseAnalyticsDialog {
                 hint: 'objects with a recorded resolution — the MTTR denominator',
             },
             {
+                label: 'MTTD',
+                value: a.mttd?.count ? humanizeMs(a.mttd.avgMs) : '—',
+                hint:
+                    a.mttd?.definition ??
+                    'occurrence → detection; only event-promoted objects carry an occurrence time',
+            },
+            {
                 label: 'Impact total',
                 value: a.impact.impactAmount ? a.impact.impactAmount.toLocaleString() : '—',
             },

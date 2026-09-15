@@ -80,6 +80,15 @@ public final class ObjectService {
      * KPI must be defined rather than implied.
      */
     public static final String ATTR_RESOLVED_AT = "resolvedAt";
+    /**
+     * Attribute key holding WHEN THE UNDERLYING CONDITION OCCURRED (epoch ms) — the numerator MTTD needs
+     * and nothing recorded until 2026-09-15 (`INCIDENT-KPI-MTTD-1`). Stamped at promotion by whoever has the
+     * occurrence time in hand: {@code EventObjectBridge} copies the triggering {@code Event.ts()}. ⚠ It is
+     * the event's OWN time, not the earliest Signal at the causation root — that fuller anchor needs an
+     * event-store read on the analytics path, which is a seam nobody has built and this row refuses to
+     * fake. An object without the stamp is simply excluded from the MTTD mean, never counted as zero.
+     */
+    public static final String ATTR_OCCURRED_AT = "occurredAt";
     /** Attribute key holding an object's comma-separated watcher list (INC-4). */
     public static final String ATTR_WATCHERS = "watchers";
     /** Attribute key holding an object's comma-separated tag list (GLOSSARY §9 — Tag / Tag Rule). */
@@ -345,6 +354,8 @@ public final class ObjectService {
         int cycleCount = 0;
         long mttrSum = 0;
         int mttrCount = 0;
+        long mttdSum = 0;
+        int mttdCount = 0;
         double impactAmount = 0;
         long recordsAffected = 0;
         for (OperationalObject o : all) {
@@ -360,6 +371,11 @@ public final class ObjectService {
             if (resolvedAt > 0 && resolvedAt >= o.createdAt()) {
                 mttrSum += resolvedAt - o.createdAt();
                 mttrCount++;
+            }
+            long occurredAt = parseEpoch(o.attributes().get(ATTR_OCCURRED_AT));
+            if (occurredAt > 0 && o.createdAt() >= occurredAt) {
+                mttdSum += o.createdAt() - occurredAt;
+                mttdCount++;
             }
             impactAmount += parseDoubleOr(o.attributes().get("impactAmount"), 0);
             recordsAffected += parseEpoch(o.attributes().get("recordsAffected")); // long-or-0 parse
@@ -378,6 +394,15 @@ public final class ObjectService {
         mttr.put("avgMs", mttrCount == 0 ? 0 : mttrSum / mttrCount);
         mttr.put("definition", "created \u2192 most recent RESOLVED transition; a reopened object measures "
                 + "to the resolution that stuck. Objects with no recorded resolution are excluded from the mean");
+        // INCIDENT-KPI-MTTD-1. Same honesty rule as MTTR: `count` is the denominator, objects with no
+        // recorded occurrence time are EXCLUDED. Today only the event bridge stamps one (gap and
+        // conservation-imbalance promotions), so a deployment whose Incidents were all opened by hand or
+        // by an Alert Rule reports count 0 — a true statement, not a KPI built from nothing.
+        Map<String, Object> mttd = new LinkedHashMap<>();
+        mttd.put("count", mttdCount);
+        mttd.put("avgMs", mttdCount == 0 ? 0 : mttdSum / mttdCount);
+        mttd.put("definition", "occurredAt (the triggering event's own time) \u2192 created (the object was opened). "
+                + "Objects with no recorded occurrence time are excluded from the mean");
         Map<String, Object> impact = new LinkedHashMap<>();
         impact.put("impactAmount", impactAmount);
         impact.put("recordsAffected", recordsAffected);
@@ -390,6 +415,7 @@ public final class ObjectService {
         out.put("byPriority", byPriority);
         out.put("cycleTime", cycle);
         out.put("mttr", mttr);
+        out.put("mttd", mttd);
         out.put("impact", impact);
         return out;
     }
