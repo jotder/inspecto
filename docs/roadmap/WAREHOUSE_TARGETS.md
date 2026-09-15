@@ -165,7 +165,7 @@ is the *customer's* system, reached only by the outbound job.
 * Any row here as a product feature in [`../stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md`](../stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md)
   without the matching §4.1 row in the landscape register.
 
-## 8. Sources
+## 8. References
 
 * DuckDB — [Lakehouse formats](https://duckdb.org/docs/current/lakehouse_formats) ·
   [Writing to Iceberg](https://duckdb.org/docs/current/core_extensions/iceberg/writing) ·
