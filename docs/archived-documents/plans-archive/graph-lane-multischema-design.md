@@ -1,6 +1,8 @@
 # Design — `GRAPH-LANE-MULTISCHEMA-1`: let the graph lane carry a multi-schema write
 
-**Status:** design pass DONE 2026-09-16; **one operator call owed** before code (§5 below).
+**Status:** ✅ **SHIPPED 2026-09-16** — design pass, operator call, and code all landed the same day.
+The operator chose **flip `auto` in the same change** (§5), so multi-schema segment writes now run through
+the graph lane on the DEFAULT lane setting, not only under `-Dingest.lane=graph`.
 **Row:** `BACKLOG.md` §3 · **blocks:** §2 Row 15 (ELT §6 step-4 deletion half) together with
 `GRAPH-LANE-RULE-ROUTED-1`.
 
@@ -72,7 +74,7 @@ the `ConsignmentIngestorPluginTest` fixture and ran `PipelineExecutor.execute` w
 To re-derive: lift that fixture's config, print nodes/edges, then execute with
 `Map.of("map_CALL", t1, "map_SMS", t2)`.
 
-## 5. ⛔ The operator call owed before code
+## 5. ✅ The operator call — ANSWERED 2026-09-16: flip `auto`
 
 **Does `-Dingest.lane=auto` start diverting multi-schema segment writes to the graph lane, or does the graph
 lane merely become *able* to carry them (`graph` only), leaving `auto` flat?**
@@ -83,10 +85,30 @@ lane merely become *able* to carry them (`graph` only), leaving `auto` flat?**
   been bitten by exactly that (a well-tested mirror that no live caller reached), so it should be a deliberate,
   time-boxed choice, not the default.
 
-⛔ Do not pick this while implementing: it is a production-behaviour call, and the gate can be made green
-either way.
+✅ **ANSWERED: flip `auto` in the same change.** Chosen over `graph`-only so the lane gets real production
+exposure rather than a path only the gate exercises. ⚠ Blast radius accepted knowingly: every `segments:`
+pipeline's ingest write now runs through the graph lane by default.
 
-## 6. Verification
+## 6. As-built
+
+Shipped exactly as §3 describes, in `ConsignmentIngestStrategy` alone — no change to `PipelineLift`,
+`ConsignmentGraphRunner` or `PipelineExecutor`:
+
+* `segmentWrite(cfg, writeScope)` — the discriminator, membership in `schemas().segments()`.
+* `writeSinks(lifted, segKey)` — the sinks THIS call writes (`sink_<segKey>`, or `sink_<segKey>__d<n>`).
+* `seedOfWrite(lifted, segKey)` — `map_<segKey>`, else the old `seedFeedingTheWrite`.
+* `admittedLift` / `graphLaneCarries` / `flatReason` each gained a `segKey` overload; the 2-arg forms
+  delegate with `null`, so every existing caller and test is untouched.
+
+⚠ One fixture fact worth keeping: **`segments:` is only parsed when `processing.ingester:` is also set** —
+a `segments:` config without an ingester lifts as SINGLE-schema (a linear `acq → parse → map → sink`), which
+silently made the first spike fixture prove nothing. Any future multi-schema fixture needs both.
+
+Pinned by `GraphLaneSegmentAdmissionTest` (3 tests): a segment write is admitted, the whole-pipeline
+question still refuses with the old count message, the seed/sink are the segment's own, and a chunk base
+name is not mistaken for a segment key.
+
+## 7. Verification
 
 `mvn -o -Dingest.lane=graph -pl inspecto-engine -am -Dsurefire.failIfNoSpecifiedTests=false test` ⇒
 `ConsignmentIngestorPluginTest`, `ConsignmentIngestorPluginDeepTest`, `TypedRecordIngesterTest` green

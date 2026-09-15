@@ -264,13 +264,40 @@ to more sinks than the compiled recipe declares — and `test_etl` because *a De
 graph lane does not implement*. Those are the two features the compiled-recipe path cannot carry today, stated
 by the code itself; until both are implemented on the graph lane the flat lane cannot be deleted. Running the
 gate is now one flag, so re-run it after each of those lands rather than reading a projection round-trip test
-as parity. **Both gaps carry board rows from 2026-09-16 — `GRAPH-LANE-MULTISCHEMA-1` and
-`GRAPH-LANE-RULE-ROUTED-1` (BACKLOG §3), each design-first.** ⚠ Re-running the gate that day confirmed the
-counts and both messages, and corrected the reading of the first: the multi-schema refusal *states* an arity
-(3 sink nodes against 1 declared destination) but the real obstacle is the seeding contract — `graphLaneCarries` requires every sink to hang off ONE seed, and a per-schema lift gives each branch its own
-map, so relaxing the count alone would admit a write this lane still cannot seed. And the rule-routed gap is
+as parity. **The multi-schema gap SHIPPED 2026-09-16 (see below); `GRAPH-LANE-RULE-ROUTED-1` (BACKLOG §3) is
+the one that remains.** And the rule-routed gap is
 representational: `PipelineLift` never sees a Decision Rule (they are a space-registry fact), so the routed
 destinations cannot appear in a lifted graph at all.
+
+#### A multi-schema write is admitted PER SEGMENT (2026-09-16)
+
+A `segments:` batch reaches the write path **once per segment** (`UnionModeIngester`): each call materialises
+that segment's `transformed_<KEY>` table and writes under `database/<segKey>`. So the lane fork asks its
+admission question about the sub-chain that call actually writes — `map_<segKey> → sink_<segKey>` — and the
+write stays **one seed feeding one sink**, exactly as for a single-schema batch. `-Dingest.lane=auto` diverts
+these writes to the graph lane by default (the operator's call: real production exposure over a path only the
+gate exercises).
+
+🔴 **Two readings of this gap were wrong before the code was written, and both are worth keeping.** (1) The
+refusal *states* an arity — *sink count (3) differs from sinks[] (1)* — which reads as a count to relax; it is
+not. (2) The next reading, that the seeding contract is structurally violated because a per-schema lift gives
+each branch its own map, implied a multi-seed walk. Also wrong: the caller had **already** decomposed the batch
+per segment, so no multi-seed is needed. What was actually broken is narrower than either: **the admission
+asked at pipeline granularity while the caller works at segment granularity.** The lesson generalises — when a
+refusal message names a quantity, check which caller's granularity that quantity was measured at.
+
+⚠ `writeScope` is overloaded across the four callers — `""` whole-batch, the chunk base name when chunked,
+the segment key only in the per-segment loop — so a scope counts as a segment key only when the config
+declares a segment by that name.
+
+⚠ **`segments:` is parsed only when `processing.ingester:` is also set.** Without it a multi-schema config
+lifts as SINGLE-schema (a linear `acq → parse → map → sink`) and quietly proves nothing — it cost the first
+spike fixture of this work.
+
+⚠ The executor was never the obstacle: `PipelineExecutor.execute` has always taken a **map** of seeds
+(multi-source, T32 Phase C) and walks per-schema trees when given them. `ConsignmentGraphRunner.engages` /
+`dataFedSinkCount` still report *false* / *1* for such a graph — they gate **route** pipelines and treat
+per-schema dispatch as trunk, which is deliberate and not in conflict with the above.
 
 The reason-for-flat enumeration is the most operator-useful thing on this path: an authored route that does
 not engage, a decision rule that routed rows, no scratch directory, a destination-count mismatch, a

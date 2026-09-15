@@ -149,10 +149,16 @@ interface ConsignmentIngestStrategy {
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
 
-        com.gamma.pipeline.PipelineGraph lifted = admittedLift(cfg, applied);
+        // A multi-schema batch reaches here ONCE PER SEGMENT (UnionModeIngester), each call holding that
+        // segment's own materialised table and writing under database/<segKey>. So the admission must ask
+        // its question about the sub-chain THIS call writes - map_<segKey> -> sink_<segKey> - not about the
+        // whole lifted pipeline, which carries one such chain per schema plus quarantine and would always
+        // look like more sinks than the config declares.
+        String segKey = segmentWrite(cfg, writeScope);
+        com.gamma.pipeline.PipelineGraph lifted = admittedLift(cfg, applied, segKey);
         return lifted != null
                 ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
-                        lifted, applied, writeScope)
+                        lifted, applied, writeScope, segKey)
                 : flatWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
                         applied);
     }
@@ -174,11 +180,21 @@ interface ConsignmentIngestStrategy {
      * rows. Then {@link #LANE_PROPERTY} is honoured on top.
      */
     static com.gamma.pipeline.PipelineGraph admittedLift(PipelineConfig cfg, DecisionRuleApplier.Result applied) {
+        return admittedLift(cfg, applied, null);
+    }
+
+    /**
+     * As above, for a call that writes ONE segment of a multi-schema batch: {@code segKey} names it, and the
+     * admission is then made against that segment's own {@code map_<segKey>} -> {@code sink_<segKey>} chain.
+     * {@code null} means the call writes the whole batch (every caller before 2026-09-16).
+     */
+    static com.gamma.pipeline.PipelineGraph admittedLift(PipelineConfig cfg, DecisionRuleApplier.Result applied,
+                                                        String segKey) {
         com.gamma.pipeline.PipelineGraph lifted = null;
         if (cfg.routeConfig() != null) {
             com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
             if (com.gamma.pipeline.exec.ConsignmentGraphRunner.engages(routed)) lifted = routed;
-        } else if (applied.outputs().isEmpty() && graphLaneCarries(cfg)) {
+        } else if (applied.outputs().isEmpty() && graphLaneCarries(cfg, segKey)) {
             lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         }
         String mode = System.getProperty(LANE_PROPERTY, "auto").trim().toLowerCase(java.util.Locale.ROOT);
@@ -188,7 +204,7 @@ interface ConsignmentIngestStrategy {
             case "graph" -> {
                 if (lifted == null)
                     throw new IllegalStateException("-D" + LANE_PROPERTY + "=graph: the graph lane cannot carry "
-                            + "pipeline '" + cfg.identity().pipelineName() + "' (" + flatReason(cfg, applied)
+                            + "pipeline '" + cfg.identity().pipelineName() + "' (" + flatReason(cfg, applied, segKey)
                             + ") and the legacy flat lane is disabled by the flag — ELT Phase 6 verification. "
                             + "Drop the flag (auto) to let this pipeline write flat.");
                 yield lifted;
@@ -200,15 +216,25 @@ interface ConsignmentIngestStrategy {
 
     /** Why the admission kept this write FLAT — the message a {@code graph}-only run refuses with. */
     static String flatReason(PipelineConfig cfg, DecisionRuleApplier.Result applied) {
+        return flatReason(cfg, applied, null);
+    }
+
+    /** As above, scoped to the segment {@code segKey} when this call writes one segment of a batch. */
+    static String flatReason(PipelineConfig cfg, DecisionRuleApplier.Result applied, String segKey) {
         if (cfg.routeConfig() != null) return "the authored route does not engage the graph lane";
         if (!applied.outputs().isEmpty()) return "a Decision Rule routed rows, which the graph lane does not implement";
         if (scratchDir(cfg) == null) return "no scratch dir (dirs.temp / duckdb.temp_directory) for the branch-commit ledger";
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
-        List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
-                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
+        List<com.gamma.pipeline.PipelineNode> sinks = writeSinks(lifted, segKey);
         if (sinks.size() != cfg.sinks().size() || sinks.isEmpty())
-            return "the lifted graph's sink count (" + sinks.size() + ") differs from sinks[] (" + cfg.sinks().size() + ")";
-        String seed = seedFeedingTheWrite(lifted);
+            return segKey == null
+                    ? "the lifted graph's sink count (" + sinks.size() + ") differs from sinks[] ("
+                            + cfg.sinks().size() + ")"
+                    : "segment '" + segKey + "' lifts to " + sinks.size() + " sink(s), not the "
+                            + cfg.sinks().size() + " that sinks[] declares";
+        String seed = seedOfWrite(lifted, segKey);
+        if (seed == null || lifted.byId().get(seed) == null)
+            return "segment '" + segKey + "' has no 'map_" + segKey + "' node to seed the write from";
         String seedType = lifted.byId().get(seed).type();
         // The projection slot is a Record Transformer (transform.sql); only a node that genuinely
         // cannot run on this lane keeps the graph fork closed.
@@ -317,7 +343,7 @@ interface ConsignmentIngestStrategy {
                                               String batchId, Map<Integer, String> srcIdToFile,
                                               com.gamma.pipeline.PipelineGraph lifted,
                                               DecisionRuleApplier.Result applied,
-                                              String writeScope) throws Exception {
+                                              String writeScope, String segKey) throws Exception {
         if (!applied.outputs().isEmpty())
             throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
                     + "it with a route: pipeline's branches is not supported");
@@ -345,7 +371,7 @@ interface ConsignmentIngestStrategy {
         // schema); without one it is the sink's own upstream. Seeding there means the executor never
         // re-runs parse/map: it walks the write tail only, which is what keeps this a write-lane
         // divert rather than a second execution engine (Phase 6 precondition, 2026-08-29).
-        String seedNodeId = seedFeedingTheWrite(lifted);
+        String seedNodeId = seedOfWrite(lifted, segKey);
 
         IngestSinkWriter writer = new IngestSinkWriter(
                 conn, cfg, partCols, dbDir, writeBase, batchId, srcIdToFile);
@@ -405,6 +431,14 @@ interface ConsignmentIngestStrategy {
      * on the flat path. The route combination stays refused by name (permanent posture, 2026-08-28).
      */
     static boolean graphLaneCarries(PipelineConfig cfg) {
+        return graphLaneCarries(cfg, null);
+    }
+
+    /**
+     * As above for a per-segment write: {@code segKey} scopes the question to that segment's own
+     * {@code map_<segKey>} -> {@code sink_<segKey>} chain, which is exactly the write this call performs.
+     */
+    static boolean graphLaneCarries(PipelineConfig cfg, String segKey) {
         // The graph lane keeps a durable branch-commit ledger; the flat lane keeps none. So a pipeline
         // with no configured scratch dir stays FLAT rather than parking that ledger in the shared JVM
         // temp dir, where it outlives the batch and is not per-pipeline: a later batch reusing the id
@@ -412,15 +446,56 @@ interface ConsignmentIngestStrategy {
         // cycle 2026-08-29 — the stale log was sitting in %TEMP% between runs.
         if (scratchDir(cfg) == null) return false;
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
-        List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
-                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
+        List<com.gamma.pipeline.PipelineNode> sinks = writeSinks(lifted, segKey);
         if (sinks.size() != cfg.sinks().size() || sinks.isEmpty()) return false;
-        String seed = seedFeedingTheWrite(lifted);
-        if (!"transform.sql".equals(lifted.byId().get(seed).type())) return false;
+        String seed = seedOfWrite(lifted, segKey);
+        com.gamma.pipeline.PipelineNode seedNode = seed == null ? null : lifted.byId().get(seed);
+        if (seedNode == null || !"transform.sql".equals(seedNode.type())) return false;
         // EVERY sink must hang directly off the seed — one straggler behind another node would be
         // executed by the walk, which is new behaviour rather than the same write.
         return sinks.stream().allMatch(sink -> lifted.edgesTo(sink.id()).stream()
                 .anyMatch(e -> com.gamma.pipeline.PipelineRel.DATA.equals(e.rel()) && seed.equals(e.from())));
+    }
+
+    /**
+     * The segment this call writes, or {@code null} when it writes the whole batch.
+     *
+     * <p>⚠ {@code writeScope} is overloaded across this method's four callers: {@code ""} for a whole-batch
+     * write ({@code CsvIngestStrategy}), the chunk base name for a chunked write
+     * ({@code NativeCsvStreamingEngine}), and the segment key only in {@code UnionModeIngester}'s per-segment
+     * loop. So a scope is a segment key ONLY when the config actually declares a segment by that name —
+     * membership in {@code schemas().segments()} is the discriminator, and a chunked single-schema pipeline
+     * declares none, so a base name can never be mistaken for one.
+     */
+    static String segmentWrite(PipelineConfig cfg, String writeScope) {
+        if (writeScope == null || writeScope.isEmpty()) return null;
+        Map<String, Map<String, Object>> segments = cfg.schemas().segments();
+        return segments != null && segments.containsKey(writeScope) ? writeScope : null;
+    }
+
+    /**
+     * The sinks THIS call writes: for a per-segment write, that segment's own ({@code sink_<segKey>}, or
+     * {@code sink_<segKey>__d<n>} when {@code sinks[]} names several destinations); otherwise every sink in
+     * the graph. ⚠ A multi-schema lift carries one sink per schema PLUS a quarantine sink, so counting all of
+     * them against {@code sinks[]} compares sink nodes with destinations — two different things.
+     */
+    static List<com.gamma.pipeline.PipelineNode> writeSinks(com.gamma.pipeline.PipelineGraph lifted,
+                                                            String segKey) {
+        List<com.gamma.pipeline.PipelineNode> sinks = lifted.nodes().stream()
+                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK)).toList();
+        if (segKey == null) return sinks;
+        String own = "sink_" + segKey;
+        return sinks.stream().filter(n -> n.id().equals(own) || n.id().startsWith(own + "__d")).toList();
+    }
+
+    /**
+     * The node to seed: the segment's own {@code map_<segKey>} for a per-segment write — whose data relation
+     * IS the {@code transformed_<segKey>} table the caller just materialised — else
+     * {@link #seedFeedingTheWrite}. Still ONE seed feeding ONE sink either way: the per-segment caller already
+     * decomposed the batch, so the graph lane never needs a multi-seed walk to carry a multi-schema write.
+     */
+    static String seedOfWrite(com.gamma.pipeline.PipelineGraph lifted, String segKey) {
+        return segKey == null ? seedFeedingTheWrite(lifted) : "map_" + segKey;
     }
 
     /**
