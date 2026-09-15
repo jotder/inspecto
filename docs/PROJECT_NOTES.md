@@ -605,13 +605,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   the invariant the repo states about *itself*: a contract owns the number, docs mark the statement
   (`<!--count:ID-->`), the guard DERIVES it (`tools/check-doc-counts.mjs`).
 - ⛔ **Name a count — or any id — after the SET, never the noun.** "Node types" denotes **three** sets in
-  this repo: 30 (`BuiltinNodeType`, the roster), 11 (`node-attributes.contract.json`, only types with an
-  attribute spec) and 16 (`step-types.contract.json`, recipe entries). "Transform functions" denotes 23
+  this repo: 31 (`BuiltinNodeType`, the roster), 12 (`node-attributes.contract.json`, only types with an
+  attribute spec) and 16 (`step-types.contract.json`, recipe entries). ⚠ The first two moved together on
+  2026-09-15 when `transform.profile` landed — they are unguarded prose here, so nothing caught them. "Transform functions" denotes 23
   (SQL mapping) *or* 30 (ASN vendor plugin). The five-way and three-way count spreads were caused by the
   **ambiguity, not the arithmetic** — nobody had written down that the noun covered several sets.
 - ⚠ **Some counts have no single true value, and a guard must refuse to assert one.** Job types are **10**
-  on Personal and **12** with `inspecto-ops`; maintenance tasks are **20** built-in ids across **19**
-  switch arms plus **4** contributed. Both assemble from a built-in list plus `ServiceLoader` discovery,
+  on Personal and **12** with `inspecto-ops`; maintenance tasks are **21** built-in ids across **20**
+  switch arms plus **4** contributed (`soft_bounce_retry` added 2026-09-15). Both assemble from a built-in list plus `ServiceLoader` discovery,
   so "the count" does not exist until the classpath is fixed. A doc stating either must say which shape it
   means. A guard measures; it must not decide.
 - 🔴 **A mutation that does not COMPILE proves nothing about a test.** Two trigger-vocabulary mutations
