@@ -138,6 +138,75 @@ final class PipelineScheduler {
     private final Semaphore runPermits;
     /** Runs currently executing across <em>all</em> in-flight cycles, mirrored to {@code inspecto_active_runs}. */
     private final AtomicInteger activeRuns = new AtomicInteger();
+
+    /**
+     * <b>Watcher state per pipeline — a polling session is not a Run</b>
+     * ({@code DUCKLE-C9-WATCHER-NOT-A-RUN-1}, rescoped 2026-09-15 to observability only).
+     *
+     * <p>🔴 <b>The row's original framing was already obsolete when it was adopted.</b> It said the loop
+     * "conflates polls and runs, which makes run counts misleading". It does not:
+     * {@code CollectorProcessor.ingest} returns on {@code candidates.isEmpty()} <em>before</em>
+     * {@code RunIds.next()}, so a quiet poll mints no Run id and writes no run-scoped row — fixed in
+     * {@code 1fda46d5} on 2026-09-13, two days before the row existed. ⛔ Nothing here corrects a
+     * miscount; there was none to correct.
+     *
+     * <p>What was genuinely missing is this: a poll that finds nothing left <b>no trace at all</b>. An
+     * operator asking "is this collector alive, and when did it last look?" had only the log. A pipeline
+     * that has polled quietly for a week and one that is wedged looked identical from every API surface.
+     *
+     * <p>⚠ Deliberately IN-MEMORY and lossy across restart: this is liveness, not an audit trail. The
+     * durable record of work done is the Run/Consignment ledger, and duplicating it here would create a
+     * second, weaker answer to a question the ledger already answers properly.
+     */
+    private final Map<String, PollState> pollStates = new ConcurrentHashMap<>();
+
+    /**
+     * One pipeline's polling session. Mutable and updated from the scheduler's virtual threads, so every
+     * field is written under the instance's own lock and read through {@link #snapshot()}.
+     *
+     * <p>⚠ {@code lastError} is the whole reason this is an object rather than three metrics: a Prometheus
+     * gauge cannot carry a message, and "when did it last fail, and saying what?" is the question an
+     * operator actually asks.
+     */
+    private static final class PollState {
+        private long lastPollAt;
+        private long polls;
+        private String lastError;
+        private long lastErrorAt;
+
+        synchronized void polled(long at) {
+            lastPollAt = at;
+            polls++;
+        }
+
+        synchronized void failed(long at, String message) {
+            lastError = message;
+            lastErrorAt = at;
+        }
+
+        /** An immutable view for the read side; {@code null} entries mean "has not happened yet". */
+        synchronized Map<String, Object> snapshot() {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("lastPollAt", lastPollAt == 0 ? null : lastPollAt);
+            m.put("pollCount", polls);
+            m.put("lastError", lastError);
+            m.put("lastErrorAt", lastErrorAt == 0 ? null : lastErrorAt);
+            return m;
+        }
+    }
+
+    /**
+     * Watcher state by pipeline id, for {@code GET /collectors} — an immutable snapshot per call.
+     *
+     * <p>⚠ A pipeline that has never been polled is ABSENT rather than present-with-zeros: "never looked"
+     * and "looked and found nothing" are different answers, and collapsing them is precisely the confusion
+     * this exists to remove.
+     */
+    Map<String, Map<String, Object>> pollStates() {
+        Map<String, Map<String, Object>> out = new java.util.LinkedHashMap<>();
+        pollStates.forEach((id, st) -> out.put(id, st.snapshot()));
+        return out;
+    }
     /** Per-pipeline acquisition exclusion — SEPARATE from {@link #runGuard} (B3b): acquisition and ingest of
      *  the <em>same</em> pipeline may overlap (fetch the next files while the last batch commits), while two
      *  acquisitions of it may not (a slow fetch is skipped, not queued). */
@@ -324,12 +393,24 @@ final class PipelineScheduler {
             running.add(due.id());
             reg.setGauge("inspecto_active_runs", "Source runs currently executing", Map.of(),
                     activeRuns.incrementAndGet());
+            PollState poll = pollStates.computeIfAbsent(due.id(), k -> new PollState());
             try {
                 MultiCollectorProcessor.RunResult r =
                         MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst);
-                if (r.failed() > 0)
+                // DUCKLE-C9: stamped for EVERY dispatched poll, including one that found nothing — a quiet
+                // poll is exactly the case that previously left no trace anywhere.
+                poll.polled(System.currentTimeMillis());
+                if (r.failed() > 0) {
                     reg.inc("inspecto_source_run_failures_total", "Source-run failures", Map.of(), r.failed());
+                    poll.failed(System.currentTimeMillis(), r.failed() + " source run(s) failed");
+                }
                 return r.failed();
+            } catch (RuntimeException e) {
+                // ⚠ A throw is a poll that happened and failed — recording it here rather than only on the
+                // counted-failure path is the difference between "wedged" and "never looked".
+                poll.polled(System.currentTimeMillis());
+                poll.failed(System.currentTimeMillis(), String.valueOf(e.getMessage()));
+                throw e;
             } finally {
                 running.remove(due.id());
                 reg.setGauge("inspecto_active_runs", "Source runs currently executing", Map.of(),

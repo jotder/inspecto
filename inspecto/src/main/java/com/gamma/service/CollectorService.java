@@ -1502,6 +1502,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     public List<Map<String, Object>> collectors() {
         List<Map<String, Object>> out = new ArrayList<>();
+        // One snapshot for the whole flatten, so every row in a response reflects the same instant rather
+        // than drifting as the scheduler polls underneath us.
+        Map<String, Map<String, Object>> pollState = pipelineScheduler.pollStates();
         for (ConfigRegistry.Entry e : configRegistry.all()) {
             PipelineConfig.Collector s = e.config().collector();
             if (s == null) continue;
@@ -1528,6 +1531,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             if (s.hasConnection() && "db".equals(s.connector()))
                 dbWatermark = com.gamma.acquire.AcquisitionLedgers.shared().dbWatermark(s.connection()).orElse(null);
             m.put("dbWatermarkCurrent", dbWatermark);
+            // DUCKLE-C9-WATCHER-NOT-A-RUN-1 (observability half): the polling session's own state, which no
+            // surface carried before — a collector that has polled quietly for a week and one that is wedged
+            // were indistinguishable from here. ⚠ ABSENT (not zeros) for a pipeline never polled: "never
+            // looked" and "looked and found nothing" are different answers.
+            Map<String, Object> poll = pollState.get(e.id());
+            m.put("lastPollAt", poll == null ? null : poll.get("lastPollAt"));
+            m.put("pollCount", poll == null ? null : poll.get("pollCount"));
+            m.put("lastPollError", poll == null ? null : poll.get("lastError"));
+            m.put("lastPollErrorAt", poll == null ? null : poll.get("lastErrorAt"));
             out.add(m);
         }
         return out;
