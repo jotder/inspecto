@@ -803,9 +803,14 @@ citations elsewhere in this spec still resolve.
 10. ⚠ **A provider seam has no implementation anywhere** (§3.3) — declared for work that never arrived.
 11. ⚠ **Two documents state the Java floor as 26**, including the file that sets it; the cache holds 25
     (§3.6). The conclusion survives, the number does not.
-12. ⚠ **The dependency count is stated as 95 across 25 reactor modules by the generated lock and as 94 by
-    four prose locations** — and no stated reactor size is 25 (they are 23, 31 and 32). Cite the generated
-    file, and say which profile resolved it.
+12. ✅ **CLOSED 2026-09-15 — and it had drifted a THIRD way before it was fixed.** This read *"stated as 95
+    … by the generated lock and as 94 by four prose locations"*; by the time it was acted on the lock held
+    **96<!--count:locked-dependencies-->**, so every number in circulation — both of them — was wrong. The
+    fix is the one this list asked for, applied literally: the count is now **derived from the lock** by a
+    `count:locked-dependencies` marker in `tools/check-doc-counts.mjs`, so the three surviving prose sites
+    cannot drift again. ⛔ Six hand-edits were the wrong fix and are what produced two wrong numbers from
+    one right one. ⚠ The "across 25 reactor modules" half is separately still wrong and is NOT guarded —
+    no stated reactor size is 25 (they are 23, 31 and 32); say which profile resolved it.
 13. ⚠ **The gating row says "all six cells" after enumerating seven**, and gives the object domain as both
     31 and 37 files inside the same row. The measured count is 32 domain files, 42 in the module.
 14. ⚠ **The reactor page's decomposition is wrong** — "23 today: 14 default plus 9 profile-scoped" adds up

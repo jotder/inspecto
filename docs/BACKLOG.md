@@ -841,7 +841,22 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
 
-- **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14 (operator call); the LOADING half is open.**
+- **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14; the LOAD CALL now exists (2026-09-15);
+  what remains is EXECUTING it once.**
+  ✅ **2026-09-15: `httpfs` is now named at its call site** — `PartitionWriter.writeToObjectStore` opens with
+  `DuckDbExtension.ensureLoaded(conn, "httpfs", …)`, so an air-gapped install fails with the remedy message
+  instead of at the `COPY` with a raw DuckDB error. Both the `COPY` and the `glob()` discovery below it go
+  through `httpfs`. Staging was verified already: `package.ps1:1491` lists `httpfs` and `aws`.
+  🔴 **⚠ THIS CHANGE IS COMPILED, NOT EXECUTED — do not read the green reactor as proof.** The only test
+  over that path, `PartitionWriterObjectStoreTest`, is `assumeTrue`-gated on a live S3 endpoint + key +
+  secret, so all **4** of its tests SKIP here and in CI; the full `-Pedition-enterprise` run
+  (4513/0/0/28) never entered the method. ⇒ **The remaining acceptance is one run against a live object
+  store** (MinIO, as on 2026-09-14) confirming the lane still writes with the explicit load in place.
+  ⛔ Do not close this row on a passing build — a skipping test is the precise shape that has hidden a
+  broken path in this repo before, and this row's own premise is that a dev box autoloads what a bundle
+  does not. ⚠ Still separately open: there is **no S3 credential/endpoint config surface** in `src/main` at
+  all — the five `SET s3_*` statements live only in that skipped test, which is what keeps the lane
+  unusable outside it.
   Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
   is `excel`, `ducklake`, `postgres_scanner` — **`httpfs` and `aws` are absent**, and scale-out phase C
   bullet 6 turns `dirs.database` into an `s3://` URI, which needs both. This is the SAME defect class as

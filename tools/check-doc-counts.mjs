@@ -166,6 +166,19 @@ const MANIFEST = {
         },
         source: 'inspecto-ui/src/app/inspecto/grammar/parsing-attributes.ts',
     },
+    // SPEC-COUNTS-1's last unguarded count, and it had drifted TWO ways at once (2026-09-15): four prose
+    // sites said 94 and two said 95 while the lock held 96. A generated artifact already existed, so per
+    // that row's own rule this is a marker, not six hand-edits — the hand-edits are what produced two
+    // wrong numbers from one right one.
+    // ⚠ Counts the LOCK, not a `mvn dependency:list` run: the lock is the committed baseline a reviewer
+    // diffs, it is what `check-dependencies.mjs` enforces, and it needs no network or build to read.
+    'locked-dependencies': {
+        floor: 4,
+        what: 'third-party artifacts in the committed dependency lock',
+        derive: () => read('tools/dependencies.lock')
+            .split('\n').filter(l => l.trim() && !l.trim().startsWith('#')).length,
+        source: 'tools/dependencies.lock',
+    },
 };
 
 /** Every .java under an inspecto* module's src/main, repo-relative. */

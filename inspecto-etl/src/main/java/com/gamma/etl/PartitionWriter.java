@@ -271,6 +271,14 @@ public final class PartitionWriter {
         // Unpartitioned: COPY names the single object outright, so no pattern and no discovery needed.
         String target = partitioned ? root : root + "/" + stem + fmt.extension();
 
+        // AIRGAP-S3-EXTENSIONS-1: name the extension this lane needs, so an air-gapped install FAILS with
+        // the remedy instead of at the COPY with a DuckDB error. Both the COPY and the glob() discovery
+        // below go through httpfs; on a developer box DuckDB autoloads it, which is exactly why the gap
+        // was invisible — and why `package.ps1` staging it is not enough on its own.
+        // ⛔ A STAGED extension is not a LOADED one: an extension that arrives only by autoload has no
+        // call site to grep for, and its staged file is dead weight on any host without network.
+        DuckDbExtension.ensureLoaded(conn, "httpfs", "writing to an object-store dirs.database (" + root + ")");
+
         try (Statement stmt = conn.createStatement()) {
             stmt.execute(String.format("COPY (%s) TO %s (%s)", projection, sqlStr(target), copyOpts));
 

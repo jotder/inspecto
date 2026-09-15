@@ -198,7 +198,7 @@ at once. This is structural, not a failing — Palantir loses it too.
    they are described as plumbing and should be described as the product.
 2. **Change the evaluation unit** — "one config → operable, audited, monitored feed in under an hour", timed
    by the buyer. Every lane incumbent needs a sprint to wire together.
-3. **Thin means lean, with numbers** — 94 reactor dependencies under an SBOM guard; publish it against a
+3. **Thin means lean, with numbers** — 96<!--count:locked-dependencies--> reactor dependencies under an SBOM guard; publish it against a
    Kubernetes stack's dependency count.
 4. **Interoperate where thin** — export Datasets to Superset, import GX expectation suites, emit Incidents to
    ServiceNow. Be the operable core the specialists plug into.

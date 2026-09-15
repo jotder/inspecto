@@ -120,8 +120,12 @@ final class SchedulerAuditTask {
      * <p>⚠ This is a <b>discoverability</b> finding, not a correctness one. Since B3 the authored-pipeline
      * claim means the second job records {@code SKIPPED} rather than overlapping — the safe outcome. What
      * the operator cannot otherwise see is <em>why</em> a job intermittently skips, because the skip names
-     * the pipeline but not the job holding it. ⛔ Not a refusal: two jobs on one pipeline with different
-     * schedules or params may be deliberate, and making it fail closed needs an operator decision.
+     * the pipeline but not the job holding it. ⛔ <b>Not a refusal, and that is now DECIDED, not owed</b> —
+     * operator, 2026-09-12: <b>WARN ONLY; it must never refuse.</b> Two jobs on one pipeline with different
+     * schedules or params may be deliberate, so failing closed would refuse valid deployments. ⛔ Do not
+     * revisit as a refusal without re-opening that decision. (This sentence previously read "needs an
+     * operator decision" and stayed that way for three days after the decision was taken, while the only
+     * record of the answer sat on a backlog row — `jobs.md` now owns it.)
      *
      * <p>Keys through {@link JobService#authoredPipelineKeyOf} so this can never drift from what the claim
      * actually keys on. Pure: a config scan, no data reads.
