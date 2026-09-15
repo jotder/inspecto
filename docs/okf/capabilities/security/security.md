@@ -268,7 +268,7 @@ existing-but-unreadable `roles.toon` suspends *all* role grants. `GET/PUT /acces
 `source: authored|seed` badges, a strike-through overlay for capabilities an Access Profile denies, and a
 Revert that removes the override.
 
-**The capability vocabulary is exactly ten names**, static across editions (a Standard-authored role file
+**The capability vocabulary is exactly eleven names**, static across editions (a Standard-authored role file
 must validate on Personal — a per-edition validator was refused, `EDITIONS.md` SEC-10 note):
 
 | Capability | Gates |
@@ -276,17 +276,18 @@ must validate on Personal — a per-edition validator was refused, `EDITIONS.md`
 | `canAuthorWorkbench` | Pipeline / Collector authoring writes |
 | `canOnboardConnections` | `POST/PUT/DELETE /connections` — its own grant, **not** `canAuthorWorkbench`, because Connections are the credential + network-egress surface (2026-07-22) |
 | `canOperateRuns` | run/operate routes (and the `operate` ABAC verb) |
-| `canTriageRequirements` | `RequirementRoutes` `/decision` + `/deliver`; submission stays open |
+| `canTriageRequirements` | `RequirementRoutes` `/decision` + `/deliver`; submission stays open — ⛔ SEC-7(c), and DELIBERATE: anyone may raise a requirement, only a triager decides. A 2026-09-15 audit read the asymmetry as an oversight and gating it turned the build red against the test that pins it |
 | `canAuthorAlertRules` | Alert Rule authoring |
 | `canCurateMenus` | `/nav/menus` — split out of `canAuthorWorkbench` 2026-07-25 (D4) |
 | `canConfigureAccess` | `PUT /access/roles|policies|catalog|profiles` |
 | `canOfferDatasets` | offering a Dataset cross-space — admin/super since D14 (a data-*exposure* decision with no second gate) |
 | `canApproveShares` | approve / deny / revoke an Exchange grant |
 | `canRequestShares` | request access / pin a snapshot version |
+| `canAdminister` | installation administration: `PUT /spaces/{id}`, `DELETE /spaces/{id}` (⛔ NOT `POST /spaces`, which is the recovery route when a server hosts no Space) — added 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`). ⛔ Deliberately ONE coarse capability rather than three per-family ones (operator call): the alternative left no catch-all for the next unlisted route. ⚠ Whoever can delete a Space can do everything else this guards |
 
 **Seed roles** (`Roles.java:121-131`): `pipeline-developer`, `app-developer`, `developer` (the builder set),
 `operations`, `power`, `admin` (`canOnboardConnections`, `canConfigureAccess`, `canApproveShares`,
-`canOfferDatasets`, `canCurateMenus`, `canTriageRequirements`), `super` (the whole vocabulary via
+`canOfferDatasets`, `canCurateMenus`, `canTriageRequirements`, `canAdminister`), `super` (the whole vocabulary via
 `KNOWN_CAPABILITIES`), `business` (**only** `canTriageRequirements`). ⚠ `Roles.SEED` is asserted by an
 *equality* test in `OidcAuthenticatorTest` — every grant change must update it, and that test runs **only**
 under `-Pedition-standard|enterprise` (§8).

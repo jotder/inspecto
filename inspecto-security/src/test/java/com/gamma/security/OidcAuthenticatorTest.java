@@ -189,11 +189,15 @@ class OidcAuthenticatorTest {
         //                           second gate, so it left Builder/Power for Admin)
         //   canCurateMenus        — BACKLOG D4, 2026-07-25 (split out of canAuthorWorkbench: a nav change
         //                           is visible to every business user and is not a build activity)
+        //   canAdminister         — ROUTE-UNGATED-DEFAULT-1, 2026-09-15 (installation administration:
+        //                           Space create/update/DELETE were reachable by any authenticated caller
+        //                           and could not be gated at all — no capability meant "administrator")
         String jwt = token(Instant.now().plusSeconds(60), List.of("admin"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
-                Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS), admin.capabilities());
+                Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS,
+                Roles.CAN_ADMINISTER), admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
     }
@@ -287,7 +291,8 @@ class OidcAuthenticatorTest {
         assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS,
                         Roles.CAN_TRIAGE_REQUIREMENTS, Roles.CAN_ONBOARD_CONNECTIONS,
                         Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
-                        Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS),
+                        Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,
+                        Roles.CAN_ADMINISTER),   // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
                 subject.get().capabilities());
     }
 

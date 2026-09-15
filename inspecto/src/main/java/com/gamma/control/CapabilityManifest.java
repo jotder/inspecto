@@ -122,8 +122,20 @@ final class CapabilityManifest {
             new Entry("POST", "/pipelines/authored/([^/]+)/run", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             // RequirementRoutes
+            // ⛔ `POST /requirements` is deliberately NOT here. The route-gating audit called it "an
+            // inconsistency, not a judgement call" because its two siblings are gated — that is WRONG, and
+            // grounding it cost a red build: SEC-7(c) makes submission open on purpose (anyone may raise a
+            // requirement; only a triager decides), pinned by
+            // ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen.
             new Entry("POST", "/requirements/([^/]+)/decision", Roles.CAN_TRIAGE_REQUIREMENTS),
             new Entry("POST", "/requirements/([^/]+)/deliver", Roles.CAN_TRIAGE_REQUIREMENTS),
+            // SpaceRoutes — installation administration, gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`).
+            // ⛔ These were reachable by ANY authenticated caller: `DELETE /spaces/{id}` checked only that
+            // more than one Space existed. They were not merely un-gated but INEXPRESSIBLE — no capability
+            // meant "administrator" until `canAdminister`.
+            // ⚠ `POST /spaces` is deliberately NOT gated — it is the recovery route; see SpaceRoutes.
+            new Entry("PUT", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
+            new Entry("DELETE", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             // RunRoutes
             new Entry("POST", "/runs", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/runs/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),

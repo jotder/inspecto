@@ -80,11 +80,22 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
      * {@code GLOSSARY.md} §6-A distinguishes from the Consignment: {@code Run ⊇ Consignment ⊇ File}, and a
      * reprocess is a new Run over the <em>same</em> Consignment.
      *
-     * <p>⚠ {@code runId} may still be {@code null} on paths that have no Run identity yet —
-     * {@code ConsignmentGraphRunner} is one. That is slice 3 of
-     * {@code docs/superpower/run-model-plan.md}, and it is why the registry still carries NO unique key:
-     * NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres, so a single remaining null path
-     * would silently exempt its rows. ⛔ Do not add the constraint until every path supplies this.
+     * <p>✅ <b>Every PRODUCTION path supplies one, and the UNIQUE key was added on that basis</b> (slice 4,
+     * 2026-09-13 — {@code DbConsignmentOutputStore} carries it). ⚠ <b>This paragraph is rewritten
+     * 2026-09-15; it used to say {@code ConsignmentGraphRunner} was a live null-run path and to forbid the
+     * constraint, and it was STALE — that reading survived into a filed P1 before being refuted.</b>
+     * {@code ConsignmentGraphRunner}'s null-{@code runId} construction is in its two-arg
+     * {@code run(Input, SourceFinalizer)} overload, which <b>no production code calls</b>: the one
+     * production caller ({@code ConsignmentIngestStrategy}) passes its own {@code IngestSinkWriter}, and
+     * the ingest lane's registry write goes through {@code ConsignmentIngestor.finalizeSource} with the
+     * run id {@code ConsignmentIngestor.process} mints.
+     *
+     * <p>⛔ <b>The rule that still binds:</b> {@code NULL ≠ NULL} in a UNIQUE constraint on both DuckDB and
+     * Postgres, so any path that starts passing {@code null} here silently exempts its rows from the key —
+     * they will duplicate on re-run instead of updating, and nothing will fail. ⇒ <b>A new caller must
+     * supply a run id.</b> Nullability is retained deliberately (a pre-slice-3 registry cannot be rebuilt
+     * with an invented Run, and {@code record} is fail-open so {@code NOT NULL} would demote a landed file
+     * to a WARN) — it is a compatibility affordance, not a licence.
      */
     public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId,
                                String runId, String producer) {

@@ -124,7 +124,9 @@ class ControlApiSpacesTest {
     @Test
     void authenticatedCreateSucceedsWhenNoSpaceIsHostedYet(@TempDir Path root) throws Exception {
         Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
-                ? Optional.of(new Subject("jdoe", Set.of()))
+                ? Optional.of(new Subject("jdoe", Set.of("canAdminister")))
+                : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("nobody", Set.of()))
                 : Optional.empty());
         try (Ctx c = open(root)) {
             assertEquals(0, c.spaces.size(), "precondition: an armed Authenticator over an empty container");
@@ -135,6 +137,15 @@ class ControlApiSpacesTest {
 
             // the gate still authenticates — a missing credential is a clean 401, never a 500
             assertEquals(401, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
+
+            // ⛔ The RECOVERY guarantee is that POST /spaces needs NO capability: gating it would
+            // brick a server hosting zero Spaces exactly as the writeRoot() resolution once did.
+            // (ROUTE-UNGATED-DEFAULT-1, 2026-09-15 - gating it here turned this test red, which is
+            // how the constraint was rediscovered.) DELETE is the opposite: it is the worst single
+            // case the route audit found, so it IS gated, and this subject carries canAdminister.
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"delta\"}", "Bearer plain").statusCode(),
+                    "creating a Space needs no capability - it is the recovery route");
+            assertEquals(200, authed(c.port, "DELETE", "/spaces/delta", null).statusCode());
 
             // and deregistering back down to zero leaves the server recoverable rather than bricked
             assertEquals(200, authed(c.port, "DELETE", "/spaces/acme", null).statusCode());

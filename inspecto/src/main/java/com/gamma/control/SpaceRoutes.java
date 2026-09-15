@@ -63,13 +63,21 @@ final class SpaceRoutes implements RouteModule {
         // gallery there, and an empty list is the honest capability answer either way.
         api.get("/spaces/templates", (e, m) -> api.spaces().templates());
 
+        // ⛔ NOT gated on canAdminister, and that is a DECISION (2026-09-15). This is the
+        // RECOVERY route: deleting the last Space leaves a server hosting none, and a capability
+        // gate here would brick it exactly as the writeRoot() resolution once did - every route
+        // failing, including the one that would recover it. Pinned by
+        // ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet, whose subject
+        // holds NO capabilities. Creating a Space is additive; PUT and DELETE below are not.
         api.post("/spaces", (e, m) -> createSpace(api, api.body(e)));
 
         api.post("/spaces/import", (e, m) -> importSpace(api, e));
 
-        api.put("/spaces/([^/]+)", (e, m) -> updateSpace(api, api.body(e), ApiContext.name(m)));
+        api.put("/spaces/([^/]+)", ApiContext.withCapability("canAdminister",
+                (e, m) -> updateSpace(api, api.body(e), ApiContext.name(m))));
 
-        api.delete("/spaces/([^/]+)", (e, m) -> deleteSpace(api, e, ApiContext.name(m)));
+        api.delete("/spaces/([^/]+)", ApiContext.withCapability("canAdminister",
+                (e, m) -> deleteSpace(api, e, ApiContext.name(m))));
     }
 
     /** Create + boot a new space seeded from an uploaded bundle zip; the new id comes from {@code ?id=}. */

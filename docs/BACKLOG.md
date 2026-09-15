@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-15 (third pass, after the grounding sweep and two builds).**
-> **71 rows: 2 × P1 · 38 × P2 · 31 × P3.**
+> **70 rows: 1 × P1 · 38 × P2 · 31 × P3.**
 >
 > ✅ **Two defects BUILT and closed 2026-09-15**, both found by the sweep and both proven red before being
 > called fixed: `AUDIT-REFUSAL-GAP-1` (401/403 refusals on a matched route now reach the audit trail —
@@ -50,11 +50,19 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > failure mode this very block warns about two paragraphs down. ⛔ **Recount on the way out of every
 > shift that files a row**, not only on a grounding sweep.
 >
-> 🔴 **P1 #2: `CONSIGNMENT-OUTPUTS-NULLRUN-1`** (§4, filed 2026-09-15) — the output registry's UNIQUE key was
-> added while one lane still writes `run_id = null`, so those rows silently escape it. ✅ Operator decided
-> the fix: **thread a real run id into the graph lane**, not drop the constraint.
+> 🔴 **`CONSIGNMENT-OUTPUTS-NULLRUN-1` was filed as a P1 on 2026-09-15 and REFUTED the same day, before a
+> line of its fix was written.** The claim was that the graph lane writes `run_id = null` into
+> `consignment_outputs` and so escapes the UNIQUE key. The null-supplying construction is real
+> (`ConsignmentGraphRunner:82`) — but it sits in a two-arg `run` overload with **no production caller**:
+> the one production caller passes its own `IngestSinkWriter`, and the ingest lane registers through
+> `ConsignmentIngestor`, which mints a run id. ⬛ **The row was filed on a line number, not on a call
+> graph.** I verified the line existed and that the lane was reachable, and did not check WHICH OVERLOAD
+> the caller used — the one question that decided it.
+> ⇒ Kept as a lesson, not a row: **reachability of a FILE is not reachability of a METHOD.** What was
+> real and is now fixed: two javadocs in that subsystem contradicted each other, and the test-only overload
+> said nothing about being test-only. Both corrected 2026-09-15.
 >
-> 🔴 **P1 #1: `ROUTE-UNGATED-DEFAULT-1`** (§5) — an unlisted route is OPEN, not locked down; 83 mutating
+> 🔴 **P1: `ROUTE-UNGATED-DEFAULT-1`** (§5) — an unlisted route is OPEN, not locked down; 83 mutating
 > routes are ungated, `DELETE /spaces/{id}` among them. Its full audit is DONE
 > (`superpower/route-gating-audit.md`) and reframes it as a **vocabulary** gap: only 12 are gateable with
 > an existing capability, 22 are not expressible at all, and `Roles` has **no admin capability**. ⛔ The
@@ -85,9 +93,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 2 P1 + 38 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 1 P1 + 38 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 31 are a list of things deliberately *not* being built, not a backlog
-> to burn down. Reading all 71 as pending work overstates what is owed by roughly 40%.
+> to burn down. Reading all 70 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -675,33 +683,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
-- **P1** · 🔴 **`CONSIGNMENT-OUTPUTS-NULLRUN-1` — a UNIQUE key was added against its own code's ⛔, and
-  the graph lane silently escapes it.** Filed 2026-09-15 by grounding `Consignment ELT`, whose claim that
-  this was *"settled, unbuilt"* is refuted — it shipped, and shipped early.
-  `PartitionSinkWriter`'s six-arg constructor carries the rule verbatim: *"it is why the registry still
-  carries NO unique key: NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres, so a single
-  remaining null path would silently exempt its rows. **⛔ Do not add the constraint until every path
-  supplies this.**"* The constraint was added anyway on 2026-09-13 —
-  `DbConsignmentOutputStore.java:122` `UNIQUE (consignment_id, path, run_id)` with
-  `ON CONFLICT … DO UPDATE` at `:225` — on the stated basis that *"every production path has supplied one
-  since slice 3"* (`:57-58`).
-  🔴 **That basis is FALSE.** `ConsignmentGraphRunner.java:83` still calls the **4-arg**
-  `PartitionSinkWriter` constructor, which threads `runId = null`; only `PipelineJobRunner.java:316` supplies
-  a real one. And the graph lane is reachable on the **default** setting — `-Dingest.lane=auto`
-  (`ConsignmentIngestStrategy.java:168`) admits it whenever an authored route engages or
-  `graphLaneCarries(cfg)` holds. ⇒ Graph-lane rows are exempt from the key, so a re-run appends a duplicate
-  row instead of updating the `row_count`, in the one table the §11.3 output registry is meant to be
-  authoritative for. ⚠ Two javadocs in the same subsystem **directly contradict each other** today; whichever
-  fix lands must correct the loser, not leave both standing.
-  ✅ **DECIDED 2026-09-15 (operator): thread a real run id into the graph lane** — that is the end state
-  both javadocs already assume, and it removes the exemption at its source. ⛔ Not by dropping the
-  constraint, and ⛔ not by `NOT NULL`, which `:59-62` shows is strictly worse (`record` is fail-open, so a
-  violation would demote a **landed** file to a WARN, and a pre-slice-3 registry could not be rebuilt).
-  **First step: find whether a Run identity is in scope at `ConsignmentGraphRunner:83`** — the run-model
-  plan's slice 3 is where that seam was supposed to land. ⚠ Verify by RE-RUN, not by unit test: the
-  exemption is invisible to any test that writes one row once.
-  → `okf/backend/engine/db-layer.md` §3.9 · `archived-documents/plans-archive/run-model-plan.md`
-
 - **P2** · **`ENRICH-SILENT-FULL-RECOMPUTE-1` — an incremental recompute silently becomes a FULL one.**
   Filed 2026-09-15 by grounding `Onboarding ↔ Pipeline unification W4`, which carried this as a *design
   note* (*"never silently convert one into the other"*) when it is **a live defect already doing exactly
@@ -932,7 +913,33 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
   bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
 
-- **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down; 75 mutating routes
+- **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down.**
+  ✅ **The blocking half is BUILT 2026-09-15.** `Roles.CAN_ADMINISTER` exists — **one** coarse capability per
+  the operator's call, not three per-family ones — so duckle's "unlisted ⇒ admin" rule is **expressible for
+  the first time**. `PUT /spaces/{id}` and `DELETE /spaces/{id}` are gated on it; `DELETE /spaces/{id}` was
+  the worst single case the audit found, reachable by any authenticated caller with only a
+  more-than-one-Space check. Vocabulary is now **eleven**; `security.md` §capability-vocabulary owns it.
+  🔴 **And building it REFUTED two of the audit's own "gateable 12" — both were deliberately open, and
+  gating them turned the build red.** ⛔ `POST /requirements`: the audit called it *"an inconsistency, not a
+  judgement call"* because both its siblings are gated. It is **SEC-7(c)**, deliberate and pinned by
+  `ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen` — anyone may raise a requirement, only a
+  triager decides. ⛔ `POST /spaces`: it is the **recovery route**. Deleting the last Space leaves a server
+  hosting none, and a capability gate there bricks it exactly as the old `writeRoot()` resolution did —
+  every route failing, including the one that would recover it. Both reverted; both now say so at the
+  registration site, and the recovery guarantee has its own assertion.
+  ⇒ ⛔ **Re-ground the remaining 10 of the 12 one at a time before gating them.** An audit's "correctly
+  ungated" bucket was reviewed; its "should be gated" bucket evidently was not, and a route being an
+  outlier among its siblings is not evidence that the outlier is the mistake.
+  **What remains:** (a) the other ~19 inexpressible routes — Incident/Case triage (~15, in the optional
+  `inspecto-ops` module) and agent governance (4, `AgentRoutes`); ⚠ **the audit itself says the triage
+  family needs a product decision first** — whether Incident triage should stay open even now that
+  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) the 10 unverified gateable routes;
+  (c) ✅ **operator decided 2026-09-15: record the exemption reasoning for the 49 correctly-ungated routes**
+  in the audit doc, so the ratchet starts from a reviewed baseline; (d) the ratchet itself, **last**.
+  → `superpower/route-gating-audit.md` · `okf/capabilities/security/security.md`
+
+  *(Original row, for the grounding it still carries:)*
+  🔴 **— 75 mutating routes
   are ungated, `DELETE /spaces/{id}` among them.** Filed 2026-09-15 from duckle candidate S5 ("a route with
   no entry in the permission table requires admin, so a later-added route is locked down rather than left
   open"). **Grounded, not assumed** — measured on this tree:

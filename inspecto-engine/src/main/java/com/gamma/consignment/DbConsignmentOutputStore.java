@@ -55,7 +55,12 @@ import java.util.Optional;
  * longer exists.
  *
  * <p>⚠ <b>{@code run_id} is deliberately still nullable</b>, though every production path has supplied one
- * since slice 3. {@code NULL ≠ NULL} in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is
+ * since slice 3. ✅ <b>Re-verified 2026-09-15</b>, because the opposite was asserted and filed as a P1: the
+ * ingest lane registers through {@code ConsignmentIngestor.finalizeSource} with the id
+ * {@code ConsignmentIngestor.process} mints, the pipeline-job lane through {@code PipelineJobRunner}'s
+ * {@code RunContext}, and the summary/derived lanes through {@code ConsignmentProcessJobType}. The one
+ * null-supplying construction — {@code ConsignmentGraphRunner}'s two-arg {@code run} overload — has no
+ * production caller, and now says so at its own declaration. {@code NULL ≠ NULL} in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is
  * exempt from the key — but {@code NOT NULL} would be strictly worse than that exemption: {@link #record} is
  * fail-open, so a violation would drop a <em>landed</em> file's row into a WARN, and a registry written before
  * slice 3 could not be rebuilt at all (its legacy rows have no run identity, and inventing one would report a

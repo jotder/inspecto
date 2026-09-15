@@ -77,6 +77,15 @@ public final class ConsignmentGraphRunner {
      * Drive the {@code transform → sink} subgraph downstream of the seed and commit it. {@code finalizer}
      * runs once, after every sink branch is durable, with the outputs written across all branches — the
      * ingest path passes the re-homed {@code ConsignmentIngestor.commit} body; a test may pass a no-op.
+     *
+     * <p>⚠ <b>TEST-ONLY as of 2026-09-15 — no production code calls this overload</b>, and that is
+     * load-bearing, not incidental: the {@link PartitionSinkWriter} it builds below supplies <b>no run
+     * id</b>, and {@code consignment_outputs} carries {@code UNIQUE (consignment_id, path, run_id)} where
+     * {@code NULL ≠ NULL}. ⛔ <b>Do not wire this overload into a production path as it stands</b> — its
+     * rows would be silently exempt from that key and would duplicate on re-run with nothing failing.
+     * Production goes through {@link #run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize)}
+     * with a caller-supplied writer. (A P1 was filed on 2026-09-15 reading this construction as a live
+     * production path; it was refuted on grounding. This note exists so the next reader need not repeat it.)
      */
     public static Result run(Input in, SourceFinalizer finalizer) throws Exception {
         PartitionSinkWriter writer =

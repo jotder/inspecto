@@ -73,6 +73,16 @@ public final class Roles {
     public static final String CAN_OFFER_DATASETS      = "canOfferDatasets";
     public static final String CAN_REQUEST_SHARES      = "canRequestShares";
     public static final String CAN_APPROVE_SHARES      = "canApproveShares";
+    /**
+     * Administration of the INSTALLATION itself, as distinct from authoring or operating what runs in it
+     * (`ROUTE-UNGATED-DEFAULT-1`, 2026-09-15). The route-gating audit found 83 ungated mutating routes and
+     * — the finding that mattered — that only 12 could be expressed with the ten capabilities above at all:
+     * there was no name meaning "administrator", so `DELETE /spaces/{id}` could not be gated even in
+     * principle. ⛔ This is deliberately ONE coarse capability, not three per-family ones (operator call):
+     * the alternative left no catch-all for the next unlisted route, which is the hole the audit opened on.
+     * ⚠ Consequence to keep in view: whoever can delete a Space can do everything else this guards.
+     */
+    public static final String CAN_ADMINISTER          = "canAdminister";
 
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
@@ -124,7 +134,7 @@ public final class Roles {
         m.put("operations", new Def(ops, null));
         m.put("support", new Def(ops, null));
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
-                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS), null));
+                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
                 CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
