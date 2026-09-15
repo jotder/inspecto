@@ -140,6 +140,45 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **REACHABILITY OF A FILE IS NOT REACHABILITY OF A METHOD** (2026-09-15). A P1 was filed, reported as
+  confirmed, and refuted the same day on this exact gap. The claim: the graph ingest lane writes
+  `run_id = null` into `consignment_outputs` and so escapes its UNIQUE key. Everything checked was true —
+  the null-supplying line exists (`ConsignmentGraphRunner:82`), and the graph lane **is** reachable on the
+  default `-Dingest.lane=auto`. The unchecked question was **which overload the caller uses**: that line
+  lives in a two-arg `run` overload with no production caller, while production passes its own
+  `IngestSinkWriter` and registers through `ConsignmentIngestor`, which mints a run id.
+  ⇒ **Grep the CALL GRAPH, not the line.** "Class X is used in production" and "this constructor in class
+  X runs in production" are different claims, and an overloaded method makes them come apart silently.
+  ⚠ Same family as the dead-parity-mirror trap: grep for **callers**, not for the symbol's existence.
+
+- 🔴 **AN OUTLIER AMONG SIBLINGS IS NOT EVIDENCE THAT THE OUTLIER IS THE MISTAKE** (2026-09-15). A route
+  audit listed `POST /requirements` as gateable because both its siblings carry a capability gate and it
+  does not — "an inconsistency, not a judgement call". It is **SEC-7(c)** and deliberate (anyone may raise
+  a requirement; only a triager decides), pinned by a test that says so in its name. Gating it turned the
+  build red. The same pass listed `POST /spaces`, which is the **recovery route**: deleting the last Space
+  leaves a server hosting none, and a gate there bricks it exactly as an earlier `writeRoot()` resolution
+  did — every route failing, *including the one that would recover it*.
+  ⇒ Asymmetry is evidence that **something** was decided, not of which side was wrong. Read the sibling's
+  test names before "fixing" the odd one out. ⚠ Note where the audit's rigour actually was: it reviewed
+  its *correctly-ungated* buckets carefully and its *should-be-gated* bucket not at all.
+
+- 🔴 **A ROW KEPT "FOR PROVENANCE" IS INDISTINGUISHABLE FROM AN OPEN ROW** (2026-09-15). A closed P1 sat on
+  `BACKLOG.md` under its own closure note, marked *"(original row retained below for provenance)"*, and was
+  counted as live work by every reader and every `grep`. ⇒ Closed work leaves the board; provenance is the
+  OKF concept's job and git's. ⚠ The board's census had also been carried forward rather than recounted
+  and was wrong by 17 rows — **recount on the way out of any shift that files one.**
+
+- 🔴 **THREE WAYS A BUILD VERDICT LIED IN ONE SHIFT** (2026-09-15) — all three produced confident,
+  specific, wrong answers:
+  1. **A stale `build.log` in a reused scratchpad path.** A delegated verification reported two failures
+     verbatim from an earlier run, both already fixed. ⛔ Tie any delegated verdict to a fresh run: ask for
+     the summed per-module lines and check them against the known baseline.
+  2. **`-pl <module>` without `-am`** — four tests erroring with
+     `java.io.IOException: HTTP/1.1 header parser received no bytes`, which is **a server that never
+     booted** against a stale sibling jar, not the defect it looked like.
+  3. **`-Dtest='A+B'`** is not valid syntax: it runs **nothing** and reports `BUILD SUCCESS`.
+     Use commas. (Same family as the no-op-build-reports-exit-0 note below.)
+
 - 🔴 **A PER-SPACE FACT READ FROM A JVM-WIDE PROPERTY IS INVISIBLE TO THE WHOLE TEST SUITE.**
   Until 2026-09-15, nine engine call sites read `System.getProperty("assist.write.root")` for the component
   registry while their sibling `dataDir` was per-Space and every control-plane route resolved
