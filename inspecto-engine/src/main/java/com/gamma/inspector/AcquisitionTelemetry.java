@@ -41,13 +41,29 @@ final class AcquisitionTelemetry {
 
     /** Emit the {@link EventType#SEQUENCE_GAP} fact for one missing key in the configured series (Phase D). */
     static void emitSequenceGap(PipelineConfig cfg, String expectedKey, String sequence, String unit) {
-        EventLog.current().emit(Event.builder(EventType.SEQUENCE_GAP)
+        Event.Builder b = Event.builder(EventType.SEQUENCE_GAP)
                 .source(SOURCE)
                 .pipeline(cfg.identity().pipelineName())
                 .message("Missing expected file in sequence: " + expectedKey)
                 .attr("expected", expectedKey)
                 .attr("sequence", sequence)
-                .attr("unit", unit));
+                .attr("unit", unit);
+        // STALE-TILES-PRECISION-1 (2026-09-15): name the STORES this pipeline produces, so a reader can mark
+        // the Datasets on those stores stale without guessing through the pipeline → produces[] hop. A gap
+        // is per collector, so it legitimately reaches every store the pipeline writes; a pipeline with
+        // one store now says which. Comma-joined, omitted when the graph declares none.
+        String stores = producedStores(cfg);
+        if (!stores.isEmpty()) b.attr("stores", stores);
+        EventLog.current().emit(b);
+    }
+
+    /** The {@code store} of every sink the pipeline's graph declares, comma-joined — {@code ""} when none or unliftable. */
+    static String producedStores(PipelineConfig cfg) {
+        try {
+            return String.join(",", com.gamma.pipeline.PipelineStores.produced(com.gamma.pipeline.PipelineLift.lift(cfg)));
+        } catch (RuntimeException notLiftable) {
+            return "";   // telemetry never fails an acquisition — a graph that will not lift simply names no store
+        }
     }
 
     /** Refresh the per-pipeline gauge of files the readiness gate is currently holding back (Phase B). */

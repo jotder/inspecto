@@ -463,6 +463,10 @@ class SourceConfigIntegrationTest {
                 .toList();
         assertEquals(1, gaps.size(), "exactly one hole reported (the 02:00 file)");
         assertEquals("cdr_2026061402.csv", String.valueOf(gaps.get(0).attributes().get("expected")));
+        // STALE-TILES-PRECISION-1: the gap names the stores it disrupts — exactly what the graph produces.
+        String stores = AcquisitionTelemetry.producedStores(cfg);
+        if (stores.isEmpty()) assertFalse(gaps.get(0).attributes().containsKey("stores"), "no store ⇒ no attr, never an empty one");
+        else assertEquals(stores, String.valueOf(gaps.get(0).attributes().get("stores")));
 
         // the poll loop re-runs each cycle; a persistent gap must not re-fire
         CollectorProcessor.run(cfg);

@@ -74,6 +74,15 @@ import './dashboard.kind'; // register the dashboard kind
  */
 const STALE_EVENT_WINDOW = 200;
 
+/** `SEQUENCE_GAP.attributes.stores` is comma-joined by the emitter; absent or blank ⇒ undefined (fall back to produces[]). */
+function splitStores(v: string | undefined): string[] | undefined {
+    const parts = (v ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    return parts.length ? parts : undefined;
+}
+
 @Component({
     selector: 'app-dashboard-editor',
     standalone: true,
@@ -301,12 +310,29 @@ export class DashboardEditorComponent implements OnInit {
     private loadStaleness(): void {
         for (const type of DISRUPTION_TYPES) {
             this.events.search({ type, limit: STALE_EVENT_WINDOW }).subscribe({
-                next: (rows) => this.disruptions.update((all) => [...all, ...rows]),
+                // STALE-TILES-PRECISION-1: a SEQUENCE_GAP names the stores it reaches (comma-joined attr).
+                next: (rows) =>
+                    this.disruptions.update((all) => [
+                        ...all,
+                        ...rows.map((r) => ({ ...r, stores: splitStores(r.attributes?.['stores']) })),
+                    ]),
                 error: () => undefined,
             });
         }
         this.events.search({ type: 'BATCH_COMMITTED', limit: STALE_EVENT_WINDOW }).subscribe({
-            next: (rows) => this.commits.set(rows),
+            next: (rows) => this.commits.update((all) => [...all, ...rows]),
+            error: () => undefined,
+        });
+        // STALE-TILES-PRECISION-1: a `dataset.write` Signal is a commit at STORE granularity — its subject
+        // names the store — so a pipeline that refreshed one of its stores clears only that one.
+        this.events.signals({ type: 'dataset.write', limit: STALE_EVENT_WINDOW }).subscribe({
+            next: (rows) =>
+                this.commits.update((all) => [
+                    ...all,
+                    ...rows
+                        .filter((r) => r.subjectRef?.kind === 'dataset' && !!r.subjectRef.id)
+                        .map((r) => ({ pipeline: r.pipeline, ts: r.ts, stores: [r.subjectRef!.id] })),
+                ]),
             error: () => undefined,
         });
         this.pipelinesApi.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });

@@ -167,4 +167,20 @@ describe('seed adapters round-trip', () => {
         expect(back.severity).toBe('WARNING');
         expect(back.value).toBe(45_000);
     });
+
+    /** STALE-TILES-PRECISION-1: the subject survives the projection, and the ledger's ISO `at` reads as millis. */
+    it('carries the subject through and accepts an ISO instant for at', () => {
+        const row = signalToEvent({
+            signalId: 's1',
+            type: 'dataset.write',
+            at: '2026-09-15T10:00:00Z',
+            source: { kind: 'dataset', id: 'orders_store', rel: 'emits' },
+            subject: { kind: 'dataset', id: 'orders_store' },
+            severity: 'info',
+            payload: { pipeline: 'orders', dataset: 'orders_store', rows: 4 },
+        } as never);
+        expect(row.subjectRef).toEqual({ kind: 'dataset', id: 'orders_store' });
+        expect(row.ts).toBe(Date.parse('2026-09-15T10:00:00Z'));
+        expect(row.pipeline).toBe('orders');
+    });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CommitEvent, DisruptionEvent, stalePipelines, staleWidgets } from './stale-tiles';
+import { CommitEvent, DisruptionEvent, stalePipelines, staleStoresOf, staleWidgets } from './stale-tiles';
 
 const gap = (pipeline: string | null, ts: number): DisruptionEvent => ({ type: 'SEQUENCE_GAP', pipeline, ts });
 const quarantine = (pipeline: string, ts: number): DisruptionEvent => ({ type: 'FILE_QUARANTINED', pipeline, ts });
@@ -121,5 +121,48 @@ describe('staleWidgets (the full chain)', () => {
 
     it('is inert with no disruptions at all — the common case must cost nothing', () => {
         expect(staleWidgets([], [commit('orders', 1)], PIPELINES, DATASETS, WIDGETS).size).toBe(0);
+    });
+});
+
+/** STALE-TILES-PRECISION-1: store-level inputs decide per store; pipeline-level inputs still fall back. */
+describe('staleStoresOf (store granularity)', () => {
+    it('a dataset.write to ONE store clears that store and leaves the sibling stale', () => {
+        // pipeline `both` produces orders_store + shared_store; only orders_store was rewritten after the gap
+        const stale = staleWidgets(
+            [gap('both', 100)],
+            [{ pipeline: 'both', ts: 101, stores: ['orders_store'] }],
+            PIPELINES,
+            DATASETS,
+            WIDGETS,
+        );
+        expect(stale.has('w_orders')).toBe(false);
+        expect(stale.has('w_shared')).toBe(true);
+        expect(stale.get('w_shared')!.store).toBe('shared_store');
+    });
+
+    it('a gap that names its stores marks only those', () => {
+        const stores = staleStoresOf(
+            [{ type: 'SEQUENCE_GAP', pipeline: 'both', ts: 100, stores: ['shared_store'] }],
+            [],
+            PIPELINES,
+        );
+        expect([...stores.keys()]).toEqual(['shared_store']);
+    });
+
+    it('a pipeline-level commit still clears every store the pipeline produces (regression)', () => {
+        expect(staleWidgets([gap('both', 100)], [commit('both', 101)], PIPELINES, DATASETS, WIDGETS).size).toBe(0);
+        // `orders` also produces orders_store, so its commit refreshes THAT store — only shared_store stays stale.
+        // (Under the old pipeline-level anchor both of `both`'s stores stayed marked; that was the imprecision.)
+        const after = staleWidgets([gap('both', 100)], [commit('orders', 101)], PIPELINES, DATASETS, WIDGETS);
+        expect([...after.keys()]).toEqual(['w_shared']);
+    });
+
+    it('a store-level commit for another store does not clear anything', () => {
+        const stale = staleStoresOf(
+            [gap('orders', 100)],
+            [{ pipeline: 'orders', ts: 101, stores: ['payments_store'] }],
+            PIPELINES,
+        );
+        expect([...stale.keys()]).toEqual(['orders_store']);
     });
 });

@@ -17,11 +17,15 @@
  * over a field that already exists and is already validated server-side (`ComponentIntegrity` checks
  * `widget.datasetId → dataset` and `dashboard.tiles[].widgetId → widget`).
  *
- * ⚠ **The granularity that follows, stated plainly:** a disruption marks **every** Dataset fed by that
- * pipeline, not only the rows or the column that actually gapped. That is a deliberate over-approximation
- * — a tile wrongly marked stale costs a second look, a tile wrongly left clean is a number someone acts on
- * — and it is the honest limit of a pipeline-level anchor. Narrowing it needs the emitters to carry a
- * store identity (`INCIDENT`-style `Ref` subject), which is a backend change, not a resolver change.
+ * ⚠ **Granularity (revised 2026-09-15, `STALE-TILES-PRECISION-1`):** the anchor is the STORE where the input
+ * names one, the pipeline where it does not. A `SEQUENCE_GAP` now carries `stores` (the sinks its pipeline
+ * produces) and a `dataset.write` Signal carries its store as `subject` — so a commit clears exactly the
+ * store it wrote, and a pipeline producing two stores that only refreshed one no longer clears both. An
+ * input with no store still falls back to `pipeline → produces[]`, the original over-approximation: a tile
+ * wrongly marked stale costs a second look, a tile wrongly left clean is a number someone acts on.
+ * ⚠ Two of this header's original claims were wrong and are corrected here: the imprecision was in THIS
+ * resolver's inputs as much as in the emitters, and `FILE_QUARANTINED` has **no emitter anywhere** — it is
+ * kept in `DISRUPTION_TYPES` as a declared trigger, but nothing produces it today.
  *
  * <h3>Self-clearing by construction</h3>
  * There is no stored "stale" flag anywhere, and deliberately so. Staleness is **derived**: a pipeline is
@@ -39,12 +43,16 @@ export interface DisruptionEvent {
     pipeline: string | null;
     ts: number;
     message?: string;
+    /** The stores the disruption reaches, when the emitter named them (`SEQUENCE_GAP.attributes.stores`). */
+    stores?: readonly string[];
 }
 
-/** A successful batch commit — the thing that clears a disruption. */
+/** A successful write — a batch commit (pipeline-level) or a `dataset.write` Signal (store-level). */
 export interface CommitEvent {
     pipeline: string | null;
     ts: number;
+    /** The stores this write refreshed, when known — a `dataset.write`'s subject; absent on `BATCH_COMMITTED`. */
+    stores?: readonly string[];
 }
 
 /** Structural view of `PipelineSummary`: the stores this pipeline writes. */
@@ -133,20 +141,8 @@ export function staleWidgets(
     datasets: readonly DatasetBinding[],
     widgets: readonly WidgetBinding[],
 ): Map<string, StaleMark> {
-    const stale = stalePipelines(disruptions, commits);
-    if (stale.size === 0) return new Map();
-
-    // store → the mark of the stale pipeline that produces it. A store fed by two stale pipelines keeps
-    // the most recent disruption, which is the one an operator would look at first.
-    const staleStores = new Map<string, StaleMark>();
-    for (const p of pipelines) {
-        const mark = stale.get(p.name);
-        if (!mark) continue;
-        for (const store of p.produces ?? []) {
-            const existing = staleStores.get(store);
-            if (!existing || mark.at > existing.at) staleStores.set(store, { ...mark, store });
-        }
-    }
+    const staleStores = staleStoresOf(disruptions, commits, pipelines);
+    if (staleStores.size === 0) return new Map();
 
     const staleDatasets = new Map<string, StaleMark>();
     for (const d of datasets) {
@@ -159,6 +155,45 @@ export function staleWidgets(
         if (!w.datasetId) continue;
         const mark = staleDatasets.get(w.datasetId);
         if (mark) out.set(w.id, mark);
+    }
+    return out;
+}
+
+/**
+ * store → the mark of its newest un-cleared disruption. Every disruption and every commit is projected onto
+ * STORES first — its own `stores` when it names them, else every store its pipeline produces — and the
+ * comparison runs per store. That is what lets one `dataset.write` clear one store while a sibling store of
+ * the same pipeline stays marked. A store fed by two stale disruptions keeps the most recent.
+ */
+export function staleStoresOf(
+    disruptions: readonly DisruptionEvent[],
+    commits: readonly CommitEvent[],
+    pipelines: readonly ProducingPipeline[],
+): Map<string, StaleMark> {
+    const produces = new Map<string, readonly string[]>();
+    for (const p of pipelines) produces.set(p.name, p.produces ?? []);
+    const storesOf = (pipeline: string | null, own?: readonly string[]): readonly string[] =>
+        own && own.length ? own : pipeline ? (produces.get(pipeline) ?? []) : [];
+
+    const latestCommit = new Map<string, number>();
+    for (const c of commits)
+        for (const store of storesOf(c.pipeline, c.stores))
+            latestCommit.set(store, Math.max(latestCommit.get(store) ?? 0, c.ts));
+
+    const worst = new Map<string, DisruptionEvent>();
+    for (const d of disruptions) {
+        if (!d.pipeline && !(d.stores && d.stores.length)) continue; // a service-wide event invalidates nothing
+        for (const store of storesOf(d.pipeline, d.stores)) {
+            const seen = worst.get(store);
+            if (!seen || d.ts > seen.ts) worst.set(store, d);
+        }
+    }
+
+    const out = new Map<string, StaleMark>();
+    for (const [store, d] of worst) {
+        if (d.ts <= (latestCommit.get(store) ?? 0)) continue; // a later write to THIS store fixed it
+        const pipeline = d.pipeline ?? '';
+        out.set(store, { pipeline, type: d.type, at: d.ts, store, reason: reasonFor(d, pipeline || store) });
     }
     return out;
 }

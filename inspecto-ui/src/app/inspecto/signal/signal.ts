@@ -19,11 +19,23 @@ export const SIGNAL_SEVERITIES = ['trace', 'debug', 'info', 'warn', 'error', 'cr
 export type SignalSeverity = (typeof SIGNAL_SEVERITIES)[number];
 
 /** One emitted operational fact — the unit of the Signal network. `payload` is the structured detail bag (never row content). */
+/** A Signal's `subject`/`actor` Ref as the server sends it — `rel` is optional on the wire (`Ref.of()` sets none). */
+export interface SignalRef {
+    kind: string;
+    id: string;
+    rel?: string;
+    via?: string;
+}
+
 export interface Signal {
     signalId: string;
     type: string; // BATCH_COMMITTED | ALERT_FIRED | JOB_SUCCEEDED | EXPECTATION_FAILED | OBJECT_ACTIVITY | AUDIT | …
-    at: number; // epoch millis
+    at: number | string; // epoch millis on the stream; the `GET /signals` ledger view sends an ISO instant
     source: Ref; // {kind,id,rel:'emits'} — the producer that raised it
+    /** What the Signal is ABOUT — for `dataset.write` the store (`{kind:'dataset', id:<store>}`). Since 3d399573. */
+    subject?: SignalRef | null;
+    /** Who did it — for `dataset.write` the job or processor. */
+    actor?: SignalRef | null;
     correlationId?: string | null;
     severity: SignalSeverity;
     payload: Record<string, unknown>;
@@ -81,12 +93,18 @@ export function sourceLabel(source: Ref): string {
 }
 
 /** Project a Signal onto the `EventRow` view (`/events` read surface). `severity`/`sourceRef` are display-only extras. */
+/** The wire's `at` — epoch millis on the stream, an ISO instant from the ledger view — as millis. */
+export function signalMillis(at: number | string): number {
+    return typeof at === 'number' ? at : Date.parse(at);
+}
+
 export function signalToEvent(s: Signal): EventRow {
     const p = s.payload;
+    const at = signalMillis(s.at);
     return {
         eventId: s.signalId,
-        ts: s.at,
-        timestamp: new Date(s.at).toISOString(),
+        ts: at,
+        timestamp: new Date(at).toISOString(),
         level: severityToLevel(s.severity),
         type: s.type,
         source: sourceLabel(s.source),
@@ -96,6 +114,7 @@ export function signalToEvent(s: Signal): EventRow {
         attributes: (p['attributes'] as Record<string, string> | undefined) ?? {},
         severity: s.severity,
         sourceRef: s.source,
+        subjectRef: s.subject ?? undefined,
     };
 }
 
@@ -111,7 +130,7 @@ export function signalToAlert(s: Signal): FiredAlert {
         comparator: (p['comparator'] as string | undefined) ?? '',
         threshold: Number(p['threshold'] ?? 0),
         window: (p['window'] as string | undefined) ?? '',
-        epochMillis: s.at,
+        epochMillis: signalMillis(s.at),
         message: (p['message'] as string | undefined) ?? '',
     };
 }

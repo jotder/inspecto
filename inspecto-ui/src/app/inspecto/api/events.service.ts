@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import { spaceScopedUrl } from './space-scope';
 import { SpacesService } from './spaces.service';
@@ -30,6 +30,8 @@ export interface EventRow {
     attributes: Record<string, string>;
     severity?: SignalSeverity;
     sourceRef?: Ref;
+    /** The Signal's subject — what it is about (a `dataset.write` names its store here). Absent on raw Events. */
+    subjectRef?: { kind: string; id: string; rel?: string; via?: string };
 }
 
 /** Filter + page over the event store (the `?…` query of GET /events/search); every field is optional. */
@@ -96,6 +98,17 @@ export class EventsService {
     private spaces = inject(SpacesService);
 
     /** Filtered events, newest-first (GET /events/search). An empty filter returns the newest `limit` events. */
+    /**
+     * The Signal ledger view (`GET /signals?type=&limit=`) as rows — the one place a Signal's `subject`
+     * survives, which `search()` over raw Events cannot give (an Event has no subject). Used by the
+     * stale-tile resolver to see `dataset.write` at STORE granularity (STALE-TILES-PRECISION-1).
+     */
+    signals(filter: { type?: string; limit?: number } = {}): Observable<EventRow[]> {
+        return this.http
+            .get<Signal[]>(apiUrl('/signals'), { params: toParams(filter as Record<string, unknown>) })
+            .pipe(map((rows) => (Array.isArray(rows) ? rows : []).map(signalToEvent)));
+    }
+
     search(filter: EventFilter = {}): Observable<EventRow[]> {
         return this.http.get<EventRow[]>(apiUrl('/events/search'), {
             params: toParams(filter as Record<string, unknown>),
