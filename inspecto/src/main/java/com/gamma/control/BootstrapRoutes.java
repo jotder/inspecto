@@ -53,9 +53,16 @@ final class BootstrapRoutes implements RouteModule {
         // that shares state — which decides whether a degraded store is tolerable or a boot failure.
         data.put("topology", com.gamma.util.Topology.mode().name().toLowerCase());
         data.put("features", features(api));
-        data.put("configSpecs", configSpecs());
-        data.put("enumerations", enumerations());
-        data.put("spaces", spaces(api));
+        // Landing-page plan D2 (2026-09-15): before sign-in a Standard/Enterprise deployment tells an
+        // unauthenticated caller only what the SPA needs to START the OIDC redirect — edition, topology,
+        // feature flags and the anonymous session. The Space roster and the spec catalogue are
+        // deployment inventory and wait for a bearer. Personal registers no Authenticator, so it is
+        // unchanged: there is no "before sign-in" to protect. Derived from the SPI slot, not the edition.
+        if (!(Authenticators.active().isPresent() && ApiContext.subject(ex).isEmpty())) {
+            data.put("configSpecs", configSpecs());
+            data.put("enumerations", enumerations());
+            data.put("spaces", spaces(api));
+        }
         data.put("session", session(ex));
 
         String etag = ETags.of(ContentHash.of(data));

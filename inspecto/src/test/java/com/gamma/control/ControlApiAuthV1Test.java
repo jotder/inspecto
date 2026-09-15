@@ -194,6 +194,39 @@ class ControlApiAuthV1Test {
         }
     }
 
+    /** Landing-page plan D2 (2026-09-15): the public bootstrap must not hand an unauthenticated caller the
+     *  Space roster or the spec catalogue — a sign-in page needs edition, features and the anonymous
+     *  session, nothing more. The same call with a bearer serves everything. */
+    @Test
+    void anonymousBootstrapUnderAnAuthenticatorOmitsTheInventory(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(cfg, root)) {
+            JsonNode anon = V1Body.of(get(c.port, "/bootstrap").body());
+            assertNull(anon.get("spaces"), "the Space roster is inventory, not sign-in context");
+            assertNull(anon.get("configSpecs"));
+            assertNull(anon.get("enumerations"));
+            assertNotNull(anon.get("edition"));
+            assertNotNull(anon.get("features"));
+            assertNotNull(anon.get("session"));
+
+            JsonNode authed = V1Body.of(get(c.port, "/bootstrap", "Authorization", "Bearer valid").body());
+            assertTrue(authed.get("spaces").isArray());
+            assertTrue(authed.get("configSpecs").isObject());
+            assertTrue(authed.get("enumerations").isObject());
+        }
+    }
+
+    @Test
+    void personalBootstrapServesTheInventoryToEveryone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // No Authenticator ⇒ Personal: there is no pre-sign-in state, so the full payload stays public.
+        try (Ctx c = open(cfg, root)) {
+            JsonNode b = V1Body.of(get(c.port, "/bootstrap").body());
+            assertTrue(b.get("spaces").isArray());
+            assertTrue(b.get("configSpecs").isObject());
+            assertTrue(b.get("enumerations").isObject());
+        }
+    }
+
     @Test
     void healthStaysOpenWithNoAuthenticatorInvolved(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
