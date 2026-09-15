@@ -200,6 +200,12 @@
              (normal 'mvn test'). The core module's 'coverage' profile's prepare-agent goal
              overrides this. Both modules inherit it. -->
         <argLine></argLine>
+        <!-- ELT §6 step-2 PARITY GATE (2026-09-16): `mvn -Dingest.lane=graph test` runs the WHOLE suite with
+             the flat lane disabled (ConsignmentIngestStrategy.admittedLift refuses, naming the pipeline and
+             its flatReason, instead of falling back). Wired here as an explicit surefire system property
+             rather than relying on user-property propagation, so the gate is one documented switch. Default
+             `auto` = today's admission behaviour, so ordinary runs are unchanged. -->
+        <ingest.lane>auto</ingest.lane>
     </properties>
 
     <!-- M1: single source of truth for the versions of the deps that were duplicated across
@@ -396,6 +402,8 @@
                     <configuration>
                         <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
                         <systemPropertyVariables>
+                            <!-- The ELT parity-gate switch — see the `ingest.lane` property above. -->
+                            <ingest.lane>${ingest.lane}</ingest.lane>
                             <!--
                               Path containment (PathJail / ConfigSafetyValidator) refuses anything
                               outside the allowed roots, which default to the working directory. Tests
