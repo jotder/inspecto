@@ -1248,8 +1248,12 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   what caught the worst of it, and the same check then refuted two more.
   ⛔ **`LegacyVendorFunctions` — “reaches no bundle and no document” is FLATLY WRONG.** It is registered
   through `META-INF/services/com.gamma.asn.plugin.TransformFunctionProvider`, discovered by
-  `FunctionRegistry` via `ServiceLoader`, and **called by production tx configs** — `ccnEventType(...)` and
-  siblings appear in `asn-parser/config/rtdms/mtna/ccn/ccn_tx.json`, `ccn_gprs_tx.json`, `mtn_occ_tx.json`.
+  `FunctionRegistry` via `ServiceLoader`, and **called by real tx configs** — `ccnEventType(...)` and
+  siblings appear in three `*_tx.json` under the `rtdms/mtna` tree.
+  ⚠ **Those configs are UNTRACKED** — `asn-parser/.gitignore:12` ignores `config/`, so they are operator
+  data present in a working copy, not shipped repo content (the citation guard caught me quoting their
+  paths as if they were). ⇒ This does not weaken the verdict, it **confirms the row's own suspicion**:
+  the plugin really is *deliberately operator-side*, which is the case the row said to stop for.
   It is documented as **the canonical worked example** of the plugin SPI in `asn-parser/docs/PLUGIN_GUIDE.md`
   (also `asn-decoders/README.md`, `CONFIG_REFERENCE.md`), and `.github/workflows/ci.yml` names
   `asn-plugin-vendors` in its test coverage. Deleting it breaks `RTDMS_ASN_Test` and the asn-golden parity
