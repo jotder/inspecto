@@ -20,6 +20,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -105,6 +107,51 @@ class ControlApiDataSourceExportTest {
     private HttpResponse<byte[]> sendBytes(int port, String path) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofByteArray());
+    }
+
+    private HttpResponse<String> postBytes(int port, String path, byte[] body, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Content-Type", "application/zip");
+        if (auth != null) b.header("Authorization", auth);
+        return client.send(b.method("POST", BodyPublishers.ofByteArray(body)).build(), BodyHandlers.ofString());
+    }
+
+    /**
+     * ROUTE-UNGATED-DEFAULT-1 (gated 2026-09-15). {@code POST /import} writes real config and hot-registers
+     * what it unpacked — the same act its siblings {@code /bundle/import} and {@code /pipelines/import}
+     * already gate — and was the one of the three left open, with no test exercising it at all. This test
+     * lives beside the export tests because it is the same route class; the body is deliberately NOT a valid
+     * bundle: the gate is asserted in front of the handler, and the permitted case is proven by the refusal
+     * changing from 403 to the handler's own 4xx — the gate is not what stopped it.
+     */
+    @Test
+    void importRequiresCanAuthorWorkbench(@TempDir Path root) throws Exception {
+        Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")))
+                : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("nobody", Set.of()))
+                : Optional.empty());
+        try (Ctx c = open(root)) {
+            byte[] notAZip = "not a bundle".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+            assertEquals(401, postBytes(c.port, "/import", notAZip, null).statusCode(), "no credential → 401");
+
+            HttpResponse<String> denied = postBytes(c.port, "/import", notAZip, "Bearer plain");
+            assertEquals(403, denied.statusCode(), "a Subject WITHOUT the capability is refused: " + denied.body());
+            assertTrue(denied.body().contains("canAuthorWorkbench"), "the refusal names the capability");
+
+            assertEquals(401, sendText(c.port, "/export").statusCode(),
+                    "control: the armed Authenticator is in force for this Ctx — an unauthenticated READ is "
+                            + "401 too, so the 401/403 above are the gate's doing and not an accident of setup");
+
+            int permitted = postBytes(c.port, "/import", notAZip, "Bearer valid").statusCode();
+            assertNotEquals(403, permitted, "with the capability the gate lets the request THROUGH");
+            assertNotEquals(401, permitted);
+            assertTrue(permitted >= 400 && permitted < 500,
+                    "…and the handler, not the gate, rejects the non-bundle body (got " + permitted + ")");
+        } finally {
+            Authenticators.forTest(null);
+        }
     }
 
     private static Map<String, byte[]> unzip(byte[] zip) throws Exception {

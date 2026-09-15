@@ -33,6 +33,12 @@ final class CapabilityManifest {
             new Entry("POST", "/alerts/rules", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("PUT", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("DELETE", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
+            // AssistRoutes — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). ⛔ A PAIR: the settings
+            // are server-wide and /test makes a real outbound call to whatever baseUrl was last saved, so
+            // gating either alone leaves the other as the injection point or the trigger. Live in every
+            // Standard/Enterprise bundle — inspecto-agent IS staged, unlike inspecto-intelligence.
+            new Entry("POST", "/assist/settings", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/assist/settings/test", Roles.CAN_AUTHOR_WORKBENCH),
             // BiRoutes
             new Entry("POST", "/bi/templates/([^/]+)/apply", Roles.CAN_AUTHOR_WORKBENCH),
             // BundleRoutes
@@ -50,6 +56,10 @@ final class CapabilityManifest {
             new Entry("POST", "/connections", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("PUT", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("DELETE", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
+            // DataSourceRoutes — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). Import writes config
+            // and hot-registers what it unpacked, exactly like /bundle/import and /pipelines/import above and
+            // below; it was the one of the three left open, with no comment defending it and no test at all.
+            new Entry("POST", "/import", Roles.CAN_AUTHOR_WORKBENCH),
             // DatasetRoutes — materializing writes DATA, never config, so it is an operation and not an
             // authoring write: the same capability as any job trigger, and the same effect was already
             // reachable by triggering a `maintenance` job with `task: materialize`.
@@ -66,6 +76,12 @@ final class CapabilityManifest {
             new Entry("POST", "/rule-templates/([^/]+)/simulate", Roles.CAN_AUTHOR_WORKBENCH),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
+            // EventRoutes (inspecto-events) — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). A saved
+            // view is server-wide (SavedView carries no subject; one store per service), so writing or deleting
+            // one is authoring, not a personal convenience. ⚠ The delete is a POST-shaped DELETE. This file had
+            // no gate of any kind before — a whole route class the 2026-09-15 sweep never opened.
+            new Entry("POST", "/events/views", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/events/views/([^/]+)/delete", Roles.CAN_AUTHOR_WORKBENCH),
             // ExchangeRoutes
             new Entry("POST", "/exchange/offers", Roles.CAN_OFFER_DATASETS),
             new Entry("POST", "/exchange/refresh", Roles.CAN_OFFER_DATASETS),

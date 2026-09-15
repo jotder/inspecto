@@ -198,6 +198,20 @@ separately. ✅ **That row was filed and then REFUTED on 2026-09-15**: the per-r
 **six** routes gated on it — `PUT /spaces/{id}`, `DELETE /spaces/{id}` (§6a), and all four of §6c agent
 governance. Each carries a `CapabilityManifest` entry; `CapabilityManifestTest` pins registration and
 manifest to each other in both directions, and was proven red by un-gating one.
+✅ **Plus the five §5 gates on `canAuthorWorkbench`, later on 2026-09-15 (compliance plan step 1)** —
+`POST /import`, both `/events/views` writes, and the `/assist/settings` pair — so **eleven** routes were
+gated on 2026-09-15 in total, and two whole route classes (`EventRoutes`, `AssistRoutes`) that had no gate of
+any kind gained their first. Each new test asserts THREE statuses on purpose: 401 (no credential), **403 (a
+present Subject lacking the capability — the only assertion that distinguishes a gate from a login)**, and the
+permitted outcome; each also pins that the sibling READ stays open by policy.
+⚠ **Verified in a clean worktree, not the shared tree**: reactor **4530 / 0 / 0 / 28 over 26 test modules**
+(= the recorded 4526 + the four new tests). The same command in the shared checkout was RED — 33 failures +
+8 errors in `DbStatusStoreTest`, `CollectorServiceTest`, `RunLeaseContractTest`, `ControlApiTest` — because a
+peer session had nine uncommitted engine files in the tree; every one of those classes is green with this
+patch on HEAD alone. ⛔ A red reactor in this sandbox is not evidence until `git status` says whose
+changes it compiled.
+✅ **Mutation-checked, not merely green**: removing the gate on `POST /assist/settings` turned both of its tests
+and `CapabilityManifestTest` red, and nothing else — a test that cannot fail proves nothing, and these can.
 
 🔴 **§5's list of 12 is now 11 — one of its entries was WRONG, and gating it turned the build red.**
 ⚠ **This line said "now 10 — two of its entries" until 2026-09-15, and the arithmetic was wrong.**
@@ -234,11 +248,11 @@ every remaining entry as a hypothesis.
 
 | Route | Verdict | The fact that decides it |
 |---|---|---|
-| `POST /import` | ✅ **GATE** `canAuthorWorkbench` | Parses a bundle, writes into the Space's `config/` and **hot-registers connections and pipelines live** (`DataSourceRoutes:246-312`). Both true siblings are gated — `/bundle/import` (`BundleRoutes:118`), `/pipelines/import` (`PipelineBundleRoutes:96`). No manifest entry, no defending comment, and **no test exercises it at all**. |
-| `POST /events/views` | ✅ **GATE** `canAuthorWorkbench` | A saved view is **server-wide, not per-user**: `SavedView` is `(name, filters, createdAt)` with no subject field (`SavedView.java:9-20`) over one `SavedViewStore` per service (`CollectorService:116`). Any caller creates what every caller sees. |
-| `POST /events/views/{id}/delete` | ✅ **GATE** `canAuthorWorkbench` | Same store, no ownership check — deletes another caller's view. ⚠ A POST-shaped DELETE does not change the authorization question. |
-| `POST /assist/settings` | ✅ **GATE** `canAuthorWorkbench` | **Server-wide** provider config, one file (`AssistModelSettings.save`), reachable in Standard/Enterprise. 🔴 Its own javadoc names a `scope: assist.write` **that the route never enforces** — documented intent, unenforced. |
-| `POST /assist/settings/test` | ✅ **GATE** `canAuthorWorkbench` | Performs a **real outbound call** (`p.generate(...)`) to whatever `baseUrl` was last saved. ⛔ **Gate it WITH the route above, never alone** — see the security note below. |
+| `POST /import` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | Parses a bundle, writes into the Space's `config/` and **hot-registers connections and pipelines live** (`DataSourceRoutes:246-312`). Both true siblings are gated — `/bundle/import` (`BundleRoutes:118`), `/pipelines/import` (`PipelineBundleRoutes:96`). No manifest entry, no defending comment, and **no test exercises it at all**. |
+| `POST /events/views` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | A saved view is **server-wide, not per-user**: `SavedView` is `(name, filters, createdAt)` with no subject field (`SavedView.java:9-20`) over one `SavedViewStore` per service (`CollectorService:116`). Any caller creates what every caller sees. |
+| `POST /events/views/{id}/delete` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | Same store, no ownership check — deletes another caller's view. ⚠ A POST-shaped DELETE does not change the authorization question. |
+| `POST /assist/settings` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | **Server-wide** provider config, one file (`AssistModelSettings.save`), reachable in Standard/Enterprise. 🔴 Its own javadoc names a `scope: assist.write` **that the route never enforces** — documented intent, unenforced. |
+| `POST /assist/settings/test` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | Performs a **real outbound call** (`p.generate(...)`) to whatever `baseUrl` was last saved. ⛔ **Gate it WITH the route above, never alone** — see the security note below. |
 | `POST /recon/run` | ⛔ **DELIBERATE EXEMPTION** | 🔴 The audit called it *"the same shape as every other trigger"*. **It triggers nothing** — stateless compute, nothing persisted, no job dispatched. Siblings `/recon/columns` and `/recon/breaks` are the same shape and were never proposed; `/bi/query` is ungated for this reason (`BiRoutes:44`). The class javadoc says these routes *"are stateless compute over ReconService"* with `/recon/promote` as *"the one exception… which writes"*. |
 | `POST /tags/assignments/{k}/{id}` | ⛔ **DELIBERATE EXEMPTION** | `TagRoutes.java:60-62` states it: gated **per target via `AnnotationTargets`, not by capability**, because *"a capability gate would make 'can tag' independent of 'can see' — which is exactly how a tag would turn into an access grant."* |
 | `DELETE /tags/assignments/{k}/{id}/{tag}` | ⛔ **DELIBERATE EXEMPTION** | Same comment, which covers both assignment routes together. |

@@ -51,12 +51,18 @@ public final class EventRoutes implements RouteModule {
         api.get("/events/search", (e, m) -> toMaps(api.service().events().query(eventQuery(e, EventQuery.DEFAULT_LIMIT))));
         api.get("/events/export", (e, m) -> exportEvents(api, e));
         api.get("/events/views", (e, m) -> api.service().savedViews().list());
-        api.post("/events/views", (e, m) -> saveView(api, api.body(e)));
-        api.post("/events/views/([^/]+)/delete", (e, m) -> {
+        // A saved view is SERVER-WIDE, not per-user: SavedView is (name, filters, createdAt) with no subject,
+        // over one SavedViewStore per service. Any caller creates what every caller sees and can delete
+        // another caller's view — that is authoring, not a personal convenience, so both writes take the
+        // authoring capability (ROUTE-UNGATED-DEFAULT-1, grounded 2026-09-15; this file had no gate at all).
+        // The delete is POST-shaped for the client's convenience; the verb changes nothing about who may.
+        api.post("/events/views", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> saveView(api, api.body(e))));
+        api.post("/events/views/([^/]+)/delete", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> {
             if (!api.service().savedViews().delete(ApiContext.name(m)))
                 throw new ApiException(404, "no saved view named '" + ApiContext.name(m) + "'");
             return Map.of("name", ApiContext.name(m), "deleted", true);
-        });
+        }));
         api.get("/events/([^/]+)", (e, m) -> eventById(api, ApiContext.name(m)));
     }
 

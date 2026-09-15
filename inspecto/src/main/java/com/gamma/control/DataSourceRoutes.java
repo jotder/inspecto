@@ -57,7 +57,11 @@ final class DataSourceRoutes implements RouteModule {
         api.get("/datasources", (e, m) -> resolver(api).dataSourceIds());
         api.get("/datasources/([^/]+)/export", (e, m) -> exportDataSource(api, e, ApiContext.name(m)));
         api.get("/export", (e, m) -> exportSpace(api, e));
-        api.post("/import", (e, m) -> importBundle(api, e));
+        // Import writes real config AND hot-registers what it unpacked (importBundle: writeConfig, then
+        // registerConnection/registerPipeline) — the same act its two siblings already gate, /bundle/import
+        // and /pipelines/import. It was the one of the three left open (ROUTE-UNGATED-DEFAULT-1, grounded
+        // 2026-09-15: no comment defended its openness and no test exercised it at all).
+        api.post("/import", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> importBundle(api, e)));
         api.post("/import/preview", (e, m) -> previewImport(api, e));
     }
 

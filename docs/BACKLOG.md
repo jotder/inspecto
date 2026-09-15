@@ -276,9 +276,9 @@ from thirty-eight separate rows.
 | 2 | Do reads get a capability posture? | **No — reads stay open by design, stated as policy**; confidentiality sits at the Space/ABAC layer. The ratchet covers the **83 mutating** routes; the 34 read-shaped POSTs are **EXEMPT as reads**, not deferred | same |
 | 3 | The 10 remaining gateable-now routes | **Ground all 10 FIRST**, report a per-route verdict, then code — 2 of the first 4 attempts were deliberate exemptions | same |
 | 4 | Ownership/identity in the auth-free core | **Owner = the authenticated `Subject` where one is attached, `"appUser"` where none is** — one design pass, mirroring how `requireCapability` degrades to a no-op on Personal | `DUCKLE-C1` · `DUCKLE-C4` (§5) |
-| 5 | A Break's Incident identity | **`(type, key, column)` — full parity** with the client's `breakId`. ⚠ Accepted cost: a value Break and a missing-row Break on one key+column become separate Incidents | `BREAK-DEDUPE-GRAIN-1` (§3) |
-| 6 | What does `producer` identify? | **A structured `Ref` `{kind, id}` plus the owning pipeline** — all three emit sites corrected | `DATASET-SELF-TRIGGER-1` (§5) |
-| 7 | May retention prune resume state? | **Never prune below the high watermark** — floor the sweep; no schema change | `LEDGER-PRUNE-EATS-RESUME-STATE-1` (§5) |
+| 5 | A Break's Incident identity | ✅ SHIPPED 2026-09-15. **`(type, key, column)` — full parity** with the client's `breakId`. ⚠ Accepted cost: a value Break and a missing-row Break on one key+column become separate Incidents | `BREAK-DEDUPE-GRAIN-1` (§3) |
+| 6 | What does `producer` identify? | ✅ SHIPPED 2026-09-15. **A structured `Ref` `{kind, id}` plus the owning pipeline** — all three emit sites corrected | `DATASET-SELF-TRIGGER-1` (§5) |
+| 7 | May retention prune resume state? | ✅ SHIPPED 2026-09-15. **Never prune below the high watermark** — floor the sweep; no schema change | `LEDGER-PRUNE-EATS-RESUME-STATE-1` (§5) |
 | 8 | `batches` vs a per-schema row set | **A child table** for per-schema outputs; `batches` stays one row per ingest | Consignment ELT (§3) |
 | 9 | Execute an intervening node at rest? | **YES — `EXECUTED` nodes anywhere**; fusion may break mid-graph | Platform Services Stage 2 (§3) · §2 Row 15 |
 | 10 | ELT Phase 6 prerequisites | **Converter + parity gate NOW; the release is a SEPARATE call** — ⚠ including the `v3.12.0` name collision | §2 Row 15 |
@@ -655,6 +655,29 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   widening on this table's sibling is exactly what produced the `CONSIGNMENT-OUTPUTS-NULLRUN-1` P1
   scare on 2026-09-15, two days after `consignment_outputs` gained its UNIQUE key early. The child
   table costs a join on reads that want output tables, and changes no row's identity.
+
+  🔴 **RE-GROUNDED 2026-09-15 before building — the child table ALREADY EXISTS, and building a new one
+  would have duplicated it.** Two premises in this row were wrong:
+  (a) **`batches` is not a SQL table.** It is a per-run CSV audit ledger (`ConsignmentAuditWriter`, header
+  `consignment_id,pipeline,schema_name,output_table,…`), mirrored into DuckDB as
+  `inspecto_status_batches(pipeline, seq, payload)` where the whole row is an opaque JSON blob — not
+  columns. "Add a child table" therefore had no relational thing to be a child OF.
+  (b) **`consignment_outputs` is already a per-Consignment child table, written on the ORDINARY ingest
+  path** — `ConsignmentIngestor.finalizeSource:473`, not only by the processor/summary path — and it is
+  default-ON (`consignment.outputs.backend=duckdb`) so it exists in **Personal** too, with an established
+  UPSERT, state lifecycle and read API.
+  ⇒ **The real gap is representational, not structural:** `ConsignmentOutputs.fromLineage` takes ONE
+  `tableName` for the whole batch and `ConsignmentIngestor` passes `batch.table()`, so a segmented ingest's
+  rows are all stamped with the batch's single table. The segment identity survives only inside each output
+  file's PATH. ⇒ Make the existing child table per-schema accurate; do not add a sibling ledger.
+  ⚠ **The two segmented ingesters are NOT structurally alike**, which the row's framing implies:
+  `UnionModeIngester` has `segKey` right in its write loop, but `GenerationModeIngester` writes per MEMBER
+  through `DuckDbRecordSink`, which fans out to segments internally — there the segment is known only inside
+  `generationFlush(Seg)`. Any attribution must be collected in BOTH places or one path silently keeps the
+  flattened value.
+  ⚠ `PartitionOutput` is the wrong place to carry it — ~14 construction sites across two modules. The
+  established idiom is `IngestOutcome`'s existing `bounds` map, keyed by output file, built in that same
+  loop.
 - **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built; ⚠ **"needs `SeqScope`" is STALE as a blocker — regrounded 2026-09-15: `SeqScope` already ships** as a nested enum at `FileSequenceGaps.java:74-79` (`PER_BUCKET`/`CONTINUOUS`). The type exists; only the wiring does not. ⚠ **K1 is unwired too**, which this row never said: `DbConsignmentOutputStore.dailyVolume()` has zero call sites, same as `VolumeBaseline`/`FileSequenceGaps`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (🔴 **"do not grow the `EventType` enum" is wrong in KIND — corrected 2026-09-15: there is no enum.** `EventType.java:19` is a class of `public static final String` constants, deliberately open per its own javadoc, and no `kpi.*` entry exists. The constants-class guidance still applies; the thing it warns about does not exist), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
 - **P2** · ✅ **TRIGGER (operator, 2026-09-13):** an author needs to declare "this Collector takes NO data
   extensions". · **`SCHEMA-FORM-EMPTY-LIST-1` — the UI cannot author an explicit empty list** (filed 2026-09-13,
@@ -764,6 +787,12 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `(type, key, column)` parity decision on `BREAK-DEDUPE-GRAIN-1`, which needs the same widening.
   ⇒ ⛔ **build the attribute shape ONCE, for both**; doing them separately means widening the same
   structure twice and reconciling two spellings of a Break's identity.
+  🔴 **RE-GROUNDED 2026-09-15 — the shared prerequisite did NOT materialise.** `BREAK-DEDUPE-GRAIN-1`
+  shipped that day and widened the **identity** (a composite `breakId` attribute), which is a different
+  thing from the **evidence** this row needs. ⇒ The saving assumed above is *not* available: the Incident
+  now carries `breakId`/`breakKey`/`breakType`/`column`, and carrying which ROWS formed the break is still
+  this row's own work, added on top of that set. ⚠ The one thing genuinely settled for free is the
+  *spelling* of a Break's identity — build against `breakId`, do not invent a second one.
 
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
@@ -899,6 +928,28 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   opens six. ⛔ Do not "improve" this back toward key-only dedupe without reopening the decision.
   ⚠ Nothing pins the behaviour in either direction today — `aDifferentBreakInTheSameReconciliation
   OpensItsOwnIncident` varies only the key — so the new grain needs a test that varies the COLUMN.
+
+  ✅ **SHIPPED 2026-09-15.** Both halves moved in one change, as required: `promote` writes a composite
+  **`breakId`** Incident attribute and dedupes on it, `promoted` indexes by it, and the SPA's `breakId()`
+  renders the byte-identical string (`isPromoted`/`incidentFor` now look up by it, not by `b.key`).
+  ⚠ **A single composite attribute, not three matched ones.** `ObjectAccess.hasActiveMatching` takes a map
+  and *could* match three, but `activeAttributeIndex` indexes ONE attribute — a three-attribute dedupe
+  would leave the offer read unable to express the grain, and the symmetry is the load-bearing part.
+  🔴 **The decision said "parity with the client's `breakId`" — and the client's `breakId` was NOT
+  injective.** It joined with `KEY_SEP`, which is `''`, while a recon `key` is itself a join of the key
+  columns' values, so keys routinely contain the separator (the repo's own fixtures use `EU|voice`).
+  Mirroring it verbatim would have made `(break, "EU|voice", "amount")` and `(break, "EU", "voice|amount")`
+  ONE identity — the very collision this row removes, reintroduced one level down. Both sides now escape
+  `\` then `|`. ⛔ `KEY_SEP` itself was left alone: it belongs to `keyOf`, and changing it would have
+  altered every break's `key` **value**, not merely its identity.
+  ⚠ **One-time upgrade effect, accepted:** Incidents opened before this carry no `breakId`, so each such
+  Break can be promoted once more before the new grain governs. Chosen over carrying a legacy predicate,
+  which would have re-introduced the key-only grain being replaced.
+  ⛔ **The shared widening with `FEATURE-RECON-CARDINALITY` (§3) is NOT done.** That row wanted the Incident
+  attribute shape widened once for both; this widened the *identity*, not the *evidence*. Carrying WHICH
+  ROWS formed a break is still its own work — on top of the `breakId`/`breakKey`/`breakType`/`column` set
+  now written, not instead of it.
+  → `ControlApiReconPromoteTest` (11 tests, 4 new) · `reconciliation-types.spec.ts` (5 new)
 - **P2** · ✅ **TRIGGER (operator, 2026-09-13):** an **SLA commitment names MTTD**. Until then it is a metric nobody reads,
   and the "first signal" instant is a modelling choice better made against a real definition. ⚠ Re-grounded
   2026-09-13: MTTR's anchor DID ship (`ATTR_RESOLVED_AT`) and does **not** confer one on MTTD — that is a
@@ -1287,7 +1338,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   **What remains:** (a) the other ~19 inexpressible routes — Incident/Case triage (~15, in the optional
   `inspecto-ops` module) and agent governance (4, `AgentRoutes`); ⚠ **the audit itself says the triage
   family needs a product decision first** — whether Incident triage should stay open even now that
-  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) ~~the 10 unverified gateable routes~~ ✅ **GROUNDED 2026-09-15 — and there were ELEVEN, not ten** (`POST /spaces` was §6(a), not §5, so the refutation was subtracted from the wrong bucket). **Result: 5 GATE · 3 deliberate exemptions · 3 operator calls** — per-route verdicts in the audit's §5 GROUNDED table. 🔴 Two of the five are a **request-forgery-shaped pair** (`POST /assist/settings` writes a server-wide `baseUrl`, `POST /assist/settings/test` calls out to it) and ⛔ must be gated in ONE commit; `inspecto-agent` IS staged, so unlike §6(c) this one is live in shipped bundles. 🔴 **And the grounding produced a REFRAMING that outranks the five: the enforcement model is fail-OPEN** — `withCapability` is opt-in and an undeclared route is simply open, so fixing routes one by one passes a point-in-time review and fails a Type II window. ⇒ the P1's remaining work is now **`superpower/route-gating-compliance-plan.md`** (2026-09-15, operator: *"goal is to pass compliance"*): step 1 gate the five · step 2 every mutating route ends as a capability OR a categorized exemption · **step 3 flip the default** (a marked `Gated` handler gives the router the capability with zero call-site changes; undeclared mutating ⇒ refuse at boot AND fail CI) · step 4 capability on audit events, one inventory event per boot, and a **derived, CI-enforced** evidence report. ⛔ Step 3 waits for step 2 — *ratchet last* still holds;
+  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) ~~the 10 unverified gateable routes~~ ✅ **GROUNDED 2026-09-15 — and there were ELEVEN, not ten** (`POST /spaces` was §6(a), not §5, so the refutation was subtracted from the wrong bucket). **Result: 5 GATE · 3 deliberate exemptions · 3 operator calls** — per-route verdicts in the audit's §5 GROUNDED table. 🔴 Two of the five are a **request-forgery-shaped pair** (`POST /assist/settings` writes a server-wide `baseUrl`, `POST /assist/settings/test` calls out to it) and ⛔ must be gated in ONE commit; `inspecto-agent` IS staged, so unlike §6(c) this one is live in shipped bundles. 🔴 **And the grounding produced a REFRAMING that outranks the five: the enforcement model is fail-OPEN** — `withCapability` is opt-in and an undeclared route is simply open, so fixing routes one by one passes a point-in-time review and fails a Type II window. ⇒ the P1's remaining work is now **`superpower/route-gating-compliance-plan.md`** (2026-09-15, operator: *"goal is to pass compliance"*): step 1 gate the five (✅ **SHIPPED 2026-09-15** — all five, verified in a clean worktree because the shared tree carried a peer's nine uncommitted engine files that turned the same reactor red in classes this change never touched) · step 2 every mutating route ends as a capability OR a categorized exemption · **step 3 flip the default** (a marked `Gated` handler gives the router the capability with zero call-site changes; undeclared mutating ⇒ refuse at boot AND fail CI) · step 4 capability on audit events, one inventory event per boot, and a **derived, CI-enforced** evidence report. ⛔ Step 3 waits for step 2 — *ratchet last* still holds;
   (c) ✅ **operator decided 2026-09-15: record the exemption reasoning for the 49 correctly-ungated routes**
   in the audit doc, so the ratchet starts from a reviewed baseline; (d) the ratchet itself, **last**.
   → `superpower/route-gating-audit.md` · `okf/capabilities/security/security.md`
@@ -1536,6 +1587,30 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `STALE-TILES-PRECISION-1` needs on a Signal's `subject`. ⇒ **build the `Ref` vocabulary once.**
   ⚠ And it interacts with `PIPELINE-DRYRUN-1`: a dry run must not emit these at all.
 
+  ✅ **SHIPPED 2026-09-15.** `DatasetWriteSignal.emit(dataset, rows, Ref producer, String owningPipeline)`:
+  the producer rides the Signal's `actor` slot (a `Ref`, previously always `null`) and the owning pipeline
+  is a separate payload key, `PAYLOAD_PIPELINE`. All three emit sites corrected — `MaterializeTask` now
+  says `Ref.of("job", …)`, `ConsignmentProcessJobType` says `Ref.of("processor", …)`, and
+  `CollectorService` **reads the owning pipeline through** instead of dropping it. The guard exists and
+  fires: `PipelineScheduler.onDatasetWrite(dataset, producerPipeline)` skips the producing pipeline.
+  ✅ **The existing `Ref {kind, id, rel, via}` was reused, not duplicated** (`com.gamma.signal.Ref`,
+  `@PublicApi since 4.0.0`) — so `STALE-TILES-PRECISION-1` inherits the same vocabulary as intended.
+  🔴 **`null` owning pipeline means "suppress NOTHING", and that is load-bearing.** A cron or manually
+  fired job genuinely has no owning pipeline (`ctx.trigger()` carries one only for `event:<pipeline>`), so
+  reading absence as "suppress" would have silently killed the ordinary materialize-then-trigger path that
+  predates the guard. A test pins each direction: self suppressed, another pipeline still fires, unowned
+  still fires.
+  ⚠ **The wiring was the defect, not the comparison** — a guard unit-tested only on `PipelineScheduler`
+  would have passed while the shipped path stayed broken, because `CollectorService` never delivered the
+  value. `aDatasetWriteOwnedByTheSubscriberItselfDoesNotRetriggerIt` drives the real subscriber end to end.
+  ✅ `PIPELINE-DRYRUN-1`'s half is already satisfied **structurally**: both emit sites sit behind their
+  callers' existing dry-run gates (`MaintenanceJob` short-circuits to `noPreview`; `persistSummaries`
+  returns before populating `pending`), so no new flag was added. ⚠ That is a caller-level guarantee, not
+  an asserted one — if the dry-run gates move, the emission moves with them silently.
+  ⚠ `MaterializeTask.run` gained a `JobContext` parameter to reach the trigger.
+  → `PipelineSchedulerEventTriggerTest` (3 new) · `CollectorServiceTriggerTest` (1 new) ·
+  `DatasetWriteSignalTest` (extended)
+
 - **P2** · **`LEDGER-PRUNE-EATS-RESUME-STATE-1` — retention deletes resume position, not just history.**
   Filed 2026-09-15 from duckle candidate S1 ("saved state — watermarks, resume positions — is NEVER
   touched by retention"). `AcquisitionLedger.highWatermark()` is **derived from the fingerprints the
@@ -1557,6 +1632,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ A pruned-then-reappearing old file still re-ingests as NEW under this answer, which is arguably
   correct rather than a loss — the defect was losing the *position*, not forgetting the *history*.
 
+  ✅ **SHIPPED 2026-09-15.** The floor is a correlated `MAX(last_modified)` **per source**, applied in
+  `DbAcquisitionLedger` (SQL) and `InMemoryAcquisitionLedger` (a per-source floor map). No schema change,
+  as decided. 🔴 **The decision's own words hid a trap: prune ages on `processed_at`, but the watermark
+  derives from `last_modified`** — two different clocks on one row. "Never prune below the high watermark"
+  therefore means *keep the row(s) holding `MAX(last_modified)`*, not *keep recent rows*; a floor written
+  against `processed_at` would compile, pass a naive test, and still delete the resume position.
+  ⚠ A **global** sweep (`source = null`) floors each source **independently** — one shared floor would let
+  a busy source's frontier protect a quiet source's rows.
+  ✅ **One PAIR of `PRUNE-PREVIEW-DRIFT-1` (below) is closed in passing — not the row.** `prune` and
+  `countPrunable` are now two call sites of ONE predicate in each ledger implementation, and a test pins
+  that the preview and the sweep agree. ⛔ Do not re-split them. ⚠ **The row stays OPEN**: it also covers
+  `ReceiptPruneTask`, `NotificationPruneTask` and `DedupPruneTask` (whose dry run reports the ledger's
+  total size rather than a plan), none of which this touched.
+  → `AcquisitionLedgerPruneTest` (10 tests, incl. the single-row source that is *entirely* resume state).
+
 - **P3** · **`PRUNE-PREVIEW-DRIFT-1` — dry-run and the real prune are two different predicates.**
   Filed 2026-09-15 from duckle candidate S1 ("`--dry-run` and the real prune share one planning
   function"). ✅ The file-partition tasks already do it right — `ParquetEventStore.prune(before, dryRun)`
@@ -1565,6 +1655,9 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   the act calls `prune(cutoff)`, **each with its own independently written WHERE clause**
   (`AcquisitionLedger.java:72-83`, `DbAcquisitionLedger.java:225-258`; same shape in `ReceiptPruneTask` /
   `NotificationPruneTask`) — two definitions of "what is prunable" that can drift.
+  ✅ **The ACQUISITION-LEDGER pair is unified (2026-09-15)**, as a side effect of shipping the watermark
+  floor on `LEDGER-PRUNE-EATS-RESUME-STATE-1` — both impls now share one predicate and a test pins the
+  agreement. ⚠ The row remains open for `ReceiptPruneTask`, `NotificationPruneTask` and `DedupPruneTask`.
   ⛔ Worst case found: **`DedupPruneTask`'s dry run does not count matching rows at all** — it reports the
   ledger's *total* size as the preview, which is not a plan. ⇒ unify each pair onto one predicate; the
   partition tasks are the template. → `AcquisitionLedger.java:72` · `DedupPruneTask.java`

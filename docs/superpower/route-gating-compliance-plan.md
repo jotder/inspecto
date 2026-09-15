@@ -1,7 +1,8 @@
 # Route Gating for Compliance — Plan
 
-> **Status: DRAFTED 2026-09-15, operator direction *"goal is to pass compliance"*. Step 1 is being built
-> in the same shift; steps 2–4 are sequenced and grounded but not started.** This plan takes the
+> **Status: DRAFTED 2026-09-15, operator direction *"goal is to pass compliance"*. ✅ Step 1 SHIPPED the
+> same shift — all five gates, verified in a clean worktree (4530/0/0/28); steps 2–4 are sequenced and
+> grounded but not started.** This plan takes the
 > route-gating audit ([`route-gating-audit.md`](route-gating-audit.md), all 11 remaining routes grounded
 > 2026-09-15) from *a reviewed list* to *a control an auditor can test*. It is the second half of
 > `ROUTE-UNGATED-DEFAULT-1` (P1).
@@ -43,7 +44,7 @@ state-changing ones only*) but no per-route classification yet.
 
 ---
 
-## 1. Step 1 — Gate the five (BUILD NOW)
+## 1. Step 1 — Gate the five — ✅ SHIPPED 2026-09-15
 
 **Compliance purpose:** close the known gaps before the observation window opens. One of them is a live
 request-forgery surface, which an auditor would classify as a finding in its own right.
@@ -76,6 +77,10 @@ Standard and Enterprise bundle.
 
 **Acceptance:** reactor green with `-Pedition-enterprise`; the five appear in `ENTRIES`; each has a 403 test
 that goes red when its `withCapability` is removed (mutation-check at least the assist pair).
+✅ **MET 2026-09-15.** Mutation: the `withCapability` on `POST /assist/settings` removed in the worktree →
+`settingsPairRequiresCanAuthorWorkbench` red (expected 403, got 200), `settingsGateRunsBeforeTheAbsentModule503`
+red (expected 403, got 503), and `CapabilityManifestTest` red naming the drift (*"declared in the manifest but
+NOT registered: POST /assist/settings"*); the other seven assist tests stayed green; restore verified byte-identical.
 
 ---
 

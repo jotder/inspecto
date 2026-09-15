@@ -32,14 +32,25 @@ final class AssistRoutes implements RouteModule {
         // Registered BEFORE the intent catch-all so "settings" never resolves as a skill intent. ──
         api.get("/assist/settings", (e, m) -> assistAgentOr503(api).settings());
         api.get("/assist/metrics", (e, m) -> assistAgentOr503(api).metrics());
-        api.post("/assist/settings/test", (e, m) -> assistAgentOr503(api).testSettings());
-        api.post("/assist/settings", (e, m) -> {
+        // ⛔ These two are gated TOGETHER and must stay that way (ROUTE-UNGATED-DEFAULT-1, grounded
+        // 2026-09-15). The settings are SERVER-WIDE — one AssistModelSettings file, no per-caller scope — and
+        // /test performs a REAL outbound call to whatever baseUrl/provider was last saved. Ungated, that pair
+        // let any authenticated caller point the server at an arbitrary URL and then make it call out:
+        // request-forgery-shaped, and live in every Standard/Enterprise bundle because inspecto-agent IS
+        // staged (unlike /agent/*, whose gate is correct-but-unreached). Gating only /test would leave the
+        // write route as the injection point; gating only the write would leave the trigger open. The
+        // agent's own javadoc already named `scope: assist.write` here — documented, and until now
+        // unenforced. The capability gate runs BEFORE assistAgentOr503, so a caller without it sees 403
+        // whether or not the optional module is present.
+        api.post("/assist/settings/test", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> assistAgentOr503(api).testSettings()));
+        api.post("/assist/settings", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> {
             try {
                 return assistAgentOr503(api).updateSettings(api.body(e));
             } catch (IllegalArgumentException ex) {
                 throw new ApiException(400, ex.getMessage());
             }
-        });
+        }));
         api.post("/assist/(.+)", (e, m) -> assist(api, ApiContext.name(m), api.body(e)));
     }
 

@@ -17,6 +17,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -135,8 +137,50 @@ class ControlApiEventsTest {
         }
     }
 
+    /**
+     * ROUTE-UNGATED-DEFAULT-1 (gated 2026-09-15): a saved view is server-wide — {@code SavedView} carries no
+     * subject and there is one store per service — so writing or deleting one is authoring, not a personal
+     * convenience. Both writes take {@code canAuthorWorkbench}; the read stays open (reads are open by policy
+     * on every edition). ⚠ Three statuses are asserted on purpose: 401 is authentication, 403 is the GATE —
+     * a present Subject lacking the capability — and only the 403 case distinguishes a gated route from one
+     * that merely requires a login. This file had no capability gate of any kind before this test.
+     */
+    @Test
+    void savedViewWritesRequireCanAuthorWorkbench(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")))
+                : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("nobody", Set.of()))
+                : Optional.empty());
+        try (Ctx c = open(dir)) {
+            String view = "{\"name\":\"errors\",\"level\":\"ERROR\"}";
+
+            assertEquals(401, send(c.port, "POST", "/events/views", view).statusCode(),
+                    "no credential is a clean 401, never a 500");
+
+            HttpResponse<String> denied = sendAs(c.port, "POST", "/events/views", view, "Bearer plain");
+            assertEquals(403, denied.statusCode(), "a Subject WITHOUT the capability is refused: " + denied.body());
+            assertTrue(denied.body().contains("canAuthorWorkbench"), "the refusal names the capability");
+            assertEquals(403, sendAs(c.port, "POST", "/events/views/errors/delete", null, "Bearer plain").statusCode(),
+                    "the POST-shaped delete is gated identically — the verb changes nothing");
+
+            assertEquals(200, sendAs(c.port, "GET", "/events/views", null, "Bearer plain").statusCode(),
+                    "reads stay open by policy: the same capability-less Subject may LIST views");
+
+            assertEquals(200, sendAs(c.port, "POST", "/events/views", view, "Bearer valid").statusCode());
+            assertEquals(200, sendAs(c.port, "POST", "/events/views/errors/delete", null, "Bearer valid").statusCode());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
+        return sendAs(port, method, path, body, null);
+    }
+
+    private HttpResponse<String> sendAs(int port, String method, String path, String body, String auth) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
+        if (auth != null) b.header("Authorization", auth);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());

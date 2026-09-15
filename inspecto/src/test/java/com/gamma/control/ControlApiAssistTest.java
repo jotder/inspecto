@@ -21,6 +21,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -84,6 +86,76 @@ class ControlApiAssistTest {
     private HttpResponse<String> get(int port, String path) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.GET().build(), BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> postAs(int port, String path, String body, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", auth).header("Content-Type", "application/json");
+        return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> getAs(int port, String path, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", auth);
+        return client.send(b.GET().build(), BodyHandlers.ofString());
+    }
+
+    /** Bearer valid → a Subject WITH the authoring capability; Bearer plain → a Subject WITHOUT any. */
+    private static void armAuthenticator() {
+        Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")))
+                : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("nobody", Set.of()))
+                : Optional.empty());
+    }
+
+    /**
+     * ROUTE-UNGATED-DEFAULT-1 (gated 2026-09-15). The settings are SERVER-WIDE and {@code /test} makes a real
+     * outbound call to whatever baseUrl was last saved, so the two are a request-forgery-shaped PAIR and are
+     * gated together — this test pins BOTH under one Subject so they cannot drift apart. ⚠ The 403 case (a
+     * present Subject lacking the capability) is the assertion that proves a gate rather than a login; the
+     * read stays open by policy. With the stub agent present the permitted path is 200 (the SPI defaults
+     * answer {@code supported:false}), so a pass is a real pass and not an accidental 503.
+     */
+    @Test
+    void settingsPairRequiresCanAuthorWorkbench(@TempDir Path dir) throws Exception {
+        armAuthenticator();
+        try (Ctx c = open(dir, true)) {
+            assertEquals(401, post(c.port, "/assist/settings", "{}").statusCode(), "no credential → 401");
+
+            HttpResponse<String> write = postAs(c.port, "/assist/settings", "{\"provider\":\"x\"}", "Bearer plain");
+            assertEquals(403, write.statusCode(), "the WRITE is the injection point: " + write.body());
+            assertTrue(write.body().contains("canAuthorWorkbench"), "the refusal names the capability");
+            assertEquals(403, postAs(c.port, "/assist/settings/test", "{}", "Bearer plain").statusCode(),
+                    "the TEST is the trigger — gated with the write, never apart from it");
+
+            assertEquals(200, getAs(c.port, "/assist/settings", "Bearer plain").statusCode(),
+                    "reads stay open by policy: the masked settings view needs no capability");
+
+            assertEquals(200, postAs(c.port, "/assist/settings", "{\"provider\":\"x\"}", "Bearer valid").statusCode());
+            assertEquals(200, postAs(c.port, "/assist/settings/test", "{}", "Bearer valid").statusCode());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    /**
+     * The gate runs BEFORE {@code assistAgentOr503}: a caller without the capability sees 403 whether or not
+     * the optional module is present. Pinned because the opposite order would make the refusal depend on
+     * packaging — 503 on Personal, 403 on Standard — and an auditor reading "no agent → 503" would be told
+     * the route is protected by absence, which is not protection.
+     */
+    @Test
+    void settingsGateRunsBeforeTheAbsentModule503(@TempDir Path dir) throws Exception {
+        armAuthenticator();
+        try (Ctx c = open(dir, false)) {
+            assertEquals(403, postAs(c.port, "/assist/settings", "{}", "Bearer plain").statusCode(),
+                    "capability refused before the module lookup");
+            assertEquals(503, postAs(c.port, "/assist/settings", "{}", "Bearer valid").statusCode(),
+                    "with the capability, the absent module is the only remaining refusal");
+        } finally {
+            Authenticators.forTest(null);
+        }
     }
 
     @Test
