@@ -64,7 +64,12 @@ final class AuditTrail {
         }
     }
 
-    /** Record a forbidden/unknown-route attempt (404/405) for a non-GET request. Never throws. */
+    /** Record a refused attempt. Two callers, with deliberately different scopes: an unknown or
+     *  method-mismatched route (404/405) is recorded for <em>non-GET</em> only, because a bare GET there is
+     *  usually an SPA deep link rather than an API attempt; an authentication or authorization refusal
+     *  (401/403) on a route that <em>did</em> match is recorded for <em>every</em> method, GET included —
+     *  the path is unambiguously an API call, and a refused read is a record worth keeping
+     *  (`AUDIT-REFUSAL-GAP-1`). Never throws. */
     static void accessDenied(HttpExchange ex, String method, String path, int status) {
         try {
             String actor = ApiContext.actor(ex);

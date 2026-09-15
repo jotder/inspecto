@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.event.Event;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,67 @@ class ControlApiAuthV1Test {
             assertEquals(403, r.statusCode());
             assertEquals("PERMISSION_DENIED", V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
+    }
+
+    /**
+     * AUDIT-REFUSAL-GAP-1: both refusals above must reach the audit trail. They used to unwind past
+     * {@code AuditTrail.record} into the error boundary, so the audit log held every SUCCESSFUL call to a
+     * route and none of the denied ones — the inverse of what an investigator needs.
+     *
+     * <p>⚠ Asserting the 401 and the 403 <em>separately</em> is deliberate: they are thrown from two
+     * different places ({@code authenticate} before the handler, {@code requireCapability} inside it) and
+     * are caught by two different guards, so one test passing would not prove the other path.
+     */
+    @Test
+    void anUnauthenticatedRefusalIsAudited(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(401, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}").statusCode());
+            assertTrue(deniedWithStatus(c, "/components/widget", 401),
+                    "a 401 on a matched route is recorded as ACCESS_DENIED");
+        }
+    }
+
+    @Test
+    void aCapabilityRefusalIsAudited(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(403, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
+                    "Authorization", "Bearer limited").statusCode());
+            assertTrue(deniedWithStatus(c, "/components/widget", 403),
+                    "a capability 403 is recorded as ACCESS_DENIED");
+            assertEquals("guest", deniedEvent(c, "/components/widget", 403).path("attributes").path("actor").asText(),
+                    "the refused attempt names the identity that made it");
+        }
+    }
+
+    /**
+     * A refused READ is audited too — unlike the 404/405 case, which stays non-GET only because a bare GET
+     * there is usually an SPA deep link. Here the path matched a real route, so there is no ambiguity.
+     */
+    @Test
+    void aRefusedReadIsAuditedAsWell(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(401, get(c.port, "/components/widget").statusCode());
+            assertTrue(deniedWithStatus(c, "/components/widget", 401), "a refused GET is recorded");
+        }
+    }
+
+    private boolean deniedWithStatus(Ctx c, String path, int status) {
+        return deniedEvent(c, path, status) != null;
+    }
+
+    private JsonNode deniedEvent(Ctx c, String path, int status) {
+        // Read the store in process: /events is itself behind the gate under test.
+        JsonNode events = JSON.valueToTree(c.svc.events().page(200, null, null).stream().map(Event::toMap).toList());
+        for (JsonNode e : events) {
+            JsonNode a = e.path("attributes");
+            if ("ACCESS_DENIED".equals(e.path("type").asText())
+                    && a.path("http_path").asText().contains(path)
+                    && status == a.path("http_status").asInt()) return e;
+        }
+        return null;
     }
 
     @Test

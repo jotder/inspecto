@@ -58,6 +58,17 @@ timestamp: 2026-07-16T00:00:00Z
 * **`AuditTrail`** — a central interceptor in `ControlApi.dispatch` records every successful
   state-changing request plus non-GET forbidden-route attempts (actor/action/target, secret
   scrubbing, immutable store). One seam covers all routes; 405 immutability is inherent to dispatch.
+  ✅ **And refusals on a route that DID match — `AUDIT-REFUSAL-GAP-1`, 2026-09-15.** A `401` from the
+  AuthN gate and a `403` from a capability check both unwound past the recording call into the error
+  boundary, which only shapes the response — so the log held every *successful* call to a route and none
+  of the denied ones, the inverse of what an investigator needs. Both are now caught in `routeDispatch`
+  and recorded as `ACCESS_DENIED`.
+  ⚠ **Two deliberate asymmetries, both load-bearing.** (1) The AuthZ **policy** DENY is *not* caught
+  there: `authorize` already writes its own `access.denied` via `AuditTrail.policyDecision`, and catching
+  it again would log one refusal twice — so `authorize` sits outside the guard on purpose. (2) Unlike the
+  404/405 path, this records **GET** too: a 404 on a bare GET is usually an SPA deep link, but a matched
+  route is unambiguously an API call, and a refused read is exactly the attempt worth keeping.
+  Pinned by three tests in `ControlApiAuthV1Test`, each proven red by removing the recording call.
 * **Email/SMTP channel wired to `deliver(n, target)`** (2026-07-20) — `SmtpEmailChannel`
   (`inspecto-notify-channels/src/main/java/com/gamma/notify/channel/SmtpEmailChannel.java`, id `email`,
   ⚠ **relocated from `inspecto-connectors` 2026-09-07, EDG-01 cell 1** — CP-15 is not for Personal and that sidecar ships in every edition,

@@ -726,9 +726,29 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             if (!m.matches()) continue;
             pathMatched = true;
             if (!r.method.equals(method)) continue;
-            authenticate(ex, path);
+            // AUDIT-REFUSAL-GAP-1 (2026-09-15): a 401 from the AuthN gate and a 403 from a capability
+            // check both unwound past the AuditTrail.record below into the error boundary, which only
+            // shapes the response — so the refusals an investigator most wants were the ones the audit
+            // log never held, while a *successful* call to the same route was recorded.
+            // ⚠ authorize() stays OUTSIDE these guards deliberately: a policy DENY already writes its own
+            // access.denied through AuditTrail.policyDecision, and catching it here would log it twice.
+            // ⚠ Unlike the 404/405 calls in this method, this records GET as well. A refused READ is
+            // exactly the attempt the row was filed about, and there is no ambiguity to protect here —
+            // the path matched a real route, so it cannot be an SPA deep link.
+            try {
+                authenticate(ex, path);
+            } catch (ApiException ae) {
+                AuditTrail.accessDenied(ex, method, path, ae.status);
+                throw ae;
+            }
             authorize(ex, method, path);
-            Object result = r.handler.handle(ex, m);
+            Object result;
+            try {
+                result = r.handler.handle(ex, m);
+            } catch (ApiException ae) {
+                if (ae.status == 401 || ae.status == 403) AuditTrail.accessDenied(ex, method, path, ae.status);
+                throw ae;
+            }
             if (result != HANDLED) respond(ex, 200, result);
             // The REAL status, not a literal 200. A handler that responds itself and returns HANDLED
             // routinely sends 422 (a rejected config write, a failed compatibility gate) — recording
