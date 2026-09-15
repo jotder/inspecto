@@ -23,6 +23,7 @@
 // Marker: <!--count:ID--> placed directly after the number, e.g.  **119**<!--count:processors-->
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { bundleModules, editionOnlyModules } from './bundle-modules.mjs';
 import { join, relative, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -113,6 +114,22 @@ const MANIFEST = {
     // "Eight formats" (= the ten tokens minus two aliases) is not derivable either: the aliases live in
     // two `equals` calls, not a structure, so a guard would have to mirror them — write "ten tokens"
     // with the marker and let the prose bound "eight" to it.
+    // ── SPEC-COUNTS-1's last hand-typed count, closed 2026-09-15: `tools/bundle-modules.mjs` is the one
+    // module list sbom.mjs and check-sbom-modules.mjs both read (the dependency count was already derived —
+    // `locked-dependencies` below). ⚠ Named for the SET: "staged jars" was stated eight ways because it
+    // silently meant different sets (first-party only vs + the PG sidecar; Standard vs Enterprise).
+    'optional-modules': {
+        floor: 2,
+        what: 'first-party modules an edition can add beyond Personal (Standard + Enterprise floors)',
+        derive: () => editionOnlyModules('Enterprise').length,
+        source: 'tools/bundle-modules.mjs',
+    },
+    'enterprise-first-party-jars': {
+        floor: 1,
+        what: 'first-party jars the Enterprise bundle stages (NOT counting the postgresql sidecar)',
+        derive: () => bundleModules('Enterprise').length,
+        source: 'tools/bundle-modules.mjs',
+    },
     'parsing-frontend-tokens': {
         floor: 5,
         what: 'parsing.frontend tokens accepted at config load (aliases counted: fixed_width, excel)',

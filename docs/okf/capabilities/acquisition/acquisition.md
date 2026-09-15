@@ -946,8 +946,20 @@ Incidental (the route string is an example for another concern, but they do exer
 
 ### 8.5 Runnable examples
 
-⚠ **No committed example exercises remote collection.** Every `collector.connector` in every committed
-`*_pipeline.toon` is `local` (20 occurrences), and `collector.fetch`, `post_action`, `rate_limit` and
+✅ **One committed example now exercises a non-local connector, and it was DRIVEN live 2026-09-15**
+(`COLLECTOR-DATASET-UNPROVEN-1`, closed): `spaces/demo/config/orders/orders_by_region_feed_pipeline.toon` —
+`collector: {connector: dataset, dataset: datasets/orders_by_region}` plus the `trigger: {type: event, on: dataset,
+from: …}` half, `parsing.frontend: parquet`. On a multi-Space server (`-Dspaces.root=spaces`, Standard modules on
+the classpath) `POST /spaces/demo/jobs/orders_by_region_materialize/trigger` → 202 → SUCCESS, 4 rows; the
+`DatasetWriteSignal` fired the feed **in the same second** (batch `SUCCESS`, 4 rows, 1 partition, 0 rejected,
+180 ms) and the Parquet landed under `spaces/demo/data/orders_by_region_feed/database/`. 🔴 Two things the run
+found that no test had: (a) the committed materialize job was **broken** — `measures: "gross,sum"` is not the
+measure grammar (`sum(gross)`), so the demo's own materialize had never run; (b) the demo space **does not boot on
+the core jar at all** — `ops_analytics_sample_job.toon` declares `type: objects.analytics` (an `inspecto-ops` job
+type) and `SpaceManager` SKIPS the whole space with a WARN (filed `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`). ⚠ Before
+the Dataset exists the feed's first poll fails loudly (`unknown dataset 'orders_by_region'`) — fail-fast, by
+design; the registry component `orders_by_region.toon` is committed so a fresh checkout resolves it at boot.
+⚠ Otherwise every `collector.connector` in every committed `*_pipeline.toon` is `local` (20 occurrences), and `collector.fetch`, `post_action`, `rate_limit` and
 `retry` appear in **zero** committed config. What is runnable is the acquisition *semantics* layer over the
 local connector:
 

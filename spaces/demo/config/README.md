@@ -53,6 +53,7 @@ seed script copies it into the consumed inbox). Everything under `../data/` exce
 | Pipeline (Stage-1) | `orders/orders_pipeline.toon` + `orders/orders_schema.toon` (EXPR transform + derived GROSS; gap detection `ORDERS_{yyyyMMdd}`) | `*_pipeline.toon` | Pipelines |
 | Pipeline: pipe-delimited | `payments/payments_pipeline.toon` + `payments/payments_schema.toon` (`delimiter: "\|"`, header row, geo columns; `UPPER(TRIM(MERCHANT))` EXPR) | `*_pipeline.toon` | Pipelines |
 | Pipeline: NDJSON | `shipments/shipments_pipeline.toon` + `shipments/shipments_schema.toon` (`parsing.frontend: json`, `format: newline`; the `selector` is the JSON key, and `ORDER_ID` joins the orders store) | `*_pipeline.toon` | Pipelines |
+| Pipeline: Dataset consumer | `orders/orders_by_region_feed_pipeline.toon` + `orders/orders_by_region_feed_schema.toon` (`collector.connector: dataset` over `datasets/orders_by_region`, fired by `trigger: {on: dataset}`; `parsing.frontend: parquet`; needs `jobs/orders_by_region_materialize_job.toon` to have run once — until then its poll fails loudly with `unknown dataset`) | `*_pipeline.toon` | Pipelines |
 | Enrichment (Stage-2) | `orders/orders_daily_enrich.toon` (on-commit + hourly rollup) | `*_enrich.toon` | Enrichment |
 | Semantic catalog | `orders/orders_meta.toon` | `*_meta.toon` | Catalog |
 | Alert Rule | `orders/orders_volume_alert.toon` (WARN while < 10 orders loaded) | `*_alert.toon` | Alerts |

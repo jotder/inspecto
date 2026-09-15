@@ -1,0 +1,35 @@
+name: orders_by_region_feed
+active: true
+version: 1
+
+trigger:
+  type: event
+  on: dataset
+  from: datasets/orders_by_region
+
+collector:
+  connector: dataset
+  dataset: datasets/orders_by_region
+  discovery: poll
+
+dirs:
+  poll:       spaces/demo/data/inbox/orders_by_region_feed
+  database:   spaces/demo/data/orders_by_region_feed/database
+  backup:     spaces/demo/data/orders_by_region_feed/backup
+  temp:       spaces/demo/data/orders_by_region_feed/temp
+  errors:     spaces/demo/data/orders_by_region_feed/errors
+  quarantine: spaces/demo/data/orders_by_region_feed/quarantine
+  status_dir: spaces/demo/data/orders_by_region_feed/status
+  log_dir:    spaces/demo/data/orders_by_region_feed/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.parquet"
+  schema_file: spaces/demo/config/orders/orders_by_region_feed_schema.toon
+
+parsing:
+  frontend: parquet

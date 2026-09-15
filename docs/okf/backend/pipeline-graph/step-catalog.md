@@ -355,7 +355,9 @@ processor has something real behind it, but not as a chain Step or not the whole
 *What exists today* column is the honest boundary. A **planned** processor renders inactive in the
 palette (*"Not yet available"*): no engine code, no config keys; adding one is a product decision
 (a new Step kind needs a `BuiltinNodeType`, a `RowShaper` arm or a contributed `PipelineNodeExecutor`,
-a `PipelineEditable` LOWERABLE + STEP_KIND + lift registration, and the runtime steps→graph seam — the
+a `BuiltinNodeType.FlatHome` declaration on the enum case (since `NODE-TYPE-MIRRORS-1`, 2026-09-15, this is
+where `PipelineEditable` derives LOWERABLE and STEP_KIND from — they are no longer hand-kept lists) plus the
+lift/lower code that home names, and the runtime steps→graph seam — the
 four registrations [catalog-vs-executors](../engine/catalog-vs-executors.md) names). The board's
 edition cells and the two Enterprise-only rows live in `tools/render-processor-board.mjs`.
 
@@ -624,3 +626,23 @@ edition cells and the two Enterprise-only rows live in `tools/render-processor-b
   [execution-lanes](execution-lanes.md) · [catalog-vs-executors](../engine/catalog-vs-executors.md) ·
   [pipeline-editor](../../frontend/features/pipeline-editor.md) (the palette and panes) ·
   [job-vs-step](../control-plane/job-vs-step.md) (why some catalog entries are Jobs, not Steps).
+
+## Adding a node type — what is declared once, what is derived, what is legitimately separate (2026-09-15)
+
+`NODE-TYPE-MIRRORS-1` measured the cost of adding ONE node type at ten hand sites and asked for the mirrors to
+be DERIVED. As-built:
+
+| Site | Now |
+|---|---|
+| `BuiltinNodeType` case | ✅ source of truth — and it now carries the **flat-config home**: `FlatHome.NONE` / `BLOCK` / `STEP` + the `steps:` kind. A constructor guard refuses a `STEP` without a kind and a kind without `STEP`. |
+| `PipelineEditable.LOWERABLE` | 🔁 **derived** — every case whose `flatHome() != NONE` |
+| `PipelineEditable.STEP_KIND` | 🔁 **derived** — every `STEP` case's `stepKind()`; `BuiltinNodeTypeFlatHomeTest` pins each kind to a `PipelineConfig.Step` constant, TRANSFORM-only, unique |
+| `inspecto-ui/…/node-attributes.ts` | 🔁 **derived** — imports `node-attributes.contract.json` (the JSON `NodeAttributesContractTest` regenerates from the Java table) instead of a hand-typed copy; its spec now pins shape, not equality with itself |
+| `NodeAttributes` (spec + `byType` + registration) | ⛔ **stays** — a form schema (widget / tier / default / help / options per key) is a richer structure than an enum field can carry; it IS the attribute-spec table, not a mirror of one |
+| `ProcessorCatalog` | ⛔ **stays** — a many-to-many PRODUCT taxonomy that includes PLANNED processors with no node type at all; its own javadoc forbids folding it into the enum |
+| `RecipeCompiler` ×2, `RowShaper`, `ConfigSpecs` block | per-node work by nature, out of scope |
+
+⚠ **What the derivation did NOT fix, stated so nobody thinks it did:** `FlatHome.BLOCK` is still a CLAIM that
+lift/lower code exists for the type — the `LOWERABLE` trap moved onto the enum case, it did not disappear.
+The guard that would catch a false claim is the round trip in `NodeConfigNameContractTest`; add the new type to
+it. ⚠ The `transform.<kind>` namespace rule (site 0) is still stated nowhere the compiler can see.

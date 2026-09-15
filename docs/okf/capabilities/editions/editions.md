@@ -54,7 +54,7 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 * **The three editions** — Personal, Standard, Enterprise — as build flavours of one commit, and the five
   mechanisms that assemble them.
-* **The nine optional modules**, the twelve staged jars, and the shape assertions that prove each staged
+* **The 10**<!--count:optional-modules--> **optional modules**, the 12<!--count:enterprise-first-party-jars--> first-party jars an Enterprise bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
   jar can do its job.
 * **The absence contract** — the provider seams, the five stub route groups, and the requirement that a
   missing module answers with an explanation rather than a not-found.
@@ -149,7 +149,7 @@ Both pages also cite the parent build file at two line numbers for the profile i
 comments, and the identifiers moved when the gating modules were inserted. **Cite the identifier, not the
 line** — the same lesson the compliance area recorded about its own citations.
 
-### 3.3 Nine optional modules, twelve staged jars
+### 3.3 Optional modules and staged jars — 10<!--count:optional-modules--> modules, 12<!--count:enterprise-first-party-jars--> first-party jars (+ the postgresql sidecar)
 
 | Edition | Optional modules compiled | Jars staged into the bundle |
 |---|---|---|
@@ -892,7 +892,7 @@ this area has three sites whose line citations drifted (§3.2).
 | The profiles | `pom.xml` — two profile identifiers, module lists only | — |
 | The bill of materials | `tools/sbom.mjs`, over the set in `tools/bundle-modules.mjs` | ⚠ Needs the reactor installed to resolve (§5.3 item 1) |
 | Its drift guard | `tools/check-sbom-modules.mjs`, wired into `ci.yml` | — |
-| The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ 95 across 25 modules against four prose sites saying 94 |
+| The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ **96**<!--count:locked-dependencies--> locked coordinates (this cell read 95 until 2026-09-15 — the lock had moved and nothing derived the prose); originally 95 across 25 modules against four prose sites saying 94 |
 | The release pipeline | `.github/workflows/release.yml` | 🔴 No Standard step; every bundle skips the runtime |
 | The test pipeline | `.github/workflows/ci.yml` | ⚠ One profile pass; no Personal-with-tests, no Standard |
 | The reported edition and feature flags | `BootstrapRoutes` | 🔴 Two-valued edition string; four modules with no flag (§3.5) |

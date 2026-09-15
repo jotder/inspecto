@@ -1,0 +1,17 @@
+partitionKey: REGION
+raw:
+  name: ORDERS_BY_REGION
+  format: PARQUET
+  fields[2]{name,selector,type,description,unit,classification}:
+    REGION,"region",VARCHAR,"Sales region code, as grouped by the materialize job","","INTERNAL"
+    SUM_GROSS,"sum_gross",DOUBLE,"Gross order value summed per region","USD","INTERNAL"
+mapping:
+  canonicalName: orders_by_region_feed
+  rawName: ORDERS_BY_REGION
+  fields[2]:
+    - name: REGION
+      from: REGION
+      fn: keep
+    - name: SUM_GROSS
+      from: SUM_GROSS
+      fn: keep

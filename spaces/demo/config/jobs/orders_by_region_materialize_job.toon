@@ -5,5 +5,5 @@ job:
   cron: "0 5 * * *"
   dataset: orders_dataset
   target: orders_by_region
-  measures: "gross,sum"
+  measures: "sum(gross)"
   group_by: region

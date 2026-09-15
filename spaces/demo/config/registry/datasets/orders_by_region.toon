@@ -1,0 +1,7 @@
+name: orders_by_region
+physicalRef: orders_by_region
+description: Materialized from dataset 'orders_dataset' (job 'orders_by_region_materialize')
+materialized:
+  at: "2026-09-15T16:40:30.384546700Z"
+  from: orders_dataset
+  rows: 4

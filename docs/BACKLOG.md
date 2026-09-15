@@ -1,6 +1,6 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-15 (§5 sweep, later) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+**Updated:** 2026-09-15 (§4 pass, later still) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
 every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
 `DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
 `ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
@@ -252,6 +252,7 @@ nothing, which is the shape that kept `DEPLOY-SERVICE-WRAPPER-1` looking open fo
 | **Which framework(s) the evidence is written against** | the route-gating evidence report under `compliance/evidence/` (step 4e, not yet written) · the `controls-matrix.md` row mapping | SOC 2 Type II is assumed throughout the plan; ISO 27001 A.9 maps onto the same evidence but the matrix rows differ |
 | **Job path semantics** — should a job's relative `dir` / `data_dir` / `backup_dir` / `archive` / `target_dir` resolve against the **Space root** instead of the JVM's working directory? | `JOB-DIR-CWD-CONTAINMENT-1` (§5) | 🔴 Regrounded 2026-09-15: the row's own fix (pass `configDir`) is a no-op for jobs, and the gate and the run-time tasks BOTH resolve against the CWD today, so they agree. Moving only the gate splits them; moving both changes what every existing job's relative path means. That is a semantics call, not a bug fix. |
 | **Eager or deferred resolution of an `s3://` `dirs.database`** — validate a profile at PARSE time (forces the deployment-root / pipeline-field split, because `CollectorService` parses every pipeline before `loadConnections` runs) or resolve at FIRST WRITE-TIME USE (no split; `dirs.database` is a plain `String` nothing resolves at parse) | scale-out phase C §5.4 bullet 6 (the credential surface that `AIRGAP-S3-EXTENSIONS-1` left behind when it closed 2026-09-15) | The bootstrap order is measured (`ServiceBootstrap.buildFrom:69` vs `:73-74`); which side of it to build on is a design posture only the operator sets. |
+| **Three verdicts for `SPEC-DEADSEAM-1`'s survivors** — (1) `ExpressionProvider`: retire the never-registered THIRD-PARTY extension point (the interface itself is the live expression engine) or keep it as SPI; (2) `DatasetRelation.temporalColumn`: keep unwired (an active plan's Q2 tie-break depends on its throw-on-two behaviour) or wire it; (3) `LegacyVendorFunctions`: it is in-repo load-bearing (ServiceLoader-registered, called by `RTDMS_ASN_Test`, the PLUGIN_GUIDE's worked example) — document it as the canonical plugin, or nothing | `SPEC-DEADSEAM-1` (§4) | The standing verdict ("DELETE all four") was refuted for three of four; two deletions would have removed live code. Each survivor is a different kind of question and no default is safe. |
 | **Approve or decline pinning a `ref:`** in `ci.yml` / `release.yml` | nothing yet — filed here so the question is not lost | 🔴 The 2026-09-15 decision to keep building eoiagent from its upstream tree makes the unpinned `ref:` **permanent rather than temporary**, which changes it from a tolerable shortcut into a standing exposure. Offered at the sitting; not answered |
 
 ✅ **Every DECISION is answered.** The six queued on 2026-09-14 were answered that day; the duckle triage
@@ -1154,72 +1155,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
-- **P2** · **`NODE-TYPE-MIRRORS-1` — “this node type exists” is declared by hand in TEN places, and only
-  the guards know it.** Filed 2026-09-15 from the measured cost of adding ONE node type
-  (`transform.profile`, the Profiler pick). Not a hypothesis: every site below was found by a guard or a
-  test going red, **not** by the author reading the code. ⚠ The type was first built as
-  `quality.profile` and compiled clean — `NodeTypeStepKinds.isKnown` only recognises `transform.<kind>`,
-  so the whole namespace was wrong with nothing red to say so. That is site 0: the naming rule itself is
-  a convention no declaration states.
-
-  **The inventory, split by whether it is genuinely per-node work or a restatement of the same fact:**
-
-  | # | Site | Kind |
-  |---|---|---|
-  | 1 | `BuiltinNodeType` enum case | ✅ source of truth |
-  | 2 | `RecipeCompiler` top-level verb switch | per-node (real behaviour) |
-  | 3 | `RecipeCompiler` **`steps:`-chain switch** — a SECOND dispatch in the same file | per-node, ⚠ easily missed |
-  | 4 | `RowShaper` executor dispatch + impl | per-node (real behaviour) |
-  | 5 | `PipelineEditable.LOWERABLE` | 🔴 MIRROR |
-  | 6 | `PipelineEditable.STEP_KIND` | 🔴 MIRROR |
-  | 7 | `NodeAttributes` — spec + `byType()` validate list + map registration (3 sub-sites, one file) | 🔴 MIRROR |
-  | 8 | `ProcessorCatalog` entry | 🔴 MIRROR |
-  | 9 | **`inspecto-ui/.../node-attributes.ts` — a hand-kept TS copy of the Java table** | 🔴 MIRROR |
-  | 10 | `ConfigSpecs.pipeline()` — the block's `FieldSpec`, plus the block named three times inside the `stage-two-blocks-require-output-store` cross-field rule (message, fields, predicate) | per-node (the flat home), ⚠ 4 sub-sites |
-
-  Plus two GENERATED artifacts that must be rewritten in the same change
-  (`processor-catalog.contract.json` via `-Dprocessor.catalog.write=true`, `node-attributes.contract.json`
-  via `-Dnode.attributes.write=true`), the flat-config home (`PipelineConfig` record/field/accessor/
-  constructor/`resolveSteps` + `PipelineConfigParser` + `PipelineLift` + the lower direction), and **four
-  guarded doc-count families across 13 sites in 6 files**.
-
-  ✅ **The guards WORK — that is the good news and the reason this is P2, not P1.** `check-doc-counts`,
-  `NodeAttributesContractTest`, `ProcessorCatalogContractTest`, `node-attributes.spec.ts` and
-  `MaintenanceTaskContractTest`'s sibling pattern each caught a miss. ⚠ But they catch it at PUSH time,
-  after the work is written, and each one costs a build cycle to discover.
-  🔴 **The real risk is the mirror that has NO guard.** `LOWERABLE` is the proof: its javadoc says
-  “node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE”, and a type
-  can be added to it with **no flat home at all** and every test still passes. That is a false claim the
-  suite cannot see — found only by reading the javadoc and checking `PipelineLift` by hand.
-  ⇒ **The ask is to DERIVE the mirrors, not to add more guards.** Sites 5–9 all answer questions the enum
-  plus its attribute spec already determine; #9 in particular is a cross-language hand copy of a table
-  the server publishes on `GET /pipelines/node-types`, whose own spec comment already admits the TS side
-  “is the fallback, not the source”. ⚠ A fallback that must be hand-synced is not a fallback, it is a
-  second source.
-  ⛔ **Do NOT ‘fix’ this by relaxing a guard.** Every one of them is load-bearing; the cost is the
-  DUPLICATION they police, not the policing.
-  ⚠ Sites 2–4 and 10 are legitimately per-node (a new type genuinely needs compiling, executing and a
-  declared config home) and are not in scope — counting them as duplication would overstate the problem.
-  ⚠ Site 10 does carry its own trap: `PipelineKeyCoverageContractTest.UNDECLARED_BLOCKS` is a ratchet
-  that may only ever SHRINK, so a new block must be DECLARED rather than added to it — the easy path
-  (copy what `processing.summarize` does) is the one the ratchet exists to stop.
-  → `okf/backend/pipeline-graph/step-catalog.md` · `PipelineEditable.java:155` ·
-  `inspecto-ui/src/app/modules/admin/pipelines/node-attributes.ts`
-- **P2** · **`ENRICH-SILENT-FULL-RECOMPUTE-1` — an incremental recompute silently becomes a FULL one.**
-  Filed 2026-09-15 by grounding `Onboarding ↔ Pipeline unification W4`, which carried this as a *design
-  note* (*"never silently convert one into the other"*) when it is **a live defect already doing exactly
-  that**. `EnrichmentService.doRecompute:194` decides the mode with
-  `boolean full = (filter == null || filter.isEmpty())`, and `toFilter:307-319` drops any partition path
-  whose keys are not in `job.input().partitions()` (`:316`), contributing nothing when the map ends empty
-  (`:319`). ⇒ An **event-triggered incremental** recompute whose partition columns do not match the job's
-  declared ones produces an empty filter and runs a **full-window** recompute — dispatched at `:178-180`,
-  with nothing logged to say the mode changed.
-  **Fix: distinguish "no partitions requested" from "requested partitions matched nothing", and refuse the
-  second.** ⛔ Do not make it fall back to full — silently widening the blast radius of a triggered job is
-  the defect, not the remedy. ⚠ The repo already has the idiom to copy: `DedupScope` refuses a windowed
-  dedup that has no ledger rather than quietly running unwindowed.
-  → `okf/backend/control-plane/onboarding-authoring.md`
-
+- **P2** · 🔴 **`DEMO-SPACE-PERSONAL-UNBOOTABLE-1` — the demo space does not boot on the core jar, and the
+  boot only WARNS.** Found 2026-09-15 driving `COLLECTOR-DATASET-UNPROVEN-1`: `java -cp inspecto-processor.jar
+  … -Dspaces.root=spaces` hosted `default` and `ucc` only — `SpaceManager` logged *"Skipping space dir spaces\demo
+  — failed to load: unknown job type 'objects.analytics'"* and carried on. `spaces/demo/config/jobs/
+  ops_analytics_sample_job.toon` declares a job type contributed by `inspecto-ops` (Standard+), so the
+  "editable sample catalog — one working example of every authorable component kind" is unreachable on
+  Personal, and `GET /spaces` simply omits it. ⚠ Two defects in one: (a) a committed sample space depends on an
+  optional module without saying so; (b) a space that fails to load is a WARN, not a refusal or a visible
+  degraded state — the same shape as `DUCKLE-C9`'s "a wedged watcher looks like a quiet one". ⇒ Either move the
+  ops sample job out of `demo` (or gate it), and decide whether an unloadable space should be listed as
+  `degraded` rather than vanish. → `SpaceManager` · `spaces/demo/config/jobs/ops_analytics_sample_job.toon`
+- **P2** · **`POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1` — a collector whose connector cannot be built shows NO
+  poll state, not an error.** Found 2026-09-15 on the same live run: `orders_by_region_feed`'s first poll
+  failed with an ERROR-logged `Acquisition failed … unknown dataset` (`PipelineScheduler`, the connector factory
+  threw), and its event-triggered run then succeeded — yet `GET /spaces/demo/collectors` reported
+  `lastPollAt: null, pollCount: null, lastPollError: null` for it while the three `local` pipelines each showed
+  `pollCount: 1`. The polling session shipped for row 32 (`PipelineScheduler.pollStates`) records only the
+  tick path that reaches the connector; a failure BEFORE the connector exists, and an event-driven run, leave
+  no trace — which is precisely the "is it wedged, and saying what?" question the session was built to answer.
+  ⇒ record the failure at the `Acquisition failed` catch, and count event-triggered runs (or state that they
+  are not polls, on the wire). → `PipelineScheduler.java` (`runOne`, `pollStates`) · `acquisition.md` `GET /collectors`
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
   sanctions**, and it is SERVER-side, so it fixes the partial roster for *every* client with no UI union:
@@ -1234,12 +1190,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ **Interaction with what shipped:** once `/spaces` and `/bootstrap` answer fleet-wide, their
   `podScoped: true` declaration becomes WRONG and must be removed — leaving it only on
   `GET /system/scheduler`, which stays genuinely per-Pod. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
-
-- **P2** · **`OPENAPI-GEN-1` — generate the OpenAPI path/method skeleton from the route table** (⛔ decided 2026-09-10
-  over "exemplar coverage, deliberately" and "document the rest by hand"). `openapi-v1.json` documents 24 operations
-  against 266 live registrations (9.0 %, measured and ratcheted by `ApiContractTest`). Derive every path + method from
-  the registrations so structural coverage is 100 % and a route can never be undocumented; the hand-written exemplars
-  keep the request/response schemas. → `okf/capabilities/control-api/control-api.md` §2 `API-2` / §5
 
 *(Drained 2026-09-07. Three of the five rows here were standing refusals wearing a tech-debt label — a
 "LEAVE unless someone is already in the file" is not work — and moved to §6. A fourth was already closed by
@@ -1267,58 +1217,6 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
 These four are the **classes** behind roughly half of the consolidation's findings. Each is one guard, not N
 fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-archive/post-consolidation-sprints.md`.
 
-- **P2** · **`COLLECTOR-DATASET-UNPROVEN-1` — the `dataset` collector has never been driven end to end,
-  because nothing committed declares it.** Filed 2026-09-15, recovered from inside the closed
-  `COLLECTOR-SPACE-ROOT-1` entry when it was deleted — it was live work with no row of its own.
-  🔴 **`collector.dataset` appears in no pipeline under `spaces/` and none under `inspecto/examples/`.**
-  `acquisition.md` §8.4 records only that every committed `collector.connector` is `local` (20
-  occurrences), which is adjacent to this and does not state it. So the 2026-09-15 space-root fix to
-  `DatasetCollectorConnectorFactory` was **verified by test, not by execution** — unlike its parent
-  `MATERIALIZE-SPACE-ROOT-1`, which was proven on a live multi-Space run (202 → SUCCESS, 7 rows,
-  Dataset registered). ⇒ Treat the connector's end-to-end behaviour as **unproven, exactly as it was
-  before that change**.
-  **Fix: author one committed `collector.dataset` pipeline and drive it on a live multi-Space server**,
-  the same way the materialize job was proven. ⛔ Do not close this on a passing `SpaceConfigRootTest` —
-  that suite is what already passes while the path stays unexercised. ⚠ This is an instance of the §6
-  rule *"a capability with no committed example is a capability nobody has ever run"*.
-  → `okf/capabilities/acquisition/acquisition.md` §8.4 · `okf/capabilities/data-plane/data-plane.md` §3.6
-
-
-- **P2** · **`SPEC-COUNTS-1` — eight facts, each counted two to six ways, and the narrative doc is wrong every
-  time.** Measured 2026-09-09: builtin node types **30** (docs said 20/28/20/29 — five ways); parser frontends
-  **six ways** (3/5/6/7/9/10 across five pages and the user guide); maintenance tasks **19+4** (docs said
-  4/16/13, and the *served descriptor* was one of the wrong ones — fixed `f0e4dee2`); job types **12** (docs
-  said 4/9/4/10); transform functions **23** (24, and "~20" in the same file); processors **119** (121); the
-  dependency count **95 across 25 modules** generated against **94** in four prose sites; and the staged-jar
-  set stated in **eight** places with five wrong. ⚠ In every case the *generated or catalogued* artifact
-  was right. **The fix is to cite the generated file, and to add a counting guard only where no generated
-  artifact exists.**
-  ✅ **CLASS CLOSED 2026-09-09 for every count a contract owns** — `tools/check-doc-counts.mjs`, wired
-  into `ci.yml` + `.githooks/pre-push`, falsified in four directions. Twenty statements across eleven
-  documents now carry a `<!--count:ID-->` marker and are **derived** from the owning contract at run
-  time: processors **119** (8 sites), step types **16** (5), node types **30** (3, from the
-  `BuiltinNodeType` enum — no contract owns the roster), SQL mapping functions **23** (2), processor
-  families **8**, and node types carrying an attribute spec **11**.
-  🔴 **The ambiguity was the root cause, not the arithmetic.** "Node types" denoted THREE sets — 30 in
-  the enum, 11 in `node-attributes.contract.json`, 16 in `step-types.contract.json` — so a single
-  number could not be right; that distinction is now stated in `pipeline-editor.md`. Likewise
-  "transform functions" denotes two unrelated registries (23 SQL mapping vs 30 ASN vendor), which is
-  why the marker id is `sql-mapping-functions` and not the noun.
-  ⛔ **`job types` and `maintenance tasks` are deliberately NOT guarded**, and this is a measurement
-  result: both are assembled from a built-in list plus `ServiceLoader` discovery, so both totals are
-  **edition-dependent** (job types 10 on Personal, 12 with `inspecto-ops`; maintenance 20 built-in ids
-  across 19 switch arms plus 4 contributed). "The count" does not exist until the classpath is fixed,
-  so a guard asserting one number would assert a falsehood in the name of ending wrong counts. A doc
-  stating either must say which shape it means — a writing rule, not something a guard can settle.
-  ✅ **Parser frontends CLOSED 2026-09-09** — the "six ways" were FOUR sets sharing one noun: **10**<!--count:parsing-frontend-tokens-->
-  `parsing.frontend` tokens (`PipelineConfigParser.FRONTENDS`), **6**<!--count:builtin-parsers--> DuckDB-native built-ins
-  (`BuiltinParsers.IDS`), **7**<!--count:parser-node-types--> `parser.*` node types (`step-types.contract.json`), and three
-  byte→row *mechanisms* — a prose taxonomy with no owner in code, so written as *mechanisms* and not guarded.
-  "Eight formats" (tokens minus two aliases) is not derivable without mirroring the alias pairs, so prose binds
-  it to the marked ten. → `okf/capabilities/ingestion/ingestion.md` §3.3 / §7.
-  ⚠ Still hand-typed and unguarded, for want of a generated artifact: the dependency count and the
-  staged-jar set. → `tools/check-doc-counts.mjs` · the owning specs' §2
-  tables, which carry the measured number.
 - **P2** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
   `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
   vendor-transform plugin registers **30** legacy functions through a real seam (🔴 this said "~40" until 2026-09-09; counted from `LegacyVendorFunctions`' 30 `f.put(` registrations — ⚠ and note this is a DIFFERENT set from the 23 SQL mapping functions, which is why `check-doc-counts.mjs` names its id `sql-mapping-functions` rather than the ambiguous noun) and **reaches no bundle and no
@@ -1374,6 +1272,10 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⇒ **The row needs re-deciding, not re-running.** “Four dead seams” was true of one. The three
   survivors are three DIFFERENT questions: retire an unused extension point (Expression), keep or wire an
   unwired reader (temporal), and document a live-but-undocumented plugin (vendor).
+
+  ⛔ **BLOCKED on the operator (2026-09-15 §4 pass) — the three questions are filed in §1 as one owed
+  decision.** Nothing here is buildable until they are answered: two of the three "deletions" would have
+  removed live code, so the standing DELETE verdict is void and no default is safe to assume.
 ## 5. Docs & hygiene
 
 - **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down.**

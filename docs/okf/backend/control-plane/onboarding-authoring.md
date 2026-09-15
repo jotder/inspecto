@@ -222,3 +222,23 @@ P3 makes that derived view the *physical* truth — compaction output **is** the
 
 (2) and (3) are why the guided create derives the full orders-convention dir set +
 `duplicate_check` silently.
+
+## An event-triggered enrichment is never silently widened to a full recompute (2026-09-15)
+
+`ENRICH-SILENT-FULL-RECOMPUTE-1`, closed. `EnrichmentService.doRecompute` decides *full vs scoped* from one
+predicate — `filter == null || filter.isEmpty()` — and `toFilter` drops every committed partition path whose
+keys share nothing with `job.input().partitions()`. Until 2026-09-15 that made two different states read the
+same: **"no partitions requested"** (a legitimately unscoped commit → full recompute) and **"the requested
+partitions matched nothing"** (the producer partitions by columns this job does not). The second silently ran
+a full-window recompute, with nothing logged to say the mode had changed — the exact thing the W4 design
+note called out as a rule, while the code was already doing it.
+
+* `onConsignmentEvent` now tells them apart: a non-empty event whose filter comes out empty is **REFUSED** —
+  a `FAILED` audit row with scope `refused` and the reason (*"no column in common … refusing rather than
+  silently recomputing the full window"*), the failure metric, a log line — and no recompute runs. Same idiom
+  as `RowShaper.windowedDedup`, which refuses a windowed dedup with no ledger rather than running unwindowed.
+* A genuinely unscoped commit (an empty partition list) still recomputes fully, as before.
+* ⛔ Do not "fix" a refusal by falling back to full — silently widening a triggered job's blast radius is the
+  defect, not the remedy. The producer's partition columns and the job's `input.partitions` must agree.
+* Pinned by `EnrichmentServiceTest.eventWhosePartitionsMatchNoJobColumnIsRefusedNotWidenedToFull`
+  (mutation-verified: disabling the guard makes it fail on "a refused recompute announces no commit").

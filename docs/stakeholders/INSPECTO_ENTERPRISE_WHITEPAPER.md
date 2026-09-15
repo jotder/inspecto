@@ -107,7 +107,8 @@ categories a regulated enterprise otherwise buys, integrates and secures separat
    gap detection and schema-drift detection, over **10**<!--count:parsing-frontend-tokens--> parsing
    frontends.
 2. **The vectorised lakehouse** — DuckDB executing directly over Hive-partitioned Parquet on local disk;
-   an optional DuckLake catalog on PostgreSQL gives shared deployments a single commit boundary.
+   an optional DuckLake catalog on PostgreSQL gives shared deployments a single commit boundary and makes 
+   every committed file visible atomically.
 3. **Reconciliation & quality** — declarative Dataset-vs-Dataset matching with exact, absolute or
    percentage tolerance; Breaks with a real lifecycle; quality signals at ingest.
 4. **Operations & investigation** — Alerts → Incidents → Cases with SLAs and root-cause analysis; graph

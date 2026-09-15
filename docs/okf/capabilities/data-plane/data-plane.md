@@ -285,6 +285,13 @@ makes it do anything, and the resolver could not bound them. Declared 2026-09-14
 `min_files` comment records one line above, and worse here because nothing shipped had ever fired the task
 to expose it. ⇒ **a task's presence in the runner's switch is not evidence its contract is declared.**
 
+✅ **The consumer half is proven live too (2026-09-15).** `spaces/demo/config/orders/orders_by_region_feed_pipeline.toon`
+consumes the matrix this section's job writes (`connector: dataset` + `on: dataset`), and on a live multi-Space
+server the materialize's `DatasetWriteSignal` fired it within the same second — 4 rows in, 4 rows committed. The
+proof, and the two defects it surfaced (a broken committed job, a space that does not boot on Personal), are in
+`acquisition.md` §8.5. ⚠ The committed job now reads `measures: "sum(gross)"` — the measure grammar is `count` or
+`agg(field)`, never `field,agg`.
+
 ### 3.7 The DuckDB runtime
 
 `DuckDbUtil` (`inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java`): driver load, `tempDbFile`,
