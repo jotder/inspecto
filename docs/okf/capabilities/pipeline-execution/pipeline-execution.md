@@ -264,7 +264,13 @@ to more sinks than the compiled recipe declares — and `test_etl` because *a De
 graph lane does not implement*. Those are the two features the compiled-recipe path cannot carry today, stated
 by the code itself; until both are implemented on the graph lane the flat lane cannot be deleted. Running the
 gate is now one flag, so re-run it after each of those lands rather than reading a projection round-trip test
-as parity.
+as parity. **Both gaps carry board rows from 2026-09-16 — `GRAPH-LANE-MULTISCHEMA-1` and
+`GRAPH-LANE-RULE-ROUTED-1` (BACKLOG §3), each design-first.** ⚠ Re-running the gate that day confirmed the
+counts and both messages, and corrected the reading of the first: the multi-schema refusal *states* an arity
+(3 sink nodes against 1 declared destination) but the real obstacle is the seeding contract — `graphLaneCarries` requires every sink to hang off ONE seed, and a per-schema lift gives each branch its own
+map, so relaxing the count alone would admit a write this lane still cannot seed. And the rule-routed gap is
+representational: `PipelineLift` never sees a Decision Rule (they are a space-registry fact), so the routed
+destinations cannot appear in a lifted graph at all.
 
 The reason-for-flat enumeration is the most operator-useful thing on this path: an authored route that does
 not engage, a decision rule that routed rows, no scratch directory, a destination-count mismatch, a
