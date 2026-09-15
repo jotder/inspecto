@@ -40,6 +40,8 @@ export interface BootstrapBranding {
 /** The slice of `GET /bootstrap` this service consumes (edition switch + session). */
 interface Bootstrap {
     edition?: string;
+    /** HOME-VERSION-1: the deployment's own version, from the jar manifest — "dev" when unstamped. */
+    version?: string;
     features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean; ops?: boolean };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
@@ -73,6 +75,8 @@ export class SessionService {
     /** 'none' (Personal / offline) or 'oidc' (Standard). Drives {@link loginRequired} + {@link authGuard}. */
     readonly authMode = signal<'none' | 'oidc'>('none');
     readonly edition = signal<string>('personal');
+    /** The running product's version as `GET /bootstrap` reported it; null until the bootstrap read lands. */
+    readonly version = signal<string | null>(null);
     readonly authenticated = signal(false);
     /**
      * `bootstrap.session.actor` for an AUTHENTICATED subject — the `Subject.id()` the security module
@@ -142,6 +146,7 @@ export class SessionService {
             this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError(() => of({} as Bootstrap))),
         );
         this.edition.set(boot.edition ?? 'personal');
+        this.version.set(boot.version?.trim() ? boot.version.trim() : null);
         const mode = boot.features?.authMode === 'oidc' ? 'oidc' : 'none';
         this.authMode.set(mode);
         this.capabilities.set(boot.session?.capabilities ?? []);

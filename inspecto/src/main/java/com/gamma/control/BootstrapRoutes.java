@@ -49,6 +49,9 @@ final class BootstrapRoutes implements RouteModule {
     private Object bootstrap(ApiContext api, HttpExchange ex) throws IOException {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("edition", edition());
+        // HOME-VERSION-1: the deployment reports its own version, pre-sign-in like branding — a support
+        // call reads it off the sign-in page. "dev" for an unstamped (target/classes) run, by design.
+        data.put("version", ProductVersion.current());
         // D12: the deployment's topology, so an operator can tell a single node from one member of a set
         // that shares state — which decides whether a degraded store is tolerable or a boot failure.
         data.put("topology", com.gamma.util.Topology.mode().name().toLowerCase());

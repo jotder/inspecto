@@ -133,6 +133,11 @@ class ControlApiMetadataV1Test {
 
             String etag = r.headers().firstValue("ETag").orElse(null);
             assertNotNull(etag, "bootstrap is ETag'd (cacheable metadata)");
+            // HOME-VERSION-1: the deployment names its version; a target/classes run says "dev", a
+            // stamped jar says its Implementation-Version — never blank, never the SPA scaffold's number.
+            JsonNode version = data.path("version");
+            assertTrue(version.isTextual() && !version.asText().isBlank(), "bootstrap carries data.version: " + version);
+            assertEquals(ProductVersion.current(), version.asText());
             HttpResponse<String> cached = client.send(
                     req(c.port, "/bootstrap", "If-None-Match", etag).GET().build(),
                     BodyHandlers.ofString());

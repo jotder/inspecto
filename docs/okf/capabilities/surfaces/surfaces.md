@@ -139,6 +139,21 @@ consumer impossible** without changing it first.
 
 ### 3.3 What the server publishes for the shell
 
+🔴 **The running product knows its own version (`HOME-VERSION-1`, closed 2026-09-15).** Until then NOTHING in the
+system did: no Java read `Implementation-Version`, no route served one, `environment.ts` had no field, and
+`inspecto-ui/package.json` says `21.0.0` — the Angular scaffold's number — which is why the sign-in landing
+deliberately showed no version at all. Now ONE source: `inspecto/pom.xml`'s shade `ManifestResourceTransformer`
+stamps `Implementation-Version: ${project.version}` into the fat JAR, `ProductVersion.current()` reads it back
+through `Package.getImplementationVersion()`, and `GET /bootstrap` carries it as `data.version` (documented in
+`openapi-v1.json`'s `Bootstrap` schema, required). A `target/classes` run reports the WORD `dev` — never a
+number that could pass for a release — and `-Dproduct.version` overrides for a launcher that repackages.
+`SessionService.version()` exposes it; the sign-in page appends `v<version>` to its footer once the bootstrap
+read lands (nothing until then, pinned by `sign-in.a11y.spec.ts`). **Verified 2026-09-15:** the packaged jar's
+manifest reads `Implementation-Version: 4.0.0-SNAPSHOT` and a boot of it answers `/bootstrap` with
+`version: 4.0.0-SNAPSHOT`; the reactor's own tests see `dev`. ⚠ `package.json`'s `21.0.0` is left alone on
+purpose — the SPA must never be a second source of the product version.
+
+
 `GET /bootstrap` aggregates six sections behind one ETag'd conditional request: the edition string,
 feature flags, config specs, enumerations, the space list and the session. Its stated purpose is to
 replace a handful of startup round-trips.

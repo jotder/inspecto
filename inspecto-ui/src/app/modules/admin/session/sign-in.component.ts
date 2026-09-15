@@ -49,7 +49,12 @@ import { environment } from 'environments/environment';
                     </p>
                 </div>
 
-                <span class="text-secondary text-sm">{{ footer() }}</span>
+                <span class="text-secondary text-sm">
+                    {{ footer() }}
+                    @if (version(); as v) {
+                        <span class="text-hint ml-2 font-mono" data-testid="product-version">v{{ v }}</span>
+                    }
+                </span>
             </div>
 
             <!-- Right: the one action. -->
@@ -97,6 +102,8 @@ export class SignInComponent implements OnInit {
     readonly logo = computed(() => this.session.branding().logoDataUrl);
     readonly caption = computed(() => this.session.branding().caption);
     readonly footer = computed(() => this.session.branding().footerText ?? environment.footerText);
+    /** HOME-VERSION-1: the version the backend reports — the field a support call reads aloud. Absent until known. */
+    readonly version = computed(() => this.session.version());
 
     ngOnInit(): void {
         // Already signed in (or Personal/offline where login is never required) → straight into the app.

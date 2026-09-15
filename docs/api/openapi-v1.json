@@ -7542,11 +7542,15 @@
       "Bootstrap" : {
         "type" : "object",
         "description" : "The platform bootstrap aggregate — backend-owned only; the frontend registries (ComponentKind/VizType/$-params/theme) are excluded by design and merged client-side.",
-        "required" : [ "edition", "features", "configSpecs", "enumerations", "spaces", "session" ],
+        "required" : [ "edition", "version", "features", "configSpecs", "enumerations", "spaces", "session" ],
         "properties" : {
           "edition" : {
             "type" : "string",
             "enum" : [ "personal", "standard" ]
+          },
+          "version" : {
+            "type" : "string",
+            "description" : "The running product's version, read from the fat JAR's manifest (Implementation-Version, stamped by inspecto/pom.xml), or \"dev\" for an unstamped target/classes run. HOME-VERSION-1, 2026-09-15."
           },
           "features" : {
             "type" : "object",

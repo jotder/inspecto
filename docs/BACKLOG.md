@@ -1,6 +1,6 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-15 (dependency pass, latest) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+**Updated:** 2026-09-15 (dependency pass, latest) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), `HOME-VERSION-1` SHIPPED (manifest → `/bootstrap` → sign-in footer), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
 every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
 `DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
 `ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
@@ -243,7 +243,7 @@ for ONE clause and blocked for the rest (noted per row).
   *(S items closed the same day: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`,
   `SCHEMA-FORM-EMPTY-LIST-1`, `SIGNIN-PREVIEW-1`, API v1 jlink re-verify.)*
 - M — `TYPEFLOW-DATASET-COLUMNS-1` steps 3+4 (⚠ relies on the dead-seam verdict (2) = keep `temporalColumn`) ·
-  `RECON-CARDINALITY-2` · `HOME-VERSION-1` · `AGT-ARTIFACT-1` · `INCIDENT-KPI-MTTD-1` · `STALE-TILES-PRECISION-1` ·
+  `RECON-CARDINALITY-2` · ~~`HOME-VERSION-1`~~ (closed 2026-09-15) · `AGT-ARTIFACT-1` · `INCIDENT-KPI-MTTD-1` · `STALE-TILES-PRECISION-1` ·
   `AGT-5` per-tool dry-run seam · Pipeline graph pre-materialise cap + §6 step-2 parity gate · `DUCKLE-C4` ·
   `HOME-TILES-1` (backend counts first) · `DUCKLE-C2` (P3).
 - L — `AUTHORING-REDESIGN-1` (c) only · canonical bundle export/import · Onboarding↔Pipeline W4/W5 · Parsing
@@ -898,16 +898,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   a Pipeline, so the row stays correctly deferred. ⚠ Asked and answered, not overlooked.
 
 ### Control plane, jobs, notifications, queries
-
-- **P2** · **`HOME-VERSION-1` — nothing in the running system knows the product version, so no surface can show it.**
-  Filed 2026-09-15 building the sign-in landing (landing-page plan D2 asked for "branding + version"). **Grounded:**
-  no Java file reads `Implementation-Version` or a filtered resource, no route serves a version, `environment.ts`
-  has no version field, and `inspecto-ui/package.json` says **21.0.0** — the Angular scaffold's number, not the
-  product's `4.0.0-SNAPSHOT`. ⛔ **The version was therefore NOT shown**: a wrong number on a sign-in page is worse
-  than none, and it is exactly the field a support call reads aloud. Wanted: one source — Maven stamping the fat
-  JAR's manifest and the backend reporting it, or the build writing it into the SPA — then the sign-in page and an
-  About surface read it. **Close when a running deployment reports its own version and the sign-in page shows it.**
-  → `okf/capabilities/surfaces/surfaces.md` §3.3
 
 - **P3** · **`HOME-TILES-1` — Home shows three activity sources because only three have a cheap call.**
   Filed 2026-09-15. The approved mockups carried "Expectations breached" and "Datasets written" tiles; neither was

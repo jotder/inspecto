@@ -154,6 +154,13 @@
                                 <!-- Default main class for convenience; override with -cp and full class name -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.gamma.inspector.CollectorProcessor</mainClass>
+                                    <!-- HOME-VERSION-1 (2026-09-15): the ONE source of the product version at run
+                                         time. ProductVersion reads it back through Package.getImplementationVersion;
+                                         a target/classes run (no manifest) reports "dev". -->
+                                    <manifestEntries>
+                                        <Implementation-Title>${project.artifactId}</Implementation-Title>
+                                        <Implementation-Version>${project.version}</Implementation-Version>
+                                    </manifestEntries>
                                 </transformer>
                                 <!-- Merge JDBC driver service registrations from all dependencies -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>

@@ -7,11 +7,15 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { describe, expect, it, vi } from 'vitest';
 import { SignInComponent } from './sign-in.component';
 
-function create(branding: { logoDataUrl?: string; caption?: string; footerText?: string } = {}) {
+function create(
+    branding: { logoDataUrl?: string; caption?: string; footerText?: string } = {},
+    version: string | null = null,
+) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => true,
         beginLogin: vi.fn(),
+        version: signal<string | null>(version),
         branding: signal({
             logoDataUrl: branding.logoDataUrl ?? null,
             caption: branding.caption ?? null,
@@ -65,5 +69,14 @@ describe('SignInComponent (W6d)', () => {
         expect(el.querySelector('img[src^="data:image"]')).toBeNull();
         // The product mark always renders; only the operator's own logo is conditional.
         expect(el.querySelector('img[src*="inspecto-logo"]')).toBeTruthy();
+    });
+
+    /** HOME-VERSION-1: the version is shown only once the backend has reported it — never a scaffold number. */
+    it('shows the product version the backend reports, and nothing until it does', () => {
+        const unknown = create({});
+        expect(unknown.el.querySelector('[data-testid="product-version"]')).toBeNull();
+
+        const known = create({}, '4.0.0-SNAPSHOT');
+        expect(known.el.querySelector('[data-testid="product-version"]')?.textContent?.trim()).toBe('v4.0.0-SNAPSHOT');
     });
 });
