@@ -967,6 +967,26 @@ class JobServiceTest {
         return maintenance(name, null, null, Map.of("task", "heartbeat"));
     }
 
+    /**
+     * DEMO-SPACE-PERSONAL-UNBOOTABLE-1: a job authored against a type this classpath does not register (an
+     * optional module's type on a core boot) is skipped with a warning — the OTHER jobs still host and the
+     * service still constructs. Before this the constructor threw and the whole Space was skipped at boot.
+     */
+    @Test
+    void aJobOfAnUnregisteredTypeIsSkippedAtBootInsteadOfSinkingTheService(@TempDir Path dir) throws Exception {
+        JobConfig alien = JobConfig.fromMap(Map.of("job", Map.of(
+                "name", "ops_sample", "type", "objects.analytics", "cron", "0 * * * *", "enabled", "true")));
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(heartbeat("hb"), alien), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            assertTrue(js.jobs().stream().anyMatch(v -> v.name().equals("hb")), "the hosted job is still there");
+            assertTrue(js.jobs().stream().anyMatch(v -> v.name().equals("ops_sample")),
+                    "the config is still LISTED — it is authored content, merely not hosted here");
+            assertThrows(IllegalArgumentException.class, () -> js.upsertJob(alien),
+                    "the author-present path keeps refusing an unknown type — leniency is boot-only");
+        }
+    }
+
     @Test
     void aFiringIsTurnedAwayWhileAnotherNodeHoldsTheJobsArmingClaim(@TempDir Path dir) throws Exception {
         // §5.2: the per-instance Scheduler keeps firing on every pod; the arming claim is what makes

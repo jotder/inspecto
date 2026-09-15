@@ -700,6 +700,15 @@ final class PipelineScheduler {
                 if (landed > 0) log.info("Acquired {} file(s) for '{}'", landed, due.id());
             } catch (Exception e) {
                 log.error("Acquisition failed for '{}'", due.id(), e);
+                // POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1 (2026-09-15): this catch is where a connector that
+                // cannot even be BUILT lands (unknown dataset, unreachable host, missing credentials) — and
+                // until now it left the collector's poll state untouched, so GET /collectors showed
+                // lastPollAt/lastPollError null for a pipeline that had just failed loudly in the log. A
+                // fetch attempt is a poll that happened and failed; say so where the operator reads it.
+                PollState poll = pollStates.computeIfAbsent(due.id(), k -> new PollState());
+                long now = System.currentTimeMillis();
+                poll.polled(now);
+                poll.failed(now, "acquisition failed: " + e.getMessage());
             } finally {
                 acquirePermits.release();
             }

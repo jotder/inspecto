@@ -40,16 +40,24 @@ public final class FakeRemoteConnectorFactory implements CollectorConnectorFacto
     static final AtomicReference<CountDownLatch> GATE = new AtomicReference<>();
     /** Total {@code fetchTo} calls, so a test can assert a second overlapping acquisition did NOT fetch. */
     static final AtomicInteger FETCHES = new AtomicInteger();
+    /** When set, {@code create} throws — the connector cannot even be BUILT (the live shape of
+     *  POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1: an unknown dataset, an unreachable host). */
+    static final AtomicReference<String> FAIL_CREATE = new AtomicReference<>();
 
     static void reset(Path remoteRoot) {
         REMOTE_ROOT.set(remoteRoot);
         GATE.set(null);
         FETCHES.set(0);
+        FAIL_CREATE.set(null);
     }
 
     @Override public String scheme() { return "faketest"; }
 
-    @Override public CollectorConnector create(PipelineConfig cfg) { return new FakeRemoteConnector(); }
+    @Override public CollectorConnector create(PipelineConfig cfg) {
+        String why = FAIL_CREATE.get();
+        if (why != null) throw new IllegalArgumentException(why);
+        return new FakeRemoteConnector();
+    }
 
     /** Discovers regular files under {@link #REMOTE_ROOT} and fetches by copying their bytes. */
     private static final class FakeRemoteConnector implements CollectorConnector {

@@ -369,7 +369,21 @@ public final class JobService implements AutoCloseable {
                 this::onPackUnloaded);
         this.packs.scanAtStartup();
         for (JobConfig c : this.configs) {
-            if (c.enabled()) jobs.put(c.name(), build(c));
+            if (!c.enabled()) continue;
+            // DEMO-SPACE-PERSONAL-UNBOOTABLE-1 (2026-09-15): a job whose TYPE is not registered on this
+            // classpath — an optional module's type on a Personal/core boot, or a Job Pack that is not
+            // installed — is skipped with a WARN naming the type, and the SPACE STILL BOOTS. Before this the
+            // IllegalArgumentException escaped the constructor, SpaceManager logged "Skipping space dir …
+            // failed to load" and the whole space vanished from GET /spaces because of one sample job.
+            // ⚠ Only the boot path is lenient: upsertJob (an author is present) still refuses, so a typo in a
+            // new job is a 4xx at save time rather than a silently unhosted job.
+            if (!registry.has(c.type())) {
+                log.warn("[JOB] '{}' NOT hosted: job type '{}' is not registered on this classpath "
+                        + "(registered: {}) — an optional module or Job Pack is absent; the space boots without it",
+                        c.name(), c.type(), registry.ids());
+                continue;
+            }
+            jobs.put(c.name(), build(c));
         }
     }
 

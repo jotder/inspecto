@@ -130,6 +130,35 @@ class AcquisitionDriverTest {
         }
     }
 
+    /**
+     * POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1: an acquisition whose connector fails before landing anything
+     * is a poll that HAPPENED and FAILED — the collector row must say so, not stay "never looked". Found on
+     * a live run where a dataset collector's first poll threw `unknown dataset` and GET /collectors showed
+     * null for every poll field while the log carried the ERROR.
+     */
+    @Test
+    void aFailedAcquisitionIsRecordedAsAFailedPoll(@TempDir Path dir) throws Exception {
+        FakeRemoteConnectorFactory.reset(dir.resolve("remote"));
+        FakeRemoteConnectorFactory.FAIL_CREATE.set("unknown dataset 'orders_by_region'");   // create() throws
+
+        Path cfg = remotePipeline(dir, "REMOTE_ETL");
+        CollectorService svc = new CollectorService(List.of(cfg), 3600, 1);
+        try {
+            scheduler(svc).dispatchAcquireCycle();
+
+            assertTrue(awaitTrue(() -> scheduler(svc).pollStates().containsKey("remote_etl")
+                            || scheduler(svc).pollStates().containsKey("REMOTE_ETL")),
+                    "the failed acquisition must leave a poll state behind: " + scheduler(svc).pollStates());
+            var st = scheduler(svc).pollStates().values().iterator().next();
+            assertNotNull(st.get("lastPollAt"), "a fetch attempt IS a poll");
+            assertEquals(1L, st.get("pollCount"));
+            assertNotNull(st.get("lastError"), "…and this one failed, so the row says why: " + st);
+            assertTrue(String.valueOf(st.get("lastError")).startsWith("acquisition failed:"), String.valueOf(st.get("lastError")));
+        } finally {
+            svc.close();
+        }
+    }
+
     @Test
     void periodicIngestCycleDoesNotFetchForARemoteCollector(@TempDir Path dir) throws Exception {
         Path remote = Files.createDirectories(dir.resolve("remote"));
