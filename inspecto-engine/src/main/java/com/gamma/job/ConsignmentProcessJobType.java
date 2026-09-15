@@ -286,6 +286,19 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 ctx.log().warn("consignment output registry is disabled — the processor gets no readable "
                         + "relations", "consignment_id", consignmentId);
 
+            // DATASET-PUBLISH-ON-FAILURE-1 (2026-09-15): dataset.write announcements are ACCUMULATED here
+            // and emitted only once the whole chain has completed. They used to fire inside
+            // persistSummaries, i.e. before persistDerivedTables (which throws) and before every later
+            // chain step had run — so a run that went on to fail had already told the platform its dataset
+            // was fresh, and an on:dataset trigger could act on a write its own run then abandoned.
+            // ⚠ Deferring is sufficient BECAUSE a processor signals failure by throwing (ProcessorResult's
+            // own contract: it distinguishes only "did the work" from "nothing to do"), so reaching the end
+            // of this loop is exactly the success condition. MaterializeTask already had this ordering.
+            // ⚠ Granularity is UNCHANGED on purpose — still one signal per (store, producer), summed. One
+            // signal per run, and whether derived tables should announce at all, are contract changes for
+            // dataset.write consumers and are deliberately left alone here.
+            Map<PendingWrite, Long> pending = new java.util.LinkedHashMap<>();
+
             ProcessorResult last = null;
             for (int i = 0; i < processors.size(); i++) {
                 String processorId = chain.get(i);
@@ -315,7 +328,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                     if (result == null)
                         return JobResult.failed("processor '" + processorId + "' returned no result", ms(t0));
 
-                    persistSummaries(ctx, consignmentId, summaries.emitted(), processorId);
+                    persistSummaries(ctx, consignmentId, summaries.emitted(), processorId, pending);
                     // ⚠ Inside the reader's try-with-resources on purpose: the author's SQL names the
                     // Consignment's lazy views, which live on that sandbox and vanish when it closes.
                     persistDerivedTables(ctx, consignmentId, reader, tables.emitted(), processorId);
@@ -326,6 +339,10 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                             "step", (i + 1) + " of " + chain.size(),
                             "processor", processorId, "status", last.status());
             }
+            // The chain completed — nothing threw, so every write it announces is one that survived the
+            // whole run. Additive and must never throw, as before.
+            pending.forEach((w, n) -> com.gamma.signal.DatasetWriteSignal.emit(w.store(), n, w.producer()));
+
             return chain.size() == 1
                     ? new JobResult(last.status(), last.message(), ms(t0))
                     : new JobResult(last.status(), chain.size() + " step chain complete ("
@@ -385,8 +402,11 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
             return java.nio.file.Paths.get(dataDir, "_derived").toString();
         }
 
+        /** One deferred {@code dataset.write} announcement, keyed exactly as the emit used to be. */
+        private record PendingWrite(String store, String producer) {}
+
         private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows,
-                                      String processorId) throws Exception {
+                                      String processorId, Map<PendingWrite, Long> pending) throws Exception {
             if (rows.isEmpty()) return;
             if (dataDir == null) {
                 ctx.log().warn("§7.3 summary persistence is off (no data root) — " + rows.size()
@@ -403,13 +423,12 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                         SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, ctx.runId(),
                                 rows, processorId);
                 ConsignmentOutputStores.record(written);
-                // S3a: the summaries are visible once recorded — one dataset.write per distinct store
-                // (additive, never throws).
-                java.util.Map<String, Long> rowsByStore = new java.util.LinkedHashMap<>();
+                // S3a: the summaries are visible once recorded — one dataset.write per distinct store.
+                // ⚠ ACCUMULATED, not emitted (DATASET-PUBLISH-ON-FAILURE-1): the caller fires these only
+                // after the whole chain has completed. Announcing here published a write that a later
+                // step — or persistDerivedTables, immediately below the call site — could still abandon.
                 for (ConsignmentOutput o : written)
-                    rowsByStore.merge(o.tableName(), o.rows(), Long::sum);
-                rowsByStore.forEach((store, n) ->
-                        com.gamma.signal.DatasetWriteSignal.emit(store, n, processorId));
+                    pending.merge(new PendingWrite(o.tableName(), processorId), o.rows(), Long::sum);
                 ctx.log().info("wrote " + written.size() + " summary file(s) from " + rows.size() + " row(s)",
                         "consignment_id", consignmentId);
             }

@@ -187,6 +187,19 @@ service layer passes it a bus, and the bus publishes to three subscribers — th
 consignment-event handler, a mirror that republishes every commit as a signal so a signal trigger also
 works, and the ingest scheduler's upstream-commit and dataset-write handlers.
 
+⚠ **A `dataset.write` is announced only once the run that produced it has COMPLETED**
+(`DATASET-PUBLISH-ON-FAILURE-1`, 2026-09-15). `ConsignmentProcessJobType` used to emit inside
+`persistSummaries` — i.e. before `persistDerivedTables`, which throws, and before every later chain step
+had run — so a run that went on to fail had already told the platform its Dataset was fresh, and an
+`on: dataset` trigger could act on a write its own run then abandoned. Announcements are now accumulated
+across the chain and fired after it closes. `MaterializeTask` always had this ordering (its emit sits
+after the swap), so the two producers now agree.
+⛔ Deferring is **sufficient** precisely because a processor signals failure by **throwing** —
+`ProcessorResult` distinguishes only "did the work" from "nothing to do" — so reaching the end of the
+chain *is* the success condition. ⚠ Granularity is unchanged: still one signal per (store, producer),
+summed. Whether a run should emit **one** signal, and whether derived tables should announce at all, are
+contract changes for `dataset.write` consumers and are deliberately still open.
+
 ⚠ **There is no on-commit *job* trigger.** Commit-fired jobs ride the signal bus. Do not cite the
 graph-structure refusal as the thing that keeps job work at rest — that is a pipeline-edge relation and a
 different mechanism.

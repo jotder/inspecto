@@ -8,8 +8,10 @@ import java.util.Map;
 
 /**
  * Emits the {@code dataset.write} Signal at the moment a Dataset's data becomes <b>visible</b> —
- * post-swap in {@code MaterializeTask}, post-{@code record} in
- * {@code ConsignmentProcessJobType.persistSummaries}, and any future Dataset-producing sink
+ * post-swap in {@code MaterializeTask}, after the whole chain completes in
+ * {@code ConsignmentProcessJobType} (⚠ moved there from inside {@code persistSummaries} by
+ * {@code DATASET-PUBLISH-ON-FAILURE-1}, 2026-09-15: announcing mid-chain published writes that a later
+ * step, or {@code persistDerivedTables}, could still abandon), and any future Dataset-producing sink
  * (ELT amendment Phase 3 <b>S3a</b>, design of record 2026-08-06). Payload
  * {@code {dataset, rows, at, producer}} where {@code producer} is the writing pipeline/job name.
  *

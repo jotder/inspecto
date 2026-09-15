@@ -257,6 +257,87 @@ class ConsignmentProcessJobTypeTest {
         }
     }
 
+    /** A step that fails the framework's way — by throwing. {@code ProcessorResult} has no FAILED state. */
+    private static final class Exploder implements ConsignmentProcessor {
+        @Override public String id() { return "exploder"; }
+
+        @Override
+        public ProcessorResult process(ProcessorContext ctx) {
+            throw new IllegalStateException("step two refuses to run");
+        }
+    }
+
+    /**
+     * DATASET-PUBLISH-ON-FAILURE-1: a chain whose LATER step fails must announce nothing. The write is
+     * rolled forward by {@code persistSummaries}, but the run as a whole did not succeed, and an
+     * {@code on: dataset} trigger acting on that announcement would be acting on a run that failed.
+     *
+     * <p>⚠ The failure surfaces as a THROW out of {@code run}, not as a failed {@code JobResult}: a
+     * processor signals failure by throwing, and it is the Job framework <em>above</em> this type that
+     * converts that into a FAILED run. Asserting the throw is therefore part of the proof, not noise —
+     * without it a regression that stopped emitting altogether would pass this negative test silently.
+     */
+    @Test
+    void aChainThatFailsLaterAnnouncesNoDatasetWrite(@TempDir Path dir) throws Exception {
+        String space = "consignment-publish-failure-" + java.util.UUID.randomUUID();
+        com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+        com.gamma.event.EventLog.register(space, log);
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
+        try {
+            Path f = writeParquet(dir.resolve("detail"), 3);
+            Path data = dir.resolve("data");
+            try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+                store.record(List.of(out(f, 3)));
+                ConsignmentOutputStores.use(store);
+
+                IllegalStateException boom = assertThrows(IllegalStateException.class,
+                        () -> chainJob(data.toString(), new DailyCounter(), new Exploder())
+                                .run(new CapturingJobContext(params("c1", "daily-counter,exploder"), false)),
+                        "the chain failed at its second step");
+                assertEquals("step two refuses to run", boom.getMessage());
+
+                assertTrue(com.gamma.signal.Signals.query(log.store(),
+                                com.gamma.signal.DatasetWriteSignal.TYPE, null, null, null, null, 10).isEmpty(),
+                        "no dataset.write is announced for a run that did not complete");
+            }
+        } finally {
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            com.gamma.event.EventLog.unregister(space);
+        }
+    }
+
+    /** The positive half: the announcement still happens — and still names the processor — when the chain
+     *  completes. Without this, deferring the emit could silently become dropping it. */
+    @Test
+    void aChainThatCompletesStillAnnouncesTheDatasetWrite(@TempDir Path dir) throws Exception {
+        String space = "consignment-publish-success-" + java.util.UUID.randomUUID();
+        com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+        com.gamma.event.EventLog.register(space, log);
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
+        try {
+            Path f = writeParquet(dir.resolve("detail"), 3);
+            Path data = dir.resolve("data");
+            try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+                store.record(List.of(out(f, 3)));
+                ConsignmentOutputStores.use(store);
+
+                JobResult result = job(new DailyCounter(), data.toString())
+                        .run(new CapturingJobContext(params("c1", "daily-counter"), false));
+                assertTrue(result.success(), result.message());
+
+                List<com.gamma.signal.Signal> signals = com.gamma.signal.Signals.query(log.store(),
+                        com.gamma.signal.DatasetWriteSignal.TYPE, null, null, null, null, 10);
+                assertEquals(1, signals.size(), "one dataset.write per written store, as before");
+                assertEquals("cdr__summary", signals.get(0).payload().get("dataset"));
+                assertEquals("daily-counter", signals.get(0).payload().get("producer"),
+                        "granularity is unchanged: the announcement still names the processor that wrote");
+            }
+        } finally {
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            com.gamma.event.EventLog.unregister(space);
+        }
+    }
+
     @Test
     void persistsEmittedSummariesAndRegistersThem(@TempDir Path dir) throws Exception {
         Path f = writeParquet(dir.resolve("detail"), 3);

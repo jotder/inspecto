@@ -1,8 +1,9 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-15 — census recounted (75 rows); **all 20 SHIPPED/CLOSED entries swept off the page**
-(~470 lines) after verifying each one's as-built is homed; `SPEC-JAVALANE-RATIO-1` and
-`COLLECTOR-DATASET-UNPROVEN-1` filed.
+**Updated:** 2026-09-15 — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
+`DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
+`ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
 **2026-09-07** — §4–§7 re-grounded and drained (see each section's note).
 **2026-09-06 — consolidated.** The previous page (505 KB, 3,288 lines, roughly half of its rows
 already closed) is frozen as
@@ -13,8 +14,17 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 2026-09-07, its retirement trigger having fired), the remainders of every plan still in
 `docs/superpower/`, and the last handoff's next steps.
 
-> **Where the board stands — recounted 2026-09-15 (second pass, after a full grounding sweep of §3–§5).**
-> **73 rows: 2 × P1 · 40 × P2 · 31 × P3.**
+> **Where the board stands — recounted 2026-09-15 (third pass, after the grounding sweep and two builds).**
+> **71 rows: 2 × P1 · 38 × P2 · 31 × P3.**
+>
+> ✅ **Two defects BUILT and closed 2026-09-15**, both found by the sweep and both proven red before being
+> called fixed: `AUDIT-REFUSAL-GAP-1` (401/403 refusals on a matched route now reach the audit trail —
+> `events-metrics.md` owns the as-built, including the two deliberate asymmetries) and
+> `DATASET-PUBLISH-ON-FAILURE-1` (a `dataset.write` is announced only after the run completes —
+> `pipeline-execution.md` §triggers). Reactor **4513 / 0 / 0 / 28 over 26 modules**, `-Pedition-enterprise`.
+> ⚠ **That baseline is +8 over the 4505 last recorded, and only 5 are mine** — the other 3 came from
+> `6ec10981`, which landed after the baseline was written. ⛔ Reconcile a moved baseline by counting
+> `@Test` additions per commit; do not assume your own change explains the whole delta.
 >
 > ✅ **Every P2 was grounded against CODE on 2026-09-15**, not against its own text. **Five closed outright**
 > — `RECON-CARDINALITY-1` (tier 1 shipped whole; tier 2 survives as the demand-gated
@@ -75,9 +85,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 2 P1 + 40 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 2 P1 + 38 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 31 are a list of things deliberately *not* being built, not a backlog
-> to burn down. Reading all 73 as pending work overstates what is owed by roughly 40%.
+> to burn down. Reading all 71 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -1071,19 +1081,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ Lineage/impact code already exists (42 Java / 25 TS hits); **what is absent is the gate over a diff**.
   → Lineage · `docs/api` breaking-change record · CI
 
-- **P2** · **`AUDIT-REFUSAL-GAP-1` — a capability 403 and an auth 401 are never audited.** Filed 2026-09-15
-  from duckle candidate S6 ("refusals audited as carefully as successes"). Two of the three sub-rules are
-  **already satisfied** and should not be re-litigated: `AuditTrail.record` appends
-  `" (refused, HTTP <status>)"` for any status ≥ 400 (`AuditTrail.java:51`), so *allowed ≠ succeeded*
-  holds for anything reaching a handler; and reads are deliberately not audited — `AuditTrail.classify`
-  (`:123-128`) audits GET only for `/export`, so a polling dashboard cannot bury the record.
-  🔴 **The gap is the refusal the gating mechanism itself produces.** `ApiContext.requireCapability`'s 403
-  (`ApiContext.java:168-171`) and `authenticate`'s 401 (`ControlApi.java:796`) both throw `ApiException`,
-  which unwinds **past** `routeDispatch`'s `AuditTrail.record` / `accessDenied` calls (`:729-738`) into
-  `errorBoundary` (`:594-599`), which only shapes an HTTP response. ⇒ only unmatched-route 404/405 and ABAC
-  policy denials are audited; **a denied capability check leaves no trace at all.** ⚠ That is the exact
-  record a security review would ask for first. → `ControlApi.java:594` · `ApiContext.java:168`
-
 - **P2** · 🔴 **`DATASET-SELF-TRIGGER-1` — a pipeline can trigger itself through `on: dataset`, and the
   javadoc says it cannot.** Filed 2026-09-15 from duckle candidate S3 ("no self-subscription").
   `PipelineScheduler.onUpstreamCommit` has an explicit self-loop guard (`:445`); **`onDatasetWrite`
@@ -1101,17 +1098,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `onDatasetWrite`, so today the value never even reaches the scheduler. ⇒ the real work is **deciding
   what `producer` identifies** and populating it consistently; the guard is downstream of that.
   → `PipelineScheduler.java:469` · `CollectorService.java:1026` · `ConsignmentProcessJobType.java:412`
-
-- **P2** · **`DATASET-PUBLISH-ON-FAILURE-1` — a run that later fails has already announced its write.**
-  Filed 2026-09-15 from duckle candidate S3 ("failed or ceiling-stopped runs publish nothing").
-  `ConsignmentProcessJobType:318` emits `dataset.write` inside `persistSummaries`; `:321` then calls
-  `persistDerivedTables`, which is `throws Exception` and propagates out of `run()` (`:244`). A run that
-  dies in derived tables — or in a later step of a multi-processor chain (`:275-327`) — has **already
-  published**, so a downstream `on: dataset` consumer is triggered by a failed producer.
-  ✅ **`MaterializeTask` is the correct model and shows the fix is cheap**: its emit (`:132`) sits *after*
-  the atomic swap, so a failure publishes nothing. ⚠ Also asymmetric: the derived-table path (`:361-380`)
-  emits **nothing at all**, and the summary path emits **one signal per distinct store** rather than one
-  per run — worth settling in the same change. → `ConsignmentProcessJobType.java:318`
 
 - **P2** · **`LEDGER-PRUNE-EATS-RESUME-STATE-1` — retention deletes resume position, not just history.**
   Filed 2026-09-15 from duckle candidate S1 ("saved state — watermarks, resume positions — is NEVER
