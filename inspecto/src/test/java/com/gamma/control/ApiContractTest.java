@@ -229,11 +229,16 @@ class ApiContractTest {
         JsonNode contract = contract();
         int documentedPaths = 0;
         int documentedOperations = 0;
+        int generatedOperations = 0;   // OPENAPI-GEN-1 skeletons (x-generated) — path+method only, no schemas
         for (var it = contract.path("paths").fields(); it.hasNext(); ) {
             var entry = it.next();
             documentedPaths++;
-            for (var opIt = entry.getValue().fieldNames(); opIt.hasNext(); )
-                if (HTTP_METHODS.contains(opIt.next())) documentedOperations++;
+            for (var opIt = entry.getValue().fields(); opIt.hasNext(); ) {
+                var op = opIt.next();
+                if (!HTTP_METHODS.contains(op.getKey())) continue;
+                documentedOperations++;
+                if (op.getValue().path("x-generated").asBoolean(false)) generatedOperations++;
+            }
         }
 
         int liveRoutes;
@@ -260,15 +265,19 @@ class ApiContractTest {
                         + "control-api.md §2 in the same commit");
 
         // Printed pass or fail. An unstated coverage figure is an unaudited one, which is how 6% survived.
+        // Since OPENAPI-GEN-1 (2026-09-15) STRUCTURAL coverage is 100% by construction — every live route
+        // (and every absent-module stub, which mirrors an optional module's route) has a path+method, or
+        // OpenApiPathsContractTest is red. The figure that still moves by hand is SCHEMA coverage: the
+        // operations whose request/response shapes a person wrote.
+        int schemaDocumented = documentedOperations - generatedOperations;
         System.out.printf(
-                "ApiContractTest coverage: OpenAPI documents %d path(s) / %d operation(s) against %d live "
-                        + "route registration(s) (+%d absent-module stubs) — %.1f%% of the CORE surface, "
-                        + "which is an UPPER BOUND: a full Enterprise bundle adds the optional modules' "
-                        + "routes against the same documented set. Exemplar coverage is a DECISION still "
-                        + "owed to the operator (control-api.md §5); raise MIN_DOCUMENTED_* when you "
-                        + "document more.%n",
-                documentedPaths, documentedOperations, liveRoutes, stubbed,
-                100.0 * documentedOperations / liveRoutes);
+                "ApiContractTest coverage: OpenAPI has %d path(s) / %d operation(s) — %d hand-documented with "
+                        + "schemas, %d generated skeletons — against %d live route registration(s) + %d "
+                        + "absent-module stubs. Structural coverage is enforced by OpenApiPathsContractTest; "
+                        + "SCHEMA coverage is %.1f%% of the core surface and is the number to raise "
+                        + "(control-api.md §5). Raise MIN_DOCUMENTED_* when you document more.%n",
+                documentedPaths, documentedOperations, schemaDocumented, generatedOperations, liveRoutes, stubbed,
+                100.0 * schemaDocumented / (liveRoutes + stubbed));
     }
 
     /** Read one of {@link ControlApi}'s private route sets. Same package, plain classpath, no module-info. */
