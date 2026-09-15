@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import java.util.Map;
+
 /**
  * One persisted Run Artifact (R7, §10): the owning run + job, a monotonic {@code seq}, the logical
  * {@code name} and {@code kind} ({@code dataset} | {@code file}), the {@code ref} (dataset id or file
@@ -18,4 +20,10 @@ package com.gamma.job;
  */
 public record RunArtifact(String runId, String job, int seq, String name, String kind,
                           String ref, ResultSetMeta resultSet, long rows, long bytes,
-                          String watermark, String at) {}
+                          String watermark, String at, Map<String, Object> detail) {
+    /** The pre-{@code detail} shape — every dataset/file artifact, and every JSONL line written before 2026-09-15. */
+    public RunArtifact(String runId, String job, int seq, String name, String kind, String ref,
+                       ResultSetMeta resultSet, long rows, long bytes, String watermark, String at) {
+        this(runId, job, seq, name, kind, ref, resultSet, rows, bytes, watermark, at, null);
+    }
+}

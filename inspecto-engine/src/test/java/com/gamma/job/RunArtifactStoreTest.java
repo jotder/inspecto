@@ -45,6 +45,25 @@ class RunArtifactStoreTest {
         assertEquals(1024L, f.bytes());
         assertNull(f.resultSet(), "a file artifact has no result-set shape");
         assertEquals(2, f.seq(), "seq is monotonic across a run's artifacts");
+        assertNull(f.detail(), "dataset/file artifacts carry no detail");
+    }
+
+    /** DUCKLE-C4: the parameter receipt is one more artifact on the run, and survives the JSONL round trip. */
+    @Test
+    void recordsTheParameterReceiptAsAnArtifact(@TempDir Path dir) {
+        RunArtifactStore store = new RunArtifactStore(dir.toString());
+        RunContext ctx = new RunContext("r2", "default", "loader", "manual", "r2", null, 0,
+                Map.of(), new RunLogStore(dir.toString()), 100, store);
+
+        ctx.artifacts().params(Map.of("day", Map.of("source", "args", "overrode", List.of("config"))));
+
+        List<RunArtifact> arts = store.read("r2");
+        assertEquals(1, arts.size());
+        assertEquals("params", arts.get(0).kind());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> day = (Map<String, Object>) arts.get(0).detail().get("day");
+        assertEquals("args", day.get("source"));
+        assertEquals(List.of("config"), day.get("overrode"));
     }
 
     @Test

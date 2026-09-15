@@ -41,16 +41,34 @@ final class ParameterResolver {
      *  resolved value didn't parse as its declared {@link ParamType}, and any name whose {@code $}-value
      *  named a token no provider declares (all three ⇒ REJECTED). */
     record Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType,
-                      List<String> unknownExpression) {}
+                      List<String> unknownExpression, Map<String, Provenance> provenance) {
+        /** The pre-provenance shape, for callers that only want the values. */
+        Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType,
+                   List<String> unknownExpression) {
+            this(resolved, missingRequired, invalidType, unknownExpression, Map.of());
+        }
+    }
+
+    /**
+     * Where a resolved value came from, and what it overrode (`DUCKLE-C4-PARAM-PROVENANCE-1`, 2026-09-15).
+     * {@code source} is the layer that won — {@code args} (trigger / manual), {@code bind} (signal), {@code config}
+     * (the {@code params:} block), {@code config:flow} (the legacy alias), {@code deduce}, {@code default} —
+     * and {@code overrode} names the LOWER layers that also carried a value, in ladder order, ⚠ only when
+     * their authored value differs from the winner's: two surfaces agreeing is not an override. Values are
+     * never recorded here — a {@code secret} is therefore a non-question; "was a token supplied, and by
+     * whom" is exactly what the layer names answer.
+     */
+    record Provenance(String source, List<String> overrode) {}
 
     /** One trip down the layer ladder: the value found ({@code null} ⇒ unresolved), or the unregistered
      *  token that stopped it (§6.3) — an Expression nobody declares must fail the Run, never fall through
      *  to the next layer, where it would surface as a confusing "missing required parameter". */
-    private record Layered(String value, String unknownExpr) {
-        static final Layered NONE = new Layered(null, null);
-        static Layered of(String value)     { return new Layered(value, null); }
-        static Layered unknown(String expr) { return new Layered(null, expr); }
+    private record Layered(String value, String unknownExpr, String source, List<String> overrode) {
+        static final Layered NONE = new Layered(null, null, null, List.of());
+        static Layered of(String value)     { return new Layered(value, null, null, List.of()); }
+        static Layered unknown(String expr) { return new Layered(null, expr, null, List.of()); }
         boolean stops() { return value != null || unknownExpr != null; }
+        Layered from(String layer, List<String> overrode) { return new Layered(value, unknownExpr, layer, List.copyOf(overrode)); }
     }
 
     /** Deliberately permissive: {@code local@domain.tld} with no spaces. An address is only truly validated
@@ -66,6 +84,7 @@ final class ParameterResolver {
         List<String> missing = new ArrayList<>();
         List<String> invalidType = new ArrayList<>();
         List<String> unknown = new ArrayList<>();
+        Map<String, Provenance> provenance = new LinkedHashMap<>();
         for (ParameterDecl d : decls) {
             Layered l = value(d, args, bind, config, expressions, ctx);
             if (l.unknownExpr() != null) {
@@ -87,9 +106,10 @@ final class ParameterResolver {
                 continue;
             }
             out.put(d.name(), v);
+            provenance.put(d.name(), new Provenance(l.source(), l.overrode()));
         }
         return new Resolution(Map.copyOf(out), List.copyOf(missing), List.copyOf(invalidType),
-                List.copyOf(unknown));
+                List.copyOf(unknown), Map.copyOf(provenance));
     }
 
     /** Check a resolved value against the declaration's full contract (§7.2, step 8) — type, then
@@ -175,35 +195,38 @@ final class ParameterResolver {
     private static Layered value(ParameterDecl d, Map<String, String> args,
                                  Map<String, String> bind, Map<String, String> config,
                                  ExpressionRegistry expressions, ExpressionContext ctx) {
-        String a = args.get(d.name());
-        if (a != null && !a.isBlank()) {
-            Layered av = authored(d, a.trim(), expressions, ctx);
-            if (av.stops()) return av;
-        }
-        String b = bind.get(d.name());
-        if (b != null && !b.isBlank()) {
-            Layered bv = expression(b.trim(), expressions, ctx);
-            if (bv.stops()) return bv;
-        }
-        String c = config.get(d.name());
-        if (c != null && !c.isBlank()) {
-            Layered cv = authored(d, c.trim(), expressions, ctx);
-            if (cv.stops()) return cv;
-        }
-        // Tier 3 dual-read (vocabulary plan §4): the `pipeline` job parameter's pre-rename config key was
-        // `flow` — read-only fallback for *_job.toon files that were never resaved under the new name.
-        if ("pipeline".equals(d.name())) {
-            String legacy = config.get("flow");
-            if (legacy != null && !legacy.isBlank()) {
-                Layered lv = authored(d, legacy.trim(), expressions, ctx);
-                if (lv.stops()) return lv;
+        // The ladder, top down. Each rung is (layer name, raw authored text, how to read it). The FIRST rung
+        // that stops wins — exactly as before — but the walk no longer returns there: it keeps going to
+        // learn which lower rungs ALSO carried a (different) value, which is the provenance the receipt
+        // records (DUCKLE-C4). Rungs whose raw text is blank are not "supplied" and are not overrides.
+        Layered winner = null;
+        String winnerLayer = null;
+        String winnerRaw = null;
+        List<String> overrode = new ArrayList<>();
+        String[][] rungs = {
+                {"args", args.get(d.name())},
+                {"bind", bind.get(d.name())},
+                {"config", config.get(d.name())},
+                // Tier 3 dual-read (vocabulary plan §4): the `pipeline` job parameter's pre-rename config key
+                // was `flow` — read-only fallback for *_job.toon files that were never resaved under the new name.
+                {"config:flow", "pipeline".equals(d.name()) ? config.get("flow") : null},
+                {"deduce", d.deduce()},
+        };
+        for (String[] rung : rungs) {
+            String raw = rung[1];
+            if (raw == null || raw.isBlank()) continue;
+            if (winner != null) {
+                if (!raw.trim().equals(winnerRaw)) overrode.add(rung[0]);   // agreeing is not overriding
+                continue;
             }
+            Layered l = switch (rung[0]) {
+                case "bind", "deduce" -> expression(raw.trim(), expressions, ctx);
+                default -> authored(d, raw.trim(), expressions, ctx);
+            };
+            if (l.stops()) { winner = l; winnerLayer = rung[0]; winnerRaw = raw.trim(); }
         }
-        if (d.deduce() != null && !d.deduce().isBlank()) {
-            Layered dv = expression(d.deduce().trim(), expressions, ctx);
-            if (dv.stops()) return dv;
-        }
-        return Layered.of(d.defaultValue());   // may be null
+        if (winner != null) return winner.from(winnerLayer, overrode);
+        return Layered.of(d.defaultValue()).from(d.defaultValue() == null ? null : "default", List.of());   // may be null
     }
 
     /** An author-typed value — trigger {@code args} (layer 1) or the {@code params:} block (layer 3), the

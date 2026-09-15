@@ -43,6 +43,32 @@ class ParameterResolverTest {
         return new ParameterDecl(name, ParamType.STRING, required, deduce, def, name);
     }
 
+    /** DUCKLE-C4: the receipt names the winning layer and the lower layers it overrode — names, never values. */
+    @Test
+    void provenanceNamesTheWinningLayerAndWhatItOverrode() {
+        ExpressionContext c = ctx(Optional.empty(), (a, b) -> Optional.empty(), Map.of());
+        List<ParameterDecl> decls = List.of(decl("x", false, null, "dflt"));
+
+        var argsWin = ParameterResolver.resolve(decls, Map.of("x", "from-args"), Map.of(), Map.of("x", "from-config"), EXPR, c);
+        assertEquals("from-args", argsWin.resolved().get("x"));
+        assertEquals("args", argsWin.provenance().get("x").source());
+        assertEquals(List.of("config"), argsWin.provenance().get("x").overrode(), "config carried a DIFFERENT value and lost");
+
+        var agree = ParameterResolver.resolve(decls, Map.of("x", "same"), Map.of(), Map.of("x", "same"), EXPR, c);
+        assertEquals(List.of(), agree.provenance().get("x").overrode(), "two surfaces agreeing is not an override");
+
+        var configWins = resolve(decls, Map.of("x", "from-config"), c);
+        assertEquals("config", configWins.provenance().get("x").source());
+        assertEquals(List.of(), configWins.provenance().get("x").overrode());
+
+        var defaulted = resolve(decls, Map.of(), c);
+        assertEquals("dflt", defaulted.resolved().get("x"));
+        assertEquals("default", defaulted.provenance().get("x").source());
+
+        var absent = resolve(List.of(decl("y", false, null, null)), Map.of(), c);
+        assertFalse(absent.provenance().containsKey("y"), "an unresolved parameter has no receipt line");
+    }
+
     @Test
     void deducesTheBuiltInDollarContext() {
         var c = ctx(Optional.of(LocalDateTime.parse("2026-07-07T06:00:04")));

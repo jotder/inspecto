@@ -101,6 +101,11 @@ final class RunContext implements JobContext {
             store.append(new RunArtifact(runId, job, seq.incrementAndGet(), name, "file",
                     path == null ? null : path.toString(), null, 0L, bytes, null, Instant.now().toString()));
         }
+
+        @Override public void params(java.util.Map<String, java.util.Map<String, Object>> provenance) {
+            store.append(new RunArtifact(runId, job, seq.incrementAndGet(), "params", "params",
+                    null, null, 0L, 0L, null, Instant.now().toString(), java.util.Map.copyOf(provenance)));
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.time.Instant;
 
 /**
@@ -21,4 +22,12 @@ public interface ArtifactRecorder {
 
     /** A produced file (export, report output, …). */
     void file(String name, Path path, long bytes);
+
+    /**
+     * The run's parameter RECEIPT (`DUCKLE-C4-PARAM-PROVENANCE-1`): for every resolved parameter, which layer
+     * supplied it and which lower layers it overrode — {@code {name → {source, overrode:[…]}}}. Layer names
+     * only, never values, so a {@code secret} needs no masking here. Default no-op so a recorder that has
+     * nowhere to put it (dry-run wrappers, tests) is not forced to care.
+     */
+    default void params(Map<String, Map<String, Object>> provenance) {}
 }

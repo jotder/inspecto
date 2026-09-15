@@ -1249,6 +1249,12 @@ public final class JobService implements AutoCloseable {
             return;
         }
         ctx.params(pr.resolved());
+        // DUCKLE-C4: the parameter RECEIPT — which layer each value came from and what it overrode. Built here
+        // (the values are resolved), written AFTER the run body (below) so a run's OUTPUT artifacts keep their
+        // positions — readers that take artifacts.get(0) as "the output" predate the receipt.
+        java.util.Map<String, java.util.Map<String, Object>> receipt = new LinkedHashMap<>();
+        pr.provenance().forEach((n, prov) -> receipt.put(n,
+                java.util.Map.of("source", prov.source() == null ? "default" : prov.source(), "overrode", prov.overrode())));
         ctx.dryRun(firing.dryRun());
         // S1-2: grant exactly the type's declared requires: — registration already validated the
         // ids, so this cannot throw for a registered type. Grants are honest (R4): a service that
@@ -1286,6 +1292,10 @@ public final class JobService implements AutoCloseable {
         } finally {
             packs.releaseRun(packOwner);
             if (pipelineId != null) runningPipelines.remove(pipelineId);
+            // DUCKLE-C4: the receipt rides the run whether it succeeded or threw — "why did it use THAT value"
+            // matters most for a failed run. GET /jobs/{name}/runs/{runId}/artifacts, kind `params`; layer
+            // names only, no values, no secrets; excluded from latestArtifacts (outputs) and `$upstream`.
+            if (!receipt.isEmpty()) ctx.artifacts().params(receipt);
         }
         ctx.log().info("run completed", "status", res.status(), "durationMs", res.durationMs());
         // One terminal lifecycle signal: job.run.failed on a thrown exception, else job.run.completed.
@@ -1505,7 +1515,10 @@ public final class JobService implements AutoCloseable {
 
     /** Artifacts of a job's most recent successful run (R7) — {@code GET /jobs/{name}/artifacts/latest}; empty if none. */
     public List<RunArtifact> latestArtifacts(String name) {
-        return ledger.lastSuccessRunId(name).map(runArtifactStore::read).orElse(List.of());
+        // The parameter RECEIPT (kind `params`, DUCKLE-C4) is about the run, not an OUTPUT of it — it stays on
+        // runArtifacts(runId) and is excluded here so `$upstream(...)` and the outputs listing see only outputs.
+        return ledger.lastSuccessRunId(name).map(runArtifactStore::read).orElse(List.<RunArtifact>of())
+                .stream().filter(a -> !"params".equals(a.kind())).toList();
     }
 
     /** One named artifact recorded by a specific run (highest seq wins) — backs the artifact content download. */
