@@ -228,7 +228,12 @@ describe('promoted Breaks (BREAK-INCIDENT-RESOLVE-1)', () => {
     it('reads the promoted map from the server on load, not from session memory', async () => {
         const { c, promoted } = await create({
             promoted: vi.fn(() =>
-                of({ reconciliation: 'r1', promoted: { 'value_break|EU · data|amount': 'inc-7' }, total: 1, truncated: false }),
+                of({
+                    reconciliation: 'r1',
+                    promoted: { 'value_break|EU · data|amount': 'inc-7' },
+                    total: 1,
+                    truncated: false,
+                }),
             ),
         });
         expect(promoted).toHaveBeenCalled();
@@ -269,7 +274,12 @@ describe('promoted Breaks (BREAK-INCIDENT-RESOLVE-1)', () => {
     it('follows a promoted Break to its Incident', async () => {
         const { c } = await create({
             promoted: vi.fn(() =>
-                of({ reconciliation: 'r1', promoted: { 'value_break|EU · data|amount': 'inc-7' }, total: 1, truncated: false }),
+                of({
+                    reconciliation: 'r1',
+                    promoted: { 'value_break|EU · data|amount': 'inc-7' },
+                    total: 1,
+                    truncated: false,
+                }),
             ),
         });
         const router = TestBed.inject(Router);

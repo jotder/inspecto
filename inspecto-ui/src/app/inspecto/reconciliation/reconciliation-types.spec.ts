@@ -233,8 +233,9 @@ describe('breakId — the server-shared Break identity', () => {
     it('is injective when a value contains the separator', () => {
         // Without escaping both render `value_break|EU|voice|amount` and two different Breaks would share
         // one Incident — the defect BREAK-DEDUPE-GRAIN-1 removes, reintroduced one level down.
-        expect(breakId(b('value_break', 'EU|voice', 'amount')))
-            .not.toBe(breakId(b('value_break', 'EU', 'voice|amount')));
+        expect(breakId(b('value_break', 'EU|voice', 'amount'))).not.toBe(
+            breakId(b('value_break', 'EU', 'voice|amount')),
+        );
     });
 
     it('is injective when a value contains a backslash', () => {
