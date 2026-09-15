@@ -32,14 +32,31 @@
 
 | # | Step | Verify |
 |---|---|---|
-| 1 | **Actor wiring (SPA).** `SessionService.actor` signal set from `bootstrap.session.actor` when `authenticated`, cleared in `onAuthLost()`. `UserComponent` renders it; the dead `user_name`/`UserService.user$` plumbing goes. | `session.service.spec.ts` + `user.component.spec.ts` assert the rendered name; `npm run lint:tokens`, three tsconfig typechecks, `npx ng test`. |
-| 2 | **Trim the public bootstrap (backend).** Under an `Authenticator` with no subject, `GET /bootstrap` omits `spaces`, `configSpecs`, `enumerations`; keeps `edition`, `features`, `session` (anonymous), `auth`. Personal (no authenticator) unchanged. | New real-HTTP test in the security module's test tree: anonymous → keys absent; bearer → keys present; Personal → unchanged. `mvn -o test -Pedition-standard` for `inspecto-security` + `-am`. |
-| 3 | **Home route** `modules/admin/home/` at `/home`; root `''` → `home`. Sections and their gates: greeting (`actor()` under OIDC, "Welcome to Inspecto." otherwise) · listen-address notice (`authMode()==='none'`, dismissible per browser) · Lens card (current Lens + `LENS_HOME[lens]` primary button + Switch Lens) · quick start / quick actions (`canOnboardConnections`, `canAuthorWorkbench`, `opsEnabled` for Triage Incidents, `canOperateRuns` for Run now, `canAdminister` for Administer this Space) · activity strip + needs-attention list from existing Runs / Incidents / Expectations routes, `<inspecto-empty-state>` when empty · access card (`multiSpace` true) · footer version + `Editions` link. Uses `<inspecto-alert>`, `<inspecto-status-badge>`, `<inspecto-empty-state>`, `<inspecto-chip>`; no hardcoded colour. Nav gains `home` (first item) — three edits: route, `navigation-data.ts`, `ACCESS_ACTION_NODES` untouched (Home hosts no gateable action of its own). | Spec with `expectNoA11yViolations`; module-flag and capability gating each asserted both ways; preview at `/` on Personal and with `mockAuthMode: 'oidc'`. |
-| 4 | **`LensService.canAdminister`** computed (first UI consumer) — the same derivation shape as the other ten. | Spec: granted under OIDC only when the capability is published; Personal honour-system per the existing precedent. |
+| 1 ✅ | **Actor wiring (SPA).** SHIPPED `9ed28c35`. `SessionService.actor` signal set from `bootstrap.session.actor` when `authenticated`, cleared in `onAuthLost()`. `UserComponent` renders it; the dead `user_name`/`UserService.user$` plumbing goes. | `session.service.spec.ts` + `user.component.spec.ts` assert the rendered name; `npm run lint:tokens`, three tsconfig typechecks, `npx ng test`. |
+| 2 ✅ | **Trim the public bootstrap (backend).** SHIPPED `6fadbd81`. Under an `Authenticator` with no subject, `GET /bootstrap` omits `spaces`, `configSpecs`, `enumerations`; keeps `edition`, `features`, `session` (anonymous), `auth`. Personal (no authenticator) unchanged. | New real-HTTP test in the security module's test tree: anonymous → keys absent; bearer → keys present; Personal → unchanged. `mvn -o test -Pedition-standard` for `inspecto-security` + `-am`. |
+| 3 ✅ | **Home route** SHIPPED `1029a292`. `modules/admin/home/` at `/home`; root `''` → `home`. Sections and their gates: greeting (`actor()` under OIDC, "Welcome to Inspecto." otherwise) · listen-address notice (`authMode()==='none'`, dismissible per browser) · Lens card (current Lens + `LENS_HOME[lens]` primary button + Switch Lens) · quick start / quick actions (`canOnboardConnections`, `canAuthorWorkbench`, `opsEnabled` for Triage Incidents, `canOperateRuns` for Run now, `canAdminister` for Administer this Space) · activity strip + needs-attention list from existing Runs / Incidents / Expectations routes, `<inspecto-empty-state>` when empty · access card (`multiSpace` true) · footer version + `Editions` link. Uses `<inspecto-alert>`, `<inspecto-status-badge>`, `<inspecto-empty-state>`, `<inspecto-chip>`; no hardcoded colour. Nav gains `home` (first item) — three edits: route, `navigation-data.ts`, `ACCESS_ACTION_NODES` untouched (Home hosts no gateable action of its own). | Spec with `expectNoA11yViolations`; module-flag and capability gating each asserted both ways; preview at `/` on Personal and with `mockAuthMode: 'oidc'`. |
+| 4 ✅ | **`LensService.canAdminister`** SHIPPED `19e3e239`. computed (first UI consumer) — the same derivation shape as the other ten. | Spec: granted under OIDC only when the capability is published; Personal honour-system per the existing precedent. |
 | 5 | **Sign-in landing restyle** (`sign-in.component.ts`): left panel = product mark, Space branding (default Space's `BrandingService`), headline, footer text + version + reachability from `/health`; right = the existing card. Version comes from the build (`environment` / `package.json` at build time), never from bootstrap. | Spec + a11y; preview with `mockAuthMode: 'oidc'`. |
 | 6 | **Docs**: surfaces §3.8 (root → Home), §3.3 (trimmed bootstrap), auth-security (actor wired), `USER_GUIDE` first-run section; `INDEX.md` untouched (no new root doc). | `node tools/check-vocabulary.mjs`; `graphify update .` |
 
-Order: 1 → 2 → 3 → 4 → 5 → 6. Steps 1 and 2 are independent of each other.
+Order: 1 → 2 → 4 → 3 → 5 → 6. ⚠ **4 before 3**, not as written: Home's administration action gates on
+`canAdminister`, so the capability had to exist first.
+
+## 3a. As-built deviations from the mockups (step 3, 2026-09-15)
+
+- 🔴 **The "Expectations breached" and "Datasets written" tiles are NOT built.** Neither has a backing
+  call: `ExpectationsService.list()` takes no limit and there is no breach endpoint, and no route reports
+  a dataset-write count at all. Counting breaches would mean fetching every Expectation on a landing
+  page. ⛔ Do not add either tile until the backend serves a cheap count — a landing page is the wrong
+  place to discover this cost.
+- **Home renders no footer.** The shell already has one; the mockup's version/edition line would double it.
+- **A failed run-history call is not a first run.** `GET /jobs/runs` needs the DuckDB jobs backend, so its
+  404/503 is an expected deployment state. `runsUnavailable` is tracked separately from "no runs", because
+  showing the first-run page to a running deployment would tell it nothing had ever run. Pinned by a test.
+- **`lensHome(lens, eventsEnabled)`** was extracted from `lensHomeRedirect` so the Home button and the root
+  redirect share one statement of the Ops-without-Events fallback instead of mirroring it.
+- **The Space name renders only in a multi-Space deployment** — a single-Space install would print the
+  seeded name "default" as a page eyebrow.
 
 ## 4. Deliberately not in scope
 
