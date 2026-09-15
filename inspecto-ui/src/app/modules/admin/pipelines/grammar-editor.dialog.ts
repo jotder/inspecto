@@ -42,6 +42,10 @@ export interface GrammarEditorDialogData {
     /** The pipeline's own config directory, threaded to the onward Schema editor so a drafted satellite
      *  lands beside its pipeline (`SCHEMA-SATELLITE-SUBDIR-1`). Blank/absent = the write root. */
     configSubdir?: string;
+    /** The pipeline's registered identity, threaded to the onward Schema editor so it can show the
+     *  DERIVED output schema beside the authored one (`DERIVED-SCHEMA-PANEL-ORPHAN-1`). ⚠ This travels
+     *  purely as a pass-through — nothing in THIS dialog reads it. */
+    pipeline?: string;
 }
 
 /**
@@ -196,6 +200,10 @@ export class GrammarEditorDialog {
                 sampleRows: this.previewRows(),
                 home: 'config',
                 subdir: this.data.configSubdir,
+                // DERIVED-SCHEMA-PANEL-ORPHAN-1: only this opener knows a pipeline, so only this one
+                // shows the derived schema. The Components pane's registry schemas belong to no
+                // pipeline, so the panel stays hidden there rather than rendering an empty state.
+                pipeline: this.data.pipeline,
             } satisfies SchemaEditorData,
             width: '1000px',
             maxHeight: '88vh',

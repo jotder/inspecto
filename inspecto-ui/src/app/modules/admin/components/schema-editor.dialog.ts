@@ -9,6 +9,7 @@ import { map, Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ComponentDef, ComponentsService, ConfigService, Finding } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { DerivedSchemaPanelComponent } from 'app/inspecto/schema';
 import {
     CellFinding,
     EditableGridComponent,
@@ -47,6 +48,23 @@ export interface SchemaEditorData {
      * instruction from an empty one. ⛔ Ignored for `home: 'registry'`: that is not a satellite.
      */
     subdir?: string;
+    /**
+     * The pipeline whose DERIVED output schema is shown beside the authored one
+     * (`DERIVED-SCHEMA-PANEL-ORPHAN-1`) — the identity `pipelineId()` produces, which is what
+     * `GET /config/schema/derived?pipeline=` resolves through `configFor`.
+     *
+     * 🔴 **Absent is meaningful, and `home: 'registry'` must never supply it.** A registry schema is
+     * shared and attached to no pipeline, so "what does this pipeline write?" has no answer there —
+     * the panel is hidden rather than shown empty. Only the `home: 'config'` opener, drafting a
+     * pipeline's satellite, knows a pipeline to ask about.
+     *
+     * ⚠ **It derives from the last SAVED config, not from this dialog's draft.** The route's own words
+     * are "every schema a *saved* pipeline declares" — so on a brand-new satellite there is nothing to
+     * derive from yet, and mid-edit the panel shows the schema as it was BEFORE the current edit. The
+     * panel is labelled accordingly; ⛔ do not let it read as live feedback on the unsaved edit, which
+     * is the one way this panel could mislead an author rather than help them.
+     */
+    pipeline?: string;
 }
 
 /** One typed field row — `ConfigSpecs.schema()`'s `raw.fields[]` keys, verbatim. */
@@ -94,6 +112,7 @@ const COLUMNS: EditableGridColumn[] = [
         MatInputModule,
         EditableGridComponent,
         InspectoAlertComponent,
+        DerivedSchemaPanelComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -123,6 +142,24 @@ const COLUMNS: EditableGridColumn[] = [
                 [csvName]="(data.def?.name ?? 'schema') + '-fields.csv'"
                 (rowsChange)="onRows($event)"
             ></inspecto-editable-grid>
+            @if (data.pipeline) {
+                <!--
+                  DERIVED-SCHEMA-PANEL-ORPHAN-1: the engine can compute what the pipeline writes, so the
+                  author stops restating it. Shown only when a pipeline is known — a registry schema
+                  (home: 'registry') belongs to none.
+                  ⚠ The heading says "last saved" deliberately: the route derives from the SAVED config,
+                  so this does not reflect the edit in progress. Silently omitting that would make it
+                  read as live feedback on the current draft, which is the one way it could mislead.
+                -->
+                <div class="mt-6">
+                    <h3 class="text-secondary mb-1 text-sm font-medium">Derived output schema · last saved</h3>
+                    <p class="text-secondary mb-2 text-xs">
+                        What the engine computes this pipeline writes, from its last saved configuration — not from the
+                        edits above.
+                    </p>
+                    <inspecto-derived-schema-panel [pipeline]="data.pipeline"></inspecto-derived-schema-panel>
+                </div>
+            }
             @if (findings().length) {
                 <div role="alert" class="mt-3">
                     <inspecto-alert variant="error" title="Not saved — this edit is not BACKWARD-compatible">

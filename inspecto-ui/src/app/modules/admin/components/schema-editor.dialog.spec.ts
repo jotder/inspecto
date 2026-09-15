@@ -52,6 +52,7 @@ function create(
     components: Partial<ComponentsService> = {},
     home?: 'registry' | 'config',
     subdir?: string,
+    pipeline?: string,
 ) {
     const ref = { close: vi.fn(), disableClose: false };
     // An EDIT saves here (the registry component); only a CREATE goes to ConfigService.write.
@@ -82,6 +83,11 @@ function create(
                 findings: [],
             }),
         ),
+        // The derived-schema panel fetches on init whenever a pipeline is supplied, so the stub must
+        // exist or the pipeline-bearing tests fail on an undefined method rather than on their subject.
+        derivedSchema: vi
+            .fn()
+            .mockReturnValue(of({ pipeline: 'orders', sourcePath: 'csv', typedSource: false, schemas: [] })),
         suggestSchema: vi.fn().mockReturnValue(
             of({
                 fields: [
@@ -98,7 +104,7 @@ function create(
         imports: [SchemaEditorDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows, home, subdir } },
+            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows, home, subdir, pipeline } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ConfigService, useValue: api },
             { provide: ComponentsService, useValue: comps },
@@ -319,5 +325,32 @@ describe('SchemaEditorDialog satellite home (SCHEMA-SATELLITE-SUBDIR-1)', () => 
         c.onRows([{ name: 'ID', selector: '0', type: 'VARCHAR', description: '', unit: '', classification: '' }]);
         c.save();
         expect(comps.create).toHaveBeenCalled();
+    });
+
+    // ── DERIVED-SCHEMA-PANEL-ORPHAN-1: the derived panel, wired ──────────────────────
+
+    /**
+     * 🔴 The panel was BUILT and never mounted — `DerivedSchemaPanelComponent` appeared only in a barrel
+     * export and its own spec, so `GET /config/schema/derived` had no reachable consumer in the product.
+     * This pins that the parse editor's onward link now shows it.
+     */
+    it('shows the derived output schema when a pipeline is known', () => {
+        const { fixture, api } = create(DEF, {}, undefined, {}, 'config', undefined, 'orders');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-derived-schema-panel')).not.toBeNull();
+        expect(api.derivedSchema).toHaveBeenCalledWith('orders');
+    });
+
+    /**
+     * ⛔ The other direction, and the reason `pipeline` is a parameter rather than always-on: a REGISTRY
+     * schema is shared and attached to no pipeline, so "what does this pipeline write?" has no answer.
+     * The panel must be absent there — not present-and-empty, which would invite the author to read a
+     * blank panel as "this pipeline writes nothing".
+     */
+    it('hides the derived panel for a registry schema, which belongs to no pipeline', () => {
+        const { fixture, api } = create(DEF, {}, undefined, {}, 'registry');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-derived-schema-panel')).toBeNull();
+        expect(api.derivedSchema).not.toHaveBeenCalled();
     });
 });

@@ -2165,6 +2165,10 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                     typeLabel: node.type,
                     categoryLabel: categoryLabel(category),
                     configSubdir: this.configSubdir(),
+                    // ⚠ The REGISTERED identity (what `pipelineId()` produces), not the display name —
+                    // it is passed on to the Schema editor's derived-schema panel, which asks
+                    // `GET /config/schema/derived?pipeline=` and that resolves through `configFor`.
+                    pipeline: this.selectedId(),
                 },
             })
             .afterClosed()

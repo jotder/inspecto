@@ -287,10 +287,10 @@ from thirty-eight separate rows.
 | 13 | The `.docx` generator | **Delete it; convert from the committed `.md`** — check its styling first so nothing is silently lost — ⚠ **amended on that check**, see the note below the table | ✅ SHIPPED: `scripts/generate_whitepaper_docx.py` |
 | 14 | Has the stale `.docx` been distributed? | **No — it never left the team.** No corrective action; the row is purely the generator change | same |
 | 15 | ~45 MB of cross-platform deadweight per zip | **Approved — filter the EXTENSION directory only**; launchers stay cross-copied; evidence from the zip entry tables | `AIRGAP-CROSSPLAT-DEADWEIGHT-1` (§5) |
-| 16 | Where do S3 endpoint/key/region live? | **`ConnectionProfile` for BOTH** the pipeline field and `dirs.database`. ⚠ Bootstrap ordering to be verified — if profiles cannot resolve early enough, the split is forced | `AIRGAP-S3-EXTENSIONS-1` (§5) |
-| 17 | Which Step Processor partial? | **Profiler** — it is also `DUCKLE-C8`'s prerequisite, so it does double duty | Step Processor catalog (§3) |
-| 18 | Four dead seams | **DELETE all four.** ⚠ The vendor plugin is grounded for out-of-repo references before removal — it is the irreversible one | `SPEC-DEADSEAM-1` (§4) |
-| 19 | The orphaned derived-schema panel | **Wire it into the schema authoring pane** | `DERIVED-SCHEMA-PANEL-ORPHAN-1` (§3) |
+| 16 | Where do S3 endpoint/key/region live? | ⚠ CAVEAT FIRED 2026-09-15 — profiles resolve AFTER pipeline parse, so parse-time validation forces the split; deferred resolution avoids it. Operator's call. **`ConnectionProfile` for BOTH** the pipeline field and `dirs.database`. ⚠ Bootstrap ordering to be verified — if profiles cannot resolve early enough, the split is forced | `AIRGAP-S3-EXTENSIONS-1` (§5) |
+| 17 | Which Step Processor partial? | 🔴 RATIONALE REFUTED 2026-09-15 — DUCKLE-C8 is an Expectation kind templated on `FileSequenceGaps`; there is NO double duty, and no Profiler code exists. Re-take. **Profiler** — it is also `DUCKLE-C8`'s prerequisite, so it does double duty | Step Processor catalog (§3) |
+| 18 | Four dead seams | 🔴 REFUTED 2026-09-15 — THREE of the four are ALIVE (vendor plugin is called by production tx configs; `ExpressionProvider` IS the expression engine; `temporalColumn` is cited by an active plan). Only `AssistDialog` deleted. ~~**DELETE all four.**~~ ⚠ The vendor plugin is grounded for out-of-repo references before removal — it is the irreversible one | `SPEC-DEADSEAM-1` (§4) |
+| 19 | The orphaned derived-schema panel | ✅ SHIPPED 2026-09-15. **Wire it into the schema authoring pane** | `DERIVED-SCHEMA-PANEL-ORPHAN-1` (§3) |
 | 20 | SOC 2 window start date | **Not open** — record it as NOT STARTED with what must be true first, so the gap is checkable instead of silent | §2 SOC 2 |
 | 21 | `SEC-INCIDENT-1` carry-forwards | **Both DONE** — write the dated CC6.1 line. ⚠ Two dates owed (§1 above) | §2 SEC-INCIDENT-1 |
 | 22 | `DATA-GOV-1` archive | **Not done** — record as outstanding | §2 DATA-GOV-1 |
@@ -302,11 +302,11 @@ from thirty-eight separate rows.
 | 28 | Data/format demand gates | **XLSX export** and **a real delete-feed** fired. ⛔ xz/zstd and `D-11` did **not** | §3 rows |
 | 29 | Ops/analytics demand gates | **ALL FOUR FIRED** — recon pairing · space-to-space comparison · MTTD · false-stale | four §3 rows |
 | 30 | Scale/cross-space demand gates | **ALL FOUR FIRED** — cross-Space consequence · multi-operator install · a second code-registered dataset producer · a quarantine-replay driver | §3 rows |
-| 31 | Secrets reaching logs unmasked | **SPLIT OUT and fix both paths now** — filed as `PARAM-SECRET-LEAK-1`, ✅ **BUILT and retired the same day** | as-built: `okf/backend/control-plane/jobs.md` §ParameterDecl |
-| 32 | Which adopted duckle row first? | **`DUCKLE-C9-WATCHER-NOT-A-RUN-1`** | its §5 row |
+| 31 | Secrets reaching logs unmasked | ✅ RE-VERIFIED 2026-09-15 — `SecretMasking` + a 170-line test exist; JobService's run-log line and ParameterResolver's messages are both masked. Nothing to rebuild. **SPLIT OUT and fix both paths now** — filed as `PARAM-SECRET-LEAK-1`, ✅ **BUILT and retired the same day** | as-built: `okf/backend/control-plane/jobs.md` §ParameterDecl |
+| 32 | Which adopted duckle row first? | 🔴 PREMISE STALE 2026-09-15 — the poll/Run conflation was fixed in `1fda46d5` (2026-09-13), BEFORE the row was adopted; only the observability half is real. Re-take. **`DUCKLE-C9-WATCHER-NOT-A-RUN-1`** | its §5 row |
 | 33 | The unmeasured Java-lane ratio | **Soften to a qualitative statement** — no benchmark run, and the dead citation goes with it | ✅ SHIPPED: `stakeholders/COMPETITIVE_LANDSCAPE.md` §1.3 |
 | 34 | D8 notification residuals | **Soft-bounce retry ONLY**; the SES/SNS adapter stays filed with its own review | Notifications (§3) · `D8-SUPPRESS-1` (§3) |
-| 35 | The ≈44 orphan pages | **Confirm the count, AND re-derive what `SPEC-STALEREF-1` was** — ⚠ it has no row anywhere, yet this row defers to it | `SPEC-ORPHANPAGE-1` (§5) |
+| 35 | The ≈44 orphan pages | ✅ DONE 2026-09-15 — ≈44 NOT confirmed (measured 57; method dominates); `SPEC-STALEREF-1` = 23 stale citations, CLOSED 2026-09-09. **Confirm the count, AND re-derive what `SPEC-STALEREF-1` was** — ⚠ it has no row anywhere, yet this row defers to it | `SPEC-ORPHANPAGE-1` (§5) |
 | 36 | The graphify skill divergence | **Re-sync from the package** — ✅ **DONE**; the repo copy is now byte-identical to `site-packages/graphify/skill.md`. ⚠ The operator reaffirmed after the premise was shown false, so the PowerShell port was traded away deliberately — see the note below | `GRAPHIFY-1` (§5), now tracks whether the port comes back |
 | 37 | What is "sandbox execution"? | **Dry-run: execute fully, discard ALL writes.** New scope, filed as `PIPELINE-DRYRUN-1`; `X4` is scoped against it | new §3 row |
 | 38 | What leads this shift? | **The secret-masking fix, then the P1** | §0 |
@@ -544,6 +544,22 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **Step Processor catalog** — 119 processors: **35**<!--count:processors-delivered--> delivered / **17**<!--count:processors-partial--> partial / 67 planned (`processor-catalog.contract.json`, counted 2026-09-10 — `quality.schema.drift` DELIVERED 2026-09-10 as a per-batch `quality.schema_drift` Signal; the earlier count was 34/18 on 2026-09-08 — the earlier "69 planned" was a grep artefact) (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
+
+  🔴 **GROUNDED 2026-09-15 — the “double duty” rationale for picking PROFILER is FALSE.** §1 row 17
+  chose Profiler because “it is also `DUCKLE-C8`'s prerequisite”. It is not.
+  `DUCKLE-C8-BASELINE-EXPECTATION-1` is an **Expectation kind** — server-built SQL over AT-REST data,
+  alongside `non_null`/`range`/`regex`/`referential`/`condition` — and its own row names
+  **`FileSequenceGaps`** (acquisition code) as the template to model it on. Nothing in that path touches
+  `RecipeCompiler`/`BuiltinNodeType`. The two share the word “profile” and nothing else.
+  ⚠ **And “partial” overstates what exists:** `quality.profiler.inline`'s own catalog note reads
+  *“storage/completeness KPIs exist; no per-column profile step”* — there is **no `Profiler` class anywhere
+  in the repo**. It is unbuilt, not half-built; the “partial” marks a related KPI capability elsewhere.
+  ⚠ **Shape correction for whoever builds it:** a Step Processor catalog entry is a `BuiltinNodeType` enum
+  case compiled to SQL by `RecipeCompiler`/`ProcessorCatalog` — **not** the `ConsignmentProcessor`
+  ServiceLoader SPI (that is the whole-Consignment third-party pack seam, a different capability).
+  ⇒ **The pick stands or falls on Profiler's own merit.** ⛔ Nothing was built — the stated reason for
+  choosing it over the other 16 partials has evaporated, and that is the operator's call to re-take.
+
 
   ✅ **DECIDED 2026-09-15:** **build the PROFILER partial next.** Picked by name, as this row requires. ⚠ The reason
   it was picked over Kafka-consumer and the three sinks is that it is **not standalone work**:
@@ -1226,10 +1242,60 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ Counting note that must survive the deletion: the vendor plugin's **30** functions are a
   DIFFERENT set from the 23 SQL mapping functions, which is why `check-doc-counts.mjs` names its id
   `sql-mapping-functions` and not the ambiguous noun.
+
+  🔴 **GROUNDED 2026-09-15 — the verdict does NOT hold: THREE of the four are ALIVE. Only
+  `AssistDialog` was deleted.** The row's own gate (“ground the vendor plugin before removing it”) is
+  what caught the worst of it, and the same check then refuted two more.
+  ⛔ **`LegacyVendorFunctions` — “reaches no bundle and no document” is FLATLY WRONG.** It is registered
+  through `META-INF/services/com.gamma.asn.plugin.TransformFunctionProvider`, discovered by
+  `FunctionRegistry` via `ServiceLoader`, and **called by production tx configs** — `ccnEventType(...)` and
+  siblings appear in `asn-parser/config/rtdms/mtna/ccn/ccn_tx.json`, `ccn_gprs_tx.json`, `mtn_occ_tx.json`.
+  It is documented as **the canonical worked example** of the plugin SPI in `asn-parser/docs/PLUGIN_GUIDE.md`
+  (also `asn-decoders/README.md`, `CONFIG_REFERENCE.md`), and `.github/workflows/ci.yml` names
+  `asn-plugin-vendors` in its test coverage. Deleting it breaks `RTDMS_ASN_Test` and the asn-golden parity
+  run. ⇒ It is not operator-side and not dead — it is **in-repo load-bearing**.
+  ⛔ **`ExpressionProvider` — deleting the interface deletes the expression engine.** `BuiltinExpressions`
+  implements it, `ExpressionRegistry.withBuiltins()` registers it, and `ParameterResolver`/`JobService`/
+  `JobPackManager` consume it (the last via `ServiceLoader` for Job Packs). ⚠ What is actually unused is
+  narrower and worth stating precisely: **no `META-INF/services` file registers an EXTERNAL provider**. The
+  dead thing is the third-party extensibility, not the seam.
+  ⛔ **`DatasetRelation.temporalColumn` — an ACTIVE plan depends on it.**
+  `superpower/dataset-column-derivation-plan.md` cites it as a design constraint (its §2.3 turns on
+  `temporalColumn` throwing on two temporal columns), **already records that it has zero production
+  callers**, and carries an operator decision of 2026-09-14 (Q2, temporal tie-break) built on that
+  behaviour. ⚠ It also has a live javadoc cross-reference from `SinkPartitions.java:30`. ⇒ It is
+  **unwired, not dead** — the same shape as `DERIVED-SCHEMA-PANEL-ORPHAN-1`.
+  ✅ **`AssistDialog` DELETED** — the only one that survived checking: no caller, selector
+  `app-assist-dialog` used nowhere, named only in the never-maintained archive tier. ⚠ Its
+  `AssistPanelComponent` is alive with three other consumers (`assist.component`, `node-detail.dialog`,
+  `diagnosis-detail.dialog`), so removing this host orphaned nothing.
+  ⇒ **The row needs re-deciding, not re-running.** “Four dead seams” was true of one. The three
+  survivors are three DIFFERENT questions: retire an unused extension point (Expression), keep or wire an
+  unwired reader (temporal), and document a live-but-undocumented plugin (vendor).
 ## 5. Docs & hygiene
 
 - **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14; the LOAD CALL now exists (2026-09-15);
   what remains is EXECUTING it once.**
+  🔴 **BOOTSTRAP ORDERING VERIFIED 2026-09-15 — the decision's own caveat FIRES.** §1 row 16 said
+  “`ConnectionProfile` for BOTH … if profiles cannot resolve early enough, the split is forced”. They
+  cannot, for a parse-time reference: `ServiceBootstrap.buildFrom` constructs `CollectorService` (`:69`),
+  whose constructor's FIRST statement is `requireDistinctPipelineIds(registry)` — that calls
+  `PipelineConfig.load` for every pipeline and so requires `dirs.database` — while `loadConnections` /
+  `registerConnection` run only at `:73-74`. ⇒ **every pipeline's `dirs.database` is parsed before any
+  `ConnectionProfile` exists.**
+  ✅ **But there is a third option the decision did not consider, and it avoids the split:** `dirs.database`
+  is typed as a plain `String` and is NOT resolved at parse time — nothing in `PipelineConfigParser` looks
+  a profile up. Physical use (`PartitionWriter`, `MetadataGraphBuilder`, `ReferenceReader`) happens long
+  after both steps. ⇒ **eager/parse-time validation forces the split; DEFERRED resolution at first
+  write-time use does not.** That is the real choice, and it is the operator's.
+  ⚠ **Two framing corrections to the decision text:** (a) `ConnectionProfile` has **no S3-specific**
+  fields — endpoint/region/key would ride its free-form `options` map, which is workable but unspecified;
+  (b) there is **no deployment-level `dirs.database`** — it is a required PER-PIPELINE field. The real
+  space-level data root is `SpaceRoot.dataDir()`, which has no S3 awareness at all. So “BOTH” names one
+  config surface plus one that does not exist in that form.
+  ⚠ Precedent check: `source.connection: <id>` already resolves a PIPELINE field through
+  `ConnectionRegistry` — so the pipeline half has a template. There is **no precedent** for a
+  deployment-level field resolving through a profile.
   ✅ **2026-09-15: `httpfs` is now named at its call site** — `PartitionWriter.writeToObjectStore` opens with
   `DuckDbExtension.ensureLoaded(conn, "httpfs", …)`, so an air-gapped install fails with the remedy message
   instead of at the `COPY` with a raw DuckDB error. Both the `COPY` and the `glob()` discovery below it go
@@ -1446,6 +1512,44 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   (dead config keys), C10 (pool rules) and C1 (Dataset freshness). ⚠ Reason for the record: it fixes
   run counts **where operators actually read them**, and the grounding already called it cheap to
   separate. ⛔ It touches the live collector loop, so "cheap" describes the design, not the care.
+
+  ✅ **SHIPPED 2026-09-15 — the panel is mounted; `GET /config/schema/derived` has a reachable consumer.**
+  `pipeline` now threads pipeline-editor → `GrammarEditorDialogData` → `SchemaEditorData` → the panel.
+  ⚠ **“The schema authoring pane” was ambiguous and the decision did not say which.** Two dialogs qualify;
+  `SchemaEditorDialog` was chosen because the panel's OWN docblock targets it (“beside the authored one
+  (step-workbench S5)”) and `okf/frontend/features/schema-mapping-authoring.md` names it as the surface.
+  🔴 **It was not a template edit: no dialog in the chain knew a pipeline.** The panel needs the
+  REGISTERED identity (`pipelineId()`), which `GET /config/schema/derived` resolves via `configFor` — so
+  the value had to be threaded through THREE levels. `SchemaEditorData` gained `pipeline?` beside its
+  existing `home`/`subdir`, which exist for the same reason (the two openers genuinely differ).
+  ⛔ **Hidden for `home: 'registry'`, deliberately.** A registry schema is shared and attached to no
+  pipeline, so the panel is ABSENT there rather than present-and-empty — an empty panel would invite
+  “this pipeline writes nothing”. A test pins each direction.
+  ⚠ **Labelled “last saved”, and that label is load-bearing.** The route derives from the SAVED config
+  (“every schema a *saved* pipeline declares”) while the dialog edits an in-memory draft — so mid-edit it
+  shows the schema BEFORE the current edit. Unlabelled it would read as live feedback on the unsaved
+  edit, which is the one way this panel could mislead an author rather than help them.
+
+  🔴 **GROUNDED 2026-09-15 — the PREMISE IS STALE; there is no conflation left to fix.** The row says
+  the collector loop “conflates polls and runs, which makes run counts misleading in exactly the place
+  operators read them”. It does not. `CollectorProcessor.ingest` returns on `candidates.isEmpty()`
+  **before** `RunIds.next()` is ever called, so a quiet poll mints no Run id and writes no run-scoped row.
+  ⚠ **The fix landed 2026-09-13 in `1fda46d5`** (“the Collector's ingest path stops writing a NULL
+  run_id”) — i.e. BEFORE this row was adopted on 2026-09-15 from a 2026-09-14 grounding note. The row was
+  born describing a defect that had already been repaired two days earlier.
+  ⚠ The nearest live wrinkle is terminology, not counts: `PipelineScheduler.runOne` moves
+  `inspecto_active_runs`/`inspecto_poll_cycles_total` per dispatched source per tick — but code and the
+  published metric table both already call those **poll cycles / source runs**, distinct from capital-R
+  Run. Nothing an operator reads is inflated by quiet polls.
+  ✅ **What is genuinely absent is the OBSERVABILITY half, and only that:** no watcher/session identity
+  exists anywhere (`lastPollAt` / `pollCount` / `lastError` return zero hits in main sources), and there is
+  no `interrupted` reconciliation. That is **additive instrumentation, not a bug fix** — and
+  `pollCount − runCount` as “quiet time” is largely moot once quiet polls are known not to touch the Run
+  counter at all.
+  ⇒ **RESCOPE before building.** It was picked FIRST because it “fixes run counts where operators read
+  them”; that rationale is gone, so the ordering decision (§1 row 32) rests on a premise that no longer
+  holds and is the operator's to re-take. ⛔ Nothing was built against it.
+
 
 - **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` — Dataset freshness on a CLOCK, not on failures.** Adopted
   2026-09-15 from duckle §1 C1.
@@ -1853,6 +1957,42 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   never filed, and "the same budget better spent" currently points at nothing. ⇒ establish what it
   referred to; ⚠ if it names work that was dropped rather than done, that is a finding in its own
   right. ⛔ Never carry "roughly twenty" forward again — this count has been wrong three times.
+
+  🔴 **CONFIRMATION PASS RUN 2026-09-15 — ≈44 is NOT confirmed. The measurement is 57.**
+  Per population (claim → measured): routed admin panes **17 → 24**, unrouted shell surfaces **4 → 11**,
+  shared components **12 → 10**, shared libraries **11 → 12**. Totals **44 → 57**.
+  ✅ The **shared tier corroborates**: 23 claimed vs 22 measured, so the earlier pass used the same
+  per-directory rule and only the component/library boundary moved. The pane and shell halves each run
+  **+7**, consistent with surfaces added since (`home`, `session/sign-in`, `session/callback`,
+  `share-viewer`, `agent-chat`, `autonomy`, `learning` are all recent).
+  🔴 **The METHOD dominates the answer, which is why this count keeps moving — state the rule with any
+  future number.** Two normalisations decide it: (a) `okf/frontend/architecture.md` declares
+  `resource: inspecto-ui/src/app/` and `overview.md` declares `inspecto-ui/` — taken literally these
+  umbrellas cover every surface and the orphan count is **0**; they must be excluded. (b) A feature page
+  names its `X.routes.ts`, not the pane component — letting that stand for its directory gives 24 panes;
+  not letting it gives **44**, and a grand total of 76. ⚠ The reappearance of 44 there is coincidence, not
+  provenance.
+  🔴 **A material slice is LINKAGE debt, not missing pages — so this number must not be used to size
+  writing work.** Of five orphans spot-checked, **two are already documented in prose** and lack only the
+  front-matter pointer: `processing-status.component.ts` has a full table row in
+  `okf/capabilities/observability/observability.md:419` (file, endpoints, row action), and
+  `notification-center.component.ts` is described across `okf/capabilities/incidents/incidents.md:349/397/399`
+  — which **already files its own missing page as a known gap**. Adding a `resource:` entry is far cheaper
+  than authoring a concept page. ⇒ Any future sizing must split ORPHAN into *undocumented* vs *unlinked*.
+
+  ✅ **`SPEC-STALEREF-1` RE-DERIVED — it CLOSED, it was not dropped.** It was **23 stale paths and dead
+  citations**, the largest family the docs consolidation found, filed as a Sprint 2 board row
+  (`1800ae6f`) and **closed 2026-09-09** by `tools/check-doc-citations.mjs` (`bd4293f9` repaired 152
+  citations). The guard is live in BOTH `.githooks/pre-push:184` and `.github/workflows/ci.yml:98`, and
+  runs on every push.
+  ⚠ **Why it appears nowhere:** its row was swept off the board with every other closed row in
+  `37f5b297`, while its CITATIONS survived in five capability-page footers (`assistant.md:411`,
+  `metamodel.md:403`, `observability.md:538`, `pipeline-authoring.md:443`, `surfaces.md:397`). The trail
+  was intact; only the row was gone.
+  ⇒ **So “the same budget better spent” points at COMPLETED work.** That sentence should be struck rather
+  than honoured — it currently defers this row's budget to a row that finished six days earlier.
+  ⚠ The row's own worry (“if it names work that was dropped rather than done, that is a finding in its own
+  right”) resolves the benign way: done, guarded, and still enforced.
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 
 One line each; the reasoning is in the pointer. Reopen only on the stated trigger.
