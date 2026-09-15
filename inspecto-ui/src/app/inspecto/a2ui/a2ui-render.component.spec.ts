@@ -56,6 +56,30 @@ describe('A2uiRenderComponent', () => {
         expect(el.querySelector('b')).toBeNull();
     });
 
+    /** AGT-ARTIFACT-1: a draft renders as read-only text — JSON via textContent, findings as a list, never HTML. */
+    it('renders a draft artifact as plain JSON text with its findings', () => {
+        const fixture = create({
+            kind: 'draft',
+            title: 'component draft — draft',
+            config: {
+                tool: 'component_draft',
+                type: 'expectation',
+                clean: false,
+                findings: [{ fieldPath: 'target', message: 'required' }],
+                draft: { name: 'half_baked', note: '<b>not html</b>' },
+            },
+        });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="a2ui-draft"]')).toBeTruthy();
+        expect(el.textContent).toContain('expectation draft');
+        expect(el.textContent).toContain('"name": "half_baked"');
+        expect(el.textContent).toContain('<b>not html</b>'); // literal text, never markup
+        expect(el.querySelector('b')).toBeNull();
+        expect(el.textContent).toContain('1 finding(s)');
+        expect(el.textContent).toContain('target');
+    });
+
     it('renders a kpi artifact through <inspecto-kpi> with mapped value/label', () => {
         const fixture = create({
             kind: 'kpi',

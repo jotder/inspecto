@@ -18,7 +18,8 @@ final class InspectoToolProvider implements ToolProvider {
 
     @Override
     public List<Tool> tools() {
-        return InspectoTools.tools(service);
+        // AGT-ARTIFACT-1: the draft skills are wrapped so their result reaches the answer as an artifact.
+        return InspectoTools.tools(service).stream().map(DraftArtifacts::recording).toList();
     }
 
     @Override

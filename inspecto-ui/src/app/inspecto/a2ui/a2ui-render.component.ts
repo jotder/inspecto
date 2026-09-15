@@ -42,7 +42,7 @@ interface InvokeState {
 /**
  * A2UI render host (S4, spike §4.3) — the agent-emitted counterpart of `viz-render.component.ts`:
  * an `@switch` on the artifact's `kind` dispatching to the trusted design-system components.
- * The allowlist is closed (`text | kpi | chart | data-table`, mirroring the server-side one) and
+ * The allowlist is closed (`text | kpi | chart | data-table | draft`, mirroring the server-side one) and
  * **fail-closed**: an unknown kind — or a known kind with unusable config — degrades to the shared
  * empty-state placeholder. No agent content is ever rendered as HTML; `text` is plain text.
  *
@@ -99,6 +99,32 @@ interface InvokeState {
                         [columns]="tableColumns()"
                         [autoHeight]="true"
                     />
+                }
+                @case ('draft') {
+                    <!-- AGT-ARTIFACT-1: a draft skill's output, READ-ONLY. Plain text only (JSON via
+                         textContent, never innerHTML); "apply this draft" is deliberately not offered here. -->
+                    <div class="flex flex-col gap-2" data-testid="a2ui-draft">
+                        <div class="text-secondary text-xs">
+                            {{ draftType() }}
+                            @if (draftClean() === true) {
+                                <span class="ml-1">· validated clean</span>
+                            } @else if (draftClean() === false) {
+                                <span class="text-warn ml-1">· {{ draftFindings().length }} finding(s)</span>
+                            }
+                        </div>
+                        <pre class="max-h-96 overflow-auto rounded bg-card p-2 font-mono text-xs whitespace-pre-wrap">{{
+                            draftText()
+                        }}</pre>
+                        @if (draftFindings().length) {
+                            <ul class="text-xs">
+                                @for (f of draftFindings(); track $index) {
+                                    <li>
+                                        <span class="font-mono">{{ f.fieldPath }}</span> — {{ f.message }}
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
                 }
                 @default {
                     <inspecto-empty-state
@@ -194,6 +220,36 @@ export class A2uiRenderComponent {
     readonly title = computed<string>(() => {
         const t = this.artifact()?.title;
         return typeof t === 'string' ? t : '';
+    });
+
+    /** `draft`: the draft as indented JSON text — a string, so the template can only ever render it as text. */
+    readonly draftText = computed<string>(() => {
+        const d = this.config()['draft'];
+        if (d === undefined || d === null) return '';
+        try {
+            return typeof d === 'string' ? d : JSON.stringify(d, null, 2);
+        } catch {
+            return String(d);
+        }
+    });
+    /** `draft`: what kind of component it is ("expectation draft"), from the tool's own `type`/`draftKind`. */
+    readonly draftType = computed<string>(() => {
+        const c = this.config();
+        const t = c['type'] ?? c['draftKind'];
+        return typeof t === 'string' && t ? `${t} draft` : 'draft';
+    });
+    /** `draft`: the validator's verdict when the tool reported one; `null` when it did not. */
+    readonly draftClean = computed<boolean | null>(() => {
+        const c = this.config()['clean'];
+        return typeof c === 'boolean' ? c : null;
+    });
+    /** `draft`: anchored findings, defensively mapped — anything not `{fieldPath, message}`-shaped is dropped. */
+    readonly draftFindings = computed<{ fieldPath: string; message: string }[]>(() => {
+        const raw = this.config()['findings'];
+        if (!Array.isArray(raw)) return [];
+        return raw
+            .filter((f): f is Record<string, unknown> => !!f && typeof f === 'object')
+            .map((f) => ({ fieldPath: String(f['fieldPath'] ?? ''), message: String(f['message'] ?? '') }));
     });
 
     /** Config as a guaranteed record — wrong-typed config degrades to `{}`, never throws. */

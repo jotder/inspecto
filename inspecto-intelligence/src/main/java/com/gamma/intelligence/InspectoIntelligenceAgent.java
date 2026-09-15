@@ -72,7 +72,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     private static final Logger log = LoggerFactory.getLogger(InspectoIntelligenceAgent.class);
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ARTIFACT_MIME_TYPE = "application/vnd.a2ui+json";
-    private static final Set<String> ARTIFACT_KINDS = Set.of("text", "kpi", "chart", "data-table");
+    private static final Set<String> ARTIFACT_KINDS = Set.of("text", "kpi", "chart", "data-table",
+            com.gamma.intelligence.pack.DraftArtifacts.KIND);
 
     private final Map<String, AgentSession> sessions = new ConcurrentHashMap<>();
     // P5: durable so the investigation corpus survives a restart and backs case-similarity recall;
@@ -442,7 +443,14 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
                 Map<String, Object> parsed = parseArtifact(artifact);
                 if (parsed != null) sink.onArtifact(parsed);
             }
-            @Override public void onComplete(AgentAnswer finalAnswer) { sink.onComplete(toResult(finalAnswer)); }
+            @Override public void onComplete(AgentAnswer finalAnswer) {
+                AgentAskResult result = toResult(finalAnswer);
+                // AGT-ARTIFACT-1: a draft captured from the tool belt was never streamed as an `artifact` frame
+                // (no InlineArtifact existed), so emit it here — BEFORE `complete`, the order the client and
+                // AgentRoutesTest already pin for inline artifacts.
+                if (result.artifact() != null && finalAnswer.artifact() == null) sink.onArtifact(result.artifact());
+                sink.onComplete(result);
+            }
             @Override public void onError(EoiAgentException error) { sink.onError(error.getMessage()); }
         });
     }
@@ -702,8 +710,12 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         List<AgentAskResult.Citation> citations = answer.citations() == null ? List.of()
                 : answer.citations().stream().map(InspectoIntelligenceAgent::toCitation).toList();
         NavigationIntent nav = answer.navigation();
+        Map<String, Object> artifact = parseArtifact(answer.artifact());
+        // AGT-ARTIFACT-1: no inline artifact — was a draft skill's result recorded for this run? Consumed on
+        // read, so a later answer on the same session never re-attaches a stale draft.
+        if (artifact == null) artifact = com.gamma.intelligence.pack.DraftArtifacts.take(answer.run());
         return new AgentAskResult(answer.kind().name(), answer.text(), citations,
-                nav == null ? null : nav.targetPageId(), parseArtifact(answer.artifact()));
+                nav == null ? null : nav.targetPageId(), artifact);
     }
 
     private static AgentAskResult.Citation toCitation(Citation c) {

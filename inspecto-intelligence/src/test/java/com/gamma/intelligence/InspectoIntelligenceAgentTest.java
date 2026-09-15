@@ -213,6 +213,25 @@ class InspectoIntelligenceAgentTest {
         assertEquals(Map.of("kind", "chart", "config", Map.of()), result.artifact());
     }
 
+    /** AGT-ARTIFACT-1: with no inline artifact, a draft recorded for the SAME run rides the answer. */
+    @Test
+    void toResultAttachesADraftRecordedForTheAnswersRun() {
+        com.eoiagent.core.ToolResult ok = new com.eoiagent.core.ToolResult(true,
+                Map.of("kind", "expectation", "type", "expectation", "clean", true, "findings", List.of(),
+                        "draft", Map.of("name", "orders_id_notnull")), null, Map.of());
+        com.gamma.intelligence.pack.DraftArtifacts.record("component_draft",
+                new com.eoiagent.core.ToolCall("component_draft", Map.of(), new RunId("run-d1")), ok);
+
+        AgentAnswer other = new AgentAnswer(AnswerKind.TEXT, "text", null, null, List.of(), new RunId("run-d2"));
+        assertNull(InspectoIntelligenceAgent.toResult(other).artifact(), "a different run gets no draft");
+
+        AgentAnswer answer = new AgentAnswer(AnswerKind.TEXT, "Here is a draft.", null, null, List.of(), new RunId("run-d1"));
+        AgentAskResult result = InspectoIntelligenceAgent.toResult(answer);
+        assertNotNull(result.artifact());
+        assertEquals("draft", result.artifact().get("kind"));
+        assertNull(InspectoIntelligenceAgent.toResult(answer).artifact(), "consumed on read — never re-attached");
+    }
+
     @Test
     void toResultDropsAnArtifactThatFailsValidationRatherThanThrowing() {
         AgentAnswer wrongMimeType = new AgentAnswer(AnswerKind.INLINE_ARTIFACT, "here's a chart",
