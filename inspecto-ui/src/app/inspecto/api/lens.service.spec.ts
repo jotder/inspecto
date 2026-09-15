@@ -86,6 +86,21 @@ describe('LensService', () => {
         expect(service.canTriageRequirements()).toBe(true);
     });
 
+    // The coarse Space-governance grant (2026-09-15). Identity, not lens-scoped: admin qualifies for no
+    // non-Business lens, so lens-scoping it would deny exactly the subject the server authorizes.
+    it('canAdminister is granted only to a subject holding it, and survives the business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        service.selectLens('business');
+
+        session.capabilities.set(['canOperateRuns']);
+        expect(service.canAdminister()).toBe(false);
+
+        session.capabilities.set(['canAdminister']);
+        expect(service.canAdminister()).toBe(true);
+    });
+
     // Off-OIDC there is no identity to justify the exemption — granted() is true for everyone — so the
     // lens stays the only signal and the Business "View as" preview keeps hiding authoring affordances.
     it('identity capabilities are still lens-suppressed in honor-system mode', () => {

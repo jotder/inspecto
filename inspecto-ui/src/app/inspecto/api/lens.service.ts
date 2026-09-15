@@ -211,6 +211,18 @@ export class LensService {
      *  "I want this dataset to build with" is exactly an activity a lens represents. */
     readonly canRequestShares = computed(() => this.lensCapability('canRequestShares', 'exchange.request'));
 
+    /** May administer this Space — the coarse governance grant the backend added on 2026-09-15 and now
+     *  enforces on `PUT`/`DELETE /spaces/{id}` and the four agent-governance routes. RBAC: Admin, Super.
+     *
+     *  {@link identityCapability}, for the reason that forced {@link canConfigureAccess} there: admin
+     *  qualifies for no non-Business lens, so a lens-scoped administration grant would be evaluated false
+     *  client-side for exactly the subject the server authorizes — the bootstrap deadlock again.
+     *
+     *  ⚠ Deliberately coarse, and deliberately NOT the gate for Incident/Case triage: triage is day-to-day
+     *  support work, and whether it needs a capability at all is an open product question
+     *  (`docs/superpower/route-gating-audit.md` §6b). Do not widen this one to cover it. */
+    readonly canAdminister = computed(() => this.identityCapability('canAdminister', 'space.administer'));
+
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */
     selectLens(lens: Lens): void {

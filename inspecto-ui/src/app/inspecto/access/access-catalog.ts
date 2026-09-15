@@ -92,6 +92,14 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             capability: 'canOnboardConnections',
             label: 'Onboard connections (create / edit / delete)',
         },
+        {
+            // The coarse Space-governance grant (2026-09-15): the backend gates Space update/delete and
+            // the agent-governance routes on it. Hung under Settings, which is where both surfaces live.
+            id: 'space.administer',
+            kind: 'action',
+            capability: 'canAdminister',
+            label: 'Administer the space (settings / agent governance)',
+        },
     ],
 };
 
