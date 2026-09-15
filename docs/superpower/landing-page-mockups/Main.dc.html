@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; color: #FFFFFF; background: #0f172a; -webkit-font-smoothing: antialiased; }
+    a { color: #a5b4fc; text-decoration: none; } a:hover { color: #c7d2fe; text-decoration: underline; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes drift { from { transform: translateY(0); } to { transform: translateY(-18px); } }
+    @keyframes dash { to { stroke-dashoffset: -400; } }
+    .rise { animation: rise .7s cubic-bezier(.2,.7,.2,1) both; }
+    .d1 { animation-delay: .08s } .d2 { animation-delay: .18s } .d3 { animation-delay: .28s } .d4 { animation-delay: .4s }
+    .graph { animation: drift 9s ease-in-out infinite alternate; }
+    .flowline { stroke-dasharray: 6 10; animation: dash 14s linear infinite; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; overflow: hidden; background: #0f172a;">
+
+  <!-- Left: deployment identity -->
+  <div style="position: relative; flex: 0 0 820px; display: flex; flex-direction: column; justify-content: space-between; padding: 40px 56px 36px 56px; background: #020617; border-right: 1px solid rgba(241,245,249,0.12); overflow: hidden;">
+
+    <!-- atmosphere: pipeline graph motif -->
+    <svg class="graph" viewBox="0 0 820 900" width="820" height="900" style="position: absolute; top: 0; left: 0; pointer-events: none;" aria-hidden="true">
+      <defs>
+        <radialGradient id="glow" cx="62%" cy="48%" r="55%">
+          <stop offset="0" stop-color="#4f46e5" stop-opacity="0.32"/>
+          <stop offset="0.55" stop-color="#1e1b4b" stop-opacity="0.18"/>
+          <stop offset="1" stop-color="#020617" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="edge" x1="0" x2="1">
+          <stop offset="0" stop-color="#2196F3" stop-opacity="0.15"/>
+          <stop offset="1" stop-color="#818cf8" stop-opacity="0.75"/>
+        </linearGradient>
+      </defs>
+      <rect width="820" height="900" fill="url(#glow)"/>
+      <g fill="none" stroke="url(#edge)" stroke-width="1.5" stroke-linecap="round">
+        <path class="flowline" d="M120 300 C 220 300, 240 420, 340 420"/>
+        <path class="flowline" d="M120 540 C 220 540, 240 420, 340 420"/>
+        <path class="flowline" d="M400 420 C 480 420, 490 330, 560 330"/>
+        <path class="flowline" d="M400 420 C 480 420, 490 510, 560 510"/>
+        <path class="flowline" d="M620 330 C 680 330, 690 420, 740 420"/>
+        <path class="flowline" d="M620 510 C 680 510, 690 420, 740 420"/>
+      </g>
+      <g stroke="#818cf8" stroke-opacity="0.55" stroke-width="1.5">
+        <rect x="76" y="280" width="44" height="40" rx="8" fill="#0f172a"/>
+        <rect x="76" y="520" width="44" height="40" rx="8" fill="#0f172a"/>
+        <rect x="340" y="396" width="60" height="48" rx="10" fill="#1e1b4b"/>
+        <rect x="560" y="308" width="60" height="44" rx="10" fill="#0f172a"/>
+        <rect x="560" y="488" width="60" height="44" rx="10" fill="#0f172a"/>
+        <rect x="740" y="398" width="60" height="44" rx="10" fill="#1e1b4b"/>
+      </g>
+      <g fill="#a5b4fc" fill-opacity="0.8">
+        <circle cx="98" cy="300" r="3"/><circle cx="98" cy="540" r="3"/>
+        <circle cx="370" cy="420" r="4"/><circle cx="590" cy="330" r="3"/>
+        <circle cx="590" cy="510" r="3"/><circle cx="770" cy="420" r="4"/>
+      </g>
+      <g stroke="#FFFFFF" stroke-opacity="0.05">
+        <path d="M0 120 H820 M0 240 H820 M0 360 H820 M0 480 H820 M0 600 H820 M0 720 H820 M0 840 H820"/>
+        <path d="M120 0 V900 M240 0 V900 M360 0 V900 M480 0 V900 M600 0 V900 M720 0 V900"/>
+      </g>
+    </svg>
+
+    <!-- product mark -->
+    <div class="rise" style="position: relative; display: flex; align-items: center; gap: 12px;">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 6.75556V0L1.02839 14.6389C0.462304 15.1924 0.457197 16.1016 1.01703 16.6615L3.55556 19.2" fill="#2196F3"/>
+        <path d="M16 6.75556V0L30.9716 14.6389C31.5377 15.1924 31.5428 16.1016 30.983 16.6615L28.4444 19.2" fill="#1878C6"/>
+        <path d="M3.55556 19.2L9.6 13.1556H16V19.2" fill="#1565C0"/>
+        <path d="M28.4444 19.2L22.4 13.1556H16V19.2" fill="#10519D"/>
+        <path d="M16 25.9556H9.95555L12.9778 22.7556L16 25.9556Z" fill="#1565C0"/>
+        <path d="M16 32L22.0444 25.9556L16 25.9556V32Z" fill="#1878C6"/>
+        <path d="M16 32L9.95555 25.9556H16V32Z" fill="#2196F3"/>
+        <path d="M16 25.9556H22.0444L19.0222 22.7556L16 25.9556Z" fill="#10519D"/>
+        <path d="M7.72363 21.7502C7.18605 22.3085 7.19441 23.1944 7.74243 23.7424L9.95556 25.9556L16 19.5556V13.1556" fill="#2196F3"/>
+        <path d="M24.2764 21.7502C24.814 22.3085 24.8056 23.1944 24.2576 23.7424L22.0444 25.9556L16 19.5556V13.1556" fill="#1878C6"/>
+      </svg>
+      <span style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Inspecto</span>
+    </div>
+
+    <!-- deployment branding: logo, caption from the default Space's branding document -->
+    <div style="position: relative; display: flex; flex-direction: column; gap: 22px; max-width: 560px;">
+      <div class="rise d1" style="display: inline-flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border: 1px solid rgba(241,245,249,0.12); border-radius: 12px; background: rgba(30,41,59,0.55); backdrop-filter: blur(6px); width: fit-content;">
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: #1e293b; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;">GA</div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span style="font-size: 14px; font-weight: 600;">Gamma Analytics</span>
+          <span style="font-size: 12px; color: #a5b4fc; font-style: italic;">Data operations control plane</span>
+        </div>
+      </div>
+      <h1 class="rise d2" style="margin: 0; font-size: 48px; line-height: 1.08; font-weight: 700; letter-spacing: -0.02em; text-wrap: pretty;">Every Pipeline, every Run, one place to see it.</h1>
+      <p class="rise d3" style="margin: 0; font-size: 16px; line-height: 1.6; color: #94a3b8; max-width: 480px; text-wrap: pretty;">Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a Dataset it can trust.</p>
+    </div>
+
+    <!-- footer: version only. No Space roster, no edition badge before sign-in. -->
+    <div class="rise d4" style="position: relative; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+      <span>© Gamma Analytics 2026</span>
+      <span class="mono" style="display: inline-flex; align-items: center; gap: 8px; color: #94a3b8;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.18);"></span>
+        control plane reachable · v4.0.0
+      </span>
+    </div>
+  </div>
+
+  <!-- Right: the one action -->
+  <div style="flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 48px; background: #0f172a;">
+    <div class="rise d2" style="width: 384px; display: flex; flex-direction: column; background: #1e293b; border-radius: 16px; padding: 32px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.35), 0 4px 6px -4px rgba(0,0,0,0.35); border: 1px solid rgba(241,245,249,0.08);">
+      <div style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 12px; background: rgba(79,70,229,0.18); color: #a5b4fc; margin: 0 auto;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+      </div>
+      <h2 style="margin: 20px 0 0 0; text-align: center; font-size: 24px; font-weight: 600; letter-spacing: -0.01em;">Sign in</h2>
+      <p style="margin: 8px 0 0 0; text-align: center; font-size: 14px; line-height: 1.55; color: #94a3b8; text-wrap: pretty;">This workspace is secured. Continue with your organisation's single sign-on.</p>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 28px;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 44px; border-radius: 8px; background: #4f46e5; color: #FFFFFF; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.3);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/></svg>
+          <span>Sign in with SSO</span>
+        </div>
+        <p style="margin: 0; text-align: center; font-size: 12px; line-height: 1.5; color: #94a3b8;">You will be redirected to your identity provider and back.</p>
+      </div>
+
+      <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(241,245,249,0.12); display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+        <span>Need access? Ask your Space administrator.</span>
+        <a href="#" style="font-size: 12px;">Help</a>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

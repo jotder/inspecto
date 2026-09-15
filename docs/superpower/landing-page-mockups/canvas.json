@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "1 · Sign-in landing (Standard / Enterprise, before sign-in)", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "HomePersonal.dc.html", "title": "2 · Home, Personal, first run", "x": 1560, "y": 0, "w": 1440, "h": 900 },
+    { "file": "HomeEnterprise.dc.html", "title": "3 · Home, Enterprise, Ops Lens, multi-space", "x": 3120, "y": 0, "w": 1440, "h": 900 }
+  ],
+  "annotations": [
+    { "id": "rule-of-record", "x": 0, "y": -220, "w": 520, "text": "Three surfaces, one shell, no edition switch.\n\n1 · Before sign-in exists only where an authenticator is registered. It shows the Space's branding document, the version and one SSO action. No Space roster, no edition badge, no module list.\n\n2 + 3 · Home is one route. What appears on it is driven by bootstrap.features (module presence) and session.capabilities, never by the edition string." },
+    { "id": "personal-notes", "x": 1560, "y": -160, "w": 460, "text": "Personal: no user menu, no Space switcher (single space). Events / Incidents absent from nav because those modules did not register. The amber notice renders when features.authMode is none (control plane binds every interface). Root redirects here; the Lens landing route becomes the primary button." },
+    { "id": "enterprise-notes", "x": 3120, "y": -160, "w": 460, "text": "Enterprise: Space switcher because features.multiSpace is true; user menu because authMode is oidc. Actor name needs the bootstrap session.actor wired into a signal (dead today). Quick actions = one row per held capability; the Administer row is the first UI consumer of canAdminister. Numbers and names are SAMPLE values." }
+  ],
+  "launch": { "view": "canvas" }
+}

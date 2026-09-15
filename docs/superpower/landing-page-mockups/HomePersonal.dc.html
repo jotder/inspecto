@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; color: #FFFFFF; background: #0f172a; -webkit-font-smoothing: antialiased; }
+    a { color: #a5b4fc; text-decoration: none; } a:hover { color: #c7d2fe; text-decoration: underline; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .ico { width: 20px; height: 20px; flex: 0 0 auto; }
+    .nav-item { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px; margin: 0 12px; border-radius: 6px; color: #cbd5e1; font-size: 13px; font-weight: 500; }
+    .nav-item .ico { color: #94a3b8; }
+    .nav-item.active { background: rgba(255,255,255,0.07); color: #FFFFFF; }
+    .nav-item.active .ico { color: #a5b4fc; }
+    .nav-group { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 16px; margin: 12px 12px 0 12px; color: #818cf8; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+    .nav-sub { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 0 16px 0 28px; margin: 0 12px; border-radius: 6px; color: #cbd5e1; font-size: 13px; font-weight: 500; }
+    .card { background: #1e293b; border: 1px solid rgba(241,245,249,0.08); border-radius: 16px; }
+    .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 8px; background: #4f46e5; color: #FFFFFF; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .btn-stroked { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid rgba(241,245,249,0.16); color: #FFFFFF; font-size: 14px; font-weight: 500; background: transparent; }
+    .topbtn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px; border-radius: 8px; color: #cbd5e1; font-size: 14px; font-weight: 500; }
+    .topbtn .ico { color: #94a3b8; }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .rise { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
+    .d1 { animation-delay: .08s } .d2 { animation-delay: .16s } .d3 { animation-delay: .24s } .d4 { animation-delay: .32s } .d5 { animation-delay: .4s }
+  </style>
+</helmet>
+
+<svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 12 2.25 21.75 12M4.5 9.75V21h5.25v-6h4.5v6h5.25V9.75"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 13.5h4.5V21H3zM9.75 8.25h4.5V21h-4.5zM16.5 3h4.5v18h-4.5z"/></symbol>
+    <symbol id="i-ops" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 8.25zm9.75 0a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25zM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18zm9.75 0a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18z"/></symbol>
+    <symbol id="i-pipeline" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></symbol>
+    <symbol id="i-stream" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></symbol>
+    <symbol id="i-studio" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/></symbol>
+    <symbol id="i-catalog" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085"/></symbol>
+    <symbol id="i-cog" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869z"/><path fill="none" stroke="currentColor" stroke-width="1.5" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></symbol>
+    <symbol id="i-chevr" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></symbol>
+    <symbol id="i-builder" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></symbol>
+  </defs>
+</svg>
+
+<div style="width: 1440px; height: 900px; display: flex; overflow: hidden; background: #0f172a;">
+
+  <!-- Sidebar (gamma-vertical-navigation, 280px, dark) -->
+  <div style="flex: 0 0 280px; display: flex; flex-direction: column; background: #0f172a; border-right: 1px solid rgba(241,245,249,0.12); overflow: hidden;">
+    <div style="display: flex; flex-direction: column; padding: 24px 24px 0 24px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <path d="M16 6.75556V0L1.02839 14.6389C0.462304 15.1924 0.457197 16.1016 1.01703 16.6615L3.55556 19.2" fill="#2196F3"/>
+          <path d="M16 6.75556V0L30.9716 14.6389C31.5377 15.1924 31.5428 16.1016 30.983 16.6615L28.4444 19.2" fill="#1878C6"/>
+          <path d="M3.55556 19.2L9.6 13.1556H16V19.2" fill="#1565C0"/>
+          <path d="M28.4444 19.2L22.4 13.1556H16V19.2" fill="#10519D"/>
+          <path d="M16 25.9556H9.95555L12.9778 22.7556L16 25.9556Z" fill="#1565C0"/>
+          <path d="M16 32L22.0444 25.9556L16 25.9556V32Z" fill="#1878C6"/>
+          <path d="M16 32L9.95555 25.9556H16V32Z" fill="#2196F3"/>
+          <path d="M16 25.9556H22.0444L19.0222 22.7556L16 25.9556Z" fill="#10519D"/>
+          <path d="M7.72363 21.7502C7.18605 22.3085 7.19441 23.1944 7.74243 23.7424L9.95556 25.9556L16 19.5556V13.1556" fill="#2196F3"/>
+          <path d="M24.2764 21.7502C24.814 22.3085 24.8056 23.1944 24.2576 23.7424L22.0444 25.9556L16 19.5556V13.1556" fill="#1878C6"/>
+        </svg>
+        <span style="font-size: 16px; font-weight: 600;">Inspecto</span>
+      </div>
+      <p style="margin: 6px 0 0 0; font-size: 14px; font-style: italic; color: #a5b4fc;">Data operations control plane</p>
+      <div style="position: relative; margin-top: 16px;">
+        <svg class="ico" style="position: absolute; left: 8px; top: 10px; color: #94a3b8;"><use href="#i-search"/></svg>
+        <div style="height: 40px; border-radius: 6px; background: #1e293b; padding: 0 36px; display: flex; align-items: center; font-size: 12px; color: #94a3b8;">Filter menus</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; margin-top: 12px; gap: 4px;">
+      <div class="nav-item active"><svg class="ico"><use href="#i-home"/></svg><span>Home</span></div>
+      <div class="nav-group"><span>Business</span><svg class="ico" style="width: 16px; height: 16px; color: #64748b;"><use href="#i-chevr"/></svg></div>
+      <div class="nav-group"><span>Operations</span><svg class="ico" style="width: 16px; height: 16px; color: #64748b;"><use href="#i-chevr"/></svg></div>
+      <div class="nav-group"><span>Platform</span><svg class="ico" style="width: 16px; height: 16px; color: #64748b;"><use href="#i-chev"/></svg></div>
+      <div class="nav-item"><svg class="ico"><use href="#i-wrench"/></svg><span>Workbench</span><svg class="ico" style="margin-left: auto; width: 16px; height: 16px; color: #64748b;"><use href="#i-chev"/></svg></div>
+      <div class="nav-sub"><span>Pipelines</span></div>
+      <div class="nav-sub"><span>Runs</span></div>
+      <div class="nav-sub"><span>Expectations</span></div>
+      <div class="nav-sub"><span>Collectors</span></div>
+      <div class="nav-item"><svg class="ico"><use href="#i-studio"/></svg><span>Studio</span><svg class="ico" style="margin-left: auto; width: 16px; height: 16px; color: #64748b;"><use href="#i-chevr"/></svg></div>
+      <div class="nav-item"><svg class="ico"><use href="#i-catalog"/></svg><span>Catalog</span><svg class="ico" style="margin-left: auto; width: 16px; height: 16px; color: #64748b;"><use href="#i-chevr"/></svg></div>
+      <div class="nav-group"><span>System</span><svg class="ico" style="width: 16px; height: 16px; color: #64748b;"><use href="#i-chevr"/></svg></div>
+      <div class="nav-item"><svg class="ico"><use href="#i-cog"/></svg><span>Settings</span></div>
+    </div>
+  </div>
+
+  <!-- Main column -->
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;">
+
+    <!-- Top bar h-16. Personal: no Space switcher, no user menu. -->
+    <div style="height: 64px; flex: 0 0 64px; display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid rgba(241,245,249,0.12);">
+      <svg class="ico" style="width: 24px; height: 24px; color: #94a3b8;"><use href="#i-bars"/></svg>
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+        <div class="topbtn"><svg class="ico"><use href="#i-builder"/></svg><span>Builder</span><svg class="ico" style="width: 16px; height: 16px;"><use href="#i-chev"/></svg></div>
+        <div class="topbtn" style="padding: 0 10px;"><svg class="ico"><use href="#i-bell"/></svg></div>
+        <div style="display: flex; align-items: center; gap: 10px; height: 40px; width: 280px; padding: 0 12px; border-radius: 8px; background: #1e293b; color: #94a3b8; font-size: 13px;">
+          <svg class="ico"><use href="#i-search"/></svg>
+          <span style="flex: 1 1 auto;">Search or run a command</span>
+          <span class="mono" style="font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(241,245,249,0.16);">Ctrl K</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div style="flex: 1 1 auto; min-height: 0; padding: 22px 40px 0 40px; display: flex; flex-direction: column; gap: 20px; overflow: hidden;">
+
+      <!-- Listen-address notice: shown when auth mode is none -->
+      <div class="rise" style="display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: 12px; background: rgba(120,53,15,0.55); border: 1px solid rgba(253,230,138,0.22); color: #fde68a;">
+        <svg class="ico" style="width: 22px; height: 22px; margin-top: 1px;"><use href="#i-warn"/></svg>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0;">
+          <span style="font-size: 14px; font-weight: 600;">This control plane is listening on every network interface.</span>
+          <span style="font-size: 13px; line-height: 1.5; color: #fef3c7;">Personal ships no sign-in, so anyone who can reach the port can change configuration. For a single-user install, bind to loopback or firewall the port.</span>
+        </div>
+        <span class="mono" style="font-size: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(2,6,23,0.45); color: #fde68a; white-space: nowrap; align-self: center;">-Dcontrol.bind=127.0.0.1</span>
+        <a href="#" style="font-size: 13px; font-weight: 600; color: #fde68a; align-self: center; white-space: nowrap;">How to bind</a>
+        <svg class="ico" style="width: 18px; height: 18px; color: #fde68a; align-self: center;"><use href="#i-x"/></svg>
+      </div>
+
+      <!-- Hero row -->
+      <div class="rise d1" style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: stretch;">
+        <div style="display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 8px 0;">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #818cf8;">First run</span>
+          <h1 style="margin: 0; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; text-wrap: pretty;">Welcome to Inspecto.</h1>
+          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #94a3b8; max-width: 560px; text-wrap: pretty;">Nothing has been onboarded yet. Three steps take a file in a folder to a Dataset you can query, with every Run and every Expectation on record.</p>
+        </div>
+        <div class="card" style="display: flex; flex-direction: column; gap: 12px; padding: 20px 24px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(79,70,229,0.18); color: #a5b4fc; display: flex; align-items: center; justify-content: center;"><svg class="ico" style="width: 22px; height: 22px;"><use href="#i-builder"/></svg></div>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 12px; color: #94a3b8;">Your Lens</span>
+              <span style="font-size: 16px; font-weight: 600;">Builder</span>
+            </div>
+          </div>
+          <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #94a3b8;">Builder lands on Pipelines. Business sees KPI Reports, Ops sees the Overview.</p>
+          <div style="display: flex; align-items: center; gap: 14px; margin-top: 2px;">
+            <div class="btn-primary" style="flex: 1 1 auto;"><span>Open Pipelines</span><svg class="ico" style="width: 18px; height: 18px;"><use href="#i-arrow"/></svg></div>
+            <a href="#" style="font-size: 13px; font-weight: 500; white-space: nowrap;">Switch Lens</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Three steps -->
+      <div class="rise d2" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+        <div class="card" style="display: flex; flex-direction: column; gap: 12px; padding: 20px 22px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(33,150,243,0.16); color: #74b0f5; display: flex; align-items: center; justify-content: center;"><svg class="ico" style="width: 22px; height: 22px;"><use href="#i-stream"/></svg></div>
+            <span class="mono" style="font-size: 12px; color: #64748b;">01</span>
+          </div>
+          <span style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Onboard a Stream</span>
+          <p style="margin: 0; font-size: 13px; line-height: 1.55; color: #94a3b8; flex: 1 1 auto; text-wrap: pretty;">Point a Collector at a folder, a bucket or a database and describe the records it carries. Inspecto proposes the grammar from a sample.</p>
+          <div class="btn-stroked" style="align-self: flex-start;"><span>Open Catalog onboard</span></div>
+        </div>
+        <div class="card" style="display: flex; flex-direction: column; gap: 12px; padding: 20px 22px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(79,70,229,0.18); color: #a5b4fc; display: flex; align-items: center; justify-content: center;"><svg class="ico" style="width: 22px; height: 22px;"><use href="#i-pipeline"/></svg></div>
+            <span class="mono" style="font-size: 12px; color: #64748b;">02</span>
+          </div>
+          <span style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Author a Pipeline</span>
+          <p style="margin: 0; font-size: 13px; line-height: 1.55; color: #94a3b8; flex: 1 1 auto; text-wrap: pretty;">Parse, check Expectations, transform and write a Dataset. Draw it as steps on the canvas or write the SQL; both views stay in sync.</p>
+          <div class="btn-stroked" style="align-self: flex-start;"><span>New Pipeline</span></div>
+        </div>
+        <div class="card" style="display: flex; flex-direction: column; gap: 12px; padding: 20px 22px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(20,184,166,0.16); color: #5eead4; display: flex; align-items: center; justify-content: center;"><svg class="ico" style="width: 22px; height: 22px;"><use href="#i-studio"/></svg></div>
+            <span class="mono" style="font-size: 12px; color: #64748b;">03</span>
+          </div>
+          <span style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Query it in Studio</span>
+          <p style="margin: 0; font-size: 13px; line-height: 1.55; color: #94a3b8; flex: 1 1 auto; text-wrap: pretty;">Ask questions of the Dataset, save Measures as Widgets, arrange a Dashboard and hand it to the Business Lens.</p>
+          <div class="btn-stroked" style="align-self: flex-start;"><span>Open Studio</span></div>
+        </div>
+      </div>
+
+      <!-- Activity, empty (the shared empty-state component) -->
+      <div class="rise d3" style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px;">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px 28px; border-radius: 16px; border: 2px dashed #475569; color: #94a3b8; text-align: center;">
+          <svg class="ico" style="width: 40px; height: 40px; color: #64748b;"><use href="#i-inbox"/></svg>
+          <span style="font-size: 16px; font-weight: 500; color: #FFFFFF;">No Runs yet</span>
+          <span style="font-size: 13px; line-height: 1.5;">Recent Runs, breached Expectations and written Datasets appear here once a Pipeline has run.</span>
+        </div>
+        <div class="card" style="display: flex; align-items: center; gap: 14px; padding: 20px 24px;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(148,163,184,0.12); color: #cbd5e1; display: flex; align-items: center; justify-content: center;"><svg class="ico" style="width: 22px; height: 22px;"><use href="#i-book"/></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto;">
+            <span style="font-size: 14px; font-weight: 600;">User Guide</span>
+            <span style="font-size: 12px; color: #94a3b8;">From first Collector to first Dashboard.</span>
+          </div>
+          <svg class="ico" style="width: 18px; height: 18px; color: #64748b;"><use href="#i-chevr"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer h-14 -->
+    <div style="height: 56px; flex: 0 0 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; border-top: 1px solid rgba(241,245,249,0.12); font-size: 13px; color: #94a3b8;">
+      <span style="font-weight: 500;">Gamma Analytics 2026</span>
+      <span class="mono" style="font-size: 12px; display: inline-flex; align-items: center; gap: 12px;"><span>Personal · v4.0.0</span><a href="#" class="mono" style="font-size: 12px;">Editions</a></span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
