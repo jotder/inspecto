@@ -13,7 +13,26 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 2026-09-07, its retirement trigger having fired), the remainders of every plan still in
 `docs/superpower/`, and the last handoff's next steps.
 
-> **Where the board stands — recounted 2026-09-15.** **75 rows: 1 × P1 · 44 × P2 · 30 × P3.**
+> **Where the board stands — recounted 2026-09-15 (second pass, after a full grounding sweep of §3–§5).**
+> **73 rows: 2 × P1 · 40 × P2 · 31 × P3.**
+>
+> ✅ **Every P2 was grounded against CODE on 2026-09-15**, not against its own text. **Five closed outright**
+> — `RECON-CARDINALITY-1` (tier 1 shipped whole; tier 2 survives as the demand-gated
+> `RECON-CARDINALITY-2`), `STUDIO-HALVES-1` (shipped end to end, example job included), `EXPECTATIONS-UI-1`
+> (its premise *"zero SPA files mention it"* was false — **31** do, and the pane is routed and mounted),
+> `SPEC-AGT-EDITIONS-1` (both halves refuted; the real work was a one-paragraph doc fix, now made) and
+> `ROUTE-OWNERSHIP-SCOPE-1` (the per-row owner check it calls missing already exists —
+> `ObjectRoutes.java:195-243`). **Two rows shrank on recount**: `SPEC-GREENCELL-1` five instances → **two**,
+> `SPEC-DEPLOY-ROWS-1` fifteen → **thirteen**.
+> 🔴 **And the sweep FOUND more than it closed, which is the honest result.** Two new rows, both from
+> premises that were being carried as settled: `CONSIGNMENT-OUTPUTS-NULLRUN-1` (**P1** — a UNIQUE key was
+> added against an explicit ⛔ in the code, and the graph lane escapes it on the DEFAULT ingest setting) and
+> `ENRICH-SILENT-FULL-RECOMPUTE-1` (an incremental recompute silently running as a full one — carried for
+> weeks as a *design note* while the code was already doing it).
+> ⛔ **The lesson, again: a row that says "settled, unbuilt" is two claims, and both need grounding.**
+> `Consignment ELT` asserted the `consignment_outputs` key was *"still not addable"* and that
+> `ON CONFLICT DO UPDATE` was *"settled, unbuilt"* — both had shipped two days earlier, and shipping them
+> early is what created the P1.
 > 🔴 **The header said "58 rows: 0 × P1 · 35 × P2 · 23 × P3" for a day after it stopped being true** — that
 > was the 2026-09-14 grounding, and the 2026-09-15 shift then filed or adopted **seventeen rows** (nine
 > `DUCKLE-C*` build rows, six defects, `ROUTE-UNGATED-DEFAULT-1` and `AIRGAP-CROSSPLAT-DEADWEIGHT-1`)
@@ -21,7 +40,11 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > failure mode this very block warns about two paragraphs down. ⛔ **Recount on the way out of every
 > shift that files a row**, not only on a grounding sweep.
 >
-> 🔴 **One P1: `ROUTE-UNGATED-DEFAULT-1`** (§5) — an unlisted route is OPEN, not locked down; 83 mutating
+> 🔴 **P1 #2: `CONSIGNMENT-OUTPUTS-NULLRUN-1`** (§4, filed 2026-09-15) — the output registry's UNIQUE key was
+> added while one lane still writes `run_id = null`, so those rows silently escape it. ✅ Operator decided
+> the fix: **thread a real run id into the graph lane**, not drop the constraint.
+>
+> 🔴 **P1 #1: `ROUTE-UNGATED-DEFAULT-1`** (§5) — an unlisted route is OPEN, not locked down; 83 mutating
 > routes are ungated, `DELETE /spaces/{id}` among them. Its full audit is DONE
 > (`superpower/route-gating-audit.md`) and reframes it as a **vocabulary** gap: only 12 are gateable with
 > an existing capability, 22 are not expressible at all, and `Roles` has **no admin capability**. ⛔ The
@@ -52,9 +75,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1 P1 + 44 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 30 are a list of things deliberately *not* being built, not a backlog
-> to burn down. Reading all 75 as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 2 P1 + 40 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 31 are a list of things deliberately *not* being built, not a backlog
+> to burn down. Reading all 73 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -347,71 +370,6 @@ it was; both are corrected below.
 
 ## 3. Product features — decided or unblocked, simply unbuilt
 
-
-- **P2** · **`RECON-CARDINALITY-1` — one-to-many / many-to-many recon matching.** ✅ **DECIDED 2026-09-12
-  (operator): BUILD it**, rather than drop the claim from whitepaper §4. `ReconService` supports key
-  matching with `exact`/`absolute`/`percent` tolerance only; cardinality is not a match option today.
-  ⚠ An **M**, and the design half is the hard half, not the code: *what is a "break" when one row
-  legitimately matches three?* Settle the break semantics before building the matcher, or the Incident
-  counts become meaningless.
-
-  🔴 **REGROUNDED 2026-09-12: the "brochure is untrue" clause is FALSE, and the decision's basis is
-  inverted.** The whitepaper makes no cardinality claim today and has not since v1.2. Verifiable sequence:
-  `48bd6d04` (2026-09-11) landed **v1.1**, whose "Declarative Matching Rules" bullet read *"… and
-  one-to-many or many-to-many reconciliation logic"*; `9547d495` filed THIS ROW against that sentence
-  hours later; `db11a412` — the **v1.2 market-focused rewrite, the same day** — **deleted the sentence**;
-  `7da8bf3d` (2026-09-12) then recorded the operator's *"BUILD it, rather than drop the claim"*.
-  ⚠ **The claim had already been dropped when that choice was made**, so "build over drop" offered as its
-  alternative something that had already happened. §4.1 and the §2 layer summary both now say tolerance is
-  *"exact, absolute or percentage"* — **exactly what the code does**.
-  ⛔ The row's "do not soften the whitepaper meanwhile" instruction was therefore violated **a day before
-  it was written**, inside an unrelated rewrite — the precise failure it existed to prevent: a tracked gap
-  turned into an untracked one. That is the reusable lesson here, not the matcher.
-  ⇒ **Now an ordinary P2 feature, NOT a release gate.** Nothing is untrue while it waits. The operator's
-  build decision stands but deserves re-confirmation on the corrected basis.
-
-  ⚠ **Premise re-checked 2026-09-12 — it HOLDS, but the row states it too weakly.** Cardinality is not
-  merely "not a match option", it is **structurally unreachable**: `ReconService.sideSql` (`:290-302`)
-  pre-aggregates each side to one row per key (`SUM`/`COUNT` … `GROUP BY keys`) *before* `joinChain`
-  (`:342-351`) runs its DuckDB `FULL OUTER JOIN`, so many rows sharing a key are **summed away before
-  matching ever happens**. Building this means making a side *not* aggregate, which changes join semantics.
-  🔴 The design half is concrete, not cautionary: a Break is computed fresh per call
-  (`ReconService.breaks:181-206`) and becomes durable only through `POST /recon/promote`, whose Incident
-  attrs are `reconciliation`/`breakKey`/`breakType`/`column`/`runId` (`ReconRoutes.java:190-197`) — that
-  shape **cannot express which of N counterparts, nor how many**.
-  🔴 **Correction to that same-day note: the reference fixture DID contain a duplicate key all along.**
-  `ReconServiceTest`'s `REL_A` carries two `('EU','voice',100.0)` rows summing to the single `200.0` in
-  `REL_B`, and the fixture's own comment calls it *"matched-equal"* — it reconciled clean, and an existing
-  assertion at `:101` already read `2L` records for that key without anyone treating it as a cardinality
-  question. ⚠ The duplicate was not absent from the tests, it was **invisible in them**, which is a
-  sharper statement of the defect than "untested".
-  ✅ **TIER 1 BACKEND SHIPPED 2026-09-12** — design + as-built in
-  [`plans-archive/recon-cardinality-plan.md`](archived-documents/plans-archive/recon-cardinality-plan.md). `cardinality:
-  one_to_one|one_to_many|many_to_one|many_to_many` on a reconciliation config; absent ⇒ `many_to_many`,
-  which asserts nothing, and the `cardinality_break` key is emitted **only** when an assertion is declared
-  — so a reconciliation authored before this option gets a byte-identical payload. 32 modules, 4373 tests,
-  mutation-proven on the whole feature. ✅ **TIER 1 IS COMPLETE END TO END** — the two
-  consumer-side residuals landed the same shift: the run summary counts the type (one `COUNT(*) FILTER`,
-  emitted only when asserted, over a `cardinalityViolation` predicate now SHARED with the break query so
-  the summary cannot count something different from the list it summarises), and the client names it
-  (`BreakType`, the `ReconBreakSets` wire key, the `summarize` seed, and `breaksFromSets` carrying the
-  per-side counts as evidence). 🔴 **Picking the right client seam was the trap**: `recon-board.ts:17-19`
-  records that the offline `aggregateRecon`/`reconBreakSets` mirror has had NO caller since the mock
-  backend was removed (2026-08-31), so wiring the type only into it would have looked done and been
-  invisible to the running app — the live path is `/recon/breaks` → `breaksFromSets`, which **had no spec
-  at all** until this added three. Backend 4374 tests, UI 2952, both halves mutation-proven separately.
-  Tier 2 (row-level pairing) stays demand-gated.
-
-  ✅ **DESIGN PASS DONE 2026-09-12 — [`plans-archive/recon-cardinality-plan.md`](archived-documents/plans-archive/recon-cardinality-plan.md).**
-  It answers the row's "what is a break when one row matches three?": for the canonical case (one invoice
-  vs three payments) **today's arithmetic is already correct** — you want the sum. The real defect is
-  narrower and is a **correctness hole, not a feature gap**: a duplicated row on either side is
-  indistinguishable from a genuinely larger value, so it **reconciles clean**. 🔴 And `COUNT(*) AS mr`
-  **already carries per-key multiplicity through the join**, discarded as a boolean at `:495-497` — so
-  tier 1 (cardinality as an *assertion*: a fourth `cardinality_break` type, default `many_to_many` so
-  nothing existing changes, no join change) needs **no new SQL**. Row-level pairing is tier 2 and
-  demand-gated. One decision open in §5.
-  → whitepaper §4.1 (carries no such claim) · `ReconService` · `ReconConfigLoader`
 Grouped by area. A row with lettered items keeps the letters of its source doc so the two stay aligned.
 
 ### Authoring (Parse / Transform / pipeline editor)
@@ -449,8 +407,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — X4 record-level replay from quarantine: sidecar error manifests (offset/reason), all-or-nothing vs eject-and-continue as per-pipeline CONFIG — ⛔ no build without a driver (same item as the run-detail "reprocess is whole-batch only" note). X1 deferrals: per-pipeline `processing.retry` block (regenerate node-attributes + step-types contracts); operator cancel / retry-now affordance (today: delete the sidecar under `<status_dir>/retries/`, or `reprocess`). → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
 - **P2** · **`STREAM-CONSUMER-1` — adapter stream-consumer runtime** (filed 2026-09-10 — it was committed in `roadmap/ROADMAP.md` §3.4 and listed in `okf/capabilities/acquisition/acquisition.md` §"Open elsewhere on the board" with **no board row**, the id column pointing back at the ROADMAP paragraph). The land-then-ack seam exists (a source-side `post` that deletes the remote original runs only after the local copy is committed); the **consumer loop** that keeps an adapter draining a streaming source with at-least-once semantics does not. Not demand-gated: the ROADMAP commits to it. First action is a design pass on where the loop lives (Collector scan vs a long-running job), not code. → `okf/capabilities/acquisition/acquisition.md`
 - **P2** · **Pipeline graph** — flip the intake cap on by default (needs a soak); a pre-materialise cap to save remote-fetch bandwidth (cap applies post-dedup); 🔴 **THREE** kinds still last-one-wins, deliberately out of A2 scope: `acquisition`, `gap`, `dedup.marker` — *corrected 2026-09-09: `parser` was in this list and does NOT belong; a second parser is REFUSED by name (`MULTI_PARSER`, `PipelineEditable.java:65,696`), which is the opposite of last-one-wins. `pipeline-editor.md` §Multiplicity states it correctly.*; 🔴 ~~`BatchGraphRunner` has zero production callers~~ **WRONG ON BOTH COUNTS — corrected 2026-09-09.** (a) **There is no class of that name** — it was renamed in the 2026-08-31 Consignment commit. (b) The class that DOES exist, `ConsignmentGraphRunner`, has **production callers**: `engages()` drives the live lane admission (`ConsignmentIngestStrategy.admittedLift`) and **`run(...)` executes on the ingest path** (`ConsignmentIngestStrategy:355`). ⛔ This row was cited as Row 15's parity blocker, so re-derive that gate before using it. What IS still owed is §6 step 2, the parity gate through the compiled-recipe path. Owner: `okf/capabilities/pipeline-execution/pipeline-execution.md` §2.3; → `okf/backend/pipeline-graph/pipeline-graph-design.md` §14
-- **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; ~~whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed~~ — ✅ **ANSWERED 2026-09-14: it exists** (`inspecto-engine/.../notify/DbDeliveryReceiptStore.java`, wired through `ServiceStores`/`OperationalDb`); and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations; ~~`run_id` is `null` everywhere~~ ✅ **CLOSED 2026-09-13 — the Run model shipped in full (slices 1-3), so `run_id` carries a real attempt on every production path.** ⛔ The `consignment_outputs` key is STILL not addable, but now for the OTHER of the two original reasons: two sinks can legitimately write one path in one run with different `row_count`s. Resolution settled, unbuilt: `ON CONFLICT DO UPDATE`; §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
-- **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built, needs `SeqScope`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (⚠ do not grow the `EventType` enum; a constants class should land before ~10 string literals do), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
+- **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; ~~whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed~~ — ✅ **ANSWERED 2026-09-14: it exists** (`inspecto-engine/.../notify/DbDeliveryReceiptStore.java`, wired through `ServiceStores`/`OperationalDb`); and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations — ⚠ **and it is never incremented at all** (`ConsignmentOutputs.java:336` writes a literal `0`), so "dead field" was closer to true than the 2026-09-14 correction allowed; ~~`run_id` is `null` everywhere~~ ~~✅ CLOSED 2026-09-13 — `run_id` carries a real attempt on every production path~~ 🔴 **BOTH of this row's key claims are REFUTED, regrounded 2026-09-15, and are now `CONSIGNMENT-OUTPUTS-NULLRUN-1` (§4, P1): the key was not "still not addable" — it was ADDED on 2026-09-13 (`DbConsignmentOutputStore.java:122`) together with the `ON CONFLICT DO UPDATE` this row calls unbuilt (`:225`); and `run_id` is NOT supplied on every production path — `ConsignmentGraphRunner.java:83` still threads null, so those rows escape the key.** ⛔ Do not re-file either claim from this row; §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
+- **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built; ⚠ **"needs `SeqScope`" is STALE as a blocker — regrounded 2026-09-15: `SeqScope` already ships** as a nested enum at `FileSequenceGaps.java:74-79` (`PER_BUCKET`/`CONTINUOUS`). The type exists; only the wiring does not. ⚠ **K1 is unwired too**, which this row never said: `DbConsignmentOutputStore.dailyVolume()` has zero call sites, same as `VolumeBaseline`/`FileSequenceGaps`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (🔴 **"do not grow the `EventType` enum" is wrong in KIND — corrected 2026-09-15: there is no enum.** `EventType.java:19` is a class of `public static final String` constants, deliberately open per its own javadoc, and no `kpi.*` entry exists. The constants-class guidance still applies; the thing it warns about does not exist), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
 - **P2** · **`WHITEPAPER-DOCX-DRIFT-1` — the `.docx` generator re-authors the prose instead of reading the
   `.md`** (filed 2026-09-11 at handoff, verified not merely suspected). `scripts/generate_whitepaper_docx.py`
   (593 lines, tracked) names `INSPECTO_ENTERPRISE_WHITEPAPER.md`'s path **only as its OUTPUT `.docx`**
@@ -523,118 +481,22 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   words that merely look alike, and `caseType` feeds RBAC data scopes.
 - **P3** · ✅ **TRIGGER (operator, 2026-09-13):** the first operator who asks for a spreadsheet download — which is
   also when the new-dependency question gets answered, rather than in advance. · **D-8 XLSX export** — zero groundwork (no spreadsheet library in any pom); gated only by a bare label — state the operator question before answering it. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
+- **P3** · **`RECON-CARDINALITY-2` — row-level pairing for a cardinality break.** All that survives of
+  `RECON-CARDINALITY-1`, which was **CLOSED 2026-09-15**: tier 1 shipped whole and was verified in code —
+  `ReconService.java:76` (the `Cardinality` enum), `:448-451` (the `cardinality_break` column, emitted only
+  when the spec is not `MANY_TO_MANY`), `:515` `cardinalityViolation` shared by both the summary and list
+  SQL so the two cannot diverge, `ReconConfigLoader.java:58-62` reached by **both** production callers
+  (`ReconRunJob:78`, `ReconRoutes:301`), and the client end at `recon-board.ts:86,160-163`.
+  Tier 2 is the demand-gated remainder: **which rows on each side formed the break**, not just that one
+  occurred. ⚠ It is not a display change — `ReconRoutes:194-195` promotes only `breakKey`/`breakType`, so
+  carrying pairs needs a wider Incident attribute shape first. ⛔ Demand-gated per §0: build when someone
+  asks by name.
+  → `okf/capabilities/incidents/incidents.md` · `archived-documents/plans-archive/recon-cardinality-plan.md`
+
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
 ### Control plane, jobs, notifications, queries
 
-- **P2** · **`EXPECTATIONS-UI-1` — the Expectations pane** (`ING-6` is a Must with NO UI — zero SPA files mention it; decided
-  2026-09-10: ADOPT, the Must stands): define `non_null | range | regex | referential | condition` checks per Dataset, run
-  evaluate, show `lastResult`; reuse `<inspecto-query-panel>`; results already open Incidents and `expectation.violated`
-  Signals, so triage needs nothing new. → `okf/capabilities/ingestion/ingestion.md` §3.7
-- **P2** · **`STUDIO-HALVES-1` — Run and Materialize** (decided 2026-09-10): a **Run** action per saved Query Library entry
-  calling `POST /queries/{id}/run` with results in the same panel; a **Materialize** action on the Dataset page plus ONE
-  committed example job that schedules a materialization, so the path is exercised by something shipped.
-  → `okf/capabilities/data-plane/data-plane.md` · `okf/capabilities/studio/studio.md`
-  **⚠ GROUNDED 2026-09-14 — the row is buildable, but its query half is the opposite shape it describes.**
-  - ✅ `POST /queries/([^/]+)/run` EXISTS and is `QueryRoutes.register`'s **only** route (`QueryRoutes.java:43`);
-    it returns the Result Set contract and refuses non-`type:sql` queries with 422 (`:55`).
-  - 🔴 **The route has never been exercised by anything shipped.** The Query Library editor already has a
-    "Run preview" button (`queries.component.html:117`), and it does **not** call that route — `run()`
-    goes through `DatasetRowsService` → `DbBrowserService`, i.e. the `/db/*` browser path
-    (`queries.component.ts:297`). The only mention of `/queries/{id}/run` anywhere in the SPA is a comment
-    in `bi-query.service.ts:32`. ⇒ the work is **re-pointing an existing Run at the shipped route**, not
-    adding a first Run. The missing affordance is the per-row one: list actions are Edit / History / Delete
-    only (`queries.component.html:250,258,267`).
-  - ✅ `<inspecto-query-panel>` exists (`query-panel.component.ts:25`) and the Dataset editor already hosts it.
-  - ⛔ **The Materialize half has no invocation seam and needs a decision before code.** `MaterializeTask`
-    is package-private (`MaterializeTask.java:46`) and reachable only as the `maintenance` job's
-    `task: materialize` (`MaintenanceJob.java:211`); there is **no materialize route and no `/datasets/*`
-    write route at all**. A Dataset-page action must either get a new route or create-and-trigger a job via
-    `POST /jobs` + `POST /jobs/{id}/trigger` (`JobRoutes.java:54,125`), supplying the required `dataset`
-    and `target` keys (`MaterializeTask.java:63`). ⚠ `target` must differ from `source`.
-  - 🔴 **"ONE committed example job" is not a top-up — there are ZERO today.** A repo-wide search for
-    `task: materialize` over tracked `*.toon` returns nothing; the committed maintenance library declares
-    only `compact`, `db_maintenance`, `ledger_prune` and `cleanup`
-    (`inspecto/examples/06-serve/maintenance-library/*.toon:4`). The word `materiali` does not appear
-    anywhere in `inspecto-ui/src/app`.
-  ✅ **QUERY HALF SHIPPED 2026-09-14** — every saved entry has a Run that calls the route and renders the
-  rows in a shared data-table, with a 422 refusal shown in place. ⚠ The action is deliberately OUTSIDE
-  `canAuthor()`: running a stored read-only query is operational, not authoring, and a spec pins that.
-  ⚠ The editor's own Run is unchanged and still previews the **unsaved draft** through `/db/*` — the two
-  are different questions, and only the new one proves what a job will execute. **Verified in the running
-  app**, which corrected the spec: this route sends the **v1** envelope `{error: {errorCode, message, …}}`,
-  not the legacy `{error: '<message>'}` — `apiErrorMessage` reads both, so pinning the wrong one passed
-  while describing a response nobody sends. ✅ **DECIDED 2026-09-14 — the materialize half is UNBLOCKED: route (a), ADD A MATERIALIZE ROUTE.**
-  The operator chose a real surface over route (b) (create-and-trigger a job from the page), because (b)
-  makes a **viewer action write a job document** — an authoring side effect from a page a non-author can
-  open — and that is a worse trade than one more endpoint. ⚠ The accepted cost is stated: **this adds a
-  surface to the next MAJOR's API review**, and it must be built to the `endpoint` skill's contract — the
-  fail-closed gate order (write-root 503 → spec/`ConfigSafetyValidator` 422 → path jail 403 → conflict 409
-  → act atomically) plus a **real-HTTP test class covering every gate**, not a unit test of the handler.
-  ⚠ Two things the grounding above already settled and the build must not re-litigate: `MaterializeTask`
-  is **package-private** (`MaterializeTask.java:46`), so the route needs a deliberate visibility decision
-  rather than an incidental widening; and `target` must differ from `source` (`:63`). ⛔ The row's "ONE
-  committed example job" half is **still zero** and is not discharged by the route — it is the thing that
-  proves the path, so ship it in the same change.
-  ✅ **MATERIALIZE HALF SHIPPED 2026-09-14 — `STUDIO-HALVES-1` is COMPLETE on the server side.**
-  `POST /datasets/{id}/materialize` (`DatasetRoutes`, registered in `ControlApi`), **asynchronous**: 202 +
-  `runId` + `Location`, the `POST /jobs/{name}/trigger` shape, because the default snapshot is a million
-  rows. Behind it `JobService.triggerMaterializeRun` builds a synthetic `type: maintenance` config and runs
-  it on the ordinary lifecycle **without registering it** — a test asserts `jobs()` is still empty after a
-  202, because authoring nothing is the entire reason a route was chosen over route (b).
-  Gates, one real-HTTP test each (`ControlApiDatasetMaterializeTest`, **9/9 green**): 503 · 404 · 422 ×3 ·
-  409 · 202, plus "a different target is not blocked". Capability **`canOperateRuns`**, not an authoring
-  one — materializing writes data, never config, and a holder could already reach the same effect by
-  triggering a `maintenance` job, so an authoring gate would be stricter than the existing path to the same
-  outcome while protecting nothing. ✅ The example job shipped with it:
-  `spaces/demo/config/jobs/orders_by_region_materialize_job.toon` (daily, `region` × `sum(gross)` → the
-  Dataset `orders_by_region`), documented in that space's README.
-  🔴 **Two things this uncovered that the row did not predict:**
-  (a) **`materialize`'s five parameters were UNDECLARED on the `maintenance` job type** — the authoring
-  form could offer the task and not one parameter that makes it do anything, and the resolver could not
-  bound them. It is the identical defect the `min_files` comment records one line above it in
-  `JobService`, and it survived because **nothing shipped had ever fired the task**. Declared now.
-  ⇒ *a task's presence in the runner's switch is not evidence its contract is declared.*
-  (b) ⚠ **The new test class's admitted runs all FAIL by construction, so 9/9 is NOT end-to-end proof** —
-  `open()` clears `assist.write.root` after boot (`ControlApi` captured it at construction;
-  `MaterializeTask` re-reads it on the worker thread). Every gate assertion is decided before the run is
-  submitted, so the tests are sound — but it is written into the class doc so nobody reads the green as
-  "materialize works over HTTP".
-  (c) 🔴 **A capability-gated route needs a `CapabilityManifest` entry too, and the guard that says so
-  fails in a DIFFERENT MODULE.** `ApiContext.withCapability` is the enforcement; `CapabilityManifest` is
-  the published declaration, and `CapabilityManifestTest.manifestMatchesTheRegistrationSitesExactly`
-  compares them in both directions. Missing the entry failed the reactor in **`inspecto-processor`** —
-  nowhere near `DatasetRoutes` — and because the reactor is **fail-fast** it left **13 modules SKIPPED,
-  i.e. unverified rather than passing**, including both edition modules the `-Pedition-enterprise` profile
-  exists to reach. ⚠ The `endpoint` skill listed the five gates and the test class and said nothing about
-  the manifest; it now does.
-  ✅ **UI HALF SHIPPED 2026-09-15 — `STUDIO-HALVES-1` is COMPLETE.** A **Materialize** action in the
-  Dataset editor header (`dataset-editor.component`), gated on `lens.canOperateRuns()` and edit mode, opens
-  `MaterializeDatasetDialog` — which asks for the **one thing the action needs now**, the target id, and
-  nothing else. 4 new specs (2981 UI tests green, exit 0); `lint:tokens`, `format:check`, all three
-  tsconfigs and the production build green. Notes worth keeping:
-  - The dialog treats an EXISTING target as a **hint, not a refusal** — materializing over a target is the
-    normal refresh case, and only `target == source` is refused, matching the server.
-  - **No run poller was invented.** This SPA has none, and every other trigger call site reloads and lets
-    the Runs/Jobs views show the outcome; the toast reports the run id instead of claiming a snapshot.
-  - 🔴 **The Query Library "Run" is a FALSE analogue** — it is synchronous and returns rows. The 202+runId
-    idiom to copy is `JobsService.trigger()` / `RunsService.trigger()`.
-  - 🔴 Two spec traps paid for in failures: stubbing `LensService` replaces it **for child components too**,
-    so a one-method stub broke 13 tests with `canAuthorWorkbench is not a function` (a child,
-    `TransferMenuComponent`, calls it); and `TestBed.overrideProvider(MatDialog, …)` — required because
-    the editor's ag-Grid injects the real one — **must run before the TestBed is instantiated**, not inside
-    the test after `createComponent`.
-  🔴 **DRIVING IT LIVE FOUND A REAL DEFECT THAT EVERY GREEN GATE MISSED — see `MATERIALIZE-SPACE-ROOT-1`
-  (P1) above.** Against a live multi-space server the route answered **202** and the run then **FAILED**
-  with `unknown dataset '<the id the route had just resolved>'`, because `MaterializeTask` re-reads the
-  JVM-wide write root while the route resolves the space's. It is pre-existing and wider than materialize.
-  Contained here by a 503 refusal so no 202 is ever issued for a run that cannot succeed; **both directions
-  of that gate are pinned** (`refusedWhenTheTaskCannotReachThisSpacesRegistry` +
-  `acceptedWhenTheTwoWriteRootsAgree` — the second exists because the other tests leave the property unset,
-  which skips the gate for a *different* reason and would hide a broken comparison).
-  ⚠ Also confirmed live, and the reason the example job is trustworthy: the backend logged
-  `Registered maintenance job 'orders_by_region_materialize'` at boot — **a TOON file that merely parses is
-  not a file that loads**, and a `#` comment banner in the first draft would have truncated it silently.
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
@@ -761,25 +623,40 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   plus the reboot leg — is **unrun**, because it needs a systemd host and an elevated Windows box and this
   checkout is neither. ⛔ Do not mark `SCR-3`'s acceptance met until someone runs both; the installers
   print the exact commands. → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
-- **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** Five instances,
-  and the pattern matters more than any one: **no Standard artifact is built** at all while both supply-chain
-  controls show Standard green; **the trimmed runtime ships in nothing** while `OPS-07` is green in all three
-  editions (every release passes `-NoRuntime`); **intake caps** are advertised by `JOB-04` and are off by
-  default; `BI-4`/`BI-6`/`BI-7` promise Standard+ for **ungated code**, so a Personal install can mint a
-  public share link; and replay was green and uncaveated over an in-memory map (fixed 2026-09-09, `2cd1661b`).
+- **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** 🔴 **Recounted
+  2026-09-15: TWO live instances, not five** — three of the original five are now false, and a row about
+  unverified claims had carried its own for days.
+  **Still live:** **intake caps** are advertised by `JOB-04` as ✅✅✅ with an empty notes cell
+  (`EDITIONS.md:164`) and are **off by default** (`IntakeGovernor.java:64-68`, `UNBOUNDED = 0`); and
+  `BI-4`/`BI-6`/`BI-7` promise Standard+ over code that is ungated on Personal.
+  ⚠ **The `BI-*` instance is a DOC defect, not a security hole** — corrected 2026-09-15. `ShareRoutes:46`
+  does gate on `canAuthorWorkbench`, but `ApiContext.requireCapability:168-171` enforces only when a
+  `Subject` is attached, and its javadoc states the intent: *"A no-op on Personal edition — no
+  `Authenticator` is ever present there… every route stays open, unchanged."* Personal is auth-free **by
+  design**; the defect is the edition table marking those rows ✅ for it. ⛔ Do not "fix" this in
+  `ShareRoutes`.
+  **Refuted and struck 2026-09-15:** ⛔ ~~no Standard artifact is built~~ — `release.yml:150-152` packages
+  Standard `-Sign` and **fails the release** if the zip carries `inspecto-policy` (`:154-165`);
+  ⛔ ~~the trimmed runtime ships in nothing / every release passes `-NoRuntime`~~ — `-NoRuntime` survives in
+  `release.yml` only inside the comment explaining its **removal** (`:111-119`), and that cell is no longer
+  green anyway (`EDITIONS.md:350` is 🟡🟡🟡, citing this row); and replay was fixed 2026-09-09 (`2cd1661b`).
   → the rule this needs is one line: **a green cell must name the evidence that makes it true**, and a cell
   whose evidence is "the script can do it" is not describing the bundle a customer receives.
-- **P2** · **`SPEC-AGT-EDITIONS-1` — seven `AGT` rows claim edition `All` and no bundle carries the code.**
-  The assistant and intelligence modules are plain reactor modules, built and tested on every run and staged
-  by nothing, so `/assist/*` and `/agent/*` answer 503 in **every** artifact `package.ps1` produces —
-  deliberately (`CP-14`, `PKG-5`) but not as `All` says. Either the cells become "built, not bundled" or the
-  packaging switch lands. Blocked by the same Java-floor question as `PKG-5`, which itself has no owner.
-  → `okf/capabilities/assistant/assistant.md` §2.
-- **P2** · **`SPEC-DEPLOY-ROWS-1` — FIFTEEN deployment items have no board row.** 🔴 **Recounted 2026-09-09: this row said fourteen and its own enumeration missed `SCR-4` (the nginx/IIS proxy + TLS reference configs — TLS, HSTS, static-UI gzip, and restricting `/metrics` and `/health/details` to the monitoring network). A row that exists to catch items with no home had an item with no home.** Its only statement anywhere is its acceptance line in `okf/capabilities/editions/editions.md` §5.2. Thirteen from the deployment
+- **P2** · **`SPEC-DEPLOY-ROWS-1` — THIRTEEN deployment items have no board row.** ⚠ **This row has now been
+  recounted THREE times — fourteen → fifteen (2026-09-09) → thirteen (2026-09-15).** A row whose whole
+  subject is items nobody counted is exactly the row that must be re-derived, never carried forward.
+  🔴 **2026-09-09: this row said fourteen and its own enumeration missed `SCR-4` (the nginx/IIS proxy + TLS reference configs — TLS, HSTS, static-UI gzip, and restricting `/metrics` and `/health/details` to the monitoring network). A row that exists to catch items with no home had an item with no home.** Its only statement anywhere is its acceptance line in `okf/capabilities/editions/editions.md` §5.2. Thirteen from the deployment
   plan (the preflight tool, the acceptance script, the off-site backup copy, upgrade/rollback automation, the
   sizing table, the disaster-recovery pack, phases 0–5, the platform list, the government-variant refusal)
-  plus two board cells with no home at all (distributed scheduler coordination, the shared object store) —
-  despite the board's closing claim that every planned row has a backlog home. ⚠ The words `preflight`,
+  ~~plus two board cells with no home at all (distributed scheduler coordination, the shared object store)~~
+  🔴 **Recounted 2026-09-15: THIRTEEN, not fifteen — both board cells are now homed** and are struck.
+  *Distributed scheduler coordination* is tracked under the signed scale-out plan (§2 E1, and phase B's
+  design constraint) and is **built** — `RunLease.java:39`; *the shared object store* is **D4 SIGNED**
+  (option (ii), object store + DuckLake catalog on Postgres). ⚠ The thirteen plan items are unchanged, and
+  re-verified 2026-09-15: every occurrence of `preflight`, `standby`, `disaster recovery`, `off-site`,
+  `rollback`, `sizing`, `government` and `SCR-4` in this file is **inside this row's own text** — so the
+  core claim still holds, and `SCR-4` is still the sole item whose only statement anywhere is its
+  acceptance line. ⚠ The words `preflight`,
   `standby` and `disaster recovery` appear **nowhere** in this file. Their only durable home today is
   `okf/capabilities/editions/editions.md` §3.9–§3.13, which is why that spec had to be written before the
   plan could move — ✅ **and it did move, 2026-09-09**, with the six tables the narrative could not carry
@@ -787,6 +664,48 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   rows, VER-1…VER-12, and the phase sequencing incl. the T4 promote order).
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
+
+- **P1** · 🔴 **`CONSIGNMENT-OUTPUTS-NULLRUN-1` — a UNIQUE key was added against its own code's ⛔, and
+  the graph lane silently escapes it.** Filed 2026-09-15 by grounding `Consignment ELT`, whose claim that
+  this was *"settled, unbuilt"* is refuted — it shipped, and shipped early.
+  `PartitionSinkWriter`'s six-arg constructor carries the rule verbatim: *"it is why the registry still
+  carries NO unique key: NULL ≠ NULL in a UNIQUE constraint on both DuckDB and Postgres, so a single
+  remaining null path would silently exempt its rows. **⛔ Do not add the constraint until every path
+  supplies this.**"* The constraint was added anyway on 2026-09-13 —
+  `DbConsignmentOutputStore.java:122` `UNIQUE (consignment_id, path, run_id)` with
+  `ON CONFLICT … DO UPDATE` at `:225` — on the stated basis that *"every production path has supplied one
+  since slice 3"* (`:57-58`).
+  🔴 **That basis is FALSE.** `ConsignmentGraphRunner.java:83` still calls the **4-arg**
+  `PartitionSinkWriter` constructor, which threads `runId = null`; only `PipelineJobRunner.java:316` supplies
+  a real one. And the graph lane is reachable on the **default** setting — `-Dingest.lane=auto`
+  (`ConsignmentIngestStrategy.java:168`) admits it whenever an authored route engages or
+  `graphLaneCarries(cfg)` holds. ⇒ Graph-lane rows are exempt from the key, so a re-run appends a duplicate
+  row instead of updating the `row_count`, in the one table the §11.3 output registry is meant to be
+  authoritative for. ⚠ Two javadocs in the same subsystem **directly contradict each other** today; whichever
+  fix lands must correct the loser, not leave both standing.
+  ✅ **DECIDED 2026-09-15 (operator): thread a real run id into the graph lane** — that is the end state
+  both javadocs already assume, and it removes the exemption at its source. ⛔ Not by dropping the
+  constraint, and ⛔ not by `NOT NULL`, which `:59-62` shows is strictly worse (`record` is fail-open, so a
+  violation would demote a **landed** file to a WARN, and a pre-slice-3 registry could not be rebuilt).
+  **First step: find whether a Run identity is in scope at `ConsignmentGraphRunner:83`** — the run-model
+  plan's slice 3 is where that seam was supposed to land. ⚠ Verify by RE-RUN, not by unit test: the
+  exemption is invisible to any test that writes one row once.
+  → `okf/backend/engine/db-layer.md` §3.9 · `archived-documents/plans-archive/run-model-plan.md`
+
+- **P2** · **`ENRICH-SILENT-FULL-RECOMPUTE-1` — an incremental recompute silently becomes a FULL one.**
+  Filed 2026-09-15 by grounding `Onboarding ↔ Pipeline unification W4`, which carried this as a *design
+  note* (*"never silently convert one into the other"*) when it is **a live defect already doing exactly
+  that**. `EnrichmentService.doRecompute:194` decides the mode with
+  `boolean full = (filter == null || filter.isEmpty())`, and `toFilter:307-319` drops any partition path
+  whose keys are not in `job.input().partitions()` (`:316`), contributing nothing when the map ends empty
+  (`:319`). ⇒ An **event-triggered incremental** recompute whose partition columns do not match the job's
+  declared ones produces an empty filter and runs a **full-window** recompute — dispatched at `:178-180`,
+  with nothing logged to say the mode changed.
+  **Fix: distinguish "no partitions requested" from "requested partitions matched nothing", and refuse the
+  second.** ⛔ Do not make it fall back to full — silently widening the blast radius of a triggered job is
+  the defect, not the remedy. ⚠ The repo already has the idiom to copy: `DedupScope` refuses a windowed
+  dedup that has no ledger rather than quietly running unwindowed.
+  → `okf/backend/control-plane/onboarding-authoring.md`
 
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
@@ -1050,7 +969,19 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   scheduler
 
 - **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` — Dataset freshness on a CLOCK, not on failures.** Adopted
-  2026-09-15 from duckle §1 C1. A rule declares `maximumAge` or `expectedAfterSchedule`; **no declared
+  2026-09-15 from duckle §1 C1.
+  ⛔ **SHARED BLOCKER — do not answer it here.** This row, `DUCKLE-C4-PARAM-PROVENANCE-1` and the deleted
+  `ROUTE-OWNERSHIP-SCOPE-1` all bottom out in the **same missing thing: there is no ownership/identity model
+  in the auth-free core** (`NotificationRule.java:112-113` hardcodes one `"appUser"` recipient; `AlertRule`
+  has no owner field at all). ✅ **Decided 2026-09-15 (operator): record the convergence, do NOT decide the
+  model yet** — answering it per-row would produce three incompatible answers. Owner-routed alerting is
+  therefore **out of scope for this row** until that one design lands.
+  ⚠ Also grounded 2026-09-15: `AlertService.evaluate:176-210` is **fire-only** — there is no recovery or
+  all-clear path in any form, and cooldown only suppresses re-fires. A clock-based freshness rule needs one,
+  and building it is not a sub-case of this row's `maximumAge` check.
+  ⚠ And the codebase carries a standing objection this row must answer before persisting anything:
+  `stale-tiles.ts:1-34` — *"There is no stored 'stale' flag anywhere, and deliberately so… ⛔ Do not
+  'improve' this by persisting a flag."* A rule declares `maximumAge` or `expectedAfterSchedule`; **no declared
   limit ⇒ `unknown`, never `fresh`**; a failed *or partial* run does not count as a refresh; a disabled or
   missing schedule makes the Dataset stale; `fresh→stale` alerts and `stale→fresh` sends an all-clear
   through the same Alert Rules, and **the all-clear is never held by a cooldown**; `stale_since` carries
@@ -1072,7 +1003,20 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `FileSequenceGaps` is the nearest cousin to model the kind on. → Expectation kinds
 
 - **P2** · **`DUCKLE-C4-PARAM-PROVENANCE-1` — record where a parameter value came from, and what it
-  overrode.** Adopted 2026-09-15 from duckle §1 C4. Two surfaces binding one parameter: **later wins** (a
+  overrode.** Adopted 2026-09-15 from duckle §1 C4.
+  🔴 **Regrounded 2026-09-15 — this row's `secret` claim is REFUTED and its "cheapest of the eight" ranking
+  is wrong.** It says *"It needs a `secret` ParamType, which does not exist"*: `ParameterDecl.java:30-38`
+  already carries a `secret` **boolean** — orthogonal to type, which is the better design — with a working
+  masker at `JobRoutes.maskSecrets:207-222`. ⚠ **The real gap is that masking is applied to the job-detail
+  GET only**: `JobService.java:1236` logs the fully resolved **unmasked** map, and
+  `ParameterResolver.itemViolation:117-134` embeds raw values in rejection messages. That is a leak on two
+  paths, and it is the part worth doing first.
+  ⚠ The provenance half is larger than "cheap": the winning layer **is** computed in
+  `ParameterResolver.value():160-192` and then **discarded** — `Resolution` is a plain map — and there is no
+  receipt to attach it to (`JobRun` carries no params field). ⛔ Secret masking is in scope; **owner-routed
+  anything is not** — see the shared ownership blocker on `DUCKLE-C1-DATASET-FRESHNESS-1`.
+  ✅ The row's one confirmed claim: `ParameterResolver.resolve` really is the single boundary — exactly two
+  production callers (`JobService.java:1209`, `PackTestHarness.java:162`). Two surfaces binding one parameter: **later wins** (a
   documented rule, not an emergent one), and the receipt records `{source, overrode:[…]}`; only a
   *differing* value counts as an override; **`secret` is a declared type replaced with `***` in history and
   never dropped**, so "was a token supplied?" stays answerable; all problems reported at once with stable
@@ -1126,16 +1070,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   breaking/non-breaking — the honesty of the middle tier is the feature.
   ⚠ Lineage/impact code already exists (42 Java / 25 TS hits); **what is absent is the gate over a diff**.
   → Lineage · `docs/api` breaking-change record · CI
-
-- **P2** · **`ROUTE-OWNERSHIP-SCOPE-1` — can a caller address ANOTHER user's notification, note or object
-  by id?** Filed 2026-09-15 by `route-gating-audit.md`, which deliberately did **not** test it: capability
-  gating and authorization-by-ownership are different questions, and answering one does not answer the
-  other. The audit found four notification routes correctly ungated **because they mutate the caller's own
-  state** (`/notifications/{id}/read`, `/read-all`, `/preferences`, `DELETE /notifications/{id}`) — ⚠ but
-  "the caller's own" is an assumption about **scoping**, not something the capability spine can enforce.
-  The same question applies to `/notes/{kind}/{id}/comments` and every `/objects/{id}/*` route.
-  ⇒ Probe each with a second identity and a first identity's id. ⛔ A capability gate would NOT fix this
-  even if added — an owner check is per-row, not per-route. → `route-gating-audit.md` §3
 
 - **P2** · **`AUDIT-REFUSAL-GAP-1` — a capability 403 and an auth 401 are never audited.** Filed 2026-09-15
   from duckle candidate S6 ("refusals audited as carefully as successes"). Two of the three sub-rules are

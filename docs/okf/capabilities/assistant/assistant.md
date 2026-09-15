@@ -175,7 +175,8 @@ precedence). ⚠ Note the irony this creates for the board: `AGT-5`'s edition ce
 but nothing in the code edition-gates L3 — it is exactly the **`-D` capability switch** that EDG-01
 rejected as an edition mechanism, and the live plan puts L2 at Standard+ and L3 at Enterprise while the
 original ladder gated L3 on Decision Rules the as-built policy engine does not use. Four sources, four
-gatings, all moot while nothing is bundled (§3.10).
+gatings — moot for `/agent/*`, which is bundled by nothing, but **no longer moot for `/assist/*`**, which
+ships on Standard+ since `PKG-5` (§3.10).
 
 **The tool belt is 23 tools, and the canonical source is a test.** `InspectoPackTest` asserts
 `assertEquals(23, tools.size())`, so the number is pinned even though no single enum lists it.
@@ -305,12 +306,20 @@ JDK 25 versus Java 24 question is resolved.
 🔴 **This is the section that governs how every row in §2 should be read.**
 
 `inspecto-agent`, `inspecto-agent-hosted` and `inspecto-intelligence` are **unconditional reactor
-modules** — they compile and their tests run on every build — and the packaging table marks
-`inspecto-agent` / `inspecto-intelligence` as bundled **never**, in both flavors. The core fat JAR
-carries the two SPI *interfaces* (`com.gamma.assist.spi.AssistAgent`,
-`com.gamma.intelligence.spi.IntelligenceAgent`) and **no implementor and no `META-INF/services` entry**,
-so `ServiceLoader` finds nothing and the assist routes answer **`503`** — the documented absent-module
-behaviour, the same pattern the editions board uses as its reference example.
+modules** — they compile and their tests run on every build. ⚠ **Corrected 2026-09-15: the two are no
+longer packaged alike, and this passage claimed they were for three days after that stopped being true.**
+
+- **`inspecto-agent` ships in Standard and Enterprise** since `PKG-5` (2026-09-12). `package.ps1:270` puts
+  it in the `$modules` build list for both, `:345-348` requires the shaded sidecar, `:518-520` stages
+  `inspecto-agent.jar`, and `:527` **fails the build** when the `AssistAgent` service entry is missing. So
+  `/assist/*` is live on Standard+.
+- **`inspecto-intelligence` is bundled by nothing.** The string `intelligence` appears nowhere in
+  `package.ps1`, so `/agent/*` (`AgentRoutes`) answers **`503`** in every artifact.
+
+For that second module the original mechanism still holds: the core fat JAR carries the two SPI
+*interfaces* (`com.gamma.assist.spi.AssistAgent`, `com.gamma.intelligence.spi.IntelligenceAgent`) and
+**no implementor and no `META-INF/services` entry**, so `ServiceLoader` finds nothing — the documented
+absent-module behaviour, the same pattern the editions board uses as its reference example.
 
 **It cannot arrive by accident**: the core build step builds upstream dependencies only, and the agent
 modules depend *on* the core rather than the other way round, so nothing pulls them in.
@@ -408,10 +417,14 @@ what it promises is absence.
 > **crosses** areas; a spec holds what belongs to **one**. See
 > [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
-1. 🔴 **The whole area's edition cells are wrong and nothing tracks the reconciliation.** Seven `AGT`
-   rows claim `All`; no bundle carries the code. Either the rows say "not bundled", or a packaging
-   decision changes that. The editions board already says the truth, so this is a requirements-board
-   repair plus a product decision on whether AI is ever meant to ship.
+1. ✅ **CLOSED 2026-09-15 — both halves of this item were refuted on grounding.** It read: *"Seven `AGT`
+   rows claim `All`; no bundle carries the code."* Re-derived against the table in §2: **only `AGT-3`
+   still reads `All`**, and its own cell explains why that is vacuous (what it promises is an absence) —
+   `AGT-1`/`AGT-2`/`AGT-4`/`AGT-5` each carry a 🔴 *no edition* correction and `AGT-6a`/`AGT-6b` read `—`.
+   And "no bundle carries the code" stopped being true at `PKG-5`: `inspecto-agent` ships Standard+ (§3.10).
+   ⚠ What survives is narrower and is stated in §3.10: `inspecto-intelligence` is bundled by nothing, so
+   `/agent/*` is 503 everywhere. The product decision on whether *that* module is meant to ship is real;
+   the requirements-board repair is not owed.
 2. 🔴 **`EOI-7`'s claim contradicts the build.** "No SNAPSHOT anywhere" versus a parent pom pinning
    `0.2.0-SNAPSHOT` of an unpublished upstream. The row needs rewriting to the actual state, and the
    reproducibility question — a build that depends on a moving branch head — deserves its own row.
