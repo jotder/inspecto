@@ -303,7 +303,7 @@ from thirty-eight separate rows.
 | 33 | The unmeasured Java-lane ratio | **Soften to a qualitative statement** — no benchmark run, and the dead citation goes with it | ✅ SHIPPED: `stakeholders/COMPETITIVE_LANDSCAPE.md` §1.3 |
 | 34 | D8 notification residuals | **Soft-bounce retry ONLY**; the SES/SNS adapter stays filed with its own review | Notifications (§3) · `D8-SUPPRESS-1` (§3) |
 | 35 | The ≈44 orphan pages | **Confirm the count, AND re-derive what `SPEC-STALEREF-1` was** — ⚠ it has no row anywhere, yet this row defers to it | `SPEC-ORPHANPAGE-1` (§5) |
-| 36 | The graphify skill divergence | ~~**Re-sync from the package**~~ 🔴 **NOT EXECUTED — the premise was false; see the note below the table** | `GRAPHIFY-1` (§5), still open |
+| 36 | The graphify skill divergence | **Re-sync from the package** — ✅ **DONE**; the repo copy is now byte-identical to `site-packages/graphify/skill.md`. ⚠ The operator reaffirmed after the premise was shown false, so the PowerShell port was traded away deliberately — see the note below | `GRAPHIFY-1` (§5), now tracks whether the port comes back |
 | 37 | What is "sandbox execution"? | **Dry-run: execute fully, discard ALL writes.** New scope, filed as `PIPELINE-DRYRUN-1`; `X4` is scoped against it | new §3 row |
 | 38 | What leads this shift? | **The secret-masking fix, then the P1** | §0 |
 
@@ -324,9 +324,13 @@ the current `.md` nor the new render. That is precisely the claim the v1.2 rewri
 ⚠ A quieter instance of the same drift went with it: the generator printed a literal `PAGE n OF 10`
 while the markdown carries **11** top-level sections. The count is now derived from the source.
 
-**(36) the graphify skill re-sync** was ⛔ **not performed at all.** The copies differ by **shell
-dialect** — 18 ```bash blocks in the package against 18 ```powershell in the repo — not by a missing
-fix, and re-syncing would have broken the skill for every shift on this Windows sandbox. See its row.
+**(36) the graphify skill re-sync** was ✅ **performed — after its premise was shown false and the
+operator reaffirmed the decision anyway.** ⚠ Recorded because the trade is not the one the answer was
+given for: the copies differ by **shell dialect**, not by a missing fix — **18 ```bash blocks in the
+package against 18 ```powershell in the repo**, the same count, because the repo copy was a 1:1 Windows
+port. ⇒ the re-sync **deliberately traded a working PowerShell port for the upstream bash text** on a
+win32 sandbox. ⛔ Do not read this as "the divergence was drift that got cleaned up"; it was a port
+that was given up, and whether it comes back is now what its row tracks.
 
 ⚠ **Three answers carry a stated cost that was ACCEPTED, not overlooked** — ⛔ do not "fix" any of them
 later without reopening the decision. (5) `(type, key, column)` parity **fragments** Incidents: a value
@@ -1650,21 +1654,29 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⛔ And the row's own lesson stands regardless of the outcome: **comparing version markers will
   never tell you this** — both read `0.9.53` while the files differ by ~300 lines.
 
-  🔴 **THE DECISION WAS TAKEN ON A FALSE PREMISE AND IS NOT EXECUTED — re-ask it.** On 2026-09-15 the
-  operator chose *"re-sync from the package"*, on this row's claim that the repo copy carries a uv/pipx
-  block *"that 0.9.53 does not"*. ⛔ **That claim is REFUTED.** Measured: the installed
-  `site-packages/graphify/skill.md` mentions `uv`/`pipx`/`#3028` **6 times** — it has the same fixes.
+  ✅ **RE-SYNCED 2026-09-15 — the repo copy is now byte-identical to the installed package** (755 → 713
+  lines). The row's original ask (*"either re-sync from the package or record why the repo copy
+  deliberately diverges"*) is discharged. ⚠ **It was executed AFTER its premise was refuted, on the
+  operator's reaffirmation** — the refutation stands and is kept below, because it names what the
+  re-sync cost.
+  🔴 **THE ROW'S STATED PREMISE WAS FALSE.** It claimed the repo copy carries a uv/pipx block
+  *"that 0.9.53 does not"*. ⛔ **REFUTED.** Measured: the installed `site-packages/graphify/skill.md`
+  mentions `uv`/`pipx`/`#3028` **6 times** — it has the same fixes, in its own dialect.
   🔴 **The real divergence is a PLATFORM PORT, not a missing fix.** The package copy contains **18
   ```bash blocks**; the repo copy contains **18 ```powershell blocks** — the same count, because the
   repo copy is a 1:1 Windows port of the same skill. The two-way diff is **171 lines only in the repo,
   129 only in the package** (the "~300 lines" this row quoted is their sum, not a one-way gap).
-  ⇒ **Re-syncing would replace every PowerShell block with bash on a win32, PowerShell-primary
-  sandbox**, breaking the skill for every shift — so it was not performed. ⚠ The repo copy also carries
-  a second named fix the row never mentioned: `#3028`, where PowerShell 5.1's `Out-File -Encoding utf8`
-  writes a BOM that rides into the saved interpreter path and fails the hook rebuild with WinError 123.
-  ⇒ **The real question is not sync-or-diverge but: should the repo keep a Windows port at all**, and if
-  so, how do the package's 129 newer lines reach it? ⛔ Neither "re-sync" nor "record the divergence"
-  answers that; a port needs a merge story, which is what this row should have said.
+  ⇒ **The re-sync therefore replaced every PowerShell block with bash** on a win32, PowerShell-primary
+  sandbox. ⚠ The repo copy also carried a second named fix the row never mentioned: `#3028`, where
+  PowerShell 5.1's `Out-File -Encoding utf8` writes a BOM that rides into the saved interpreter path and
+  fails the hook rebuild with **WinError 123**. Both that and the `#831` uv/pipx detection are preserved
+  verbatim in the re-sync commit's message, and the pre-re-sync file is one `git show` away.
+  ✅ **Verified after the swap**: the frontmatter is intact so the skill still loads, and `graphify
+  --version` still reports `0.9.53`.
+  ⇒ **WHAT THIS ROW NOW TRACKS — one question, not the old sync-or-diverge pair: does the team need the
+  PowerShell port back?** If the bash steps turn out to be unusable on this sandbox, the answer is a
+  **merge story** (the port re-applied over the package's newer text), ⛔ not another straight re-sync in
+  either direction — that is the loop this row has now been round once.
   ⚠ The row's own lesson survives intact and is now doubly earned: **comparing version markers will
   never tell you this** — both read `0.9.53`.
 
