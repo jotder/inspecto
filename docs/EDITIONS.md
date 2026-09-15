@@ -136,6 +136,17 @@ board exists for the cells that *differ* or are *undecided*.
 | — | deliberately not in this edition (a decision, not a gap) |
 | ❓ | undecided — needs an operator call before anyone builds |
 
+🔴 **A ✅ means the capability is PRESENT AND USABLE on that edition. It does NOT mean "gated to this
+tier and above."** (Convention stated 2026-09-15, `SPEC-GREENCELL-1`.) The distinction is load-bearing
+because **Personal is auth-free by design and enforces no capability gate at all**:
+`ApiContext.requireCapability` is a deliberate no-op when no `Subject` is attached, so a route carrying a
+capability check is still open there. Read the wrong way, every gated row looks like an overclaim on
+Personal — which is exactly how `BI-4`/`BI-6`/`BI-7` were first filed as a security hole and then
+**corrected to a documentation defect**. ⛔ Do **not** "fix" that by adding refusals to the routes: it
+would break an edition's designed posture to satisfy a table. Where a capability is *enforced*, and by
+what, is owned by [`okf/capabilities/security/security.md`](okf/capabilities/security/security.md)
+§capability-vocabulary — not by this matrix.
+
 ⚠ Keep the row IDs stable once referenced; append new rows at the end of their area. A cell that
 changes state carries the date in Notes. Source of truth for *what* a feature is stays
 [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
@@ -161,7 +172,7 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `recon.run`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F. ⚠ **`caserule.evaluate` and `objects.analytics` are `inspecto-ops` Job Types (EDG-01 cell 7) — unknown on Personal**; the framework cell stays ✅ (corrected 2026-09-08, `okf/capabilities/incidents/incidents.md` §2) |
 | JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | ✅ | ✅ | ✅ | |
 | JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | 🟡 | ✅ | ✅ | P is 🟡 (corrected 2026-09-08): four of the listed tasks are not on Personal. `event_prune` added 2026-09-02 (COMPLY-3). ⚠ **`incident_purge` is an `inspecto-ops` task (EDG-01 cell 7) — unknown on Personal**; backup/restore/verify are `inspecto-backup` (cell 2), also not Personal (corrected 2026-09-08) |
-| JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | |
+| JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | 🔴 **Intake caps ship OFF BY DEFAULT** (`IntakeGovernor.java:64-68`, `UNBOUNDED = 0`) — corrected 2026-09-15, this cell was ✅✅✅ with an empty note. The broker and the caps are present and usable (so ✅ is right per the legend above); an operator must set a cap for one to bind. ⛔ Flipping the default ON is a separate decision that **waits on a soak** and is NOT discharged by this note — see BACKLOG §3 Pipeline graph. The concurrency half of D11 *is* on by default; only the cap half is not |
 
 ### Step Processors (one row per processor; the board's authoring surface) [`ING` · `PIP`]
 

@@ -1603,8 +1603,46 @@ if (Test-Path $docsSrc) {
 }
 
 # ── step 8: zip (Windows bundle, then swap runtime/ and zip again for Linux) ───
-if (Test-Path $outZip) { Remove-Item $outZip -Force }
-Compress-Archive -Path $bundleDir -DestinationPath $outZip
+# Each zip carries ONLY its own platform's DuckDB extensions. Both platforms are staged into the one
+# $bundleDir above (so a single assembly serves both targets), but a bundle can only ever LOAD the
+# directory its own launcher probes: run.sh reads duckdb-extensions/linux_amd64, serve.bat reads
+# windows_amd64. Shipping both was called "harmless — like run.sh sitting unused in the Windows zip",
+# and at three extensions it was. At five it is ~43-45 MB zipped per bundle, about 16% of the
+# download, unreachable by construction — httpfs + aws added 33.5 MB of that on 2026-09-14
+# (AIRGAP-CROSSPLAT-DEADWEIGHT-1, measured from the built zips' own entry tables).
+#
+# ⛔ This filters the EXTENSION directory ONLY. The launchers are cross-copied ON PURPOSE — run.sh
+# does ship in the Windows zip — so a naive "filter by platform" that swept them out too would break
+# a deliberate convenience. ⚠ The boot smoke runs against $bundleDir BEFORE this step and stays green
+# whatever the zips contain, so it cannot witness this: verify from the zip entry tables instead.
+function Compress-BundleForPlatform {
+    param(
+        [Parameter(Mandatory)][string] $Platform,
+        [Parameter(Mandatory)][string] $DestinationPath
+    )
+    $extRoot = Join-Path $bundleDir 'duckdb-extensions'
+    $parked  = @()
+    if (Test-Path $extRoot) {
+        foreach ($dir in Get-ChildItem -Path $extRoot -Directory) {
+            if ($dir.Name -ne $Platform) {
+                $tmp = Join-Path $sandboxRoot ('inspecto-deploy-ext-' + $dir.Name)
+                if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
+                Move-Item $dir.FullName $tmp
+                $parked += , @($tmp, $dir.FullName)
+            }
+        }
+    }
+    try {
+        if (Test-Path $DestinationPath) { Remove-Item $DestinationPath -Force }
+        Compress-Archive -Path $bundleDir -DestinationPath $DestinationPath
+    } finally {
+        # Restored even when Compress-Archive throws — a half-stripped $bundleDir would otherwise
+        # silently produce a SECOND zip missing extensions it was supposed to carry.
+        foreach ($pair in $parked) { Move-Item $pair[0] $pair[1] }
+    }
+}
+
+Compress-BundleForPlatform -Platform 'windows_amd64' -DestinationPath $outZip
 
 if ($builtLinuxRuntime) {
     # Common bundle content (jar, config, docs, UI, scripts) was already assembled once above;
@@ -1616,10 +1654,11 @@ if ($builtLinuxRuntime) {
     Move-Item $windowsRuntimeOut $windowsRuntimeTmp
     Move-Item (Join-Path $sandboxRoot 'inspecto-deploy-linux-runtime') $windowsRuntimeOut
 
-    if (Test-Path $outZipLinux) { Remove-Item $outZipLinux -Force }
-    Compress-Archive -Path $bundleDir -DestinationPath $outZipLinux
+    Compress-BundleForPlatform -Platform 'linux_amd64' -DestinationPath $outZipLinux
 
-    # Restore the Windows runtime so $bundleDir on disk matches $outZip (in case anything inspects it).
+    # Restore the Windows runtime. ⚠ $bundleDir is now a SUPERSET of either zip — it holds both
+    # platforms' extensions, while each zip holds only its own — so anything inspecting it must not
+    # treat it as a mirror of $outZip.
     Remove-Item $windowsRuntimeOut -Recurse -Force
     Move-Item $windowsRuntimeTmp $windowsRuntimeOut
 }

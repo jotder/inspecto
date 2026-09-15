@@ -98,8 +98,9 @@ and the console's share of the cores left in the peak headroom. Above 32 cores: 
 
 ⚠ **Caveats that bound every figure above:** one end-to-end run on one machine, synthetic clean files, no
 concurrent dashboard queries, no inbox churn, no thermal soak; the server-core factor is an estimate; wide
-schemas cost more per cell than the 12-column slope predicts; messy files fall to the Java lane at roughly a
-third of the native rate (`BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1`). **A sustained benchmark on the
+schemas cost more per cell than the 12-column slope predicts; messy files fall to the Java lane, which is
+**materially slower than the native lane — by a margin we have not measured under controlled conditions and
+therefore do not quote**. **A sustained benchmark on the
 target hardware with a CI floor is still the single highest-value piece of evidence we do not have** (§6, A3).
 
 ### 1.4 The extension surface — what "plugins for the rest" rests on

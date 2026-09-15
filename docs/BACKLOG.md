@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-15 (FOURTH pass, after the thirty-eight-decision sitting).**
-> **71 rows: 1 × P1 · 55 × P2 · 15 × P3.**
+> **68 rows: 1 × P1 · 52 × P2 · 15 × P3.**
 >
 > 🔴 **The headline is not any single answer: SIXTEEN P3 rows stopped being demand-gated in one sitting.**
 > §0 defines P3 as *demand-gated — build only when someone asks by name*. On 2026-09-15 the operator was
@@ -278,9 +278,9 @@ from thirty-eight separate rows.
 | 8 | `batches` vs a per-schema row set | **A child table** for per-schema outputs; `batches` stays one row per ingest | Consignment ELT (§3) |
 | 9 | Execute an intervening node at rest? | **YES — `EXECUTED` nodes anywhere**; fusion may break mid-graph | Platform Services Stage 2 (§3) · §2 Row 15 |
 | 10 | ELT Phase 6 prerequisites | **Converter + parity gate NOW; the release is a SEPARATE call** — ⚠ including the `v3.12.0` name collision | §2 Row 15 |
-| 11 | Intake caps ✅✅✅ but off by default | **Fix the CELL now**, soak separately, flip the default only on the soak result | `SPEC-GREENCELL-1` · Pipeline graph (§3) |
-| 12 | What does a ✅ cell mean? | **"Present and usable"** — gating is documented in `security.md`'s capability vocabulary, so Personal's ✅ is correct as written and no cell changes | `SPEC-GREENCELL-1` (§3) |
-| 13 | The `.docx` generator | **Delete it; convert from the committed `.md`** — check its styling first so nothing is silently lost | `WHITEPAPER-DOCX-DRIFT-1` (§3) |
+| 11 | Intake caps ✅✅✅ but off by default | **Fix the CELL now**, soak separately, flip the default only on the soak result | ✅ cell fixed: `EDITIONS.md` `JOB-04`; the soak stays open on §3 Pipeline graph |
+| 12 | What does a ✅ cell mean? | **"Present and usable"** — gating is documented in `security.md`'s capability vocabulary, so Personal's ✅ is correct as written and no cell changes | ✅ SHIPPED: `EDITIONS.md` §Matrix legend |
+| 13 | The `.docx` generator | **Delete it; convert from the committed `.md`** — check its styling first so nothing is silently lost — ⚠ **amended on that check**, see the note below the table | ✅ SHIPPED: `scripts/generate_whitepaper_docx.py` |
 | 14 | Has the stale `.docx` been distributed? | **No — it never left the team.** No corrective action; the row is purely the generator change | same |
 | 15 | ~45 MB of cross-platform deadweight per zip | **Approved — filter the EXTENSION directory only**; launchers stay cross-copied; evidence from the zip entry tables | `AIRGAP-CROSSPLAT-DEADWEIGHT-1` (§5) |
 | 16 | Where do S3 endpoint/key/region live? | **`ConnectionProfile` for BOTH** the pipeline field and `dirs.database`. ⚠ Bootstrap ordering to be verified — if profiles cannot resolve early enough, the split is forced | `AIRGAP-S3-EXTENSIONS-1` (§5) |
@@ -300,12 +300,33 @@ from thirty-eight separate rows.
 | 30 | Scale/cross-space demand gates | **ALL FOUR FIRED** — cross-Space consequence · multi-operator install · a second code-registered dataset producer · a quarantine-replay driver | §3 rows |
 | 31 | Secrets reaching logs unmasked | **SPLIT OUT and fix both paths now** — filed as `PARAM-SECRET-LEAK-1`, ✅ **BUILT and retired the same day** | as-built: `okf/backend/control-plane/jobs.md` §ParameterDecl |
 | 32 | Which adopted duckle row first? | **`DUCKLE-C9-WATCHER-NOT-A-RUN-1`** | its §5 row |
-| 33 | The unmeasured Java-lane ratio | **Soften to a qualitative statement** — no benchmark run, and the dead citation goes with it | `SPEC-JAVALANE-RATIO-1` (§4) |
+| 33 | The unmeasured Java-lane ratio | **Soften to a qualitative statement** — no benchmark run, and the dead citation goes with it | ✅ SHIPPED: `stakeholders/COMPETITIVE_LANDSCAPE.md` §1.3 |
 | 34 | D8 notification residuals | **Soft-bounce retry ONLY**; the SES/SNS adapter stays filed with its own review | Notifications (§3) · `D8-SUPPRESS-1` (§3) |
 | 35 | The ≈44 orphan pages | **Confirm the count, AND re-derive what `SPEC-STALEREF-1` was** — ⚠ it has no row anywhere, yet this row defers to it | `SPEC-ORPHANPAGE-1` (§5) |
-| 36 | The graphify skill divergence | **Re-sync from the package.** ⚠ Capture the `fixes #831` uv/pipx block in the commit message first — re-syncing DELETES it | `GRAPHIFY-1` (§5) |
+| 36 | The graphify skill divergence | ~~**Re-sync from the package**~~ 🔴 **NOT EXECUTED — the premise was false; see the note below the table** | `GRAPHIFY-1` (§5), still open |
 | 37 | What is "sandbox execution"? | **Dry-run: execute fully, discard ALL writes.** New scope, filed as `PIPELINE-DRYRUN-1`; `X4` is scoped against it | new §3 row |
 | 38 | What leads this shift? | **The secret-masking fix, then the P1** | §0 |
+
+🔴 **TWO of these thirty-eight were answered on a premise that did not survive contact with the
+work. Both are recorded here and on their rows rather than quietly re-done.**
+
+**(13) the `.docx` generator** was to be *deleted* and the document produced *by conversion*. ⛔ The
+styling check that the answer itself called for is what found the blocker: **no converter exists in this
+environment** — pandoc, soffice and libreoffice are all absent, and only `python-docx` is installed — so
+"delete it and convert" was not implementable as written. ⇒ **the generator was rewritten to RENDER the
+committed `.md`** through the styling helpers it already had (kept verbatim; 593 → 370 lines). That
+reaches the decision's intent — the `.md` becomes the single origin, so every guard over it now covers
+the `.docx` by construction — without losing the branding or depending on a tool nobody has.
+✅ **Proven, not assumed:** the stale `.docx` contains **`many-to-many`**, which appears in **neither**
+the current `.md` nor the new render. That is precisely the claim the v1.2 rewrite deleted on
+2026-09-11 — still being made by the file a stakeholder would have been handed. ⚠ The old file was also
+**abridged**, not merely stale: 26,012 characters against the markdown's 38,371.
+⚠ A quieter instance of the same drift went with it: the generator printed a literal `PAGE n OF 10`
+while the markdown carries **11** top-level sections. The count is now derived from the source.
+
+**(36) the graphify skill re-sync** was ⛔ **not performed at all.** The copies differ by **shell
+dialect** — 18 ```bash blocks in the package against 18 ```powershell in the repo — not by a missing
+fix, and re-syncing would have broken the skill for every shift on this Windows sandbox. See its row.
 
 ⚠ **Three answers carry a stated cost that was ACCEPTED, not overlooked** — ⛔ do not "fix" any of them
 later without reopening the decision. (5) `(type, key, column)` parity **fragments** Incidents: a value
@@ -576,7 +597,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ **The accepted cost is a fusion break mid-graph, at a price nobody has measured.** The S2-2 bridge
   spike (rows/s through a no-op `EXECUTED` Step vs fused) is **no longer blocking** but is still worth
   running, because the only adjacent measurement spans a **half to a thirteenth** of the native rate
-  (`SPEC-JAVALANE-RATIO-1`) — a range too wide to design against. ⛔ Unchanged by this decision:
+  (the Java-lane A/B, whose row closed 2026-09-15 without a measurement) — a range too wide to design against. ⛔ Unchanged by this decision:
   third-party `LOWERED` steps stay closed until a SQL-fragment guard exists.
 - **P2** · **Consignment addressing** — (torn multi-file reads: CLOSED 2026-08-29 by the pinned `ConsignmentSelector` list — this row said "open" for a week; the two readers that still re-globbed, `DbBrowserRoutes.browseStore` and `ExpectationEvaluator`, were pinned 2026-09-06) 🔴 `generation` was called "a dead field (always 0, never read)" — **the never-read half is FALSE** (`DbConsignmentOutputStore.java:655` reads it; `:219` writes it), corrected 2026-09-14; ⚠ `retire_superseded` must be configured or every full recompute leaves a complete extra copy on disk; ingest-side Consignment-scoped accessor waits for a consumer; ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. → `okf/backend/engine/consignment-addressing.md`
 - **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — X4 record-level replay from quarantine: sidecar error manifests (offset/reason), all-or-nothing vs eject-and-continue as per-pipeline CONFIG — ⛔ no build without a driver (same item as the run-detail "reprocess is whole-batch only" note). X1 deferrals: per-pipeline `processing.retry` block (regenerate node-attributes + step-types contracts); operator cancel / retry-now affordance (today: delete the sidecar under `<status_dir>/retries/`, or `reprocess`). → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
@@ -615,7 +636,9 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   precondition and is not waived. ⚠ **But the DOC half is not waiting for it**: `EDITIONS.md:164`
   advertises `JOB-04` as ✅✅✅ with an empty notes cell over a feature that is off by default
   (`IntakeGovernor.java:64-68`, `UNBOUNDED = 0`), and that cell is being corrected now. ⇒ the claim and
-  the default are being fixed on **different clocks, deliberately** — see `SPEC-GREENCELL-1`.
+  the default are being fixed on **different clocks, deliberately**. ✅ The cell was corrected 2026-09-15
+  (`EDITIONS.md` `JOB-04`) and `SPEC-GREENCELL-1` retired with it; ⛔ **the soak and the default flip are
+  THIS row's and remain open** — the doc fix does not discharge them.
 - **P2** · **Consignment ELT** — (three items added 2026-09-07 from the archived plan's §11.2/§11.7/§15, which BACKLOG never carried: **`batches` is structurally singular** — its `schema_name`/`output_table` are one-per-row while a Consignment's EL emits a row set *per schema*, so this needs either one row per `(consignment, schema)` or a child table, an open decision; ~~whether a **durable `DeliveryReceiptStore`** exists beyond the in-memory one is a one-grep check still owed~~ — ✅ **ANSWERED 2026-09-14: it exists** (`inspecto-engine/.../notify/DbDeliveryReceiptStore.java`, wired through `ServiceStores`/`OperationalDb`); and §8.4's SLA config object is dropped with sealing, not pending.) `generation` is on the registry but compaction does not stage generations — ⚠ **and it is never incremented at all** (`ConsignmentOutputs.java:336` writes a literal `0`), so "dead field" was closer to true than the 2026-09-14 correction allowed; ~~`run_id` is `null` everywhere~~ ~~✅ CLOSED 2026-09-13 — `run_id` carries a real attempt on every production path~~ 🔴 **BOTH of this row's key claims are REFUTED, regrounded 2026-09-15, and are now `CONSIGNMENT-OUTPUTS-NULLRUN-1` (§4, P1): the key was not "still not addable" — it was ADDED on 2026-09-13 (`DbConsignmentOutputStore.java:122`) together with the `ON CONFLICT DO UPDATE` this row calls unbuilt (`:225`); and `run_id` is NOT supplied on every production path — `ConsignmentGraphRunner.java:83` still threads null, so those rows escape the key.** ⛔ Do not re-file either claim from this row; §7.4 rollup cache deliberately unbuilt until read-time aggregation is measurably slow; §7.3 unpartitioned fallback stands by operator call — revisit if flat summary targets appear. → `okf/backend/engine/db-layer.md` §3.9
 
   ✅ **DECIDED 2026-09-15:** **`batches` gains a CHILD TABLE for per-schema outputs; it stays one row per ingest.**
@@ -625,26 +648,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   scare on 2026-09-15, two days after `consignment_outputs` gained its UNIQUE key early. The child
   table costs a join on reads that want output tables, and changes no row's identity.
 - **P2** · **Completeness KPI (when the hold lifts)** — K2 wiring (`FileSequenceGaps` analysis shipped `14c6ef0e`, wiring not built; ⚠ **"needs `SeqScope`" is STALE as a blocker — regrounded 2026-09-15: `SeqScope` already ships** as a nested enum at `FileSequenceGaps.java:74-79` (`PER_BUCKET`/`CONTINUOUS`). The type exists; only the wiring does not. ⚠ **K1 is unwired too**, which this row never said: `DbConsignmentOutputStore.dailyVolume()` has zero call sites, same as `VolumeBaseline`/`FileSequenceGaps`); K4 `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, signal + deduped Incident on breach, must refuse loudly when `-Dconsignment.outputs.backend=none`). ✅ **K5 SHIPPED 2026-09-07** — 🔴 corrected 2026-09-09: this row and `INDEX.md` both listed K5 as remaining while the plan's own slice table and §5 recorded it done, a three-way split. Non-blocking: signal type naming `kpi.completeness.evaluated`/`.breached` (🔴 **"do not grow the `EventType` enum" is wrong in KIND — corrected 2026-09-15: there is no enum.** `EventType.java:19` is a class of `public static final String` constants, deliberately open per its own javadoc, and no `kpi.*` entry exists. The constants-class guidance still applies; the thing it warns about does not exist), K3 baseline-window default as a job parameter. ⚠ `VolumeBaseline`/`FileSequenceGaps` have no production caller today. 🔴 **Three items had no board home at all until 2026-09-09**, found when archiving the plan: (a) **`KPI-UNKNOWN-1`** — a null-`bounds` sink's daily count is **UNKNOWN, not zero**, and the KPI must carry that end to end (only the registry-off trap was ever filed); (b) where the sequence **template** itself comes from — the Collector's existing one, a job parameter, or the Collector's with an override — still undecided; (c) K1's and K3's acceptance criteria, now in `okf/capabilities/observability/observability.md` §3.9. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
-- **P2** · **`WHITEPAPER-DOCX-DRIFT-1` — the `.docx` generator re-authors the prose instead of reading the
-  `.md`** (filed 2026-09-11 at handoff, verified not merely suspected). `scripts/generate_whitepaper_docx.py`
-  (593 lines, tracked) names `INSPECTO_ENTERPRISE_WHITEPAPER.md`'s path **only as its OUTPUT `.docx`**
-  (`:592`) and never reads the markdown — the document body is built from ~12 hand-written
-  `add_paragraph`/`add_heading` blocks. 🔴 **So the v1.2 rewrite (`db11a412`) did not reach the `.docx` at
-  all: the generated file still carries v1.1 prose**, and the `.docx` is gitignored, so nothing flags the
-  divergence. A stakeholder handed the `.docx` gets a different document from the one the guards check —
-  and `check-doc-counts` only validates the `.md`. ⚠ Also hardcodes an absolute
-  `c:\sandbox\inspecto-clean\…` output path, so it cannot run on another checkout.
-  ⇒ Either make it render the committed `.md`, or delete it and produce the `.docx` by conversion. ⛔ Do not
-  hand the `.docx` to anyone until this is settled. → `docs/stakeholders/README.md`
-
-  ✅ **DECIDED 2026-09-15:** **DELETE the generator and produce the `.docx` by converting the committed `.md`.**
-  All 593 lines go; the `.md` becomes the single origin, so `check-doc-counts` and the vocabulary guard
-  cover the stakeholder document **by construction** rather than missing it, and the hardcoded
-  `c:\sandbox\inspecto-clean\…` path problem disappears with it. ⛔ **Check what styling the ~12
-  hand-written blocks actually provide before deleting** — that is the only thing conversion could lose.
-  ✅ **And the distribution question is CLOSED: the stale v1.1 `.docx` never left the team**, so there is
-  no re-issue and no correction owed. ⇒ this row is now purely the generator change; the ⛔ do-not-send
-  instruction can retire when conversion replaces it.
 - **P2** · ✅ **TRIGGER (operator, 2026-09-13):** an author needs to declare "this Collector takes NO data
   extensions". · **`SCHEMA-FORM-EMPTY-LIST-1` — the UI cannot author an explicit empty list** (filed 2026-09-13,
   split out of the Unpack codecs row, where it was a UI defect nobody would have found). schema-form's `list`
@@ -964,38 +967,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   acceptance is `kill -9` → back on `/health`, **plus the reboot leg**, on both platforms.
   ⚠ Access details are an owed input in §1. ⛔ `SCR-3`'s acceptance stays unmet until both are run —
   a shift that reads this row looking for code to write will find none and may mark it done.
-- **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** 🔴 **Recounted
-  2026-09-15: TWO live instances, not five** — three of the original five are now false, and a row about
-  unverified claims had carried its own for days.
-  **Still live:** **intake caps** are advertised by `JOB-04` as ✅✅✅ with an empty notes cell
-  (`EDITIONS.md:164`) and are **off by default** (`IntakeGovernor.java:64-68`, `UNBOUNDED = 0`); and
-  `BI-4`/`BI-6`/`BI-7` promise Standard+ over code that is ungated on Personal.
-  ⚠ **The `BI-*` instance is a DOC defect, not a security hole** — corrected 2026-09-15. `ShareRoutes:46`
-  does gate on `canAuthorWorkbench`, but `ApiContext.requireCapability:168-171` enforces only when a
-  `Subject` is attached, and its javadoc states the intent: *"A no-op on Personal edition — no
-  `Authenticator` is ever present there… every route stays open, unchanged."* Personal is auth-free **by
-  design**; the defect is the edition table marking those rows ✅ for it. ⛔ Do not "fix" this in
-  `ShareRoutes`.
-  **Refuted and struck 2026-09-15:** ⛔ ~~no Standard artifact is built~~ — `release.yml:150-152` packages
-  Standard `-Sign` and **fails the release** if the zip carries `inspecto-policy` (`:154-165`);
-  ⛔ ~~the trimmed runtime ships in nothing / every release passes `-NoRuntime`~~ — `-NoRuntime` survives in
-  `release.yml` only inside the comment explaining its **removal** (`:111-119`), and that cell is no longer
-  green anyway (`EDITIONS.md:350` is 🟡🟡🟡, citing this row); and replay was fixed 2026-09-09 (`2cd1661b`).
-  → the rule this needs is one line: **a green cell must name the evidence that makes it true**, and a cell
-  whose evidence is "the script can do it" is not describing the bundle a customer receives.
-
-  ✅ **DECIDED 2026-09-15:** **BOTH live instances are resolved, and neither is a code change.**
-  **(a) Intake caps** — the `JOB-04` cell is corrected NOW to say the caps exist but are off by default;
-  flipping the default waits on the soak (Pipeline graph row). ⇒ claim and default move on different
-  clocks, deliberately.
-  **(b) `BI-4`/`BI-6`/`BI-7`** — ⛔ **no cell changes and `ShareRoutes` is not touched.** The operator
-  settled the ambiguity at its root instead: **a ✅ means "present and usable" on that edition**, not
-  "gated to this tier and above"; gating is documented in `security.md`'s capability vocabulary. On that
-  reading Personal's ✅ is **correct as written**, and the whole class dissolves rather than being
-  patched three cells at a time. ⚠ The matrix needs **one legend line** stating the convention — that is
-  the entire fix, and without it the next reader makes the same misreading this row started as.
-  ⇒ **the rule this row exists to establish still stands**: a green cell must name the evidence that
-  makes it true, and "the script can do it" is not the bundle a customer receives.
 - **P2** · **`SPEC-DEPLOY-ROWS-1` — THIRTEEN deployment items have no board row.** ⚠ **This row has now been
   recounted THREE times — fourteen → fifteen (2026-09-09) → thirteen (2026-09-15).** A row whose whole
   subject is items nobody counted is exactly the row that must be re-derived, never carried forward.
@@ -1097,34 +1068,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   rule *"a capability with no committed example is a capability nobody has ever run"*.
   → `okf/capabilities/acquisition/acquisition.md` §8.4 · `okf/capabilities/data-plane/data-plane.md` §3.6
 
-- **P2** · **`SPEC-JAVALANE-RATIO-1` — a stakeholder doc states a Java-lane throughput ratio that no
-  measurement has ever produced.** Filed 2026-09-15. `stakeholders/COMPETITIVE_LANDSCAPE.md:102` bounds
-  every headline figure with *"messy files fall to the Java lane at roughly a third of the native rate"*,
-  citing `BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1` — **a row that is now CLOSED**, so the claim
-  cites a board entry rather than a measurement, and will shortly cite nothing at all.
-  🔴 **"A third" matches neither side of the only run that exists.** Same harness, 6-core/12-thread
-  laptop, 48 files × 250K rows × 100 cols, 24 batches, `processing.threads=12`: **before** the
-  2026-09-14 checkpoint fix the Java lane did **5.2K rows/s against the native lane's 69K** — about a
-  *thirteenth*; **after** it, 12 batches reached **34.5K rows/s**, which is the opposite error. ⚠ The two
-  Java numbers are not at equal batch counts, so ⛔ **do not simply substitute "half"** — that would
-  replace one unmeasured ratio with another, which is the whole defect.
-  **Fix: one A/B at equal batch count and column width on the current tree, then state the measured
-  ratio with its conditions** — `PerfDeepDiveBenchmark#concurrencyAndAutoDerive` reproduces it via
-  `-Dbench.threads` / `-Dbench.cols` / `-Dbench.engine`. ⚠ The result does **not** go in
-  `performance.md` — the operator instructed 2026-09-14 that these measurements are not recorded there;
-  the landing place is the sentence itself. ⚠ Single site — no other doc repeats the ratio.
-  → `docs/stakeholders/COMPETITIVE_LANDSCAPE.md` §1.3 · `okf/backend/build-run/performance.md`
-
-  ✅ **DECIDED 2026-09-15:** **SOFTEN the sentence to a qualitative statement; do NOT run the A/B.** The
-  ratio clause becomes something defensible ("materially slower") and the citation to the now-closed
-  `JAVA-INGEST-APPENDER-SERIAL-1` goes with it, since it would shortly have pointed at nothing.
-  ⇒ **no measurement is owed and this row does not need a benchmark run to close.**
-  ⛔ **Do not substitute a number later without measuring** — "half" is as unmeasured as "a third",
-  and swapping one for the other is the defect, not the fix. The two Java figures on record (5.2K
-  rows/s before the 2026-09-14 checkpoint fix, 34.5K after, against native 69K) are **not at equal
-  batch counts** and cannot be divided into a ratio.
-  ⚠ The landing place is still the sentence itself — ⛔ nothing goes into `performance.md`.
-  ⚠ Single site; no other doc repeats the claim, so this is one edit.
 
 - **P2** · **`SPEC-COUNTS-1` — eight facts, each counted two to six ways, and the narrative doc is wrong every
   time.** Measured 2026-09-09: builtin node types **30** (docs said 20/28/20/29 — five ways); parser frontends
@@ -1620,6 +1563,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ Rejected alternative, recorded so it is not re-proposed as a shortcut: dropping `aws` saves only
   16.37 MB and **removes a capability** (the AWS credential chain) rather than deadweight.
 
+  ✅ **BUILT 2026-09-15 — and deliberately NOT closed: the evidence this row demands has not been
+  produced.** `package.ps1` step 8 now cuts each zip through `Compress-BundleForPlatform`, which parks
+  the other platform's `duckdb-extensions/<plat>/` directory, zips, and restores it in a `finally` (a
+  throwing `Compress-Archive` would otherwise leave a half-stripped `$bundleDir` and silently produce a
+  SECOND zip missing extensions it was supposed to carry). It follows the move-aside/re-zip idiom the
+  script already uses for `runtime/` rather than inventing a second pattern.
+  ⛔ **The extension directory only** — the launchers stay cross-copied, as the row required.
+  🔴 **What is still owed is the zip entry tables**, and ⛔ nothing else substitutes: the boot smoke runs
+  against `$bundleDir` *before* zipping and stays green whatever the zips contain, so it cannot witness
+  this change in either direction. ⚠ Note `$bundleDir` is now a **superset** of either zip — it holds
+  both platforms while each zip holds one — so anything comparing the two must stop treating the
+  directory as a mirror of `inspecto-deploy.zip`. Verified so far only that `package.ps1` parses clean
+  (0 errors, decoded as UTF-8 — ⚠ a BOM-less file parsed as ANSI reports 43 phantom errors on the
+  PRISTINE file too, so check a probe against HEAD before believing it).
+
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
   - ✅ `living-operational-system.md` — **DISTILLED + ARCHIVED 2026-09-07.** The north star is now the OKF
@@ -1691,6 +1649,24 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   repo — a skill-file divergence is a team-wide fact, not one machine's drift.
   ⛔ And the row's own lesson stands regardless of the outcome: **comparing version markers will
   never tell you this** — both read `0.9.53` while the files differ by ~300 lines.
+
+  🔴 **THE DECISION WAS TAKEN ON A FALSE PREMISE AND IS NOT EXECUTED — re-ask it.** On 2026-09-15 the
+  operator chose *"re-sync from the package"*, on this row's claim that the repo copy carries a uv/pipx
+  block *"that 0.9.53 does not"*. ⛔ **That claim is REFUTED.** Measured: the installed
+  `site-packages/graphify/skill.md` mentions `uv`/`pipx`/`#3028` **6 times** — it has the same fixes.
+  🔴 **The real divergence is a PLATFORM PORT, not a missing fix.** The package copy contains **18
+  ```bash blocks**; the repo copy contains **18 ```powershell blocks** — the same count, because the
+  repo copy is a 1:1 Windows port of the same skill. The two-way diff is **171 lines only in the repo,
+  129 only in the package** (the "~300 lines" this row quoted is their sum, not a one-way gap).
+  ⇒ **Re-syncing would replace every PowerShell block with bash on a win32, PowerShell-primary
+  sandbox**, breaking the skill for every shift — so it was not performed. ⚠ The repo copy also carries
+  a second named fix the row never mentioned: `#3028`, where PowerShell 5.1's `Out-File -Encoding utf8`
+  writes a BOM that rides into the saved interpreter path and fails the hook rebuild with WinError 123.
+  ⇒ **The real question is not sync-or-diverge but: should the repo keep a Windows port at all**, and if
+  so, how do the package's 129 newer lines reach it? ⛔ Neither "re-sync" nor "record the divergence"
+  answers that; a port needs a merge story, which is what this row should have said.
+  ⚠ The row's own lesson survives intact and is now doubly earned: **comparing version markers will
+  never tell you this** — both read `0.9.53`.
 
 
 ### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
