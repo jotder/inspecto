@@ -3,6 +3,7 @@ import {
     buildReconciliation,
     CompareColumn,
     ageBucketOf,
+    breakId,
     breakAgeDays,
     mergeBreaks,
     matchedKeyCount,
@@ -210,5 +211,45 @@ describe('buildReconciliation', () => {
         expect(r.id).toMatch(/^switch_vs_billing_[a-z0-9]{4}$/);
         expect(r.breaks).toEqual([]);
         expect(r.lastRunAt).toBeNull();
+    });
+});
+
+describe('breakId — the server-shared Break identity', () => {
+    const b = (type: ReconBreak['type'], key: string, column?: string): ReconBreak =>
+        ({ type, key, column, status: 'open' }) as ReconBreak;
+
+    /**
+     * ⛔ A published contract, not an internal detail: `ReconRoutes.breakIdentity()` renders the
+     * byte-identical string into the `breakId` Incident attribute it dedupes on and keys
+     * `GET /recon/promoted` by (`BREAK-DEDUPE-GRAIN-1`). These literals are duplicated verbatim in
+     * `ControlApiReconPromoteTest`; if one side changes spelling, one of the two suites must go red.
+     */
+    it('renders (type, key, column) in the spelling the backend pins', () => {
+        expect(breakId(b('value_break', 'EU|voice', 'amount'))).toBe('value_break|EU\\|voice|amount');
+        expect(breakId(b('break' as ReconBreak['type'], 'EU|voice'))).toBe('break|EU\\|voice|');
+        expect(breakId(b('break' as ReconBreak['type'], 'NA|data'))).toBe('break|NA\\|data|');
+    });
+
+    it('is injective when a value contains the separator', () => {
+        // Without escaping both render `value_break|EU|voice|amount` and two different Breaks would share
+        // one Incident — the defect BREAK-DEDUPE-GRAIN-1 removes, reintroduced one level down.
+        expect(breakId(b('value_break', 'EU|voice', 'amount')))
+            .not.toBe(breakId(b('value_break', 'EU', 'voice|amount')));
+    });
+
+    it('is injective when a value contains a backslash', () => {
+        // `\` is the escape character itself, so it must be escaped FIRST or `a\` + `|b` collides with
+        // `a` + `\|b`. (Each literal below is a single backslash.)
+        expect(breakId(b('value_break', 'a\\', 'b'))).not.toBe(breakId(b('value_break', 'a', '\\b')));
+    });
+
+    it('distinguishes a missing column from an empty one only by content, not by position', () => {
+        expect(breakId(b('value_break', 'k'))).toBe(breakId(b('value_break', 'k', '')));
+    });
+
+    it('separates the three identity components', () => {
+        expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('missing_left', 'k', 'c')));
+        expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('value_break', 'k2', 'c')));
+        expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('value_break', 'k', 'c2')));
     });
 });

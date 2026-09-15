@@ -152,10 +152,21 @@ final class ReconRoutes implements RouteModule {
      * than handing Ops a clone. ⛔ Do not "fix" this by persisting Breaks to make the reference real: the C9
      * contract puts Break lifecycle on the client deliberately, and an Incident is the durable artifact.
      *
-     * <p>The dedupe is on the KEY, not on {@code (key, type, column)}: one business key that breaks on three
-     * columns is one thing for an operator to investigate, and the specific type/column ride along as
-     * attributes. ⚠ A consequence worth knowing: when the same key later breaks a different way, the open
-     * Incident is reused and its attributes still describe the FIRST observation.
+     * <p>🔴 <b>The dedupe grain is {@code (type, key, column)} — full parity with the client's
+     * {@code breakId}</b> ({@code BREAK-DEDUPE-GRAIN-1}, decided 2026-09-15). It was the KEY alone until then,
+     * which meant one business key breaking on {@code amount} and on {@code count} produced ONE Incident and
+     * the second promote was silently suppressed. ⚠ <b>Accepted cost</b>, decided rather than overlooked: a
+     * value Break and a missing-row Break on one key+column are now separate Incidents.
+     *
+     * <p>⛔ The write and the read MUST stay on one spelling — the offer read is keyed to match the dedupe
+     * precisely so the two cannot disagree — which is why the identity is one synthesized
+     * {@link #BREAK_ID} attribute rather than three matched attributes: {@code activeAttributeIndex} indexes a
+     * SINGLE attribute, so three-attribute matching would leave the read unable to express the grain.
+     *
+     * <p>⚠ <b>One-time upgrade effect.</b> Incidents opened before this change carry no {@link #BREAK_ID}
+     * attribute, so they no longer suppress a re-promote of the same Break: each such Break can be promoted
+     * once more, after which the new grain governs. Accepted as a bounded, low-harm transition rather than
+     * carrying a second legacy predicate that would re-introduce the key-only grain it replaces.
      *
      * <p>Gates, in order: write root unset → 503 · missing {@code reconciliation}/{@code key} → 422 ·
      * unknown reconciliation → 404 · no operational-object engine (a Personal build has none) → 503.
@@ -191,7 +202,8 @@ final class ReconRoutes implements RouteModule {
 
         Map<String, String> attrs = new LinkedHashMap<>();
         attrs.put("reconciliation", reconId);
-        attrs.put("breakKey", key);                 // ⚠ the dedupe attribute — see the class note
+        attrs.put(BREAK_ID, breakIdentity(type, key, column));   // ⚠ the dedupe attribute — see the class note
+        attrs.put("breakKey", key);                 // kept: the human-readable half, and what reports group by
         attrs.put("breakType", type);
         if (column != null && !column.isBlank()) attrs.put("column", column);
         if (runId != null && !runId.isBlank()) attrs.put("runId", runId);
@@ -202,7 +214,7 @@ final class ReconRoutes implements RouteModule {
                 "Reconciliation break: " + key,
                 "Break '" + key + "' (" + type + ")" + where + " promoted from reconciliation '" + reconId + "'"
                         + (runId == null || runId.isBlank() ? "" : ", run " + runId) + ".",
-                "WARNING", reconId, attrs, "breakKey");
+                "WARNING", reconId, attrs, BREAK_ID);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("incidentId", incidentId.orElse(null));
@@ -257,7 +269,7 @@ final class ReconRoutes implements RouteModule {
         // ⚠ `scope` is the reconciliation id, exactly as promote() passes it to openIncident — that shared
         // spelling is what makes this index findable at all.
         Map<String, String> index = objects.activeAttributeIndex(
-                com.gamma.objects.ObjectType.INCIDENT, safeId, "breakKey");
+                com.gamma.objects.ObjectType.INCIDENT, safeId, BREAK_ID);
 
         Map<String, String> page = index;
         if (index.size() > PROMOTED_CAP) {
@@ -278,6 +290,34 @@ final class ReconRoutes implements RouteModule {
 
     /** Hard cap on {@link #promoted}'s map — a diagnostic read must not become an unbounded export. */
     private static final int PROMOTED_CAP = 1000;
+
+    /**
+     * The Incident attribute carrying a Break's full identity, and the attribute {@link #promote} dedupes on
+     * and {@link #promoted} indexes by ({@code BREAK-DEDUPE-GRAIN-1}). One spelling, used by both halves.
+     */
+    static final String BREAK_ID = "breakId";
+
+    /**
+     * A Break's identity — {@code (type, key, column)} — rendered as the one string both the dedupe and the
+     * offer read match on. The client computes the byte-identical value in {@code reconciliation-types.ts}'s
+     * {@code breakId()}; ⛔ <b>the two are one contract and must change together</b>, because the SPA looks its
+     * own Breaks up in {@link #promoted}'s map by this exact string.
+     *
+     * <p>🔴 <b>Why the parts are escaped rather than merely joined.</b> A reconciliation key is itself a
+     * composite of the key columns' values, so it routinely CONTAINS the obvious separators — the repo's own
+     * test data uses keys like {@code "EU|voice"}. A plain join would let {@code (break, "EU|voice", "amount")}
+     * and {@code (break, "EU", "voice|amount")} collide into one identity, silently merging two different
+     * Breaks into one Incident — the very defect this decision exists to fix, reintroduced one level down.
+     * Escaping {@code \} then {@code |} makes the rendering injective, so distinct triples stay distinct.
+     */
+    static String breakIdentity(String type, String key, String column) {
+        return esc(type) + '|' + esc(key) + '|' + esc(column == null ? "" : column);
+    }
+
+    /** Escape a single identity part so {@code |} inside a value cannot be read as the separator. */
+    private static String esc(String part) {
+        return (part == null ? "" : part).replace("\\", "\\\\").replace("|", "\\|");
+    }
 
     // ── spec assembly ───────────────────────────────────────────────────────────────
 

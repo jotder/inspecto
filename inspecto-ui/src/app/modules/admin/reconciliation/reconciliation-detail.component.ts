@@ -87,12 +87,13 @@ export class ReconciliationDetailComponent implements OnInit {
      * only by this tab's own promotes, so a reload forgot every promotion and re-offered the action as if
      * it had never happened.
      *
-     * 🔴 Keyed by **`b.key`, NOT `breakId(b)`** — that is the server's dedupe grain. `promote()` sends
-     * `key: b.key`, and the route stores it as the `breakKey` attribute it dedupes on; `breakId` is a
-     * richer client-side identity (`type|key|column`) that would never match what came back. ⚠ A
-     * consequence worth knowing: two Breaks sharing a key but differing in type or column are ONE Incident
-     * to the server, so both read as promoted here. That is the dedupe the write path actually performs —
-     * reporting it faithfully is right; disagreeing with it would be the bug.
+     * 🔴 Keyed by **`breakId(b)`** — `(type, key, column)`, the server's dedupe grain since
+     * `BREAK-DEDUPE-GRAIN-1` (2026-09-15). It was keyed by the bare `b.key` until then, matching a server
+     * that deduped on `breakKey` alone; two Breaks sharing a key but differing in type or column were ONE
+     * Incident, so both read as promoted here. Both halves moved together — ⛔ **they are one contract**:
+     * `ReconRoutes.breakIdentity()` renders the byte-identical string into the `breakId` attribute it
+     * dedupes on and indexes `GET /recon/promoted` by, and this map is looked up with the value
+     * {@link breakId} computes. Changing either spelling alone silently empties this map.
      *
      * ⛔ Do NOT "simplify" this into a client-side filter of `GET /objects` by `breakKey`. Promotion is
      * suppressed only while the Incident is **non-terminal**, so an ARCHIVED one means the Break is
@@ -100,9 +101,9 @@ export class ReconciliationDetailComponent implements OnInit {
      * matching on mere existence would report an available action as unavailable.
      */
     private readonly promoted = signal<Readonly<Record<string, string>>>({});
-    readonly isPromoted = (b: ReconBreak): boolean => b.key in this.promoted();
+    readonly isPromoted = (b: ReconBreak): boolean => breakId(b) in this.promoted();
     /** The Incident covering this Break, or null — the back-reference the board was missing. */
-    readonly incidentFor = (b: ReconBreak): string | null => this.promoted()[b.key] ?? null;
+    readonly incidentFor = (b: ReconBreak): string | null => this.promoted()[breakId(b)] ?? null;
 
     /** The Board dimension path this page is scoped to (from `?path=`), or null for the whole recon. */
     readonly path = signal<Record<string, string> | null>(null);
@@ -415,7 +416,11 @@ export class ReconciliationDetailComponent implements OnInit {
             next: (res) => {
                 // ⚠ `incidentId` is null exactly when `deduped` — the dedupe seam suppresses without naming
                 // the survivor — so a re-read is the only way to learn which Incident covers this Break.
-                if (res.incidentId) this.promoted.set({ ...this.promoted(), [b.key]: res.incidentId });
+                // ⛔ Keyed by `breakId(b)`, the same identity `isPromoted`/`incidentFor` read and the server
+                // now returns (`BREAK-DEDUPE-GRAIN-1`). Keying this optimistic write by `b.key` while the
+                // readers looked up the identity made a just-promoted Break render as un-promoted until a
+                // reload — the write and the read must use one spelling.
+                if (res.incidentId) this.promoted.set({ ...this.promoted(), [breakId(b)]: res.incidentId });
                 else this.loadPromoted(r.id);
                 if (res.deduped) this.toastr.info(`An Incident for key "${b.key}" is already open.`);
                 else this.toastr.success(`Incident opened for key "${b.key}".`);

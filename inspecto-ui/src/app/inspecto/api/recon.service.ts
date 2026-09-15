@@ -49,8 +49,11 @@ export interface ReconPromoteResult {
 /**
  * What `GET /recon/promoted` reports (`BREAK-INCIDENT-RESOLVE-1`) — the READ half of promotion.
  *
- * 🔴 `promoted` maps a Break key to the id of the Incident covering it, and lists **only Breaks whose
- * Incident is still ACTIVE**. That is not a detail: `POST /recon/promote` suppresses a duplicate only while
+ * 🔴 `promoted` maps a Break's **`breakId` identity — `(type, key, column)`, the value `breakId()` computes**
+ * — to the id of the Incident covering it, and lists **only Breaks whose Incident is still ACTIVE**. ⚠ It was
+ * keyed by the bare Break key until `BREAK-DEDUPE-GRAIN-1` (2026-09-15) widened the server's dedupe grain to
+ * match the client's identity; look entries up with `breakId(b)`, never `b.key`.
+ * That is not a detail: `POST /recon/promote` suppresses a duplicate only while
  * the Incident is non-terminal, so an ARCHIVED one means the Break can be promoted again. The server
  * applies that rule for both halves, which is why this is a route rather than the client filtering
  * `GET /objects` — a client matching on mere existence would call an available action unavailable.

@@ -169,9 +169,33 @@ function keyOf(row: Record<string, unknown>, keyColumns: string[]): string {
     return keyColumns.map((k) => String(row[k] ?? '')).join(KEY_SEP);
 }
 
-/** Stable identity for a break within a run — key + type + column — used by {@link mergeBreaks}. */
+/**
+ * Escape one identity part so a `|` inside a value cannot be read as the separator.
+ *
+ * ⚠ Mirror of `ReconRoutes.esc` — see {@link breakId}.
+ */
+function escPart(part: string): string {
+    return part.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+}
+
+/**
+ * Stable identity for a break — `(type, key, column)` — used by {@link mergeBreaks} **and as the server's
+ * Incident dedupe grain** (`BREAK-DEDUPE-GRAIN-1`).
+ *
+ * ⛔ **One contract with the backend.** `ReconRoutes.breakIdentity()` renders the byte-identical string into
+ * the `breakId` attribute it dedupes promotions on and indexes `GET /recon/promoted` by; the detail component
+ * looks its own Breaks up in that map with this value. Changing either spelling alone silently empties the
+ * map, and every Break would read as un-promoted.
+ *
+ * 🔴 **Why the parts are escaped, and why this does not use `KEY_SEP`.** `KEY_SEP` is `''` and belongs to
+ * {@link keyOf}, which composes `b.key` itself out of the key columns' values — so a key routinely contains
+ * the separators (the repo's own fixtures use keys like `EU|voice`). Joining with `''` made this function
+ * non-injective: `('break', 'EU|voice', 'amount')` and `('break', 'EU', 'voice|amount')` rendered the same
+ * string. Escaping `\` then `|` makes distinct triples stay distinct. ⛔ Do NOT "tidy" this back onto
+ * `KEY_SEP` — that constant is a different concern, and changing it would alter every break's `key` value.
+ */
 export function breakId(b: ReconBreak): string {
-    return `${b.type}${KEY_SEP}${b.key}${KEY_SEP}${b.column ?? ''}`;
+    return `${escPart(b.type)}|${escPart(b.key)}|${escPart(b.column ?? '')}`;
 }
 
 /** True when `left` and `right` agree within the column's tolerance (non-numeric ⇒ exact string compare). */

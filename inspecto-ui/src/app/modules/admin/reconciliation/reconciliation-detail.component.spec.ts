@@ -219,11 +219,16 @@ describe('promoted Breaks (BREAK-INCIDENT-RESOLVE-1)', () => {
     /**
      * 🔴 The defect: `promoted` used to be an in-memory Set filled only by this tab's own clicks, so a
      * reload forgot every promotion. It is now read from the server on load.
+     *
+     * ⚠ The stub's map is keyed by the Break IDENTITY the server actually returns — `type|key|column`
+     * (`BREAK-DEDUPE-GRAIN-1`), not the bare key it used to send. The literal spelling is deliberate:
+     * this is a wire contract shared with `ReconRoutes.breakIdentity()`, so computing it with `breakId()`
+     * here would let both sides drift together and still agree.
      */
     it('reads the promoted map from the server on load, not from session memory', async () => {
         const { c, promoted } = await create({
             promoted: vi.fn(() =>
-                of({ reconciliation: 'r1', promoted: { 'EU · data': 'inc-7' }, total: 1, truncated: false }),
+                of({ reconciliation: 'r1', promoted: { 'value_break|EU · data|amount': 'inc-7' }, total: 1, truncated: false }),
             ),
         });
         expect(promoted).toHaveBeenCalled();
@@ -264,7 +269,7 @@ describe('promoted Breaks (BREAK-INCIDENT-RESOLVE-1)', () => {
     it('follows a promoted Break to its Incident', async () => {
         const { c } = await create({
             promoted: vi.fn(() =>
-                of({ reconciliation: 'r1', promoted: { 'EU · data': 'inc-7' }, total: 1, truncated: false }),
+                of({ reconciliation: 'r1', promoted: { 'value_break|EU · data|amount': 'inc-7' }, total: 1, truncated: false }),
             ),
         });
         const router = TestBed.inject(Router);
