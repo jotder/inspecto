@@ -123,27 +123,17 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-⚠ **ONE open decision (duckle C7, below). The six queued on 2026-09-14 were all answered that day**, each
-recorded on its owning row or plan; a further eight duckle candidates were adopted 2026-09-15 and are now
-§3 build rows.
+✅ **EMPTY again as of 2026-09-15.** The six queued on 2026-09-14 were answered that day; the duckle triage
+(nine candidates adopted incl. C7, C5 struck), the route-gating approach and the `JAVA-INGEST-APPENDER-
+SERIAL-1` closure were all decided on 2026-09-15. Every answer is recorded on its owning row.
+⚠ §1 reporting "empty" is only meaningful if decisions are FILED here when they arise — that assumption
+failed once already (three sat unfiled in a plan from 2026-09-11 to 2026-09-14).
 
 ⚠ **Read the closure notes below before re-filing anything**: §1 reported itself empty in every handoff
 from 2026-09-11 to 2026-09-14 while three of these six sat unfiled in a plan that reported itself blocked.
 ⛔ **A plan is where a decision is *described*; this section is where it is *queued*.** Describing one in
 `superpower/` and not filing it here is what produced that three-day stall, and it is the only way it can
 happen again.
-
-**⛔ ONE DECISION IS OPEN (filed 2026-09-15).**
-
-- **Duckle C7 — does the "no in-app git integration" exclusion cover an affected/contracts CHECK?** The
-  operator struck in-app git integration from scope on 2026-09-14. C7 ("which Pipelines does a change
-  reach, against a git revision; contract verdicts depend on the reader — a removed read column is
-  breaking, an unread one is *possibly* breaking, never compatible") **reads git objects**, so it is
-  tied to git presence — but it is a **CI-shaped check over a diff**, not an in-app git feature.
-  ⇒ Rule it either way and the row is settled: **in scope** (it becomes a §3 build row alongside the
-  other eight adopted candidates) or **excluded** (struck with the exclusion cited).
-  ⚠ Lineage/impact code already exists (42 Java / 25 TS hits) — what is absent is the gate over a diff.
-  → `superpower/duckle-concepts-candidates.md` C7
 
 **Answered 2026-09-14 — the six, with where each now lives:**
 
@@ -1648,6 +1638,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   the unreadable-policy refusal do not. 🔴 The prefix-boundary rule is **the exact defect corrected in
   scale-out phase C §5.4**, which is evidence this rule set earns its keep rather than a reason to skip it.
   → Config safety · sealed sandbox · edition gating
+
+- **P3** · **`DUCKLE-C7-AFFECTED-CONTRACTS-1` — which Pipelines does a change reach, and which contracts
+  break?** Adopted by the operator 2026-09-15 from duckle §1 C7, **with the git question ruled: IN SCOPE.**
+  The standing "no in-app git integration" exclusion covers an in-app git *feature*; this is a **CI-shaped
+  check over a diff**, which is a different thing. Recorded so the exclusion is not re-applied to it later.
+  What it is: given a revision, report which Pipelines a change reaches, **each carrying the chain that
+  reached it**; asset edges *and* parent→child ref edges (the reverse direction); **deleting a producer is
+  a change**; canvas geometry ignored; dynamic paths listed as **uncertain** rather than resolved.
+  🔴 **The contract verdicts are the subtle half and the reason to build it at all — they depend on the
+  READER:** removing a column somebody reads is **breaking**; removing one nobody reads is **"possibly
+  breaking", never "compatible"**; anything downstream of a transform is a **"revalidate" tier**, because
+  there is no column lineage to prove either way. ⛔ Do not collapse those three verdicts into
+  breaking/non-breaking — the honesty of the middle tier is the feature.
+  ⚠ Lineage/impact code already exists (42 Java / 25 TS hits); **what is absent is the gate over a diff**.
+  → Lineage · `docs/api` breaking-change record · CI
 
 - **P2** · **`ROUTE-OWNERSHIP-SCOPE-1` — can a caller address ANOTHER user's notification, note or object
   by id?** Filed 2026-09-15 by `route-gating-audit.md`, which deliberately did **not** test it: capability

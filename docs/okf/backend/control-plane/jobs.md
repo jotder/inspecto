@@ -298,6 +298,31 @@ ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-loc
   their dates never coincide. ⛔ Every zone in both is **named**; a test asserting `systemDefault()` passes
   everywhere and proves nothing.
 
+## Three single-seam properties, confirmed by audit (2026-09-15)
+
+Distilled from the duckle review before that candidate list was archived. Each was checked against the
+code rather than assumed, and each is the kind of property that is **cheap to hold and expensive to
+regain** — so the note exists to stop a future change quietly introducing a second seam.
+
+- **One run id, and logs are found by FIELD not by text.** `JobService.newRunId` mints one id that threads
+  unchanged into the live-run map / `JobRun` (the receipt), `RunContext`, and `RunLogEntry.runId`. Run logs
+  are **one JSONL file per run named by that id**, and the read path is a direct file lookup
+  (`RunLogStore.read(runId)`), never a grep over a shared log. ⇒ a run whose message text merely *mentions*
+  another run's id can never be served as that run's log. ⛔ Do not add a log reader that filters by
+  matching text.
+- **One parameter boundary.** `ParameterResolver.resolve` has exactly **one** production call site
+  (`JobService.executeRun`), and every trigger surface — manual API, cron, signal, replay — reaches it
+  through `submitRun → runJob → executeRun`. ⇒ a typed parameter is validated once, wherever the fire came
+  from. ⚠ SQL `$`-tokens are a **separate and deliberate** namespace (`com.gamma.query.Parameters`) with a
+  different grammar and purpose; `ParameterResolver`'s own header records consolidating the two as future
+  work. Do not "unify" them casually — they are two contracts, not one duplicated.
+- **One config source behind two limiters.** `scheduler.toon` is parsed in exactly one place
+  (`SchedulerSettings.read`), and `SchedulerRoutes.installResourceCaps` pushes its two keys out to the two
+  limiters — `ConcurrencyBroker.setSystemCap` (Consignment slots) and `JobService.installMaxConcurrentRuns`
+  (Run slots). **Neither limiter reads the file itself**, so there is no second parse to drift.
+  ⚠ They are two **different numbers by design** — different resource types — not one number read twice;
+  do not "fix" them into agreement.
+
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:

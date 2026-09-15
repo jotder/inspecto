@@ -30,7 +30,7 @@ are now `DUCKLE-*` build rows in `BACKLOG.md` §3 and are **tracked there, not h
 |---|---|
 | C1 freshness SLA · C2 run diff · C3 dead-property refusal · C4 parameter provenance · C6 policy narrowing · C8 baseline Expectation · C9 watcher-not-a-run · C10 admission pools | ✅ **ADOPTED** → `DUCKLE-C1…C10-*` §3 rows |
 | C5 releases as content-addressed snapshots | ⛔ **STRUCK** — struck by its own grounding ("design reference, not new scope" against ~55 existing release/promotion rows) |
-| C7 affected + contracts vs a git revision | ⏸ **AWAITING ONE RULING** — it reads git objects, so does the standing "no in-app git integration" exclusion cover a **CI-shaped check over a diff**? Queued in `BACKLOG.md` §1 |
+| C7 affected + contracts vs a git revision | ✅ **ADOPTED 2026-09-15, with the git question ruled: IN SCOPE.** The exclusion covers an in-app git *feature*; this is a CI-shaped check over a diff → `DUCKLE-C7-AFFECTED-CONTRACTS-1` |
 
 ⚠ **Ranking notes carried onto the rows, not lost here:** C1 depends on **S2** (retention must keep the
 last publication of an SLA-bearing Dataset) and **S13** (there is no ownership model at all, so
@@ -88,8 +88,8 @@ model at all, not merely a missing lint). ⛔ **Re-grep a row before ranking it*
 
 ## 3. Next step
 
-✅ **§1 (C1–C10) was decided by the operator on 2026-09-15** — eight adopted as `DUCKLE-*` §3 rows, C5
-struck, **C7 awaiting one ruling** (queued in `BACKLOG.md` §1). See the table at the top of §1.
+✅ **§1 (C1–C10) was decided by the operator on 2026-09-15** — **nine adopted** as `DUCKLE-*` §3 rows
+(C7 included, its git question ruled in scope), C5 struck. See the table at the top of §1.
 
 ✅ **§2 is DONE as a review pass (2026-09-15).** Every "check ours" note now carries a grounded verdict, so
 the remaining decision there is only *whether to adopt the rule*, never *what is true today*. What that pass
@@ -108,9 +108,8 @@ inspecto against crisply stated rules — including a P1 (75 ungated mutating ro
 among them) and a self-triggering hot loop whose javadoc asserted it could not happen. ⇒ **the value of a
 list like this is the grounding it forces, not the features it proposes.**
 
-⚠ **Do not archive this file yet — ONE ruling short.** Survivors are filed and §2 is fully distilled, so
-the only thing holding it in `superpower/` is **C7**. Once that is ruled (adopt ⇒ file a `DUCKLE-C7-*`
-row; exclude ⇒ strike it citing the exclusion), `git mv` this file to
-`docs/archived-documents/plans-archive/` and run `graphify update .`.
-⛔ Archiving before C7 is ruled would bury an open decision in the never-maintained tier — the same failure
-mode as the three decisions that sat unfiled in a plan from 2026-09-11 to 2026-09-14.
+✅ **ARCHIVED 2026-09-15 — this file is DONE and is history, not current.** Every candidate is decided,
+every survivor is a `DUCKLE-*` row in `BACKLOG.md` §3, every §2 defect is filed, and the three
+"already satisfied" properties (S7/S8/S14) were **distilled into `okf/backend/control-plane/jobs.md`**
+before the move, so archiving buried nothing.
+⛔ Nothing here is tracked any more — read `BACKLOG.md` for the work and `jobs.md` for the properties.
