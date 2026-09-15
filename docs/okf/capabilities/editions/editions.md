@@ -219,6 +219,12 @@ could not be determined from the repository (§5).
 ⚠ **One seam has no implementation at all** — an expression provider interface with no registration in any
 module. Harmless today; it is a seam declared for work that never came.
 
+✅ **Standard jlink runtime vs Nimbus — RE-VERIFIED 2026-09-15.** `pwsh inspecto/package.ps1 -Edition Standard -NoUi`
+(runtime embedded, boot smoke ON): *"verified: Nimbus classes + 3 SPI registrations present in the security
+sidecar"*, both trimmed runtimes built (Windows 91.5 MB, Linux 105.5 MB), and *"the staged Standard bundle boots
+and answers /health"* on the embedded Windows runtime — exit 0. The `-NoRuntime until confirmed` caveat on the
+API v1 row is discharged.
+
 ### 3.4 The absence contract
 
 Every provider seam that carries edition behaviour has **a defined answer when nothing is found**, and the

@@ -406,6 +406,16 @@ for Alert Rules.
   `countPrunable` at all — so a preview of "holds 3" could precede a sweep that removed 1. Pinned by
   `DbDedupLedgerTest.previewMatchesTheSweep`, `AcquisitionLedgerPruneTest.previewMatchesTheSweep*` and
   `DbDeliveryReceiptStoreTest.countPrunablePreviewsAndPruneDeletes`.
+* **A job of an unregistered type is skipped at BOOT, not the whole Space** (`DEMO-SPACE-PERSONAL-UNBOOTABLE-1`,
+  2026-09-15). `JobService`'s constructor used to call `registry.create` for every enabled config and let the
+  `unknown job type` exception escape — `SpaceManager` then logged *"Skipping space dir … failed to load"* and the
+  Space vanished from `GET /spaces`. The demo space did exactly that on the core jar because ONE sample job
+  (`ops_analytics_sample_job.toon`, `type: objects.analytics`, an `inspecto-ops` type) was in it. Now the
+  constructor WARNs `'<job>' NOT hosted: job type '<type>' is not registered on this classpath (registered: …)`
+  and continues; the config stays LISTED in `jobs()` (authored content, merely not hosted here). ⛔ Leniency is
+  boot-only: `upsertJob` (an author is present) still refuses an unknown type. ⚠ Open design question, not
+  decided here: whether a Space with unhosted jobs should show as `degraded` on the wire rather than silently
+  complete.
 * **Nightly chain (MNT-13)** — pure config: each link `on_signal: job.run.completed` +
   `when: "$signal.job == <prev> && $signal.outcome == SUCCESS"` (halt-on-failure by guard); shipped as a
   parameterized Job Template + `spaces/demo` instance.

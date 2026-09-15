@@ -58,8 +58,12 @@ const STATE_KEY = 'inspecto.pkce.state';
  * <p><b>Offline / Personal is byte-for-byte unchanged.</b> When `authMode !== 'oidc'` (Personal, or the
  * mock backend answering offline) this service does nothing beyond the one bootstrap read: no login, no
  * token, no redirect — {@link loginRequired} is always false and {@link authGuard} is a pass-through.
- * The Standard flow (redirect → callback → {@link completeLogin}) engages only when a real backend (or
- * the `mockAuthMode: 'oidc'` dev switch) reports OIDC. Mirrors {@link SpacesService}'s signal shape.
+ * The Standard flow (redirect → callback → {@link completeLogin}) engages only when the backend reports
+ * OIDC on `GET /bootstrap`. ⚠ There is NO client-side dev switch (a `mockAuthMode: 'oidc'` one was named
+ * here for weeks and never existed — SIGNIN-PREVIEW-1). To preview the guest routes locally, run the core
+ * with `tools/run-backend.ps1 -AuthMode oidc`: the core echoes `auth.mode` on `/bootstrap` without
+ * authenticating anything, so `/sign-in` renders while the redirect itself will not complete. Mirrors
+ * {@link SpacesService}'s signal shape.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionService {

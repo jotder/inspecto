@@ -279,6 +279,24 @@ dense controls, an unverified keyboard path for grid resize and reorder, and unv
 UI-gate row names the token lint, the unit tests and the build. Two non-functional requirements cite the
 accessibility gate as evidence of a control that the matrix does not carry.
 
+### 3.7b Previewing the sign-in page locally (`SIGNIN-PREVIEW-1`, closed 2026-09-15)
+
+The restyled `/sign-in` renders only when `GET /bootstrap` reports `features.authMode: 'oidc'`, and until
+2026-09-15 no shift had ever opened it in a browser — the `mockAuthMode: 'oidc'` dev switch its own javadoc
+promised **never existed**. The recipe, no source edit required:
+
+```bash
+pwsh tools/run-backend.ps1 -AuthMode oidc      # the CORE echoes -Dauth.mode on /bootstrap
+cd inspecto-ui && npx ng serve                 # proxy.conf.json forwards /api to :8080
+# open http://localhost:4204/sign-in
+```
+
+⚠ **Preview only.** The core has no `Authenticator`: it reports `edition: standard` / `authMode: oidc` and
+authenticates NOTHING, so the page renders while "Sign in with SSO" cannot complete — for a real session run the
+Standard bundle with the OIDC properties (§security). The optional-module 503s in the console are the absent-module
+stubs, not the page. **Seen 2026-09-15:** desktop 1280×800 — hero + card side by side; phone 375×812 — one column,
+no horizontal scroll, card intact.
+
 ### 3.8 Routing
 
 **The root redirects to `home`** (landing-page plan D1, 2026-09-15). It previously redirected per Lens,

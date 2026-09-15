@@ -1,6 +1,6 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-15 (§4 pass, later still) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+**Updated:** 2026-09-15 (dependency pass, latest) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
 every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
 `DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
 `ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
@@ -229,6 +229,54 @@ files *today*. ⚠ **This is a deliberate exception to §0's own ordering, made 
 🔴 **And the P1 does NOT start with code.** Its first move is grounding all 10 remaining gateable routes
 and reporting a per-route verdict — two of the first four attempted were **deliberate exemptions** whose
 gating turned the build red, and one of those two produced no red at all.
+
+### Dependency map — what blocks what (analysed 2026-09-15, every P-ranked row in §3–§5 read)
+
+**Verdict counts:** UNBLOCKED **37** · BLOCKED-OPERATOR **8** · DESIGN-FIRST **7** · BLOCKED-EXTERNAL (trigger not
+fired / release / hardware) **12** · BLOCKED-ROW **2**. ⚠ Read the row before starting — several are unblocked
+for ONE clause and blocked for the rest (noted per row).
+
+**Unblocked, smallest first** (S = one sitting · M = a day · L = multi-day):
+- S — *(none left — `SPEC-DEPLOY-ROWS-1` closed 2026-09-15: its thirteen items are named on the Deployment topology row, specified in `editions.md` §3.9–§3.14).* ⚠ The first draft of this map listed a "Consignment ELT
+  `generation` clause" here — a misreading of `GenerationModeIngester`; that row's only remainder is the §7.4
+  rollup cache, which is trigger-gated.
+  *(S items closed the same day: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`,
+  `SCHEMA-FORM-EMPTY-LIST-1`, `SIGNIN-PREVIEW-1`, API v1 jlink re-verify.)*
+- M — `TYPEFLOW-DATASET-COLUMNS-1` steps 3+4 (⚠ relies on the dead-seam verdict (2) = keep `temporalColumn`) ·
+  `RECON-CARDINALITY-2` · `HOME-VERSION-1` · `AGT-ARTIFACT-1` · `INCIDENT-KPI-MTTD-1` · `STALE-TILES-PRECISION-1` ·
+  `AGT-5` per-tool dry-run seam · Pipeline graph pre-materialise cap + §6 step-2 parity gate · `DUCKLE-C4` ·
+  `HOME-TILES-1` (backend counts first) · `DUCKLE-C2` (P3).
+- L — `AUTHORING-REDESIGN-1` (c) only · canonical bundle export/import · Onboarding↔Pipeline W4/W5 · Parsing
+  Stage-1 (ASN.1 module ref) · Platform Services Stage 2 · `EXECUTION-RESIDUALS` X1 deferrals · Completeness KPI
+  K1/K2/K4 · Job framework space-to-space comparison · D6 spec-authoring UI · Signal/Decision S8 · Security
+  policy-authoring UX · Deployment topology gaps · Postgres multi-user (build; acceptance needs a Postgres host)
+  · `DUCKLE-C3` · `DUCKLE-C1` · `DUCKLE-C8` · `DUCKLE-C10` feature · `DUCKLE-C6` · `DUCKLE-C7`.
+
+**Blocked on the operator (§1), by rows unblocked:** the FOUR route calls → the P1 (`ROUTE-UNGATED-DEFAULT-1`
+step 3 → 4c/4d/4e; also gated by "confirm reads-open-by-policy" and "which framework(s)") · the three dead-seam
+verdicts → `SPEC-DEADSEAM-1` + the `temporalColumn` clause of Consignment addressing + `TYPEFLOW-DATASET-COLUMNS-1`
+Q2 · "a spreadsheet library" → D-8 XLSX · "access details" → `DEPLOY-SERVICE-WRAPPER-1` (a run, not a build) ·
+"job path semantics" → `JOB-DIR-CWD-CONTAINMENT-1` · pick the next Step Processor partial BY NAME → the catalog row
+· commission the SES/SNS adapter review → Notifications + `D8-SUPPRESS-1`. "Eager/deferred `s3://`", the two
+dates, RTO/RPO, the stray `master`, the `ref:` pin unblock no §3–§5 row directly.
+
+**Design-first (a decision pass before code, by the row's own words):** AI drafting on non-schema kinds ·
+Onboarding D5-ref (ground the real delete-feed first) · Branch-aware residuals (b)(c) · `PIPELINE-DRYRUN-1` (which
+seam enforces the mode) · `STREAM-CONSUMER-1` (where the loop lives) · Bundle/Exchange load-as-draft ·
+Completeness KPI (b) sequence-template source · `AUTHORING-REDESIGN-1` (e).
+
+**Row → row chains:** `PIPELINE-DRYRUN-1` → `EXECUTION-RESIDUALS` X4 (replay default) · dead-seam verdict (2) →
+`TYPEFLOW-DATASET-COLUMNS-1`, Consignment addressing · ingress path-routing (scale-out plan §5.5, **no board row**)
+→ `SPACES-FROM-PARTITION-MAP-1` → remove `podScoped: true` from `/spaces`, `/bootstrap` · backend cheap-count
+endpoints → `HOME-TILES-1` · a soak run → Pipeline graph intake-cap flip · `DUCKLE-C10` rules (recorded) constrain
+scale-out phase B → `DUCKLE-C10` feature · a Postgres host → Postgres multi-user acceptance. Satisfied
+predecessors: `BREAK-DEDUPE-GRAIN-1` → `RECON-CARDINALITY-2`; `DATASET-SELF-TRIGGER-1`'s `Ref` →
+`STALE-TILES-PRECISION-1`; the at-rest decision → Platform Services Stage 2 and ELT Phase 6.
+
+**External / trigger-gated (do not start on speculation):** Step catalog P4 parser mapping · `AGT-SEGMENT-1` ·
+Unpack xz/zstd · Branch-aware (d)–(g) · Consignment ELT §7.4 rollup cache · `GLOSSARY-CASE-1` and Vocabulary
+Tier 3 (next MAJOR) · D-11 hand-authored relations · Queries/BI graph/spatial/search/api · `EXPORT-1` · API v1
+further adopters · Pipeline graph intake-cap flip (soak) · `SPACES-FROM-PARTITION-MAP-1` (ingress first).
 
 ## 1. Operator decisions pending
 
@@ -754,39 +802,9 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   semantics: schema-form writes an empty list as `null`, and `null` already means "unset, use the
   default", which is the opposite of "deliberately none". ⛔ Do not fix it by making `null` mean empty
   somewhere downstream; the two states must stay distinguishable at the control.
-- **P2** · ✅ **TRIGGER (operator, 2026-09-13):** decide it on its own terms — wire the panel somewhere, or
-  delete it with its endpoint's only consumer. · **`DERIVED-SCHEMA-PANEL-ORPHAN-1` — a live endpoint's only UI is
-  mounted nowhere** (filed 2026-09-13, split out of `TYPEFLOW-DATASET-COLUMNS-1` where it was a sub-clause).
-  `GET /config/schema/derived` is wired end to end (`ConfigService.derivedSchema`), but
-  `DerivedSchemaPanelComponent:29`'s selector appears only in its own spec and the `schema/index.ts` barrel — in no
-  template and no route — so nothing mounts it. ⛔ **Do not delete on sight:** `MOCK-DEAD-COMPUTE-1` was closed as
-  a **RETAIN** precisely because dead code here can be a deliberate test vehicle. Establish which this is first.
-  → `okf/frontend/features/schema-mapping-authoring.md`
-
-  ✅ **DECIDED 2026-09-15:** **WIRE the panel into the schema authoring pane** — it is not a test vehicle and
-  is not deleted. ⇒ `GET /config/schema/derived` gains a reachable consumer and stops being a live
-  endpoint nothing can reach.
-  ⚠ **It has never been seen by a user**, so "wire it" includes whatever it needs to be presentable;
-  ⛔ do not assume the component is finished merely because it compiles and has a spec.
-  ✅ Keeping the endpoint also preserves the natural consumer for `TYPEFLOW-DATASET-COLUMNS-1`
-  steps 3+4, which is now live work rather than a hypothetical.
-
-  ✅ **SHIPPED 2026-09-15 — the panel is mounted; `GET /config/schema/derived` has a reachable consumer.**
-  `pipeline` now threads pipeline-editor → `GrammarEditorDialogData` → `SchemaEditorData` → the panel.
-  ⚠ **“The schema authoring pane” was ambiguous and the decision did not say which.** Two dialogs qualify;
-  `SchemaEditorDialog` was chosen because the panel's OWN docblock targets it (“beside the authored one
-  (step-workbench S5)”) and `okf/frontend/features/schema-mapping-authoring.md` names it as the surface.
-  🔴 **It was not a template edit: no dialog in the chain knew a pipeline.** The panel needs the
-  REGISTERED identity (`pipelineId()`), which `GET /config/schema/derived` resolves via `configFor` — so
-  the value had to be threaded through THREE levels. `SchemaEditorData` gained `pipeline?` beside its
-  existing `home`/`subdir`, which exist for the same reason (the two openers genuinely differ).
-  ⛔ **Hidden for `home: 'registry'`, deliberately.** A registry schema is shared and attached to no
-  pipeline, so the panel is ABSENT there rather than present-and-empty — an empty panel would invite
-  “this pipeline writes nothing”. A test pins each direction.
-  ⚠ **Labelled “last saved”, and that label is load-bearing.** The route derives from the SAVED config
-  (“every schema a *saved* pipeline declares”) while the dialog edits an in-memory draft — so mid-edit it
-  shows the schema BEFORE the current edit. Unlabelled it would read as live feedback on the unsaved
-  edit, which is the one way this panel could mislead an author rather than help them.
+  ✅ **SHIPPED 2026-09-15** — an "Explicitly none" toggle on a non-required `list` control writes `[]`; clearing
+  entries still writes `null`. Neither path produces the other. As-built `okf/backend/engine/unpack-stage.md`;
+  pinned by two new `schema-form.component.spec.ts` cases.
 - **P2** · **`TYPEFLOW-DATASET-COLUMNS-1` — a Dataset's columns are never derived from the pipeline that
   fills it** (filed 2026-09-11, split out of `TYPEFLOW-CONSUMERS-1` (b)). A `DatasetColumn` is
   `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic lives
@@ -898,15 +916,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⛔ Do not add either tile client-side — the cost is the reason they were dropped. **Close when the backend serves
   a cheap count for either, and the tile lands with it.** → `okf/capabilities/surfaces/surfaces.md` §3.8
 
-- **P3** · **`SIGNIN-PREVIEW-1` — the restyled sign-in page has never been seen in a browser.**
-  Filed 2026-09-15. It renders only when `features.authMode === 'oidc'`, and **no dev switch produces that against a
-  Personal backend** — `session.service.ts`'s javadoc names a `mockAuthMode: 'oidc'` switch that **does not exist in
-  the tree** (grep: one stale comment, zero implementations), and `tools/run-backend.ps1` passes no `-Dauth.mode`.
-  So the page is covered by unit tests (render, one-`h1`, branding, fallback, a11y) and by nothing else; its
-  responsive behaviour is unverified. Wanted: either the dev switch its own javadoc already promises, or a documented
-  `-Dauth.mode=oidc` preview recipe. **Close when a shift can open `/sign-in` locally without editing source.**
-  → `okf/capabilities/surfaces/surfaces.md` §3.8
-
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
@@ -937,7 +946,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   kind**, so this row is no longer server-only — it is a producer step in `toResult` / the `askStream`
   override (`:431-448`), the kind whitelist, **and** UI work. ⛔ Still not "populate a field"; the
   grounding above stands unchanged.
-- **P2** · **API v1** — adopt the cursor-pagination seam on further list families as demanded (4 adopters live); adopt `ETags.respond` on further singleton reads as demanded; Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed). → `okf/backend/control-plane/api-v1.md`
+- **P2** · **API v1** — adopt the cursor-pagination seam on further list families as demanded (4 adopters live); adopt `ETags.respond` on further singleton reads as demanded; ~~Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed)~~ ✅ RE-VERIFIED 2026-09-15 — Standard package with embedded runtime boots and answers `/health` (as-built `okf/capabilities/editions/editions.md` §3.3). The remaining adopters are demand-gated. → `okf/backend/control-plane/api-v1.md`
 - **P2** · **Bundle / Exchange** — `requires` present-but-different classification; per-editor "load as draft" import — design first, likely multi-session (`BundleTransferService.write` commits straight through; no generic draft seam). ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/exchange-sharing.md`
 - **P2** · **Notifications** — D8 residuals: soft-bounce retry scheduling (distinction recorded, nothing retries); SES/SNS adapter (needs SNS subscription confirmation + a cert-chain fetch from a validated `amazonaws.com` URL — ⚠ outbound fetch from an unauthenticated callback path deserves its own review); GeoIP; auth-gated per-user prefs / security triggers. (Auto-disable policy is a §1 decision.) → `okf/backend/control-plane/events-metrics.md`
 
@@ -983,7 +992,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   **diagnosable** today — which means the build is about preventing the error, not explaining it, and
   the existing diagnosis surfaces are the thing to extend rather than duplicate.
 - **P2** · ✅ **TRIGGER (operator, 2026-09-13):** the first operator who promotes two Breaks on one key and
-  finds only one Incident. · **`BREAK-DEDUPE-GRAIN-1` — the server dedupes promotion on `key` alone, but a
+  finds only one Incident. · ~~**`BREAK-DEDUPE-GRAIN-1`**~~ ✅ **SHIPPED 2026-09-15 (`5d4c5e61`, `(type, key, column)` parity; as-built `incidents.md` §promoted read-back) — the text below is kept as history only** · **`BREAK-DEDUPE-GRAIN-1` — the server dedupes promotion on `key` alone, but a
   Break's identity includes its COLUMN** (filed 2026-09-13 while shipping `BREAK-INCIDENT-RESOLVE-1`;
   pre-existing, not introduced by it). `ReconRoutes` stores `breakKey = key` and dedupes on that
   attribute, while the client's own `breakId` is `type|key|column`
@@ -1098,7 +1107,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   because this row states the residual pair and would otherwise read as if both were queued.
 
 - **P2** · **AGT-5 per-tool dry-run seam — GATE DISCHARGED 2026-09-08, now actionable.** This sat in §2 as externally gated on eoiagent shipping a per-tool `DryRunProvider`. **It has shipped**: `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunProvider.java`, `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunResult.java`, and four per-tool dry-run tools, under an **Accepted** ADR-0008 enforcing approval + dry-run in the runtime (upstream `jotder/inspect-agent`, verified via the git-tree API 2026-09-08). ⚠ The gate was not "waiting" — it was **held shut by a broken check**: the `gh search code` probe it named returns 0 for every term in that repo, control included. **What this unblocks:** inspecto can now drop its parallel `AgentApprovals` previewer and consume the upstream per-tool seam on `PlatformBuilder`. ⛔ Still separately gated: `incident_explain` waits on the eoiagent **host** seam, and the local-models-only scope cut stands. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
-- **P2** · **Deployment topology gaps** — ~~GAP-3 service wrappers (SCR-3)~~ → own P1 row `DEPLOY-SERVICE-WRAPPER-1` (2026-09-11) · GAP-4 DuckDB `memory_limit` default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `archived-documents/plans-archive/deployment-topology-plan.md` §11
+- **P2** · **Deployment topology gaps** — ~~GAP-3 service wrappers (SCR-3)~~ → own P1 row `DEPLOY-SERVICE-WRAPPER-1` (2026-09-11) · GAP-4 DuckDB `memory_limit` default · GAP-5 T15 surge admission · GAP-6 Vault/KMS (SEC-8) · GAP-10 bundle missing 13 archived docs (SCR-10). Phases 0–5 all unbuilt. ✅ **This row is ALSO the board home of the thirteen plan items `SPEC-DEPLOY-ROWS-1` counted (closed 2026-09-15 by naming them here rather than filing thirteen rows that would duplicate the spec):** the preflight tool · the acceptance script · the off-site backup copy · upgrade/rollback automation · the sizing table · the disaster-recovery pack · phases 0–5 (six) · the platform list · the government-variant refusal · **`SCR-4`** (nginx/IIS proxy + TLS reference configs — TLS, HSTS, static-UI gzip, `/metrics` + `/health/details` restricted to the monitoring network; ⚠ still the one item whose only statement anywhere else is its acceptance line). Their durable specification is `okf/capabilities/editions/editions.md` §3.9–§3.14; this row tracks the BUILD. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `archived-documents/plans-archive/deployment-topology-plan.md` §11
 - **P2** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
   🔴 **TRIGGER FIRED 2026-09-15 — no longer demand-gated, re-ranked P2.** A multi-operator install exists. 🔴 **The §6 PARK IS LIFTED** — that line is
@@ -1132,50 +1141,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   acceptance is `kill -9` → back on `/health`, **plus the reboot leg**, on both platforms.
   ⚠ Access details are an owed input in §1. ⛔ `SCR-3`'s acceptance stays unmet until both are run —
   a shift that reads this row looking for code to write will find none and may mark it done.
-- **P2** · **`SPEC-DEPLOY-ROWS-1` — THIRTEEN deployment items have no board row.** ⚠ **This row has now been
-  recounted THREE times — fourteen → fifteen (2026-09-09) → thirteen (2026-09-15).** A row whose whole
-  subject is items nobody counted is exactly the row that must be re-derived, never carried forward.
-  🔴 **2026-09-09: this row said fourteen and its own enumeration missed `SCR-4` (the nginx/IIS proxy + TLS reference configs — TLS, HSTS, static-UI gzip, and restricting `/metrics` and `/health/details` to the monitoring network). A row that exists to catch items with no home had an item with no home.** Its only statement anywhere is its acceptance line in `okf/capabilities/editions/editions.md` §5.2. Thirteen from the deployment
-  plan (the preflight tool, the acceptance script, the off-site backup copy, upgrade/rollback automation, the
-  sizing table, the disaster-recovery pack, phases 0–5, the platform list, the government-variant refusal)
-  ~~plus two board cells with no home at all (distributed scheduler coordination, the shared object store)~~
-  🔴 **Recounted 2026-09-15: THIRTEEN, not fifteen — both board cells are now homed** and are struck.
-  *Distributed scheduler coordination* is tracked under the signed scale-out plan (§2 E1, and phase B's
-  design constraint) and is **built** — `RunLease.java:39`; *the shared object store* is **D4 SIGNED**
-  (option (ii), object store + DuckLake catalog on Postgres). ⚠ The thirteen plan items are unchanged, and
-  re-verified 2026-09-15: every occurrence of `preflight`, `standby`, `disaster recovery`, `off-site`,
-  `rollback`, `sizing`, `government` and `SCR-4` in this file is **inside this row's own text** — so the
-  core claim still holds, and `SCR-4` is still the sole item whose only statement anywhere is its
-  acceptance line. ⚠ The words `preflight`,
-  `standby` and `disaster recovery` appear **nowhere** in this file. Their only durable home today is
-  `okf/capabilities/editions/editions.md` §3.9–§3.13, which is why that spec had to be written before the
-  plan could move — ✅ **and it did move, 2026-09-09**, with the six tables the narrative could not carry
-  now in that spec's §3.14 (sizing, failure→tier, the signed RPO/RTO SLOs, the nine remaining preflight
-  rows, VER-1…VER-12, and the phase sequencing incl. the T4 promote order).
-  → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
-- **P2** · 🔴 **`DEMO-SPACE-PERSONAL-UNBOOTABLE-1` — the demo space does not boot on the core jar, and the
-  boot only WARNS.** Found 2026-09-15 driving `COLLECTOR-DATASET-UNPROVEN-1`: `java -cp inspecto-processor.jar
-  … -Dspaces.root=spaces` hosted `default` and `ucc` only — `SpaceManager` logged *"Skipping space dir spaces\demo
-  — failed to load: unknown job type 'objects.analytics'"* and carried on. `spaces/demo/config/jobs/
-  ops_analytics_sample_job.toon` declares a job type contributed by `inspecto-ops` (Standard+), so the
-  "editable sample catalog — one working example of every authorable component kind" is unreachable on
-  Personal, and `GET /spaces` simply omits it. ⚠ Two defects in one: (a) a committed sample space depends on an
-  optional module without saying so; (b) a space that fails to load is a WARN, not a refusal or a visible
-  degraded state — the same shape as `DUCKLE-C9`'s "a wedged watcher looks like a quiet one". ⇒ Either move the
-  ops sample job out of `demo` (or gate it), and decide whether an unloadable space should be listed as
-  `degraded` rather than vanish. → `SpaceManager` · `spaces/demo/config/jobs/ops_analytics_sample_job.toon`
-- **P2** · **`POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1` — a collector whose connector cannot be built shows NO
-  poll state, not an error.** Found 2026-09-15 on the same live run: `orders_by_region_feed`'s first poll
-  failed with an ERROR-logged `Acquisition failed … unknown dataset` (`PipelineScheduler`, the connector factory
-  threw), and its event-triggered run then succeeded — yet `GET /spaces/demo/collectors` reported
-  `lastPollAt: null, pollCount: null, lastPollError: null` for it while the three `local` pipelines each showed
-  `pollCount: 1`. The polling session shipped for row 32 (`PipelineScheduler.pollStates`) records only the
-  tick path that reaches the connector; a failure BEFORE the connector exists, and an event-driven run, leave
-  no trace — which is precisely the "is it wedged, and saying what?" question the session was built to answer.
-  ⇒ record the failure at the `Acquisition failed` catch, and count event-triggered runs (or state that they
-  are not polls, on the wire). → `PipelineScheduler.java` (`runOne`, `pollStates`) · `acquisition.md` `GET /collectors`
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
   sanctions**, and it is SERVER-side, so it fixes the partial roster for *every* client with no UI union:

@@ -169,6 +169,16 @@ catalog and by persisting `fields[]`.
   button). This fires on a *parser format* change, never on a manual edit made through `SchemaEditorDialog`,
   and never names which mapping rules would break.
 
+### 1.x The derived output schema beside the authored one (`DERIVED-SCHEMA-PANEL-ORPHAN-1`, shipped 2026-09-15)
+
+`DerivedSchemaPanelComponent` — a live `GET /config/schema/derived` consumer that was mounted NOWHERE for two
+days — is wired into `SchemaEditorDialog`. `pipeline` threads pipeline-editor → `GrammarEditorDialogData` →
+`SchemaEditorData` → the panel, because the route derives from the REGISTERED identity (`pipelineId()`), so it
+was three levels of plumbing rather than a template edit. ⛔ Hidden for `home: 'registry'` — a registry schema
+belongs to no pipeline, and an empty panel would read as "this pipeline writes nothing". ⚠ Labelled **"last
+saved"**, and the label is load-bearing: the route derives from the SAVED config while the dialog edits a draft,
+so mid-edit it shows the schema before the current edit. A test pins each direction.
+
 ## 2. Mapping authoring — the Load pane (`pipeline-load-definition.component.ts`) was DELETED 2026-09-05
 
 > The catalog carries ONE entry for this surface — `transform.record`, *Record Transformer*, folded

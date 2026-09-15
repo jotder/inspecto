@@ -164,7 +164,7 @@ redesign.
 
 `processing.unpack.data_extensions` (published, `FieldType.LIST`, default
 `.csv .tsv .txt .json .jsonl .ndjson .xml`) is the escape hatch: narrow it, or author
-`data_extensions[0]:` for an **empty** list to opt out entirely and key on verbatim names. Empty is
+`data_extensions[0]:` for an **empty** list to opt out entirely and key on verbatim names. ✅ Authorable from the UI since 2026-09-15 (`SCHEMA-FORM-EMPTY-LIST-1`): the schema form's `list` control offers an **"Explicitly none"** toggle on a non-required list, which writes `[]` — distinct from clearing the entries, which still writes `null` ("unset, the default applies"). The two states never collapse into each other at the control. Empty is
 honoured as a CHOICE, never as "unset". Entries are normalised (bare / upper-case / padded → leading-
 dot lower-case). ⚠ TOON's scalar-list form is **counted** (`data_extensions[2]: "a", "b"`), not
 bracketed — a bracketed literal parses as one comma-split string, silently.
