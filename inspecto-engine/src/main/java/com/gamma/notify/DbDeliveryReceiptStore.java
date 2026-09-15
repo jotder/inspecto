@@ -209,9 +209,12 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
                 ps -> ps.setInt(1, limit));
     }
 
+    /** The one definition of "prunable" — shared by the preview and the sweep (PRUNE-PREVIEW-DRIFT-1). */
+    private static final String PRUNABLE = "sent_at < ?";
+
     @Override
     public int countPrunable(long cutoffMs) {
-        String sql = "SELECT COUNT(*) FROM " + TABLE + " WHERE sent_at < ?";
+        String sql = "SELECT COUNT(*) FROM " + TABLE + " WHERE " + PRUNABLE;
         try {
             return withConn(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -230,7 +233,7 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
     public int prune(long cutoffMs) {
         try {
             return withConn(conn -> {
-                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE sent_at < ?")) {
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + TABLE + " WHERE " + PRUNABLE)) {
                     ps.setLong(1, cutoffMs);
                     return ps.executeUpdate();
                 }

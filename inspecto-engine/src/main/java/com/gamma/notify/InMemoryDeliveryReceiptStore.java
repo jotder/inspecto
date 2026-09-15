@@ -65,17 +65,22 @@ public final class InMemoryDeliveryReceiptStore implements DeliveryReceiptStore 
         return out.size() > limit ? new ArrayList<>(out.subList(0, Math.max(limit, 0))) : out;
     }
 
+    /** The one definition of "prunable" — shared by the preview and the sweep (PRUNE-PREVIEW-DRIFT-1). */
+    private static boolean prunable(DeliveryReceipt r, long cutoffMs) {
+        return r.sentAt() < cutoffMs;
+    }
+
     @Override
     public synchronized int countPrunable(long cutoffMs) {
         int n = 0;
-        for (DeliveryReceipt r : byDeliveryId.values()) if (r.sentAt() < cutoffMs) n++;
+        for (DeliveryReceipt r : byDeliveryId.values()) if (prunable(r, cutoffMs)) n++;
         return n;
     }
 
     @Override
     public synchronized int prune(long cutoffMs) {
         int before = byDeliveryId.size();
-        byDeliveryId.values().removeIf(r -> r.sentAt() < cutoffMs);
+        byDeliveryId.values().removeIf(r -> prunable(r, cutoffMs));
         return before - byDeliveryId.size();
     }
 }

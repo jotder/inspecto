@@ -90,17 +90,22 @@ public final class InMemoryNotificationStore implements NotificationStore {
         return true;
     }
 
+    /** The one definition of "prunable" — shared by the preview and the sweep (PRUNE-PREVIEW-DRIFT-1). */
+    private static boolean prunable(Notification x, long cutoffMs) {
+        return x.ts() < cutoffMs;
+    }
+
     @Override
     public synchronized int countPrunable(long cutoffMs) {
         int n = 0;
-        for (Notification x : byId.values()) if (x.ts() < cutoffMs) n++;
+        for (Notification x : byId.values()) if (prunable(x, cutoffMs)) n++;
         return n;
     }
 
     @Override
     public synchronized int prune(long cutoffMs) {
         int before = byId.size();
-        byId.values().removeIf(x -> x.ts() < cutoffMs);
+        byId.values().removeIf(x -> prunable(x, cutoffMs));
         return before - byId.size();
     }
 

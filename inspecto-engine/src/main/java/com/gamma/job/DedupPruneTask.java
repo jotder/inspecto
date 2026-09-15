@@ -30,8 +30,8 @@ final class DedupPruneTask {
                     + "(-Ddedup.ledger.backend=none) — nothing to prune", 0L);
         LocalDate cutoff = LocalDate.now().minusDays(days);
         if (dryRun)
-            return JobResult.ok("dedup_prune[dry-run]: ledger holds " + ledger.size()
-                    + " claim(s); would remove those whose window started before " + cutoff,
+            return JobResult.ok("dedup_prune[dry-run]: would remove " + ledger.countPrunable(cutoff)
+                    + " of " + ledger.size() + " claim(s) whose window started before " + cutoff,
                     (System.nanoTime() - t0) / 1_000_000L);
         int removed = ledger.prune(cutoff);
         return JobResult.ok("dedup_prune: removed " + removed + " claim(s) whose window started before "

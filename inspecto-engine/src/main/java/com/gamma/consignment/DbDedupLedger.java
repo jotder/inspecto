@@ -175,9 +175,29 @@ public final class DbDedupLedger implements AutoCloseable {
     public int prune(java.time.LocalDate cutoff) throws SQLException {
         return src.with(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(
-                    "DELETE FROM inspecto_dedup_keys WHERE window_start < ?")) {
+                    "DELETE FROM inspecto_dedup_keys WHERE " + PRUNABLE)) {
                 ps.setObject(1, cutoff);
                 return ps.executeUpdate();
+            }
+        });
+    }
+
+    /**
+     * The ONE definition of "prunable", shared by {@link #prune} and {@link #countPrunable} so the
+     * dry-run and the sweep cannot drift (PRUNE-PREVIEW-DRIFT-1). Before 2026-09-15 the maintenance
+     * task's dry run reported {@link #size()} — the whole ledger — as its preview, which is not a plan.
+     */
+    private static final String PRUNABLE = "window_start < ?";
+
+    /** How many claims {@link #prune} would remove for {@code cutoff}, from the same predicate. */
+    public int countPrunable(java.time.LocalDate cutoff) throws SQLException {
+        return src.with(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT count(*) FROM inspecto_dedup_keys WHERE " + PRUNABLE)) {
+                ps.setObject(1, cutoff);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getInt(1) : 0;
+                }
             }
         });
     }

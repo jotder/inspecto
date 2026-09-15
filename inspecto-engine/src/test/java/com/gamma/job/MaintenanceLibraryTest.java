@@ -127,6 +127,8 @@ class MaintenanceLibraryTest {
                 JobResult dry = new MaintenanceJob(job(Map.of("task", "dedup_prune", "retention_days", "7")))
                         .run(dryCtx(java.nio.file.Files.createTempDirectory("dp_audit")));
                 assertTrue(dry.message().contains("[dry-run]"), dry.message());
+                assertTrue(dry.message().contains("would remove 1 of 2"),
+                        "the preview is the sweep's own predicate, not the ledger's size: " + dry.message());
                 assertEquals(2, ledger.size(), "a preview must not delete");
 
                 JobResult r = new MaintenanceJob(job(Map.of("task", "dedup_prune", "retention_days", "7"))).run();

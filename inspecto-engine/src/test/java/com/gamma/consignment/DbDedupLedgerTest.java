@@ -107,6 +107,25 @@ class DbDedupLedgerTest {
     }
 
     /**
+     * PRUNE-PREVIEW-DRIFT-1: the dry run and the sweep are two call sites of ONE predicate. Before this
+     * the maintenance task previewed {@code size()} — the whole ledger — so a preview of "3" could
+     * precede a sweep that removed 1.
+     */
+    @Test
+    void previewMatchesTheSweep() throws Exception {
+        try (DbDedupLedger l = ledger()) {
+            l.claim("p", W.minusDays(5), "old", List.of(DbDedupLedger.hash(List.of("old"))));
+            l.claim("p", W.minusDays(1), "older", List.of(DbDedupLedger.hash(List.of("older"))));
+            l.claim("p", W, "cur", List.of(DbDedupLedger.hash(List.of("cur"))));
+
+            int preview = l.countPrunable(W);
+            assertEquals(2, preview, "the preview counts only what the predicate matches, not size()");
+            assertEquals(3L, l.size(), "a preview must not delete");
+            assertEquals(preview, l.prune(W), "the sweep removes exactly what the preview promised");
+        }
+    }
+
+    /**
      * 🔴 The separator is load-bearing, and I shipped this wrong once before catching it. Joining the key
      * values with "" would make {@code ["a","bc"]} and {@code ["ab","c"]} hash identically — two DIFFERENT
      * records silently deduplicating against each other. The unit separator cannot occur in a parsed field
