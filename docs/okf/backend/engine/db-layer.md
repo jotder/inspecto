@@ -255,6 +255,12 @@ ghost that collides with itself. ⛔ Keying on the pod would produce exactly tha
 failure a detector has, because an operator who learns to ignore it has lost the real one too. ⚠ A Space
 with **no** declarations still publishes: that is when the delete matters.
 
+⚠ **Write-time hooks were deliberately NOT added**, and this deviates from the operator's own wording
+("written at config-write time"). The registry is published at **boot**, where the full roster is known;
+`ConfigWriteRoutes.writeConfig`/`patchConfig` and bundle import are three more seams that would each see
+only their own change. ⇒ A `dirs.poll` added by a config write is detected on that pod's **next boot** —
+which is also when the pre-existing local audit runs.
+
 🔴 **Known gap: a Space DELETED outright leaves its rows behind**, because deletion happens where nothing
 publishes. `pod` and `declared_at` make such a finding diagnosable; clearing it is manual
 (`DELETE FROM inbox_registry WHERE space = …`). ⛔ Do not "fix" it with a TTL — an inbox declaration has no

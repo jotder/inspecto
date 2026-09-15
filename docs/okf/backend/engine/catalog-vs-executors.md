@@ -282,6 +282,12 @@ naturally expressible as a join against a stored relation.
 
 ## Cross-cutting
 
+* **The measure shorthand has ONE home:** `MeasureCompiler.splitShorthand`
+  (`MeasureCompiler.java:66-76`), which all three production call sites reach (`MaterializeTask:143`,
+  `ReportJob:164`, `RowShaper:468`). ⛔ `RecipeVerbParityTest` deliberately still hand-rolls the split and
+  **must keep doing so**: it exists to prove the recipe path produces byte-compatible measures, and a
+  parity test that calls the thing it is checking proves nothing. That copy is independent verification,
+  not duplication. The rationale lives in that javadoc and in `DatasetMeasureProbe.java:30-36`.
 * **Dispatch architecture:** `RowShaper.shape()` (`RowShaper.java:155-183`) — SPI seam
   (`PipelineNodeExecutors.get(type)`) first, then a hardcoded `if (BuiltinNodeType.X.equals(type))` chain
   (`transform.sql` at `:174`), else throws. No per-catalog-id branch exists; several catalog ids fan into

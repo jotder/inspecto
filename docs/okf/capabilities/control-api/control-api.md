@@ -262,6 +262,9 @@ is bounded with a `truncated` flag that reports the *true* total.
   pipeline's `configSubdir` through `GrammarEditorDialogData` → `SchemaEditorData.subdir`. ⚠ A root-level
   pipeline still sends **no `subdir` key at all** — absent means "fall back to the server's scan", which is
   a different instruction from `''`.
+  ⚠ **The sibling `openMappingEditor` was checked and is NOT the same defect**: it writes through
+  `ComponentsService` (the registry), not `/config/write`. Recorded so a later sweep of this shape does
+  not re-investigate it.
   ⚠ Also: `Envelope.java` **never sets an `etag` key in `metadata`** for any route, so the SPA's
   `V1EnvelopeMetadata.etag` (`v1.ts:27`) is a field the server has never populated. The ETag travels only
   as an HTTP header — which means `v1.interceptor.ts` is **not** what withholds it: that interceptor clones

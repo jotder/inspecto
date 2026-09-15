@@ -118,6 +118,10 @@ recorded in §5: the client mirror of the authored-key set carried two keys wher
 and the missing one was `fields`. It was the fourth hand-mirrored map in this repository to drift, and
 ✅ **it is fixed and pinned as of 2026-09-09** — `MapNodeKeyContractTest` parses `pipeline-editable.ts`
 and holds both sets against the Java ones, so the mirror cannot drift silently again.
+🔴 **The live cost, measured:** for four days the client REFUSED a key the server accepts — `lower`
+reported `UNSUPPORTED_MAP_KEY` and advertised `[columns, rules]` as the accepted set — and dropped it on
+the round trip. That is exactly the failure `MAP_AUTHORED`'s own Java comment says the constant exists to
+make impossible, reproduced on the client because the list was a hand copy.
 
 ## 3. Specification
 

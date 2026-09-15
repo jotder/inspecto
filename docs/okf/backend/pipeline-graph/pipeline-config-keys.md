@@ -136,7 +136,7 @@ comment states the stake: *"a key that becomes executable without joining this a
 dropped on save, which is the failure both constants exist to make impossible."* The old sentence
 (“the engine never reads it … must not be added to the contract”) is exactly the reasoning that left the
 client mirror `pipeline-editable.ts` carrying two keys where `PipelineEditable.MAP_AUTHORED` carries
-three — the drift now in `BACKLOG.md` §4. ⚠ Its absence also no longer means a locked table: the
+three — the drift recorded in `pipeline-authoring.md` §2. ⚠ Its absence also no longer means a locked table: the
 “hand edit LOCKS the Step” rule was superseded 2026-09-05 by the peer Fields|SQL views. Details:
 [`catalog-vs-executors.md`](../engine/catalog-vs-executors.md).
 

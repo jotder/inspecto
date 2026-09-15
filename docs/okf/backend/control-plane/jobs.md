@@ -323,6 +323,27 @@ regain** — so the note exists to stop a future change quietly introducing a se
   ⚠ They are two **different numbers by design** — different resource types — not one number read twice;
   do not "fix" them into agreement.
 
+### The shared-pipeline audit (`JOB-PIPELINE-PARAM-UNIQUE-1`, shipped 2026-09-12)
+
+`SchedulerAuditTask.sharedPipelineFindings` is a pure config scan reporting every pipeline targeted by more
+than one enabled job, naming **all** of them. It runs inside the on-demand `scheduler_audit` task **and** as
+a default-on host audit (`JobService.auditSharedPipelines`) hooked to the same two transition sources as the
+orphan audit, with the same once-per-transition debounce and the same `-Djobs.orphan.audit=false` kill
+switch. The skip message now appends `— may be held by [other jobs]`.
+
+⛔ **WARN ONLY — it must never refuse** (operator decision, 2026-09-12). Two jobs on one pipeline with
+different schedules or parameters may be deliberate, so failing closed would refuse valid deployments.
+⛔ Do not revisit as a refusal without re-opening that decision. ⚠ `SchedulerAuditTask`'s own javadoc still
+reads *"making it fail closed needs an operator decision"* — that sentence is **stale**; the decision was
+taken.
+
+🔴 **The finding keys through `JobService.authoredPipelineKeyOf`, never its own copy.** Recomputing it as
+`params().get("pipeline")` drops the Tier-3 `flow:` dual read *and* the type check — mutation-verified
+2026-09-12: that change fails exactly `theLegacyFlowKeyAndTheCanonicalPipelineKeyAreTheSamePipeline` and
+`aMaintenanceJobCarryingAPipelineParamIsNotASharer`. The production symptom would be a pair of jobs that
+skip each other while the audit calls them healthy. ⛔ Naming only the first sharer is likewise
+mutation-guarded — it leaves the operator exactly as unable to act as the bare skip message did.
+
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:

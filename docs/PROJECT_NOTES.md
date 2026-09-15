@@ -243,6 +243,8 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   **`forkCount=0` was the cause and the core count was innocent**: forked at 4 cores the full enterprise
   reactor completes at **4475/0/0/24**, identical to 12 cores, and `ControlApiPreferencesTest` itself
   passes in 0.115 s (`CORECOUNT-SWEEP-1`).
+  ⚠ **That result masks the core count ONLY** — the box kept 32 GB. Behaviour on a 4-core host with
+  proportionally less RAM is still not established, and is deliberately not carried as an open row.
 
 - ⚠ **A mutation anchor that is not unique proves nothing, and reports a hole that does not exist.** Twice
   on 2026-09-14 a falsification run flagged the guard as blind when the mutation had simply landed

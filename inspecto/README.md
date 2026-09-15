@@ -330,7 +330,8 @@ served same-origin by `ControlApi`, so one process hosts both the API and the UI
 > it did — anyone following it would have believed they had secured an auth-free service. `SCR-9` removed
 > it from the generated launchers on 2026-09-09; **this README, which ships inside the bundle, still
 > carried it until 2026-09-11**. Real authentication is the `inspecto-security` module (Standard+, OIDC):
-> see [EDITIONS](../docs/EDITIONS.md). Remaining instances elsewhere in the docs: `DOC-DEADTOKEN-1`.
+> see [EDITIONS](../docs/EDITIONS.md). ✅ The sweep is complete as of 2026-09-14 — every remaining mention
+in the tree describes the flag as *removed*, which is true and deliberately left in place.
 
 ```bash
 # Prod: serve the bundled SPA from the deploy bundle (package.ps1 puts it in ./ui)

@@ -39,6 +39,8 @@ Three traps, each of which cost a run on 2026-09-12:
    stays forked and nothing has to be unforked. The JVM prints `NOTE: Picked up JDK_JAVA_OPTIONS` twice,
    once for Maven and once for the fork. ⛔ Prefer it — `-DforkCount=0` is what **hung** the reactor in
    `CORECOUNT-SWEEP-1`, and the core count it was blamed on turned out to be innocent.
+   ⚠ **With `-Dmaven.test.failure.ignore=true`, `BUILD SUCCESS` is meaningless on its own.** Read the sum
+   of the per-module summary lines — which include `[WARNING]`-level ones — never the final line.
 
 ## WSO2 Identity Server — `OidcAgainstRealProviderTest` (2 tests)
 

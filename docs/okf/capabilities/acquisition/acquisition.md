@@ -373,6 +373,8 @@ is not eaten by `yy` (`yyyy yy MM dd HH mm ss`). Config `collector.post_action: 
 archive_path: …, tags: {…}, on_unsupported: WARN_AND_CONTINUE }` — `on_unsupported` is the §9 policy for
 "delete requested on a read-only source"; a post-action that fails at runtime bumps
 `inspecto_post_actions_failed_total` and **the file is still ingested**.
+⚠ Both `RemoteAcquisitionHandler` author-facing messages name **`collector.post_action.on_success`**
+(corrected 2026-09-13 — they had named a key that does not exist).
 
 ### 3.9 The connector SPI, and the ten resolvable schemes
 

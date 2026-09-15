@@ -267,6 +267,14 @@ set on the worker thread), with `forSpace(id)` for a caller that already holds a
 resolve through it (`materialize`, `recon.run`, `report`, `metadata_validate`, `storage_report`,
 `file_repository_audit`, `objects.analytics`), and `DecisionRules` — which had this design all along, for
 one consumer — forwards to it rather than keeping a second map.
+✅ **It carries a per-Space DATA root beside the config root** (`COLLECTOR-SPACE-ROOT-1`, 2026-09-15) —
+registered together by `SpaceBootstrap`, dropped together by `forget` (pinned:
+`forgetDropsBothRootsTogether`), and `DatasetCollectorConnectorFactory` resolves both through it. ⚠ Only
+**one** of the five `data.dir` readers was space-blind; the other four already used the
+property-as-override pattern, so this was a single straggler, not a class.
+⛔ **A half-fix here is worse than none.** That connector read **two** JVM-wide properties —
+`assist.write.root` *and* `data.dir` — so swapping in `SpaceConfigRoot.current()` for the first alone
+would have re-created the very defect its parent closed. Both roots had to move at once.
 ⛔ **A named Space does not fall back to the JVM property**; falling back is what caused the defect.
 ⇒ **single-space deployments make the two paths identical, which is why no test ever saw it** — and why
 the proof is a live multi-space run: 202 → SUCCESS, 7 rows, Parquet written, Dataset registered in `ucc`.

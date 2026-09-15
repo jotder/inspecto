@@ -384,7 +384,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Board id | What remains |
 |---|---|---|
 | **`MAPPING-SPELLING-1`** — do the generators emit `mapping.fields[]`? Recommended: emit `fields[]`, keep the `rules[]` read path, migrate the committed schemas, then rewrite `configuration.md` §2 | `BACKLOG.md` §1 (the one pending operator decision) | Absorbs `RECORD-TRANSFORMER-1` |
-| ✅ ~~`MAP_AUTHORED` drift~~ **FIXED + PINNED 2026-09-09** — the mirror carries `fields`, and `MapNodeKeyContractTest` now parses `pipeline-editable.ts` and asserts both sets against the Java ones | `BACKLOG.md` §4 | Done as a contract, not a fifth hand-fix |
+| ✅ ~~`MAP_AUTHORED` drift~~ **FIXED + PINNED 2026-09-09** — the mirror carries `fields`, and `MapNodeKeyContractTest` now parses `pipeline-editable.ts` and asserts both sets against the Java ones | `pipeline-authoring.md` §2 | Done as a contract, not a fifth hand-fix |
 | Onboarding residuals — D5-ref (how a `delete` tombstone enters the reference store), D6-ref (within-batch tie-break), enrichment/job identity by name | `BACKLOG.md` §3 *Onboarding* | Wait for a real delete feed |
 | Unification W4 (`EnrichmentService` incremental vs full recompute) and W5 (promotion-grade export; import-time referential integrity) | `BACKLOG.md` §3 | |
 | Canonical-pipeline selective bundle export; retire the `authored-pipeline` bundle kind | `BACKLOG.md` §3 *Authoring* | |

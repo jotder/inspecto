@@ -1,6 +1,9 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-07 — §4–§7 re-grounded and drained (see each section's note).
+**Updated:** 2026-09-15 — census recounted (75 rows); **all 20 SHIPPED/CLOSED entries swept off the page**
+(~470 lines) after verifying each one's as-built is homed; `SPEC-JAVALANE-RATIO-1` and
+`COLLECTOR-DATASET-UNPROVEN-1` filed.
+**2026-09-07** — §4–§7 re-grounded and drained (see each section's note).
 **2026-09-06 — consolidated.** The previous page (505 KB, 3,288 lines, roughly half of its rows
 already closed) is frozen as
 [`archived-documents/backlog-snapshot-2026-09-06.md`](archived-documents/backlog-snapshot-2026-09-06.md);
@@ -10,27 +13,48 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 2026-09-07, its retirement trigger having fired), the remainders of every plan still in
 `docs/superpower/`, and the last handoff's next steps.
 
-> **Where the board stands — grounded 2026-09-14** (every row re-checked against code, not against its own
-> text). **58 rows: 0 × P1 · 35 × P2 · 23 × P3.** (`LAUNCHER-GUARD-1` closed 2026-09-14 —
-> `tools/check-launchers.mjs` now EXECUTES both emitted launchers; `security.md` §2.2 owns the as-built.
-> `LINKGUARD-CASE-1` was filed AND closed the same day — both doc guards now resolve against `git ls-files`,
-> case-exact, so a path that is gitignored or miscapitalised is caught on Windows instead of only on CI.)
+> **Where the board stands — recounted 2026-09-15.** **75 rows: 1 × P1 · 44 × P2 · 30 × P3.**
+> 🔴 **The header said "58 rows: 0 × P1 · 35 × P2 · 23 × P3" for a day after it stopped being true** — that
+> was the 2026-09-14 grounding, and the 2026-09-15 shift then filed or adopted **seventeen rows** (nine
+> `DUCKLE-C*` build rows, six defects, `ROUTE-UNGATED-DEFAULT-1` and `AIRGAP-CROSSPLAT-DEADWEIGHT-1`)
+> without recounting. ⚠ **The rows were current; only the census was stale** — and a stale census is the
+> failure mode this very block warns about two paragraphs down. ⛔ **Recount on the way out of every
+> shift that files a row**, not only on a grounding sweep.
 >
-> ✅ **No P1 rows. `AIRGAP-EXTENSIONS-CI-1` was filed AND closed on 2026-09-14** — no released bundle had
-> ever carried a DuckDB extension on any platform, because `package.ps1` stages them best-effort from a
-> local cache and no workflow populated one. Closed by a per-platform fetch step, `-RequireExtensions` on
-> the release path, and a `--check` guard on every push.
-> ⚠ **Three rows opened and closed the same day**, all out of scale-out §5.4: that one, plus
-> `AIRGAP-DUCKLAKE-PG-1` and `DUCKLAKE-GRAPH-LANE-1`, so the P2 count moved far less than the activity did.
-> 🔴 **The surrounding prose said "36 → 35" and "the 36 P2 rows" while the header said 34** — three numbers
-> for one count, none recounted. ⛔ **Count the rows, do not carry a number forward**: the P2/P3 totals are
-> `grep -cE '^- \*\*P2\*\*'` / `grep -cE '^- \*\*P3( |\*)'` between the §3 and §6 headings, and nothing else
-> is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row spells its rank
-> `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
+> 🔴 **One P1: `ROUTE-UNGATED-DEFAULT-1`** (§5) — an unlisted route is OPEN, not locked down; 83 mutating
+> routes are ungated, `DELETE /spaces/{id}` among them. Its full audit is DONE
+> (`superpower/route-gating-audit.md`) and reframes it as a **vocabulary** gap: only 12 are gateable with
+> an existing capability, 22 are not expressible at all, and `Roles` has **no admin capability**. ⛔ The
+> next move is a decision, not code — and ⛔ NOT the ratchet, which would freeze 83 unreviewed exemptions.
 >
-> ⚠ **Only the 35 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when someone
-> asks by name"** — so those 23 are a list of things deliberately *not* being built, not a backlog to burn
-> down. Reading all 58 as pending work overstates what is owed by roughly 40%.
+> ✅ **All 20 SHIPPED/CLOSED entries were swept off the page 2026-09-15** — about 470 lines — each one
+> first checked against the doc that owns its as-built. ⚠ **The sweep was not mechanical: 11 of the 20
+> carried text that existed NOWHERE else**, which was migrated before the delete (guard lessons →
+> `guard-coverage.md`, the shared-pipeline audit + its **"WARN ONLY — never refuse"** operator decision →
+> `jobs.md` and §6, the `release.yml` reactor-install as-built → `editions.md`, the write-time-hooks
+> deviation → `db-layer.md`, and more). ⛔ **Never bulk-delete closed rows on the strength of their
+> ✅ marker** — the marker says the *work* is done, not that the *knowledge* landed anywhere.
+> 🔴 **Three findings the sweep produced that a delete would have destroyed:** (1) `SBOM-RESOLVE-1`'s own
+> owning doc still described it as an **open P1** four days after it shipped; (2) `SchedulerAuditTask`'s
+> javadoc still says an operator decision is *owed* that was **answered 2026-09-12**, and the board entry
+> was the only record of the answer; (3) `COLLECTOR-SPACE-ROOT-1` hid **live, untracked work** — now filed
+> as `COLLECTOR-DATASET-UNPROVEN-1`. ⚠ A closed row is where open work goes to hide.
+> ⚠ Two entries also pointed at the wrong owning doc (`MEASURE-SHORTHAND-ONE-HOME-1` →
+> `catalog-vs-executors.md` and `DUCKLAKE-GRAPH-LANE-1` → `db-layer.md`, neither of which mentioned its
+> subject). ⛔ **A `→` pointer is a claim, not a fact** — follow it before trusting that a row is homed.
+>
+> ⚠ **Three rows opened and closed the same day (2026-09-14)**, all out of scale-out §5.4:
+> `AIRGAP-EXTENSIONS-CI-1`, `AIRGAP-DUCKLAKE-PG-1` and `DUCKLAKE-GRAPH-LANE-1` — so the P2 count moved far
+> less than the activity did.
+> 🔴 **On 2026-09-14 the surrounding prose said "36 → 35" and "the 36 P2 rows" while the header said 34** —
+> three numbers for one count, none recounted. ⛔ **Count the rows, do not carry a number forward**: the
+> P2/P3 totals are `grep -cE '^- \*\*P2\*\*'` / `grep -cE '^- \*\*P3( |\*)'` between the §3 and §6
+> headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
+> spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
+>
+> ⚠ **Only the 1 P1 + 44 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 30 are a list of things deliberately *not* being built, not a backlog
+> to burn down. Reading all 75 as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -43,8 +67,11 @@ one line of *what remains* plus a pointer to the document that owns the detail. 
 only** — nothing here is done.
 
 **Rules of use.**
-- A row's stated cause and severity are a **hypothesis** recorded when the row was filed. Ground it in the
-  code before building; the archived snapshot records how often that grounding overturned a row.
+- A row's stated cause, severity **and proposed remedies** are all a **hypothesis** recorded when the row
+  was filed. Ground them in the code before building; the archived snapshot records how often that
+  grounding overturned a row. ⚠ The remedies clause was added 2026-09-15 from
+  `JAVA-INGEST-APPENDER-SERIAL-1`, where remedies (a)-(c) were never built and were never owed — the fix
+  came from a cause nobody had listed.
 - When an item ships: mark it in its *source* doc first (that stays authoritative), then **delete the row
   here**. No strikethrough as-built narrative — that is what the OKF concept docs and git history are for.
 - New pending items discovered mid-shift get a row at handoff time (see the `handoff` skill). Keep the row
@@ -65,6 +92,9 @@ were already shipped and only the row was stale (AUTHORING-WIDE-1, the torn mult
 evidence note), and four were re-ranked because the row hid a gate — a design pass, an operator decision, or
 a new dependency — not a build. The rule that fell out: **a P1 must name the file it changes.** A row that
 cannot is a decision (§1) or a design (P2).
+
+⚠ **P1 is no longer drained — `ROUTE-UNGATED-DEFAULT-1` (§5) was filed 2026-09-15 and comes before
+everything below.** ⛔ Its first move is the admin-capability decision, not code; see the header block.
 
 Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepaper review; each names the file it changes):
 0. **Sprint 8 — make the brochure true.** In this order, smallest first, each independently shippable:
@@ -446,40 +476,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   template and no route — so nothing mounts it. ⛔ **Do not delete on sight:** `MOCK-DEAD-COMPUTE-1` was closed as
   a **RETAIN** precisely because dead code here can be a deliberate test vehicle. Establish which this is first.
   → `okf/frontend/features/schema-mapping-authoring.md`
-- ✅ **SHIPPED 2026-09-13** · **`SCHEMA-SATELLITE-SUBDIR-1` — the parse editor's drafted schema lands at
-  the write ROOT,**
-  ✅ **BUILT:** the pipeline's own directory is threaded `pipeline-editor` → `GrammarEditorDialogData`
-  → `SchemaEditorData.subdir` → `/config/write`, so a drafted satellite lands **beside its pipeline**.
-  ✅ **The row's own instruction was followed: the test was written FIRST** and confirmed failing for the
-  right reason — the write options carried `{overwrite: true}` and no `subdir` key at all. ⚠ Only ONE of
-  the three new tests was a defect test; the other two are edge guards for the fix (a root-level
-  pipeline must send **no key**, not `''`; a `registry` home must not take a subdir) and passed before
-  and after — worth stating, because three green tests could otherwise be read as three proofs.
-  🔴 **Two stale claims retired in the same change**, both asserting the old behaviour was deliberate:
-  `schema-editor.dialog.spec.ts` said authoring at the write root *"IS the intent"*, and
-  `okf/capabilities/control-api/control-api.md` said the parse editor writes there *"on purpose"*.
-  Neither was ever true — a root write is the `SATELLITE-WRITE-1` defect, where the root file wins the
-  read and the drawer edits a schema the engine never loads.
-  ⚠ The sibling `openMappingEditor` was checked and is **NOT** the same defect: it writes through
-  `ComponentsService` (the registry), not `/config/write`.
-  *(original row follows)*
-  ✅ **PROMOTED P3→P2 2026-09-13 (operator)** — misfiled config is found late, and the cost/benefit never
-  matched "build only when someone asks by name".
-  🔴 **It is NOT the one-parameter thread-through it looks like — measured 2026-09-13 before ranking it.**
-  `configSubdir` is a signal on **`pipeline-editor.component.ts:1377`**, while `openSchemaEditor()` lives on a
-  **different component**, `grammar-editor.dialog.ts:185`. So the fix is a cross-component plumb through the
-  dialog's data, not a parameter added within one file. ⚠ `configSubdir` is also legitimately `''` (set from a
-  path prefix at `:1386`, cleared on error at `:1390`), so the receiving side must treat empty as "write root",
-  not as "missing". *(original row follows)*
-  not beside its pipeline** (filed 2026-09-11 by `SCHEMA-DIALOG-CREATE-HOME-1`'s grounding). `grammar-editor.dialog.ts`
-  `openSchemaEditor()` passes no `subdir`, so a satellite authored there lands at the write root — 🔴 the
-  exact shape of `SATELLITE-WRITE-1`, which the *real* parse surface already fixed: its own comment
-  (`pipeline-parse-definition.component.ts:525-533`) records that a root-level file then **WINS the read**
-  and orphans a duplicate. The opener has `configSubdir()` in hand (`pipeline-editor.component.ts:1377`)
-  and simply does not thread it through `GrammarEditorDialogData` → `SchemaEditorData`. ⚠ **Nothing pins
-  the destination today** (no test asserts where that draft lands), which is why it was filed rather than
-  changed alongside the create-home fix — it is a behaviour change on a shipped surface with no
-  regression net. Write the test first. → `okf/capabilities/control-api/control-api.md` §3.5
 - **P3** · **`TYPEFLOW-DATASET-COLUMNS-1` — a Dataset's columns are never derived from the pipeline that
   fills it** (filed 2026-09-11, split out of `TYPEFLOW-CONSUMERS-1` (b)). A `DatasetColumn` is
   `{name, type, role}`; `TypeFlow.sinkColumns` yields only `{name, type}`, and the role heuristic lives
@@ -510,21 +506,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ **The HEADLINE is still open and this row stays P3** — steps 3+4: `TypeFlow.Column` is still
   `record Column(String name, String type)` (`TypeFlow.java:30`), `sinkColumns` (`:75`) yields no role, its
   only consumer is `ConfigPreviewRoutes.java:110`, and no DuckDB-type → coarse-type mapping exists.
-  → `okf/backend/engine/catalog-vs-executors.md`
-- **SHIPPED 2026-09-11** · **`MEASURE-SHORTHAND-ONE-HOME-1` — the measure shorthand had FIVE statements,
-  not three** (filed 2026-09-11 by `TYPEFLOW-CONSUMERS-1`, shipped the same day). ⚠ **The row's count was
-  a lower bound, as they keep being.** Three production splitters (`MaterializeTask`, `ReportJob`,
-  `RowShaper.summarize`) — all now routed through `MeasureCompiler.splitShorthand`, messages preserved
-  byte-identically (the helper's context prefix is optional for exactly that reason). Plus two the row
-  never counted:
-  - 🔴 A **fifth statement as a REGEX**: `DatasetMeasureProbe.MEASURE` hardcoded the aggregation
-    alternation, so an aggregate added to `MeasureCompiler.AGGS` would have left alert validation
-    rejecting what the compiler accepts. Same package, so it now builds the alternation from `AGGS`; the
-    produced pattern is byte-identical to the literal it replaced.
-  - ⛔ A fourth copy in `RecipeVerbParityTest`, which **must stay hand-rolled**: it exists to prove the
-    recipe path produces byte-compatible measures, and a parity test that calls the thing it is checking
-    proves nothing. That copy is independent verification, not duplication — the distinction is recorded
-    on `splitShorthand` so nobody "finishes the job" by collapsing it.
   → `okf/backend/engine/catalog-vs-executors.md`
 - **P3 · RELEASE-GATED (next MAJOR), not demand-gated** · **`GLOSSARY-CASE-1` — split the two `Case`s in code**
   ✅ **Re-gated 2026-09-13 (operator).** It is not waiting for anyone to ask — it renames **four published
@@ -684,27 +665,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   kind**, so this row is no longer server-only — it is a producer step in `toResult` / the `askStream`
   override (`:431-448`), the kind whitelist, **and** UI work. ⛔ Still not "populate a field"; the
   grounding above stands unchanged.
-- ✅ **CLOSED 2026-09-14 · `RETIRE-HALVES-1` — both server halves are deleted, and the sweep was wider than the row.**
-  Decided 2026-09-10, built as a **full sweep** on the operator's 2026-09-14 call. Gone: `GET /bi/datasets`
-  (`BiRoutes`), the whole queue family (`QueueRoutes`, `Queue`, `QueueStore`, `InMemoryQueueStore`,
-  `QueueRouter`, `*_queue.toon`), the three `watch|unwatch|watchers` routes, and the escalation engine
-  (`EscalationPolicy`, `*_escalation.toon`, `ObjectService.escalate`). `INC-4` is WITHDRAWN in its spec.
-  🔴 **THREE of the row's own claims were wrong, found by grounding before building:**
-  (a) there is **no escalation-policy *route family*** — escalation was `*_escalation.toon` applied
-  internally by the SLA sweep, so "retiring the routes" would have deleted nothing and left the behaviour;
-  the operator chose to retire the **capability**, which is a product change, not a cleanup.
-  (b) the **watcher *model* is not dead** — `POST /objects/{id}/merge` unions `OperationalObject.watchers()`
-  and `merge-cases.dialog.ts` calls it, so only the three routes went; the attribute is live with no reader.
-  (c) **"and OpenAPI entries" is moot** — `openapi-v1.json` documented none of these paths.
-  ⚠ **Two live seams the row never mentioned had to change**: `POST /objects/{id}/assign` and
-  `POST /objects/{id}/split` both accepted a `queue` parameter, so both are now person-only
-  (`assign` needs an `assignee`, 400 otherwise). The UI only ever sent `assignee`, verified before cutting.
-  ⚠ **`OBJECT_ESCALATED` is kept** as an `@PublicApi` constant with nothing emitting it — removing a
-  published constant is a breaking change, and stored events still carry the type; its builtin
-  notification rule is deleted, since it could never fire again.
-  ⚠ Pagination is NOT retired: kept as API surface, the SPA adopts a cursor when a list outgrows a page.
-  → `studio.md` · `okf/capabilities/incidents/incidents.md` §2 `INC-4`
-
 - **P2** · **API v1** — adopt the cursor-pagination seam on further list families as demanded (4 adopters live); adopt `ETags.respond` on further singleton reads as demanded; Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed). → `okf/backend/control-plane/api-v1.md`
 - **P2** · **Bundle / Exchange** — `requires` present-but-different classification; per-editor "load as draft" import — design first, likely multi-session (`BundleTransferService.write` commits straight through; no generic draft seam). ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/exchange-sharing.md`
 - **P2** · **Notifications** — D8 residuals: soft-bounce retry scheduling (distinction recorded, nothing retries); SES/SNS adapter (needs SNS subscription confirmation + a cert-chain fetch from a validated `amazonaws.com` URL — ⚠ outbound fetch from an unauthenticated callback path deserves its own review); GeoIP; auth-gated per-user prefs / security triggers. (Auto-disable policy is a §1 decision.) → `okf/backend/control-plane/events-metrics.md`
@@ -734,40 +694,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   OpensItsOwnIncident` varies only the key, so nothing pins which behaviour is intended.
   ⚠ It may well be RIGHT — one key being worked is arguably one Incident — which is why this is a
   product question, not a bug fix. ⛔ Whoever answers it must change the dedupe attribute and the client
-  key together: `BREAK-INCIDENT-RESOLVE-1`'s read is keyed on `b.key` precisely to match the write, and
-  changing one alone would make the offer and the dedupe disagree.
-  → `okf/capabilities/incidents/incidents.md`
-- ✅ **SHIPPED 2026-09-13** · **`BREAK-INCIDENT-RESOLVE-1` — a promoted Break carries no back-reference on
-  the board.**
-  ✅ **BUILT:** `GET /recon/promoted?reconciliation=<id>` reports `breakKey → incidentId` for Breaks whose
-  Incident is still ACTIVE, backed by a new `ObjectAccess.activeAttributeIndex`. The SPA loads it on
-  open (no longer a session-only Set) and a promoted Break gains an **Open the Incident** action — the
-  back-reference this row was named for.
-  🔴 **Why a route and not a client-side filter of `GET /objects`:** promotion is suppressed only while
-  the Incident is **non-terminal**, so an ARCHIVED one means the Break is promotable again. Both halves
-  now read the same seam, so the offer and the dedupe cannot disagree; a client matching on mere
-  existence would have reported an available action as unavailable. Pinned by
-  `anArchivedIncidentStopsCountingAsPromoted`.
-  ⚠ **Two things the build corrected in my own plan:** the map is keyed on **`b.key`**, the server's real
-  dedupe grain, not the client's richer `breakId` (`type|key|column`) — which would never have matched;
-  and the promote action is deliberately **NOT disabled** when promoted, because an archived Incident
-  makes re-promoting legitimate and the server, not the button, decides that.
-  ⚠ A pre-existing question this surfaced is filed separately as `BREAK-DEDUPE-GRAIN-1`.
-  *(original row follows)*
-  ✅ **PROMOTED P3→P2 2026-09-13 (operator)** — re-grounded first: `promoted` is a **session-only in-memory
-  signal** (`reconciliation-detail.component.ts:82-84`), so a promotion is **lost on reload**. That is
-  user-visible data loss, not a missing feature. ✅ The server half already exists — `breakKey` is written as an
-  Incident attribute at `ReconRoutes.java:193` — so this is mostly a read path. *(original row follows)***
-  Filed 2026-09-11 while shipping `BREAK-INCIDENT-1`. The board marks a Break promoted **for the session
-  only** (an in-memory set), because a Break is not persisted server-side and the route's dedupe reply does
-  **not** name the surviving Incident: `IncidentAccess.openIncident` reports suppression as
-  `Optional.empty()`, so `{incidentId: null, deduped: true}` is all a repeat promotion can say. ⇒ after a
-  reload the operator cannot see which Breaks are already tracked, nor click through to the Incident.
-  Two ways out, and ⛔ **the cheap-looking one is wrong**: persisting a promoted flag onto the Break would
-  put Break lifecycle back on the server, which the C9 contract deliberately keeps client-side. The honest
-  fix is to have the board **list the reconciliation's Incidents** (`GET /objects?type=INCIDENT`,
-  correlation id = the reconciliation) and match on the `breakKey` attribute — read-only, no new SPI, and
-  it survives a reload. Only worth doing if an operator asks; the promote itself is idempotent either way.
+  key together: the promote-offer read is keyed on `b.key` precisely to match the write
+  (`incidents.md:161`), and changing one alone would make the offer and the dedupe disagree.
   → `okf/capabilities/incidents/incidents.md`
 - **P3** · ✅ **TRIGGER (operator, 2026-09-13):** an **SLA commitment names MTTD**. Until then it is a metric nobody reads,
   and the "first signal" instant is a modelling choice better made against a real definition. ⚠ Re-grounded
@@ -822,99 +750,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P3** · **Postgres multi-user** — ⛔ **PARKED by §6** until a multi-operator install exists; the old "(after the §1 decision)" heading outlived its decision, which was *park it*. Kept for the shape when it lifts: P1 pool behind `JdbcDrivers` (each `Db*Store` holds ONE `synchronized` connection); P2 replace `browseConnection()` (F2: it hands out the store's long-lived connection, a pool has no such thing); P3 **schema**-per-space URL wiring (NOT db-per-space); P4 `CaseStore` interface + PG impl (JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores + a concurrency test. Keep events on Parquet. ⚠ Not the same work as `OperationalDb`/PG-1 (shipped). → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 
 
-- ✅ **CLOSED 2026-09-14 · `AIRGAP-DUCKLAKE-PG-1` — the working spelling is established and shipped.**
-  The row said "⛔ do not guess one — the probe is `LOAD ducklake` then `ATTACH`". It was probed, against a
-  live Postgres, trying four spellings: **`postgres:` + libpq keywords ATTACHES** (`ducklake:postgres:dbname=…
-  host=… port=… user=… password=…`) — verified properly, i.e. the `ducklake_*` metadata tables were created
-  **in the Postgres database** and a second independent connection read a row back through the catalog, so
-  it is a real shared catalog and not a file that happened to open. `postgresql://` and `postgres://` both
-  fail, confirming the original measurement. `okf/backend/integrations.md` now carries the working line.
-  🔴 **The probe found something the row did not suspect, and it is worse than the failure it was chasing:
-  a `catalog_url` with NO recognised backend prefix does not fail — it silently creates a LOCAL DuckDB file
-  catalog named after the entire connection string** (it wrote a 1.8 MB file into the repo root, password in
-  the filename). ⛔ **D10 does not cover this**: D10 makes an unreachable catalog fatal, and this one is
-  reached, successfully, privately. On N pods that is N private catalogs with every batch green — the exact
-  split-brain the partitioned topology exists to prevent, arriving as SUCCESS. Now refused by
-  `DuckLakeRegistrar.requireSharedCatalog` when partitioned; a file catalog stays correct on one node.
-  🔴 **And the row's own residual turned out to be a live air-gap hole, now closed.** It said "reconsider
-  whether `postgres_scanner` must be staged — deliberately **not** bundled today precisely because no
-  deployment can reach that path". That premise died with the row: a deployment *can* now reach it.
-  **Measured: `ATTACH 'ducklake:postgres:…'` AUTO-LOADS `postgres_scanner`** (observed `loaded=false` →
-  `true` across the attach, with no explicit `LOAD` anywhere in this repo), while `package.ps1` staged only
-  `excel` and `ducklake`. ⛔ So an air-gapped Enterprise pod would have failed **every batch**: `ducklake`
-  loads from its staged file, the attach reaches for `postgres_scanner`, finds no cache, tries a network
-  `INSTALL`, and **D10 makes that fatal when partitioned**. The hole `AIRGAP-EXTENSIONS-1` closed for
-  `ducklake` reopened one layer down the moment D4 chose a Postgres catalog. `postgres_scanner` is now in
-  `$duckdbExtNames` (`package.ps1:~1455`) — which is what that comment's own rule, "add a name here ONLY
-  with a run-time LOAD to point at", required once the LOAD existed.
-  ⚠ **Nothing greps for that LOAD**: it is DuckLake's own, inside `ATTACH`, so the staging list cannot be
-  derived from the source the way a `LOAD` name could be. A future extension with the same shape will be
-  invisible in the same way.
-  → `okf/backend/integrations.md` · `inspecto/package.ps1` · scale-out plan §5.4
-
-- ✅ **CLOSED 2026-09-14 · `DUCKLAKE-GRAPH-LANE-1` — the at-rest pipeline-job lane now registers.**
-  Filed, corrected and closed the same day. `PipelineJobRunner.registerInLakehouse` registers each store's
-  Parquet in the shared catalog after every run: one table per store, catalog from `LakehouseCatalog`, and
-  when `-Dinspecto.topology=partitioned` a catalog is **required** — so this lane can no longer be the one
-  remaining way to produce invisible output. Both branches mutation-verified; making the requirement
-  unconditional kills **25** pipeline-job tests, which is the blast radius the single-node arm protects.
-  🔴 **CORRECTED the same day, before anything was built on it — the row's own name is wrong.** It was filed
-  as "the graph lane registers nothing", copied from the scale-out plan's §5.4, which asserts the same
-  thing. **Both are false.** `ConsignmentIngestStrategy.writeAndTrace` forks to `flatWriteAndTrace` or
-  `graphWriteAndTrace` and **both return the same `Written`** (`:294`, `:374`), whose outputs flow through
-  `IngestOutcome` into the one shared tail `ConsignmentIngestor.finalizeSource`, which registers at `:321`.
-  ⛔ **So the branch-aware graph lane DOES register.** Verified by reading the fork, not by trusting the
-  plan — and the id is kept only because a shipped commit already cites it.
-  ✅ **The genuinely unregistered path is `com.gamma.job.PipelineJobRunner`** — the at-rest "Pipeline as a
-  Job" lane (`job: type: pipeline`). It drives `PipelineExecutor.execute` directly with a **no-op
-  finalizer** (`() -> {}`, `:329`), bypassing `ConsignmentIngestor` entirely, and contains **zero** DuckLake
-  references. Its batch-complete moment is `:341-350`, where `writer.outputs()` (absolute paths) is in scope.
-  ⚠ **Why it became urgent rather than merely old.** Making registration MANDATORY when partitioned (earlier
-  the same day) left a partitioned deployment refusing an unconfigured *ingest* pipeline while *pipeline
-  jobs* carried on writing invisible output — **and the new enforcement made that silence look deliberate**.
-  The gap itself predated all of it. ✅ Now closed on both sides, so "registration is mandatory when
-  partitioned" holds for the pipeline-job lane too.
-  ⚠ **It was a hole in the read side as well**, and that reasoning still stands generally:
-  `QueryExecutor`'s shared-catalog attach can only surface what the write side registered. Bullet 5 is
-  complete in itself and is **not** a workaround for an unregistered writer.
-  ✅ **How it was resolved.** `PipelineJobRunner` has **no `PipelineConfig` in scope** — it loads a
-  `PipelineGraph` from `PipelineStore`, and `sink.ducklake` is merely a UI alias for `sink.persistent` with
-  **zero execution-time meaning** (`ProcessorCatalog:167`) — so `register(List, String, PipelineConfig)` was
-  uncallable there, which is much of why the gap existed. Resolved with a config-agnostic
-  `DuckLakeRegistrar.registerInto(...)`, the catalog taken from **`LakehouseCatalog`** (the same
-  deployment-level property the READ side uses, so both ends name the lakehouse identically) and the table
-  taken from the sink **store**.
-  🔴 **The obvious seam was the wrong one, and taking it would have caused the very defect this row warns
-  about.** `PartitionSinkWriter` has `store` and that sink's outputs in hand and looks like the natural
-  place — but it serves **two** lanes (`PipelineJobRunner` AND `ConsignmentGraphRunner`), and the graph
-  ingest lane already registers through the shared tail. Registering there would have **double-registered
-  the ingest path**. The writer only gained an `outputsByStore()` accessor; the registration lives in the
-  job runner, which has no tail of its own.
-  ⚠ `DuckLakeRegistrationSiteContractTest` pins the single call site and must be widened **deliberately**
-  in the same change: its `EXPECTED_SITES` is one element AND it asserts `found.get(0)` by index, so a
-  second site needs an unordered comparison, not just another entry. The contract exists because a per-file
-  registration added alongside the batch-level one would **double-register** the ingest path.
-  → `okf/backend/engine/db-layer.md` · scale-out plan §5.4 · `DuckLakeRegistrationSiteContractTest`
-
-- ✅ **CLOSED 2026-09-14 · `AIRGAP-EXTENSIONS-CI-1` — a release now stages its DuckDB extensions.**
-  Filed and closed the same day, while staging `postgres_scanner` (above). Three parts:
-  **(1)** `tools/fetch-duckdb-extensions.mjs` downloads each extension **per platform** before packaging —
-  ⛔ an `INSTALL` would not do, it populates the cache for the RUNNING platform only, and `release.yml` runs
-  on ubuntu while the bundle also ships windows. It reads the list **out of `package.ps1`** rather than
-  repeating it, so a name added there is fetched automatically.
-  **(2)** `package.ps1 -RequireExtensions` turns the warning into a refusal, passed by all three release
-  steps for the same reason they pass `-Sign`: the release path is stricter than the desk path.
-  **(3)** `--check` runs in `ci.yml` on **every push** — because the full fetch runs only on a tag, and "a
-  path that executes only at release time" is the shape of the defect itself. It re-reads the list and HEADs
-  every file the release would fetch, without downloading 160 MB.
-  ✅ **Verified both ways:** a populated cache packages clean with all three extensions in **both** platform
-  directories (the linux ones had never been stageable on a dev machine before); an empty cache **fails**
-  with the reason. The `--check` guard was falsified too — renaming `$duckdbExtNames` makes it exit 2 rather
-  than pass with an empty list.
-  ⚠ Also ignored two packaging artifacts that were not: a **73 MB** jlink runtime left in the working tree by
-  every Linux packaging run, one `git add -A` from being committed, and the new extension cache.
-  → `inspecto/package.ps1` · `tools/fetch-duckdb-extensions.mjs` · `.github/workflows/{ci,release}.yml`
-
 - **P2** · **`DEPLOY-SERVICE-WRAPPER-1` residual — the live acceptance is UNRUN.** ✅ **The wrappers
   SHIPPED 2026-09-11** (`SCR-3`): `package.ps1` stages `inspecto.service` + `install-service.sh` (systemd)
   and `install-service.ps1` (Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). 🔴 The
@@ -926,42 +761,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   plus the reboot leg — is **unrun**, because it needs a systemd host and an elevated Windows box and this
   checkout is neither. ⛔ Do not mark `SCR-3`'s acceptance met until someone runs both; the installers
   print the exact commands. → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
-- ✅ **CLOSED 2026-09-14 · `DOC-DEADTOKEN-1` — the docs no longer teach an authentication that does nothing.**
-  Premise re-verified first: `-Dcontrol.token` has **zero** Java readers, in main *and* test.
-  🔴 **The row's scope was THREE files; the sweep found TWELVE — and a SECOND dead flag it never named.**
-  `-Dassist.read.token` is equally dead (zero readers) and travelled in the same examples, so fixing only
-  the flag the row named would have left half of every command still lying. ⚠ The row also said
-  `inspecto/README.md` "is fixed"; it still carried a live `-Dcontrol.token=dev` in a dev example — in the
-  file that **ships inside the bundle**. ⛔ This is the row's own stated lesson landing on the row itself:
-  *a cleanup that names its own scope narrowly leaves everything outside it reading as though it were
-  checked.* Grep the SYMBOL across the tree, never the file list a previous pass wrote down.
-  ✅ **Fixed:** `operations-reference.md` (24 curls retargeted, 2 dead launch flags deleted, the
-  `CONTROL_TOKEN=…` invocations and the Docker `-e` reduced to plain launchers), `inspecto/README.md`,
-  `.claude/QUICK_START.md`, `docs/FEATURE_INVENTORY.md`, and **`tools/run-backend.ps1`** — a dev script
-  nobody had listed, which was passing *both* dead flags on every local run.
-  ✅ **Two further factual errors corrected from the SHIPPED launcher rather than from the page:**
-  `operations-reference.md` claimed `serve.sh` reads `CONTROL_TOKEN/ASSIST_TOKEN/PORT/CORS_ORIGIN`. It
-  reads `PORT`, `SPACES_ROOT`, `CORS_ORIGIN` and `AUTH_OIDC_*` — measured — and the Docker passthrough list
-  named the two dead vars too. One example also carried `-Dui.static.log=DEBUG`, a second dead flag the
-  page's own banner already documented.
-  ⚠ **The curls kept their `Authorization` header** and now send `Bearer $TOKEN`: the header shape was
-  always right for Standard/Enterprise, and only the value's provenance was false. A single note says where
-  `$TOKEN` comes from (an IdP, via `AUTH_OIDC_*`; Personal is auth-free) instead of repeating it 24 times.
-  ⚠ **Every other mention in the tree is a HISTORICAL record and was deliberately left alone** —
-  `security.md`, `control-api.md`, `auth-security.md`, `EDITIONS.md`, `incidents.md` all describe the flag
-  as *removed*, which is true and worth keeping.
-  🔴 **A `#` comment between PowerShell backtick continuations breaks the parse.** My first fix to
-  `run-backend.ps1` put the explanation inline and silently broke the script; `Parser::ParseFile` caught it.
-  ⛔ Parse-check a shell script after editing it — the change looks fine in a diff.
-  → `okf/backend/build-run/operations-reference.md` · `okf/backend/editions/auth-security.md`
-  debt — but that note scoped itself to that one page, and 🔴 **`inspecto/README.md`, which SHIPS INSIDE
-  THE BUNDLE, still carried two such examples until 2026-09-11**, the worst instance of the set. That one
-  is fixed; the rest are not: `operations-reference.md` (3 + 27 + the `serve.sh` env-var line at `:997`
-  and `:1037`, the Docker `-e CONTROL_TOKEN` at `:1042`), `FEATURE_INVENTORY.md:247`,
-  `.claude/QUICK_START.md:38`. ⚠ This is the guard-scope lesson again: a cleanup that names its own scope
-  narrowly leaves the instances outside it reading as if they had been checked. → `okf/backend/build-run/operations-reference.md`
-### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
-
 - **P2** · **`SPEC-GREENCELL-1` — a board cell is green over something absent or bounded.** Five instances,
   and the pattern matters more than any one: **no Standard artifact is built** at all while both supply-chain
   controls show Standard green; **the trimmed runtime ships in nothing** while `OPS-07` is green in all three
@@ -989,59 +788,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
-- ✅ **CLOSED 2026-09-15 (operator) · `JAVA-INGEST-APPENDER-SERIAL-1` — the Java fallback ingest path did
-  not scale with concurrent batches.** Closed with **no open engineering**: the real fix shipped
-  (2026-09-14, DuckDB WAL auto-checkpoint on disposable per-batch temp DBs — 12 batches went from 8K to
-  **34.5K rows/s**, and the row's own first test, *"a two-batch run must take < 1.2× a one-batch run"*, is
-  met); residual (1) was **discharged as documentation** (the Windows/Linux gap is a jemalloc allocator
-  difference, not a tunable — `performance.md` says run the ingest tier on Linux); residual (2) was
-  **refuted by measurement** (the quote pre-scan was worth 1.7% end-to-end, not the ⅓ a JFR reading
-  suggested). 🔴 **Remedies (a)-(c) as filed were never built and are NOT owed** — the fix came from
-  (d), a cause nobody had listed. ⇒ *a row's proposed remedies are hypotheses too, not just its cause.*
-  ⛔ Do not reopen for appender-flush batching or a Java-path concurrency cap without a fresh measurement
-  showing they buy something on top of the shipped fix.
-  *(original row retained below for provenance)*
-- **P1** · **`JAVA-INGEST-APPENDER-SERIAL-1` — the Java fallback ingest path does NOT scale with concurrent batches; twelve batches run slower than one.**
-  Filed 2026-09-14 from a full-capacity run on a 6-core/12-thread laptop (`PerfDeepDiveBenchmark#concurrencyAndAutoDerive`,
-  48 files × 250K rows × 100 cols, 24 batches, `processing.threads=12`): **native engine 174 s (69K rows/s, CPU ~71 %
-  while busy) vs Java engine 2,309 s (5.2K rows/s, CPU ~20 %)** — and one Java thread alone does 8K rows/s at 100
-  columns, so concurrency made the Java path 35 % SLOWER than serial. Two `jstack`s 10 min apart showed **all 12
-  workers inside `org.duckdb.DuckDBBindings.duckdb_appender_flush` (RUNNABLE, native)** with heap at 370 MB, disk
-  0.6 % busy, 15 GB RAM free — a native mutex, not CPU, memory or I/O. Each batch has its OWN temp DuckDB file, so
-  the lock is process-wide in the JDBC driver's appender binding, or in `CsvIngester.ingest` (`:226`) flushing per
-  row. ⚠ Interaction: `performance.md` §"Two controllable axes" tells operators to raise `processing.threads` for
-  aggregate throughput — **true for native-path feeds, false for messy files that fall to Java**; until fixed the
-  guidance must say so. Remedies to weigh: (a) batch the appender flush (flush every N rows, not per row);
-  (b) route wide messy files through the native engine's reject-drain instead of the Java appender;
-  (c) a per-JVM cap on concurrent Java-path batches so they never starve native ones. First test: a
-  two-batch Java-path run must take < 1.2× a one-batch run at equal total rows.
-  ✅ **Half shipped 2026-09-14 — remedy (d), not on the list above:** the stall was DuckDB's WAL auto-checkpoint
-  (`checkpoint_threshold` default 16 MB) firing a synchronous write per ~10 appender flushes on a DISPOSABLE
-  temp DB. `configure()` now sets it to 1 TB on every per-batch connection (all four callers pair it with
-  `openTempDb`→`deleteTempDb`, so nothing durable was lost). Same laptop, 100 cols: 4 batches 30.3 s → 20.1 s;
-  12 batches now 34.5K rows/s vs 8K for one thread — the path scales again. Measurements are NOT
-  recorded in `performance.md` by operator instruction (2026-09-14); the knobs `-Dbench.threads/-Dbench.cols/
-  -Dbench.engine` on the harness reproduce them.
-  ✅ **Residual (1) DISCHARGED as documentation 2026-09-14** — the Windows/Linux gap is an allocator
-  difference (DuckDB bundles jemalloc on Linux only), not a tunable, so `performance.md` now states
-  **run the ingest tier on Linux** rather than carrying it as open work. ⛔ Bundling mimalloc is NOT
-  filed: nobody has shown it recovers the gap, and that claim would need its own measurement.
-  🔴 **Residual (2) REFUTED by measurement 2026-09-14 — the quote pre-scan is not a limit.** The JFR
-  reading ("~⅓ of the Java lane's own CPU") was carried as a reason to fold `endsInsideQuotedField` into
-  the univocity pass. An `indexOf` fast path for quote-free lines shipped instead (one line, provably
-  equivalent — the loop only assigns `inQuotes` inside a `c == quote` branch, so a line with no quote
-  returns the incoming state). It is **38× cheaper in isolation** (927 ns → 24 ns per 789-char 100-column
-  line) and worth **~1.7 % end-to-end** (three baseline runs 24.29/24.42/24.45 s vs two fixed 23.73/24.20 s
-  at 100 cols, 4 × 100K rows, `engine=java`, `threads=1`). ⇒ **the univocity rework is NOT worth scheduling
-  on this evidence** and is not filed. ⚠ **Why the profile misled: a third of the lane's *Java* CPU is not
-  a third of its *wall clock*, because the lane sits in the native `duckdb_appender_flush` frame for most
-  of its wall time.** ⛔ A hot Java method in a native-dominated lane is a share of the wrong denominator.
-  ⚠ Trap hit while measuring: the first A/B ran `-pl inspecto-engine` **without `-am`**, so it resolved a
-  stale installed `inspecto-etl` and compared the fix against itself — it read 25.83 s vs 24.45 s, i.e.
-  the fix looked *slower*. Every `-pl` benchmark that spans modules needs `-am`.
-  ⇒ **With (1) documented and (2) refuted, this row has no open engineering left; it is a candidate to
-  close once an operator agrees the Linux recommendation discharges it.**
-
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   Filed 2026-09-13, replacing `UI-POD-SCOPE-UNION-1`. ✅ **This is the remedy the architecture already
   sanctions**, and it is SERVER-side, so it fixes the partial roster for *every* client with no UI union:
@@ -1057,59 +803,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `podScoped: true` declaration becomes WRONG and must be removed — leaving it only on
   `GET /system/scheduler`, which stays genuinely per-Pod. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
 
-- ✅ **SHIPPED 2026-09-13** · **`INBOX-REGISTRY-CROSS-POD-1` — two pods can poll one inbox and nothing can see it.**
-  ✅ **BUILT:** `DbInboxRegistry` (`OperationalDb.Family.INBOX_REGISTRY`, `-Dinbox.registry.backend`, default **`none`**) is a shared `inbox_registry` table keyed `(space, pipeline)`. Each pod publishes the `dirs.poll` its own Spaces declare — `publish` REPLACING that Space's rows, so a Space moved between pods leaves no ghost to collide with itself — then reads the whole roster and hands it to the EXISTING `SpaceInboxAudit.sharedInboxFindings`, which needed no change: it audits whatever roster it is given. Design of record: `okf/backend/engine/db-layer.md` §3.4 (`inbox_registry`).
-  ⚠ **Still detection, not prevention**, as decided — and still WARN-only. 🔴 **Known gap kept visible:** a Space DELETED outright leaves its rows behind, because deletion happens where nothing publishes; the rows carry `pod`/`declared_at` so the finding is diagnosable, and clearing is manual. ⛔ Not to be fixed with a TTL — a pod that is merely down would then vanish from the roster.
-  ⚠ **Write-time hooks were deliberately NOT added.** The registry is published at BOOT, where the full roster is known; `ConfigWriteRoutes.writeConfig`/`patchConfig` and bundle import are three more seams that would each see only their own change. A `dirs.poll` added by a config write is therefore detected on that pod's next boot — which is also when the pre-existing local audit runs.
-  ✅ **DECIDED 2026-09-12 (operator): build the SHARED REGISTRY of declared inboxes** — an ops-DB family
-  in the shape `RunLease` already uses, written at config-write time and checked across pods. ⛔ Rejected:
-  requiring `dirs.poll` to resolve under its declaring Space's root. That would prevent collisions
-  structurally with no new infrastructure, but it **bans an external vendor drop directory** outside the
-  Space tree — legitimate, common, and already in use — so it would break existing deployments.
-  ⚠ This remains **detection**, not prevention: it turns an undetectable cross-pod collision into a loud
-  one. Prevention would need the containment rule that was just refused.
-  The C2 audit (`SpaceInboxAudit`, shipped 2026-09-12) warns when two Spaces **hosted by this pod** declare
-  the same `dirs.poll`. 🔴 Once Spaces are partitioned across pods (C1), the dangerous case is two Spaces on
-  **different** pods sharing a directory — and that is **undetectable locally**, because no pod can see
-  another's config. ⚠ The consequence is not a race that self-heals: `MarkerManager` marks only *after* a
-  batch commits, so there is no pre-poll claim and both pods ingest the same files — **silent
-  double-ingestion**. **Work:** a shared registry of declared inboxes (an ops-DB family, the way `RunLease`
-  is), written at config-write time and checked across pods; or structurally prevent it by requiring
-  `dirs.poll` to resolve under its declaring Space's root. ⛔ The latter is NOT a free win — an external
-  vendor drop directory outside the Space tree is a legitimate, common arrangement, so making containment
-  mandatory is a product decision, not a cleanup. → `superpower/enterprise-scale-out-plan.md` §5.3
-- ✅ **SUPERSEDED 2026-09-12 by `POD-SCOPE-DIVERGENCE-1`** · **`INTAKE-POLICY-SYSTEM-SCOPE-1`** — it named one
-  static; the census found `PUT /system/scheduler` diverges **four**. See that row.
-- ✅ **SHIPPED 2026-09-12 (the warning half)** · **`JOB-PIPELINE-PARAM-UNIQUE-1` — nothing validates that two jobs target the same pipeline.**
-  ✅ **CLOSED 2026-09-12 (operator): WARN ONLY — it must never refuse.** Two jobs on one pipeline with
-  different schedules or params may be deliberate, so failing closed would refuse valid deployments.
-  ⛔ Do not revisit as a refusal without re-opening this decision. The audit + the named skip message are
-  the whole deliverable, and both shipped.
-  A job's `name` is the only unique key (`JobService.jobs` is keyed by it); the pipeline a `type: pipeline`
-  job targets is a **param** (`params.pipeline`, read at `JobService.java:1258`), and no config-load or
-  route-level check rejects two `JobConfig`s carrying the same value. Filed 2026-09-12 while shipping B3.
-  ⚠ **Not a correctness hole any more** — B3's `SCOPE_AUTHORED` claim means the second job now records
-  `SKIPPED` instead of overlapping, which is the safe outcome. What is left is **discoverability**: an
-  operator who authored two jobs onto one pipeline sees intermittent skips with no indication why, and the
-  skip message names the pipeline but not the other job.
-
-  **Both halves of the warning work SHIPPED 2026-09-12:** `SchedulerAuditTask.sharedPipelineFindings` is a
-  pure config scan reporting every pipeline targeted by more than one enabled job, naming **all** of them;
-  it runs inside the on-demand `scheduler_audit` task **and** as a default-on host audit
-  (`JobService.auditSharedPipelines`) hooked to the same two transition sources as the orphan audit, with
-  the same once-per-transition debounce and the same `-Djobs.orphan.audit=false` kill switch. The skip
-  message now appends `— may be held by [other jobs]`.
-
-  🔴 **The finding keys through `JobService.authoredPipelineKeyOf`, never its own copy.** Recomputing it
-  as `params().get("pipeline")` drops the Tier-3 `flow:` dual read *and* the type check — mutation-verified
-  2026-09-12: that change fails exactly `theLegacyFlowKeyAndTheCanonicalPipelineKeyAreTheSamePipeline` and
-  `aMaintenanceJobCarryingAPipelineParamIsNotASharer`. The production symptom would be a pair of jobs that
-  skip each other while the audit calls them healthy. ⛔ Naming only the first sharer is likewise
-  mutation-guarded — it leaves the operator exactly as unable to act as the bare skip message did.
-
-  **STILL OPEN — needs the operator:** whether this should ever *refuse* rather than warn. ⛔ Do not make
-  it fail closed without that decision; two jobs on one pipeline with different schedules or params may
-  well be deliberate. → `superpower/enterprise-scale-out-plan.md` §5.2
 - **P2** · **`OPENAPI-GEN-1` — generate the OpenAPI path/method skeleton from the route table** (⛔ decided 2026-09-10
   over "exemplar coverage, deliberately" and "document the rest by hand"). `openapi-v1.json` documents 24 operations
   against 266 live registrations (9.0 %, measured and ratcheted by `ApiContractTest`). Derive every path + method from
@@ -1121,90 +814,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 a test that post-dates it. What was left was one release-gated wire change; `SBOM-RESOLVE-1` joined it
 2026-09-09.)*
 
-- ~~**P1** · **`SBOM-RESOLVE-1`**~~ ✅ **SHIPPED 2026-09-09.** `release.yml` gained a reactor
-  `mvn -DskipTests -Pedition-enterprise install` before the packaging steps — the profile matters, because
-  the nine edition modules are profile-scoped and a plain install leaves `inspecto-ops` absent, which is
-  the artifact Enterprise fails on. Enterprise is the superset (9 vs Standard's 8), so one pass covers
-  every edition packaged below. Verified: `mvn -o -DskipTests -Pedition-enterprise install` BUILD SUCCESS
-  over 32 modules, with `inspecto-ops` and `inspecto-policy` jars refreshed in `~/.m2`. ⚠ A truly clean
-  BEFORE could not be reproduced on this sandbox (a prior build had primed `~/.m2`); the clean-runner
-  failure is the one recorded when this row was filed. ⛔ `release.yml` does **not** invoke the generator —
-  `package.ps1:555` does, after staging — so there is no second staging gap here; that was checked and
-  refuted. Original diagnosis below.
-- **(shipped, kept for the reasoning)** **the bill of materials could not be generated on a clean runner, so the first
-  tag failed at packaging.** `tools/sbom.mjs` resolves through `mvn dependency:list`, and Maven will **not**
-  resolve a sibling reactor module from a jar built in an *earlier* invocation — only from the local
-  repository, or from an artifact produced in the same session. `inspecto/package.ps1` runs `mvn … package`
-  and then invokes the generator as a **separate** process, so every reactor dependency must already be
-  installed. `.github/workflows/release.yml:45-46` runs its only `mvn … install` under
-  `working-directory: eoiagent-src` — it installs the **agent** dependency and never this reactor. A
-  non-zero exit throws by design, so packaging stops. ⚠ **Enterprise fails first and most visibly**:
-  `inspecto-policy` gained a *test-scoped* dependency on `inspecto-ops` in EDG-01 cell 7, and resolution
-  covers every scope regardless of the generator's `-DincludeScope=runtime`. Verified 2026-09-09 on this
-  sandbox: with `inspecto-ops` absent from `~/.m2`, Enterprise failed `Could not find artifact
-  com.gamma.inspector:inspecto-ops` **both before and after** that day's module-table fix — it is not a
-  regression from it — while Personal and Standard passed only because older reactor artifacts happened to
-  be installed here. → Either add a reactor `mvn -DskipTests install` to `release.yml` before the packaging
-  steps (simplest, and what a dev machine already does), or have the generator resolve inside a build
-  phase. ⛔ Do not "fix" it by narrowing the scope filter: the failure is in **resolution**, which precedes
-  filtering. Context: `docs/okf/capabilities/editions/editions.md` §5.3 item 1.
-
-- ✅ **`MAP_AUTHORED` drift FIXED + PINNED 2026-09-09** — it was the FOURTH hand-mirrored map here to
-  drift, and it is now the first to be held by a test rather than a fifth hand-edit.
-  `pipeline-editable.ts` carries `fields`, and `MapNodeKeyContractTest.theClientMirrorMatchesTheServerSets`
-  **parses that TypeScript file** and asserts both sets against the Java ones — the Java side is the source
-  of truth, so the mirror can no longer drift silently. Mutation-proven in both languages: removing
-  `fields` again fails exactly 1 of 4 Java tests naming the missing key, and exactly 1 of 74 UI tests
-  (`lowers an authored fields projection instead of refusing it`, exit 1). ⚠ There is no shared artifact to
-  compare against and inventing one for two short lists would cost more than it saves, so a cross-language
-  pin parses the other side's source — the same idiom `MapNodeKeyContractTest` already used on RowShaper.
-  🔴 **The live cost, now measured:** for four days the client REFUSED a key the server accepts (`lower`
-  reported `UNSUPPORTED_MAP_KEY` and advertised `[columns, rules]` as the accepted set) and dropped it on
-  the round trip — exactly the failure `MAP_AUTHORED`'s own Java comment says the constant exists to make
-  impossible, reproduced on the client because the list was a hand copy.
-
-  *The original row:* **`MAP_AUTHORED` has drifted between its two homes — the FOURTH hand-mirrored map to do so.**
-  `pipeline-editable.ts:197` declares `['columns', 'rules']`; `PipelineEditable.java:89` declares
-  `Set.of("columns", "rules", "fields")` — `fields` was added 2026-09-05 and the mirror was not. The TS
-  comment at `:191` says outright that it "mirrors `PipelineEditable.MAP_AUTHORED`", and the client's job is
-  to refuse exactly what the server refuses, so the two now disagree about whether a map node may carry
-  `fields`. ⚠ Verified against both files 2026-09-08 (docs-consolidation duplication drain, group 1). ⛔ Do
-  not fix by hand-editing the list a fifth time — pin it: the repo has already recorded a derived map
-  drifting three times. → generate or contract-test the pair, as `RecordTransformContractTest` does for
-  `sql-functions`.
-- ✅ **SHIPPED 2026-09-13** · **Two author-facing messages name things that do not exist.**
-  ✅ **BOTH messages fixed, and the guard that could not see them now can.**
-  - (a) The branch toast is now **rendered FROM `BRANCH_STEP_TYPES`** (`branchStepTypesLabel()`), never
-    hand-listed — the same discipline the Java authority already had (`RouteArming:180` renders
-    `new TreeSet<>(BRANCH_STEP_KINDS)`), which is exactly why the server side never drifted. Pinned by 3
-    specs asserting the label names every member of the set.
-  - (b) Both `RemoteAcquisitionHandler` messages now say **`collector.post_action.on_success`**.
-  - 🔴 **The guard's third rule, `source-key-message`, was the load-bearing half** — and building it found
-    two things reading could not: (1) inheriting `flow-message`'s `sentencesOnly` filter **missed the
-    second message entirely**, because a concatenated fragment (`"source.post_action.on_success=" + kind`)
-    carries no whitespace and was discarded as a contract; (2) scanning template literals raw made **3 of
-    the first 4 hits false positives** (`${source.kind}` is code, not text), so interpolations are now
-    stripped. ⚠ Both were caught by MUTATING each message separately, not by reading — a guard that
-    passes proves nothing until it is proven red.
-  *(original row follows)*
-  ✅ **PROMOTED P3→P2 2026-09-13 (operator), and the guard gap was part of the SAME change.** ⛔ Do not fix (b)
-  without adding the third `SOURCE_RULES` entry to `tools/check-vocabulary.mjs` — the sweep proved the guard
-  *structurally cannot* see Collector messages (see below), so a fix alone leaves the next one unguarded. Both verified 2026-09-08 in the
-  same sweep. (a) `pipeline-editor.component.ts:673` warns *"Only filter, dedup and summarize Steps can run
-  inside a branch"*, but the real gate `BRANCH_STEP_TYPES` (`pipeline-graph.ts:794-799`) also contains
-  **`transform.sql`**, added by SQL-BRANCH-1 on 2026-09-06 — so the toast tells an author a Step cannot do
-  something it can. (b) `RemoteAcquisitionHandler.java:285` logs *"Unknown source.post_action.on_success"*
-  and `:299` builds an operator-facing message reading `source.post_action.on_success=…`, for a key that is
-  actually **`collector.post_action`** — `post_action` is read via `castMapAt(src, "post_action")` where
-  `src = castMapAt(raw, "collector")` (`PipelineConfigParser.java:376,483`). 🔴 The vocabulary guard has a
-  rule for exactly this class (an operator-read message must use the canonical term) and it did not fire.
-  ✅ **ANSWERED 2026-09-13 — it CANNOT fire, and the reason is scope, not a bad pattern.**
-  `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (`:343`, applied at `:665`) holds exactly **two** rules —
-  `flow-identifier` and `flow-message` — both Flow→Pipeline. <!-- vocab-allow: names the rename itself --> **There is no Collector rule over source files
-  at all**; the Source→Collector rule is a *prose* rule and never runs over `.java`. ⛔ So this message was
-  never in the guard's reach, and no amount of tightening the existing rules would have caught it.
-  ⚠ Both halves — (a) and (b) — **re-verified still present 2026-09-13**. Whoever fixes (b) should add the
-  third `SOURCE_RULES` entry in the same change, or the next such message lands unguarded too. <!-- vocab-allow: names both renames themselves -->
 - **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder.** The **UI half SHIPPED 2026-09-07**:
   every emitter was verified to dual-emit (`LineageRoutes:112/113`, `ViewRoutes:100/101`,
   `PipelineProjection:198/207/242`), so the DTO fields now read the canonical key — `DownstreamPipeline.pipeline`,
@@ -1226,36 +835,40 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
 These four are the **classes** behind roughly half of the consolidation's findings. Each is one guard, not N
 fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-archive/post-consolidation-sprints.md`.
 
-- ✅ **`SPEC-STALEREF-1` — the class is CLOSED 2026-09-09; the guard is `tools/check-doc-citations.mjs`.**
-  Committed and wired into `ci.yml` and `.githooks/pre-push`, falsified in both directions (a seeded dead
-  path and a seeded bare old type name each failed with their line number; each allow-rule turned the same
-  line green; the clean corpus passed; a run from the wrong directory FAILED on its emptiness floor rather
-  than passing over nothing). 🔴 **It found 152 stale citations, not 23** — 39 dead paths and 113 dead type
-  citations across 37 files, all repaired in the same commit. Three lessons worth more than the fixes:
-  **(a)** the first design — "every backticked CamelCase name must exist in the tree" — was killed by
-  measurement: 4,654 such citations, 56 distinct absences, and most were legitimate (third-party types,
-  deliberately-unbuilt designs, renames recorded on purpose), so it would have shipped as ~45 entries of
-  allowlist and 11 of rule. The guard narrowed to the one objective invariant available: the rename map the
-  repo itself commits, **parsed** from `tools/rename-batch-to-consignment.mjs`, never mirrored.
-  **(b)** Both checks needed an *allow* rule, and the same one twice: a dead path is fine on a line that
-  states the absence, an old name is fine on a line that also names its replacement — that is what
-  RECORDING history looks like, and it is what let the guard ship with **no waiver list at all**.
-  **(c)** ⛔ **A rename codemod over prose inverts any sentence whose subject is the old name's absence.**
-  The bulk repair rewrote "the phantom `BatchGraphRunner`" into "the phantom `ConsignmentGraphRunner`" —
-  the live class — in this very row, and one more like it; both were caught on diff review and restored.
-  The codemod's own header had warned of exactly this ("DOCS ARE NOT SWEPT … the canon carries deliberate
-  history that a rename would falsify"). Read the diff, not just the guard's exit code.
+- **P2** · **`COLLECTOR-DATASET-UNPROVEN-1` — the `dataset` collector has never been driven end to end,
+  because nothing committed declares it.** Filed 2026-09-15, recovered from inside the closed
+  `COLLECTOR-SPACE-ROOT-1` entry when it was deleted — it was live work with no row of its own.
+  🔴 **`collector.dataset` appears in no pipeline under `spaces/` and none under `inspecto/examples/`.**
+  `acquisition.md` §8.4 records only that every committed `collector.connector` is `local` (20
+  occurrences), which is adjacent to this and does not state it. So the 2026-09-15 space-root fix to
+  `DatasetCollectorConnectorFactory` was **verified by test, not by execution** — unlike its parent
+  `MATERIALIZE-SPACE-ROOT-1`, which was proven on a live multi-Space run (202 → SUCCESS, 7 rows,
+  Dataset registered). ⇒ Treat the connector's end-to-end behaviour as **unproven, exactly as it was
+  before that change**.
+  **Fix: author one committed `collector.dataset` pipeline and drive it on a live multi-Space server**,
+  the same way the materialize job was proven. ⛔ Do not close this on a passing `SpaceConfigRootTest` —
+  that suite is what already passes while the path stays unexercised. ⚠ This is an instance of the §6
+  rule *"a capability with no committed example is a capability nobody has ever run"*.
+  → `okf/capabilities/acquisition/acquisition.md` §8.4 · `okf/capabilities/data-plane/data-plane.md` §3.6
 
-  *The original row, kept because it names the instances:* **twenty-plus dead class citations** surviving the
-  2026-08-31 Consignment rename (five of them in the active pipeline plan's "what actually runs" section, two
-  cited *by line number*); a **deleted component named as the current mapping UI**; every `RowShaper` line
-  citation wrong **and its package path wrong**; `pipeline-graph-design.md` §14 cited when the file has eleven
-  sections; `BUNDLE-SCHEMA-1` cited as a §6 row by two current docs and present only in an archive snapshot;
-  `docs/okf/agentic/` pointing at a local path that does not exist; a dead archive pointer; and a tracked hook
-  comment naming a hook that does not exist. 🔴 **The fix is one guard**: a citation check over each
-  document's backticked symbols and paths against `git ls-files` and the module tree — which is exactly the
-  §7 pointer check every capability spec already describes, and which caught the phantom `BatchGraphRunner` (the live class is `ConsignmentGraphRunner`)
-  the moment it ran. Committing that checker is the enabler. → `okf/capabilities/tooling/tooling.md` §5.
+- **P2** · **`SPEC-JAVALANE-RATIO-1` — a stakeholder doc states a Java-lane throughput ratio that no
+  measurement has ever produced.** Filed 2026-09-15. `stakeholders/COMPETITIVE_LANDSCAPE.md:102` bounds
+  every headline figure with *"messy files fall to the Java lane at roughly a third of the native rate"*,
+  citing `BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1` — **a row that is now CLOSED**, so the claim
+  cites a board entry rather than a measurement, and will shortly cite nothing at all.
+  🔴 **"A third" matches neither side of the only run that exists.** Same harness, 6-core/12-thread
+  laptop, 48 files × 250K rows × 100 cols, 24 batches, `processing.threads=12`: **before** the
+  2026-09-14 checkpoint fix the Java lane did **5.2K rows/s against the native lane's 69K** — about a
+  *thirteenth*; **after** it, 12 batches reached **34.5K rows/s**, which is the opposite error. ⚠ The two
+  Java numbers are not at equal batch counts, so ⛔ **do not simply substitute "half"** — that would
+  replace one unmeasured ratio with another, which is the whole defect.
+  **Fix: one A/B at equal batch count and column width on the current tree, then state the measured
+  ratio with its conditions** — `PerfDeepDiveBenchmark#concurrencyAndAutoDerive` reproduces it via
+  `-Dbench.threads` / `-Dbench.cols` / `-Dbench.engine`. ⚠ The result does **not** go in
+  `performance.md` — the operator instructed 2026-09-14 that these measurements are not recorded there;
+  the landing place is the sentence itself. ⚠ Single site — no other doc repeats the ratio.
+  → `docs/stakeholders/COMPETITIVE_LANDSCAPE.md` §1.3 · `okf/backend/build-run/performance.md`
+
 - **P2** · **`SPEC-COUNTS-1` — eight facts, each counted two to six ways, and the narrative doc is wrong every
   time.** Measured 2026-09-09: builtin node types **30** (docs said 20/28/20/29 — five ways); parser frontends
   **six ways** (3/5/6/7/9/10 across five pages and the user guide); maintenance tasks **19+4** (docs said
@@ -1298,62 +911,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   keep-or-delete verdict, not a build. ⛔ Demand-gated: do not "tidy" them without one, because at
   least one (the vendor plugin) may be deliberately operator-side.
 ## 5. Docs & hygiene
-
-- ✅ **CLOSED 2026-09-14 · `CORECOUNT-SWEEP-1` — the sweep RAN and the core count is exonerated.** The
-  row's own suspicion was right and is now measured rather than argued: **`forkCount=0` caused the hang,
-  four cores did not.** The delivery mechanism it asked for exists —
-  `JDK_JAVA_OPTIONS=-XX:ActiveProcessorCount=4` reaches the **forked** test JVM (the JVM prints
-  `NOTE: Picked up JDK_JAVA_OPTIONS` twice, for Maven and for the fork), where `-DargLine` provably does
-  not. Forked at four cores the full enterprise reactor ran to completion with **no hang**:
-  **4475 tests / 0 failures / 0 errors / 24 skipped over 26 reporting modules**, identical to the
-  same-day 12-core baseline, with `ControlApiPreferencesTest` — the class the previous attempt froze
-  inside — passing in **0.115 s**. ⇒ nothing ordered after `inspecto` fails at CI's core count, which is
-  the question the row existed to answer. ⚠ Still NOT established, and deliberately not carried as an
-  open row: behaviour on a 4-core box with proportionally **less RAM** — only the core count was masked
-  here. ⚠ The recipe is recorded in `dev-infra/README.md` and `PROJECT_NOTES.md`; ⛔ the `MAVEN_OPTS` +
-  `-DforkCount=0` route it replaces is the one that hung.
-  *(original row follows)*
-- **P2** · **`CORECOUNT-SWEEP-1` — nothing has ever run the suite on a host with as few cores as CI has,
-  and the attempt to HUNG.** Filed 2026-09-14. `ControlApiConfigIfMatchTest` failed on CI and nowhere else
-  because `ConfigSafetyValidator` bounds `processing.threads` by `Runtime.availableProcessors()`: the
-  runner has 4, this sandbox 12. That one test is fixed. ⛔ **What is NOT established is that it was the
-  only one** — Maven stops at the first failing module, so every module ordered after `inspecto` has never
-  executed on a 4-core host, on CI or here.
-  🔴 **The sweep that would settle it hung.** `MAVEN_OPTS=-XX:ActiveProcessorCount=4 … -DforkCount=0
-  -Dmaven.test.failure.ignore=true` froze inside `ControlApiPreferencesTest` immediately after
-  `ControlApi started on port 64700`, and sat there with two idle JVMs at ~2 GB each — +0.03s and +0.17s of
-  CPU over 25 seconds, no `target/` writes for 27 minutes. It had to be killed.
-  ⚠ **`forkCount=0` is the prime suspect, not the core count**: CI runs FORKED on a genuinely 4-vCPU host
-  and terminates normally. `forkCount=0` was only there because `MAVEN_OPTS` is the sole reliable way to
-  get a JVM flag into the test JVM here — `-DargLine` does not reach a forked one. ⇒ **the two have to be
-  separated before either is believed**: re-run forked with the flag delivered another way (a surefire
-  `argLine` property the POM honours, or a JDK_JAVA_OPTIONS export), and bound the run with a timeout so a
-  hang reports instead of parking.
-  ⛔ **Do not conclude the product deadlocks on 4 cores from this run** — it proves a hang under
-  `forkCount=0`, which is a different claim. ⚠ Two STALE JVMs were found, not one: an earlier probe run had
-  also never exited, so check for leftovers before blaming the current run.
-  → `okf/capabilities/tooling/tooling.md` §3.2
-  ✅ **SETTLED 2026-09-14 — the two WERE separated, and the core count is exonerated. This row can close.**
-  The suspicion was right: **`forkCount=0` caused the hang, four cores did not.**
-  - **Delivery mechanism, established by measurement.** `-DargLine` genuinely does NOT reach the fork —
-    with `-X`, the forked command line is `java --enable-native-access=ALL-UNNAMED -jar surefirebooter…`
-    and carries no added flag, because the POM pins `<argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>`
-    and `@{argLine}` resolves the *project* property, not a user `-D`. **`JDK_JAVA_OPTIONS` works**: the
-    JVM prints `NOTE: Picked up JDK_JAVA_OPTIONS` **twice**, once for the Maven JVM and once for the fork,
-    and `jshell` under it reports `availableProcessors() == 4`. ⇒ **this, not `MAVEN_OPTS`+`forkCount=0`,
-    is how a JVM flag reaches the test JVM here.**
-  - **Result: `JDK_JAVA_OPTIONS=-XX:ActiveProcessorCount=4 mvn -o test -Pedition-enterprise
-    -Dmaven.test.failure.ignore=true` ran to completion, FORKED, with NO hang** —
-    **4475 tests / 0 failures / 0 errors / 24 skipped over 26 reporting modules, all 32 modules built.**
-    That is **identical** to the 12-core local baseline of the same date (4475/0/0/24), so nothing
-    ordered after `inspecto` fails at CI's core count.
-  - **The two tests the row was built around both pass at 4 cores:** `ControlApiConfigIfMatchTest` 9/9,
-    and `ControlApiPreferencesTest` — *the class the previous attempt froze inside* — in **0.115 s**.
-  - ⚠ **Failure-ignore makes `BUILD SUCCESS` meaningless on its own**; the verdict above is the sum of the
-    26 per-module summary lines, which include `[WARNING]`-level ones. ⛔ Do not read the final line.
-  - ⚠ The 24 skips are the same ones as the 12-core run (16 are `PostgresStateStoreTest`, offline), so the
-    coverage compared is like-for-like. ⚠ Still NOT established: behaviour on a 4-core box with
-    proportionally less RAM — this box kept 32 GB while only the core count was masked.
 
 - **P2** · **`AIRGAP-S3-EXTENSIONS-1` — ✅ STAGING DONE 2026-09-14 (operator call); the LOADING half is open.**
   Filed 2026-09-14, measured against a live MinIO the same day. `$duckdbExtNames` in `inspecto/package.ps1`
@@ -1430,90 +987,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   and silent local writes on the box it ships to. `PathJail.isUri` is now the one definition, enforced by
   both the jail and the 422 write gate, mutation-verified in both directions. ⚠ **Dispatch on it when
   bullets 1 and 6 land; do not delete it** — a bucket URI is not containable by `Path` comparison.
-
-- ✅ **CLOSED 2026-09-15 · `MATERIALIZE-SPACE-ROOT-1` — every registry-reading JOB TYPE was SPACE-BLIND.**
-  Filed and fixed the same day; **found by driving a live multi-space server**, not by any test. `ControlApi.writeRoot()`
-  resolves `currentContext().root().config()` — **this space's** config root (`ControlApi.java:1074-1077`)
-  — while `MaterializeTask.run` re-reads the **JVM-wide** `System.getProperty("assist.write.root")` on the
-  worker thread (`MaterializeTask.java:55-57`) and builds its `ComponentStore` from that. Where a
-  deployment serves more than one space the two disagree, and the run reads **one space's registry while
-  writing another space's data dir**.
-  **Reproduced end to end**: `POST /api/v1/spaces/ucc/datasets/sites_dataset/materialize` answered
-  **202** — the route resolved `sites_dataset` in the ucc registry — and the run then **FAILED** with
-  `unknown dataset 'sites_dataset'`, the very id that had just resolved, because the task looked in the
-  `demo` space's registry. ⛔ **The misleading part is that the 202 is honest at the moment it is sent**;
-  the failure is only visible by polling the run, which is exactly why no gate test catches it.
-  🔴 **It is NOT limited to materialize.** `JobService.java:471` states the same design for `recon.run`
-  — *"Reads the component registry from `-Dassist.write.root` at run time, like the maintenance/report
-  jobs"* — so `report` and `recon.run` carry it too. ⇒ the fix is **a per-space write root threaded into
-  `JobService`**, not a patch in one task; `dataDir` is already space-scoped, which is precisely why the
-  two halves diverge.
-  ⚠ **Why it went unnoticed for so long:** nothing shipped had ever fired `task: materialize` (see
-  `STUDIO-HALVES-1`), and single-space deployments — Personal, and every test — make the JVM property and
-  the space config root **the same path**, so the bug is a no-op there. Adding the first caller exposed it
-  within minutes of a live run.
-  🔴 **The blast radius was WIDER than this row first said — NINE run-time readers, not three.** The row
-  named `materialize`, `report` and `recon.run` from `JobService:471`'s comment; grepping the property
-  found `MetadataValidateTask`, `StorageReportTask`, `FileRepositoryAuditTask`, `ObjectsAnalyticsJob`
-  (inspecto-ops), `DatasetCollectorConnectorFactory` and `DecisionRules` as well. ⚠ **A row's cause is a
-  hypothesis** — grep the mechanism, not the row's list.
-  ✅ **FIXED by making the per-Space root the single map, not by threading a new parameter.** The seam
-  already existed and was hiding in plain sight: `DecisionRules` had a `spaceId -> registry root` map,
-  published by `SpaceBootstrap`, resolved by `EventLog.currentSpaceId()`, with the JVM property as a
-  **default-space-only** fallback — i.e. the correct design, applied to exactly one consumer.
-  `com.gamma.pipeline.SpaceConfigRoot` is now that map (holding **config** roots), `DecisionRules` forwards
-  to it, and **seven** job types resolve through it: `MaterializeTask`, `ReconRunJob`, `ReportJob`,
-  `MetadataValidateTask`, `StorageReportTask`, `FileRepositoryAuditTask`, `ObjectsAnalyticsJob`.
-  ⛔ **A named Space deliberately does NOT fall back to the JVM property** — falling back is what caused
-  the defect: it hands back *another* Space's registry, which fails far away and reads as missing data
-  rather than misconfiguration. The default Space still falls back, so every single-Space deployment is
-  byte-identical.
-  ✅ **The precondition was verified before building on it:** both `JobService` submit paths
-  (`submitRun` + `submitAdhocRun`) set the space MDC on the worker thread, so `currentSpaceId()` is
-  correct inside a run and not only on the request thread. `forSpace(id)` exists for a caller that already
-  holds an id (`ObjectsAnalyticsJob` does) — an explicit id cannot be wrong the way an unset MDC silently can.
-  ✅ **PROVEN END TO END on the live multi-space server that exposed it**: the same call that first
-  returned *202-then-FAILED* now returns **202 → SUCCESS, 7 rows**, writes
-  `spaces/ucc/data/sites_by_region/matrix-*.parquet`, and registers `sites_by_region` as a Dataset in the
-  **ucc** space. `SpaceConfigRootTest` (8) pins all three resolution rules plus the `DecisionRules`
-  forwarding; the placeholder 503 guard in `DatasetRoutes` and its test are **deleted**.
-  ⚠ **Left alone deliberately:** `DatasetCollectorConnectorFactory:66` still reads the property. It runs in
-  the **collector** lane, not the job lane, and this shift did not establish that the space MDC is set
-  there — migrating it on the assumption that it is would be the same class of unverified reasoning that
-  produced this defect. → `SpaceConfigRoot.java` · `DecisionRules.java` · `SpaceBootstrap.java:42`
-
-- ✅ **CLOSED 2026-09-15 · `COLLECTOR-SPACE-ROOT-1` — the last JVM-wide write-root reader, in the
-  COLLECTOR lane.** Filed and closed the same day as its parent `MATERIALIZE-SPACE-ROOT-1`.
-  🔴 **The row's own instruction turned out to be a TRAP, and grounding it is what caught that.** It said
-  "first establish where the collector lane sets the space MDC". That question was answered — **it does**:
-  `CollectorService.underSpace` binds it around `dispatchCycle` / `dispatchAcquireCycle` / `runCycle`, and
-  its parallel poll workers inherit it. But the row's implied next step — swap in
-  `SpaceConfigRoot.current()` — **would have re-created the very defect its parent closed**:
-  `DatasetCollectorConnectorFactory` read **two** JVM-wide properties, `assist.write.root` *and*
-  `data.dir`, so they were consistently wrong together. Moving only the registry per-Space would have left
-  one Space's registry beside another Space's data. ⇒ **a half-fix here was worse than none**, and the
-  fix had to move both roots at once.
-  ✅ **`SpaceConfigRoot` now carries a per-Space DATA root beside the config root**, registered together by
-  `SpaceBootstrap` and dropped together by `forget` (pinned: `forgetDropsBothRootsTogether`), and the
-  connector resolves both through it.
-  🔴 **The two lanes' precedence is OPPOSITE, and that asymmetry is preserved deliberately, not tidied:**
-  for the **data** root an explicit `-Ddata.dir` **wins** over the Space's own directory — the rule
-  `CollectorService`'s four call sites already apply (`System.getProperty("data.dir", root.dataDir())`);
-  for the **config** root the Space wins and the property is only the default-Space fallback — the rule
-  `ControlApi.writeRoot()` applies. ⛔ Harmonising them would be a behaviour change wearing a refactor's
-  clothes; a test asserts the asymmetry so nobody "fixes" it by accident.
-  ⚠ Only **one** of the five `data.dir` readers was space-blind — the other four already used the
-  property-as-override pattern. The row assumed a class of defect where there was a single straggler.
-  ⚠ **VERIFIED BY TEST, NOT BY EXECUTION — unlike its parent.** `SpaceConfigRootTest` (12) pins the
-  resolution and the reactor is green at **4505 / 0 / 0 / 28 over 26 modules**, but the `dataset`
-  connector itself was **not** driven on a live server: **nothing committed uses `collector.dataset`** —
-  no pipeline in `spaces/` or `inspecto/examples/` declares it. ⇒ Treat the connector's end-to-end
-  behaviour as unproven, exactly as it was before this change.
-  🔴 **That absence is also why the defect survived, and it is the SECOND time this shift the same shape
-  appeared**: `task: materialize` had no committed job either, and both were space-blind in ways only a
-  live multi-space run could show. ⇒ **a capability with no committed example is a capability nobody has
-  ever run** — the missing example is the risk signal, not a documentation gap.
-  → `SpaceConfigRoot.java` · `DatasetCollectorConnectorFactory.java` · `SpaceBootstrap.java`
 
 - **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down; 75 mutating routes
   are ungated, `DELETE /spaces/{id}` among them.** Filed 2026-09-15 from duckle candidate S5 ("a route with
@@ -1771,14 +1244,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   - ✅ `gate-register.md` — **ARCHIVED 2026-09-07.** Its own retirement trigger had fired and it had become
     actively misleading (§3.5 and §3.3 still framed items resolved weeks earlier as open calls). Its one durable
     note is now `okf/index.md` §*How to read this tier*.
-- ✅ **`INDEX.md` CONSOLIDATED 2026-09-07** — 879 lines → 150. It had become an archive log: **46
-  struck-through per-plan narratives (443 lines)** for plans already in `plans-archive/`, under a heading
-  saying plans live there only while active, against 12 real ones. The narratives are frozen in
-  `archived-documents/index-snapshot-2026-09-07.md`; the part worth keeping — which OKF concept each
-  archived plan's truth went into — is now a 46-row routing table. Verified no live-doc pointer was lost
-  (every dropped link is reachable from its own OKF sub-index). The `DOC_ALLOW['docs/INDEX.md::bare-flow']`
-  waiver was **deleted rather than kept** — the guard's own preferred outcome — and the removal was
-  falsified in both directions (the guard fires on a bare banned word in INDEX, and passes when clean).
 - **REQUIREMENTS MoSCoW / edition columns** — §3.1 ACQ-4, §3.9 SPC-5 and §3.15 UI-8 were **fixed 2026-09-07**
   (all three were contradicted by their own §5 and by the code; UI-8 had read "IN-FLIGHT, uncommitted, another
   session" for two months over a pane that shipped 2026-07-07). An authority note now says `EDITIONS.md`'s matrix
@@ -1797,6 +1262,19 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   → `compliance/controls-matrix.md` §4
 - **Template seed-pack enrichment (frontend C7)** — ongoing, not a discrete item: `kpi-overview`,
   `quality-monitor`, `trend-monitor` today. → `okf/frontend/features/studio.md`
+- **`-Dassist.token` / `-Dassist.read.token` mentions in the docs — LEAVE THEM** (from `DOC-DEADTOKEN-1`,
+  closed 2026-09-14; recorded here 2026-09-15 when that row was deleted). ⚠ **Every remaining mention in
+  the tree is a HISTORICAL record and was deliberately left alone** — `security.md`, `control-api.md`,
+  `auth-security.md`, `EDITIONS.md` and `incidents.md` all describe the flag as *removed*, which is true
+  and worth keeping. ⛔ A symbol sweep that "fixes" those five files is undoing the closure.
+  → `okf/backend/build-run/operations-reference.md`
+- **A capability with no committed example is a capability nobody has ever run** (rule recorded 2026-09-15
+  from `COLLECTOR-SPACE-ROOT-1`). Twice in one shift the same shape appeared — `task: materialize` had no
+  committed job, and `collector.dataset` has no committed pipeline — and both were space-blind in ways
+  only a live multi-Space run could show. ⇒ **The missing example is the risk signal, not a documentation
+  gap.** ⛔ Do not read "the tests pass" as "the path has been exercised" for any capability that nothing
+  in `spaces/` or `inspecto/examples/` declares. (`acquisition.md` §8.4 and `ingestion.md` are instances
+  of this rule; this is the rule itself.)
 - **GRAPHIFY-1 tool sync** — ⚠ the row's own check is blind: `.graphify_version` and `graphify --version` both
   read `0.9.53` while `.claude/skills/graphify/SKILL.md` differs from the installed package's copy by ~300 lines
   (the repo copy carries a uv/pipx detection block labelled "fixes #831" that 0.9.53 does not). Either re-sync from

@@ -111,8 +111,9 @@ lower thanks to the native engine below).
 that date the Java appender lane got SLOWER under concurrency: every per-batch temp DB ran DuckDB's default
 16 MB WAL auto-checkpoint, a synchronous write per ~10 appender flushes that serialised the batches on a
 laptop SSD (all workers parked in `duckdb_appender_flush`, CPU ~20 %). `ConsignmentIngestStrategy.configure()`
-now sets `checkpoint_threshold='1TB'` on those disposable connections. One limit remains on that lane
-(`BACKLOG.md` §4 `JAVA-INGEST-APPENDER-SERIAL-1`): on Windows the process heap halves 12-way appender
+now sets `checkpoint_threshold='1TB'` on those disposable connections. One limit remains on that lane, and it is
+**documented here rather than tracked** (`JAVA-INGEST-APPENDER-SERIAL-1` was CLOSED 2026-09-15 with no
+open engineering — this page owns the as-built): on Windows the process heap halves 12-way appender
 throughput versus Linux, because **DuckDB bundles jemalloc on Linux only**. ⇒ **run the ingest tier on
 Linux**; a Windows host is supported but pays that penalty on wide string appends, and it is an allocator
 difference, not a tuning knob — no `processing.*` setting recovers it. Delimited feeds on a clean config
@@ -127,6 +128,12 @@ lines without the per-character walk, and it is **38× cheaper in isolation** (9
 23.73 / 24.20 s — consistent in direction, tiny in size). 🔴 **The lesson generalises: a third of the
 *Java* CPU is not a third of the *wall clock* when the lane spends most of its time in a native frame**
 (`duckdb_appender_flush`). ⛔ Do not schedule the larger univocity rework on that profile alone.
+
+⛔ **Do not reopen this lane for appender-flush batching or a Java-path concurrency cap** without a fresh
+measurement showing they buy something on top of the shipped fix. Those were remedies (a)-(c) on the
+original row; **none was built, and none is owed** — the fix came from (d), a cause nobody had listed.
+⚠ The row's own acceptance test — *"a two-batch Java-path run must take < 1.2× a one-batch run at equal
+total rows"* — is met; 12 batches went from 8K to **34.5K rows/s**.
 
 **Two controllable axes** (set both to keep the CPU honest):
 

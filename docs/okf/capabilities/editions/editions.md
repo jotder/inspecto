@@ -755,13 +755,24 @@ citations elsewhere in this spec still resolve.
    generator**. Closed by moving the set into `tools/bundle-modules.mjs` and adding the CI guard
    `tools/check-sbom-modules.mjs`, which holds it against the packaging script's three enumerations; a
    duplicate driver component, invalid under both schemas, was fixed in the same pass.
-   🔴 **What remains, and is not the same defect — now tracked as `SBOM-RESOLVE-1` (`BACKLOG.md` §4, P1),
-   so this item is no longer `UNTRACKED`:** generating the document at all requires the reactor to be
-   **installed** in the local repository, because the build tool will not resolve a sibling module from a
-   jar built in an earlier invocation. The release pipeline installs only the agent dependency. Enterprise
-   fails first — the policy module's cell-7 test-scoped edge to the operational-objects module must resolve
-   even though the document lists runtime scope only — and on a clean runner every edition would. Either the
-   pipeline installs the reactor before packaging, or the generator resolves within a build phase.
+   ✅ **The second half — `SBOM-RESOLVE-1` — SHIPPED 2026-09-09.** Generating the document at all required
+   the reactor to be **installed** in the local repository, because the build tool will not resolve a
+   sibling module from a jar built in an earlier invocation, and the release pipeline installed only the
+   agent dependency. Enterprise failed first — the policy module's cell-7 test-scoped edge to the
+   operational-objects module must resolve even though the document lists runtime scope only — and on a
+   clean runner every edition would.
+   **As built:** `release.yml` gained a reactor `mvn -DskipTests -Pedition-enterprise install` before the
+   packaging steps. ⚠ **The profile matters**: the nine edition modules are profile-scoped and a plain
+   install leaves `inspecto-ops` absent, which is the artifact Enterprise fails on. Enterprise is the
+   superset (9 vs Standard's 8), so one pass covers every edition packaged below. Verified
+   `mvn -o -DskipTests -Pedition-enterprise install` BUILD SUCCESS over 32 modules, with `inspecto-ops`
+   and `inspecto-policy` jars refreshed in `~/.m2`.
+   ⛔ **Do not "fix" a recurrence by narrowing the scope filter**: the failure is in **resolution**, which
+   precedes filtering.
+   ⛔ `release.yml` does **not** invoke the generator — `package.ps1:555` does, after staging — so there is
+   no second staging gap here; that was checked and refuted.
+   ⚠ A truly clean BEFORE could not be reproduced on the sandbox (a prior build had primed `~/.m2`); the
+   clean-runner failure is the one recorded when the row was filed.
 2. ✅ **SHIPPED 2026-09-10** — the release pipeline gained the Standard step (`STANDARD-BUNDLE-1`, §3.7); the
    Standard supply-chain columns now have an artifact behind them. *(Was: no Standard artifact is built,
    checksummed, signed, given a bill of materials, or published; four documents described one that did not exist.)*

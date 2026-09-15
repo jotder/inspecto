@@ -64,7 +64,13 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
    - **A failure is FATAL** (D10, 2026-09-14) — the batch fails rather than logging a warning.
    - **Registration is MANDATORY** (2026-09-14) — `enabled: false`, or no `output.ducklake` block at all,
      fails the batch too. D10 closed the path where registration *fails*; this closes the path where it is
-     never *attempted*.
+     never *attempted*. ⚠ Making the requirement unconditional kills **25** pipeline-job tests — that is
+     the blast radius the single-node arm protects, and the reason the rule is topology-scoped.
+   - ⛔ **D10 does not cover the privately-reachable catalog.** D10 makes an *unreachable* catalog fatal;
+     a no-prefix value is reached, successfully, and privately. On N pods that is N private catalogs with
+     every batch green — the exact split-brain the partitioned topology exists to prevent, arriving as
+     SUCCESS. (Recorded here 2026-09-15 from `AIRGAP-DUCKLAKE-PG-1`; it had lived only in the in-flight
+     scale-out plan, which leaves the current tier when it is archived.)
    - **The catalog must be a shared server**, not a local file. ⛔ A value with no backend prefix does not
      error, it quietly creates a **private file catalog** for that node, so it is refused on shape before
      the attach.

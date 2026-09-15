@@ -720,6 +720,10 @@ each fix live). Genuinely open:
   and every in-branch card except the branch's tail offers insert-after (plain `insertStepAfter`);
   both open a palette narrowed to `BRANCH_STEP_TYPES` (filter / dedup / summarize — the client mirror
   of `RouteArming.BRANCH_STEP_KINDS`, so it front-runs the 422 rather than offering `join`/`route`).
+  ⚠ **The refusal toast is RENDERED from `BRANCH_STEP_TYPES`** (`branchStepTypesLabel()`, 2026-09-13),
+  never hand-listed — the same discipline the Java authority always had (`RouteArming:180` renders
+  `new TreeSet<>(BRANCH_STEP_KINDS)`), which is exactly why the server side never drifted. Pinned by three
+  specs asserting the label names every member of the set.
   Remove/move inside a branch stay canvas work. Backend:
   [editable-round-trip §19](../../backend/pipeline-graph/editable-round-trip.md).
 - ~~TRANSFER-ARCH-1~~ **SHIPPED 2026-09-01** as the server-side pipeline bundle

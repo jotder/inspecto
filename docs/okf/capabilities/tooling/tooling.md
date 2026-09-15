@@ -366,6 +366,11 @@ name claims every edition is signed when **two of three** are, with no artifact 
    is mostly exemption is this area's recorded failure three times over**, so check B narrowed to the one
    objective invariant available: the rename map the repository itself commits, PARSED from the codemod
    rather than mirrored, because a hand-mirrored map drifts.
+   ⛔ **A rename codemod over prose inverts any sentence whose subject is the old name's absence.** The
+   bulk repair rewrote "the phantom `BatchGraphRunner`" into "the phantom `ConsignmentGraphRunner`" — the
+   live class — and one more like it; both were caught on diff review and restored. The codemod's own
+   header had warned of exactly this (*"DOCS ARE NOT SWEPT … the canon carries deliberate history that a
+   rename would falsify"*). ⇒ **Read the diff, not just the guard's exit code.**
 2. ✅ ~~**The coverage guard has no minimum module count.**~~ **FIXED 2026-09-09.** It had found **one**
    module report, computed 97.89% over its 427 instructions against a 78% floor, and reported every floor
    met with a success exit — it failed only on *zero* reports, so a single stale build directory

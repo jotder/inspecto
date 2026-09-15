@@ -58,6 +58,12 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
 3. **Anchor a source scan and assert the anchor.** `MapNodeKeyContractTest` asserts its scanned region
    was actually found before trusting the scan — *"the map-path region moved or was renamed — re-anchor
    this scan before trusting it"*. Without that, a moved region silently scans nothing.
+   ⚠ **Parsing the other side's source is the sanctioned idiom for a cross-language pin.** There is no
+   shared artifact to compare against, and inventing one for two short lists costs more than it saves —
+   so `MapNodeKeyContractTest` parses `pipeline-editable.ts` directly, the same way it already did for
+   `RowShaper`. Mutation-verified 2026-09-09: removing `fields` again fails exactly 1 of 4 Java tests
+   naming the missing key, and exactly 1 of 74 UI tests (`lowers an authored fields projection instead of
+   refusing it`, exit 1).
 4. **Prefer an assertion to an assumption — and where a skip is genuinely right, make it VISIBLE.**
    `assumeTrue` on corpus presence disarms the guard silently if a fixture path moves.
    `MappingMigrationTest` gets it right: *"the corpus must not be empty — this test would prove nothing"*.
@@ -118,6 +124,20 @@ cannot be inherited. ⚠ And a second, smaller exemption of the same family: a m
 writes no `jacoco.exec` at all, so it disappears from the denominator instead of dragging the percentage
 down. Four modules do that here (~800 lines, immaterial) — but it is why a coverage percentage is never a
 measure of *"how much code has tests"*, only of *"how much measured code was executed"*.
+
+✅ **A fourth instance, 2026-09-13 — the vocabulary guard could not reach the file it was supposed to
+police.** `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (`:343`, applied at `:665`) held exactly **two**
+rules, `flow-identifier` and `flow-message`, both Flow→Pipeline. <!-- vocab-allow: names the rename the two rule ids exist for --> **There was no Collector rule over source
+files at all** — the Source→Collector rule is a *prose* rule and never ran over `.java`. ⛔ So the
+offending author-facing message was never in the guard's reach, and no amount of tightening the existing
+rules would have caught it. The fix was a third rule, `source-key-message`, not a stricter one.
+🔴 **Building that rule found two defects reading could not**: (1) inheriting `flow-message`'s
+`sentencesOnly` filter **missed the second message entirely**, because a concatenated fragment
+(`"source.post_action.on_success=" + kind`) carries no whitespace and was discarded as a contract; and
+(2) scanning template literals raw made **3 of the first 4 hits false positives** (`${source.kind}` is
+code, not text), so interpolations are now stripped. ⚠ Both were caught by **mutating each message
+separately**, not by reading. ⛔ **A guard that passes proves nothing until it has been proven red** —
+once per rule, not once per guard.
 
 ## A third shape: the guard whose subject is a NUMBER a human wrote
 
