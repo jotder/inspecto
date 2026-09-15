@@ -265,6 +265,64 @@ public final class ReconService {
         }
     }
 
+    /**
+     * The RAW rows behind one key, per side — the evidence a cardinality break's counts summarise
+     * ({@code RECON-CARDINALITY-2}, 2026-09-15). Roles {@code a} (anchor) and {@code b} (the compared side
+     * {@code other}), each {@link BreakSet} carrying the side's physical rows verbatim (every column the
+     * relation exposes, not the unified names), capped at {@code limit} with {@code truncated} set.
+     *
+     * <p>⚠ Why a separate query: {@link #sideSql} pre-aggregates with {@code GROUP BY} before any break is
+     * detected, so row identity is gone by the time a cardinality violation is seen — it cannot be carried
+     * on the break payload without re-selecting. This re-selects on demand, for one key, and only when a
+     * reader asks; the break lists stay as they are. ⛔ It is deliberately NOT a pairing: which anchor row
+     * "matches" which compared row for an N:M key is undefined until a pairing rule is chosen (the archived
+     * plan's open question), so this returns the two row sets and says nothing about pairs.
+     *
+     * @param key every key column → its value as a string (the wire form of a break's {@code key})
+     */
+    public static Map<String, BreakSet> rows(Spec spec, int other, Map<String, String> key, int limit)
+            throws SQLException, IOException {
+        if (key == null || key.isEmpty()) throw new IllegalArgumentException("key is required");
+        for (String k : key.keySet())
+            if (!spec.keyColumns().contains(k)) throw new IllegalArgumentException("key column '" + k + "' is not a key column");
+        for (String k : spec.keyColumns())
+            if (!key.containsKey(k)) throw new IllegalArgumentException("key must name every key column; missing '" + k + "'");
+        if (other < 1 || other >= spec.sides().size())
+            throw new IllegalArgumentException("side '" + (other >= 0 && other < WIRE_SIDES.length ? WIRE_SIDES[other] : other)
+                    + "' is not a compared side of this reconciliation");
+        try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
+            Connection conn = registerSides(sandbox, spec);
+            Map<String, BreakSet> out = new LinkedHashMap<>();
+            out.put("a", rawRows(conn, spec, 0, key, limit));
+            out.put("b", rawRows(conn, spec, other, key, limit));
+            return out;
+        }
+    }
+
+    /** {@code SELECT * FROM <side view> WHERE <side filter> AND <key = literal…> LIMIT limit+1}. */
+    static String rowsSql(Spec spec, int side, Map<String, String> key, int limit) {
+        StringBuilder pred = new StringBuilder();
+        for (String k : spec.keyColumns()) {
+            if (pred.length() > 0) pred.append(" AND ");
+            // CAST + IS NOT DISTINCT FROM: the wire carries the key as text, and a NULL dim value must
+            // match a NULL — the same rules pathPredicate and keyJoin already apply to the grouped sides.
+            pred.append("CAST(").append(q(spec.physical(side, k))).append(" AS VARCHAR) IS NOT DISTINCT FROM ")
+                .append(lit(key.get(k)));
+        }
+        String filter = whereFilter(spec, side);
+        return "SELECT * FROM " + VIEWS[side]
+                + (filter.isEmpty() ? " WHERE " : filter + " AND ") + "(" + pred + ")"
+                + " LIMIT " + (Math.max(0, limit) + 1);
+    }
+
+    private static BreakSet rawRows(Connection conn, Spec spec, int side, Map<String, String> key, int limit)
+            throws SQLException {
+        List<Map<String, Object>> raw = select(conn, rowsSql(spec, side, key, limit));
+        boolean truncated = raw.size() > limit;
+        if (truncated) raw = raw.subList(0, limit);
+        return new BreakSet(List.copyOf(raw), raw.size(), truncated);
+    }
+
     /** Per-side column inventory ({@code SELECT * … LIMIT 0} metadata) + cross-side auto-matches. */
     public static Map<String, Object> columns(List<Side> sides) throws SQLException, IOException {
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {

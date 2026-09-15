@@ -194,6 +194,29 @@ class ControlApiReconTest {
         }
     }
 
+    // ── POST /recon/rows ───────────────────────────────────────────────
+
+    /** RECON-CARDINALITY-2: the raw rows behind one key, both sides, and the 422s that keep it honest. */
+    @Test
+    void rowsListsTheRawRowsBehindOneKey(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            JsonNode eu = data(postJson(c.port, "/spaces/s1/recon/rows",
+                    "{\"id\":\"orders_recon\",\"key\":{\"region\":\"EU\",\"product\":\"voice\"}}"));
+            assertEquals("EU", eu.get("key").get("region").asText());
+            assertTrue(eu.get("a").get("rowCount").asInt() >= 1, eu.toString());
+            assertTrue(eu.get("a").get("rows").get(0).has("region"), "raw physical columns, verbatim");
+            assertFalse(eu.get("a").get("truncated").asBoolean());
+            assertNotNull(eu.get("b").get("rowCount"));
+
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/rows", "{\"id\":\"orders_recon\"}").statusCode(),
+                    "no key → 422");
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/rows",
+                    "{\"id\":\"orders_recon\",\"key\":{\"region\":\"EU\"}}").statusCode(), "a PARTIAL key → 422, never a guess");
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/rows",
+                    "{\"id\":\"orders_recon\",\"key\":{\"nope\":\"x\"}}").statusCode(), "unknown key column → 422");
+        }
+    }
+
     // ── POST /recon/columns ────────────────────────────────────────────────────────
 
     @Test

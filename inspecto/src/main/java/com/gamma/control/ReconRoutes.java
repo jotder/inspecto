@@ -45,6 +45,9 @@ final class ReconRoutes implements RouteModule {
         api.post("/recon/columns", (e, m) -> columns(api, api.body(e)));
         api.post("/recon/run", (e, m) -> run(api, api.body(e)));
         api.post("/recon/breaks", (e, m) -> breaks(api, api.body(e)));
+        // RECON-CARDINALITY-2: the raw rows behind ONE key — read-shaped like its siblings (recorded so in
+        // CapabilityManifest.EXEMPTIONS); fetched on demand when a reader expands a cardinality break.
+        api.post("/recon/rows", (e, m) -> rows(api, api.body(e)));
         api.post("/recon/promote", (e, m) -> promote(api, api.body(e)));
         api.get("/recon/promoted", (e, m) -> promoted(api, ApiContext.query(e, "reconciliation")));
     }
@@ -121,6 +124,43 @@ final class ReconRoutes implements RouteModule {
             throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
         }
         Map<String, Object> data = new LinkedHashMap<>();
+        for (Map.Entry<String, ReconService.BreakSet> e : sets.entrySet()) {
+            Map<String, Object> set = new LinkedHashMap<>();
+            set.put("rows", e.getValue().rows());
+            set.put("rowCount", e.getValue().rowCount());
+            set.put("truncated", e.getValue().truncated());
+            data.put(e.getKey(), set);
+        }
+        return data;
+    }
+
+    // ── POST /recon/rows {id | config, key:{col:val…}, side?, limit?} ───────────────
+
+    /**
+     * The raw rows behind one key on both sides ({@code RECON-CARDINALITY-2}). {@code key} must name every
+     * key column; {@code side} picks the compared side as {@code /recon/breaks} does. Stateless compute like
+     * its siblings — nothing is persisted, so nothing here needs a capability.
+     */
+    private Object rows(ApiContext api, Map<String, Object> body) {
+        ReconService.Spec spec = spec(api, body);
+        Map<String, String> key = pathOf(body.get("key"));
+        if (key == null) throw new ApiException(422, "body must include 'key' — every key column and its value");
+        int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
+        String side = orDefault(ApiContext.str(body, "side"), "b");
+        int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
+        if (other < 0) throw new ApiException(422, "side must be b|c, got '" + side + "'");
+        Map<String, ReconService.BreakSet> sets;
+        try {
+            sets = ReconService.rows(spec, other, key, limit);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
+        } catch (SQLException e) {
+            throw new ApiException(422, "reconciliation failed: " + e.getMessage());
+        } catch (IOException e) {
+            throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("key", key);
         for (Map.Entry<String, ReconService.BreakSet> e : sets.entrySet()) {
             Map<String, Object> set = new LinkedHashMap<>();
             set.put("rows", e.getValue().rows());

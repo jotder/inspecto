@@ -160,6 +160,7 @@ export function breaksFromSets(
     for (const row of sets.cardinality_break?.rows ?? [])
         out.push({
             key: breakKeyOf(row.key, recon.keyColumns),
+            keyValues: row.key,
             type: 'cardinality_break',
             leftValue: row.a?.[RECON_RECORDS] ?? null,
             rightValue: row.b?.[RECON_RECORDS] ?? null,

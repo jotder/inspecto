@@ -296,4 +296,23 @@ describe('breaksFromSets — cardinality_break reaches the client (RECON-CARDINA
     it('is absent when the server sends no cardinality set', () => {
         expect(breaksFromSets(CONFIG, {})).toEqual([]);
     });
+
+    /** RECON-CARDINALITY-2: a cardinality break keeps the server's key values so its rows can be fetched. */
+    it('keeps the server key values on a cardinality break', () => {
+        const breaks = breaksFromSets(
+            { keyColumns: ['region', 'product'], compareColumns: [] },
+            {
+                cardinality_break: {
+                    rows: [{ key: { region: 'EU', product: 'voice' }, a: { __records: 2 }, b: { __records: 1 } }],
+                    rowCount: 1,
+                    truncated: false,
+                },
+            },
+        );
+        expect(breaks).toHaveLength(1);
+        expect(breaks[0].key).toBe('EU · voice');
+        expect(breaks[0].keyValues).toEqual({ region: 'EU', product: 'voice' });
+        expect(breaks[0].leftValue).toBe(2);
+        expect(breaks[0].rightValue).toBe(1);
+    });
 });

@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ReconApiService, ReconServerConfig } from 'app/inspecto/api';
+import { ReconRowsResult } from 'app/inspecto/api/recon.service';
 import { Reconciliation, ReconBreakSets, ReconRunResult, SideKey } from 'app/inspecto/reconciliation';
 
 /**
@@ -21,6 +22,11 @@ export class ReconExecService {
      * The Break sets at the recon grain for one anchor-relative pair, optionally scoped to a Board
      * dimension path. {@code side} picks the compared side ('b' default, or 'c' on a 3-way recon).
      */
+    /** The raw rows behind one key, both sides (RECON-CARDINALITY-2). */
+    async rows(recon: Reconciliation, key: Record<string, string>, side: SideKey = 'b'): Promise<ReconRowsResult> {
+        return firstValueFrom(this.api.rows(serverConfig(recon), key, side));
+    }
+
     async breaks(
         recon: Reconciliation,
         path?: Record<string, string> | null,

@@ -47,6 +47,11 @@ export type BreakStatus = 'open' | 'resolved' | 'auto_closed';
 /** One reconciliation discrepancy for a single key (and, for value breaks, a single compare column). */
 export interface ReconBreak {
     key: string;
+    /**
+     * The key as the server spelled it — one value per key column — so a follow-up call (the raw rows
+     * behind a cardinality break, RECON-CARDINALITY-2) can name the key without parsing the display string.
+     */
+    keyValues?: Record<string, unknown>;
     type: BreakType;
     /** The compare column that broke (value breaks only). */
     column?: string;

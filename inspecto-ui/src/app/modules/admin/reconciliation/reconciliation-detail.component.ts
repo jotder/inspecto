@@ -8,6 +8,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
+import { ReconRowsResult } from 'app/inspecto/api/recon.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -309,6 +310,16 @@ export class ReconciliationDetailComponent implements OnInit {
             },
         },
         {
+            // RECON-CARDINALITY-2: the counts are a summary; this shows the rows they summarise.
+            icon: 'heroicons_outline:table-cells',
+            hint: () => 'Show the rows behind this break',
+            visible: (row) => this.breakOf(row)?.type === 'cardinality_break' && !!this.breakOf(row)?.keyValues,
+            onClick: (row) => {
+                const b = this.breakOf(row);
+                if (b) void this.showRows(b);
+            },
+        },
+        {
             icon: 'heroicons_outline:arrow-top-right-on-square',
             hint: () => 'Open the Incident for this Break',
             visible: (row) => {
@@ -324,6 +335,44 @@ export class ReconciliationDetailComponent implements OnInit {
 
     private breakOf(row: FlatTreeRow): ReconBreak | undefined {
         return this.breaksById().get(row.__id);
+    }
+
+    // ── RECON-CARDINALITY-2: the rows behind a cardinality break ─────────────────────────────
+
+    /** The last "show rows" answer: the key it was asked for and both sides' raw rows. */
+    readonly breakRows = signal<{ label: string; result: ReconRowsResult } | null>(null);
+    readonly breakRowsLoading = signal(false);
+
+    /** Column defs straight from the first raw row — the side's physical columns, verbatim. */
+    rawColumns(rows: Record<string, unknown>[]): ColDef[] {
+        const first = rows[0];
+        return first
+            ? Object.keys(first).map((k) => ({
+                  field: k,
+                  headerName: k,
+                  flex: 1,
+                  valueFormatter: (p) => fmtVal(p.value),
+              }))
+            : [];
+    }
+
+    async showRows(b: ReconBreak): Promise<void> {
+        const r = this.recon();
+        if (!r || !b.keyValues) return;
+        const key: Record<string, string> = {};
+        for (const k of r.keyColumns) key[k] = String(b.keyValues[k] ?? '');
+        this.breakRowsLoading.set(true);
+        try {
+            this.breakRows.set({ label: b.key, result: await this.exec.rows(r, key, this.side()) });
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Could not load the rows behind this break'));
+        } finally {
+            this.breakRowsLoading.set(false);
+        }
+    }
+
+    closeRows(): void {
+        this.breakRows.set(null);
     }
 
     ngOnInit(): void {

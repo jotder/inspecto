@@ -32,6 +32,18 @@ export interface ReconServerConfig {
     filters?: Record<string, string>;
 }
 
+/** One side's raw rows behind a key (`POST /recon/rows`, RECON-CARDINALITY-2). */
+export interface ReconRowsSide {
+    rows: Record<string, unknown>[];
+    rowCount: number;
+    truncated: boolean;
+}
+export interface ReconRowsResult {
+    key: Record<string, string>;
+    a: ReconRowsSide;
+    b: ReconRowsSide;
+}
+
 /**
  * What `POST /recon/promote` reports back (`BREAK-INCIDENT-1`).
  *
@@ -82,6 +94,24 @@ export class ReconApiService {
 
     run(config: ReconServerConfig, limit?: number): Observable<ReconRunResult> {
         return this.http.post<ReconRunResult>(apiUrl('/recon/run'), { config, ...(limit ? { limit } : {}) });
+    }
+
+    /**
+     * The raw rows behind ONE key on both sides (RECON-CARDINALITY-2) — the evidence a cardinality break's
+     * counts summarise. Fetched on demand when a reader expands a break; `key` must name every key column.
+     */
+    rows(
+        config: ReconServerConfig,
+        key: Record<string, string>,
+        side?: string | null,
+        limit?: number,
+    ): Observable<ReconRowsResult> {
+        return this.http.post<ReconRowsResult>(apiUrl('/recon/rows'), {
+            config,
+            key,
+            ...(side ? { side } : {}),
+            ...(limit ? { limit } : {}),
+        });
     }
 
     breaks(

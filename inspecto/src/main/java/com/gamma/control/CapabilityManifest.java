@@ -274,6 +274,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/inv/projection/neighbors", "read-shaped", "computes neighbours from the body"),
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
+            new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),
             new Exemption("POST", "/queries/([^/]+)/run", "read-shaped", "runs a saved read query"),
             new Exemption("POST", "/pipelines/authored/([^/]+)/dry-run", "read-shaped", "a dry run writes nothing (PIPELINE-DRYRUN-1)"),
             new Exemption("POST", "/expectations/evaluate", "read-shaped", "evaluates and reports; a breach may open an Incident — re-classify with the pending Incident-creation call (POST /recon/promote)"),

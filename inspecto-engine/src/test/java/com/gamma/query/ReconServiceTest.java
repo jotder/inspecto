@@ -403,6 +403,35 @@ class ReconServiceTest {
                 "many_to_one constrains the compared side, and B has one row per key");
     }
 
+    /**
+     * RECON-CARDINALITY-2: the counts on a cardinality break are a summary; the rows behind them are
+     * re-selected on demand, raw and per side. EU/voice is 2 rows on A (100 + 100) and 1 row on B (200).
+     */
+    @Test
+    void theRowsBehindAKeyAreTheRawSideRows() throws Exception {
+        Map<String, ReconService.BreakSet> rows = ReconService.rows(specWith(ReconService.Cardinality.ONE_TO_ONE),
+                1, Map.of("region", "EU", "product", "voice"), 100);
+        assertEquals(2, rows.get("a").rowCount(), "the anchor holds two EU/voice rows — the break's reason");
+        assertEquals(1, rows.get("b").rowCount());
+        assertEquals(100.0, ((Number) rows.get("a").rows().get(0).get("amount")).doubleValue(),
+                "raw physical rows, not the grouped sum");
+        assertEquals(200.0, ((Number) rows.get("b").rows().get(0).get("amount")).doubleValue());
+        assertFalse(rows.get("a").truncated());
+
+        Map<String, ReconService.BreakSet> capped = ReconService.rows(specWith(ReconService.Cardinality.ONE_TO_ONE),
+                1, Map.of("region", "EU", "product", "voice"), 1);
+        assertEquals(1, capped.get("a").rowCount());
+        assertTrue(capped.get("a").truncated(), "the cap is reported, never silently applied");
+
+        // fail-closed: a partial key, an unknown column, an unknown side
+        assertThrows(IllegalArgumentException.class, () -> ReconService.rows(
+                specWith(ReconService.Cardinality.ONE_TO_ONE), 1, Map.of("region", "EU"), 100));
+        assertThrows(IllegalArgumentException.class, () -> ReconService.rows(
+                specWith(ReconService.Cardinality.ONE_TO_ONE), 1, Map.of("region", "EU", "amount", "1"), 100));
+        assertThrows(IllegalArgumentException.class, () -> ReconService.rows(
+                specWith(ReconService.Cardinality.ONE_TO_ONE), 2, Map.of("region", "EU", "product", "voice"), 100));
+    }
+
     /** A key present on ONE side only is already a missing_* break — never double-reported. */
     @Test
     void anUnmatchedKeyIsNotAlsoACardinalityBreak() throws Exception {
