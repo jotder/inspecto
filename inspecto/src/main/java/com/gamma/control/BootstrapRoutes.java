@@ -53,6 +53,12 @@ final class BootstrapRoutes implements RouteModule {
         // that shares state — which decides whether a degraded store is tolerable or a boot failure.
         data.put("topology", com.gamma.util.Topology.mode().name().toLowerCase());
         data.put("features", features(api));
+        // Landing-page plan D2 (2026-09-15): the deployment's own branding is PRE-SIGN-IN CONTEXT, not
+        // inventory, so it is served to an anonymous caller too — it is what makes the sign-in page belong
+        // to this deployment, and the operator authored it precisely to be displayed. ⚠ The SPA cannot get
+        // it the usual way there: `GET /settings/branding` sits behind the auth gate, so a sign-in page
+        // calling `BrandingService` would 401 on exactly the screen that needs it.
+        data.put("branding", branding(api));
         // Landing-page plan D2 (2026-09-15): before sign-in a Standard/Enterprise deployment tells an
         // unauthenticated caller only what the SPA needs to START the OIDC redirect — edition, topology,
         // feature flags and the anonymous session. The Space roster and the spec catalogue are
@@ -120,6 +126,20 @@ final class BootstrapRoutes implements RouteModule {
                 "datetime", "time", "currency", "enum", "array", "object"));
         e.put("outputFormats", List.of("CSV", "PARQUET"));
         return e;
+    }
+
+    /** The bound space's {@code branding.toon}, in the same wire shape {@code GET /settings/branding}
+     *  serves — nulls kept, so a client with no configured branding falls back to the shipped defaults. */
+    private static Map<String, Object> branding(ApiContext api) {
+        java.nio.file.Path root = api.writeRoot();
+        BrandingSettings b = root == null
+                ? BrandingSettings.EMPTY
+                : BrandingSettings.read(root.resolve("branding.toon"));
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("logoDataUrl", b.logoDataUrl());
+        m.put("caption", b.caption());
+        m.put("footerText", b.footerText());
+        return m;
     }
 
     private Object spaces(ApiContext api) {

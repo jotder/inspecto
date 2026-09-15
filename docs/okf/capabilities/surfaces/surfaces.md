@@ -143,6 +143,17 @@ consumer impossible** without changing it first.
 feature flags, config specs, enumerations, the space list and the session. Its stated purpose is to
 replace a handful of startup round-trips.
 
+🔴 **The anonymous payload is now NARROWER than the authenticated one** (landing-page plan D2,
+2026-09-15). Under a registered `Authenticator` with no subject resolved, the response omits `spaces`,
+`configSpecs` and `enumerations` — deployment inventory a sign-in page has no business showing — and
+keeps `edition`, `topology`, `features`, `branding` and the anonymous `session`, which is everything the
+SPA needs to start the OIDC redirect. **Personal registers no `Authenticator` and is unchanged**: there
+is no "before sign-in" there to protect, and the gate is derived from the SPI slot rather than from the
+edition string. ⚠ **`branding` was ADDED to the payload in the same change and is served anonymously on
+purpose** — it is pre-sign-in *context*, not inventory, and it is the sign-in page's ONLY source, because
+`GET /settings/branding` sits behind the auth gate and would 401 on exactly that screen. Both directions
+are pinned by `ControlApiAuthV1Test`.
+
 ⚠ **The SPA reads about half of it.** Its own bootstrap interface takes the edition, four feature flags,
 the session and the auth block — and nothing else. Config specs are still fetched **per type** from the
 spec route, and the space list still comes from the spaces routes, so the aggregation's benefit is only
@@ -270,8 +281,17 @@ accessibility gate as evidence of a control that the matrix does not carry.
 
 ### 3.8 Routing
 
-The root redirects per Lens. Two guest routes and one public share route sit outside the shell; the
-rest hang off a shelled route with the login guard and an initial-data resolver, with roughly 39 lazily
+**The root redirects to `home`** (landing-page plan D1, 2026-09-15). It previously redirected per Lens,
+straight to that Lens's landing route — which dropped the three Lenses onto three unrelated screens and
+left a fresh install with no front door. **Home is now the one landing route in every edition, and the
+Lens landing route is its primary action**; `lensHomeRedirect` survives, and the Ops-without-Events
+fallback it carries was extracted into a pure `lensHome(lens, eventsEnabled)` that both it and the Home
+button call, so the two cannot drift. ⚠ Home itself is **not** edition-aware: the listen-address warning
+keys on `authMode === 'none'`, the Incident affordances on the ops module flag, the administration action
+on `canAdminister`, and the grants card on multi-space — §3.2's rule applied, never the edition string.
+
+Two guest routes and one public share route sit outside the shell; the
+rest hang off a shelled route with the login guard and an initial-data resolver, with roughly 40 lazily
 loaded children. Breadcrumbs are a shared component fed by each detail pane rather than derived from
 the router.
 

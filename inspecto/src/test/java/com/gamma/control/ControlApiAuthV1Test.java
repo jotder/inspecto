@@ -208,6 +208,10 @@ class ControlApiAuthV1Test {
             assertNotNull(anon.get("edition"));
             assertNotNull(anon.get("features"));
             assertNotNull(anon.get("session"));
+            // Branding is pre-sign-in CONTEXT, not inventory: the sign-in page cannot read
+            // /settings/branding (auth-gated), so this is its only source.
+            assertNotNull(anon.get("branding"), "the sign-in page's only branding source");
+            assertTrue(anon.get("branding").has("logoDataUrl"));
 
             JsonNode authed = V1Body.of(get(c.port, "/bootstrap", "Authorization", "Bearer valid").body());
             assertTrue(authed.get("spaces").isArray());

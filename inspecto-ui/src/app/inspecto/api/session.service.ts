@@ -30,11 +30,19 @@ export interface OidcConfig {
     mock?: boolean;
 }
 
+/** The deployment's own branding, as `GET /bootstrap` serves it. Nulls mean "use the shipped defaults". */
+export interface BootstrapBranding {
+    logoDataUrl: string | null;
+    caption: string | null;
+    footerText: string | null;
+}
+
 /** The slice of `GET /bootstrap` this service consumes (edition switch + session). */
 interface Bootstrap {
     edition?: string;
     features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean; ops?: boolean };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
+    branding?: Partial<BootstrapBranding>;
     auth?: Partial<OidcConfig>;
 }
 
@@ -69,6 +77,15 @@ export class SessionService {
      */
     readonly actor = signal<string | null>(null);
     readonly capabilities = signal<string[]>([]);
+    /**
+     * The deployment's branding, from the bootstrap payload rather than from {@link BrandingService}.
+     *
+     * ⚠ This exists for the SIGN-IN page and nothing else. `GET /settings/branding` sits behind the auth
+     * gate, so `BrandingService` — which every in-shell surface uses — 401s on the one screen shown before
+     * anyone has signed in. Inside the shell keep using `BrandingService`: it is space-aware and refetches
+     * on a space switch, which this snapshot deliberately does not.
+     */
+    readonly branding = signal<BootstrapBranding>({ logoDataUrl: null, caption: null, footerText: null });
     /** `bootstrap.features.exchange` — the multi-space runtime hosts the cross-Space Exchange. */
     readonly exchangeEnabled = signal(false);
     /**
@@ -124,6 +141,11 @@ export class SessionService {
         const mode = boot.features?.authMode === 'oidc' ? 'oidc' : 'none';
         this.authMode.set(mode);
         this.capabilities.set(boot.session?.capabilities ?? []);
+        this.branding.set({
+            logoDataUrl: boot.branding?.logoDataUrl ?? null,
+            caption: boot.branding?.caption ?? null,
+            footerText: boot.branding?.footerText ?? null,
+        });
         this.exchangeEnabled.set(boot.features?.exchange === true);
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
         this.eventsEnabled.set(boot.features?.events === true);

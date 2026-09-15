@@ -46,6 +46,12 @@ as the RP identifier instead.
   redirect.
 - **Personal renders no user menu at all.** The auth-free shell has no principal to name and no session to
   end; showing the menu meant a blank "Signed in as" over a Sign out that could not work.
+- **Under OIDC the menu now NAMES the subject** (2026-09-15). `bootstrap.session.actor` was parsed by
+  `SessionService` and thrown away, while the menu rendered a hardcoded empty string fed by a
+  `UserService.user$` that nothing ever populated — so "Signed in as" was blank on every deployment. The
+  actor is now a signal, set only when the session reports `authenticated` and cleared with the session.
+  ⚠ The anonymous read's `actor` is the honour-system placeholder `appUser` (`ApiContext.actor`), which is
+  **not** a principal and is deliberately never displayed.
 
 **The Capability seam (RBAC groundwork, 2026-07-03; seam proven by Lens Access config 2026-07-14).**
 Authorization questions are always asked as **named capabilities** (`canAuthorWorkbench`, `canOperateRuns`,

@@ -86,6 +86,32 @@ Read left-to-right it is the Builder's whole job: **Workbench** owns everything 
 The app has two persistent regions: the **left sidebar** (the main menu) and the **top bar**
 (global controls). Everything you open loads in the large content area between them.
 
+### Home — where you land
+
+Opening Inspecto puts you on **Home**, the first entry in the sidebar. It is the same page in every
+edition; what it shows depends on what your deployment installed and what you are allowed to do.
+
+- **On a brand-new install** it says so, and walks you through the three steps that take a file in a
+  folder to a Dataset you can query: onboard a Stream, author a Pipeline, query it in Studio.
+- **Once things have run** it leads with what needs you — failed Runs, open Incidents and any approvals
+  waiting on your decision, newest first — with a count of recent Runs beside them. When nothing is
+  wrong it says so rather than showing an empty table.
+- **Your Lens card** names the Lens you are viewing through and opens straight into that Lens's own
+  starting screen: Pipelines for Builder, KPI & Reports for Business, Events for Ops. A Lens only
+  chooses where you start; it never hides a screen from you.
+- **Quick actions** lists only what you can actually do, so two people on the same deployment can see
+  different rows here.
+
+If your deployment has no sign-in configured, Home also warns that the control plane is reachable by
+anyone who can reach its port, and tells you how to restrict it. You can dismiss that notice.
+
+### Signing in
+
+Where single sign-on is configured, you land on a **sign-in page** first, showing your organisation's
+own logo and caption and a single **Sign in with SSO** button. It hands you to your identity provider
+and brings you back. Once you are signed in, the user menu in the top bar names you and is where you
+sign out. On a deployment with no sign-in there is no user menu, because there is no session to end.
+
 ### The sidebar
 
 The top of the sidebar is a fixed header, stacked top to bottom:

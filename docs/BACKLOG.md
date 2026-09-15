@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-15 (FOURTH pass, after the thirty-eight-decision sitting).**
-> **68 rows: 1 × P1 · 52 × P2 · 15 × P3.**
+> **71 rows: 1 × P1 · 53 × P2 · 17 × P3.**
 >
 > 🔴 **The headline is not any single answer: SIXTEEN P3 rows stopped being demand-gated in one sitting.**
 > §0 defines P3 as *demand-gated — build only when someone asks by name*. On 2026-09-15 the operator was

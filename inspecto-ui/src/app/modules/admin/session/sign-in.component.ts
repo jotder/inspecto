@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
 import { SessionService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { environment } from 'environments/environment';
 
 /**
  * Standard-edition sign-in screen (W6d). A single "Sign in with SSO" action that kicks off the
@@ -19,31 +20,67 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, InspectoAlertComponent],
     template: `
-        <div class="flex min-h-screen items-center justify-center p-6">
-            <div class="w-full max-w-sm rounded-2xl bg-card p-8 shadow-lg text-center">
-                <img class="mx-auto h-10" src="assets/images/logo/inspecto-logo.svg" alt="Inspecto" />
-                <h1 class="mt-6 text-2xl font-semibold">Sign in</h1>
-                <p class="mt-2 text-secondary">
-                    This is a secured (Standard-edition) workspace. Continue with your organization's single sign-on to
-                    access it.
-                </p>
+        <div class="flex min-h-screen w-full flex-col md:flex-row">
+            <!-- Left: whose deployment this is. Branding comes from the bootstrap payload, because
+                 /settings/branding is auth-gated and would 401 on exactly this screen. -->
+            <div class="bg-default flex flex-col justify-between gap-10 p-8 md:w-1/2 md:p-12 lg:p-16">
+                <div class="flex items-center gap-3">
+                    <img class="h-8" src="assets/images/logo/inspecto-logo.svg" alt="" />
+                    <span class="text-lg font-semibold">Inspecto</span>
+                </div>
 
-                @if (failed()) {
-                    <inspecto-alert class="mt-4 block text-left" variant="error" title="Sign-in failed">
-                        We couldn't complete sign-in. Please try again.
-                    </inspecto-alert>
-                }
-
-                <button mat-flat-button color="primary" class="mt-6 w-full" [disabled]="busy()" (click)="signIn()">
-                    @if (busy()) {
-                        <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
-                    } @else {
-                        <ng-container>
-                            <mat-icon svgIcon="heroicons_outline:lock-closed" />
-                            <span>Sign in with SSO</span>
-                        </ng-container>
+                <div class="flex flex-col gap-6">
+                    @if (logo() || caption()) {
+                        <div class="flex items-center gap-3">
+                            @if (logo(); as src) {
+                                <img class="h-9" [src]="src" alt="" />
+                            }
+                            @if (caption(); as c) {
+                                <span class="text-secondary text-lg italic">{{ c }}</span>
+                            }
+                        </div>
                     }
-                </button>
+                    <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
+                        Every Pipeline, every Run, one place to see it.
+                    </h1>
+                    <p class="text-secondary max-w-md text-lg">
+                        Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a Dataset
+                        it can trust.
+                    </p>
+                </div>
+
+                <span class="text-secondary text-sm">{{ footer() }}</span>
+            </div>
+
+            <!-- Right: the one action. -->
+            <div class="flex flex-auto items-center justify-center p-8 md:w-1/2">
+                <div class="bg-card w-full max-w-sm rounded-2xl p-8 text-center shadow-lg">
+                    <div
+                        class="text-primary bg-primary-50 dark:bg-primary-900 mx-auto flex h-12 w-12 items-center justify-center rounded-xl"
+                    >
+                        <mat-icon class="icon-size-6" [svgIcon]="'heroicons_outline:lock-closed'"></mat-icon>
+                    </div>
+                    <h2 class="mt-5 text-2xl font-semibold">Sign in</h2>
+                    <p class="text-secondary mt-2">
+                        This workspace is secured. Continue with your organisation's single sign-on.
+                    </p>
+                    @if (failed()) {
+                        <inspecto-alert class="mt-4 block text-left" variant="error" title="Sign-in failed">
+                            We couldn't complete sign-in. Please try again.
+                        </inspecto-alert>
+                    }
+                    <button mat-flat-button color="primary" class="mt-6 w-full" [disabled]="busy()" (click)="signIn()">
+                        @if (busy()) {
+                            <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
+                        } @else {
+                            <ng-container>
+                                <mat-icon svgIcon="heroicons_outline:lock-closed" />
+                                <span>Sign in with SSO</span>
+                            </ng-container>
+                        }
+                    </button>
+                    <p class="text-secondary mt-6 border-t pt-4 text-sm">Need access? Ask your space administrator.</p>
+                </div>
             </div>
         </div>
     `,
@@ -54,6 +91,12 @@ export class SignInComponent implements OnInit {
 
     readonly busy = signal(false);
     readonly failed = signal(false);
+
+    /** Deployment branding, from the bootstrap payload — `BrandingService` reads an auth-gated route and
+     *  would 401 here. Each falls back to the shipped default when the operator authored none. */
+    readonly logo = computed(() => this.session.branding().logoDataUrl);
+    readonly caption = computed(() => this.session.branding().caption);
+    readonly footer = computed(() => this.session.branding().footerText ?? environment.footerText);
 
     ngOnInit(): void {
         // Already signed in (or Personal/offline where login is never required) → straight into the app.

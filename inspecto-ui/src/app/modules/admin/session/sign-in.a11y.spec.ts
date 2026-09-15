@@ -1,35 +1,69 @@
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Router } from '@angular/router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { describe, expect, it, vi } from 'vitest';
 import { SignInComponent } from './sign-in.component';
 
-describe('SignInComponent (a11y, W6d)', () => {
-    beforeEach(() => {
-        TestBed.configureTestingModule({
-            imports: [SignInComponent],
-            providers: [
-                provideNoopAnimations(),
-                { provide: SessionService, useValue: { loginRequired: () => true, beginLogin: vi.fn() } },
-                { provide: Router, useValue: { navigate: vi.fn() } },
-            ],
-        });
+function create(branding: { logoDataUrl?: string; caption?: string; footerText?: string } = {}) {
+    TestBed.resetTestingModule();
+    const session = {
+        loginRequired: () => true,
+        beginLogin: vi.fn(),
+        branding: signal({
+            logoDataUrl: branding.logoDataUrl ?? null,
+            caption: branding.caption ?? null,
+            footerText: branding.footerText ?? null,
+        }),
+    };
+    TestBed.configureTestingModule({
+        imports: [SignInComponent],
+        providers: [
+            provideNoopAnimations(),
+            { provide: SessionService, useValue: session },
+            { provide: Router, useValue: { navigate: vi.fn() } },
+        ],
     });
+    const fixture = TestBed.createComponent(SignInComponent);
+    fixture.detectChanges();
+    return { fixture, el: fixture.nativeElement as HTMLElement, session };
+}
 
-    it('renders the sign-in card with no accessibility violations', async () => {
-        const fixture = TestBed.createComponent(SignInComponent);
-        fixture.detectChanges();
-        expect(fixture.nativeElement.querySelector('h1')?.textContent).toContain('Sign in');
-        await expectNoA11yViolations(fixture.nativeElement);
+describe('SignInComponent (W6d)', () => {
+    it('renders with no accessibility violations, and exactly one h1', async () => {
+        const { el } = create();
+        // ⚠ The page's h1 is the headline, not the card. "Sign in" is the card's h2 — two h1s on one page
+        // is the violation this asserts against, and the restyle (2026-09-15) is what introduced the risk.
+        expect(el.querySelectorAll('h1')).toHaveLength(1);
+        expect(el.querySelector('h2')?.textContent).toContain('Sign in');
+        await expectNoA11yViolations(el);
     });
 
     it('starts the login redirect on click', () => {
-        const fixture = TestBed.createComponent(SignInComponent);
-        fixture.detectChanges();
-        const session = TestBed.inject(SessionService);
-        fixture.nativeElement.querySelector('button').click();
+        const { el, session } = create();
+        (el.querySelector('button') as HTMLButtonElement).click();
         expect(session.beginLogin).toHaveBeenCalledOnce();
+    });
+
+    // Branding rides the bootstrap payload because /settings/branding is auth-gated: BrandingService
+    // would 401 on the one screen shown before anyone has signed in.
+    it('shows the deployment branding the bootstrap payload carried', () => {
+        const { el } = create({
+            logoDataUrl: 'data:image/svg+xml;base64,PHN2Zy8+',
+            caption: 'Finance data operations',
+            footerText: '© Gamma Analytics 2026',
+        });
+        expect(el.querySelector('img[src^="data:image"]')).toBeTruthy();
+        expect(el.textContent).toContain('Finance data operations');
+        expect(el.textContent).toContain('© Gamma Analytics 2026');
+    });
+
+    it('falls back to the shipped defaults when no branding is authored', () => {
+        const { el } = create();
+        expect(el.querySelector('img[src^="data:image"]')).toBeNull();
+        // The product mark always renders; only the operator's own logo is conditional.
+        expect(el.querySelector('img[src*="inspecto-logo"]')).toBeTruthy();
     });
 });
