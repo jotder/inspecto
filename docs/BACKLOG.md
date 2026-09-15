@@ -768,6 +768,32 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 ### Control plane, jobs, notifications, queries
 
+- **P2** · **`HOME-VERSION-1` — nothing in the running system knows the product version, so no surface can show it.**
+  Filed 2026-09-15 building the sign-in landing (landing-page plan D2 asked for "branding + version"). **Grounded:**
+  no Java file reads `Implementation-Version` or a filtered resource, no route serves a version, `environment.ts`
+  has no version field, and `inspecto-ui/package.json` says **21.0.0** — the Angular scaffold's number, not the
+  product's `4.0.0-SNAPSHOT`. ⛔ **The version was therefore NOT shown**: a wrong number on a sign-in page is worse
+  than none, and it is exactly the field a support call reads aloud. Wanted: one source — Maven stamping the fat
+  JAR's manifest and the backend reporting it, or the build writing it into the SPA — then the sign-in page and an
+  About surface read it. **Close when a running deployment reports its own version and the sign-in page shows it.**
+  → `okf/capabilities/surfaces/surfaces.md` §3.3
+
+- **P3** · **`HOME-TILES-1` — Home shows three activity sources because only three have a cheap call.**
+  Filed 2026-09-15. The approved mockups carried "Expectations breached" and "Datasets written" tiles; neither was
+  built. `ExpectationsService.list()` takes **no limit parameter** and there is no breach-count endpoint, so the
+  tile would fetch every Expectation on a landing page; and **no route reports a dataset-write count at all**.
+  ⛔ Do not add either tile client-side — the cost is the reason they were dropped. **Close when the backend serves
+  a cheap count for either, and the tile lands with it.** → `okf/capabilities/surfaces/surfaces.md` §3.8
+
+- **P3** · **`SIGNIN-PREVIEW-1` — the restyled sign-in page has never been seen in a browser.**
+  Filed 2026-09-15. It renders only when `features.authMode === 'oidc'`, and **no dev switch produces that against a
+  Personal backend** — `session.service.ts`'s javadoc names a `mockAuthMode: 'oidc'` switch that **does not exist in
+  the tree** (grep: one stale comment, zero implementations), and `tools/run-backend.ps1` passes no `-Dauth.mode`.
+  So the page is covered by unit tests (render, one-`h1`, branding, fallback, a11y) and by nothing else; its
+  responsive behaviour is unverified. Wanted: either the dev switch its own javadoc already promises, or a documented
+  `-Dauth.mode=oidc` preview recipe. **Close when a shift can open `/sign-in` locally without editing source.**
+  → `okf/capabilities/surfaces/surfaces.md` §3.8
+
 - **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
   decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
   `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
@@ -1257,7 +1283,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   **What remains:** (a) the other ~19 inexpressible routes — Incident/Case triage (~15, in the optional
   `inspecto-ops` module) and agent governance (4, `AgentRoutes`); ⚠ **the audit itself says the triage
   family needs a product decision first** — whether Incident triage should stay open even now that
-  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) the 10 unverified gateable routes;
+  `canAdminister` exists — so it is NOT simply "gate all 22"; (b) ~~the 10 unverified gateable routes~~ ✅ **GROUNDED 2026-09-15 — and there were ELEVEN, not ten** (`POST /spaces` was §6(a), not §5, so the refutation was subtracted from the wrong bucket). **Result: 5 GATE · 3 deliberate exemptions · 3 operator calls** — per-route verdicts in the audit's §5 GROUNDED table. 🔴 Two of the five are a **request-forgery-shaped pair** (`POST /assist/settings` writes a server-wide `baseUrl`, `POST /assist/settings/test` calls out to it) and ⛔ must be gated in ONE commit; `inspecto-agent` IS staged, so unlike §6(c) this one is live in shipped bundles;
   (c) ✅ **operator decided 2026-09-15: record the exemption reasoning for the 49 correctly-ungated routes**
   in the audit doc, so the ratchet starts from a reviewed baseline; (d) the ratchet itself, **last**.
   → `superpower/route-gating-audit.md` · `okf/capabilities/security/security.md`

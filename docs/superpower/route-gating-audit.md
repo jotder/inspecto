@@ -100,7 +100,7 @@ start on immediately.**
 
 | Route | Proposed capability | Why this one |
 |---|---|---|
-| `POST /requirements` | `canTriageRequirements` | 🔴 **Its own sibling is already gated** — `/requirements/{id}/decision` and `/deliver` both carry it. Creating a Requirement is ungated while deciding one is not. |
+| ~~`POST /requirements`~~ | — | ⛔ **STRUCK — REFUTED 2026-09-15.** It is **SEC-7(c), deliberate**: anyone may raise a Requirement, only a triager decides, pinned by `ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen`. ⚠ The reasoning in this cell — *"its own sibling is already gated"* — is the exact inference that has now failed **six** times in this table; it is left visible, struck, as the worked example. |
 | `POST /import` | `canAuthorWorkbench` | Sibling `POST /bundle/import` already carries it; both write config. |
 | `POST /spaces/import` | `canAuthorWorkbench` | Writes an entire Space tree. ⚠ See bucket 6 — the rest of Space lifecycle has no capability, so this one is only *half* the family. |
 | `POST /recon/run` | `canOperateRuns` | Runs a saved Reconciliation — the same shape as every other trigger already gated on it. |
@@ -199,7 +199,12 @@ separately. ✅ **That row was filed and then REFUTED on 2026-09-15**: the per-r
 governance. Each carries a `CapabilityManifest` entry; `CapabilityManifestTest` pins registration and
 manifest to each other in both directions, and was proven red by un-gating one.
 
-🔴 **§5's list of 12 is now 10 — two of its entries were WRONG, and gating them turned the build red.**
+🔴 **§5's list of 12 is now 11 — one of its entries was WRONG, and gating it turned the build red.**
+⚠ **This line said "now 10 — two of its entries" until 2026-09-15, and the arithmetic was wrong.**
+`POST /spaces` was never a §5 entry — it is §6(a) Space lifecycle, and its revert belongs to that bucket,
+where the shipped work gated 2 of 3 and recorded the third as the recovery route. Only **one** §5 entry
+(`POST /requirements`) was refuted. ⛔ **A row about uncounted items had its own count wrong** — the
+board inherited the undercount as *"the 10 unverified gateable routes"*, so it was wrong in two places.
 
 | Route | §5 said | Ground truth |
 |---|---|---|
@@ -218,6 +223,42 @@ equally often the sibling set that is wrong, or an asymmetry someone chose on pu
   the optional `inspecto-ops` module. Three options: require `canAdminister`, give triage its own
   capability after all, or leave it open by design and say so.
 - The 10 unverified §5 routes.
+
+### §5 GROUNDED — all 11 re-verified one at a time, 2026-09-15
+
+⛔ **The result: of eleven "gateable now" routes, FIVE are real gates. Three are deliberate exemptions
+with the reasoning already in the code, and three need an operator call.** ⚠ That is the sixth, seventh
+and eighth time this table's *should be gated* bucket has failed inspection — ⛔ **it was never reviewed
+to the standard its *correctly ungated* buckets were**, and the fix is not to re-read it but to treat
+every remaining entry as a hypothesis.
+
+| Route | Verdict | The fact that decides it |
+|---|---|---|
+| `POST /import` | ✅ **GATE** `canAuthorWorkbench` | Parses a bundle, writes into the Space's `config/` and **hot-registers connections and pipelines live** (`DataSourceRoutes:246-312`). Both true siblings are gated — `/bundle/import` (`BundleRoutes:118`), `/pipelines/import` (`PipelineBundleRoutes:96`). No manifest entry, no defending comment, and **no test exercises it at all**. |
+| `POST /events/views` | ✅ **GATE** `canAuthorWorkbench` | A saved view is **server-wide, not per-user**: `SavedView` is `(name, filters, createdAt)` with no subject field (`SavedView.java:9-20`) over one `SavedViewStore` per service (`CollectorService:116`). Any caller creates what every caller sees. |
+| `POST /events/views/{id}/delete` | ✅ **GATE** `canAuthorWorkbench` | Same store, no ownership check — deletes another caller's view. ⚠ A POST-shaped DELETE does not change the authorization question. |
+| `POST /assist/settings` | ✅ **GATE** `canAuthorWorkbench` | **Server-wide** provider config, one file (`AssistModelSettings.save`), reachable in Standard/Enterprise. 🔴 Its own javadoc names a `scope: assist.write` **that the route never enforces** — documented intent, unenforced. |
+| `POST /assist/settings/test` | ✅ **GATE** `canAuthorWorkbench` | Performs a **real outbound call** (`p.generate(...)`) to whatever `baseUrl` was last saved. ⛔ **Gate it WITH the route above, never alone** — see the security note below. |
+| `POST /recon/run` | ⛔ **DELIBERATE EXEMPTION** | 🔴 The audit called it *"the same shape as every other trigger"*. **It triggers nothing** — stateless compute, nothing persisted, no job dispatched. Siblings `/recon/columns` and `/recon/breaks` are the same shape and were never proposed; `/bi/query` is ungated for this reason (`BiRoutes:44`). The class javadoc says these routes *"are stateless compute over ReconService"* with `/recon/promote` as *"the one exception… which writes"*. |
+| `POST /tags/assignments/{k}/{id}` | ⛔ **DELIBERATE EXEMPTION** | `TagRoutes.java:60-62` states it: gated **per target via `AnnotationTargets`, not by capability**, because *"a capability gate would make 'can tag' independent of 'can see' — which is exactly how a tag would turn into an access grant."* |
+| `DELETE /tags/assignments/{k}/{id}/{tag}` | ⛔ **DELIBERATE EXEMPTION** | Same comment, which covers both assignment routes together. |
+| `POST /spaces/import` | ❓ **OPERATOR CALL** | Additive like `POST /spaces`, whose `⛔ NOT gated … and that is a DECISION` comment sits on the **previous line** and reasons *"creating a Space is additive"*. ⚠ But that comment **never names `/spaces/import`**, and no test covers it — treating it as covered is an inference, and inference is what failed here six times. |
+| `POST /tags/rules/{id}/apply` | ❓ **OPERATOR CALL** | Its own comment (`TagRoutes.java:56`) calls it deliberately ungated as *"an operational action… not config"* — but the closest structural sibling, `DecisionRoutes` `POST /decision-rules/{name}/apply` (same bulk-apply-a-rule shape), **is** gated `canOperateRuns`. Two ops-shaped routes disagree. |
+| `POST /recon/promote` | ❓ **OPERATOR CALL** | It does write — opens a durable Incident (`ReconRoutes:201-205`) — so it is not exempt. But `canAuthorWorkbench` has **zero precedent for Incident creation**, and the codebase already contradicts itself: `DecisionRoutes.apply()` opens Incidents under `canOperateRuns`, `ExpectationRoutes` opens them **fully ungated**. No Incident capability exists in `Roles`. |
+
+🔴 **SECURITY NOTE — the assist pair is request-forgery-shaped, and that is a finding this audit did
+not have.** `POST /assist/settings` is ungated and writes a **server-wide** `baseUrl`/`provider`;
+`POST /assist/settings/test` then makes a **real outbound request to it**. ⇒ any authenticated caller can
+point the server at an arbitrary URL and make it call out. ⚠ Unlike §6(c) agent governance — whose gate is
+correct but **unreached**, because nothing stages `inspecto-intelligence` — **`inspecto-agent` IS staged**
+(`package.ps1:340-348`), so this pair is live in every Standard and Enterprise bundle. ⛔ **Gate both in
+one commit**: gating only the test route leaves the write route as the injection point.
+
+⚠ **`EventRoutes` and `AssistRoutes` are 100% ungated FILES**, not outliers among gated siblings — neither
+appears in `CapabilityManifest` at all, so the 2026-09-15 sweep never considered them. ⛔ That is a
+different failure from the one this audit was written about: not *"a route nobody listed"* but *"a file
+nobody opened"*, and a ratchet over route registrations would have caught it while a re-read of this
+document would not.
 - The ratchet — **last**, once the above are settled.
 
 ⚠ **Reachability caveat on §6c:** `/agent/*` answers 503 in every bundle today, because no packaging step
