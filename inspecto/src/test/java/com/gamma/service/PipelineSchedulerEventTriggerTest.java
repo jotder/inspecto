@@ -225,11 +225,71 @@ class PipelineSchedulerEventTriggerTest {
                 "trigger:\n  type: event\n  on: commit\n  from: orders\n");
 
         try (Harness h = harness(List.of(down))) {
-            h.scheduler.onDatasetWrite("orders");
+            h.scheduler.onDatasetWrite("orders", null);
             h.settle();
             assertEquals(List.of(), h.ran,
                     "the two namespaces are distinct: a commit-triggered pipeline must ignore a Dataset "
                             + "write, exactly as a dataset-triggered one ignores a pipeline commit");
+        }
+    }
+
+    // ── the self-loop guard (DATASET-SELF-TRIGGER-1) ─────────────────────────
+
+    /**
+     * 🔴 <b>A pipeline must not re-trigger itself through its own Dataset write.</b>
+     * {@code ConsignmentProcessJobType} emits {@code dataset.write} from inside a pipeline's own run, so a
+     * pipeline whose processor writes store {@code orders} and subscribes to {@code datasets/orders} fed
+     * itself. Coalescing turned that into a hot loop rather than a crash, which is why it was never
+     * reported as a failure — it just looked busy.
+     *
+     * <p>⛔ The guard is only possible because the emitters carry the OWNING PIPELINE separately from the
+     * producer: the old bare {@code producer} was a job name here and a processor component id there, so
+     * comparing it against a pipeline name could never match. A guard written against that value would
+     * have looked right in review and never fired once.
+     */
+    @Test
+    void aPipelineDoesNotRetriggerItselfThroughItsOwnDatasetWrite(@TempDir Path dir) throws Exception {
+        Path self = pipeline(dir.resolve("self"), "ORDERS_PROC",
+                "trigger:\n  type: event\n  on: dataset\n  from: datasets/orders\n");
+
+        try (Harness h = harness(List.of(self))) {
+            h.scheduler.onDatasetWrite("orders", "orders_proc");
+            h.settle();
+            assertEquals(List.of(), h.ran, "the producing pipeline must not be re-triggered by its own write");
+        }
+    }
+
+    /**
+     * The guard must be narrow: a DIFFERENT pipeline writing the same Dataset still triggers the
+     * subscriber. Without this, "suppress the self-loop" could quietly become "suppress everything" and
+     * every dataset-triggered pipeline would stop firing — a far worse defect, and a silent one.
+     */
+    @Test
+    void anotherPipelinesWriteStillTriggersTheSubscriber(@TempDir Path dir) throws Exception {
+        Path sub = pipeline(dir.resolve("sub"), "ORDERS_PROC",
+                "trigger:\n  type: event\n  on: dataset\n  from: datasets/orders\n");
+
+        try (Harness h = harness(List.of(sub))) {
+            h.scheduler.onDatasetWrite("orders", "some_other_pipeline");
+            h.settle();
+            assertEquals(List.of("orders_proc"), h.ran, "only the PRODUCER is suppressed, not every subscriber");
+        }
+    }
+
+    /**
+     * ⚠ An UNOWNED write — a cron or manual job, which genuinely belongs to no pipeline — must still
+     * trigger every subscriber. {@code null} means "suppress nothing"; reading it as "suppress everything"
+     * would silently break the ordinary materialize-then-trigger path that predates the guard.
+     */
+    @Test
+    void anUnownedWriteStillTriggersTheSubscriber(@TempDir Path dir) throws Exception {
+        Path sub = pipeline(dir.resolve("sub"), "ORDERS_PROC",
+                "trigger:\n  type: event\n  on: dataset\n  from: datasets/orders\n");
+
+        try (Harness h = harness(List.of(sub))) {
+            h.scheduler.onDatasetWrite("orders", null);
+            h.settle();
+            assertEquals(List.of("orders_proc"), h.ran, "a job no pipeline owns must still trigger subscribers");
         }
     }
 }

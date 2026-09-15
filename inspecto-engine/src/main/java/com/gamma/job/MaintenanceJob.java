@@ -208,7 +208,9 @@ final class MaintenanceJob implements Job {
             case "retire_superseded"  -> RetireSupersededTask.run(cfg, dryRun);
             case "compact"            -> dryRun ? noPreview(task) : PartitionCompactor.run(cfg);
             case "reference_compact"  -> dryRun ? noPreview(task) : ReferenceCompactor.run(cfg);
-            case "materialize"        -> dryRun ? noPreview(task) : MaterializeTask.run(cfg, dataDir);
+            // ⚠ `ctx` threaded in for the owning pipeline the dataset.write Signal now carries
+            // (DATASET-SELF-TRIGGER-1) — not for the dry run, which is still gated right here.
+            case "materialize"        -> dryRun ? noPreview(task) : MaterializeTask.run(cfg, dataDir, ctx);
             // Liveness probe / test vehicle: optional sleep_ms holds the run RUNNING for a
             // deterministic window, so in-flight behavior (non-overlap, replay 409) is testable.
             case "heartbeat", "noop"  -> {

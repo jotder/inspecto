@@ -1023,7 +1023,14 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     || !com.gamma.signal.DatasetWriteSignal.TYPE.equals(attrs.get(com.gamma.signal.Signal.ATTR_TYPE)))
                 return;
             Object dataset = e.payload() == null ? null : e.payload().get("dataset");
-            if (dataset != null) underSpace(() -> pipelineScheduler.onDatasetWrite(dataset.toString()));
+            // ⚠ The OWNING PIPELINE must be carried through, not dropped: it is the only thing
+            // onDatasetWrite's self-loop guard can match on (DATASET-SELF-TRIGGER-1). This subscriber read
+            // `dataset` alone and discarded the rest, so the producer never reached the scheduler and the
+            // guard could not have fired even if it had existed.
+            Object owner = e.payload() == null ? null
+                    : e.payload().get(com.gamma.signal.DatasetWriteSignal.PAYLOAD_PIPELINE);
+            if (dataset != null) underSpace(() -> pipelineScheduler.onDatasetWrite(
+                    dataset.toString(), owner == null ? null : owner.toString()));
         });
         // Dispatch-and-return: the tick selects due pipelines and hands each to triggerWorkers, so a slow
         // pipeline cannot delay the next tick for the others. runAllOnce (POST /trigger, tests) keeps the

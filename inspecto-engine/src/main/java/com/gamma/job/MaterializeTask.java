@@ -51,7 +51,7 @@ final class MaterializeTask {
 
     private MaterializeTask() {}
 
-    static JobResult run(JobConfig cfg, String dataDir) throws Exception {
+    static JobResult run(JobConfig cfg, String dataDir, JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
         // ⛔ NOT System.getProperty("assist.write.root") — that is JVM-wide, while dataDir below is
         // per-space, so the two crossed in any multi-space deployment and this task read one space's
@@ -129,7 +129,13 @@ final class MaterializeTask {
         content.put("materialized", Map.of("from", source, "at", Instant.now().toString(), "rows", rows));
         store.write("dataset", target, content);
         // S3a: the data became visible at the swap above — announce it (additive, never throws).
-        com.gamma.signal.DatasetWriteSignal.emit(target, rows, cfg.name());
+        // ⚠ The producer is a JOB, and saying so is the point: this site passed a bare `cfg.name()` into the
+        // same parameter that ConsignmentProcessJobType filled with a PROCESSOR id, so no consumer could
+        // tell the two apart (DATASET-SELF-TRIGGER-1). The owning pipeline is known only when this job was
+        // fired by a pipeline commit; a cron or manual materialize has none, and null suppresses nothing.
+        com.gamma.signal.DatasetWriteSignal.emit(target, rows,
+                com.gamma.signal.Ref.of("job", cfg.name()),
+                TriggerInfo.owningPipeline(ctx));
 
         return JobResult.ok("materialize: " + rows + " row(s) → " + outDir.resolve(snapshot)
                 + " (dataset '" + target + "' refreshed)", (System.nanoTime() - t0) / 1_000_000L);

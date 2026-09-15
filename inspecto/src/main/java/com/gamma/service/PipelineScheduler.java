@@ -463,16 +463,35 @@ final class PipelineScheduler {
      * pipeline declaring {@code {type: event, on: dataset, from: datasets/<id>}} for that Dataset. The exact
      * sibling of {@link #onUpstreamCommit} — same off-thread hand-off (the EventLog subscriber delivers
      * on the emitting thread, which may hold a pipeline claim), same per-pipeline coalescing — over the
-     * Dataset namespace instead of the pipeline one. No self-loop guard is needed: the producer is a
-     * Dataset write (a job/materialize), never the triggered pipeline's own commit.
+     * Dataset namespace instead of the pipeline one.
+     *
+     * <p>🔴 <b>It DOES need a self-loop guard</b> ({@code DATASET-SELF-TRIGGER-1}). This javadoc used to
+     * claim one was unnecessary because "the producer is a Dataset write (a job/materialize), never the
+     * triggered pipeline's own commit" — <b>false for the consignment path</b>:
+     * {@code ConsignmentProcessJobType} emits {@code dataset.write} from inside a pipeline's own run, so a
+     * pipeline whose processor writes store {@code S} and declares {@code {on: dataset, from: datasets/S}}
+     * re-triggered itself. Coalescing meant it degraded into a hot loop rather than a stack overflow, which
+     * is why it read as "busy" rather than "broken".
+     *
+     * <p>⛔ The obvious one-line guard could not fire before 2026-09-15, and adding it would have looked
+     * correct: {@code producer} was a job name or a processor component id depending on the emitter, and
+     * {@code CollectorService} dropped it entirely before calling this method — so comparing it to a
+     * pipeline name never matched anything. The guard works only because the emitters now carry the
+     * <b>owning pipeline</b> separately from the producer {@link com.gamma.signal.Ref}.
+     *
+     * @param producerPipeline the pipeline whose run produced the write, or {@code null} when none owns it
+     *                         (a cron or manual job). ⚠ {@code null} suppresses NOTHING — a job that no
+     *                         pipeline owns must still be able to trigger every subscriber, which is the
+     *                         pre-existing behaviour this guard must not regress.
      */
-    void onDatasetWrite(String dataset) {
+    void onDatasetWrite(String dataset, String producerPipeline) {
         if (dataset == null || dataset.isBlank()) return;
         for (Path p : registry) {
             PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
             if (cfg == null) continue;
             String id = cfg.identity().pipelineName();
             if (paused.contains(id) || !cfg.active()) continue;
+            if (id.equals(producerPipeline)) continue;                       // self-loop guard
             PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
             if (t.scheduler() != PipelineTrigger.Scheduler.EVENT) continue;
             if (!"dataset".equalsIgnoreCase(t.on())) continue;

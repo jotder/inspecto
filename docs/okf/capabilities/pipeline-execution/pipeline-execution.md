@@ -200,6 +200,11 @@ chain *is* the success condition. ⚠ Granularity is unchanged: still one signal
 summed. Whether a run should emit **one** signal, and whether derived tables should announce at all, are
 contract changes for `dataset.write` consumers and are deliberately still open.
 
+🔴 **The `on: dataset` handler DOES have a self-loop guard — since 2026-09-15 (`DATASET-SELF-TRIGGER-1`).** Its javadoc previously said one was unnecessary because *“the producer is a Dataset write (a job/materialize), never the triggered pipeline’s own commit”*. That was **false for the consignment path**: `ConsignmentProcessJobType` emits from inside a pipeline’s own run, so a pipeline whose processor writes store `S` and declares `{on: dataset, from: datasets/S}` re-triggered itself — coalesced, so it degraded into a hot loop rather than a crash, and read as *busy* rather than *broken*.
+⛔ **The obvious one-line guard could not have fired**, and would have looked right in review. `producer` was a bare String meaning different things at different sites — a JOB name from `MaterializeTask`, a PROCESSOR component id from `ConsignmentProcessJobType` — and `CollectorService` **dropped it entirely** before calling the scheduler, so nothing to compare ever arrived. The fix was therefore a vocabulary change first: `producer` is now a structured `Ref {kind, id}` on the Signal’s `actor` slot, and the **owning pipeline** travels as its own payload key, which is what the guard matches on.
+⚠ **A `null` owning pipeline means “suppress nothing”, and that is load-bearing.** A cron or manually fired job genuinely has no owning pipeline (only an `event:<pipeline>` trigger carries one), so reading absence as “suppress” would have silently killed the ordinary materialize-then-trigger path that predates the guard.
+⚠ The wiring was the defect, not the comparison — a guard unit-tested only on `PipelineScheduler` would pass while the shipped path stayed broken, which is why `CollectorServiceTriggerTest` drives the real subscriber end to end.
+
 ⚠ **There is no on-commit *job* trigger.** Commit-fired jobs ride the signal bus. Do not cite the
 graph-structure refusal as the thing that keeps job work at rest — that is a pipeline-edge relation and a
 different mechanism.
@@ -676,7 +681,7 @@ procedure lives in a 71 KB *reference*.
   `SPEC-NOPROOF-1`): a **non-SUCCESS** commit triggers nothing, a trigger naming itself does not
   re-fire on its own commit (the self-loop guard, whose absence turns one commit into an unbounded run
   loop), a paused pipeline stays paused for EVENT triggers, `from` tolerates case and a `flows/` prefix,
-  and a `on: commit` pipeline ignores a Dataset write. Mutation-proven. 🔴 **The board row that asked for
+  and a `on: commit` pipeline ignores a Dataset write. Mutation-proven. ➕ **2026-09-15**: the `on: dataset` side now has the same three-way cover — the producing pipeline is suppressed, another pipeline’s write still fires it, and an **unowned** write (a cron/manual job) still fires it. ⛔ The third is not padding: reading “no owning pipeline” as “suppress” would disable materialize-then-trigger entirely, silently. 🔴 **The board row that asked for
   this said the scheduler "has no test class at all" — literally true, materially misleading**:
   `CollectorServiceTriggerTest` already proved its loop semantics end-to-end (DEFAULT_POLL, interval,
   cron, manual, the event trigger, the `on: dataset` fence) under a collaborator's name. ⚠ Grep the

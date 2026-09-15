@@ -341,7 +341,14 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
             }
             // The chain completed — nothing threw, so every write it announces is one that survived the
             // whole run. Additive and must never throw, as before.
-            pending.forEach((w, n) -> com.gamma.signal.DatasetWriteSignal.emit(w.store(), n, w.producer()));
+            // 🔴 The owning pipeline rides along so the scheduler can break the self-loop this job type
+            // creates: a pipeline whose processor writes store S and subscribes to `datasets/S` re-triggered
+            // itself (DATASET-SELF-TRIGGER-1). It is known only when this job was fired BY a pipeline
+            // commit — `event:<pipeline>`; a cron or manual run genuinely has no owner, and passing null
+            // then is correct rather than a gap: it suppresses nothing, exactly as before.
+            String owningPipeline = TriggerInfo.owningPipeline(ctx);
+            pending.forEach((w, n) -> com.gamma.signal.DatasetWriteSignal.emit(
+                    w.store(), n, com.gamma.signal.Ref.of("processor", w.producer()), owningPipeline));
 
             return chain.size() == 1
                     ? new JobResult(last.status(), last.message(), ms(t0))
@@ -402,7 +409,15 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
             return java.nio.file.Paths.get(dataDir, "_derived").toString();
         }
 
-        /** One deferred {@code dataset.write} announcement, keyed exactly as the emit used to be. */
+        /**
+         * One deferred {@code dataset.write} announcement.
+         *
+         * <p>⚠ {@code producer} is the PROCESSOR component id — it was passed as the Signal's bare
+         * {@code producer} string until {@code DATASET-SELF-TRIGGER-1} (2026-09-15), where
+         * {@code MaterializeTask} passed a JOB name through the same parameter. Two different kinds of
+         * thing in one unlabelled slot is why no consumer could use it; it is now
+         * {@code Ref.of("processor", …)} and the owning pipeline travels separately.
+         */
         private record PendingWrite(String store, String producer) {}
 
         private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows,

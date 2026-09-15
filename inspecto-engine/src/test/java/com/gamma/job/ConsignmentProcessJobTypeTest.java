@@ -329,8 +329,15 @@ class ConsignmentProcessJobTypeTest {
                         com.gamma.signal.DatasetWriteSignal.TYPE, null, null, null, null, 10);
                 assertEquals(1, signals.size(), "one dataset.write per written store, as before");
                 assertEquals("cdr__summary", signals.get(0).payload().get("dataset"));
-                assertEquals("daily-counter", signals.get(0).payload().get("producer"),
+                // ⚠ `processor:` prefix since DATASET-SELF-TRIGGER-1 (2026-09-15). The payload key now follows
+                // the repo's existing compact `kind:id` convention (`Ref.parseCompact`) that this field's other
+                // fixtures already used — it is the bare form that was the odd one out. Granularity is
+                // unchanged; what changed is that the value now SAYS what kind of thing it names, which is the
+                // whole point: the same slot used to hold a JOB name from MaterializeTask.
+                assertEquals("processor:daily-counter", signals.get(0).payload().get("producer"),
                         "granularity is unchanged: the announcement still names the processor that wrote");
+                assertEquals("processor", signals.get(0).actor().kind(), "and names it structurally too");
+                assertEquals("daily-counter", signals.get(0).actor().id());
             }
         } finally {
             org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);

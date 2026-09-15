@@ -23,7 +23,8 @@ class DatasetWriteSignalTest {
         EventLog.register(space, log);
         org.slf4j.MDC.put(EventLog.SPACE_MDC_KEY, space);
         try {
-            DatasetWriteSignal.emit("orders_rollup", 42, "materialize:orders_rollup");
+            DatasetWriteSignal.emit("orders_rollup", 42,
+                    Ref.of("materialize", "orders_rollup"), "nightly_orders");
 
             List<Signal> signals = Signals.query(log.store(), DatasetWriteSignal.TYPE,
                     null, null, null, null, 10);
@@ -34,8 +35,16 @@ class DatasetWriteSignalTest {
             assertEquals("orders_rollup", sig.subject().id());
             assertEquals("orders_rollup", sig.payload().get("dataset"));
             assertEquals(42L, ((Number) sig.payload().get("rows")).longValue());
-            assertEquals("materialize:orders_rollup", sig.payload().get("producer"));
+            assertEquals("materialize:orders_rollup", sig.payload().get("producer"),
+                    "the compact kind:id string stays in the payload for readers that had it");
             assertNotNull(sig.payload().get("at"));
+            // DATASET-SELF-TRIGGER-1: the producer is STRUCTURED on the Signal's own actor slot (null until
+            // now), and the owning pipeline is a separate value — not flattened into the producer name.
+            assertNotNull(sig.actor(), "the producer rides the actor Ref");
+            assertEquals("materialize", sig.actor().kind());
+            assertEquals("orders_rollup", sig.actor().id());
+            assertEquals("nightly_orders", sig.payload().get(DatasetWriteSignal.PAYLOAD_PIPELINE),
+                    "the owning pipeline is what the scheduler's self-loop guard matches on");
         } finally {
             org.slf4j.MDC.remove(EventLog.SPACE_MDC_KEY);
             EventLog.unregister(space);
@@ -50,7 +59,7 @@ class DatasetWriteSignalTest {
         EventLog.register(space, log);
         org.slf4j.MDC.put(EventLog.SPACE_MDC_KEY, space);
         try {
-            DatasetWriteSignal.emit("sparse_store", -1, null);
+            DatasetWriteSignal.emit("sparse_store", -1, null, null);
 
             List<Signal> signals = Signals.query(log.store(), DatasetWriteSignal.TYPE,
                     null, null, null, null, 10);
@@ -58,6 +67,9 @@ class DatasetWriteSignalTest {
             assertEquals(-1L, ((Number) signals.get(0).payload().get("rows")).longValue());
             assertFalse(signals.get(0).payload().containsKey("producer"),
                     "an absent producer is omitted, never a null in the payload");
+            assertFalse(signals.get(0).payload().containsKey(DatasetWriteSignal.PAYLOAD_PIPELINE),
+                    "an unowned write omits the pipeline too — and that means 'suppress nothing'");
+            assertNull(signals.get(0).actor(), "no producer ⇒ no actor Ref");
         } finally {
             org.slf4j.MDC.remove(EventLog.SPACE_MDC_KEY);
             EventLog.unregister(space);

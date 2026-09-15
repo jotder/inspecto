@@ -179,10 +179,42 @@ class CollectorServiceTriggerTest {
                     "a pipeline commit must never fire an on:dataset trigger (namespace fence)");
 
             // the real thing: a dataset.write Signal on this space's ledger
-            com.gamma.signal.DatasetWriteSignal.emit("orders_rollup", 7, "materialize:test");
+            com.gamma.signal.DatasetWriteSignal.emit("orders_rollup", 7,
+                    com.gamma.signal.Ref.of("job", "test"), null);
             assertTrue(downCommitted.await(10, TimeUnit.SECONDS),
                     "the dataset-triggered pipeline ran when its Dataset was written");
             assertTrue(outputCount(dir.resolve("down")) >= 1, "the triggered run produced output");
+        }
+    }
+
+    /**
+     * 🔴 The self-loop guard, end to end through the real subscriber ({@code DATASET-SELF-TRIGGER-1}).
+     *
+     * <p>⚠ This is the half the unit test on {@code PipelineScheduler} cannot cover: {@code CollectorService}
+     * <b>dropped the producer entirely</b> before calling {@code onDatasetWrite}, so the value never reached
+     * the scheduler. A guard unit-tested in isolation would have passed while the shipped path stayed
+     * broken — the wiring is the defect, not the comparison.
+     */
+    @Test
+    void aDatasetWriteOwnedByTheSubscriberItselfDoesNotRetriggerIt(@TempDir Path dir) throws Exception {
+        // ds_down both SUBSCRIBES to datasets/orders_rollup and (below) announces itself as the write's
+        // owner — the consignment-path shape: a pipeline whose processor writes the store it listens to.
+        Path down = pipeline(dir.resolve("down"), "ds_down",
+                "trigger:\n  type: event\n  on: dataset\n  from: datasets/orders_rollup\n");
+        try (CollectorService svc = new CollectorService(List.of(down), 3600, 2)) {
+            CountDownLatch downCommitted = new CountDownLatch(1);
+            svc.eventBus().subscribe(e -> {
+                if ("ds_down".equalsIgnoreCase(e.pipeline()) && "SUCCESS".equalsIgnoreCase(e.status())) {
+                    downCommitted.countDown();
+                }
+            });
+            svc.start();
+
+            com.gamma.signal.DatasetWriteSignal.emit("orders_rollup", 7,
+                    com.gamma.signal.Ref.of("processor", "summarise"), "ds_down");
+
+            assertFalse(downCommitted.await(3, TimeUnit.SECONDS),
+                    "a pipeline must not be re-triggered by a Dataset write its own run produced");
         }
     }
 }
