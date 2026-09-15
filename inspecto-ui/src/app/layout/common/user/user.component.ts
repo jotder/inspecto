@@ -36,10 +36,12 @@ export class UserComponent implements OnInit, OnDestroy {
 
     /** Personal/offline is auth-free — the whole menu is hidden rather than offer a no-op Sign out. */
     readonly signedInEdition = this.session.authMode;
+    /** The signed-in principal from `bootstrap.session.actor` (wired 2026-09-15 — this used to be a
+     *  hardcoded '' fed by a `UserService.user$` that nothing ever populated). */
+    readonly actor = this.session.actor;
 
     @Input() showAvatar: boolean = true;
     user: User;
-    user_name: string;
     private _unsubscribeAll: Subject<any> = new Subject<any>();
 
     /**
@@ -59,10 +61,6 @@ export class UserComponent implements OnInit, OnDestroy {
      * On init
      */
     ngOnInit(): void {
-        // Auth-free shell: no principal to name. The user menu populates from user$ when a user
-        // is loaded (Standard/OIDC edition); Personal leaves it blank.
-        this.user_name = '';
-
         this._userService.user$.pipe(takeUntil(this._unsubscribeAll)).subscribe((user: User) => {
             this.user = user;
 

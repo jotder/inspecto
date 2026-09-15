@@ -44,6 +44,24 @@ describe('SessionService (W6d edition switch)', () => {
         httpMock.expectNone(`${base}/auth/refresh`); // never attempts a session under Personal
     });
 
+    it('stores the actor only for an authenticated subject, and drops it when the session is lost', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ features: { authMode: 'oidc' }, session: { authenticated: false, actor: 'appUser' } });
+        await tick();
+        expect(svc.actor()).toBeNull(); // the anonymous read's placeholder is never a principal
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ accessToken: 't' });
+        await tick();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ session: { authenticated: true, actor: 'priya.n', capabilities: ['canOperateRuns'] } });
+        await init;
+        expect(svc.actor()).toBe('priya.n');
+        svc.onAuthLost();
+        expect(svc.actor()).toBeNull();
+    });
+
     it('reads features.geoLink, and treats an absent flag as NOT enabled (Personal ships no geo/link module)', async () => {
         const init = svc.init();
         httpMock

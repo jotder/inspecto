@@ -8,8 +8,8 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { UserComponent } from './user.component';
 
-function create(authMode: 'none' | 'oidc') {
-    const session = { authMode: signal(authMode), logout: vi.fn() };
+function create(authMode: 'none' | 'oidc', actor: string | null = 'ada') {
+    const session = { authMode: signal(authMode), actor: signal(actor), logout: vi.fn() };
     TestBed.configureTestingModule({
         imports: [UserComponent],
         providers: [
@@ -37,6 +37,17 @@ describe('UserComponent', () => {
     it('renders the menu under OIDC', () => {
         const { fixture } = create('oidc');
         expect(fixture.nativeElement.querySelector('button[aria-label="User menu"]')).toBeTruthy();
+    });
+
+    // Regression, 2026-09-15: "Signed in as" rendered a hardcoded '' because the menu read a
+    // `UserService.user$` nothing populated, while the actor in `bootstrap.session` was parsed and dropped.
+    it('names the signed-in actor from SessionService in the menu', () => {
+        const { fixture } = create('oidc', 'priya.n');
+        (fixture.nativeElement.querySelector('button[aria-label="User menu"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        const panel = document.querySelector('.mat-mdc-menu-panel');
+        expect(panel?.textContent).toContain('Signed in as');
+        expect(panel?.textContent).toContain('priya.n');
     });
 
     // Hiding only Sign out left a menu containing nothing but a blank "Signed in as" — verified in the

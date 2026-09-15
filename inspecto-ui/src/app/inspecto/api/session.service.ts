@@ -62,6 +62,12 @@ export class SessionService {
     readonly authMode = signal<'none' | 'oidc'>('none');
     readonly edition = signal<string>('personal');
     readonly authenticated = signal(false);
+    /**
+     * `bootstrap.session.actor` for an AUTHENTICATED subject — the `Subject.id()` the security module
+     * resolved off the bearer — else null. Personal never sets it: there the server reports the
+     * honour-system `appUser` placeholder, which is not a principal anyone should be shown as.
+     */
+    readonly actor = signal<string | null>(null);
     readonly capabilities = signal<string[]>([]);
     /** `bootstrap.features.exchange` — the multi-space runtime hosts the cross-Space Exchange. */
     readonly exchangeEnabled = signal(false);
@@ -250,6 +256,7 @@ export class SessionService {
     onAuthLost(): void {
         this.accessToken.set(null);
         this.authenticated.set(false);
+        this.actor.set(null);
         this.capabilities.set([]);
     }
 
@@ -267,7 +274,9 @@ export class SessionService {
         const boot = await firstValueFrom(
             this.http.get<Bootstrap>(apiUrl('/bootstrap')).pipe(catchError(() => of({} as Bootstrap))),
         );
-        this.authenticated.set(boot.session?.authenticated ?? true);
+        const authenticated = boot.session?.authenticated ?? true;
+        this.authenticated.set(authenticated);
+        this.actor.set(authenticated ? (boot.session?.actor ?? null) : null);
         this.capabilities.set(boot.session?.capabilities ?? []);
     }
 }
