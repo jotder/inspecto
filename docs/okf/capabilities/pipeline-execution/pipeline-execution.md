@@ -254,6 +254,18 @@ Two properties make this trustworthy rather than hopeful:
 lane** and throws, naming the specific reason the write could not be carried. `flat` is a permanent kill
 switch. Anything else throws. This flag is Row 15's **precondition, not its trigger**.
 
+🔴 **The §6 step-2 parity gate was RUN for the first time on 2026-09-16 and is NOT met.** The root pom now
+carries `<ingest.lane>auto</ingest.lane>` and hands it to surefire, so `mvn -Dingest.lane=graph test` runs the
+WHOLE suite with the flat lane disabled — the gate as D-2 wrote it. Result: **13 tests in `inspecto-engine`
+refuse** (`DecisionRuleWiringTest`, `ConsignmentIngestorPluginTest`, `ConsignmentIngestorPluginDeepTest`,
+`TypedRecordIngesterTest`), each with the lane's own reason: `events_etl` and `typed_record_etl` because *the
+lifted graph's sink count (3) differs from sinks[] (1)* — the multi-schema/plugin-ingester fixtures fan out
+to more sinks than the compiled recipe declares — and `test_etl` because *a Decision Rule routed rows, which the
+graph lane does not implement*. Those are the two features the compiled-recipe path cannot carry today, stated
+by the code itself; until both are implemented on the graph lane the flat lane cannot be deleted. Running the
+gate is now one flag, so re-run it after each of those lands rather than reading a projection round-trip test
+as parity.
+
 The reason-for-flat enumeration is the most operator-useful thing on this path: an authored route that does
 not engage, a decision rule that routed rows, no scratch directory, a destination-count mismatch, a
 non-projection node between projection and write, or a sink fed through another node.
@@ -507,7 +519,11 @@ fires. A hanging Job is a recorded gap, and the watchdog that exists covers only
   eject-and-continue choice as per-pipeline config — ⛔ explicitly no build without a driver.
 * **The retry deferrals** — a per-pipeline retry block, and an operator cancel or retry-now affordance
   (today: delete the sidecar, or reprocess).
-* **Flip the intake cap on by default** (needs a soak), and a pre-materialise cap to save fetch bandwidth.
+* **Flip the intake cap on by default** (needs a soak), and a pre-materialise cap to save fetch bandwidth —
+  ⚠ the latter is **design-first** (checked 2026-09-16): no unit, config key or enforcement point exists
+  anywhere. `IntakeGovernor` caps FILES per cycle after listing; a pre-materialise cap would have to cap BYTES
+  or files *before* the remote fetch, which needs the connector to expose size before download and a
+  decision on what happens to the remainder (deferred to the next cycle, or refused). Owed as a §1 input.
 * **Branch-aware residuals** — multi-schema with route needs a **segment-scoped lift**; mid-branch
   transforms in the route verb; three node kinds still unimplemented anywhere; the destination-list
   follow-ups.

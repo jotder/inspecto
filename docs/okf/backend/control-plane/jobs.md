@@ -211,6 +211,20 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   `secret` is a non-question, and "was a token supplied, and by whom" is exactly what the names answer. Two
   surfaces agreeing is not an override. ⚠ Not built here: the stable rejection codes (`param:unknown`,
   `param:missing`) the row also named — rejections are still prose (`JobService` joins the three lists).
+* **Two runs can be DIFFED from recorded facts only** (`DUCKLE-C2-RUN-DIFF-1`, 2026-09-16):
+  `GET /jobs/{name}/runs/{a}/diff/{b}` → `JobService.diffRuns` → the pure `JobRunDiff.diff(run, artifacts, run,
+  artifacts)`. Six kinds, each either **compared** (a list of `{field, a, b, explanation}` differences, and an
+  `explanation` array with exactly one line per difference — no prose is generated beyond what a difference
+  itself says) or **not compared** with the reason stated. `invocation` = trigger + the parameter receipt above
+  (layer names only, so a secret is never printed; when neither run has a receipt the kind says so in `note`);
+  `execution` = status, message, duration; `output` = dataset/file artifacts BY NAME — rows, bytes, ref,
+  watermark — and **absent is not zero**: an artifact one run produced and the other did not is `absent`, never
+  `0 rows` (a run that died at node 2 has no counts after it). `inputs`, `code`, `runtime` are always **not
+  compared**: no run records an input manifest, the job type's implementation version, or the JVM/host — a
+  diff that implied parity there would be lying, and stating the gap IS the deliverable. 404 when either run is
+  unknown. ⛔ Deliberately not a model summarising two receipts; the diagnosers (`HeuristicDiagnoser`,
+  `ModelDiagnoser`) may consume it, none does yet. ⚠ Not built: the `***`/digest secret comparison the row
+  named — moot, since values are never in the receipt to begin with.
 * **`ParameterDecl` carries the whole rendering + validation contract** (eleven components: `label`,
   `tier`, `options`, `pattern`, `min`/`max`, `placeholder`, `group`, `multi`, `secret`, `expressions`, …),
   and `JobTypeDescriptor.toMap()` serves it. A 6-arg delegating constructor kept all 16 raw call sites

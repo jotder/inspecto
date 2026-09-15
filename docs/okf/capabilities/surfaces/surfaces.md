@@ -323,6 +323,18 @@ button call, so the two cannot drift. ⚠ Home itself is **not** edition-aware: 
 keys on `authMode === 'none'`, the Incident affordances on the ops module flag, the administration action
 on `canAdminister`, and the grants card on multi-space — §3.2's rule applied, never the edition string.
 
+✅ **Two more tiles, each behind a cheap server count** (`HOME-TILES-1`, closed 2026-09-16). The approved
+mockups' *Expectations breached* and *Datasets written* tiles were dropped because no cheap call existed —
+`ExpectationsService.list()` takes no limit and nothing counted dataset writes — so the backend got the count
+FIRST: `GET /expectations/breached-count` (`ExpectationRoutes`; enabled Expectations whose persisted
+`lastResult.status` is FAILED, `{count}`) and `GET /signals/count?type=…&since=…` (`SignalRoutes`; a typed window
+over the Signal ledger, `{type, count, datasets, capped}` where `datasets` is the distinct `payload.dataset` set
+and `capped` says the ledger page was full, so the tile reads "at least"). Home calls both in `load()` — the
+second as `dataset.write` over the last 24 h — and a tile whose call fails is **hidden, not dashed**: the
+numbers shown are always the server's, never a client-side sweep. ⚠ Both tiles sit on the operational Home
+only; the first-run panel (no runs yet) does not show them. Read-shaped GETs, so neither needed a
+`CapabilityManifest` entry; both are in the generated OpenAPI skeleton.
+
 Two guest routes and one public share route sit outside the shell; the
 rest hang off a shelled route with the login guard and an initial-data resolver, with roughly 40 lazily
 loaded children. Breadcrumbs are a shared component fed by each detail pane rather than derived from

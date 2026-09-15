@@ -308,7 +308,7 @@ Inspecto consumes a **narrow model-transport seam, not the full embed**. What ma
 | Upstream repository | **`jotder/inspect-agent`** (public), cloned by continuous integration |
 | Distribution | **none** — no package registry; the upstream is built from source into the runner's local repository on every run |
 | Java floor | the upstream targets **JDK 25**; this reactor targets **release 24** |
-| The dry-run seam | `DryRunProvider` **is** present in the pinned artifact (verified in the local repository cache), which is what discharged the gate on 2026-09-08 |
+| The dry-run seam | `DryRunProvider` **is** present in the pinned artifact (verified in the local repository cache), which is what discharged the gate on 2026-09-08. 🔴 **But it is NOT reachable from the host** (re-verified 2026-09-16 with `javap` on the pinned `eoiagent-platform` jar): `PlatformBuilder` exposes `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`** — the only setter is on `CallbackApprovalGate.Builder`, which `PlatformBuilder` constructs internally. So "discharged" described the *type*, not the *seam*; consuming it needs an upstream `PlatformBuilder` change first (the ask is recorded on BACKLOG §2) |
 
 Two consequences worth stating plainly. First, **the build is not reproducible from published
 artifacts** — it is reproducible only from a branch head, so a change the pack needs must be pushed
