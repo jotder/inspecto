@@ -221,10 +221,50 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
         }
     }
 
+    /**
+     * The one predicate {@link #prune} and {@link #countPrunable} share — the preview and the sweep must never
+     * be two independently-written WHERE clauses again ({@code PRUNE-PREVIEW-DRIFT-1}).
+     *
+     * <p>🔴 <b>The watermark floor.</b> Age alone would delete the very row that carries the source's resume
+     * position: {@link #highWatermark} is {@code MAX(last_modified)} <em>derived from these rows</em>, so a
+     * sweep old enough to reach the frontier silently resets the source to "never seen"
+     * ({@code LEDGER-PRUNE-EATS-RESUME-STATE-1}). Protecting the row that holds that maximum makes
+     * {@code highWatermark} return the same value before and after a prune.
+     *
+     * <p>🔴 <b>Exactly ONE row per source is protected, not every row tied at the maximum.</b> An earlier
+     * {@code last_modified < MAX(...)} form looked equivalent and was not: where a source's files share one
+     * mtime — a coarse clock, a bulk copy, a generated feed — every row ties the maximum, so the whole
+     * history was protected and retention silently stopped working. ⚠ A test with two rows at one mtime is
+     * what caught it; a fixture with distinct mtimes passes either form.
+     *
+     * <p>⚠ The designation is correlated <b>per source</b>, because {@code sourceId == null} is a global sweep
+     * across every source in the space — one shared floor would let the newest source's frontier protect a
+     * stale source's rows, and vice versa.
+     *
+     * <p>⚠ The {@code ORDER BY} is a TOTAL order ({@code last_modified}, then {@code processed_at}, then
+     * {@code relative_path}); the tie-breakers are what make the protected row deterministic, so the dry run
+     * and the sweep cannot pick different survivors. ⛔ Mirrored in
+     * {@code InMemoryAcquisitionLedger.watermarkHolders} — changing one alone makes the backends diverge.
+     *
+     * <p>⚠ {@code processed_at} (when we handled the file) and {@code last_modified} (the source's own mtime)
+     * are different clocks on the same row — the age test reads the first, the floor the second. They are not
+     * interchangeable.
+     */
+    private static String prunablePredicate(String sourceId) {
+        return " WHERE processed_at < ?"
+                + " AND NOT EXISTS (SELECT 1 FROM ("
+                + "   SELECT source_id, relative_path, ROW_NUMBER() OVER ("
+                + "     PARTITION BY source_id"
+                + "     ORDER BY last_modified DESC, processed_at DESC, relative_path DESC) AS rn"
+                + "   FROM " + TABLE + ") k"
+                + " WHERE k.rn = 1 AND k.source_id = " + TABLE + ".source_id"
+                + " AND k.relative_path = " + TABLE + ".relative_path)"
+                + (sourceId != null ? " AND source_id = ?" : "");
+    }
+
     @Override
     public int prune(long processedBefore, String sourceId) {
-        String sql = "DELETE FROM " + TABLE + " WHERE processed_at < ?"
-                + (sourceId != null ? " AND source_id = ?" : "");
+        String sql = "DELETE FROM " + TABLE + prunablePredicate(sourceId);
         try {
             return src.with(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -240,8 +280,7 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
 
     @Override
     public int countPrunable(long processedBefore, String sourceId) {
-        String sql = "SELECT COUNT(*) FROM " + TABLE + " WHERE processed_at < ?"
-                + (sourceId != null ? " AND source_id = ?" : "");
+        String sql = "SELECT COUNT(*) FROM " + TABLE + prunablePredicate(sourceId);
         try {
             return src.with(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
