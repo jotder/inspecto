@@ -1513,6 +1513,16 @@ public final class JobService implements AutoCloseable {
         return runArtifactStore.read(runId);
     }
 
+    /**
+     * Two runs compared from recorded facts only ({@code DUCKLE-C2-RUN-DIFF-1}) — see {@link JobRunDiff}.
+     * Empty when either run is unknown.
+     */
+    public Optional<Map<String, Object>> diffRuns(String runA, String runB) {
+        Optional<JobRun> a = runById(runA), b = runById(runB);
+        if (a.isEmpty() || b.isEmpty()) return Optional.empty();
+        return Optional.of(JobRunDiff.diff(a.get(), runArtifacts(runA), b.get(), runArtifacts(runB)));
+    }
+
     /** Artifacts of a job's most recent successful run (R7) — {@code GET /jobs/{name}/artifacts/latest}; empty if none. */
     public List<RunArtifact> latestArtifacts(String name) {
         // The parameter RECEIPT (kind `params`, DUCKLE-C4) is about the run, not an OUTPUT of it — it stays on

@@ -118,6 +118,11 @@ final class JobRoutes implements RouteModule {
         // collide with the /runs history or /trigger routes under full-match routing.
         api.get("/jobs/([^/]+)/runs/([^/]+)/artifacts", (e, m) -> jobs(api).runArtifacts(ApiContext.param(m, 2)));
         api.get("/jobs/([^/]+)/artifacts/latest", (e, m) -> jobs(api).latestArtifacts(ApiContext.name(m)));
+        // DUCKLE-C2-RUN-DIFF-1: two runs compared BY KIND from recorded facts — a read over the receipts above.
+        // Ends in a fixed /diff/{b} tail, so it never collides with the history, log or artifact routes.
+        api.get("/jobs/([^/]+)/runs/([^/]+)/diff/([^/]+)", (e, m) -> jobs(api)
+                .diffRuns(ApiContext.param(m, 2), ApiContext.param(m, 3))
+                .orElseThrow(() -> new ApiException(404, "no run '" + ApiContext.param(m, 2) + "' or '" + ApiContext.param(m, 3) + "'")));
         // Download the bytes of one file-kind Run Artifact (report CSV/JSON, backup zip, storage report).
         // Ends in a fixed /content segment so it never collides with the metadata read above.
         api.get("/jobs/([^/]+)/runs/([^/]+)/artifacts/([^/]+)/content",
