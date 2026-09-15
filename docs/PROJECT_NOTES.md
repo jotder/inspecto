@@ -1446,6 +1446,8 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 
 ## DATA-GOV-1 decision (2026-09-06)
 
+🔴 **Status 2026-09-15 (operator): NOT DONE.** Neither the encrypted out-of-band archive nor the fetch script exists; the corpus has not moved. Recorded here so the section stops reading as decided-and-handled — the BACKLOG §2 gate closes only when this section carries the dated archive location and the fetch-script path, and today it carries neither. ⚠ Consequence: `asn-parser`'s corpus tests stay opt-in and data-gated, so that lane (compiled by `legacy-code/pom.xml`, not dead) is tested only against synthetic input; and real carrier data without an archive is a data-governance finding in its own right, independent of any other compliance work.
+
 The real carrier corpus (~57 MB, two carriers, only in working trees) moves to an **encrypted out-of-band
 archive on company storage, fetched by script**, access held by the data-agreement owner; the parity harness runs
 wherever the archive is provisioned. A **small synthetic subset is committed for CI smoke** — a complement, not a

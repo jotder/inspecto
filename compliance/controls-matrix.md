@@ -126,7 +126,7 @@ answer, not a way to invent one. ⚠ Keep the literal row prefix — BACKLOG §2
 | # | Item | Workstream | State |
 |---|---|---|---|
 | NFR-7 · N1 | SOC 2 in-scope service list + ISO 27001 ISMS boundary (applicability statements) | C1 | ⬜ open — org input, plan §6 Q4/Q5; see §5 |
-| NFR-7 · N2 | Auditor engagement (firm named, window agreed) | C1 | ⬜ open — org action. ⚠ The SOC 2 Type II observation window has **no recorded start date**, so its 6-month end cannot be computed; recording that date is a separate BACKLOG §2 row whose first action is NOT external |
+| NFR-7 · N2 | Auditor engagement (firm named, window agreed) | C1 | ⬜ open — org action. ⚠ The SOC 2 Type II observation window has **no recorded start date**, so its 6-month end cannot be computed; recording that date is a separate BACKLOG §2 row whose first action is NOT external. ✅ **Recorded 2026-09-15 (operator): the window is NOT STARTED.** ⛔ Do not open it until the route-gating control is in place — an undeclared mutating route refusing at boot and failing CI (`docs/superpower/route-gating-compliance-plan.md` step 3, which waits on step 2's three route decisions). The window should observe the control for its whole duration, not watch it being introduced (plan §5). Until then this row reads *not started*, not *unknown* |
 | NFR-7 · N3 | Penetration test (scope, vendor, report) | C3 | ⬜ open — external party |
 | NFR-7 · N4 | C5 policy content (the written policies themselves, not the controls) | C5 | ⬜ open — org authorship |
 | NFR-7 · N5 | C6 FedRAMP package | C6 | ⬜ open — demand-gated; ⛔ do not start unscoped |
