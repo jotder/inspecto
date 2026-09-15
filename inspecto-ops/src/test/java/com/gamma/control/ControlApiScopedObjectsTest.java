@@ -39,10 +39,12 @@ class ControlApiScopedObjectsTest {
     /** {@code Bearer fraud} → scoped to {fraud}; {@code Bearer all} → authenticated, unscoped. */
     private static final Authenticator FAKE = ex -> {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
+        // canAdminister: assign/merge became capability-gated 2026-09-15 (ROUTE-UNGATED-DEFAULT-1 step 2b);
+        // this class tests the DATA-SCOPE guard beneath that gate, so its subjects carry the capability.
         if ("Bearer fraud".equals(auth))
-            return Optional.of(new Subject("ana", Set.of("canOperateRuns"), Set.of("fraud")));
+            return Optional.of(new Subject("ana", Set.of("canOperateRuns", "canAdminister"), Set.of("fraud")));
         if ("Bearer all".equals(auth))
-            return Optional.of(new Subject("root", Set.of("canOperateRuns")));   // dataScopes null = unscoped
+            return Optional.of(new Subject("root", Set.of("canOperateRuns", "canAdminister")));   // dataScopes null = unscoped
         return Optional.empty();
     };
 

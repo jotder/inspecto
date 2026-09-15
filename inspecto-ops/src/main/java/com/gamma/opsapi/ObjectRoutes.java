@@ -55,22 +55,32 @@ public final class ObjectRoutes implements RouteModule {
         api.post("/objects", (e, m) -> createObject(api, e, api.body(e)));
         // Every by-id route runs behind the SEC-7d data-scope guard: an object whose caseType is outside
         // the caller's dataScopes answers 404, indistinguishable from absence (existence-hiding).
-        api.post("/objects/([^/]+)/ack", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, api.body(e))));
-        api.post("/objects/([^/]+)/resolve", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, api.body(e))));
-        api.post("/objects/([^/]+)/transition", scoped(api, (e, m) -> transitionFromBody(api, ApiContext.name(m), api.body(e))));
-        api.post("/objects/([^/]+)/assign", scoped(api, (e, m) -> assign(api, ApiContext.name(m), api.body(e))));
+        //
+        // ROUTE-UNGATED-DEFAULT-1, step 2b (operator decision 2026-09-15): triage is daily operator work,
+        // but changing an Incident's DISPOSITION is administrative. So the state-changing routes — ack /
+        // resolve / transition / assign / merge / split, the PATCH that edits priority, severity and
+        // assignee, and the Case-Rule evaluate that groups Incidents into a Case — are gated on
+        // `canAdminister`; comment / attach / link / RCA-seed stay open as collaboration and are recorded
+        // as such in CapabilityManifest.EXEMPTIONS. ⚠ The capability gate wraps the scope guard, so a
+        // caller lacking the capability gets 403 before existence-hiding gets to answer 404.
+        // ⚠ `POST /objects` (create) is NOT decided here: it is the same question as `POST /recon/promote`
+        // — which family manually opening an Incident belongs to — and is on the operator (step 2a).
+        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, api.body(e)))));
+        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, api.body(e)))));
+        api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transitionFromBody(api, ApiContext.name(m), api.body(e)))));
+        api.post("/objects/([^/]+)/assign", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> assign(api, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/links", scoped(api, (e, m) -> toLinkMaps(OpsEngine.of(api).linksOf(ApiContext.name(m)))));
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
-        api.post("/objects/([^/]+)/merge", scoped(api, (e, m) -> mergeCases(api, e, ApiContext.name(m), api.body(e))));
-        api.post("/objects/([^/]+)/split", scoped(api, (e, m) -> splitCase(api, e, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/merge", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> mergeCases(api, e, ApiContext.name(m), api.body(e)))));
+        api.post("/objects/([^/]+)/split", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> splitCase(api, e, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
         api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT))));
         api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
         api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, ApiContext.name(m), api.body(e))));
-        api.patch("/objects/([^/]+)", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e))));
+        api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
         // The effective (possibly *_workflow.toon-overridden) lifecycle for a type — lets the UI derive
@@ -81,11 +91,13 @@ public final class ObjectRoutes implements RouteModule {
         // on the generic /components CRUD (docs/superpower/findings-spec-plan.md §3.3).
         api.get("/findings/([^/]+)", (e, m) -> findingsSpecOf(api, ApiContext.name(m)));
         // Rule-raised cases (C5): auto-group Incidents into a Case. CRUD is capability-gated (config);
-        // evaluate mutates objects (an operational action, like transition), so it is ungated.
+        // evaluate mutates objects (an operational action, like transition) — and since 2026-09-15 a
+        // transition is `canAdminister`, so evaluate takes the same gate. ⚠ The route-gating audit had
+        // filed it under "read-shaped POST"; it opens a Case, so that bucket was wrong for it.
         api.get("/cases/rules", (e, m) -> OpsEngine.of(api).caseRules().stream().map(CaseRule::toMap).toList());
         api.post("/cases/rules", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> saveCaseRule(api, api.body(e))));
         api.delete("/cases/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteCaseRule(api, ApiContext.name(m))));
-        api.post("/cases/rules/([^/]+)/evaluate", (e, m) -> evaluateCaseRule(api, ApiContext.name(m)));
+        api.post("/cases/rules/([^/]+)/evaluate", ApiContext.withCapability("canAdminister", (e, m) -> evaluateCaseRule(api, ApiContext.name(m))));
     }
 
     // ── rule-raised cases (C5) ────────────────────────────────────────────────────────

@@ -120,6 +120,19 @@ final class CapabilityManifest {
             // ObjectRoutes
             new Entry("POST", "/cases/rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/cases/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
+            // ObjectRoutes — Incident/Case TRIAGE, gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1` step 2b).
+            // Operator decision: triage is daily work, but changing an Incident's disposition is
+            // administrative — so the state-changing routes take `canAdminister`, and comment / attach /
+            // link / RCA-seed stay open as collaboration (see EXEMPTIONS). Case-Rule evaluate opens a Case,
+            // which the audit had mis-bucketed as read-shaped. `POST /objects` (create) is PENDING.
+            new Entry("POST", "/objects/([^/]+)/ack", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/objects/([^/]+)/resolve", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/objects/([^/]+)/transition", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/objects/([^/]+)/assign", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/objects/([^/]+)/merge", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/objects/([^/]+)/split", Roles.CAN_ADMINISTER),
+            new Entry("PATCH", "/objects/([^/]+)", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/cases/rules/([^/]+)/evaluate", Roles.CAN_ADMINISTER),
             // PipelineRoutes — W5: the graph editor writes the canonical *_pipeline.toon; the
             // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
             // ad-hoc trigger stay for grandfathered flows.
@@ -192,6 +205,108 @@ final class CapabilityManifest {
             new Entry("DELETE", "/tags/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/tags/rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/tags/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH));
+
+    /**
+     * A MUTATING route that is deliberately ungated, with the reviewed reason (route-gating compliance plan
+     * step 2c, 2026-09-15). {@code category} is the audit's own bucket taxonomy — nothing invented:
+     * {@code identity-flow} · {@code self-verifying-public} · {@code self-service} · {@code read-shaped} ·
+     * {@code self-limiting} · {@code recovery-route} · {@code target-visibility-gated} ·
+     * {@code stateless-compute} · {@code collaboration}. Together with {@link #ENTRIES} and
+     * {@link #PENDING_OPERATOR_CALLS} this makes "ungated" a RECORDED state rather than an absence:
+     * {@code CapabilityManifestTest} scans every {@code api.post|put|patch|delete} registration in every
+     * module and fails the build on a mutating route that is in none of the three tables.
+     *
+     * <p>⛔ Reads (GET) are open by design and are not listed — confidentiality sits at the Space/ABAC
+     * layer, not at capability gating (operator, 2026-09-15). ⛔ The 503 stubs an {@code Absent*Routes}
+     * class registers for a missing optional module go through {@code api.stub}, not these methods, so
+     * they are exempt by construction ({@code absent-module-stub}).
+     */
+    record Exemption(String method, String pattern, String category, String reason) {}
+
+    /**
+     * A mutating route whose posture is an OPEN OPERATOR CALL (compliance plan step 2a). Recorded here so it is
+     * a visible third state, not a silent one — ⛔ step 3's fail-closed default cannot land while this list is
+     * non-empty, and the test pins the list so it can only shrink.
+     */
+    record Pending(String method, String pattern, String question) {}
+
+    static final List<Exemption> EXEMPTIONS = List.of(
+            // §1 identity flow — these ARE the login; a capability gate here is circular.
+            new Exemption("POST", "/auth/exchange", "identity-flow", "mints the session; nothing to be authorised by yet"),
+            new Exemption("POST", "/auth/refresh", "identity-flow", "rotates the session the caller already holds"),
+            new Exemption("POST", "/auth/logout", "identity-flow", "ends the caller's own session"),
+            // §2 self-verifying public — authenticated by something other than a Subject.
+            new Exemption("POST", "/public/delivery-status/([^/]+)", "self-verifying-public", "inbound provider callback, verified by provider signature (D8 §4.4)"),
+            new Exemption("POST", "/public/dashboards/([^/]+)/query", "self-verifying-public", "the share token IS the credential; scoped to one published dashboard"),
+            // §3 self-service — the caller's own inbox and preferences.
+            new Exemption("POST", "/notifications/read-all", "self-service", "marks the caller's own feed read"),
+            new Exemption("POST", "/notifications/([^/]+)/read", "self-service", "marks one of the caller's own entries read"),
+            new Exemption("PUT", "/notifications/preferences", "self-service", "the caller's own delivery preferences"),
+            new Exemption("DELETE", "/notifications/(?!suppressions$)([^/]+)", "self-service", "dismisses one of the caller's own entries"),
+            new Exemption("POST", "/requirements", "self-service", "SEC-7(c): anyone may raise a requirement, only a triager decides — pinned by ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen"),
+            // §4 read-shaped POST — a POST because the request carries a body, persists nothing. Reads are
+            // open by design, so these are exempt AS READS (operator, 2026-09-15) — not "deferred".
+            new Exemption("POST", "/components/transform/([^/]+)/test", "read-shaped", "dry-runs a saved component against sample rows"),
+            new Exemption("POST", "/components/grammar/([^/]+)/test", "read-shaped", "dry-runs a saved component against sample rows"),
+            new Exemption("POST", "/components/sink/([^/]+)/test", "read-shaped", "dry-runs a saved component against sample rows"),
+            new Exemption("POST", "/components/transform/preview", "read-shaped", "previews an unsaved draft"),
+            new Exemption("POST", "/components/grammar/preview", "read-shaped", "previews an unsaved draft"),
+            new Exemption("POST", "/components/sink/preview", "read-shaped", "previews an unsaved draft"),
+            new Exemption("POST", "/components/mapping/validate", "read-shaped", "validates a draft, writes nothing"),
+            new Exemption("POST", "/components/transform/describe", "read-shaped", "describes a draft's derived shape"),
+            new Exemption("POST", "/validate", "read-shaped", "validates a config draft, writes nothing"),
+            new Exemption("POST", "/config/preview/parsing", "read-shaped", "previews parsing of a draft"),
+            new Exemption("POST", "/config/preview/schema", "read-shaped", "previews a derived schema"),
+            new Exemption("POST", "/config/suggest/schema", "read-shaped", "suggests a schema from a sample"),
+            new Exemption("POST", "/connections/([^/]+)/test", "read-shaped", "opens and closes a connection; persists nothing"),
+            new Exemption("POST", "/connections/([^/]+)/probe", "read-shaped", "lists what a saved connection can see"),
+            new Exemption("POST", "/connections/test", "read-shaped", "tests an unsaved connection draft"),
+            new Exemption("POST", "/db/query", "read-shaped", "read-only SQL behind SqlGuard"),
+            new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
+            new Exemption("POST", "/enrichment/preview", "read-shaped", "previews an enrichment over sample rows"),
+            new Exemption("POST", "/parsers/([^/]+)/preview", "read-shaped", "previews a parser over a sample"),
+            new Exemption("POST", "/import/preview", "read-shaped", "previews an import; nothing is written until the gated import"),
+            new Exemption("POST", "/bundle/preview", "read-shaped", "previews a bundle's contents"),
+            new Exemption("POST", "/bundle/export", "read-shaped", "an export is a read; the import half is gated"),
+            new Exemption("POST", "/geo/projection", "read-shaped", "computes a projection from the body"),
+            new Exemption("POST", "/geo/routes", "read-shaped", "computes routes from the body"),
+            new Exemption("POST", "/inv/projection", "read-shaped", "computes a projection from the body"),
+            new Exemption("POST", "/inv/projection/neighbors", "read-shaped", "computes neighbours from the body"),
+            new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
+            new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
+            new Exemption("POST", "/queries/([^/]+)/run", "read-shaped", "runs a saved read query"),
+            new Exemption("POST", "/pipelines/authored/([^/]+)/dry-run", "read-shaped", "a dry run writes nothing (PIPELINE-DRYRUN-1)"),
+            new Exemption("POST", "/expectations/evaluate", "read-shaped", "evaluates and reports; a breach may open an Incident — re-classify with the pending Incident-creation call (POST /recon/promote)"),
+            new Exemption("POST", "/expectations/([^/]+)/evaluate", "read-shaped", "evaluates one Expectation; same caveat as /expectations/evaluate"),
+            new Exemption("POST", "/alerts/evaluate", "read-shaped", "evaluates Alert Rules now; the same evaluation the scheduler runs unattended"),
+            // §7 self-limiting — the agent surface gates itself per tool (the assistant refuses mutating
+            // tools it was not granted), and the governance routes that decide what it MAY do are gated.
+            new Exemption("POST", "/agent/sessions", "self-limiting", "opens a conversation; no tool runs without its own gate"),
+            new Exemption("POST", "/agent/sessions/(.+)/ask", "self-limiting", "a question to the assistant; tools self-gate"),
+            new Exemption("POST", "/agent/sessions/(.+)/ask/stream", "self-limiting", "streaming form of /ask"),
+            new Exemption("POST", "/agent/tools/(.+)", "self-limiting", "a tool call, each tool enforcing its own capability"),
+            new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments; runs nothing"),
+            new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),
+            // grounded one at a time 2026-09-15 (audit §5 GROUNDED)
+            new Exemption("POST", "/spaces", "recovery-route", "a server hosting zero Spaces must still answer it; a gate here bricks recovery — pinned by ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet"),
+            new Exemption("POST", "/recon/run", "stateless-compute", "triggers nothing: computes and returns, persists nothing, dispatches no job"),
+            new Exemption("POST", "/tags/assignments/([^/]+)/([^/]+)", "target-visibility-gated", "gated per TARGET via AnnotationTargets: 'can tag' must not become independent of 'can see' (TagRoutes)"),
+            new Exemption("DELETE", "/tags/assignments/([^/]+)/([^/]+)/([^/]+)", "target-visibility-gated", "same comment as the assignment POST"),
+            // Incident/Case triage — the COLLABORATION half (operator decision 2026-09-15): adding to the
+            // record is daily work; changing the disposition is administrative and is in ENTRIES.
+            new Exemption("POST", "/objects/([^/]+)/comments", "collaboration", "adds a comment; the disposition is untouched"),
+            new Exemption("POST", "/objects/([^/]+)/attachments", "collaboration", "attaches evidence"),
+            new Exemption("POST", "/objects/([^/]+)/links", "collaboration", "correlates two objects; neither's state changes"),
+            new Exemption("DELETE", "/objects/([^/]+)/links", "collaboration", "removes a correlation link"),
+            new Exemption("POST", "/objects/([^/]+)/rca", "collaboration", "seeds an RCA skeleton as comments"),
+            new Exemption("POST", "/notes/([^/]+)/([^/]+)/comments", "collaboration", "adds a comment on any note-bearing object"),
+            new Exemption("POST", "/notes/([^/]+)/([^/]+)/attachments", "collaboration", "attaches evidence on any note-bearing object"));
+
+    static final List<Pending> PENDING_OPERATOR_CALLS = List.of(
+            new Pending("POST", "/spaces/import", "does the POST /spaces recovery-route exemption extend to importing a whole config tree?"),
+            new Pending("POST", "/tags/rules/([^/]+)/apply", "operate action (canOperateRuns, like DecisionRoutes' rule-apply) or collaboration (open, like assignments)?"),
+            new Pending("POST", "/recon/promote", "which family does manually opening an Incident belong to? no Incident capability exists"),
+            new Pending("POST", "/objects", "same question as /recon/promote: manual Incident/Case creation has no family yet"));
 
     /** The declared capability gating {@code method path}, or null when the route is ungated —
      *  the A3 authorize stage classifies {@code operate} actions off this (a state-changing call

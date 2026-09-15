@@ -95,6 +95,70 @@ class CapabilityManifestTest {
                     () -> "seed grants unknown capability '" + cap + "'");
     }
 
+    /** Every mutating registration, gated or not: method( "pattern" — the same shape the audit counted 332 with. */
+    private static final Pattern MUTATING = Pattern.compile(
+            "api\\.(post|put|patch|delete)\\(\\s*\"([^\"]+)\"");
+
+    /**
+     * Route-gating compliance plan step 2c/3d (2026-09-15): a mutating route ends in exactly ONE of three
+     * recorded states — a capability ({@code ENTRIES}), an exemption with a category and a reason
+     * ({@code EXEMPTIONS}), or an open operator call ({@code PENDING_OPERATOR_CALLS}). A route in none of them
+     * fails the build; so does a route in two. This is the ratchet's BELT: it sees every module's source,
+     * which the runtime inventory (step 3a/3c, not yet built) cannot for optional modules absent from a
+     * bundle. Reads are open by design and are not scanned (operator, 2026-09-15).
+     */
+    @Test
+    void everyMutatingRouteIsGatedExemptOrPending() throws IOException {
+        Set<String> gated = new LinkedHashSet<>();
+        for (CapabilityManifest.Entry e : CapabilityManifest.ENTRIES) gated.add(route(e.method(), e.pattern()));
+        Set<String> exempt = new LinkedHashSet<>();
+        for (CapabilityManifest.Exemption x : CapabilityManifest.EXEMPTIONS) {
+            assertTrue(exempt.add(route(x.method(), x.pattern())), () -> "duplicate exemption: " + x);
+            assertFalse(x.reason() == null || x.reason().isBlank(), () -> "an exemption needs a reason: " + x);
+        }
+        Set<String> pending = new LinkedHashSet<>();
+        for (CapabilityManifest.Pending p : CapabilityManifest.PENDING_OPERATOR_CALLS)
+            assertTrue(pending.add(route(p.method(), p.pattern())), () -> "duplicate pending call: " + p);
+
+        Set<String> registered = new LinkedHashSet<>();
+        for (Path root : routeSourceRoots()) {
+            try (Stream<Path> files = Files.walk(root)) {
+                for (Path f : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                    Matcher m = MUTATING.matcher(Files.readString(f));
+                    while (m.find()) registered.add(route(m.group(1), m.group(2)));
+                }
+            }
+        }
+        assertFalse(registered.isEmpty(), "source scan found no mutating registrations — scan broken?");
+
+        Set<String> unclassified = new LinkedHashSet<>(registered);
+        unclassified.removeAll(gated);
+        unclassified.removeAll(exempt);
+        unclassified.removeAll(pending);
+        assertTrue(unclassified.isEmpty(), () -> "mutating routes in NO recorded state — declare a capability with "
+                + "ApiContext.withCapability, or an Exemption with a category and a reason: " + unclassified);
+
+        Set<String> twice = new LinkedHashSet<>(exempt);
+        twice.retainAll(gated);
+        Set<String> pendingButDecided = new LinkedHashSet<>(pending);
+        pendingButDecided.removeIf(r -> !gated.contains(r) && !exempt.contains(r));
+        assertTrue(twice.isEmpty() && pendingButDecided.isEmpty(), () ->
+                "a route may be in ONE table only. Gated AND exempt: " + twice + "; pending but already decided: " + pendingButDecided);
+
+        Set<String> stale = new LinkedHashSet<>(exempt);
+        stale.addAll(pending);
+        stale.removeAll(registered);
+        assertTrue(stale.isEmpty(), () -> "exempt/pending routes that are no longer registered: " + stale);
+
+        // The third state exists only while the operator has not answered; it can shrink, never grow.
+        assertTrue(pending.size() <= 4, () -> "PENDING_OPERATOR_CALLS may only shrink — new routes take a "
+                + "capability or an exemption, never a pending row: " + pending);
+    }
+
+    private static String route(String method, String pattern) {
+        return method.toUpperCase(Locale.ROOT) + " " + pattern;
+    }
+
     private static Set<String> scanSources() throws IOException {
         Set<String> found = new LinkedHashSet<>();
         for (Path root : routeSourceRoots()) {
