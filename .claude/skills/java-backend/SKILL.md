@@ -105,7 +105,13 @@ Entry points: `com.gamma.inspector.CollectorProcessor` (one-shot ETL) · `com.ga
   cannot be wrong the way an unset MDC silently can. The **default** Space alone falls back to the
   property, which is why single-Space deployments — Personal, and nearly every test — cannot expose a
   mistake here. ⇒ **This class of bug is invisible to the whole test suite; only a multi-Space run shows
-  it** (`MATERIALIZE-SPACE-ROOT-1`, 2026-09-15: nine readers, seven migrated).
+  it** (`MATERIALIZE-SPACE-ROOT-1` + `COLLECTOR-SPACE-ROOT-1`, 2026-09-15: nine readers found, all nine migrated).
+  🔴 **Move the registry root and the DATA root together, or not at all.** They are a pair: a per-Space
+  registry beside a JVM-wide `-Ddata.dir` IS the defect, so half a migration is worse than none.
+  ⚠ Their precedence is deliberately **opposite** and must not be harmonised — `-Ddata.dir` **overrides**
+  a Space's data directory (`System.getProperty("data.dir", root.dataDir())`, the rule
+  `CollectorService` applies), while for the config root the **Space wins** and the property is only the
+  default-Space fallback (`ControlApi.writeRoot()`). A test pins the asymmetry.
 - **Secrets** go through the `SecretsProvider` seam — never hard-code, never log. No plaintext secrets
   in `.toon` or in committed UI config.
 

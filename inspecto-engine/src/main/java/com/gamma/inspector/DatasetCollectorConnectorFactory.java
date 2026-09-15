@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.CollectorConnector;
 import com.gamma.acquire.CollectorConnectorFactory;
@@ -33,9 +34,10 @@ import java.util.Map;
  * baked into config, so relocating a store can't strand a consumer, and no free-text path exists for
  * an operator to hand-edit) through the SAME chain every other reader uses
  * ({@code DatasetRelation}'s): component {@code physicalRef} → {@link DataRef#requireUnder} under
- * the space data root → {@link SqlViews#storeReadRoot}. The ambient inputs are the sanctioned
- * job-lane flags ({@code -Dassist.write.root} for the registry, {@code -Ddata.dir} for the data
- * root — the exact {@code MaterializeTask} pattern), fail-fast when absent.
+ * the space data root → {@link SqlViews#storeReadRoot}. Both ambient inputs resolve <b>per Space</b>
+ * through {@link SpaceConfigRoot} (registry + data root), fail-fast when absent — they used to be the
+ * raw JVM-wide {@code -Dassist.write.root} / {@code -Ddata.dir} flags, which is what made this the last
+ * space-blind reader (COLLECTOR-SPACE-ROOT-1).
  *
  * <p>Registered via {@code META-INF/services} in this module: the engine is on every runtime
  * classpath that runs pipelines, so unlike the remote schemes no optional module is involved.
@@ -63,13 +65,20 @@ public final class DatasetCollectorConnectorFactory implements CollectorConnecto
 
     /** {@code dataset id → snapshot dir}, by the one resolution every Dataset reader applies. */
     static Path resolveDatasetDir(String dataset) {
-        String wr = System.getProperty("assist.write.root");
-        if (wr == null || wr.isBlank())
-            throw new IllegalStateException("connector 'dataset' needs -Dassist.write.root (the component registry)");
-        String dd = System.getProperty("data.dir");
-        if (dd == null || dd.isBlank())
+        // ⛔ NOT the raw JVM properties. This runs inside the acquisition lane, which CollectorService
+        // dispatches under the space MDC (`underSpace`, and its parallel poll workers inherit it), so both
+        // roots resolve per-Space — COLLECTOR-SPACE-ROOT-1, the last reader of the class closed by
+        // MATERIALIZE-SPACE-ROOT-1.
+        // 🔴 Both had to move TOGETHER. Resolving the registry per-Space while `data.dir` stayed JVM-wide
+        // would have re-created the very defect that row closed — one Space's registry beside another
+        // Space's data — so a half-fix here is worse than none.
+        Path writeRoot = SpaceConfigRoot.current();
+        if (writeRoot == null)
+            throw new IllegalStateException("connector 'dataset' needs a component registry for this space");
+        Path dataRoot = SpaceConfigRoot.currentDataRoot();
+        if (dataRoot == null)
             throw new IllegalStateException("connector 'dataset' needs a data root (-Ddata.dir / space dataDir)");
-        ComponentStore store = new ComponentStore(Path.of(wr).resolve("registry"));
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         Map<String, Object> content = store.get("dataset", dataset)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + dataset + "'"));
@@ -77,7 +86,7 @@ public final class DatasetCollectorConnectorFactory implements CollectorConnecto
         if (ref == null)
             throw new IllegalArgumentException("dataset '" + dataset + "' has no physicalRef — a view-backed "
                     + "Dataset has no files to collect (materialize it first)");
-        Path base = DataRef.requireUnder(Path.of(dd), ref, "collector.dataset");
+        Path base = DataRef.requireUnder(dataRoot, ref, "collector.dataset");
         return Path.of(SqlViews.storeReadRoot(base.normalize().toString().replace('\\', '/')));
     }
 

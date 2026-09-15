@@ -37,12 +37,14 @@ final class SpaceBootstrap {
         String ledgerUrl = OperationalDb.urlFor(
                 OperationalDb.Family.ACQUISITION_LEDGER, root.acquisitionLedgerDbUrl());
         AcquisitionLedgers.register(id.value(), AcquisitionLedgers.build(ledgerUrl, id.value()));
-        // Publish the component-registry root so the static ingest path can load this space's
-        // Decision Rules per batch (DecisionRuleApplier).
-        // Publishes THIS space's config root for every run-time registry reader — Decision Rules and
-        // every registry-reading job type alike (MATERIALIZE-SPACE-ROOT-1). Before this, jobs read the
-        // JVM-wide -Dassist.write.root and a multi-space deployment crossed the wires.
+        // Publishes THIS space's roots for every run-time reader — Decision Rules, every registry-reading
+        // job type, and the `dataset` collector connector (MATERIALIZE-SPACE-ROOT-1 /
+        // COLLECTOR-SPACE-ROOT-1). Before this they read the JVM-wide -Dassist.write.root and a
+        // multi-space deployment crossed the wires: one space's registry beside another space's data.
+        // ⛔ Register BOTH or neither — a per-space config root beside a server-wide data root is the
+        // defect itself, not a partial fix.
         com.gamma.pipeline.SpaceConfigRoot.register(id.value(), root.config());
+        com.gamma.pipeline.SpaceConfigRoot.registerDataRoot(id.value(), java.nio.file.Path.of(root.dataDir()));
 
         log.info("Space '{}' loaded ({} pipeline(s)) from {}",
                 id, service.pipelines().size(), root.config());

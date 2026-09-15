@@ -35,22 +35,59 @@ public final class SpaceConfigRoot {
     /** {@code space id -> config root}; keyed by {@link EventLog#currentSpaceId()}. */
     private static final Map<String, Path> ROOTS = new ConcurrentHashMap<>();
 
+    /** {@code space id -> data root}; the sibling of {@link #ROOTS}, and never registered without it. */
+    private static final Map<String, Path> DATA_ROOTS = new ConcurrentHashMap<>();
+
     private SpaceConfigRoot() {
     }
 
-    /** Publish (or replace) a Space's config root; {@code null}s are ignored. */
+    /**
+     * Publish (or replace) a Space's config root; {@code null}s are ignored.
+     *
+     * <p>⛔ <b>Register the data root in the same breath</b> ({@link #registerDataRoot}). A caller that
+     * resolves the config root per-Space while still taking the data root from a JVM-wide property
+     * reproduces {@code MATERIALIZE-SPACE-ROOT-1} exactly — one Space's registry read beside another
+     * Space's data. Half of this fix is worse than none of it.
+     */
     public static void register(String spaceId, Path configRoot) {
         if (spaceId != null && configRoot != null) ROOTS.put(spaceId, configRoot);
     }
 
-    /** Drop a Space's registration (on Space deletion). */
+    /** Publish (or replace) a Space's data root — the sibling of {@link #register}; see its note. */
+    public static void registerDataRoot(String spaceId, Path dataRoot) {
+        if (spaceId != null && dataRoot != null) DATA_ROOTS.put(spaceId, dataRoot);
+    }
+
+    /** Drop a Space's registration (on Space deletion) — both roots, so neither can outlive the other. */
     public static void forget(String spaceId) {
-        if (spaceId != null) ROOTS.remove(spaceId);
+        if (spaceId != null) {
+            ROOTS.remove(spaceId);
+            DATA_ROOTS.remove(spaceId);
+        }
     }
 
     /** Clear every registration (tests). */
     public static void clear() {
         ROOTS.clear();
+        DATA_ROOTS.clear();
+    }
+
+    /**
+     * This Space's data root, or {@code null} when it has none.
+     *
+     * <p>🔴 <b>The precedence here is the OPPOSITE of {@link #current()}, deliberately, because the two
+     * lanes already disagreed before this class existed and silently "harmonising" them would change
+     * behaviour.</b> For the <b>data</b> root an explicitly-set {@code -Ddata.dir} <b>wins</b> over the
+     * Space's own directory — the exact rule {@code CollectorService}'s four call sites apply
+     * ({@code System.getProperty("data.dir", root.dataDir())}). For the <b>config</b> root the Space wins
+     * and the property is only the default-Space fallback — the rule {@code ControlApi.writeRoot()}
+     * applies. ⛔ Do not "fix" this asymmetry here; it is a product-level question, and matching each
+     * lane's existing rule is what keeps this class a refactor rather than a behaviour change.
+     */
+    public static Path currentDataRoot() {
+        String dd = System.getProperty("data.dir");
+        if (dd != null && !dd.isBlank()) return Path.of(dd.trim());
+        return DATA_ROOTS.get(EventLog.currentSpaceId());
     }
 
     /**

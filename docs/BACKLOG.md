@@ -1467,17 +1467,38 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   there — migrating it on the assumption that it is would be the same class of unverified reasoning that
   produced this defect. → `SpaceConfigRoot.java` · `DecisionRules.java` · `SpaceBootstrap.java:42`
 
-- **P3** · **`COLLECTOR-SPACE-ROOT-1` — the last JVM-wide write-root reader, in the COLLECTOR lane.**
-  Filed 2026-09-15 as the deliberate remainder of `MATERIALIZE-SPACE-ROOT-1` (closed above).
-  `DatasetCollectorConnectorFactory:66` still reads `System.getProperty("assist.write.root")` while its
-  sibling `-Ddata.dir` is per-space — the identical shape, in the acquisition lane rather than the job
-  lane. ⛔ **Do NOT just swap in `SpaceConfigRoot.current()`.** That resolver keys on
-  `EventLog.currentSpaceId()`, which is the space MDC, and **this shift did not establish that the MDC is
-  set on the collector thread** — `JobService`'s two submit paths were read and confirmed, the collector's
-  were not. Migrating on the assumption would be the same unverified reasoning that produced the original
-  defect. ⇒ **First establish where the collector lane sets the space MDC**; if it does not, the connector
-  factory needs an explicit id and `SpaceConfigRoot.forSpace(id)`, which exists for exactly that case.
-  → `inspecto-engine/.../inspector/DatasetCollectorConnectorFactory.java:66`
+- ✅ **CLOSED 2026-09-15 · `COLLECTOR-SPACE-ROOT-1` — the last JVM-wide write-root reader, in the
+  COLLECTOR lane.** Filed and closed the same day as its parent `MATERIALIZE-SPACE-ROOT-1`.
+  🔴 **The row's own instruction turned out to be a TRAP, and grounding it is what caught that.** It said
+  "first establish where the collector lane sets the space MDC". That question was answered — **it does**:
+  `CollectorService.underSpace` binds it around `dispatchCycle` / `dispatchAcquireCycle` / `runCycle`, and
+  its parallel poll workers inherit it. But the row's implied next step — swap in
+  `SpaceConfigRoot.current()` — **would have re-created the very defect its parent closed**:
+  `DatasetCollectorConnectorFactory` read **two** JVM-wide properties, `assist.write.root` *and*
+  `data.dir`, so they were consistently wrong together. Moving only the registry per-Space would have left
+  one Space's registry beside another Space's data. ⇒ **a half-fix here was worse than none**, and the
+  fix had to move both roots at once.
+  ✅ **`SpaceConfigRoot` now carries a per-Space DATA root beside the config root**, registered together by
+  `SpaceBootstrap` and dropped together by `forget` (pinned: `forgetDropsBothRootsTogether`), and the
+  connector resolves both through it.
+  🔴 **The two lanes' precedence is OPPOSITE, and that asymmetry is preserved deliberately, not tidied:**
+  for the **data** root an explicit `-Ddata.dir` **wins** over the Space's own directory — the rule
+  `CollectorService`'s four call sites already apply (`System.getProperty("data.dir", root.dataDir())`);
+  for the **config** root the Space wins and the property is only the default-Space fallback — the rule
+  `ControlApi.writeRoot()` applies. ⛔ Harmonising them would be a behaviour change wearing a refactor's
+  clothes; a test asserts the asymmetry so nobody "fixes" it by accident.
+  ⚠ Only **one** of the five `data.dir` readers was space-blind — the other four already used the
+  property-as-override pattern. The row assumed a class of defect where there was a single straggler.
+  ⚠ **VERIFIED BY TEST, NOT BY EXECUTION — unlike its parent.** `SpaceConfigRootTest` (12) pins the
+  resolution and the reactor is green at **4505 / 0 / 0 / 28 over 26 modules**, but the `dataset`
+  connector itself was **not** driven on a live server: **nothing committed uses `collector.dataset`** —
+  no pipeline in `spaces/` or `inspecto/examples/` declares it. ⇒ Treat the connector's end-to-end
+  behaviour as unproven, exactly as it was before this change.
+  🔴 **That absence is also why the defect survived, and it is the SECOND time this shift the same shape
+  appeared**: `task: materialize` had no committed job either, and both were space-blind in ways only a
+  live multi-space run could show. ⇒ **a capability with no committed example is a capability nobody has
+  ever run** — the missing example is the risk signal, not a documentation gap.
+  → `SpaceConfigRoot.java` · `DatasetCollectorConnectorFactory.java` · `SpaceBootstrap.java`
 
 - **P3** · **`AIRGAP-CROSSPLAT-DEADWEIGHT-1` — every zip ships the other platform's DuckDB extensions,
   ~45 MB it can never load.** Filed 2026-09-14, **measured from the built zips' own entry tables**, not
