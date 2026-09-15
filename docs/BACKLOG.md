@@ -1500,6 +1500,100 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ever run** — the missing example is the risk signal, not a documentation gap.
   → `SpaceConfigRoot.java` · `DatasetCollectorConnectorFactory.java` · `SpaceBootstrap.java`
 
+- **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down; 75 mutating routes
+  are ungated, `DELETE /spaces/{id}` among them.** Filed 2026-09-15 from duckle candidate S5 ("a route with
+  no entry in the permission table requires admin, so a later-added route is locked down rather than left
+  open"). **Grounded, not assumed** — measured on this tree:
+  - **331 route registrations · 91 gated · 91 manifest entries ⇒ ~223 ungated**, of which **75 MUTATE**
+    (POST/PUT/DELETE). Capability enforcement is **opt-in**: `ApiContext.requireCapability` runs only when a
+    handler is wrapped in `withCapability`, and `CapabilityManifest.capabilityFor` documents `null` =
+    "the route is ungated" as a legitimate outcome (`CapabilityManifest.java:157-164`).
+  - ⛔ **The other gate does not cover it.** `ControlApi.authorize` (`:809-821`) is ABAC via
+    `AccessDeciders.active()`, which resolves EMPTY on Personal **and Standard** (`AccessDeciders.java:23-30`
+    — neither ships a `META-INF/services` registration), so on Standard that stage returns immediately.
+  - 🔴 **Verified example, opened and read rather than inferred:** `api.delete("/spaces/([^/]+)", …)`
+    (`SpaceRoutes.java:72`) has **no capability gate** — `deleteSpace` (`:125-139`) checks only
+    `requireMultiSpace`, id validity, and a last-space-purge 409. ⇒ on Standard **any authenticated caller
+    can deregister a Space**. ⚠ Other entries in the 75 are legitimately ungated (`/auth/exchange|refresh|
+    logout` ARE the login flow; the `preview`/`test`/`probe` POSTs are read-shaped) — **the number is not a
+    count of defects**, and triaging which of the 75 should be gated is the operator's call.
+  - ⛔ **`CapabilityManifestTest` cannot catch this and is not at fault**: it asserts the manifest and the
+    `withCapability` call sites agree with each other, bidirectionally. A route in **neither** is a third
+    case it has no notion of. ⇒ *a guard's scope is a silent exemption* — the same lesson as
+    `guard-scope-is-a-silent-exemption`.
+  **Two separable pieces:** (a) a **build-time ratchet** — enumerate the ungated MUTATING routes as an
+  explicit reviewed list and fail the build on any new one, so a later-added route faces the decision
+  instead of defaulting open. No runtime change, so no policy call needed. ⚠ Build it on the scanner
+  `CapabilityManifestTest` already trusts, not a fresh regex — a hand-rolled parse matched only 304 of 331
+  registrations here, and a flaky gate is worse than none. (b) **deciding which of the 75 to gate, and with
+  which capability** — a security-policy call for the operator, starting with `DELETE /spaces/{id}`.
+  → `CapabilityManifest.java:157` · `ApiContext.java:168` · `SpaceRoutes.java:72` · `AccessDeciders.java:23`
+
+- **P2** · **`AUDIT-REFUSAL-GAP-1` — a capability 403 and an auth 401 are never audited.** Filed 2026-09-15
+  from duckle candidate S6 ("refusals audited as carefully as successes"). Two of the three sub-rules are
+  **already satisfied** and should not be re-litigated: `AuditTrail.record` appends
+  `" (refused, HTTP <status>)"` for any status ≥ 400 (`AuditTrail.java:51`), so *allowed ≠ succeeded*
+  holds for anything reaching a handler; and reads are deliberately not audited — `AuditTrail.classify`
+  (`:123-128`) audits GET only for `/export`, so a polling dashboard cannot bury the record.
+  🔴 **The gap is the refusal the gating mechanism itself produces.** `ApiContext.requireCapability`'s 403
+  (`ApiContext.java:168-171`) and `authenticate`'s 401 (`ControlApi.java:796`) both throw `ApiException`,
+  which unwinds **past** `routeDispatch`'s `AuditTrail.record` / `accessDenied` calls (`:729-738`) into
+  `errorBoundary` (`:594-599`), which only shapes an HTTP response. ⇒ only unmatched-route 404/405 and ABAC
+  policy denials are audited; **a denied capability check leaves no trace at all.** ⚠ That is the exact
+  record a security review would ask for first. → `ControlApi.java:594` · `ApiContext.java:168`
+
+- **P2** · 🔴 **`DATASET-SELF-TRIGGER-1` — a pipeline can trigger itself through `on: dataset`, and the
+  javadoc says it cannot.** Filed 2026-09-15 from duckle candidate S3 ("no self-subscription").
+  `PipelineScheduler.onUpstreamCommit` has an explicit self-loop guard (`:445`); **`onDatasetWrite`
+  (`:469`) has none**, and its javadoc (`:465-467`) states one is unnecessary because *"the producer is a
+  Dataset write (a job/materialize), never the triggered pipeline's own commit."*
+  ⛔ **That claim is false for the consignment path**: `ConsignmentProcessJobType:412` emits
+  `DatasetWriteSignal.emit(store, n, processorId)` **from inside a pipeline's own run**. A pipeline whose
+  processor writes store `S` and declares `{on: dataset, from: datasets/S}` re-triggers itself —
+  coalesced, so it degrades to a hot loop rather than a stack overflow.
+  🔴 **DO NOT ship the obvious one-line guard — it CANNOT FIRE.** The natural fix (pass `producer` through
+  and skip when it equals the pipeline name) fails precisely on the case that needs it, because
+  **`producer` is not a pipeline name and is not even consistent**: `MaterializeTask:132` passes
+  `cfg.name()` (a JOB name) while `ConsignmentProcessJobType:412` passes `chain.get(i)` (a **processor
+  component id**). ⚠ `CollectorService:1026` also drops `producer` entirely before calling
+  `onDatasetWrite`, so today the value never even reaches the scheduler. ⇒ the real work is **deciding
+  what `producer` identifies** and populating it consistently; the guard is downstream of that.
+  → `PipelineScheduler.java:469` · `CollectorService.java:1026` · `ConsignmentProcessJobType.java:412`
+
+- **P2** · **`DATASET-PUBLISH-ON-FAILURE-1` — a run that later fails has already announced its write.**
+  Filed 2026-09-15 from duckle candidate S3 ("failed or ceiling-stopped runs publish nothing").
+  `ConsignmentProcessJobType:318` emits `dataset.write` inside `persistSummaries`; `:321` then calls
+  `persistDerivedTables`, which is `throws Exception` and propagates out of `run()` (`:244`). A run that
+  dies in derived tables — or in a later step of a multi-processor chain (`:275-327`) — has **already
+  published**, so a downstream `on: dataset` consumer is triggered by a failed producer.
+  ✅ **`MaterializeTask` is the correct model and shows the fix is cheap**: its emit (`:132`) sits *after*
+  the atomic swap, so a failure publishes nothing. ⚠ Also asymmetric: the derived-table path (`:361-380`)
+  emits **nothing at all**, and the summary path emits **one signal per distinct store** rather than one
+  per run — worth settling in the same change. → `ConsignmentProcessJobType.java:318`
+
+- **P2** · **`LEDGER-PRUNE-EATS-RESUME-STATE-1` — retention deletes resume position, not just history.**
+  Filed 2026-09-15 from duckle candidate S1 ("saved state — watermarks, resume positions — is NEVER
+  touched by retention"). `AcquisitionLedger.highWatermark()` is **derived from the fingerprints the
+  ledger holds — there is no separate watermark column** (`AcquisitionLedger.java:22-41`), and
+  `ledger_prune` deletes those fingerprints (`LedgerPruneTask.java:11-27`). So pruning deletes the
+  source's resume state; the task's own doc that a pruned file *"re-ingests as NEW"* is that loss, stated
+  as deliberate forgetting. ⚠ Partial, not total: the row-level DB-export watermark
+  (`DbAcquisitionLedger.java:200-221`) is a separate table and is **not** touched by `prune()`.
+  ⇒ The call to make is whether "deliberate forgetting" should be **opt-in per category** rather than a
+  consequence of an age-based sweep. → `AcquisitionLedger.java:64` · `LedgerPruneTask.java:11`
+
+- **P3** · **`PRUNE-PREVIEW-DRIFT-1` — dry-run and the real prune are two different predicates.**
+  Filed 2026-09-15 from duckle candidate S1 ("`--dry-run` and the real prune share one planning
+  function"). ✅ The file-partition tasks already do it right — `ParquetEventStore.prune(before, dryRun)`
+  (`:349`) and `PartitionPruneTask.run` (`:38-64`) walk one loop and branch only at the delete
+  (`if (dryRun) continue;`). 🔴 The store-backed tasks do not: preview calls `countPrunable(cutoff)` and
+  the act calls `prune(cutoff)`, **each with its own independently written WHERE clause**
+  (`AcquisitionLedger.java:72-83`, `DbAcquisitionLedger.java:225-258`; same shape in `ReceiptPruneTask` /
+  `NotificationPruneTask`) — two definitions of "what is prunable" that can drift.
+  ⛔ Worst case found: **`DedupPruneTask`'s dry run does not count matching rows at all** — it reports the
+  ledger's *total* size as the preview, which is not a plan. ⇒ unify each pair onto one predicate; the
+  partition tasks are the template. → `AcquisitionLedger.java:72` · `DedupPruneTask.java`
+
 - **P3** · **`AIRGAP-CROSSPLAT-DEADWEIGHT-1` — every zip ships the other platform's DuckDB extensions,
   ~45 MB it can never load.** Filed 2026-09-14, **measured from the built zips' own entry tables**, not
   estimated. `package.ps1` stages both platforms into one `$bundleDir` and cuts both zips from it, so
