@@ -87,6 +87,39 @@ public interface DeliveryReceiptStore extends AutoCloseable {
      *
      * @since 4.0.0
      */
+    /**
+     * Receipts a soft-bounce retry should consider: currently soft-bounced, not yet resolved, and under
+     * {@code maxAttempts} ({@code D8} soft-bounce retry).
+     *
+     * <p>⚠ <b>Candidates, not decisions.</b> The backoff clock and the suppression re-check are applied by
+     * the caller, deliberately: whether enough time has passed is a policy question, and this seam should
+     * not encode one. An over-broad implementation here can only cost work.
+     *
+     * <p>⛔ Uses {@link DeliveryReceipt#softBouncedAndUnresolved()} rather than a bare
+     * {@code statusAt.containsKey(BOUNCED_SOFT)} — a receipt that soft-bounced and then delivered keeps
+     * BOTH stamps forever (first-observation-wins), so the naive test re-sends messages already received.
+     *
+     * @since 4.0.0
+     */
+    default List<DeliveryReceipt> softBounceRetryCandidates(int maxAttempts) {
+        List<DeliveryReceipt> out = new java.util.ArrayList<>();
+        for (DeliveryReceipt r : recent(SUPPRESSION_SCAN)) {
+            if (r.attemptCount() < maxAttempts && r.softBouncedAndUnresolved()) out.add(r);
+        }
+        return List.copyOf(out);
+    }
+
+    /**
+     * Record one delivery attempt against {@code deliveryId}, returning the updated receipt (empty when
+     * unknown). Increments the count and moves the retry clock; see
+     * {@link DeliveryReceipt#lastAttemptAt()} for why the clock cannot live in the status map.
+     *
+     * @since 4.0.0
+     */
+    default Optional<DeliveryReceipt> recordAttempt(String deliveryId, long at) {
+        return get(deliveryId).map(r -> add(r.withAttempt(at)));
+    }
+
     default List<String> targetsWithStatus(DeliveryStatus status) {
         if (status == null) return List.of();
         java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();

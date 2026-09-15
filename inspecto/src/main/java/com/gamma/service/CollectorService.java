@@ -555,6 +555,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 : new com.gamma.notify.InMemoryDeliveryReceiptStore();
         this.notificationService.deliveryReceipts(deliveryReceipts);
         if (this.jobs != null) this.jobs.deliveryReceiptStore(deliveryReceipts);   // receipt_prune maintenance task
+        // soft_bounce_retry re-delivers through the service rather than reaching for a transport itself —
+        // channel resolution, the suppression re-check and the template all live there, and a task that
+        // reimplemented them would be a second, divergent send path.
+        if (this.jobs != null) this.jobs.notificationService(this.notificationService);
         this.notificationSubscriber = notificationService::onEvent;
         this.eventLog.addSubscriber(notificationSubscriber);
         String viewsFile = System.getProperty("events.views.file");

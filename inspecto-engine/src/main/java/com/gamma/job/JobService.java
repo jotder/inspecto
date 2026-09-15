@@ -109,6 +109,10 @@ public final class JobService implements AutoCloseable {
     /** This space's delivery receipts (D8), attached post-construction like the feed above; read at run
      *  time by the {@code receipt_prune} maintenance task. */
     private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
+    /** This space's notification service (D8), attached post-construction like the stores above; read at
+     *  run time by the {@code soft_bounce_retry} task, which is the first maintenance task that SENDS
+     *  rather than prunes or reads. */
+    private volatile com.gamma.notify.NotificationService notificationService;
     /** Authored-pipeline store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
     private final PipelineStore pipelineStore;
     /** This space's component registry, for resolving a pipeline's {@code use:} bindings before it runs.
@@ -1338,6 +1342,17 @@ public final class JobService implements AutoCloseable {
     /** Attach this space's delivery receipt store post-construction (it is created after this service). */
     public void deliveryReceiptStore(com.gamma.notify.DeliveryReceiptStore store) {
         this.deliveryReceiptStore = store;
+    }
+
+    /** The notification service the {@code soft_bounce_retry} task re-delivers through, or empty when the
+     *  host never attached one (then the task is a no-op rather than a failure). */
+    public Optional<com.gamma.notify.NotificationService> notificationService() {
+        return Optional.ofNullable(notificationService);
+    }
+
+    /** Attach this space's notification service post-construction (it is created after this service). */
+    public void notificationService(com.gamma.notify.NotificationService svc) {
+        this.notificationService = svc;
     }
 
     /** Install the cross-pod arming exclusion keyed by job name (§5.2). {@code null} restores the no-op. */

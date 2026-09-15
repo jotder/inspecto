@@ -46,6 +46,12 @@ import java.time.Instant;
  *       (required) ago, whatever status they carry. Receipts accrue per <b>external delivery</b>, so they
  *       grow faster than notifications; this is what bounds them (the in-memory store's oldest-first cap
  *       is a backstop, not a retention policy). See {@link ReceiptPruneTask}.</li>
+ *   <li>{@code soft_bounce_retry} — re-deliver messages that SOFT-bounced (a transient failure against an
+ *       address that is still good). Params: {@code max_attempts} (default 3) and {@code backoff_minutes}
+ *       (default 60). ⚠ The only maintenance task that <b>sends</b> rather than prunes or reads.
+ *       {@code SuppressionList} deliberately never suppresses a soft bounce, so without this the message
+ *       was simply dropped: status recorded, nothing retried, recipient never served. See
+ *       {@link SoftBounceRetryTask}.</li>
  *   <li>{@code incident_purge} — physically remove {@code ARCHIVED} Incidents closed more than
  *       {@code retention_days} (required) ago, cascading to their notes/attachments, links and tag edges
  *       (D5/MNT-14). Optional {@code max_count} (default 1000) bounds one run. Legal-held Incidents are
@@ -145,8 +151,8 @@ final class MaintenanceJob implements Job {
     }
 
     /**
-     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 20 ids
-     * across 19 arms ({@code heartbeat} and {@code noop} share one).
+     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 21 ids
+     * across 20 arms ({@code heartbeat} and {@code noop} share one).
      *
      * <p>⚠ <b>This constant and that switch are two declarations of one fact.</b>
      * {@code MaintenanceTaskContractTest} re-parses this file's own {@code case} labels and fails when the
@@ -160,7 +166,7 @@ final class MaintenanceJob implements Job {
      */
     public static final java.util.List<String> BUILT_IN_TASKS = java.util.List.of(
             "cleanup", "ledger_prune", "dedup_prune", "runlog_prune", "notification_prune",
-            "event_prune", "partition_prune", "receipt_prune", "storage_report", "storage_trend",
+            "event_prune", "partition_prune", "receipt_prune", "soft_bounce_retry", "storage_report", "storage_trend",
             "scheduler_audit", "metadata_validate", "file_repository_audit", "db_maintenance",
             "retire_superseded", "compact", "reference_compact", "materialize", "heartbeat", "noop");
 
@@ -188,6 +194,7 @@ final class MaintenanceJob implements Job {
             case "event_prune"        -> EventPruneTask.run(cfg, host, dryRun);
             case "partition_prune"    -> PartitionPruneTask.run(cfg, dryRun);
             case "receipt_prune"      -> ReceiptPruneTask.run(cfg, host, dryRun);
+            case "soft_bounce_retry"  -> SoftBounceRetryTask.run(cfg, host, dryRun);
             // ⛔ incident_purge is NOT a case here any more (EDG-01 cell 7). It is Incident retention
             // with legal-hold rules — operational-object domain — so it moved to the optional
             // inspecto-ops module and arrives through MaintenanceTaskProvider via the default arm.

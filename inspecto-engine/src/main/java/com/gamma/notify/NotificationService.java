@@ -326,6 +326,59 @@ public final class NotificationService implements NotificationAccess, AutoClosea
 
     /** The discovered SPI transport whose {@link NotificationChannel#id() id} names this persisted channel's
      *  {@code kind} (case-insensitive), or {@code null} when no such transport is on the classpath. */
+    /**
+     * Re-deliver one soft-bounced message ({@code D8} soft-bounce retry). Returns {@code true} when the
+     * transport was called, {@code false} when the attempt was declined for a stated reason.
+     *
+     * <p>🔴 <b>It reuses the receipt's own {@code deliveryId}.</b> A retry is the same delivery tried
+     * again, not a new one: the id is embedded in the outbound message, so minting a fresh one would make
+     * the provider's next callback stamp a receipt with no bounce history, and the attempt count — the
+     * only thing bounding the retry — would reset to zero every round.
+     *
+     * <p>⛔ <b>Re-checks suppression.</b> Between the bounce and this sweep the same address may have hard
+     * bounced or complained on another message; `SuppressionList` owns that decision and it must be asked
+     * again here, not assumed from the state at send time.
+     *
+     * <p>⚠ Declines rather than throws for every ordinary "cannot": unknown notification, unknown channel
+     * config, no transport for the kind, suppressed target. A sweep over many receipts must not be ended
+     * by one that is no longer deliverable.
+     */
+    public boolean retrySoftBounce(DeliveryReceipt receipt) {
+        if (receipt == null || receipt.channelConfigId() == null) return false;
+        Notification n = store.get(receipt.notificationId()).orElse(null);
+        if (n == null) {
+            log.info("soft-bounce retry skipped: notification {} is gone", receipt.notificationId());
+            return false;
+        }
+        ChannelConfig cfg = channelConfigs.get().stream()
+                .filter(c -> receipt.channelConfigId().equals(c.id()))
+                .findFirst().orElse(null);
+        if (cfg == null || !cfg.enabled()) {
+            log.info("soft-bounce retry skipped: channel config {} is gone or disabled", receipt.channelConfigId());
+            return false;
+        }
+        NotificationChannel ch = channelByKind(cfg.kind());
+        if (ch == null) {
+            log.info("soft-bounce retry skipped: no transport for kind {}", cfg.kind());
+            return false;
+        }
+        java.util.Optional<String> suppressed =
+                suppression.reasonToSuppress(cfg.target(), System.currentTimeMillis());
+        if (suppressed.isPresent()) {
+            log.info("soft-bounce retry skipped: {} is suppressed ({})", cfg.target(), suppressed.get());
+            return false;
+        }
+        try {
+            ch.deliver(n, cfg.target(), receipt.deliveryId());
+            return true;
+        } catch (Exception ex) {
+            // A failed retry is still an attempt — the caller records it either way, so a permanently
+            // unreachable transport cannot spin the sweep forever.
+            log.warn("soft-bounce retry to {} failed: {}", cfg.target(), ex.getMessage());
+            return false;
+        }
+    }
+
     private NotificationChannel channelByKind(String kind) {
         if (kind == null) return null;
         for (NotificationChannel ch : channels)

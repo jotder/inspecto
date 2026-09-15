@@ -54,7 +54,8 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
      *  part of it, and mixing the two would make "was this address ever bad" unanswerable. */
     private static final String OVERRIDES = "inspecto_delivery_suppression_overrides";
     private static final String COLS =
-            "delivery_id, notification_id, channel_config_id, target, sent_at, status_at, provider_raw, digest";
+            "delivery_id, notification_id, channel_config_id, target, sent_at, status_at, provider_raw, digest, "
+            + "attempt_count, last_attempt_at";
 
     /** Wrap an already-open JDBC connection (any engine); the schema is created if absent. */
     public DbDeliveryReceiptStore(Connection conn) {
@@ -85,6 +86,13 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
                             + "digest BOOLEAN)");
                     // forNotification() and prune()/countPrunable() are the only non-PK access paths; both scan
                     // without these. Harmless if the engine ignores the hint.
+                    // Soft-bounce retry (D8) needs a retry clock the status map cannot carry: withStatus keeps
+                    // the FIRST observation of each status, so statusAt[BOUNCED_SOFT] never advances and a
+                    // backoff measured from it would fire every remaining attempt at once. Additive and
+                    // existing-install safe - the same ADD COLUMN IF NOT EXISTS idiom DbConsignmentOutputStore
+                    // uses; rows written before this read back NULL and map to 0.
+                    st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS attempt_count INTEGER");
+                    st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS last_attempt_at BIGINT");
                     st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_notification ON " + TABLE + " (notification_id)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_sent_at ON " + TABLE + " (sent_at)");
                     // latestWithStatus() — the per-recipient suppression lookup, run once per external delivery.
@@ -104,7 +112,7 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
         // is what the in-memory `put` already is. ⚠ Not an UPSERT: DuckDB and Postgres spell it differently
         // and this store must work unchanged on both.
         String delete = "DELETE FROM " + TABLE + " WHERE delivery_id = ?";
-        String insert = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?)";
+        String insert = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?)";
         try {
             // ⚠ Delete and insert share ONE borrow — the pair IS the idempotent write, and on a pool two
             // borrows would be two connections with another writer free to slip between them.
@@ -121,6 +129,8 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
                     ps.setString(6, statusJson(receipt.statusAt()));
                     ps.setString(7, receipt.providerRaw());
                     ps.setBoolean(8, receipt.digest());
+                    ps.setInt(9, receipt.attemptCount());
+                    ps.setLong(10, receipt.lastAttemptAt());
                     ps.executeUpdate();
                 }
             });
@@ -374,8 +384,11 @@ public final class DbDeliveryReceiptStore extends AbstractJdbcStore
     }
 
     private static DeliveryReceipt read(ResultSet rs) throws SQLException {
+        // ⚠ getInt/getLong return 0 for a SQL NULL, which is exactly the right reading for a row written
+        // before these columns existed: never retried.
         return new DeliveryReceipt(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                rs.getLong(5), statusMap(rs.getString(6)), rs.getString(7), rs.getBoolean(8));
+                rs.getLong(5), statusMap(rs.getString(6)), rs.getString(7), rs.getBoolean(8),
+                rs.getInt(9), rs.getLong(10));
     }
 
     /** The status history as a flat {@code {"BOUNCED_HARD":"171…"}} object — one column, whole-map reads. */

@@ -29,11 +29,38 @@ import java.util.UUID;
  * @param digest          {@code true} when this receipt covers a <b>digest</b> delivery batching several
  *                        notifications into one message. This is the one place the per-delivery model is
  *                        lossy: a bounce tells us the digest bounced, not which notification was in it.
+ * @param attemptCount    how many times delivery has been ATTEMPTED — {@code 0} for a receipt never
+ *                        retried, so the original send is not counted. Only the soft-bounce retry sweep
+ *                        increments it.
+ * @param lastAttemptAt   when the most recent attempt was made, epoch millis; {@code 0} when never
+ *                        retried.
+ *                        <p>🔴 <b>This cannot be derived from {@link #statusAt}, and that is why it
+ *                        exists.</b> {@link #withStatus} keeps the FIRST observation of each status on
+ *                        purpose, so {@code statusAt.get(BOUNCED_SOFT)} stays pinned at the first bounce
+ *                        however many times the address bounces again. Computing a backoff from it would
+ *                        therefore measure from a fixed point in the past, and every remaining attempt
+ *                        would come due at once on the next sweep — a retry storm wearing the shape of a
+ *                        backoff. The retry clock has to be its own field.
  * @since 4.0.0
  */
 public record DeliveryReceipt(String deliveryId, String notificationId, String channelConfigId,
                               String target, long sentAt, Map<DeliveryStatus, Long> statusAt,
-                              String providerRaw, boolean digest) {
+                              String providerRaw, boolean digest,
+                              int attemptCount, long lastAttemptAt) {
+
+    /**
+     * The pre-retry shape ({@code attemptCount = 0}, {@code lastAttemptAt = 0}) — every send path opens a
+     * receipt that has not been retried, so this is what they all call.
+     *
+     * <p>⚠ Kept as a convenience constructor rather than widening the 15 existing construction sites: a
+     * receipt with no retry history is the normal case, and making every caller say {@code 0, 0} would add
+     * noise at fifteen places to serve one.
+     */
+    public DeliveryReceipt(String deliveryId, String notificationId, String channelConfigId,
+                           String target, long sentAt, Map<DeliveryStatus, Long> statusAt,
+                           String providerRaw, boolean digest) {
+        this(deliveryId, notificationId, channelConfigId, target, sentAt, statusAt, providerRaw, digest, 0, 0);
+    }
 
     public DeliveryReceipt {
         if (deliveryId == null || deliveryId.isBlank()) deliveryId = newDeliveryId();
@@ -56,8 +83,52 @@ public record DeliveryReceipt(String deliveryId, String notificationId, String c
         // recorded time, which is what makes the delivered-then-complaint ordering stable.
         merged.putIfAbsent(status, ts);
         return new DeliveryReceipt(deliveryId, notificationId, channelConfigId, target, sentAt, merged,
-                providerRaw != null ? providerRaw : raw, digest);
+                providerRaw != null ? providerRaw : raw, digest, attemptCount, lastAttemptAt);
     }
+
+    /**
+     * This receipt with one more delivery attempt recorded at {@code at} — the soft-bounce retry sweep's
+     * only mutation ({@code D8} soft-bounce retry).
+     *
+     * <p>⚠ Deliberately separate from {@link #withStatus}: a retry is something WE did, a status is
+     * something the provider told us. Folding the attempt into the status map would both lose the count
+     * (one slot per status) and let a provider callback move the retry clock.
+     */
+    public DeliveryReceipt withAttempt(long at) {
+        return new DeliveryReceipt(deliveryId, notificationId, channelConfigId, target, sentAt, statusAt,
+                providerRaw, digest, attemptCount + 1, at);
+    }
+
+    /**
+     * Whether this receipt is currently soft-bounced — the latest word from the provider is a transient
+     * failure, with no later {@code DELIVERED} or hard outcome superseding it.
+     *
+     * <p>🔴 A plain {@code containsKey(BOUNCED_SOFT)} is NOT enough: a receipt that soft-bounced and then
+     * delivered on retry keeps BOTH stamps forever (first-observation-wins), so retrying on the bare
+     * presence of the key would re-send a message the recipient already has.
+     */
+    public boolean softBouncedAndUnresolved() {
+        Long soft = statusAt.get(DeliveryStatus.BOUNCED_SOFT);
+        if (soft == null) return false;
+        for (DeliveryStatus s : RESOLVES_A_SOFT_BOUNCE) {
+            Long at = statusAt.get(s);
+            if (at != null && at >= soft) return false;
+        }
+        return true;
+    }
+
+    /**
+     * The statuses that settle a soft bounce, so retrying would be wrong.
+     *
+     * <p>{@code DELIVERED} — it got through. {@code BOUNCED_HARD} — the address is dead, and
+     * {@code SuppressionList} owns it from there. {@code COMPLAINED} — the recipient called it spam, and
+     * re-sending is the one action guaranteed to make that worse.
+     *
+     * <p>⛔ {@code UNKNOWN} is deliberately NOT here: an event the adapter could not classify tells us
+     * nothing about delivery, so treating it as a resolution would silently abandon a retryable message.
+     */
+    private static final java.util.EnumSet<DeliveryStatus> RESOLVES_A_SOFT_BOUNCE = java.util.EnumSet.of(
+            DeliveryStatus.DELIVERED, DeliveryStatus.BOUNCED_HARD, DeliveryStatus.COMPLAINED);
 
     /** Whether the destination is known bad — a hard bounce only, never a soft one. */
     public boolean hardBounced() {
