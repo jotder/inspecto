@@ -531,7 +531,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     static final String[] REQUEST_SCOPED_ATTRS = {
             ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_START_NANOS, ApiContext.ATTR_SELF_PATH,
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_STORE, ApiContext.ATTR_IDEMPOTENCY_KEY,
-            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_RESOURCE_PERMISSIONS,
+            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
+            ApiContext.ATTR_RESOURCE_PERMISSIONS,
             ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
 

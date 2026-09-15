@@ -115,6 +115,10 @@ class ControlApiAuthV1Test {
             assertEquals(401, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}").statusCode());
             assertTrue(deniedWithStatus(c, "/components/widget", 401),
                     "a 401 on a matched route is recorded as ACCESS_DENIED");
+            // Negative control for step 4a: a 401 never reached a capability check, so the row must NOT
+            // claim one. Absence means "not checked" — the assertion above is only meaningful if this holds.
+            assertFalse(deniedEvent(c, "/components/widget", 401).path("attributes").has("capability"),
+                    "an authentication refusal carries no capability — no check ran");
         }
     }
 
@@ -128,6 +132,11 @@ class ControlApiAuthV1Test {
                     "a capability 403 is recorded as ACCESS_DENIED");
             assertEquals("guest", deniedEvent(c, "/components/widget", 403).path("attributes").path("actor").asText(),
                     "the refused attempt names the identity that made it");
+            // Compliance plan step 4a (2026-09-15): the row answers "denied WHAT?". Until then the capability
+            // reached only the exception message and the audit log held a 403 with no cause.
+            assertEquals("canAuthorWorkbench",
+                    deniedEvent(c, "/components/widget", 403).path("attributes").path("capability").asText(),
+                    "the refusal names the capability that was missing");
         }
     }
 
@@ -160,6 +169,19 @@ class ControlApiAuthV1Test {
         return null;
     }
 
+    /** The AUDIT-typed sibling of {@link #deniedEvent}: the mutation-trail row for {@code path} that was
+     *  sent with {@code status}. Same in-process read of the store, for the same reason. */
+    private JsonNode auditEvent(Ctx c, String path, int status) {
+        JsonNode events = JSON.valueToTree(c.svc.events().page(200, null, null).stream().map(Event::toMap).toList());
+        for (JsonNode e : events) {
+            JsonNode a = e.path("attributes");
+            if ("AUDIT".equals(e.path("type").asText())
+                    && a.path("http_path").asText().contains(path)
+                    && status == a.path("http_status").asInt()) return e;
+        }
+        return null;
+    }
+
     @Test
     void writeRouteWithCapabilitySucceedsAndEnvelopeCarriesPermissions(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
@@ -170,6 +192,32 @@ class ControlApiAuthV1Test {
             JsonNode permissions = V1Body.envelope(r.body()).get("permissions");
             assertTrue(permissions.isArray());
             assertTrue(streamText(permissions).contains("canAuthorWorkbench"));
+            // Compliance plan step 4b (2026-09-15): a write that PASSED a capability gate is marked as
+            // privileged by that capability on its AUDIT row — so "every privileged write, by actor, by
+            // capability, in the window" is one query over the store, not a join rebuilt by hand.
+            JsonNode audited = auditEvent(c, "/components/widget", 200);
+            assertNotNull(audited, "the permitted write is on the audit trail");
+            assertEquals("jdoe", audited.path("attributes").path("actor").asText());
+            assertEquals("canAuthorWorkbench", audited.path("attributes").path("capability").asText(),
+                    "the AUDIT row names the capability the write was privileged by");
+        }
+    }
+
+    /**
+     * The other half of step 4b's contract: on Personal no Subject is ever attached, so no capability is
+     * ever CHECKED — and the AUDIT row must therefore carry none. Absence has to mean "not checked" and
+     * never "checked and passed", or an auditor reading a Personal log would be told writes were gated
+     * on an edition that gates nothing. No Authenticator is armed here on purpose.
+     */
+    @Test
+    void anUngatedWriteOnPersonalCarriesNoCapability(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}").statusCode(),
+                    "Personal: the route is open, no capability check runs");
+            JsonNode audited = auditEvent(c, "/components/widget", 200);
+            assertNotNull(audited, "the write is still audited");
+            assertFalse(audited.path("attributes").has("capability"),
+                    "nothing was checked, so nothing is claimed");
         }
     }
 

@@ -58,6 +58,14 @@ public final class AuditAttrs {
      *  or a marker like {@code <policies-unreadable>} for a fail-closed deny. */
     public static final String POLICY = "policy";
 
+    // ── capability gate (compliance plan step 4a/4b, 2026-09-15) ──────────────────
+    /** The capability a {@code withCapability} gate CHECKED on the request. On an {@code ACCESS_DENIED} row
+     *  it is the capability that was missing — the answer to "denied WHAT?", which the log did not hold
+     *  before. On an {@code AUDIT} row it marks a PRIVILEGED write: the capability the write passed. Absent
+     *  when no check ran (a 401, an ungated route, or Personal, where no Subject is ever attached) — so
+     *  absence means "not checked", never "checked and passed". */
+    public static final String CAPABILITY = "capability";
+
     /**
      * Every audit attribute key above, in projection/column order — the ONE list consumers (e.g. the
      * {@code /events/export} audit-shaped CSV) derive their columns from instead of hand-listing keys.
@@ -66,5 +74,5 @@ public final class AuditAttrs {
      */
     public static final java.util.List<String> ALL = java.util.List.of(
             ACTOR, ACTOR_TYPE, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
-            IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY);
+            IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY);
 }

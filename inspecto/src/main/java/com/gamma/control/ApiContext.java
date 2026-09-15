@@ -75,6 +75,11 @@ public interface ApiContext {
      *  {@link Authenticator} validates the request; absent on Personal edition (no Authenticator present)
      *  and on the public bootstrap/health surface. */
     String ATTR_SUBJECT           = "inspecto.subject";
+    /** The capability {@link #requireCapability} CHECKED on this exchange — set only when a Subject was
+     *  attached, i.e. only when a check actually ran. Read by {@code AuditTrail}: on a 403 it is the
+     *  capability that was missing, on a permitted write the one the write was privileged by. Absent on
+     *  Personal (nothing is checked there) and on any route with no gate (compliance plan step 4a/4b). */
+    String ATTR_CAPABILITY        = "inspecto.capability";
     /** SEC-7(b): the capability set applicable to the single resource this response carries, declared by
      *  the route via {@link #resourcePermissions}; {@link Envelope} intersects it with the Subject's
      *  session grants. Absent ⇒ the envelope keeps the session-wide array (lists, un-migrated routes). */
@@ -166,8 +171,18 @@ public interface ApiContext {
      *  {@link Authenticator} is ever present there, so no {@link Subject} is ever attached and every route
      *  stays open, unchanged. */
     static void requireCapability(HttpExchange ex, String capability) {
-        if (attr(ex, ATTR_SUBJECT) instanceof Subject s && !s.capabilities().contains(capability))
-            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "missing capability '" + capability + "'");
+        if (attr(ex, ATTR_SUBJECT) instanceof Subject s) {
+            // Recorded on the exchange BEFORE the outcome is known, so both readers see it: on a 403,
+            // AuditTrail.accessDenied stamps the capability that was MISSING; on a pass, AuditTrail.record
+            // stamps the capability this write was PRIVILEGED by. Until 2026-09-15 the name lived only in
+            // the exception message below and was gone before the audit event was built (compliance plan
+            // step 4a/4b). ⚠ Deliberately inside the Subject branch: on Personal no check runs, so no
+            // capability is stamped — an event claiming "privileged by X" on an edition that checks
+            // nothing would tell an auditor something false.
+            attr(ex, ATTR_CAPABILITY, capability);
+            if (!s.capabilities().contains(capability))
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "missing capability '" + capability + "'");
+        }
     }
 
     /** SEC-7(b): declare the capability set applicable to the single resource this response carries —

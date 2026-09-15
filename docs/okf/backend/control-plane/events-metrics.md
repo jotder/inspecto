@@ -63,6 +63,22 @@ timestamp: 2026-07-16T00:00:00Z
   boundary, which only shapes the response — so the log held every *successful* call to a route and none
   of the denied ones, the inverse of what an investigator needs. Both are now caught in `routeDispatch`
   and recorded as `ACCESS_DENIED`.
+  ✅ **And the refusal now says denied WHAT — compliance plan step 4a/4b, 2026-09-15.** `requireCapability`
+  records the capability it checks on the exchange (`ApiContext.ATTR_CAPABILITY`) **before** the outcome is
+  known, and both audit writers read it: `accessDenied` stamps `AuditAttrs.CAPABILITY` on the `ACCESS_DENIED`
+  row (the capability that was MISSING — until then it lived only in the exception message and never reached
+  the log), and `record` stamps it on the `AUDIT` row of a write that passed the gate (the capability the write
+  was PRIVILEGED by), so *"every privileged write, by actor, by capability, in the window"* is one
+  `/audit/search` query. ⚠ **The attribute is set only when a `Subject` is attached** — i.e. only when a
+  check actually ran. On Personal nothing is checked, so nothing is stamped: **absence means "not checked",
+  never "checked and passed"**, and a Personal log cannot be read as claiming gates it does not have. Pinned
+  four ways in `ControlApiAuthV1Test`: a 403 names `canAuthorWorkbench`; a 401 carries **no** capability (no
+  check was reached); a permitted write's `AUDIT` row carries it; a Personal write's row carries none.
+  🔴 **The first cut leaked.** `ATTR_CAPABILITY` is request-scoped and was not on
+  `ControlApi.REQUEST_SCOPED_ATTRS`; `ExchangeAttributeScopeTest` refused it — on a shared-attribute runtime
+  one request's capability would have been readable by the next. The guard exists for exactly this and it
+  fired; every new `ATTR_*` goes on that roster. ⚠ The audit-shaped CSV on `/events/export` derives its
+  columns from `AuditAttrs.ALL`, so it gained a `capability` column; nothing pinned the header literally.
   ⚠ **Two deliberate asymmetries, both load-bearing.** (1) The AuthZ **policy** DENY is *not* caught
   there: `authorize` already writes its own `access.denied` via `AuditTrail.policyDecision`, and catching
   it again would log one refusal twice — so `authorize` sits outside the guard on purpose. (2) Unlike the

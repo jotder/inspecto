@@ -49,7 +49,13 @@ final class AuditTrail {
             // Say so when the action was REFUSED. The action name is the one that was attempted, so a
             // 4xx/5xx must not read as an accomplished mutation in the one log an investigator trusts.
             String outcome = status >= 400 ? " (refused, HTTP " + status + ")" : "";
-            EventLog.current().emit(Event.builder(EventType.AUDIT)
+            // The capability this request was PRIVILEGED by — present iff a capability check ran and
+            // passed on the way in (ApiContext.requireCapability, Subject attached). Its absence on an
+            // AUDIT row therefore means "an ordinary mutation, or Personal where nothing is checked";
+            // its presence is what lets "every privileged write, by actor, by capability, in the window"
+            // be one /audit/search query instead of a hand-built join (compliance plan step 4b).
+            Object capability = ApiContext.attr(ex, ApiContext.ATTR_CAPABILITY);
+            var event = Event.builder(EventType.AUDIT)
                     .source("audit")
                     .message(actor + " " + action.name() + (targetId == null ? "" : " " + targetId) + outcome)
                     .actor(actor).actorType(ApiContext.actorType(ex))
@@ -58,7 +64,9 @@ final class AuditTrail {
                     .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
                     .attr(AuditAttrs.HTTP_METHOD, method)
                     .attr(AuditAttrs.HTTP_PATH, path)
-                    .attr(AuditAttrs.HTTP_STATUS, status));
+                    .attr(AuditAttrs.HTTP_STATUS, status);
+            if (capability != null) event.attr(AuditAttrs.CAPABILITY, capability);
+            EventLog.current().emit(event);
         } catch (RuntimeException ignore) {
             // best effort — the audit trail must never break the request
         }
@@ -73,15 +81,24 @@ final class AuditTrail {
     static void accessDenied(HttpExchange ex, String method, String path, int status) {
         try {
             String actor = ApiContext.actor(ex);
-            EventLog.current().emit(Event.builder(EventType.ACCESS_DENIED)
+            // The capability a 403 was refused FOR, when a capability check is what refused it. Set by
+            // ApiContext.requireCapability; absent on a 401 (authentication, no capability was reached)
+            // and on a policy DENY (which records itself through policyDecision). Until 2026-09-15 this
+            // name reached only the exception message and never the audit row — so the one question an
+            // investigator asks of a refusal, "denied WHAT?", had no answer in the log (plan step 4a).
+            Object capability = ApiContext.attr(ex, ApiContext.ATTR_CAPABILITY);
+            var event = Event.builder(EventType.ACCESS_DENIED)
                     .source("audit")
-                    .message(actor + " access.denied " + method + " " + path + " (" + status + ")")
+                    .message(actor + " access.denied " + method + " " + path + " (" + status + ")"
+                            + (capability == null ? "" : " missing " + capability))
                     .actor(actor).actorType(ApiContext.actorType(ex))
                     .action("access.denied").actionCategory("authorization")
                     .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
                     .attr(AuditAttrs.HTTP_METHOD, method)
                     .attr(AuditAttrs.HTTP_PATH, path)
-                    .attr(AuditAttrs.HTTP_STATUS, status));
+                    .attr(AuditAttrs.HTTP_STATUS, status);
+            if (capability != null) event.attr(AuditAttrs.CAPABILITY, capability);
+            EventLog.current().emit(event);
         } catch (RuntimeException ignore) {
             // best effort
         }

@@ -1,8 +1,8 @@
 # Route Gating for Compliance — Plan
 
 > **Status: DRAFTED 2026-09-15, operator direction *"goal is to pass compliance"*. ✅ Step 1 SHIPPED the
-> same shift — all five gates, verified in a clean worktree (4530/0/0/28); steps 2–4 are sequenced and
-> grounded but not started.** This plan takes the
+> same shift — all five gates, verified in a clean worktree (4530/0/0/28). ✅ Steps 4a/4b SHIPPED the same
+> shift too (4555/0/0/28 on `a831172f`); steps 2, 3 and 4c–4g are sequenced and grounded but not started.** This plan takes the
 > route-gating audit ([`route-gating-audit.md`](route-gating-audit.md), all 11 remaining routes grounded
 > 2026-09-15) from *a reviewed list* to *a control an auditor can test*. It is the second half of
 > `ROUTE-UNGATED-DEFAULT-1` (P1).
@@ -179,13 +179,19 @@ runtime inventory for core plus the scan for optional modules.
 **Compliance purpose:** CC7.2 — the auditor wants to *see* refusals and privileged actions, by actor, over the
 window, and wants the inventory the control enforces to be **derived from the code**, not typed by hand.
 
-**4a. Refusal events carry the capability.** `requireCapability` records the missing capability on the
+**4a. Refusal events carry the capability. ✅ SHIPPED 2026-09-15.** `requireCapability` records the missing capability on the
 exchange (an `ATTR_DENIED_CAPABILITY` attribute, the existing `attr(ex, …)` idiom) before throwing;
 `AuditTrail.accessDenied` reads it into a new `AuditAttrs.CAPABILITY`. Reuse `EventType.ACCESS_DENIED` —
 ⛔ no new type: `AuditLogRoutes` is fail-closed to `{AUDIT, ACCESS_DENIED}`, and a new type would be
 invisible to `/audit/search` until allowlisted.
 
-**4b. Privileged writes are marked.** `AuditTrail.record` gets the matched `Route`'s capability (the router
+**4b. Privileged writes are marked. ✅ SHIPPED 2026-09-15 — and NOT the way this paragraph planned it.**
+As built, `AuditTrail.record` reads the same exchange attribute 4a sets in `requireCapability`, so it needed
+**no router change and did not wait for 3a**. The attribute is stamped only when a `Subject` is attached
+(a check actually ran), so on Personal an `AUDIT` row carries none — absence means *not checked*, never
+*checked and passed*. ⚠ The first cut omitted `ATTR_CAPABILITY` from `ControlApi.REQUEST_SCOPED_ATTRS` and
+`ExchangeAttributeScopeTest` refused it (a cross-request leak on shared-attribute runtimes); fixed before
+commit. Original text: `AuditTrail.record` gets the matched `Route`'s capability (the router
 now knows it, 3a) and stamps `AuditAttrs.CAPABILITY` on the `AUDIT` event. ⇒ *"every privileged write, by
 actor, by capability, in the window"* becomes one `/audit/search` query. Ordinary mutations carry no
 capability and are distinguishable by its absence.
