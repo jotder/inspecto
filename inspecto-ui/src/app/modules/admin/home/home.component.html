@@ -1,0 +1,211 @@
+<div class="flex w-full flex-col gap-6 p-6 md:p-8">
+    <!-- Personal binds every interface and ships no sign-in: the one thing a new operator must be told. -->
+    @if (showBindNotice()) {
+        <inspecto-alert variant="warning" title="This control plane is listening on every network interface">
+            <div class="flex flex-col gap-2">
+                <span>
+                    This edition ships no sign-in, so anyone who can reach the port can change configuration. For a
+                    single-user install, bind it to loopback with
+                    <code class="font-mono">-Dcontrol.bind=127.0.0.1</code>
+                    or firewall the port.
+                </span>
+                <button mat-stroked-button class="self-start" (click)="dismissBindNotice()">Dismiss</button>
+            </div>
+        </inspecto-alert>
+    }
+
+    <!-- Greeting + the Lens card, whose primary action is this Lens's landing route (plan D1). -->
+    <div class="flex flex-col gap-6 lg:flex-row lg:items-stretch">
+        <div class="flex flex-1 flex-col justify-center gap-2">
+            @if (spaceName(); as space) {
+                <span class="text-secondary text-sm font-semibold uppercase tracking-wide">{{ space }}</span>
+            }
+            <h1 class="text-4xl font-bold leading-tight tracking-tight">{{ greeting() }}</h1>
+            @if (firstRun()) {
+                <p class="text-secondary max-w-2xl text-lg">
+                    Nothing has been onboarded yet. Three steps take a file in a folder to a Dataset you can query, with
+                    every Run and every Expectation on record.
+                </p>
+            } @else {
+                <p class="text-secondary max-w-2xl text-lg">{{ subtitle() }}</p>
+            }
+        </div>
+
+        <div class="bg-card flex w-full flex-col gap-3 rounded-2xl p-6 shadow lg:w-96">
+            <div class="flex items-center gap-3">
+                <mat-icon class="text-primary icon-size-6" [svgIcon]="lensIcon()"></mat-icon>
+                <div class="flex flex-col">
+                    <span class="text-secondary text-sm">Your Lens</span>
+                    <span class="text-lg font-semibold">{{ lensLabel() }}</span>
+                </div>
+            </div>
+            <p class="text-secondary text-sm">
+                A Lens chooses what this page opens into. It never hides a screen — every Lens can reach everything.
+            </p>
+            <button mat-flat-button color="primary" (click)="openLensHome()">
+                <span>Open {{ lensHome() }}</span>
+                <mat-icon class="icon-size-5" [svgIcon]="'heroicons_outline:arrow-right'"></mat-icon>
+            </button>
+        </div>
+    </div>
+
+    <!-- First run: the three steps. Otherwise: what happened, and what needs attention. -->
+    @if (firstRun()) {
+        <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+            <div class="bg-card flex flex-col gap-3 rounded-2xl p-6 shadow">
+                <mat-icon class="text-primary icon-size-7" [svgIcon]="'heroicons_outline:arrow-down-tray'"></mat-icon>
+                <span class="text-lg font-semibold">Onboard a Stream</span>
+                <p class="text-secondary flex-auto text-sm">
+                    Point a Collector at a folder, a bucket or a database and describe the records it carries. Inspecto
+                    proposes the Grammar from a sample.
+                </p>
+                @if (canOnboard()) {
+                    <a mat-stroked-button class="self-start" [routerLink]="'/catalog-onboard'">Open Catalog onboard</a>
+                }
+            </div>
+            <div class="bg-card flex flex-col gap-3 rounded-2xl p-6 shadow">
+                <mat-icon class="text-primary icon-size-7" [svgIcon]="'heroicons_outline:arrows-right-left'"></mat-icon>
+                <span class="text-lg font-semibold">Author a Pipeline</span>
+                <p class="text-secondary flex-auto text-sm">
+                    Parse, check Expectations, transform and write a Dataset. Draw it as Steps on the canvas or write
+                    the SQL; both views stay in sync.
+                </p>
+                @if (canAuthor()) {
+                    <a mat-stroked-button class="self-start" [routerLink]="'/pipelines'">Open Pipelines</a>
+                }
+            </div>
+            <div class="bg-card flex flex-col gap-3 rounded-2xl p-6 shadow">
+                <mat-icon
+                    class="text-primary icon-size-7"
+                    [svgIcon]="'heroicons_outline:presentation-chart-line'"
+                ></mat-icon>
+                <span class="text-lg font-semibold">Query it in Studio</span>
+                <p class="text-secondary flex-auto text-sm">
+                    Ask questions of the Dataset, save Measures as Widgets, arrange a Dashboard and hand it to the
+                    Business Lens.
+                </p>
+                <a mat-stroked-button class="self-start" [routerLink]="'/studio/queries'">Open Studio</a>
+            </div>
+        </div>
+    } @else {
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow">
+                <span class="text-secondary text-sm font-medium">Recent Runs</span>
+                <div class="flex items-baseline gap-3">
+                    <span class="text-3xl font-semibold leading-none">{{ runsLabel() }}</span>
+                    @if (failedRuns().length) {
+                        <inspecto-status-badge value="error" [label]="failedRuns().length + ' failed'" />
+                    }
+                </div>
+            </div>
+            @if (opsEnabled()) {
+                <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow">
+                    <span class="text-secondary text-sm font-medium">Incidents open</span>
+                    <span class="text-3xl font-semibold leading-none">{{ openIncidents().length }}</span>
+                </div>
+            }
+            @if (pendingApprovals().length) {
+                <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow">
+                    <span class="text-secondary text-sm font-medium">Approvals waiting</span>
+                    <span class="text-3xl font-semibold leading-none">{{ pendingApprovals().length }}</span>
+                </div>
+            }
+        </div>
+
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+            <div class="bg-card flex flex-1 flex-col rounded-2xl p-6 shadow">
+                <h2 class="text-lg font-semibold">Needs attention</h2>
+                @if (attention().length) {
+                    <ul class="mt-2 flex flex-col">
+                        @for (row of attention(); track row.subject + row.at) {
+                            <li class="flex items-center gap-4 border-t py-3">
+                                <inspecto-status-badge [value]="row.tone" [label]="row.badge" />
+                                <span class="shrink-0 font-mono text-sm">{{ row.subject }}</span>
+                                <span class="text-secondary min-w-0 flex-auto truncate text-sm">{{ row.detail }}</span>
+                                <span class="text-secondary shrink-0 font-mono text-xs">{{ ago(row.at) }}</span>
+                                <a mat-icon-button [routerLink]="row.link" [attr.aria-label]="'Open ' + row.subject">
+                                    <mat-icon
+                                        class="icon-size-5"
+                                        [svgIcon]="'heroicons_outline:chevron-right'"
+                                    ></mat-icon>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                } @else {
+                    <inspecto-empty-state
+                        class="mt-4 block"
+                        [icon]="'heroicons_outline:check-circle'"
+                        [message]="
+                            runsUnavailable()
+                                ? 'Run history needs the DuckDB jobs backend. Failed Runs, open Incidents and waiting approvals appear here once it is on.'
+                                : 'Nothing is failing, and nothing is waiting on you.'
+                        "
+                    />
+                }
+            </div>
+
+            <div class="flex w-full flex-col gap-5 lg:w-96">
+                <div class="bg-card flex flex-col gap-1 rounded-2xl p-4 shadow">
+                    <span class="text-secondary px-2 pb-1 text-sm font-semibold uppercase tracking-wide">
+                        Quick actions
+                    </span>
+                    @if (opsEnabled()) {
+                        <a
+                            class="hover:bg-hover flex items-center gap-3 rounded-lg px-2 py-2"
+                            [routerLink]="'/incidents'"
+                        >
+                            <mat-icon class="icon-size-5" [svgIcon]="'heroicons_outline:fire'"></mat-icon>
+                            <span class="text-sm font-medium">Triage Incidents</span>
+                        </a>
+                    }
+                    @if (canOperate()) {
+                        <a class="hover:bg-hover flex items-center gap-3 rounded-lg px-2 py-2" [routerLink]="'/jobs'">
+                            <mat-icon class="icon-size-5" [svgIcon]="'heroicons_outline:play'"></mat-icon>
+                            <span class="text-sm font-medium">Run a Pipeline now</span>
+                        </a>
+                    }
+                    @if (canOnboard()) {
+                        <a
+                            class="hover:bg-hover flex items-center gap-3 rounded-lg px-2 py-2"
+                            [routerLink]="'/catalog-onboard'"
+                        >
+                            <mat-icon class="icon-size-5" [svgIcon]="'heroicons_outline:arrow-down-tray'"></mat-icon>
+                            <span class="text-sm font-medium">Onboard a Stream</span>
+                        </a>
+                    }
+                    @if (canAdminister()) {
+                        <a
+                            class="hover:bg-hover flex items-center gap-3 rounded-lg px-2 py-2"
+                            [routerLink]="'/settings'"
+                        >
+                            <mat-icon class="icon-size-5" [svgIcon]="'heroicons_outline:shield-check'"></mat-icon>
+                            <span class="text-sm font-medium">Administer this space</span>
+                        </a>
+                    }
+                </div>
+
+                <!-- Server-resolved grants. Off OIDC there is no identity, so there is nothing honest to show. -->
+                @if (multiSpace() && grants().length) {
+                    <div class="bg-card flex flex-col gap-3 rounded-2xl p-5 shadow">
+                        <div class="flex items-center gap-2">
+                            <mat-icon
+                                class="text-primary icon-size-5"
+                                [svgIcon]="'heroicons_outline:shield-check'"
+                            ></mat-icon>
+                            <span class="font-semibold">Your access here</span>
+                        </div>
+                        <p class="text-secondary text-sm">
+                            Scoped to this space. These are the grants the server resolved for you.
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            @for (g of grants(); track g) {
+                                <inspecto-chip>{{ g }}</inspecto-chip>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>

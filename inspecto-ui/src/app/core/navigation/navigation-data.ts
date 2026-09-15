@@ -11,6 +11,13 @@ export const defaultNavigation: GammaNavigationItem[] = [
         type: 'divider',
     },
     {
+        id: 'home',
+        title: 'Home',
+        type: 'basic',
+        icon: 'heroicons_outline:home',
+        link: '/home',
+    },
+    {
         id: 'business-group',
         title: 'Business',
         type: 'collapsable',

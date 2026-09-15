@@ -26,8 +26,13 @@ const OPS_HOME_WITHOUT_EVENTS = 'pipelines';
  *  whose every call 503s — the one place a hidden nav entry cannot save them, because nothing was clicked.
  *  `SessionService.init()` is an APP_INITIALIZER, so the flag is settled before this resolver runs. */
 export function lensHomeRedirect(): string {
-    const lens = inject(LensService).currentLens();
-    if (lens === 'ops' && !inject(SessionService).eventsEnabled()) return OPS_HOME_WITHOUT_EVENTS;
+    return lensHome(inject(LensService).currentLens(), inject(SessionService).eventsEnabled());
+}
+
+/** The pure half of the rule above, so the Home pane's own "open my Lens" button cannot drift from it
+ *  (a hand-mirrored copy of this fallback is exactly the kind that goes stale). */
+export function lensHome(lens: Lens, eventsEnabled: boolean): string {
+    if (lens === 'ops' && !eventsEnabled) return OPS_HOME_WITHOUT_EVENTS;
     return LENS_HOME[lens];
 }
 
@@ -35,8 +40,11 @@ export function lensHomeRedirect(): string {
 /* eslint-disable max-len */
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 export const appRoutes: Route[] = [
-    // Default landing route — per-lens home page (W4).
-    { path: '', pathMatch: 'full', redirectTo: lensHomeRedirect },
+    // Default landing route — Home (landing-page plan D1, 2026-09-15). Root used to redirect straight to
+    // `lensHomeRedirect`, which dropped the three Lenses onto three unrelated screens and gave a fresh
+    // install no front door. Home is now that one door in every edition, and the Lens landing route is its
+    // primary action — `lensHomeRedirect` stays exported because the Home card reproduces its Ops fallback.
+    { path: '', pathMatch: 'full', redirectTo: 'home' },
 
     // Standard-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
     // session (authGuard bounces here). No app shell, no guard. On Personal/offline these are simply
@@ -93,6 +101,7 @@ export const appRoutes: Route[] = [
             initialData: initialDataResolver,
         },
         children: [
+            { path: 'home', loadChildren: () => import('app/modules/admin/home/home.routes') },
             { path: 'overview', loadChildren: () => import('app/modules/admin/dashboard/dashboard.routes') },
             // Ops Overview moved /dashboard → /overview so it no longer collides with Studio's
             // /studio/dashboards (audit C2). Redirect keeps old links/bookmarks working.
