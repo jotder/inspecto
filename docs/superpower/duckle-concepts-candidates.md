@@ -23,6 +23,22 @@ Expectation, Alert Rule, Collector, Consignment.
 
 ## 1. Main candidates (rough payoff order)
 
+✅ **TRIAGED BY THE OPERATOR 2026-09-15.** Eight adopted, one struck, one awaiting a ruling. Adopted rows
+are now `DUCKLE-*` build rows in `BACKLOG.md` §3 and are **tracked there, not here**:
+
+| Candidate | Outcome |
+|---|---|
+| C1 freshness SLA · C2 run diff · C3 dead-property refusal · C4 parameter provenance · C6 policy narrowing · C8 baseline Expectation · C9 watcher-not-a-run · C10 admission pools | ✅ **ADOPTED** → `DUCKLE-C1…C10-*` §3 rows |
+| C5 releases as content-addressed snapshots | ⛔ **STRUCK** — struck by its own grounding ("design reference, not new scope" against ~55 existing release/promotion rows) |
+| C7 affected + contracts vs a git revision | ⏸ **AWAITING ONE RULING** — it reads git objects, so does the standing "no in-app git integration" exclusion cover a **CI-shaped check over a diff**? Queued in `BACKLOG.md` §1 |
+
+⚠ **Ranking notes carried onto the rows, not lost here:** C1 depends on **S2** (retention must keep the
+last publication of an SLA-bearing Dataset) and **S13** (there is no ownership model at all, so
+owner-routed alerting cannot work yet) — rank those together. C4 is the cheapest of the eight because the
+parameter contract already shipped behind a single boundary. C10's rule set is worth adopting even if the
+feature waits, because it constrains scale-out phase B's `RunLease`, which already exists.
+
+
 | # | Concept (duckle's rule) | Inspecto today (grounded 2026-09-14) | Nearest inspecto home |
 |---|---|---|---|
 | C1 | **Dataset freshness SLA on a clock, not on failures.** An ownership rule declares `maximumAge` or `expectedAfterSchedule`. No declared limit ⇒ `unknown`, never `fresh`. A failed or *partial* run does not count as a refresh. A disabled/missing schedule makes the Dataset stale. `fresh→stale` alerts and `stale→fresh` sends an all-clear through the same Alert Rules; the all-clear is never held by a cooldown. `stale_since` carried across evaluations. Evaluated once a minute on its own thread, not the scheduler's. | **Absent.** All 13 Java "freshness" hits are notification *delivery-status* freshness (`DeliveryStatusAdapter`, `EnrichmentConfig`), not Dataset age. Nearest relative: the completeness KPI (K1+K2). BACKLOG: 0 rows. | Alert Rule / Incident; Catalog Dataset badge; agent skill `OperationalTables` |
@@ -72,8 +88,8 @@ model at all, not merely a missing lint). ⛔ **Re-grep a row before ranking it*
 
 ## 3. Next step
 
-⛔ **§1 (C1–C10) still needs the operator: strike rows, merge duplicates, rank.** Those are build/don't-build
-calls on features, so nothing there was actioned — a candidate list is not authority to build.
+✅ **§1 (C1–C10) was decided by the operator on 2026-09-15** — eight adopted as `DUCKLE-*` §3 rows, C5
+struck, **C7 awaiting one ruling** (queued in `BACKLOG.md` §1). See the table at the top of §1.
 
 ✅ **§2 is DONE as a review pass (2026-09-15).** Every "check ours" note now carries a grounded verdict, so
 the remaining decision there is only *whether to adopt the rule*, never *what is true today*. What that pass
@@ -92,7 +108,9 @@ inspecto against crisply stated rules — including a P1 (75 ungated mutating ro
 among them) and a self-triggering hot loop whose javadoc asserted it could not happen. ⇒ **the value of a
 list like this is the grounding it forces, not the features it proposes.**
 
-⚠ **Do not archive this file yet.** The lifecycle says archive once the work is distilled, and §1 is still
-undecided. When §1 is triaged: move survivors to `BACKLOG.md` §3 (re-grepping "inspecto today" at filing
-time — two rows here had wrong premises), then `git mv` this file to
+⚠ **Do not archive this file yet — ONE ruling short.** Survivors are filed and §2 is fully distilled, so
+the only thing holding it in `superpower/` is **C7**. Once that is ruled (adopt ⇒ file a `DUCKLE-C7-*`
+row; exclude ⇒ strike it citing the exclusion), `git mv` this file to
 `docs/archived-documents/plans-archive/` and run `graphify update .`.
+⛔ Archiving before C7 is ruled would bury an open decision in the never-maintained tier — the same failure
+mode as the three decisions that sat unfiled in a plan from 2026-09-11 to 2026-09-14.

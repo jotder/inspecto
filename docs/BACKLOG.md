@@ -123,14 +123,27 @@ code before filing, not just the board.
 
 ## 1. Operator decisions pending
 
-✅ **EMPTY — all SIX were answered on 2026-09-14, in one sitting, and each answer is recorded on its
-owning row or plan (linked below). Nothing on this board is waiting on the operator.**
+⚠ **ONE open decision (duckle C7, below). The six queued on 2026-09-14 were all answered that day**, each
+recorded on its owning row or plan; a further eight duckle candidates were adopted 2026-09-15 and are now
+§3 build rows.
 
 ⚠ **Read the closure notes below before re-filing anything**: §1 reported itself empty in every handoff
 from 2026-09-11 to 2026-09-14 while three of these six sat unfiled in a plan that reported itself blocked.
 ⛔ **A plan is where a decision is *described*; this section is where it is *queued*.** Describing one in
 `superpower/` and not filing it here is what produced that three-day stall, and it is the only way it can
 happen again.
+
+**⛔ ONE DECISION IS OPEN (filed 2026-09-15).**
+
+- **Duckle C7 — does the "no in-app git integration" exclusion cover an affected/contracts CHECK?** The
+  operator struck in-app git integration from scope on 2026-09-14. C7 ("which Pipelines does a change
+  reach, against a git revision; contract verdicts depend on the reader — a removed read column is
+  breaking, an unread one is *possibly* breaking, never compatible") **reads git objects**, so it is
+  tied to git presence — but it is a **CI-shaped check over a diff**, not an in-app git feature.
+  ⇒ Rule it either way and the row is settled: **in scope** (it becomes a §3 build row alongside the
+  other eight adopted candidates) or **excluded** (struck with the exclusion cited).
+  ⚠ Lineage/impact code already exists (42 Java / 25 TS hits) — what is absent is the gate over a diff.
+  → `superpower/duckle-concepts-candidates.md` C7
 
 **Answered 2026-09-14 — the six, with where each now lives:**
 
@@ -986,6 +999,18 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
+- ✅ **CLOSED 2026-09-15 (operator) · `JAVA-INGEST-APPENDER-SERIAL-1` — the Java fallback ingest path did
+  not scale with concurrent batches.** Closed with **no open engineering**: the real fix shipped
+  (2026-09-14, DuckDB WAL auto-checkpoint on disposable per-batch temp DBs — 12 batches went from 8K to
+  **34.5K rows/s**, and the row's own first test, *"a two-batch run must take < 1.2× a one-batch run"*, is
+  met); residual (1) was **discharged as documentation** (the Windows/Linux gap is a jemalloc allocator
+  difference, not a tunable — `performance.md` says run the ingest tier on Linux); residual (2) was
+  **refuted by measurement** (the quote pre-scan was worth 1.7% end-to-end, not the ⅓ a JFR reading
+  suggested). 🔴 **Remedies (a)-(c) as filed were never built and are NOT owed** — the fix came from
+  (d), a cause nobody had listed. ⇒ *a row's proposed remedies are hypotheses too, not just its cause.*
+  ⛔ Do not reopen for appender-flush batching or a Java-path concurrency cap without a fresh measurement
+  showing they buy something on top of the shipped fix.
+  *(original row retained below for provenance)*
 - **P1** · **`JAVA-INGEST-APPENDER-SERIAL-1` — the Java fallback ingest path does NOT scale with concurrent batches; twelve batches run slower than one.**
   Filed 2026-09-14 from a full-capacity run on a 6-core/12-thread laptop (`PerfDeepDiveBenchmark#concurrencyAndAutoDerive`,
   48 files × 250K rows × 100 cols, 24 batches, `processing.threads=12`): **native engine 174 s (69K rows/s, CPU ~71 %
@@ -1504,8 +1529,20 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   are ungated, `DELETE /spaces/{id}` among them.** Filed 2026-09-15 from duckle candidate S5 ("a route with
   no entry in the permission table requires admin, so a later-added route is locked down rather than left
   open"). **Grounded, not assumed** — measured on this tree:
-  - **331 route registrations · 91 gated · 91 manifest entries ⇒ ~223 ungated**, of which **75 MUTATE**
-    (POST/PUT/DELETE). Capability enforcement is **opt-in**: `ApiContext.requireCapability` runs only when a
+  ✅ **FULL AUDIT DONE 2026-09-15 (operator chose "audit all first") → `superpower/route-gating-audit.md`.**
+  🔴 **It reframes the row: this is a VOCABULARY gap, not 83 oversights.** Of the 83 ungated mutating
+  routes, **only 12 can be gated with an existing capability**; **22 cannot be expressed at all** (three
+  families: Space lifecycle, Incident/Case triage, agent governance); the remaining 49 are correctly
+  ungated (identity flow, self-verifying public, self-service, read-shaped POSTs) or self-limiting.
+  🔴 **And `Roles` has NO admin capability** — ten exist, none means "administrator" — so duckle's rule as
+  stated (*"an unlisted route requires admin"*) **is not expressible today**. That decision comes first.
+  ⛔ **Do NOT ship the ratchet first**: it would freeze 83 unreviewed exemptions into a baseline.
+  ⚠ **CORRECTED COUNTS 2026-09-15.** This row first said "~223 ungated, 75 mutating". The true figures are
+  **332 registrations · 91 gated · 241 ungated · 83 mutating** — the first pass used an ad-hoc regex that
+  matched only 304 of 332 and **missed `PATCH` entirely**. The audit re-derives them with the shape
+  `CapabilityManifestTest` already trusts. ⇒ *the probe was wrong in the direction that understates.*
+  - **332 route registrations · 91 gated · 91 manifest entries ⇒ 241 ungated**, of which **83 MUTATE**
+    (POST/PUT/PATCH/DELETE). Capability enforcement is **opt-in**: `ApiContext.requireCapability` runs only when a
     handler is wrapped in `withCapability`, and `CapabilityManifest.capabilityFor` documents `null` =
     "the route is ungated" as a legitimate outcome (`CapabilityManifest.java:157-164`).
   - ⛔ **The other gate does not cover it.** `ControlApi.authorize` (`:809-821`) is ABAC via
@@ -1521,13 +1558,106 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     `withCapability` call sites agree with each other, bidirectionally. A route in **neither** is a third
     case it has no notion of. ⇒ *a guard's scope is a silent exemption* — the same lesson as
     `guard-scope-is-a-silent-exemption`.
-  **Two separable pieces:** (a) a **build-time ratchet** — enumerate the ungated MUTATING routes as an
-  explicit reviewed list and fail the build on any new one, so a later-added route faces the decision
-  instead of defaulting open. No runtime change, so no policy call needed. ⚠ Build it on the scanner
-  `CapabilityManifestTest` already trusts, not a fresh regex — a hand-rolled parse matched only 304 of 331
-  registrations here, and a flaky gate is worse than none. (b) **deciding which of the 75 to gate, and with
-  which capability** — a security-policy call for the operator, starting with `DELETE /spaces/{id}`.
+  **Order recommended by the audit** (its §"Recommended order"): (1) decide whether an **admin capability**
+  should exist — everything else is downstream; (2) gate the **12 gateable-now** routes, starting with
+  `POST /requirements`, which is an inconsistency rather than a judgement call (its own sibling
+  `/requirements/{id}/decision` is already gated); (3) decide the **three families** worst-first — Space
+  lifecycle, then agent governance (the kill-switch and policy routes are the controls over what the agent
+  may do, and nothing gates them), then Incident triage; (4) **only then** the build-time ratchet, on the
+  scanner `CapabilityManifestTest` already trusts; (5) leave the 34 read-shaped POSTs until reads have a
+  posture — gating them without gating GET would be incoherent.
   → `CapabilityManifest.java:157` · `ApiContext.java:168` · `SpaceRoutes.java:72` · `AccessDeciders.java:23`
+
+- **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.** Adopted
+  by the operator 2026-09-15 from duckle §1 C3. Stable error code + near-name suggestion (no suggestion
+  when nothing is close); strict at validate, warning at run; `x-` keys round-trip untouched; and the
+  accepted-names doc is **generated from the same map the checker enforces**, so it cannot drift.
+  🔴 **Strongest case of the eight adopted**: `PROJECT_NOTES` records several past **silent config-loss**
+  defects that are exactly this class, and today's behaviour is inconsistent three ways — `ComponentStore`
+  refuses unknown keys, `RecipeCompiler`'s own comment admits others "stay", `ArgumentDeriver` silently
+  drops. ⇒ the value is turning a silent loss into a refusal. → `ConfigSafetyValidator` · node attribute
+  specs / `step-types.contract.json`
+
+- **P2** · **`DUCKLE-C9-WATCHER-NOT-A-RUN-1` — a polling session is not a Run.** Adopted 2026-09-15 from
+  duckle §1 C9. A polling session gets its own identity (`lastPollAt`, `pollCount`, `lastError`); **only a
+  poll that moves rows or fails mints a Run**, naming the session as parent; `pollCount − runCount` is
+  quiet time; a killed watcher reconciles to `interrupted` on next start, like a receipt.
+  ⚠ The grounding called this "cheap to separate" — the collector loop currently conflates polls and runs,
+  which makes run counts misleading in exactly the place operators read them. → Collector / Consignment
+  scheduler
+
+- **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` — Dataset freshness on a CLOCK, not on failures.** Adopted
+  2026-09-15 from duckle §1 C1. A rule declares `maximumAge` or `expectedAfterSchedule`; **no declared
+  limit ⇒ `unknown`, never `fresh`**; a failed *or partial* run does not count as a refresh; a disabled or
+  missing schedule makes the Dataset stale; `fresh→stale` alerts and `stale→fresh` sends an all-clear
+  through the same Alert Rules, and **the all-clear is never held by a cooldown**; `stale_since` carries
+  across evaluations; evaluated once a minute **on its own thread, not the scheduler's**.
+  ⚠ **Two dependencies, both real:** (a) duckle **S2** — the last publication of an SLA-bearing Dataset
+  must survive retention, or a 30-day window reports a 90-day SLA breached 45 days early; cheapest to
+  honour while building this, not after. (b) duckle **S13** — owner-routed alerting needs an ownership
+  model, and **there is none** (`AlertRule` carries no owner; the auth-free core hardcodes the recipient to
+  `"appUser"`). ⇒ either scope this to the existing flat `ChannelConfig` routing, or take S13 first.
+  → Alert Rule / Incident · Catalog Dataset badge
+
+- **P3** · **`DUCKLE-C8-BASELINE-EXPECTATION-1` — a baseline QA Expectation kind.** Adopted 2026-09-15 from
+  duckle §1 C8. Profile the current input against the **median of the last N *accepted* profiles** (row
+  count; per column null count/rate, distinct, min, max, mean); limits in either direction, % or absolute;
+  `groupBy` + `requireExistingGroups` catches a missing partition when totals look normal; a profile is
+  **accepted only if the whole run succeeds**; explicit `accept`/`clear` ops audited with the replaced
+  value; **a refused run still records its profile**.
+  ⚠ Largest of the adopted set — a new Expectation kind *plus* profile storage *plus* accept/clear ops.
+  `FileSequenceGaps` is the nearest cousin to model the kind on. → Expectation kinds
+
+- **P2** · **`DUCKLE-C4-PARAM-PROVENANCE-1` — record where a parameter value came from, and what it
+  overrode.** Adopted 2026-09-15 from duckle §1 C4. Two surfaces binding one parameter: **later wins** (a
+  documented rule, not an emergent one), and the receipt records `{source, overrode:[…]}`; only a
+  *differing* value counts as an override; **`secret` is a declared type replaced with `***` in history and
+  never dropped**, so "was a token supplied?" stays answerable; all problems reported at once with stable
+  codes (`param:unknown`, `param:missing`); undeclared names **refused, not ignored**.
+  ✅ **Cheapest real win of the eight** — the parameter contract already shipped and
+  `ParameterResolver.resolve` is the single boundary every surface funnels through (confirmed 2026-09-15
+  by duckle S8), so this is additive at one seam. ⚠ It needs a `secret` ParamType, which does not exist —
+  the same missing type the scale-out credentials decision ran into. → Job parameter contract · Run receipt
+
+- **P3** · **`DUCKLE-C10-ADMISSION-POOLS-1` — named execution pools are ADMISSION ONLY.** Adopted
+  2026-09-15 from duckle §1 C10. A pool answers "may this start now" and **never widens thread or memory
+  caps**; a Pipeline may *choose* a pool but never define one the server lacks (unknown ⇒ `default`); a
+  queued run gets a durable id **immediately** with `queueReason`, becoming `running` with `queueMs`; a
+  supervisor takes **no slot** — holding one while waiting for a child needing the same pool deadlocks;
+  metric = free permits per pool.
+  ⚠ **Adopt the RULE SET now even if the feature waits**: it is a design constraint on scale-out phase B,
+  whose `RunLease` (fenced db lease) is already the seam. The deadlock rule in particular is cheap to
+  honour up front and expensive to retrofit. → `superpower/enterprise-scale-out-plan.md` phase B
+
+- **P3** · **`DUCKLE-C2-RUN-DIFF-1` — diff two Runs from recorded facts, with rule-derived explanations.**
+  Adopted 2026-09-15 from duckle §1 C2. Compare two Run receipts **by kind** (code, runtime, invocation,
+  inputs, execution, output); **every explanation line traces to a listed difference** — no generated
+  prose; "not compared" is stated explicitly; **absent is not zero** (a run that died at node 2 has no
+  counts after it); secrets compared as `***` / digest.
+  ⚠ Receipts, ledgers and provenance rows already exist (`RunArtifactStore`), so the work is the *surface*
+  and the *rules*, not the data. The agent diagnosers (`HeuristicDiagnoser`, `ModelDiagnoser`) are the
+  natural consumers. ⛔ The "no generated prose" constraint is the point — do not implement it as a model
+  summarising two receipts. → Run ledger
+
+- **P3** · **`DUCKLE-C6-POLICY-NARROWING-1` — a workspace policy that can only NARROW.** Adopted
+  2026-09-15 from duckle §1 C6. Denies union, allowlists intersect, permissions AND; `mode` comes from the
+  server file only; enforced **at plan time AND at the point of the act** (network: every hop plus DuckDB
+  itself; state mutation: every watermark/offset advance); **prefixes match at a path boundary, not as
+  strings**; and a named policy file that **cannot be read refuses the run**.
+  ⚠ Parts exist — `PathJail`, `ConfigSafetyValidator`, `DataRef` — but the structural narrowing rule and
+  the unreadable-policy refusal do not. 🔴 The prefix-boundary rule is **the exact defect corrected in
+  scale-out phase C §5.4**, which is evidence this rule set earns its keep rather than a reason to skip it.
+  → Config safety · sealed sandbox · edition gating
+
+- **P2** · **`ROUTE-OWNERSHIP-SCOPE-1` — can a caller address ANOTHER user's notification, note or object
+  by id?** Filed 2026-09-15 by `route-gating-audit.md`, which deliberately did **not** test it: capability
+  gating and authorization-by-ownership are different questions, and answering one does not answer the
+  other. The audit found four notification routes correctly ungated **because they mutate the caller's own
+  state** (`/notifications/{id}/read`, `/read-all`, `/preferences`, `DELETE /notifications/{id}`) — ⚠ but
+  "the caller's own" is an assumption about **scoping**, not something the capability spine can enforce.
+  The same question applies to `/notes/{kind}/{id}/comments` and every `/objects/{id}/*` route.
+  ⇒ Probe each with a second identity and a first identity's id. ⛔ A capability gate would NOT fix this
+  even if added — an owner check is per-row, not per-route. → `route-gating-audit.md` §3
 
 - **P2** · **`AUDIT-REFUSAL-GAP-1` — a capability 403 and an auth 401 are never audited.** Filed 2026-09-15
   from duckle candidate S6 ("refusals audited as carefully as successes"). Two of the three sub-rules are
