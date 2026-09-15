@@ -226,6 +226,72 @@ class RowShaperTest {
         assertTrue(e.getMessage().contains("esc"), e.getMessage());
     }
 
+    // ── profile (per-column statistics; catalog transform.profiler.inline) ─────
+
+    /** Seeds a table with a NULL and a repeated value, so nulls and distinctness are actually exercised. */
+    private void seedProfile() throws SQLException {
+        sql("CREATE TABLE prof AS SELECT * FROM (VALUES (1,'a',10),(2,'a',NULL),(3,'b',30)) t(id,grp,amt)");
+    }
+
+    @Test
+    void profileReportsOneRowPerColumnWithCountsAndBounds() throws Exception {
+        seedProfile();
+        var out = new RelationByRel(RowShaper.shape(
+                conn, PipelineNode.of("pf", "transform.profile", Map.of()), "prof", "pf"));
+        String t = out.table(PipelineRel.DATA);
+
+        assertEquals(3, count(t), "one row per inbound column");
+        assertEquals(List.of("column_name", "distinct_count", "max_value", "min_value", "null_count", "row_count"),
+                columns(t).stream().sorted().toList());
+
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT row_count, null_count, distinct_count, min_value, max_value "
+                     + "FROM \"" + t + "\" WHERE column_name = 'amt'")) {
+            assertTrue(rs.next());
+            assertEquals(3, rs.getInt(1), "row_count counts rows, not non-nulls");
+            assertEquals(1, rs.getInt(2), "COUNT(*) - COUNT(col) is the null count");
+            assertEquals(2, rs.getInt(3), "COUNT(DISTINCT col) ignores NULL");
+            assertEquals("10", rs.getString(4));
+            assertEquals("30", rs.getString(5));
+        }
+    }
+
+    /** ⚠ The repeated value must not be double-counted as distinct. */
+    @Test
+    void profileCountsDistinctValuesNotRows() throws Exception {
+        seedProfile();
+        var out = new RelationByRel(RowShaper.shape(
+                conn, PipelineNode.of("pf", "transform.profile", Map.of()), "prof", "pf"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT distinct_count FROM \"" + out.table(PipelineRel.DATA)
+                     + "\" WHERE column_name = 'grp'")) {
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt(1), "'a' twice and 'b' once is two distinct values");
+        }
+    }
+
+    /** {@code columns:} restricts the profile; omitting it profiles everything. */
+    @Test
+    void profileHonoursAnExplicitColumnList() throws Exception {
+        seedProfile();
+        var out = new RelationByRel(RowShaper.shape(
+                conn, PipelineNode.of("pf", "transform.profile", Map.of("columns", List.of("grp"))), "prof", "pf"));
+        assertEquals(1, count(out.table(PipelineRel.DATA)));
+    }
+
+    /**
+     * ⛔ A typo'd column is REFUSED, not skipped. Silently profiling the columns it recognised would
+     * hand back a clean-looking profile of a mistake — the failure mode worth a loud refusal.
+     */
+    @Test
+    void profileRefusesAnUnknownColumn() throws Exception {
+        seedProfile();
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () ->
+                RowShaper.shape(conn, PipelineNode.of("pf", "transform.profile",
+                        Map.of("columns", List.of("nope"))), "prof", "pf"));
+        assertTrue(e.getMessage().contains("nope"), e.getMessage());
+    }
+
     // ── summarize (group-by rollup through MeasureCompiler) ─────────────────────
 
     @Test

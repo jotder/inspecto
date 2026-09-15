@@ -199,7 +199,7 @@ closing D1–D9 (full history: `NodeConfigNameContractTest` docblock and git his
 - **A served empty array ≠ absent**: empty = the server says the type has no schema (honoured, never
   re-enables the client table); absent = catalog not yet answered (`??`).
 - 🔴 **The Step vocabulary feeds TWO committed contracts**:
-  ⚠ **It covers 11<!--count:node-types-with-attributes--> of the 30<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster, this contract is the subset with attributes, and `step-types.contract.json` holds 16<!--count:step-types--> recipe entries. Three different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
+  ⚠ **It covers 12<!--count:node-types-with-attributes--> of the 31<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster, this contract is the subset with attributes, and `step-types.contract.json` holds 16<!--count:step-types--> recipe entries. Three different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
   `inspecto/contracts/node-attributes.contract.json` (`NodeAttributesContractTest` +
   `node-attributes.spec.ts`) AND `inspecto/contracts/step-types.contract.json`
   (`StepTypesContractTest`). Regen flags `-Dnode.attributes.write=true` / `-Dstep.types.write=true`

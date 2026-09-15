@@ -393,6 +393,20 @@ public final class PipelineLift {
             sinkUpstream = summarizeId;
         }
 
+        // Per-column profile (processing.profile) sits after summarize, before any route — the same
+        // chain position resolveSteps uses, and PipelineConfigStepsTest cross-checks the two orders.
+        if (cfg.profile() != null) {
+            String profileId = "profile" + suffix;
+            Map<String, Object> pc = new LinkedHashMap<>();
+            // ⚠ Written even when EMPTY: an empty columns[] is the authored instruction "profile every
+            // column", and omitting the key would lower back as a different document than was authored.
+            pc.put("columns", cfg.profile().columns());
+            nodes.add(new PipelineNode(profileId, BuiltinNodeType.TRANSFORM_PROFILE.type(),
+                    null, null, pc, null));
+            edges.add(PipelineEdge.data(sinkUpstream, profileId));
+            sinkUpstream = profileId;
+        }
+
         // An authored route: block lifts as a transform.route node whose route:<key> edges feed the
         // sinks — branch↔sink pairing is by the branch's declared destination database. Authoring-only
         // for now (prepare() refuses arming), so this exists for the editor/recipe round-trip.

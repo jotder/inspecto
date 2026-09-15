@@ -103,7 +103,7 @@ public final class ProcessorCatalog {
             p("DQ", "quality.schema.drift", "🧬", "heroicons_outline:arrow-trending-up", "Schema drift & new-field detector", Status.DELIVERED, "parser", null, "the header each file carries vs `raw.fields[]` — width always, names when the schema was authored from the header; one `quality.schema_drift` WARN Signal per batch"),
             p("DQ", "quality.cluster.edit", "🔍", "heroicons_outline:squares-2x2", "Cluster & edit value normalizer", Status.PLANNED, null, null, null),
             p("DQ", "quality.match.fuzzy", "🔍", "heroicons_outline:magnifying-glass-circle", "Fuzzy string (Jaro-Winkler) matcher", Status.PLANNED, null, null, null),
-            p("DQ", "quality.profiler.inline", "🧮", "heroicons_outline:chart-bar-square", "Inline stream profiler & statistics", Status.PARTIAL, null, "storage_report", "storage/completeness KPIs exist; no per-column profile step"),
+            p("DQ", "quality.profiler.inline", "🧮", "heroicons_outline:chart-bar-square", "Inline stream profiler & statistics", Status.DELIVERED, BuiltinNodeType.TRANSFORM_PROFILE.type(), null, "per-column row/null/distinct counts and min/max, as a Step (2026-09-15)"),
             p("DQ", "quality.sample.reservoir", "📊", "heroicons_outline:beaker", "Statistical & reservoir sampler", Status.PLANNED, null, null, null),
             p("DQ", "quality.cleanse.transcode", "🔤", "heroicons_outline:language", "Character map & code page transcoder", Status.PLANNED, null, null, null),
             p("DQ", "quality.pii.mask", "🔒", "heroicons_outline:eye-slash", "PII masking & tokenization", Status.PLANNED, null, null, "board SEC-08 — Enterprise only"),

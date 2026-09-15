@@ -288,7 +288,7 @@ from thirty-eight separate rows.
 | 14 | Has the stale `.docx` been distributed? | **No — it never left the team.** No corrective action; the row is purely the generator change | same |
 | 15 | ~45 MB of cross-platform deadweight per zip | **Approved — filter the EXTENSION directory only**; launchers stay cross-copied; evidence from the zip entry tables | `AIRGAP-CROSSPLAT-DEADWEIGHT-1` (§5) |
 | 16 | Where do S3 endpoint/key/region live? | ⚠ CAVEAT FIRED 2026-09-15 — profiles resolve AFTER pipeline parse, so parse-time validation forces the split; deferred resolution avoids it. Operator's call. **`ConnectionProfile` for BOTH** the pipeline field and `dirs.database`. ⚠ Bootstrap ordering to be verified — if profiles cannot resolve early enough, the split is forced | `AIRGAP-S3-EXTENSIONS-1` (§5) |
-| 17 | Which Step Processor partial? | ✅ RE-TAKEN 2026-09-15: **Profiler STANDS** on its own merit, the double-duty reason having been refuted (DUCKLE-C8 is an Expectation kind templated on `FileSequenceGaps`; no Profiler code exists at all). **Profiler** — it is also `DUCKLE-C8`'s prerequisite, so it does double duty | Step Processor catalog (§3) |
+| 17 | Which Step Processor partial? | ✅ SHIPPED 2026-09-15 as `transform.profile`. RE-TAKEN: **Profiler STANDS** on its own merit, the double-duty reason having been refuted (DUCKLE-C8 is an Expectation kind templated on `FileSequenceGaps`; no Profiler code exists at all). **Profiler** — it is also `DUCKLE-C8`'s prerequisite, so it does double duty | Step Processor catalog (§3) |
 | 18 | Four dead seams | 🔴 REFUTED 2026-09-15 — THREE of the four are ALIVE (vendor plugin is called by production tx configs; `ExpressionProvider` IS the expression engine; `temporalColumn` is cited by an active plan). Only `AssistDialog` deleted. ~~**DELETE all four.**~~ ⚠ The vendor plugin is grounded for out-of-repo references before removal — it is the irreversible one | `SPEC-DEADSEAM-1` (§4) |
 | 19 | The orphaned derived-schema panel | ✅ SHIPPED 2026-09-15. **Wire it into the schema authoring pane** | `DERIVED-SCHEMA-PANEL-ORPHAN-1` (§3) |
 | 20 | SOC 2 window start date | **Not open** — record it as NOT STARTED with what must be true first, so the gap is checkable instead of silent | §2 SOC 2 |
@@ -543,7 +543,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 ### Authoring (Parse / Transform / pipeline editor)
 
 - **P2** · **AUTHORING-REDESIGN-1** — open letters (⚠ the old "(j)(l)(n2)(o) are in §1" clause was stale in all four: (o) SHIPPED 2026-09-07 as WORKBENCH-S4 — all three slices, (l) and (n2) SHIPPED, (j) `engine: auto` was already answered by shipped code; (f)(g)(m) SHIPPED 2026-09-06 — `JOIN_REFERENCE_MISSING`/`JOIN_ON_MISSING`/`UNKNOWN_JOIN_REFERENCE` at save, `SchemaMappingDrift` on all three schema save paths, `?pipeline=` sent by the UI): (c) v2 structured AST table over the SQL for WHERE/JOIN editing — ✅ **precondition DISCHARGED 2026-09-07: it does.** `json` is statically linked into the DuckDB JDBC artifact, so nothing is installed or auto-loaded and the seal is irrelevant to it: `json_extract`, `json_structure` and — the one that matters — **`json_serialize_sql`**, which returns the whole parsed AST as JSON, all work on a sealed connection while `INSTALL excel` and re-opening `enable_external_access` still fail. Pinned by `SqlSandboxTest.jsonWorksOnASealedConnection`. ⚠ So (c) reads an engine-produced AST rather than re-implementing a SQL parser in TypeScript — the same refusal the step workbench made for reference detection; (d) v3 macros as the UDF registry (per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy`, preview) — demand-gated; (e) column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; (i) per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`. Still open on (f): which COLUMNS the reference carries is the dry-run's question (it reads the store); the save checks existence and `on` presence only. → `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P2** · **Step Processor catalog** — 119 processors: **35**<!--count:processors-delivered--> delivered / **17**<!--count:processors-partial--> partial / 67 planned (`processor-catalog.contract.json`, counted 2026-09-10 — `quality.schema.drift` DELIVERED 2026-09-10 as a per-batch `quality.schema_drift` Signal; the earlier count was 34/18 on 2026-09-08 — the earlier "69 planned" was a grep artefact) (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
+- **P2** · **Step Processor catalog** — 119 processors: **36**<!--count:processors-delivered--> delivered / **16**<!--count:processors-partial--> partial / 67 planned (`processor-catalog.contract.json`, counted 2026-09-10 — `quality.schema.drift` DELIVERED 2026-09-10 as a per-batch `quality.schema_drift` Signal; the earlier count was 34/18 on 2026-09-08 — the earlier "69 planned" was a grep artefact) (`transform.lookup` DELIVERED 2026-09-06). Each partial is a product decision (Kafka consumer, XPath grammar, drift report, profiler, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email/webhook sinks…) — pick one by name. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 
   🔴 **GROUNDED 2026-09-15 — the “double duty” rationale for picking PROFILER is FALSE.** §1 row 17
   chose Profiler because “it is also `DUCKLE-C8`'s prerequisite”. It is not.
@@ -559,6 +559,32 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ServiceLoader SPI (that is the whole-Consignment third-party pack seam, a different capability).
   ⇒ **The pick stands or falls on Profiler's own merit.** ⛔ Nothing was built — the stated reason for
   choosing it over the other 16 partials has evaporated, and that is the operator's call to re-take.
+
+  ✅ **RE-TAKEN AND SHIPPED 2026-09-15 — the operator confirmed Profiler on its own merit.**
+  `quality.profiler.inline` is now **DELIVERED**, backed by a real node type `transform.profile`
+  (`BuiltinNodeType` → `RecipeCompiler` verb `profile:`, BOTH dispatch sites → `RowShaper.profile` →
+  `PipelineEditable` LOWERABLE/STEP_KIND → `NodeAttributes`) and a full FLAT-CONFIG HOME
+  (`processing.profile`: `PipelineConfig.Profile` + `Step.PROFILE` + the projection, `PipelineConfigParser`,
+  `PipelineLift`, and a DECLARED `ConfigSpecs` field joined to `stage-two-blocks-require-output-store`).
+  🔴 The namespace is `transform.*`, NOT `quality.*` — `NodeTypeStepKinds.isKnown` only recognises
+  `transform.<kind>`, and the first pass compiled clean under the wrong one (see `NODE-TYPE-MIRRORS-1`).
+  ⚠ Like `summarize`, it executes AT REST, so an active pipeline carrying it needs `output_store:`.
+  ⚠ An EMPTY `columns[]` is authored content meaning "profile every column" — it is written on lower and
+  kept by the projection, because dropping it would lower back a narrower document than was authored. Output: one row per column — `column_name`, `row_count`, `null_count`,
+  `distinct_count`, `min_value`, `max_value`. `columns:` restricts it; omitted profiles every column.
+  🔴 **DuckDB's own `SUMMARIZE` was deliberately NOT used.** It would have been one line and richer,
+  but its column set belongs to DuckDB — so an engine upgrade would silently change this node's OUTPUT
+  SCHEMA and break whatever reads it downstream. A Step's output shape is a contract; it does not get to
+  drift with a dependency. The hand-rolled SQL costs ~15 lines and pins the columns.
+  ⛔ An unknown column in `columns:` is REFUSED, not skipped — profiling four of five requested columns
+  would hand back a clean-looking profile of a typo.
+  ⚠ **Four guarded counts moved, not the two expected.** `processors-delivered` 35→36 and
+  `processors-partial` 17→16 were foreseen; `node-types` 30→31 (the enum case) and
+  `node-types-with-attributes` 11→12 (the attribute spec) were not — `check-doc-counts.mjs` named all
+  13 sites across 6 files. ⚠ Both contract JSONs under `inspecto-ui/` are GENERATED from Java
+  (`-Dprocessor.catalog.write=true`, `-Dnode.attributes.write=true`) and must be regenerated in the same
+  change, or their diff-check tests fail.
+  ⚠ `planned` stays **67**: a PARTIAL was promoted, not a planned one.
 
 
   ✅ **DECIDED 2026-09-15:** **build the PROFILER partial next.** Picked by name, as this row requires. ⚠ The reason
@@ -1107,6 +1133,57 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   → `okf/capabilities/editions/editions.md` §3.14 · `archived-documents/plans-archive/deployment-topology-plan.md` §11.
 ## 4. Engineering / tech-debt
 
+- **P2** · **`NODE-TYPE-MIRRORS-1` — “this node type exists” is declared by hand in TEN places, and only
+  the guards know it.** Filed 2026-09-15 from the measured cost of adding ONE node type
+  (`transform.profile`, the Profiler pick). Not a hypothesis: every site below was found by a guard or a
+  test going red, **not** by the author reading the code. ⚠ The type was first built as
+  `quality.profile` and compiled clean — `NodeTypeStepKinds.isKnown` only recognises `transform.<kind>`,
+  so the whole namespace was wrong with nothing red to say so. That is site 0: the naming rule itself is
+  a convention no declaration states.
+
+  **The inventory, split by whether it is genuinely per-node work or a restatement of the same fact:**
+
+  | # | Site | Kind |
+  |---|---|---|
+  | 1 | `BuiltinNodeType` enum case | ✅ source of truth |
+  | 2 | `RecipeCompiler` top-level verb switch | per-node (real behaviour) |
+  | 3 | `RecipeCompiler` **`steps:`-chain switch** — a SECOND dispatch in the same file | per-node, ⚠ easily missed |
+  | 4 | `RowShaper` executor dispatch + impl | per-node (real behaviour) |
+  | 5 | `PipelineEditable.LOWERABLE` | 🔴 MIRROR |
+  | 6 | `PipelineEditable.STEP_KIND` | 🔴 MIRROR |
+  | 7 | `NodeAttributes` — spec + `byType()` validate list + map registration (3 sub-sites, one file) | 🔴 MIRROR |
+  | 8 | `ProcessorCatalog` entry | 🔴 MIRROR |
+  | 9 | **`inspecto-ui/.../node-attributes.ts` — a hand-kept TS copy of the Java table** | 🔴 MIRROR |
+  | 10 | `ConfigSpecs.pipeline()` — the block's `FieldSpec`, plus the block named three times inside the `stage-two-blocks-require-output-store` cross-field rule (message, fields, predicate) | per-node (the flat home), ⚠ 4 sub-sites |
+
+  Plus two GENERATED artifacts that must be rewritten in the same change
+  (`processor-catalog.contract.json` via `-Dprocessor.catalog.write=true`, `node-attributes.contract.json`
+  via `-Dnode.attributes.write=true`), the flat-config home (`PipelineConfig` record/field/accessor/
+  constructor/`resolveSteps` + `PipelineConfigParser` + `PipelineLift` + the lower direction), and **four
+  guarded doc-count families across 13 sites in 6 files**.
+
+  ✅ **The guards WORK — that is the good news and the reason this is P2, not P1.** `check-doc-counts`,
+  `NodeAttributesContractTest`, `ProcessorCatalogContractTest`, `node-attributes.spec.ts` and
+  `MaintenanceTaskContractTest`'s sibling pattern each caught a miss. ⚠ But they catch it at PUSH time,
+  after the work is written, and each one costs a build cycle to discover.
+  🔴 **The real risk is the mirror that has NO guard.** `LOWERABLE` is the proof: its javadoc says
+  “node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE”, and a type
+  can be added to it with **no flat home at all** and every test still passes. That is a false claim the
+  suite cannot see — found only by reading the javadoc and checking `PipelineLift` by hand.
+  ⇒ **The ask is to DERIVE the mirrors, not to add more guards.** Sites 5–9 all answer questions the enum
+  plus its attribute spec already determine; #9 in particular is a cross-language hand copy of a table
+  the server publishes on `GET /pipelines/node-types`, whose own spec comment already admits the TS side
+  “is the fallback, not the source”. ⚠ A fallback that must be hand-synced is not a fallback, it is a
+  second source.
+  ⛔ **Do NOT ‘fix’ this by relaxing a guard.** Every one of them is load-bearing; the cost is the
+  DUPLICATION they police, not the policing.
+  ⚠ Sites 2–4 and 10 are legitimately per-node (a new type genuinely needs compiling, executing and a
+  declared config home) and are not in scope — counting them as duplication would overstate the problem.
+  ⚠ Site 10 does carry its own trap: `PipelineKeyCoverageContractTest.UNDECLARED_BLOCKS` is a ratchet
+  that may only ever SHRINK, so a new block must be DECLARED rather than added to it — the easy path
+  (copy what `processing.summarize` does) is the one the ratchet exists to stop.
+  → `okf/backend/pipeline-graph/step-catalog.md` · `PipelineEditable.java:155` ·
+  `inspecto-ui/src/app/modules/admin/pipelines/node-attributes.ts`
 - **P2** · **`ENRICH-SILENT-FULL-RECOMPUTE-1` — an incremental recompute silently becomes a FULL one.**
   Filed 2026-09-15 by grounding `Onboarding ↔ Pipeline unification W4`, which carried this as a *design
   note* (*"never silently convert one into the other"*) when it is **a live defect already doing exactly

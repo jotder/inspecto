@@ -134,6 +134,59 @@ class PipelineConfigStepsTest {
                 kinds(PipelineConfig.fromMap(m)));
     }
 
+    /**
+     * {@code processing.profile} sits between summarize and route in the lift order, so the projection
+     * has to put it there too — the same one-position drift that would silently reorder a saved pipeline.
+     */
+    @Test
+    void theProfileBlockProjectsBetweenSummarizeAndRoute() throws Exception {
+        Map<String, Object> processing = new LinkedHashMap<>();
+        processing.put("threads", 1);
+        processing.put("profile", Map.of("columns", List.of("amount")));
+        processing.put("summarize", Map.of("group_by", List.of("day"), "measures", List.of("count")));
+        processing.put("dedup", Map.of("keys", List.of("msisdn")));
+
+        Map<String, Object> m = base(Map.of());
+        m.put("processing", processing);
+        m.put("route", Map.of("on", "table"));
+
+        assertEquals(List.of("dedup", "summarize", "profile", "route"), kinds(PipelineConfig.fromMap(m)));
+    }
+
+    /**
+     * 🔴 An EMPTY {@code columns} is the authored instruction "profile every inbound column", not an
+     * absent key — so unlike every other optional key it must SURVIVE the projection. Dropping it would
+     * lower back a narrower document than the file holds, which is the silent-edit-loss this chain exists
+     * to prevent.
+     */
+    @Test
+    void anEmptyProfileColumnListSurvivesTheProjection() throws Exception {
+        Map<String, Object> processing = new LinkedHashMap<>();
+        processing.put("threads", 1);
+        processing.put("profile", Map.of("columns", List.of()));
+        Map<String, Object> m = base(Map.of());
+        m.put("processing", processing);
+
+        List<PipelineConfig.Step> steps = PipelineConfig.fromMap(m).steps();
+        assertEquals(List.of("profile"), kinds(PipelineConfig.fromMap(m)));
+        assertEquals(List.of(), steps.get(0).config().get("columns"),
+                "an empty columns[] means 'every column' — it is authored content, not an absent key");
+    }
+
+    /** A {@code profile:} with no {@code columns} at all reads as the same "every column" instruction. */
+    @Test
+    void aProfileBlockWithNoColumnsKeyReadsAsEveryColumn() throws Exception {
+        Map<String, Object> processing = new LinkedHashMap<>();
+        processing.put("threads", 1);
+        processing.put("profile", Map.of());
+        Map<String, Object> m = base(Map.of());
+        m.put("processing", processing);
+
+        PipelineConfig cfg = PipelineConfig.fromMap(m);
+        assertNotNull(cfg.profile(), "an empty profile: block is still an authored profile step");
+        assertEquals(List.of(), cfg.profile().columns());
+    }
+
     @Test
     void aConfigWithNoTransformsHasAnEmptyChainRatherThanNull() throws Exception {
         assertEquals(List.of(), PipelineConfig.fromMap(base(Map.of())).steps());

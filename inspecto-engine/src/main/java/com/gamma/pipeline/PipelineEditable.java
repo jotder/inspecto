@@ -166,6 +166,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
+            BuiltinNodeType.TRANSFORM_PROFILE.type(),   // per-column profile → processing.profile
             BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
             BuiltinNodeType.TRANSFORM_FILTER.type(),
             BuiltinNodeType.TRANSFORM_LOOKUP.type(),    // inline static map → steps: kind lookup (2026-09-06)
@@ -190,6 +191,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_JOIN.type(),      PipelineConfig.Step.JOIN,
             BuiltinNodeType.TRANSFORM_DEDUP.type(),     PipelineConfig.Step.DEDUP,
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), PipelineConfig.Step.SUMMARIZE,
+            BuiltinNodeType.TRANSFORM_PROFILE.type(),   PipelineConfig.Step.PROFILE,
             BuiltinNodeType.TRANSFORM_ROUTE.type(),     PipelineConfig.Step.ROUTE,
             BuiltinNodeType.TRANSFORM_LOOKUP.type(),    PipelineConfig.Step.LOOKUP,
             BuiltinNodeType.TRANSFORM_SQL.type(),       PipelineConfig.Step.SQL);
@@ -824,6 +826,7 @@ public final class PipelineEditable {
         PipelineNode recordDedup   = legacyShaped ? first(chain, PipelineConfig.Step.DEDUP)     : null;
         PipelineNode routeNode     = legacyShaped ? first(chain, PipelineConfig.Step.ROUTE)     : null;
         PipelineNode summarizeNode = legacyShaped ? first(chain, PipelineConfig.Step.SUMMARIZE) : null;
+        PipelineNode profileNode   = legacyShaped ? first(chain, PipelineConfig.Step.PROFILE)   : null;
         PipelineNode joinNode      = legacyShaped ? first(chain, PipelineConfig.Step.JOIN)      : null;
         // At most one under legacyShaped — two filters are precisely a case the singular
         // `csv_settings.where` cannot hold, and merging them with putAll is how the second one used to
@@ -930,6 +933,19 @@ public final class PipelineEditable {
             processing.put("summarize", sm);
         } else if (strict) {
             processing.remove("summarize");
+        }
+
+        // per-column profile → processing.profile ({columns})
+        // ⚠ `columns` is written even when EMPTY, unlike its neighbours' putIfPresent: an empty list is the
+        // authored instruction "profile every column", so dropping it would lower back a DIFFERENT document
+        // than was authored — the silent-edit-loss shape this round trip exists to prevent.
+        if (profileNode != null) {
+            Map<String, Object> pm = new LinkedHashMap<>();
+            Object cols = profileNode.cfg("columns");
+            pm.put("columns", cols instanceof List<?> l ? l : List.of());
+            processing.put("profile", pm);
+        } else if (strict) {
+            processing.remove("profile");
         }
 
         // authored map projection → processing.map ({columns, rules}). ⚠ Unlike its three neighbours

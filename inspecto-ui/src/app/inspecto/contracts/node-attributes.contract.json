@@ -426,6 +426,14 @@
     "help" : "Aggregate expressions computed per group.",
     "placeholder" : "sum(amount)"
   } ],
+  "transform.profile" : [ {
+    "key" : "columns",
+    "label" : "Columns",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Columns to profile. Leave blank to profile every inbound column.",
+    "placeholder" : "amount"
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",

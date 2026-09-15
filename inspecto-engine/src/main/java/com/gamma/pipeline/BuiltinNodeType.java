@@ -156,6 +156,13 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_SUMMARIZE("transform.summarize", NodeCategory.TRANSFORM, "Summarize",
             "Group-by rollup with algebraically-composable measures.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
+    // Per-column profile (catalog `transform.profiler.inline`, operator pick 2026-09-15). Flat home:
+    // processing.profile {columns} — omit columns to profile every one. Executes in RowShaper.profile.
+    // ⛔ The output columns are declared HERE, not taken from DuckDB's own SUMMARIZE: a node whose output
+    // SCHEMA changes with the engine version is a downstream break waiting for an upgrade.
+    TRANSFORM_PROFILE("transform.profile", NodeCategory.TRANSFORM, "Profile",
+            "Per-column row/null/distinct counts and min/max over the inbound data.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

@@ -376,6 +376,17 @@ public final class NodeAttributes {
                     .help("Aggregate expressions computed per group."));
 
     /**
+     * {@code transform.profile} (→ {@code processing.profile}) — per-column statistics.
+     *
+     * <p>⚠ {@code columns} is OPTIONAL and that is the point: "profile what arrives" is the common case and
+     * needs no parameters, so the simplest use must not be the most verbose. Leaving it blank profiles
+     * every inbound column. Keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_PROFILE = List.of(
+            NodeAttribute.of("columns", "Columns", "list", "optional").placeholder("amount")
+                    .help("Columns to profile. Leave blank to profile every inbound column."));
+
+    /**
      * {@code transform.join} (→ {@code processing.join}, D-4) — the reference join, authoring-only.
      * {@code reference} names a registered Reference component ({@code reference/<id>}), so the UI
      * renders it as an autocomplete over the registry. Keys proven by {@code NodeConfigNameContractTest}.
@@ -405,7 +416,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -418,6 +429,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
         m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
+        m.put(BuiltinNodeType.TRANSFORM_PROFILE.type(), TRANSFORM_PROFILE);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

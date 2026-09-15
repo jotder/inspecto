@@ -171,6 +171,7 @@ public final class RowShaper {
         if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix, ctx);
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_PROFILE.type().equals(type)) return profile(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
         // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
@@ -459,6 +460,74 @@ public final class RowShaper {
      * {@link Integer#MAX_VALUE} — a batch's group count is bounded by its row count, so the cap
      * never binds; it is the compiler's shape, not a sampling decision.
      */
+    /**
+     * {@code transform.profile} — one row per profiled column: row count, nulls, distinct values, min and max
+     * (catalog {@code transform.profiler.inline}, operator pick 2026-09-15).
+     *
+     * <p>🔴 <b>The output columns are declared here, not delegated to DuckDB's own {@code SUMMARIZE}.</b>
+     * {@code SUMMARIZE} would be one line and gives a richer set — but its column list belongs to the
+     * engine, so a DuckDB upgrade would silently change this node's OUTPUT SCHEMA and break whatever reads
+     * it downstream. A Step's output shape is a contract; it does not get to drift with a dependency.
+     *
+     * <p>⚠ {@code min}/{@code max} are cast to {@code VARCHAR} because one output column must hold values
+     * from columns of different types. That makes them comparable as TEXT, not as numbers — a deliberate,
+     * stated loss rather than a per-type column explosion.
+     *
+     * <p>⚠ {@code COUNT(col)} does not count NULLs, which is what makes {@code COUNT(*) - COUNT(col)} the
+     * null count; and {@code COUNT(DISTINCT col)} likewise ignores NULL, so a column that is entirely NULL
+     * reports {@code distinct_count = 0} rather than 1.
+     *
+     * <p>⛔ An unknown column name is REFUSED rather than skipped: silently profiling four of five
+     * requested columns would report a clean profile of a typo.
+     */
+    private static List<Relation> profile(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        List<String> available = columnsOf(conn, input);
+        List<String> wanted;
+        if (node.cfg("columns") instanceof List<?> declared && !declared.isEmpty()) {
+            wanted = new java.util.ArrayList<>();
+            for (Object o : declared) {
+                String name = o == null ? null : o.toString().trim();
+                if (name == null || name.isEmpty()) continue;
+                if (available.stream().noneMatch(c -> c.equalsIgnoreCase(name)))
+                    throw new IllegalArgumentException("transform.profile node '" + node.id()
+                            + "': no column '" + name + "' in the inbound data (have: " + available + ")");
+                wanted.add(name);
+            }
+        } else {
+            wanted = available;
+        }
+        if (wanted.isEmpty())
+            throw new IllegalArgumentException("transform.profile node '" + node.id()
+                    + "': the inbound data has no columns to profile");
+
+        StringBuilder select = new StringBuilder();
+        for (String c : wanted) {
+            if (select.length() > 0) select.append(" UNION ALL ");
+            select.append("SELECT ").append(sqlStr(c)).append(" AS column_name, ")
+                    .append("COUNT(*) AS row_count, ")
+                    .append("COUNT(*) - COUNT(").append(q(c)).append(") AS null_count, ")
+                    .append("COUNT(DISTINCT ").append(q(c)).append(") AS distinct_count, ")
+                    .append("CAST(MIN(").append(q(c)).append(") AS VARCHAR) AS min_value, ")
+                    .append("CAST(MAX(").append(q(c)).append(") AS VARCHAR) AS max_value ")
+                    .append("FROM ").append(q(input));
+        }
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /** The inbound relation's column names, in declaration order — a zero-row read, no scan. */
+    private static List<String> columnsOf(Connection conn, String table) throws SQLException {
+        List<String> out = new java.util.ArrayList<>();
+        try (Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM " + q(table) + " LIMIT 0")) {
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) out.add(md.getColumnName(i));
+        }
+        return out;
+    }
+
     private static List<Relation> summarize(Connection conn, PipelineNode node, String input, String prefix)
             throws SQLException {
         Object measuresRaw = node.cfg("measures");

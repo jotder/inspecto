@@ -110,6 +110,12 @@ public final class ConfigSpecs {
                 FieldSpec.of("processing.schema_file", "Schema file", FieldType.FILEPATH,
                         "Path to the *_schema.toon holding field selectors/types/partition keys. A runnable "
                                 + "pipeline needs this, a schemas[] dispatch list, or a plugin ingester."),
+                // The Profile Step's only knob (transform.profile, 2026-09-15). Declared rather than
+                // left to UNDECLARED_BLOCKS: an at-rest block nothing can SEE is exactly the gap-10
+                // debt that list records, and a new block has no reason to be born into it.
+                FieldSpec.of("processing.profile.columns", "Profile columns", FieldType.LIST,
+                        "Columns to profile (per-column row/null/distinct counts and min/max). Empty "
+                                + "or absent profiles every inbound column."),
                 FieldSpec.of("processing.ingester", "Plugin ingester class", FieldType.STRING,
                         "FQCN of a plugin ingester; when set, processing.segments must be non-empty."),
                 // The Stage-2 arming condition (pipeline spec gap 8). Undeclared until 2026-08-31, which
@@ -117,7 +123,8 @@ public final class ConfigSpecs {
                 // being REFUSED at registration — the rule below moves that answer to authoring time.
                 FieldSpec.of("output_store", "Stage-2 output store", FieldType.STRING,
                         "Names the store an at-rest chain writes. Required to ARM a pipeline carrying "
-                                + "steps:, processing.dedup, processing.summarize or processing.join — "
+                                + "steps:, processing.dedup, processing.summarize, processing.profile "
+                                + "or processing.join — "
                                 + "those execute at rest (a pipeline_config: job), never on the linear "
                                 + "ingest path, and the chain needs an authored name for what it writes."),
                 // ── grammar: one concept, two spellings — `parsing.grammar` is CANONICAL ────────
@@ -298,20 +305,21 @@ public final class ConfigSpecs {
                 // here would break authoring a pipeline in progress.
                 new CrossFieldRule(
                         "stage-two-blocks-require-output-store",
-                        "An ACTIVE pipeline carrying steps:, processing.dedup, processing.summarize or "
-                                + "processing.join must declare a top-level output_store:. Those blocks "
+                        "An ACTIVE pipeline carrying steps:, processing.dedup, processing.summarize, "
+                                + "processing.profile or processing.join must declare a top-level output_store:. Those blocks "
                                 + "execute at rest (a pipeline_config: job over the landed store), never "
                                 + "on the linear ingest path, so without output_store: they have nowhere "
                                 + "to write and the pipeline refuses to arm. Author output_store:, keep "
                                 + "the pipeline inactive (active: false), or remove the block.",
                         Severity.ERROR,
                         List.of("output_store", "steps", "processing.dedup",
-                                "processing.summarize", "processing.join"),
+                                "processing.summarize", "processing.profile", "processing.join"),
                         raw -> {
                             if (!Boolean.parseBoolean(str(raw, "active"))) return true;
                             boolean needs = false;
                             for (String block : List.of("steps", "processing.dedup",
-                                                        "processing.summarize", "processing.join"))
+                                                        "processing.summarize", "processing.profile",
+                                                        "processing.join"))
                                 needs |= authored(raw, block);
                             return !needs || present(raw, "output_store");
                         }),

@@ -33,6 +33,7 @@ class PipelineStepsProjectionTest {
     private static final Map<String, Object> DEDUP     = Map.of("keys", List.of("msisdn"));
     private static final Map<String, Object> SUMMARIZE = Map.of("group_by", List.of("day"),
                                                                 "measures", List.of("count"));
+    private static final Map<String, Object> PROFILE   = Map.of("columns", List.of("amount"));
     private static final Map<String, Object> ROUTE     = Map.of("on", "table");
 
     /**
@@ -46,6 +47,7 @@ class PipelineStepsProjectionTest {
         processing.put("threads", 1);
         // Deliberately inserted in an order that is NOT the chain order, so a projection that merely
         // echoes declaration order cannot pass.
+        if (want.contains("profile"))   processing.put("profile", PROFILE);
         if (want.contains("summarize")) processing.put("summarize", SUMMARIZE);
         if (want.contains("dedup"))     processing.put("dedup", DEDUP);
         if (want.contains("join"))      processing.put("join", JOIN);
@@ -92,7 +94,10 @@ class PipelineStepsProjectionTest {
                 new String[]{"dedup", "summarize"},
                 new String[]{"join", "dedup"},
                 new String[]{"filter", "dedup"},
-                new String[]{"filter", "join", "dedup", "summarize"});
+                new String[]{"profile"},
+                new String[]{"summarize", "profile"},
+                new String[]{"filter", "join", "dedup", "summarize"},
+                new String[]{"filter", "join", "dedup", "summarize", "profile"});
 
         for (String[] present : cases) {
             PipelineConfig cfg = configWith(present);

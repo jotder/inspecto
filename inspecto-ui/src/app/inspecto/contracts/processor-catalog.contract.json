@@ -441,10 +441,10 @@
     "label" : "Inline stream profiler & statistics",
     "emoji" : "🧮",
     "icon" : "heroicons_outline:chart-bar-square",
-    "status" : "partial",
-    "capability" : "storage_report",
-    "note" : "storage/completeness KPIs exist; no per-column profile step",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "transform.profile",
+    "note" : "per-column row/null/distinct counts and min/max, as a Step (2026-09-15)",
+    "addable" : true
   }, {
     "id" : "quality.sample.reservoir",
     "family" : "DQ",

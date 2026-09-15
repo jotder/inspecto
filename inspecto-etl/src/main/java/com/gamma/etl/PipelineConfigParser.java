@@ -576,6 +576,7 @@ final class PipelineConfigParser {
             if (b.join      != null) legacy.add("processing.join");
             if (b.dedup     != null) legacy.add("processing.dedup");
             if (b.summarize != null) legacy.add("processing.summarize");
+            if (b.profile   != null) legacy.add("processing.profile");
             if (b.route     != null) legacy.add("route");
             if (!legacy.isEmpty()) {
                 throw new IllegalArgumentException("steps: replaces the singular transform blocks — remove "
@@ -787,6 +788,18 @@ final class PipelineConfigParser {
             if (recSummarize.get("measures") instanceof List<?> ms)
                 for (Object m : ms) measures.add(String.valueOf(m));
             b.summarize = new PipelineConfig.Summarize(groupBy, measures);
+        }
+
+        // ── profile (per-column statistics, authoring/round-trip only) ──
+        // ⚠ An EMPTY block is meaningful and must survive: `processing.profile:` with no keys means
+        // "profile every inbound column". Treating absent and empty alike would make the common case
+        // unauthorable.
+        Map<String, Object> recProfile = castMapAt(proc, "profile");
+        if (recProfile != null) {
+            List<String> columns = new ArrayList<>();
+            if (recProfile.get("columns") instanceof List<?> cs)
+                for (Object c : cs) columns.add(String.valueOf(c));
+            b.profile = new PipelineConfig.Profile(columns);
         }
 
         // ── join (ELT amendment D-4/Phase 3 S2 — reference join, authoring/round-trip only) ──

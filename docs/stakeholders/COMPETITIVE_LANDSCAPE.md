@@ -117,7 +117,7 @@ feeds), `JobTypeProvider` and `MaintenanceTaskProvider` (their scheduled work), 
 
 ⚠ **Two honesty notes before any coverage percentage goes on a slide.** `ExpressionProvider` is declared and
 registered by nothing (`SPEC-DEADSEAM-1`). And the processor catalogue is **119**<!--count:processors-->
-entries of which **35**<!--count:processors-delivered--> are delivered, **17**<!--count:processors-partial-->
+entries of which **36**<!--count:processors-delivered--> are delivered, **16**<!--count:processors-partial-->
 partial, and the rest planned — a palette of inactive tiles a buyer will count. Claim coverage **by category
 covered end to end**, never as a percentage of that palette.
 
@@ -230,7 +230,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 |---|---|---|
 | Anything about the AI assistant or autonomy | ships in **no** bundle (`CP-14`, `PKG-5`) | `PKG-5` resolves and the assistant is in a downloadable artifact — **filed as a §1 decision needing an owner, 2026-09-11** |
 | "1 trillion rows/day" for Standard | off by 10–250× on one node (§1.3) | never for Standard; an Enterprise cluster-design conversation |
-| "119 processors" | 67 are planned, inactive tiles | say **35**<!--count:processors-delivered--> delivered, or name the families |
+| "119 processors" | 67 are planned, inactive tiles | say **36**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above; one dead SPI | phrase as categories covered + named seams (§1.4) |
 | A production-grade Expectation engine | routes, no UI (`ING-6`) | the UI ships, or GX suites import |
 | "Low maintenance" | the install kit (preflight, service wrappers, upgrade/rollback) is unbuilt | deployment Phases 0–1 ship — `DEPLOY-SERVICE-WRAPPER-1` (P1) is the first piece |

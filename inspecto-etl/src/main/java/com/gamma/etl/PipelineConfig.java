@@ -302,6 +302,8 @@ public final class PipelineConfig {
         public static final String DEDUP = "dedup";
         /** Group-by rollup. Legacy spelling: {@code processing.summarize}. */
         public static final String SUMMARIZE = "summarize";
+        /** Per-column profile. Legacy spelling: {@code processing.profile}. */
+        public static final String PROFILE = "profile";
         /** Branch tree. Legacy spelling: the top-level {@code route:} block. */
         public static final String ROUTE = "route";
         /**
@@ -319,7 +321,7 @@ public final class PipelineConfig {
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
          *  ({@link #LOOKUP} and {@link #SQL} last: neither has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, ROUTE, LOOKUP, SQL);
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);
@@ -1009,6 +1011,21 @@ public final class PipelineConfig {
     }
 
     /**
+     * Per-column profile ({@code processing.profile}) — the authored half of the {@code transform.profile}
+     * Step. {@code columns} is OPTIONAL and empty means "every inbound column", which is the common case:
+     * "profile what arrives" needs no parameters, so the simplest use must not be the most verbose.
+     *
+     * <p>⚠ Unlike {@link Summarize} there is nothing to refuse here — an empty block is meaningful, so this
+     * record validates shape only.
+     */
+    @PublicApi(since = "4.0.0")
+    public record Profile(List<String> columns) {
+        public Profile {
+            columns = columns == null ? List.of() : List.copyOf(columns);
+        }
+    }
+
+    /**
      * The authored half of the projection slot ({@code processing.map}; a Record Transformer,
      * {@code transform.sql}) — the flat file's home
      * for a projection an operator typed into the map node's dialog, added so that
@@ -1180,6 +1197,9 @@ public final class PipelineConfig {
     /** Group-by rollup ({@code processing.summarize}); {@code null} when absent. */
     private final Summarize summarize;
 
+    /** Per-column profile ({@code processing.profile}); {@code null} when absent. */
+    private final Profile profile;
+
     /** Reference join ({@code processing.join}); {@code null} when absent. */
     private final Join join;
 
@@ -1301,6 +1321,10 @@ public final class PipelineConfig {
      * not the linear batch path — arming lands once a recipe-driven executor is wired (Phase 3).
      */
     public Summarize summarize() { return summarize; }
+
+    /** Per-column profile ({@code processing.profile}), or {@code null} when absent. Same at-rest posture
+     *  as {@link #summarize()}: it aggregates, so it needs somewhere for the result to rest. */
+    public Profile profile() { return profile; }
     /**
      * Reference join ({@code processing.join}), or {@code null} when absent. Authoring/round-trip only:
      * {@link #prepare()} refuses an {@code active} pipeline carrying it — the linear batch path has no
@@ -1347,7 +1371,7 @@ public final class PipelineConfig {
                 b.sourceTimezone);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
-        this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.route);
+        this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.profile, b.route);
         this.explicitSteps = b.steps != null && !b.steps.isEmpty();
         this.schemas = new Schemas(b.schemaSelector, b.singleSchema, b.segmentSchemas,
                 b.ingesterClass,
@@ -1376,6 +1400,7 @@ public final class PipelineConfig {
         this.dedup = b.dedup;
         this.route = b.route;
         this.summarize = b.summarize;
+        this.profile = b.profile;
         this.join = b.join;
         this.mapConfig = b.mapConfig;
         this.disabledSteps = List.copyOf(b.disabledSteps);
@@ -1456,6 +1481,7 @@ public final class PipelineConfig {
         this.dedup = src.dedup;
         this.route = src.route;
         this.summarize = src.summarize;
+        this.profile = src.profile;
         this.join = src.join;
         this.mapConfig = src.mapConfig;
         this.disabledSteps = src.disabledSteps;
@@ -1555,7 +1581,7 @@ public final class PipelineConfig {
      * silently is the failure mode this record was introduced to remove.
      */
     private static List<Step> resolveSteps(List<Step> declared, String rowWhere, Join join, Dedup dedup,
-                                           Summarize summarize, Map<String, Object> route) {
+                                           Summarize summarize, Profile profile, Map<String, Object> route) {
         if (declared != null && !declared.isEmpty()) return List.copyOf(declared);
 
         List<Step> out = new ArrayList<>();
@@ -1569,6 +1595,11 @@ public final class PipelineConfig {
         if (summarize != null)
             out.add(new Step(Step.SUMMARIZE,
                     cfg("group_by", summarize.groupBy(), "measures", summarize.measures())));
+        if (profile != null)
+            // Map.of, not cfg(): cfg drops a null value, and an EMPTY columns[] is the authored
+            // instruction "profile every column" — dropping it would project a different step than
+            // the file holds. The compact constructor on Profile already guarantees non-null.
+            out.add(new Step(Step.PROFILE, Map.of("columns", profile.columns())));
         if (route != null)
             out.add(new Step(Step.ROUTE, route));
         return List.copyOf(out);
@@ -1689,6 +1720,16 @@ public final class PipelineConfig {
                             + "output_store: and run the chain at rest (pipeline_config: pipeline job), keep "
                             + "the pipeline inactive (active: false), or remove the summarize block");
         }
+        // processing.profile takes the same posture, and for the same reason: it AGGREGATES (one row per
+        // column, not per record), so it has nowhere to put its result on a path whose output is the
+        // record stream. Arming it without output_store: would produce a pipeline that runs and quietly
+        // profiles nothing.
+        if (active && profile != null && outputStore == null) {
+            throw new IllegalStateException(
+                    "processing.profile does not execute on the linear ingest path — author a top-level "
+                            + "output_store: and run the chain at rest (pipeline_config: pipeline job), keep "
+                            + "the pipeline inactive (active: false), or remove the profile block");
+        }
         // processing.dedup joins them 2026-08-11 (operator decision): record-grain dedup is a TRANSFORM
         // concern, so in ELT terms it belongs in the T and not the EL. It DID execute on this path — a
         // ROW_NUMBER QUALIFY in ConsignmentIngestStrategy, the one cross-record operation in the multiplexer —
@@ -1764,6 +1805,7 @@ public final class PipelineConfig {
         Dedup dedup = null;                   // record-grain dedup (processing.dedup); null ⇒ none
         Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline
         Summarize summarize = null;           // group-by rollup (processing.summarize); null ⇒ none
+        Profile profile = null;               // per-column profile (processing.profile); null ⇒ none
         Join join = null;                     // reference join (processing.join); null ⇒ none
         MapConfig mapConfig = null;           // authored map projection (processing.map); null ⇒ none
         List<String> disabledSteps = List.of();   // processing.disabled_steps (S4/D-13); empty ⇒ all enabled

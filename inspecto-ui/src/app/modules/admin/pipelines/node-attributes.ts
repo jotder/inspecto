@@ -303,6 +303,19 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     // `transform.dedup.marker` is deliberately ABSENT: P5-a moved marker dedup onto the acquisition
     // node (MARKER_DEDUP_ATTRIBUTES above), and nothing emits the node any more — it is read-compat
     // only, so a spec here would invite editing a node the lift never produces.
+    // Per-column profile (→ processing.profile; catalog `quality.profiler.inline`). ⚠ `columns` is
+    // OPTIONAL on purpose: "profile what arrives" is the common case, so the simplest use must not be
+    // the most verbose — and an EMPTY list is authored content, not an absent key.
+    'transform.profile': [
+        {
+            key: 'columns',
+            label: 'Columns',
+            type: 'list',
+            tier: 'optional',
+            help: 'Columns to profile. Leave blank to profile every inbound column.',
+            placeholder: 'amount',
+        },
+    ],
     // Group-by rollup (→ processing.summarize) — authoring-only until the branch-aware executor arms it.
     'transform.summarize': [
         {

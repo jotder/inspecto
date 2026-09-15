@@ -128,6 +128,7 @@ public final class RecipeCompiler {
                     routeSeen = true;
                 }
                 case "summarize" -> nodes.add(summarize(id, cfg, refusals));
+                case "profile" -> nodes.add(profile(id, cfg, refusals));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                         "unknown step verb '" + verb + "'"));
             }
@@ -382,6 +383,28 @@ public final class RecipeCompiler {
      *  ({@code processing.summarize}), run at rest by {@code RowShaper} through the same
      *  {@code MeasureCompiler} grammar {@code MaterializeTask} speaks (output parity gated by
      *  {@code RecipeExecutionParityTest}); live-ingest arming stays refused at {@code prepare()}. */
+    /**
+     * {@code profile:} — per-column statistics over the inbound data (catalog {@code quality.profiler.inline}).
+     *
+     * <p>{@code columns: […]} restricts which columns are profiled; omitted profiles every one. ⚠ Unlike
+     * {@code summarize}, an EMPTY config is valid and is the common case — "profile what arrives" needs no
+     * parameters, and demanding one would make the simplest use the most verbose.
+     */
+    private static PipelineNode profile(String id, Map<String, Object> cfg,
+                                        List<PipelineCompileException.Refusal> refusals) {
+        Map<String, Object> c = new LinkedHashMap<>(cfg);
+        Object columns = c.remove("columns");
+        if (columns != null && !(columns instanceof List<?>))
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "profile columns: must be a list of column names"));
+        for (String other : c.keySet())
+            refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
+                    "profile does not understand '" + other + "' (only columns)"));
+        Map<String, Object> node = new LinkedHashMap<>();
+        if (columns != null) node.put("columns", columns);
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_PROFILE.type(), node);
+    }
+
     private static PipelineNode summarize(String id, Map<String, Object> cfg,
                                           List<PipelineCompileException.Refusal> refusals) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
@@ -486,6 +509,7 @@ public final class RecipeCompiler {
                     case "dedup" -> stepNode = dedup(stepId, stepCfg, refusals);
                     case "lookup" -> stepNode = lookup(stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
+                    case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "sql" -> stepNode = sql(stepId, stepCfg, refusals);
                     case "transform" -> {
                         List<PipelineNode> built = new ArrayList<>();
