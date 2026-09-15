@@ -6911,6 +6911,70 @@
         },
         "x-generated" : true
       }
+    },
+    "/expectations/breached-count" : {
+      "get" : {
+        "tags" : [ "expectations" ],
+        "summary" : "GET /expectations/breached-count (generated skeleton)",
+        "operationId" : "getExpectationsBreachedCount",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/signals/count" : {
+      "get" : {
+        "tags" : [ "signals" ],
+        "summary" : "GET /signals/count (generated skeleton)",
+        "operationId" : "getSignalsCount",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/jobs/{jobId}/runs/{runId}/diff/{diffId}" : {
+      "get" : {
+        "tags" : [ "jobs" ],
+        "summary" : "GET /jobs/{jobId}/runs/{runId}/diff/{diffId} (generated skeleton)",
+        "operationId" : "getJobsByJobIdRunsByRunIdDiffByDiffId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "jobId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "diffId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

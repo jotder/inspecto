@@ -45,6 +45,9 @@ final class ExpectationRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/expectations", (e, m) -> list(api));
+        // HOME-TILES-1 (2026-09-16): the landing page's "Expectations breached" tile — a server-side count over
+        // the registry's persisted lastResult, so the page never fetches every Expectation to count failures.
+        api.get("/expectations/breached-count", (e, m) -> breachedCount(api));
         api.post("/expectations/evaluate", (e, m) -> evaluateAll(api));
         api.post("/expectations/([^/]+)/evaluate", (e, m) -> single(e, evaluateOne(api, ApiContext.name(m))));
         api.post("/expectations", ApiContext.withCapability("canAuthorWorkbench",
@@ -63,6 +66,25 @@ final class ExpectationRoutes implements RouteModule {
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * {@code GET /expectations/breached-count} → {@code {count}}: enabled Expectations whose persisted
+     * {@code lastResult.status} is {@code FAILED}. Reads the same registry {@link #list} reads (O(n) content maps,
+     * no evaluation); a never-evaluated Expectation has a null lastResult and does not count; write root unset ⇒ 0.
+     */
+    private Object breachedCount(ApiContext api) {
+        Path root = api.writeRoot() == null ? null : api.writeRoot().resolve("registry");
+        long count = 0;
+        if (root != null) {
+            for (ComponentRegistry.Component c : new ComponentStore(root).list(TYPE)) {
+                Map<String, Object> content = c.content();
+                if ("false".equalsIgnoreCase(String.valueOf(content.getOrDefault("enabled", "true")))) continue;
+                if (content.get("lastResult") instanceof Map<?, ?> last
+                        && "FAILED".equalsIgnoreCase(String.valueOf(last.get("status")))) count++;
+            }
+        }
+        return Map.of("count", count);
+    }
 
     private Object list(ApiContext api) {
         Path root = api.writeRoot() == null ? null : api.writeRoot().resolve("registry");

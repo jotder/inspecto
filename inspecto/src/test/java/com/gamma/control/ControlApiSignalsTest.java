@@ -46,6 +46,30 @@ class ControlApiSignalsTest {
         return new Ctx(spaces, api, api.port());
     }
 
+    /** HOME-TILES-1: a count over the ledger, windowed, with the type required and the cap stated. */
+    @Test
+    void countsSignalsOfATypeInAWindow(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String base = "/spaces/acme";
+            assertEquals(422, send(c.port, "GET", base + "/signals/count", null).statusCode(), "type is required");
+
+            assertEquals(200, send(c.port, "POST", base + "/jobs",
+                    "{\"name\":\"broken\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"cron\":\"0 3 * * *\"}").statusCode());
+            send(c.port, "POST", base + "/jobs/broken/trigger", null);
+            pollForTerminalRunSignal(c.port, base);
+
+            JsonNode all = JSON.readTree(send(c.port, "GET", base + "/signals/count?type=job.run.*", null).body()).get("data");
+            assertTrue(all.get("count").asInt() >= 1, all.toString());
+            assertFalse(all.get("capped").asBoolean());
+            assertEquals(0, all.get("datasets").asInt(), "a job.run signal names no dataset");
+
+            long future = System.currentTimeMillis() + 3_600_000L;
+            JsonNode none = JSON.readTree(send(c.port, "GET", base + "/signals/count?type=job.run.*&since=" + future, null).body()).get("data");
+            assertEquals(0, none.get("count").asInt(), "the window bounds the count");
+        }
+    }
+
     @Test
     void queriesSignalsWithTypeAndSeverityFilters(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

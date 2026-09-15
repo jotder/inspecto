@@ -205,6 +205,30 @@ class ControlApiExpectationTest {
         }
     }
 
+    /** HOME-TILES-1: the breached count is server-side, over the persisted lastResult, enabled Expectations only. */
+    @Test
+    void breachedCountFollowsEvaluationAndDisabling(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        String target = "orders_" + System.nanoTime();
+        seedParquet(target, "SELECT * FROM (VALUES (1,'a@x.com'),(2,NULL)) t(id,email)");
+        try (Ctx c = open(cfg, wr)) {
+            assertEquals(0, json(send(c.port, "GET", "/expectations/breached-count", null)).get("count").asInt(),
+                    "no Expectations ⇒ 0");
+            String name = "nn_" + System.nanoTime();
+            json(send(c.port, "POST", "/expectations", mk(name, target, "email", "non_null", null)));
+            assertEquals(0, json(send(c.port, "GET", "/expectations/breached-count", null)).get("count").asInt(),
+                    "created but never evaluated ⇒ no lastResult ⇒ not breached");
+            json(send(c.port, "POST", "/expectations/" + name + "/evaluate", null));
+            assertEquals(1, json(send(c.port, "GET", "/expectations/breached-count", null)).get("count").asInt(),
+                    "one FAILED lastResult");
+            json(send(c.port, "PUT", "/expectations/" + name,
+                    mk(name, target, "email", "non_null", "\"enabled\":false")));
+            assertEquals(0, json(send(c.port, "GET", "/expectations/breached-count", null)).get("count").asInt(),
+                    "a disabled Expectation is not counted even with a stale FAILED result");
+        } finally {
+            cleanup(target);
+        }
+    }
+
     // ── evaluate-all skips disabled ────────────────────────────────────────────────
 
     @Test

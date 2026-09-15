@@ -59,6 +59,11 @@ export class ExpectationsService {
         return this.http.get<Expectation[]>(apiUrl('/expectations'));
     }
 
+    /** HOME-TILES-1: enabled Expectations whose last evaluation FAILED — a server count, never a client-side sweep. */
+    breachedCount(): Observable<{ count: number }> {
+        return this.http.get<{ count: number }>(apiUrl('/expectations/breached-count'));
+    }
+
     create(body: ExpectationUpsert): Observable<Expectation> {
         return this.http.post<Expectation>(apiUrl('/expectations'), body);
     }

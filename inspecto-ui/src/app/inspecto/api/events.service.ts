@@ -103,6 +103,16 @@ export class EventsService {
      * survives, which `search()` over raw Events cannot give (an Event has no subject). Used by the
      * stale-tile resolver to see `dataset.write` at STORE granularity (STALE-TILES-PRECISION-1).
      */
+    /**
+     * HOME-TILES-1: how many Signals of `type` landed since `sinceMs`, and how many distinct datasets they name.
+     * `capped` means the ledger page was full and the figure is a lower bound.
+     */
+    signalCount(type: string, sinceMs?: number): Observable<{ count: number; datasets: number; capped: boolean }> {
+        return this.http.get<{ count: number; datasets: number; capped: boolean }>(apiUrl('/signals/count'), {
+            params: toParams({ type, ...(sinceMs ? { since: sinceMs } : {}) } as Record<string, unknown>),
+        });
+    }
+
     signals(filter: { type?: string; limit?: number } = {}): Observable<EventRow[]> {
         return this.http
             .get<Signal[]>(apiUrl('/signals'), { params: toParams(filter as Record<string, unknown>) })

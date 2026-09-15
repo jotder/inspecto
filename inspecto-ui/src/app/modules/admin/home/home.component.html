@@ -88,7 +88,7 @@
             </div>
         </div>
     } @else {
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:grid-cols-5">
             <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow">
                 <span class="text-secondary text-sm font-medium">Recent Runs</span>
                 <div class="flex items-baseline gap-3">
@@ -108,6 +108,29 @@
                 <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow">
                     <span class="text-secondary text-sm font-medium">Approvals waiting</span>
                     <span class="text-3xl font-semibold leading-none">{{ pendingApprovals().length }}</span>
+                </div>
+            }
+            <!-- HOME-TILES-1: server counts; absent (not a dash) when the call failed. -->
+            @if (breached() !== null) {
+                <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow" data-testid="tile-breached">
+                    <span class="text-secondary text-sm font-medium">Expectations breached</span>
+                    <div class="flex items-baseline gap-3">
+                        <span class="text-3xl font-semibold leading-none">{{ breached() }}</span>
+                        @if (breached()! > 0) {
+                            <inspecto-status-badge value="error" label="failing" />
+                        }
+                    </div>
+                </div>
+            }
+            @if (datasetsWritten(); as w) {
+                <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow" data-testid="tile-datasets-written">
+                    <span class="text-secondary text-sm font-medium">Datasets written (24h)</span>
+                    <div class="flex items-baseline gap-3">
+                        <span class="text-3xl font-semibold leading-none">{{ w.datasets }}</span>
+                        <span class="text-hint text-sm"
+                            >{{ w.count }} write{{ w.count === 1 ? '' : 's' }}{{ w.capped ? ' (at least)' : '' }}</span
+                        >
+                    </div>
                 </div>
             }
         </div>

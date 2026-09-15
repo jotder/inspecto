@@ -11,6 +11,7 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,8 +40,41 @@ final class SignalRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/signals", (e, m) -> signals(api, e));
+        // HOME-TILES-1 (2026-09-16): a cheap count over the ledger — the landing page's "Datasets written" tile
+        // counts dataset.write Signals since a moment without paging them to the client.
+        api.get("/signals/count", (e, m) -> count(api, e));
         api.get("/signals/tree", (e, m) -> signalTree(api, e));
         api.get("/signals/stream", (e, m) -> stream(api, e));
+    }
+
+    /**
+     * {@code GET /signals/count?type=&since=&until=} → {@code {count, datasets, capped}}: how many Signals of
+     * {@code type} landed in the window, and how many DISTINCT {@code payload.dataset} values they name
+     * ({@code datasets}; 0 when the type carries none). ⚠ The type filter is applied over the ledger page
+     * (an in-store filter exists for the SIGNAL event type only), so a window holding more than
+     * {@code EventQuery.MAX_LIMIT} signals reports a LOWER BOUND and says so with {@code capped: true} — an
+     * honest floor, never a silently truncated exact figure.
+     */
+    private Object count(ApiContext api, HttpExchange e) {
+        String type = ApiContext.query(e, "type");
+        if (type == null || type.isBlank()) throw new ApiException(422, "type is required");
+        Long since = parseEpochMs(ApiContext.query(e, "since"), "since");
+        Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
+        int page = com.gamma.event.EventQuery.MAX_LIMIT;
+        List<Signal> found = Signals.query(api.service().events(), type, since, until, null, null, page);
+        java.util.Set<String> datasets = new java.util.HashSet<>();
+        for (Signal sig : found) {
+            Object ds = sig.payload() == null ? null : sig.payload().get("dataset");
+            if (ds != null && !String.valueOf(ds).isBlank()) datasets.add(String.valueOf(ds));
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("type", type);
+        out.put("count", found.size());
+        out.put("datasets", datasets.size());
+        // capped when the underlying SIGNAL page was full — the type filter may have dropped some, so the
+        // count of THIS type is at least what we saw
+        out.put("capped", found.size() >= page);
+        return out;
     }
 
     /** {@code GET /signals?type=&since=&until=&severity=&source=&correlationId=&limit=} — the correlation-chain-filterable ledger view. */

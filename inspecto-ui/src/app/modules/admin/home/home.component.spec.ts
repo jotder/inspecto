@@ -4,6 +4,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import {
     ApprovalsService,
+    EventsService,
+    ExpectationsService,
     JobsService,
     LensService,
     ObjectsService,
@@ -17,6 +19,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { HomeComponent } from './home.component';
 
 interface Stubs {
+    breached?: number;
+    breachedError?: unknown;
+    writes?: { count: number; datasets: number; capped: boolean };
+    writesError?: unknown;
     runs?: unknown[];
     runsError?: { status: number };
     incidents?: unknown[];
@@ -45,6 +51,16 @@ function create(s: Stubs = {}) {
     };
     const objects = { list: vi.fn(() => of(s.incidents ?? [])) };
     const approvals = { list: vi.fn(() => of(s.approvals ?? [])) };
+    const expectations = {
+        breachedCount: vi.fn(() =>
+            s.breachedError ? throwError(() => s.breachedError) : of({ count: s.breached ?? 0 }),
+        ),
+    };
+    const events = {
+        signalCount: vi.fn(() =>
+            s.writesError ? throwError(() => s.writesError) : of(s.writes ?? { count: 0, datasets: 0, capped: false }),
+        ),
+    };
     const session = {
         actor: signal(s.actor ?? null),
         authMode: signal(s.authMode ?? 'none'),
@@ -72,6 +88,8 @@ function create(s: Stubs = {}) {
             { provide: JobsService, useValue: jobs },
             { provide: ObjectsService, useValue: objects },
             { provide: ApprovalsService, useValue: approvals },
+            { provide: ExpectationsService, useValue: expectations },
+            { provide: EventsService, useValue: events },
             { provide: SessionService, useValue: session },
             { provide: SpacesService, useValue: spaces },
             { provide: LensService, useValue: lens },
@@ -185,5 +203,29 @@ describe('HomeComponent', () => {
 
         const single = create({ runs: [RUN()], multiSpace: false, capabilities: ['canOperateRuns'] });
         expect(single.el.textContent).not.toContain('Your access here');
+    });
+
+    /** HOME-TILES-1: the two counted tiles (operational Home only — first-run shows the onboarding panel) show the server's numbers and hide — not dash — when the call fails. */
+    describe('counted tiles', () => {
+        it('shows breached Expectations and Datasets written from the server counts', () => {
+            const { el } = create({ runs: [RUN()], breached: 3, writes: { count: 7, datasets: 4, capped: false } });
+            expect(el.querySelector('[data-testid="tile-breached"]')?.textContent).toContain('3');
+            expect(el.querySelector('[data-testid="tile-breached"]')?.textContent).toContain('failing');
+            const w = el.querySelector('[data-testid="tile-datasets-written"]')?.textContent ?? '';
+            expect(w).toContain('4');
+            expect(w).toContain('7 writes');
+            expect(w).not.toContain('at least');
+        });
+
+        it('says "at least" when the ledger count is capped', () => {
+            const { el } = create({ runs: [RUN()], writes: { count: 10000, datasets: 12, capped: true } });
+            expect(el.querySelector('[data-testid="tile-datasets-written"]')?.textContent).toContain('at least');
+        });
+
+        it('hides a tile whose count call failed instead of showing a dash', () => {
+            const { el } = create({ runs: [RUN()], breachedError: { status: 503 }, writesError: { status: 404 } });
+            expect(el.querySelector('[data-testid="tile-breached"]')).toBeNull();
+            expect(el.querySelector('[data-testid="tile-datasets-written"]')).toBeNull();
+        });
     });
 });

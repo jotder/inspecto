@@ -6,6 +6,8 @@ import { lensHome } from 'app/app.routes';
 import {
     AgentApproval,
     ApprovalsService,
+    EventsService,
+    ExpectationsService,
     JobRunRow,
     JobsService,
     LensService,
@@ -47,11 +49,11 @@ const NOTICE_DISMISSED = 'inspecto.home.bindNoticeDismissed';
  * and by the subject's capabilities — the shell's standing rule
  * (`docs/okf/capabilities/surfaces/surfaces.md` §3.2). The `edition` field is inert and unread.
  *
- * ⚠ **Only three data sources, deliberately.** The mockups carried "Expectations breached" and
- * "Datasets written" tiles; neither has a backing call — `ExpectationsService.list()` has no limit
- * parameter and no breach endpoint exists, and there is no dataset-write count at all. A landing page
- * that fetches every Expectation to count failures is the wrong trade, so those two tiles are NOT
- * built. Add them when the backend serves a cheap count, not before.
+ * **Five data sources, each behind a CHEAP call.** The two the mockups carried and the first build dropped —
+ * "Expectations breached" and "Datasets written" — landed 2026-09-16 (`HOME-TILES-1`) only once the backend
+ * served a count for each (`GET /expectations/breached-count`, `GET /signals/count?type=dataset.write`): a
+ * landing page that fetched every Expectation to count failures was the wrong trade, and neither tile is
+ * computed client-side. Both hide, rather than show a dash, when their call fails.
  */
 @Component({
     selector: 'inspecto-home',
@@ -72,6 +74,8 @@ export class HomeComponent implements OnInit {
     private jobs = inject(JobsService);
     private objects = inject(ObjectsService);
     private approvalsApi = inject(ApprovalsService);
+    private expectations = inject(ExpectationsService);
+    private events = inject(EventsService);
     private spaces = inject(SpacesService);
     private router = inject(Router);
     private toastr = inject(ToastrService);
@@ -119,6 +123,9 @@ export class HomeComponent implements OnInit {
     readonly failedRuns = computed(() => this.runs().filter((r) => r.status === 'FAILED'));
     readonly openIncidents = this.incidents;
     readonly pendingApprovals = computed(() => this.approvals().filter((a) => a.status === 'PENDING'));
+    /** HOME-TILES-1: server counts; `null` = the call failed or the module is absent, and the tile hides. */
+    readonly breached = signal<number | null>(null);
+    readonly datasetsWritten = signal<{ count: number; datasets: number; capped: boolean } | null>(null);
 
     /** A genuinely empty install: the run history loaded and holds nothing. */
     readonly firstRun = computed(() => !this.loading() && !this.runsUnavailable() && this.runs().length === 0);
@@ -212,6 +219,17 @@ export class HomeComponent implements OnInit {
         this.approvalsApi.list(20).subscribe({
             next: (a) => this.approvals.set(a),
             error: () => this.approvals.set([]),
+        });
+
+        // HOME-TILES-1: two more cheap counts. Silent on error — a missing write root or an older backend
+        // hides the tile; the numbers that ARE shown are always the server's, never a client-side sweep.
+        this.expectations.breachedCount().subscribe({
+            next: (r) => this.breached.set(r.count),
+            error: () => this.breached.set(null),
+        });
+        this.events.signalCount('dataset.write', Date.now() - 24 * 3_600_000).subscribe({
+            next: (r) => this.datasetsWritten.set(r),
+            error: () => this.datasetsWritten.set(null),
         });
     }
 
