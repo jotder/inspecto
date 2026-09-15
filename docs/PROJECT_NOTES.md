@@ -1281,6 +1281,26 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   interfaces inline in the service. Interceptor chain: first-position `v1Interceptor` (shape-guarded envelope
   unwrap), `spaceInterceptor` (space id **after** `/v1`), `errorInterceptor`, and `auth.interceptor` — the
   auth flow is a **no-op on Personal** (OIDC only when `bootstrap.features.authMode` says so, W6d).
+- 🔴 **A surface shown BEFORE sign-in cannot use the ordinary services** (2026-09-15, landing pages).
+  `GET /settings/branding` sits behind the auth gate, so `BrandingService` — which every in-shell surface
+  uses — **401s on the sign-in page**, the one screen where deployment branding matters most. Branding now
+  rides `GET /bootstrap` (public) and `SessionService.branding` exposes it; ⛔ do not "simplify" the sign-in
+  page onto `BrandingService`. The general rule: on a pre-sign-in surface, `/bootstrap` and `/health` are the
+  only routes you may assume, and anything else must be checked against `ControlApi.PUBLIC_PATHS`.
+- 🔴 **Nothing in the running system knows the product version** (2026-09-15). No Java file reads
+  `Implementation-Version`, no route serves a version, `environment.ts` has no version field, and
+  `inspecto-ui/package.json` says **21.0.0** — the Angular scaffold's number, **not** the product's
+  `4.0.0-SNAPSHOT`. ⛔ Never print `package.json`'s version as the product version. BACKLOG `HOME-VERSION-1`.
+- ⚠ **A javadoc can name a dev switch that does not exist.** `session.service.ts` documents a
+  `mockAuthMode: 'oidc'` switch for previewing the OIDC arm; **grep finds that one comment and zero
+  implementations**, and `tools/run-backend.ps1` passes no `-Dauth.mode` either — so the sign-in page cannot
+  be opened locally at all without editing source, and it shipped unit-tested but never seen in a browser
+  (BACKLOG `SIGNIN-PREVIEW-1`). Check that a switch a comment promises is real before planning to use it.
+- ⚠ **`TestBed` refuses a second `configureTestingModule` once instantiated**, so a spec helper that builds a
+  fixture can only be called **once per `it()`** — the documented house rule. When a test genuinely needs two
+  fixtures (gating read in `ngOnInit` cannot be un-called by flipping a signal afterwards), call
+  `TestBed.resetTestingModule()` at the top of the helper and say why; otherwise build one fixture and mutate
+  its stub signals.
 - **Feature panes** in `src/app/modules/admin/<feature>/`, **signals + OnPush**. A pane can be reused across
   routes via `ActivatedRoute.snapshot.data` (Cases/Issues = one `ObjectsComponent`).
 - **Second "lens" on a pane = `mat-button-toggle-group`, NOT a new nav item** (Pipelines `flow|combined`, Jobs
