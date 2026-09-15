@@ -114,7 +114,9 @@ paid for violating them.
   Beside it, the external-facing [`stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md`](stakeholders/INSPECTO_ENTERPRISE_WHITEPAPER.md)
   (v1.2, 2026-09-11) — written to the landscape's §4 claims register, with a release-basis note naming the
   Sprint 8 rows it assumes shipped; its `.docx` is generated, gitignored.
-- [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks.
+- [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks;
+  [`roadmap/WAREHOUSE_TARGETS.md`](roadmap/WAREHOUSE_TARGETS.md) — Inspecto as the ETL/ELT feeder into
+  warehouses and lakes: four delivery mechanisms, a grounded target matrix, build order (2026-09-15).
 
 ## In-flight plans (`superpower/` — a plan lives here ONLY while its work is active)
 

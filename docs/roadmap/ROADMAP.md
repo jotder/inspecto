@@ -113,6 +113,8 @@ The single most important item for commercialization.
 | ~~L4~~ | ✅ **Push/event-notification discovery — SHIPPED 2026-07-08 as `ACQ-6`, not Later.** `POST /collectors/{id}/notify` triggers an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. 🔴 Corrected 2026-09-09 (docs-consolidation step 6): this row's stated trigger — "a source that emits change notifications" — had already been met and the work delivered fourteen months of roadmap-time earlier than this table claims. | — | — |
 | L5 | **Cross-unit parallelism / Stage-2 streaming** — finer-grained parallelism within a run | M | A workload bottlenecked on per-unit sequencing |
 
+| L6 | **Inspecto as the warehouse feeder** — outbound export job (`EXPORT-1`), Iceberg/Delta sink via DuckDB's writers, `JdbcSink`, outbound connector SPI; the target matrix and build order are in [`WAREHOUSE_TARGETS.md`](WAREHOUSE_TARGETS.md) | S → M per step | A customer whose warehouse is the system of record and who needs the quality gate before the load (2026-09-15) |
+
 **Guiding rule for Later:** these are deliberately deferred against the single-JVM, crash-isolated ethos. The seams are kept open (stateless engine, pluggable stores, stateless-JWT auth), so none of them require a rewrite when pulled forward — only assembly.
 
 ---
