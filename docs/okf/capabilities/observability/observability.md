@@ -161,9 +161,16 @@ widgets bound to them (`datasetId`) → tiles (`dashboard.tiles[].widgetId`)`, e
 already exists and that `ComponentIntegrity` already validates. It lives in
 `inspecto-ui/src/app/inspecto/signal/stale-tiles.ts`, framework-free and structurally typed.
 
-⚠ **The granularity that follows, stated rather than hidden:** a disruption marks **every** Dataset fed by
-that pipeline, not only the rows or column that gapped. A deliberate over-approximation — a tile wrongly
-marked stale costs a second look, a tile wrongly left clean is a number someone acts on.
+✅ **Store granularity where the inputs allow it** (`STALE-TILES-PRECISION-1`, 2026-09-15). The resolver
+(`staleStoresOf`) now projects every disruption and every commit onto STORES first and compares per store: a
+`SEQUENCE_GAP` carries `attributes.stores` (the sinks its pipeline produces, comma-joined — `AcquisitionTelemetry`),
+and a `dataset.write` Signal is read as a STORE-level commit through `GET /signals?type=dataset.write`
+(`EventsService.signals`, projecting the Signal's `subject` — which `signalToEvent` used to drop). So a pipeline
+that produces two stores and refreshed one no longer clears both. An input with no store falls back to
+`pipeline → produces[]`, the original over-approximation — a tile wrongly marked stale costs a second look, a
+tile wrongly left clean is a number someone acts on. 🔴 Two claims corrected: the imprecision lived in this
+resolver's inputs (raw `BATCH_COMMITTED` Events, not Signals) as much as in the emitters; and `FILE_QUARANTINED`
+has **no emitter anywhere** — it stays a declared trigger nothing produces.
 
 **Clearing is derived, not stored.** A pipeline is stale while its most recent disruption is *newer* than
 its most recent `BATCH_COMMITTED`. So "clear on the next successful run" is not a second mechanism that

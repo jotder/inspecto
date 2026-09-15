@@ -201,6 +201,16 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   deliberately **not** done in the resolver — at fire time it could only refuse what post-resolution
   validation already judges on the evidence (a STRING-yielding `$signal.<field>` legitimately carries a
   date). That check earns its keep at **author** time, in the picker.
+* **Every run leaves a parameter RECEIPT** (`DUCKLE-C4-PARAM-PROVENANCE-1`, 2026-09-15): `ParameterResolver`
+  keeps the layer that won each value (`args` · `bind` · `config` · `config:flow` · `deduce` · `default`) and the
+  LOWER layers that also carried a *different* value (`Resolution.provenance`, `{source, overrode:[…]}`), and
+  `JobService` writes it as a `params` run artifact (`GET /jobs/{name}/runs/{runId}/artifacts`, kind `params`,
+  `detail = {name → {source, overrode}}`) AFTER the run body — so a run's output artifacts keep their positions
+  (`artifacts[0]` stayed "the output" for existing readers) — and whether the run succeeded or threw. ⛔ It is
+  NOT an output: `latestArtifacts` (the outputs listing and `$upstream(...)`) excludes kind `params`. Layer NAMES only, never values — a
+  `secret` is a non-question, and "was a token supplied, and by whom" is exactly what the names answer. Two
+  surfaces agreeing is not an override. ⚠ Not built here: the stable rejection codes (`param:unknown`,
+  `param:missing`) the row also named — rejections are still prose (`JobService` joins the three lists).
 * **`ParameterDecl` carries the whole rendering + validation contract** (eleven components: `label`,
   `tier`, `options`, `pattern`, `min`/`max`, `placeholder`, `group`, `multi`, `secret`, `expressions`, …),
   and `JobTypeDescriptor.toMap()` serves it. A 6-arg delegating constructor kept all 16 raw call sites

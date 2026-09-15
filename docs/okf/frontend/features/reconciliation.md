@@ -84,6 +84,17 @@ what drifts first. ⚠ The Board writes ONE instant to both `mergeBreaks(…, ru
   post-construction (`JobService.objects(...)`, resolved lazily since the built-in is constructed
   before the Object Engine exists). Break-level assignment stays with Cases.
 
+**The rows behind a cardinality break** (`RECON-CARDINALITY-2`, 2026-09-15). A `cardinality_break` carries per-side
+ROW COUNTS; the rows themselves are gone by the time the break is detected, because `ReconService.sideSql`
+pre-aggregates with `GROUP BY`. They are re-selected ON DEMAND: `POST /recon/rows {id|config, key:{col:val…}, side?,
+limit?}` (`ReconService.rows`) returns each side's raw physical rows for ONE key — every column the relation exposes,
+capped with `truncated` — and the detail page's tree grid gains a *Show the rows behind this break* action on
+cardinality rows, rendering both sides side by side. `ReconBreak.keyValues` keeps the server's key map so the
+follow-up call never parses the display string. ⛔ Deliberately NOT a pairing: which anchor row matches which
+compared row for an N:M key is undefined until a pairing rule is chosen (the archived plan's open question), so
+the two row sets are shown and nothing is claimed about pairs. ⛔ The key must name every key column — a partial
+key is a 422, never a guess. Read-shaped (recorded in `CapabilityManifest.EXEMPTIONS`).
+
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
 review sheet: [`reviews/reconciliation.md`](../../../archived-documents/superpower-reviews/reconciliation.md).

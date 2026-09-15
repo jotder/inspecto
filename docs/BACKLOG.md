@@ -1,6 +1,6 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-15 (dependency pass, latest) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), `HOME-VERSION-1` SHIPPED (manifest → `/bootstrap` → sign-in footer), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+**Updated:** 2026-09-16 (next unblocked set) — five M rows CLOSED and as-built homed: `RECON-CARDINALITY-2` (rows behind a break, on demand), `STALE-TILES-PRECISION-1` (store granularity), `INCIDENT-KPI-MTTD-1` (narrower anchor, no placeholder), `DUCKLE-C4-PARAM-PROVENANCE-1` (a `params` run artifact), `AGT-ARTIFACT-1` (four draft skills answer with a `draft` artifact; `pipeline_author` stays out). (dependency pass, 2026-09-15) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), `HOME-VERSION-1` SHIPPED (manifest → `/bootstrap` → sign-in footer), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
 every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
 `DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
 `ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
@@ -243,9 +243,10 @@ for ONE clause and blocked for the rest (noted per row).
   *(S items closed the same day: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`,
   `SCHEMA-FORM-EMPTY-LIST-1`, `SIGNIN-PREVIEW-1`, API v1 jlink re-verify.)*
 - M — `TYPEFLOW-DATASET-COLUMNS-1` steps 3+4 (⚠ relies on the dead-seam verdict (2) = keep `temporalColumn`) ·
-  `RECON-CARDINALITY-2` · ~~`HOME-VERSION-1`~~ (closed 2026-09-15) · `AGT-ARTIFACT-1` · `INCIDENT-KPI-MTTD-1` · `STALE-TILES-PRECISION-1` ·
-  `AGT-5` per-tool dry-run seam · Pipeline graph pre-materialise cap + §6 step-2 parity gate · `DUCKLE-C4` ·
+  `AGT-5` per-tool dry-run seam · Pipeline graph pre-materialise cap + §6 step-2 parity gate ·
   `HOME-TILES-1` (backend counts first) · `DUCKLE-C2` (P3).
+  *(M items closed 2026-09-15/16: `HOME-VERSION-1`, `RECON-CARDINALITY-2`, `STALE-TILES-PRECISION-1`,
+  `INCIDENT-KPI-MTTD-1`, `DUCKLE-C4-PARAM-PROVENANCE-1`, `AGT-ARTIFACT-1`.)*
 - L — `AUTHORING-REDESIGN-1` (c) only · canonical bundle export/import · Onboarding↔Pipeline W4/W5 · Parsing
   Stage-1 (ASN.1 module ref) · Platform Services Stage 2 · `EXECUTION-RESIDUALS` X1 deferrals · Completeness KPI
   K1/K2/K4 · Job framework space-to-space comparison · D6 spec-authoring UI · Signal/Decision S8 · Security
@@ -867,31 +868,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⛔ **The new-dependency question is NOT answered by the trigger** — that was the point of gating it
   this way. There is **no spreadsheet library in any pom**, and picking one is an operator sign-off
   filed as an owed input in §1. ⇒ this row cannot start until that name exists.
-- **P2** · **`RECON-CARDINALITY-2` — row-level pairing for a cardinality break.** All that survives of
-  `RECON-CARDINALITY-1`, which was **CLOSED 2026-09-15**: tier 1 shipped whole and was verified in code —
-  `ReconService.java:76` (the `Cardinality` enum), `:448-451` (the `cardinality_break` column, emitted only
-  when the spec is not `MANY_TO_MANY`), `:515` `cardinalityViolation` shared by both the summary and list
-  SQL so the two cannot diverge, `ReconConfigLoader.java:58-62` reached by **both** production callers
-  (`ReconRunJob:78`, `ReconRoutes:301`), and the client end at `recon-board.ts:86,160-163`.
-  Tier 2 is the demand-gated remainder: **which rows on each side formed the break**, not just that one
-  occurred. ⚠ It is not a display change — `ReconRoutes:194-195` promotes only `breakKey`/`breakType`, so
-  carrying pairs needs a wider Incident attribute shape first. ⛔ Demand-gated per §0: build when someone
-  asks by name.
-  → `okf/capabilities/incidents/incidents.md` · `archived-documents/plans-archive/recon-cardinality-plan.md`
-
-  🔴 **TRIGGER FIRED 2026-09-15 — no longer demand-gated, re-ranked P2.** Someone wants to see WHICH rows formed a cardinality break.
-  ✅ **And it got cheaper the same day.** Its stated prerequisite — a wider Incident attribute shape,
-  because `ReconRoutes:194-195` promotes only `breakKey`/`breakType` — is now **shared** with the
-  `(type, key, column)` parity decision on `BREAK-DEDUPE-GRAIN-1`, which needs the same widening.
-  ⇒ ⛔ **build the attribute shape ONCE, for both**; doing them separately means widening the same
-  structure twice and reconciling two spellings of a Break's identity.
-  🔴 **RE-GROUNDED 2026-09-15 — the shared prerequisite did NOT materialise.** `BREAK-DEDUPE-GRAIN-1`
-  shipped that day and widened the **identity** (a composite `breakId` attribute), which is a different
-  thing from the **evidence** this row needs. ⇒ The saving assumed above is *not* available: the Incident
-  now carries `breakId`/`breakKey`/`breakType`/`column`, and carrying which ROWS formed the break is still
-  this row's own work, added on top of that set. ⚠ The one thing genuinely settled for free is the
-  *spelling* of a Break's identity — build against `breakId`, do not invent a second one.
-
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
   ⬜ **RE-CONFIRMED NOT FIRED 2026-09-15** — every business relation in play is already expressed by
@@ -906,36 +882,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⛔ Do not add either tile client-side — the cost is the reason they were dropped. **Close when the backend serves
   a cheap count for either, and the tile lands with it.** → `okf/capabilities/surfaces/surfaces.md` §3.8
 
-- **P2** · **`AGT-ARTIFACT-1` — produce `AgentAskResult.artifact`** (the inverse pair: a live client consumer, no producer;
-  decided 2026-09-10: BUILD): the draft skills (`component_draft`, `pipeline_author`, `query_author`, `projection_author`,
-  `kpi_report_builder`) return their draft as the artifact the assistant UI already renders, so an answer is actionable
-  rather than prose. → `okf/capabilities/assistant/assistant.md` §3
-  **⚠ GROUNDED 2026-09-14 — the skeleton is CONFIRMED, the causal claim is WRONG, and the row understates the work.**
-  - ✅ The field exists: `AgentAskResult(..., Map<String,Object> artifact)` (`AgentAskResult.java:21`), nullable raw map.
-  - ✅ The client consumer is genuinely live, not aspirational: SSE `event: artifact` → `agent.service.ts:244`
-    → `models.ts:610` → `assist-panel.component.ts:142` renders `<inspecto-a2ui-render>` (`.html:43`).
-    The SSE relay `AgentRoutes.java:265` is already generic and needs no change.
-  - ✅ No producer: `InspectoIntelligenceAgent.toResult` (`:698`) is the only construction site, and its own
-    comment records that no eoiagent tool or session can emit an `INLINE_ARTIFACT` today. The only place
-    `AnswerKind.INLINE_ARTIFACT` is constructed is a test (`InspectoIntelligenceAgentTest.java:199`).
-  - ✅ All five skills exist **in this repo**, not upstream — `InspectoTools.java` at `:789` `component_draft`,
-    `:834` `query_author`, `:934` `projection_author`, `:1075` `kpi_report_builder`, `:1449` `pipeline_author`.
-  - 🔴 **"Return their draft as the artifact" does not describe a wiring change.** Those tools return
-    `{kind:"query"|"expectation"|…, draft:{…}}`, and `parseArtifact` whitelists
-    `ARTIFACT_KINDS = {text, kpi, chart, data-table}` (`InspectoIntelligenceAgent.java:74`) — so a draft
-    payload is **dropped as an unknown kind** even if it reached the seam. ⇒ the row needs a **translation
-    layer** from draft shape to a renderable artifact kind (or a new allowed kind), plus a producer step in
-    `toResult` / the `askStream` override (`:431-448`). ⛔ Do not scope this as "populate a field".
-  - ⚠ Not established: whether the external eoiagent SPI auto-promotes a tool return value into an
-    `InlineArtifact`. That code is outside this repo. The in-repo evidence makes "no producer" safe regardless.
-  ✅ **DECIDED 2026-09-14 — ADD A `draft` KIND.** The operator chose to widen `ARTIFACT_KINDS`
-  (`InspectoIntelligenceAgent.java:74`) rather than translate drafts into an existing kind. Reason for the
-  record: translating loses the draft's **structure**, and the structure is the whole point — a draft that
-  arrives as `text` or `data-table` can be read but never accepted, so "apply this draft" could not be
-  built later without redoing this. ⚠ The accepted cost: **the SPA's `a2ui` renderer must handle the new
-  kind**, so this row is no longer server-only — it is a producer step in `toResult` / the `askStream`
-  override (`:431-448`), the kind whitelist, **and** UI work. ⛔ Still not "populate a field"; the
-  grounding above stands unchanged.
 - **P2** · **API v1** — adopt the cursor-pagination seam on further list families as demanded (4 adopters live); adopt `ETags.respond` on further singleton reads as demanded; ~~Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed)~~ ✅ RE-VERIFIED 2026-09-15 — Standard package with embedded runtime boots and answers `/health` (as-built `okf/capabilities/editions/editions.md` §3.3). The remaining adopters are demand-gated. → `okf/backend/control-plane/api-v1.md`
 - **P2** · **Bundle / Exchange** — `requires` present-but-different classification; per-editor "load as draft" import — design first, likely multi-session (`BundleTransferService.write` commits straight through; no generic draft seam). ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/exchange-sharing.md`
 - **P2** · **Notifications** — D8 residuals: soft-bounce retry scheduling (distinction recorded, nothing retries); SES/SNS adapter (needs SNS subscription confirmation + a cert-chain fetch from a validated `amazonaws.com` URL — ⚠ outbound fetch from an unauthenticated callback path deserves its own review); GeoIP; auth-gated per-user prefs / security triggers. (Auto-disable policy is a §1 decision.) → `okf/backend/control-plane/events-metrics.md`
@@ -1029,43 +975,6 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ROWS formed a break is still its own work — on top of the `breakId`/`breakKey`/`breakType`/`column` set
   now written, not instead of it.
   → `ControlApiReconPromoteTest` (11 tests, 4 new) · `reconciliation-types.spec.ts` (5 new)
-- **P2** · ✅ **TRIGGER (operator, 2026-09-13):** an **SLA commitment names MTTD**. Until then it is a metric nobody reads,
-  and the "first signal" instant is a modelling choice better made against a real definition. ⚠ Re-grounded
-  2026-09-13: MTTR's anchor DID ship (`ATTR_RESOLVED_AT`) and does **not** confer one on MTTD — that is a
-  self-stamped transition, while MTTD needs a *pre-Incident* instant; `detectedAt`/`firstSignal` have zero hits.
-  · **`INCIDENT-KPI-MTTD-1` — MTTD still has no anchor.** Split out of `INCIDENT-KPI-MTTR-1` when its
-  MTTR half shipped 2026-09-11. Detection time needs a *first-signal* instant and nothing records one on an
-  Incident. The proposed anchor stands: **earliest Signal at the Incident's `causationId` root → the
-  Incident's `createdAt`**. ⚠ Adopting it means reading the event store from the analytics path, a seam
-  `ObjectService` does not have — it emits through `EventLog` but never queries. ⛔ Do **not** publish a
-  placeholder meanwhile: an undefined KPI is indistinguishable from a measured one once it is on a
-  dashboard, which is the failure the MTTR half was filed against. → `okf/capabilities/incidents/incidents.md`
-
-  🔴 **TRIGGER FIRED 2026-09-15 — no longer demand-gated, re-ranked P2.** An SLA commitment names MTTD.
-  ⚠ **The cost the row warned about is now due**: adopting the proposed anchor (earliest Signal at the
-  Incident's `causationId` root → its `createdAt`) means **reading the event store from the analytics
-  path**, a seam `ObjectService` does not have — it emits through `EventLog` but never queries.
-  ⛔ And the standing refusal holds while that seam is built: **do not publish a placeholder MTTD.**
-  An undefined KPI is indistinguishable from a measured one once it is on a dashboard, which is the
-  exact failure the MTTR half was filed against.
-- **P2** · ✅ **TRIGGER (operator, 2026-09-13):** the first **false-stale complaint** at pipeline granularity. The shipped
-  badge is correct but coarse; coarse-but-correct is only imprecise, so it waits until someone is actually misled.
-  · **`STALE-TILES-PRECISION-1` — narrow the stale badge below pipeline granularity.** ✅ The badge
-  SHIPPED 2026-09-11 on a **pipeline** anchor (operator's call over two larger options). ⚠ The residual is
-  the granularity that follows: a disruption marks **every** Dataset fed by that pipeline, not only the
-  rows or column that gapped. Narrowing it is a BACKEND change, not a resolver change — the emitters must
-  carry a store/Dataset identity on the Signal's `subject` `Ref` (the `Ref` vocabulary already reserves a
-  `tiles` relation, unused). ⛔ Also unbuilt and deliberately so: **quarantine emits no Signal at all**, so
-  a quarantined file is only caught via the `FILE_QUARANTINED` event. Take this only if operators report
-  the over-approximation as noise — it is a correct-but-wide badge, not a wrong one.
-  → `okf/capabilities/observability/observability.md` §3.1
-
-  🔴 **TRIGGER FIRED 2026-09-15 — no longer demand-gated, re-ranked P2.** An operator has been misled by the badge's pipeline-level granularity.
-  ⚠ **This is a BACKEND change, not a resolver change** — the emitters must carry a store/Dataset
-  identity on the Signal's `subject` `Ref`. ✅ **Build it with the `Ref` work from
-  `DATASET-SELF-TRIGGER-1`**, whose 2026-09-15 decision introduces a structured `Ref` `{kind, id}` +
-  owning pipeline on the same signal family — one vocabulary, not two. ⛔ Still deliberately out of
-  scope: quarantine emits no Signal at all.
 - ~~**P2** · **`CATALOG-WIDGET-NODES-1` — Widgets and Dashboards are not Catalog nodes**~~
   ✅ **SHIPPED 2026-09-13.** `NodeKind` gained `DATASET` / `WIDGET` / `DASHBOARD`, `EdgeKind` gained
   `BINDS_TO`, and `MetadataGraphBuilder.addStudioLayer` wires `DASHBOARD → WIDGET → DATASET` with
@@ -1427,42 +1336,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   value; **a refused run still records its profile**.
   ⚠ Largest of the adopted set — a new Expectation kind *plus* profile storage *plus* accept/clear ops.
   `FileSequenceGaps` is the nearest cousin to model the kind on. → Expectation kinds
-
-- **P2** · **`DUCKLE-C4-PARAM-PROVENANCE-1` — record where a parameter value came from, and what it
-  overrode.** Adopted 2026-09-15 from duckle §1 C4.
-  🔴 **Regrounded 2026-09-15 — this row's `secret` claim is REFUTED and its "cheapest of the eight" ranking
-  is wrong.** It says *"It needs a `secret` ParamType, which does not exist"*: `ParameterDecl.java:30-38`
-  already carries a `secret` **boolean** — orthogonal to type, which is the better design — with a working
-  masker at `JobRoutes.maskSecrets:207-222`. ⚠ **The real gap is that masking is applied to the job-detail
-  GET only**: `JobService.java:1236` logs the fully resolved **unmasked** map, and
-  `ParameterResolver.itemViolation:117-134` embeds raw values in rejection messages. That is a leak on two
-  paths, and it is the part worth doing first.
-  ⚠ The provenance half is larger than "cheap": the winning layer **is** computed in
-  `ParameterResolver.value():160-192` and then **discarded** — `Resolution` is a plain map — and there is no
-  receipt to attach it to (`JobRun` carries no params field). ⛔ Secret masking is in scope; **owner-routed
-  anything is not** — see the shared ownership blocker on `DUCKLE-C1-DATASET-FRESHNESS-1`.
-  ✅ The row's one confirmed claim: `ParameterResolver.resolve` really is the single boundary — exactly two
-  production callers (`JobService.java:1209`, `PackTestHarness.java:162`). Two surfaces binding one parameter: **later wins** (a
-  documented rule, not an emergent one), and the receipt records `{source, overrode:[…]}`; only a
-  *differing* value counts as an override; **`secret` is a declared type replaced with `***` in history and
-  never dropped**, so "was a token supplied?" stays answerable; all problems reported at once with stable
-  codes (`param:unknown`, `param:missing`); undeclared names **refused, not ignored**.
-  ✅ **Cheapest real win of the eight** — the parameter contract already shipped and
-  `ParameterResolver.resolve` is the single boundary every surface funnels through (confirmed 2026-09-15
-  by duckle S8), so this is additive at one seam. ⚠ It needs a `secret` ParamType, which does not exist —
-  the same missing type the scale-out credentials decision ran into. → Job parameter contract · Run receipt
-
-  ✅ **SPLIT 2026-09-15 — the secret-masking half left this row as `PARAM-SECRET-LEAK-1`, which was
-  BUILT and retired the same day** (as-built: `okf/backend/control-plane/jobs.md` §ParameterDecl). ⇒ ⛔ **do not rebuild masking here**; this row is
-  now the provenance work only.
-  ⚠ Reason for the split: the leak is two call sites routed through a masker that already exists,
-  while provenance needs a receipt that does not (`JobRun` carries no params field) — so leaving them
-  joined meant a live secret leak shipping at a feature's pace.
-  ✅ **And the ownership blocker is answered** (see `DUCKLE-C1` above): owner = `Subject` where
-  present, `"appUser"` where absent. ⇒ recording *who* supplied an overriding value is now
-  expressible. ⚠ The rest of the row's regrounding stands unchanged — the winning layer **is**
-  computed in `ParameterResolver.value():160-192` and then **discarded**, and `ParameterResolver.
-  resolve` really is the single boundary (exactly two production callers).
 
 - **P3** · **`DUCKLE-C10-ADMISSION-POOLS-1` — named execution pools are ADMISSION ONLY.** Adopted
   2026-09-15 from duckle §1 C10. A pool answers "may this start now" and **never widens thread or memory

@@ -195,12 +195,16 @@ Three rules, each pinned by `ObjectServiceTest`:
 * **The definition travels with the number.** Both blocks carry a `definition` string and the KPI tiles
   render it; a KPI whose meaning is implied is what this row exists to stop.
 
-⛔ **MTTD is NOT built** and no number is published for it — deliberately, because it has no anchor.
-Detection time needs a *first-signal* instant, and nothing records one on an Incident today. The proposed
-anchor is **the earliest Signal at the Incident's `causationId` root → the Incident's `createdAt`**;
-adopting it means reading the event store from the analytics path, which crosses a seam `ObjectService`
-does not have today. Tracked as `INCIDENT-KPI-MTTD-1`. Publishing a placeholder would be worse than the
-gap: an undefined KPI is indistinguishable from a measured one once it is on a dashboard.
+✅ **MTTD is built on a NARROWER anchor than first proposed** (`INCIDENT-KPI-MTTD-1`, 2026-09-15). The proposed
+anchor — the earliest Signal at the Incident's `causationId` root — needs an event-store read on the analytics
+path, a seam `ObjectService` does not have, and this row refused to fake it. What IS recorded without any new
+seam is the triggering event's OWN time: `EventObjectBridge.promoteGap`/`promoteImbalance` stamp
+`ObjectService.ATTR_OCCURRED_AT` (`occurredAt`, epoch ms) from `Event.ts()` at promotion, and `analytics()` adds
+`mttd = {count, avgMs, definition}` = `occurredAt → createdAt` over objects that carry the stamp. Same honesty
+rule as MTTR: `count` is the denominator, unstamped objects (hand-opened, Alert-Rule-opened) are EXCLUDED, so a
+deployment with no bridge-promoted objects reports count 0 — a true statement. The Case-analytics dialog shows an
+MTTD tile with the server's own definition. ⚠ Still absent: **MTTA** — nothing stamps an acknowledged-at
+(`ack()` records no timestamp), so it needs its own seam before it could exist.
 
 ### How a Break can be promoted when no Break is stored
 

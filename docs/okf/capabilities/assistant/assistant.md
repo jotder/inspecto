@@ -116,6 +116,21 @@ The Assistant is deliberately **two** things:
 older `com.gamma.agent.kernel.tool.ToolRegistry` (the reflex skills' path, e.g. `AlertRuleTool`,
 `SqlOracleTool` in `inspecto-agent`). Nothing bridges them, and adding a tool means choosing a side.
 
+### 3.1b Draft skills answer with an ARTIFACT (`AGT-ARTIFACT-1`, 2026-09-15)
+
+`AgentAskResult.artifact` had a live client consumer (Agent Chat mounts `<inspecto-a2ui-render>`) and NO producer:
+the pinned eoiagent jars never construct an `InlineArtifact` — every `AgentAnswer` is built with a null artifact —
+so the producer lives here and cannot read the draft off the answer. `DraftArtifacts.recording(tool)` wraps the
+draft skills (`component_draft`, `query_author`, `projection_author`, `kpi_report_builder`) in
+`InspectoToolProvider.tools()`; an `ok` result carrying `draft` is remembered per `RunId` (the id eoiagent threads
+through every `ToolCall` and the final answer), and `toResult` attaches it as `artifact: {kind: "draft", title,
+config: {tool, draftKind, type, clean, findings, draft}}` when the answer has no inline artifact — consumed on
+read, so a later answer never re-attaches a stale draft. On the stream it is emitted as an `artifact` frame
+BEFORE `complete`, the order the client already pins. The renderer's closed allow-list gains `draft`: the draft
+as indented JSON via `textContent` (never HTML), the validator verdict, the anchored findings. ⛔ "Apply this
+draft" is deliberately not offered. ⚠ `pipeline_author` is NOT wrapped: its result has no `draft` key (the graph
+rides under `flow`) — aliasing it is a decision, not a one-liner.
+
 ### 3.2 The assist agent (AGT-1)
 
 **The SPI is core, the implementation is not.** `AssistAgent`
