@@ -508,7 +508,7 @@ D13 (operator, 2026-07-25) parked every parser/grammar field's `tier:` assignmen
 onboarding-observation session** — ⛔ *explicitly not an engineering guess*. The session has **not
 happened**. The full kit (session protocol, per-lane task script, per-field capture sheets, field
 inventory) is provenance in
-[`archived-documents/plans-archive/parser-field-tiers-interview-plan.md`](../../../archived-documents/plans-archive/parser-field-tiers-interview-plan.md),
+[`superpower/parser-field-tiers-interview-plan.md`](../../../superpower/parser-field-tiers-interview-plan.md),
 archived 2026-09-09 by operator decision. ⚠ **The kit is still runnable and the session is still owed** —
 archived here means "not maintained", not "abandoned". Board row: `BACKLOG.md` §2 *D13 parser field tiers*.
 

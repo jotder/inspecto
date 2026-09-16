@@ -339,9 +339,15 @@ final class CapabilityManifest {
      * so an exemption can never accidentally widen to a route it was not written for.
      */
     static boolean isExempt(String method, String pattern) {
+        return exemptionFor(method, pattern) != null;
+    }
+
+    /** The recorded exemption for {@code (method, pattern)}, or {@code null} — the inventory needs its
+     *  category and reason, not merely the fact that one exists. */
+    static Exemption exemptionFor(String method, String pattern) {
         for (Exemption e : EXEMPTIONS)
-            if (e.method().equals(method) && e.pattern().equals(pattern)) return true;
-        return false;
+            if (e.method().equals(method) && e.pattern().equals(pattern)) return e;
+        return null;
     }
 
     static Set<String> capabilities() {

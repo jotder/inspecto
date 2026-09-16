@@ -43,9 +43,47 @@ final class AuditLogRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/audit/search", (e, m) -> search(api, e));
         api.get("/audit/export", (e, m) -> export(api, e));
+        // 4d: the route inventory the evidence report and an auditor's own probe both consume. A READ,
+        // therefore open by policy (3e) - it exposes the SHAPE of the surface, never data behind it.
+        api.get("/audit/route-inventory", (e, m) -> routeInventory(api));
     }
 
     /** {@code GET /audit/search?type=AUDIT|ACCESS_DENIED&limit=&offset=&pipeline=&correlationId=&q=&from=&to=} */
+    /**
+     * {@code GET /audit/route-inventory} — every registered route with the posture it declared
+     * (route-gating plan step 4d): a capability, or an exemption with its category and reason.
+     *
+     * <p>⚠ This is the RUNTIME table, from the router itself, so it reports what this server actually
+     * deployed — including optional modules a source scan cannot see. The digest is the one the boot event
+     * records, so an auditor can tie a running server to the event that announced its shape.
+     */
+    private static Object routeInventory(ApiContext api) {
+        if (!(api instanceof ControlApi control))
+            throw new ApiException(501, "route inventory is not available on this host");
+        List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
+        for (ControlApi.RouteRow r : control.routeInventory()) {
+            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("method", r.method());
+            row.put("pattern", r.pattern());
+            row.put("posture", r.posture());
+            if (r.capability() != null) row.put("capability", r.capability());
+            if (r.exemptionCategory() != null) {
+                row.put("exemptionCategory", r.exemptionCategory());
+                row.put("exemptionReason", r.exemptionReason());
+            }
+            rows.add(row);
+        }
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("digest", control.routeInventoryDigest());
+        out.put("counts", java.util.Map.of(
+                "total", rows.size(),
+                "gated", rows.stream().filter(r -> "gated".equals(r.get("posture"))).count(),
+                "exempt", rows.stream().filter(r -> "exempt".equals(r.get("posture"))).count(),
+                "openRead", rows.stream().filter(r -> "open-read".equals(r.get("posture"))).count()));
+        out.put("routes", rows);
+        return out;
+    }
+
     private static Object search(ApiContext api, HttpExchange ex) {
         return api.service().events().query(auditQuery(ex, EventQuery.DEFAULT_LIMIT))
                 .stream().map(Event::toMap).toList();

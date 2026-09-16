@@ -137,6 +137,13 @@ jobs:
       - name: Guard — every stated product count is derived from its contract
         run: node tools/check-doc-counts.mjs
 
+      # Route-gating evidence (compliance plan 4e). The table in compliance/evidence/route-gating.md is
+      # DERIVED from the route registrations; --check fails if the committed table has drifted from the
+      # code, so the evidence document cannot say something the system does not. It also fails outright
+      # on any mutating route that declares NO posture — the same hole the boot check closes at runtime.
+      - name: Guard — the route-gating evidence table matches the code
+        run: node tools/route-gating-report.mjs --check
+
       # NUL-byte guard (2026-09-10). Found while running scale-out spike S4: an agent reported one file
       # "drops out of a naive content grep"; measured, a recursive `rg -l --glob '*.java' 'SHARED'` over
       # the module listed three files and NOT the fourth, although that fourth declares `SHARED`. ripgrep

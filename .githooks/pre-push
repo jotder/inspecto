@@ -206,6 +206,13 @@ fi
 # derives. Cheap (no build, pure file reads) and it catches the commonest doc drift there is: a
 # number that was right when it was typed. ⚠ Adding a processor or a node type changes SIX doc
 # statements at once, which is the point — the guard names every one of them.
+# Route-gating evidence guard (compliance plan 4e). The evidence table is derived from the route
+# registrations; a drifted table is a compliance document making a claim the code does not support.
+if ! run_guard "tools/route-gating-report.mjs --check" "route-gating evidence guard"      "Run node tools/route-gating-report.mjs and commit the regenerated table."; then
+  echo "pre-push: refusing to push — the route-gating evidence table no longer matches the code." >&2
+  exit 1
+fi
+
 if ! run_guard tools/check-doc-counts.mjs "doc-count guard" \
      "CI runs it too — a drifted count there is a red master."; then
   echo "pre-push: refusing to push — a stated count no longer matches its contract (above)." >&2

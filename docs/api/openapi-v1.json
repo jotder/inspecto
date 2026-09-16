@@ -6975,6 +6975,20 @@
         },
         "x-generated" : true
       }
+    },
+    "/audit/route-inventory" : {
+      "get" : {
+        "tags" : [ "audit" ],
+        "summary" : "The route inventory this server registered",
+        "operationId" : "getAuditRouteInventory",
+        "description" : "Every registered route with the posture it declared: a capability, or an exemption with its category and reason. Reports what this server actually DEPLOYED (including optional modules a source scan cannot see), plus counts by posture and a digest over the sorted table — the same digest the route.inventory.snapshot audit event records once per boot, so a running server can be tied to the event that announced its shape. A read, therefore open by policy: it exposes the shape of the surface, never data behind it. Route-gating compliance plan step 4d; evidence in compliance/evidence/route-gating.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

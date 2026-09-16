@@ -481,6 +481,37 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         new AbsentMetricsRoutes().register(this);
         new AbsentEventsRoutes().register(this);
         new AbsentObjectRoutes().register(this);
+        announceRouteInventory();
+    }
+
+    /**
+     * <b>4c — one inventory event per boot.</b> After registration completes, record what the route surface
+     * IS: counts by posture plus a digest of the whole table. ⇒ the evidence store holds what was true at
+     * each boot, and a digest that differs between boots is itself a signal that the surface moved.
+     *
+     * <p>⚠ Additive and never fatal: an audit sink that is absent or failing must not stop a server from
+     * booting — the same posture every other emit on this path takes.
+     */
+    private void announceRouteInventory() {
+        try {
+            List<RouteRow> rows = routeInventory();
+            long gated = rows.stream().filter(r -> "gated".equals(r.posture())).count();
+            long exempt = rows.stream().filter(r -> "exempt".equals(r.posture())).count();
+            com.gamma.event.EventLog.current().emit(
+                    com.gamma.event.Event.builder(com.gamma.event.EventType.AUDIT)
+                            .source("audit")
+                            .message("route inventory: " + rows.size() + " routes, " + gated + " gated, "
+                                    + exempt + " exempt")
+                            .actor("system").actionCategory("configuration")
+                            .action("route.inventory.snapshot")
+                            .attr("routes", rows.size())
+                            .attr("gated", gated)
+                            .attr("exempt", exempt)
+                            .attr("openRead", rows.size() - gated - exempt)
+                            .attr("digest", routeInventoryDigest()));
+        } catch (RuntimeException e) {
+            log.warn("route inventory snapshot not recorded: {}", e.getMessage());
+        }
     }
 
     // ── dispatch: a composable middleware chain (S6) ─────────────────────────────
@@ -1115,6 +1146,44 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private final java.util.Set<String> registeredRoutes = new java.util.HashSet<>();
 
     /**
+     * <b>The runtime route inventory (route-gating plan step 4c/4d).</b> One row per registered route, with
+     * the posture it declared. ⚠ This is what a REGISTRATION knows and a source scan cannot: the test
+     * classpath does not carry the optional modules, so {@code CapabilityManifestTest}'s scan sees every
+     * module's code while this sees what is actually deployed. The evidence report needs both.
+     */
+    public record RouteRow(String method, String pattern, String capability,
+                           String exemptionCategory, String exemptionReason) {
+        /** How this route is declared, for counting: {@code gated}, {@code exempt} or {@code open-read}. */
+        public String posture() {
+            if (capability != null) return "gated";
+            if (exemptionCategory != null) return "exempt";
+            return "open-read";
+        }
+    }
+
+    private final List<RouteRow> inventory = new ArrayList<>();
+
+    /** The registered routes and their declared postures, sorted — the 4d read and the 4c digest's source. */
+    public List<RouteRow> routeInventory() {
+        return inventory.stream()
+                .sorted(java.util.Comparator.comparing(RouteRow::pattern).thenComparing(RouteRow::method))
+                .toList();
+    }
+
+    /**
+     * A stable digest over the whole inventory (4c). ⚠ Order-independent by construction — it hashes the
+     * SORTED table — so a digest that changes between boots means the route surface changed, not that two
+     * modules loaded in a different order. That is the whole signal.
+     */
+    public String routeInventoryDigest() {
+        StringBuilder sb = new StringBuilder();
+        for (RouteRow r : routeInventory())
+            sb.append(r.method()).append(' ').append(r.pattern()).append(' ').append(r.posture())
+              .append(' ').append(r.capability() == null ? r.exemptionCategory() : r.capability()).append('\n');
+        return ContentHash.of(sb.toString());
+    }
+
+    /**
      * The one registration path. ⚠ A second registration of the same {@code (method, pattern)} is refused
      * at boot. Matching is first-match, so a duplicate would never fail loudly — the later handler would
      * simply never run, and the loser could be either one depending on module order. That is the exact
@@ -1144,7 +1213,20 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                     + "added it, that module collides with a built-in route or registered after the stubs.");
         }
         requireDeclaredPosture(method, pattern, h);
+        recordPosture(method, pattern, h);
         routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
+    }
+
+    /** Add this route to the runtime inventory with whatever posture it declared. */
+    private void recordPosture(String method, String pattern, Handler h) {
+        if (h instanceof ApiContext.Gated g) {
+            inventory.add(new RouteRow(method, pattern, g.capability(), null, null));
+            return;
+        }
+        CapabilityManifest.Exemption ex = CapabilityManifest.exemptionFor(method, pattern);
+        inventory.add(ex == null
+                ? new RouteRow(method, pattern, null, null, null)
+                : new RouteRow(method, pattern, null, ex.category(), ex.reason()));
     }
 
     /**
