@@ -884,9 +884,11 @@ operator applies flags through their own deployment tooling; this screen tells t
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a
   default, a `Mode`, url/user/password properties and a root supplier. Budget it.
-- **`OperationalDb.Family` is now the roster** — the **fourteen** families' property names live there and nowhere
+- **`OperationalDb.Family` is now the roster** — the **fifteen** families' property names live there and nowhere
   else, so the store openers and the report cannot drift; naming a family off the list stops compiling.
   ⛔ They had been ten **string literals** across `ServiceStores` + `SpaceBootstrap`.
+  ⚠ This bullet read **fourteen** until 2026-09-16; `INBOX_REGISTRY` (scale-out §5.3) was added to the enum
+  without it. The count is `Family.values()` and nothing else — see §5.0-b, which depends on it.
 - ⚠ **Three irregularities the report models rather than flattens:** three different "is it on" spellings
   with three different defaults (`none` / `duckdb` / `memory` / `file`); a **`*.backend` starting with
   `jdbc:` IS the URL** and bypasses `OperationalDb` entirely (a third source beyond per-family and
@@ -911,6 +913,52 @@ operator applies flags through their own deployment tooling; this screen tells t
 - ⚠ **A new gated route must also be declared in `CapabilityManifest.ENTRIES`** — `CapabilityManifestTest`
   compares the manifest against the actual `withCapability` registration sites and fails the build on
   drift. It caught exactly this omission on the first full reactor run.
+
+### 5.0-b Who reads a `*.backend` — `resolve()` is a MIRROR, not the implementation (2026-09-16)
+
+*(Distilled from `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`, closed as REFUTED 2026-09-16 — the third
+successive framing of that row to fail grounding. This subsection is its only home.)*
+
+**Every family reads its own `*.backend` with its own `System.getProperty` at its own opener.** That is
+the house idiom, not an outlier, and "bypasses `OperationalDb.resolve()`" is therefore **not a defect
+signature** — it describes all fifteen:
+
+- `OperationalDb.resolve(Family, SpaceRoot)` / `resolveAll(SpaceRoot)` have **exactly one caller
+  repo-wide**: the diagnostic [`OperationalDbReport.java:47`](../../../../inspecto/src/main/java/com/gamma/service/OperationalDbReport.java).
+  **No store opener calls either**, and [`ServiceStores.java:62`](../../../../inspecto/src/main/java/com/gamma/service/ServiceStores.java)
+  says so outright — *"Mirrors OperationalDb.resolve"*. ⛔ Read `resolve()` as a **mirror of the openers
+  for reporting**, never as their implementation; changing it changes what the report says, not what the
+  service opens.
+- **The shared seam that IS load-bearing is `OperationalDb.urlFor(Family, default)`** — the URL half.
+  Every family goes through it, the acquisition ledger included
+  ([`SpaceBootstrap.java:37-39`](../../../../inspecto/src/main/java/com/gamma/service/SpaceBootstrap.java),
+  and `ServiceBootstrap.java:113` since `ACQUIRE-LEDGER-SHARED-URL-1`). ⚠ So "one source of truth" already
+  holds for URLs and does **not** hold for backends — they are separate questions, and only the second is open.
+- ⛔ **`resolve()` is public but unusable outside `com.gamma.service`**: it returns
+  `record Resolved` ([`OperationalDb.java:209`](../../../../inspecto/src/main/java/com/gamma/service/OperationalDb.java)),
+  which is **package-private** (`OperationalDb` is a `public final class`, so nested members are not
+  implicitly public the way an interface's would be).
+- ⛔ **Routing a leaf module's backend read through `OperationalDb` is a MODULE CYCLE.** `inspecto-acquire`
+  is a deliberate leaf; `inspecto/pom.xml:96` depends **on it**, and `OperationalDb.java:3` imports
+  `com.gamma.acquire.SecretResolver`. `Family` is invisible from the leaf and cannot be made visible
+  without inverting that dependency.
+- ⚠ **`Resolved` is not value-identical to what an opener needs**: it discards the raw backend string, and
+  [`AcquisitionLedgers.java:152-156`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)
+  needs it **verbatim** for its `StoreHealth` message. Substituting it — even inside the package — would
+  change an invalid-value message.
+- ⇒ **What a real de-duplication would cost:** a public, `SpaceRoot`-free accessor (e.g.
+  `backendOf(Family)` returning the raw trimmed string) in a module **below** `inspecto-acquire`, plus all
+  fifteen sites. ⛔ That is an architecture decision, not a clean-up, and nothing on the board authorises
+  it. Re-file only as that systemic question.
+- ⚠ **`AcquisitionLedgers.shared()` never returns null** — it falls back to `InMemoryAcquisitionLedger`, so
+  a caller **cannot tell memory from durable by nullness** and must ask `StoreHealth.of(spaceId)`, the one
+  place the resolved backend is still known. *(This is the fact the Completeness-KPI K4 design tripped over;
+  it survives the refutation.)*
+
+🔴 **The standing lesson: "X bypasses the central helper" is only a defect if the other N sites do not.**
+Count the sites before filing. This row was filed three times — first as *"not a `Family` member at all"*
+(false: `OperationalDb.java:147` declares it), then as *"duplicated resolution bypassing `resolve()`"*
+(true but not a defect), and only the site count settled it.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
@@ -1020,11 +1068,19 @@ evaluations can therefore open duplicates. Treat the dedup as best-effort and do
 
 ## Proving the JDBC stores on real PostgreSQL (DAT-6)
 
-`PostgresStateStoreTest` opens **twelve** JDBC-backed store classes against a real server and round-trips
-each one (nine until 2026-09-12, when A3 added the event store, delivery receipts and the dedup ledger —
-the last two being the gap DAT-6's own coverage claim had), plus the run lease since B1 — **thirteen**
-store classes in all. The roster is **fourteen** families; the one still uncovered is the
-**acquisition ledger**.
+`PostgresStateStoreTest` opens JDBC-backed store classes against a real server and round-trips each one
+(nine until 2026-09-12, when A3 added the event store, delivery receipts and the dedup ledger — the last
+two being the gap DAT-6's own coverage claim had), plus the run lease since B1 and `DbInboxRegistry` since
+2026-09-13 — **fifteen** store classes in all.
+
+✅ **The roster is fifteen families and COVERAGE IS NOW COMPLETE** (re-measured 2026-09-16). ⚠ This
+paragraph used to claim **thirteen** store classes, put the roster one short, and name the acquisition
+ledger as the one still uncovered — three numbers and a named gap, all stale: it is round-tripped at
+`PostgresStateStoreTest:292`, and `INBOX_REGISTRY` had joined the enum without this paragraph moving.
+🔴 **Do not re-open that "gap" — measure before believing it.** ⛔ And measure with a probe that can
+return a hit: a count of `Db*.open(` call sites reports **fourteen** and drops `DbDedupLedger`, which is
+built with `new DbDedupLedger(conn)` at `:479`. The two idioms are the whole discrepancy, and a probe
+matching only one of them reports an absence that is not there.
 
 ⚠ **That count is mirrored in nine places** and was missed by hand twice in two shifts, so
 `tools/check-family-count.mjs` now fails the build when any of them drifts from

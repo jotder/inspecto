@@ -15,12 +15,15 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **55<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
+> **54<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
 > shift, which filed four rows (it was 50 / 35 / 14 on the way in). ⚠ **The board grew while four items
 > were worked**, and that is the honest result, not a failure: all four were already SHIPPED or REFUTED,
-> and grounding them produced five residuals that were previously invisible. ⛔ One row
-> (`ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`, closed as refuted) is still counted above and is **pending
-> sweep** — its refutation text must land in an owning doc BEFORE the row is deleted.
+> and grounding them produced five residuals that were previously invisible. ✅ **The one row that was
+> pending sweep is now SWEPT** (2026-09-16): `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`, closed as refuted,
+> had its refutation distilled into [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md)
+> **§5.0-b** — which is its only home — and the row is deleted, hence 55 → 54 and 15 → 14 P3.
+> ⚠ **Homing it found two more count drifts**, in the doc that was receiving it and in the design doc that
+> carried the same claim: `OperationalDb.Family` is **fifteen** families, and both said fourteen/eleven.
 >
 > 🔴 **This line read “71 rows: 1 × P1 · 53 × P2 · 17 × P3” until 2026-09-16, and had been wrong for two days.**
 > That census dated from the 2026-09-15 fourth pass; the two shifts since closed, swept or re-ranked
@@ -137,8 +140,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 1<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 15<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 14<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -343,6 +346,13 @@ reason §1 has never carried one is that nobody thought to file one here. Four o
 CODE IS ALREADY COMPLETE — ⛔ so a shift reading those rows will look for something to build and find
 nothing, which is the shape that kept `DEPLOY-SERVICE-WRAPPER-1` looking open for days.
 
+✅ **The table is NINE live rows as of 2026-09-16** (everything else in it is struck). ⚠ It read ELEVEN
+until that sweep: **two answered inputs had been re-filed as new rows instead of striking the answered
+ones** — *job path semantics* and the *pre-materialise cap*, both answered earlier the same day, each
+appearing once struck-and-answered and once open. ⛔ **Answer an owed input by STRIKING its row, never by
+adding a second one** — §0's "nine owed inputs" was right the whole time while this table said eleven,
+which is the same census failure §0 records against itself, one section down.
+
 | Owed input | Blocks | Why only the operator can supply it |
 |---|---|---|
 | **Two dates** — when the off-repo backup bundle was deleted, and when the no-reuse check completed | the `SEC-INCIDENT-1` CC6.1 line (§2) | Both acts happened off-repo and leave no trace here. ⛔ A line dated *when it was written down* would misstate the evidence to an auditor |
@@ -357,11 +367,11 @@ nothing, which is the shape that kept `DEPLOY-SERVICE-WRAPPER-1` looking open fo
 | **FOUR route calls** (was three — `POST /objects` added 2026-09-15 when step 2b found manual Incident/Case creation is the `/recon/promote` question again; all four sit in `CapabilityManifest.PENDING_OPERATOR_CALLS`, and step 3 waits on them) — `POST /spaces/import` (does the `POST /spaces` "additive, recovery route" decision extend to bundle import?) · `POST /tags/rules/{id}/apply` (operate action → `canOperateRuns`, or collaboration act → open, like assignments?) · `POST /recon/promote` (which family owns *manually opening an Incident*? — `canAuthorWorkbench` has no precedent, `DecisionRoutes` uses `canOperateRuns`, `ExpectationRoutes` is ungated, no Incident capability exists) | `ROUTE-UNGATED-DEFAULT-1` step 2 → **step 3 (the fail-closed default) cannot land until these are decided**. ✅ **THREE OF THE FOUR ANSWERED 2026-09-16:** `POST /spaces/import` → **yes, the `POST /spaces` additive/recovery posture extends to bundle import** (stays open, exempted explicitly by step 3) · `POST /tags/rules/{id}/apply` → **collaboration act, leave OPEN** (consistent with assignments, not with run operation) · `POST /recon/promote` → **create the Incident capability the domain lacks** rather than borrowing `canOperateRuns` or `canAuthorWorkbench`; ⚠ it also gives the currently-ungated `ExpectationRoutes` a home, and ⛔ its dedupe lines are the ones the `(type, key, column)` decision rewrites — do both in one change. ✅ **AND `POST /objects` ANSWERED 2026-09-16: the same new Incident capability**, deliberately — it is the same act as `/recon/promote` (manually opening an Incident) and must not acquire a second precedent. ⇒ **ALL FOUR ROUTE CALLS ARE ANSWERED; `ROUTE-UNGATED-DEFAULT-1` step 3 is UNBLOCKED.** ⛔ Step 3 is still not a pure code change: the Incident capability does not exist in `Roles` yet, so it is created first, and the two Incident routes plus `ExpectationRoutes` adopt it together with the `(type, key, column)` dedupe rewrite. | Each was grounded 2026-09-15 and is a genuine question, not a formality — the handler, the comment and the tests point different ways. ⚠ `/recon/promote`'s dedupe lines are the same ones the `(type, key, column)` decision rewrites; do both in one change. → `archived-documents/plans-archive/route-gating-compliance-plan.md` §2a |
 | ~~**Confirm reads-open-by-policy as the COMPLIANCE position**~~ ✅ **AFFIRMED 2026-09-16** — write it into `compliance/controls-matrix.md` CC6: read routes are open **by policy**, because confidentiality is enforced at the Space/ABAC layer. ⇒ the route-gating plan's §3e is unblocked | `archived-documents/plans-archive/route-gating-compliance-plan.md` §3e · `controls-matrix.md` CC6 | ⚠ This is now an auditor-facing CLAIM, not only an engineering posture: if reads are ever gated, the matrix line moves with the code |
 | **Which framework(s) the evidence is written against** | the route-gating evidence report under `compliance/evidence/` (step 4e, not yet written) · the `controls-matrix.md` row mapping | SOC 2 Type II is assumed throughout the plan; ISO 27001 A.9 maps onto the same evidence but the matrix rows differ |
-| **Job path semantics** — should a job's relative `dir` / `data_dir` / `backup_dir` / `archive` / `target_dir` resolve against the **Space root** instead of the JVM's working directory? | `JOB-DIR-CWD-CONTAINMENT-1` (§5) | 🔴 Regrounded 2026-09-15: the row's own fix (pass `configDir`) is a no-op for jobs, and the gate and the run-time tasks BOTH resolve against the CWD today, so they agree. Moving only the gate splits them; moving both changes what every existing job's relative path means. That is a semantics call, not a bug fix. |
+| ~~**Job path semantics**~~ ✅ **SWEPT 2026-09-16 — this was an UNSTRUCK DUPLICATE** of the answered entry above, and doubly stale: the call was ANSWERED 2026-09-16 *and* `JOB-DIR-CWD-CONTAINMENT-1` **SHIPPED** the same day (§5, struck) | — | Its grounding survives on the shipped row, which is why this could be struck rather than migrated: *"the row's own fix (pass `configDir`) is a no-op"* is discharged by `ConfigSafetyValidator.checkJob` now USING `configDir`, and *"the gate and the run-time tasks BOTH resolve against the CWD"* by `PathJail.resolveJobPath` being the single rule called from both sides. ⛔ Checked before striking — a duplicate is only safe to strike when the surviving copy carries its grounding too |
 | **Eager or deferred resolution of an `s3://` `dirs.database`** — validate a profile at PARSE time (forces the deployment-root / pipeline-field split, because `CollectorService` parses every pipeline before `loadConnections` runs) or resolve at FIRST WRITE-TIME USE (no split; `dirs.database` is a plain `String` nothing resolves at parse) | scale-out phase C §5.4 bullet 6 (the credential surface that `AIRGAP-S3-EXTENSIONS-1` left behind when it closed 2026-09-15) | The bootstrap order is measured (`ServiceBootstrap.buildFrom:69` vs `:73-74`); which side of it to build on is a design posture only the operator sets. |
 | **Three verdicts for `SPEC-DEADSEAM-1`'s survivors** — (1) `ExpressionProvider`: retire the never-registered THIRD-PARTY extension point (the interface itself is the live expression engine) or keep it as SPI; (2) `DatasetRelation.temporalColumn`: keep unwired (an active plan's Q2 tie-break depends on its throw-on-two behaviour) or wire it; (3) `LegacyVendorFunctions`: it is in-repo load-bearing (ServiceLoader-registered, called by `RTDMS_ASN_Test`, the PLUGIN_GUIDE's worked example) — document it as the canonical plugin, or nothing | `SPEC-DEADSEAM-1` (§4) | The standing verdict ("DELETE all four") was refuted for three of four; two deletions would have removed live code. Each survivor is a different kind of question and no default is safe. |
 | **Approve or decline pinning a `ref:`** in `ci.yml` / `release.yml` | nothing yet — filed here so the question is not lost | 🔴 The 2026-09-15 decision to keep building eoiagent from its upstream tree makes the unpinned `ref:` **permanent rather than temporary**, which changes it from a tolerable shortcut into a standing exposure. Offered at the sitting; not answered |
-| **Pre-materialise cap: the UNIT and the REMAINDER policy** — bytes or files per cycle before the remote fetch; and whether files over the cap wait for the next cycle or are refused | the Pipeline graph row's pre-materialise cap (§3) | Nothing exists to extend (checked 2026-09-16): `IntakeGovernor` caps files AFTER listing; a pre-fetch cap needs the connector to expose size before download, which is a connector-SPI question, and the remainder policy is a product call. Filed 2026-09-16 |
+| ~~**Pre-materialise cap: the UNIT and the REMAINDER policy**~~ ✅ **SWEPT 2026-09-16 — this was an UNSTRUCK DUPLICATE** of the answered entry above (bytes; the remainder defers) | — | ⚠ Unlike the job-path duplicate, this one carried grounding the answered copy did **not** have, so it was **migrated, not deleted**: *"nothing exists to extend — `IntakeGovernor` caps AFTER listing, a pre-fetch cap is a connector-SPI question"* now lives on the **§3 Pipeline graph** row that has to build it |
 
 ✅ **Every DECISION is answered.** The six queued on 2026-09-14 were answered that day; the duckle triage
 (nine candidates adopted incl. C7, C5 struck), the route-gating approach and the `JAVA-INGEST-APPENDER-
@@ -812,6 +822,15 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   the default are being fixed on **different clocks, deliberately**. ✅ The cell was corrected 2026-09-15
   (`EDITIONS.md` `JOB-04`) and `SPEC-GREENCELL-1` retired with it; ⛔ **the soak and the default flip are
   THIS row's and remain open** — the doc fix does not discharge them.
+
+  ✅ **The pre-materialise cap's two owed inputs are ANSWERED 2026-09-16 (operator): cap on BYTES, and the
+  remainder DEFERS to the next run** — not refused, and not counted in files. Bytes because remote
+  bandwidth is the scarce resource a file count does not bound: one huge file blows through a count.
+  ⚠ **But the clause is not therefore startable, and the grounding says why** (checked 2026-09-16, moved
+  here from §1 when its answered entry was swept): **nothing exists to extend.** `IntakeGovernor` caps
+  files **AFTER listing**, and a *pre-fetch* cap needs the connector to expose a size **before** download
+  — ⛔ that is a **connector-SPI** question, not a governor setting. ⇒ the answer unblocks the product
+  call, and the SPI question is what remains.
 - ~~**P2** · **`GRAPH-LANE-MULTISCHEMA-1` — the graph lane cannot carry a multi-schema write**~~ ✅ **SHIPPED 2026-09-16** (filed, designed, decided and built the same day; `auto` flipped per the operator's call — multi-schema segment writes now divert to the graph lane by DEFAULT). 12 of the 13 parity-gate refusals are green; the fix was `ConsignmentIngestStrategy` alone (`segmentWrite` / `writeSinks` / `seedOfWrite` + three `segKey` overloads), pinned by `GraphLaneSegmentAdmissionTest`. As-built + the fixture gotcha (`segments:` is only parsed when `processing.ingester:` is set) in `archived-documents/plans-archive/graph-lane-multischema-design.md` §6. Original row text follows.
   - **P2** · **`GRAPH-LANE-MULTISCHEMA-1` — the graph lane cannot carry a multi-schema write** (filed 2026-09-16 from the parity-gate run; ⛔ **design-first**). 12 of the 13 refusals the §6 step-2 gate produced are this one gap: `events_etl` and `typed_record_etl` refuse with *the lifted graph's sink count (3) differs from sinks[] (1)*. **Grounded by re-running the gate, not read off the previous shift's note** — `mvn -o -pl inspecto-engine -am -Dingest.lane=graph -Dtest=… -Dsurefire.failIfNoSpecifiedTests=false test` ⇒ 20 run / 10 failures / 3 errors in `TypedRecordIngesterTest`, `ConsignmentIngestorPluginTest`, `ConsignmentIngestorPluginDeepTest`. ⚠ **The refusal message names an arity, but the gap is structural and bigger than the count.** A multi-schema config lifts to one `map → sink` chain PER SCHEMA (`PipelineLift.java:22-24`), so three sink NODES stand against one declared DESTINATION — and `graphLaneCarries` (`ConsignmentIngestStrategy.java:407-424`) then requires **every** sink to hang directly off **one** seed (`seedFeedingTheWrite:433`), which a per-schema lift cannot satisfy by construction: each branch has its own map. ⛔ So do **not** "fix the count" — widening line 417/209 to accept N sinks would admit a write whose seeding contract is still violated. The design question is whether the graph lane seeds PER BRANCH, and 🔴 **it is NOT established that the executor can already run per-schema trees once seeded** — `ConsignmentGraphRunner.hasRouteFedChain` (`:154-167`) deliberately EXCLUDES a multi-schema parser's `route:<key>` dispatch edges, calling them *"the flat lane's own per-schema trees"*, so per-schema execution on this lane is unproven either way. ✅ **ESTABLISHED 2026-09-16 by spike — and it refutes BOTH readings above, including my own ‘structural seeding’ one written the same day.** (1) The executor is **not** the gap: `PipelineExecutor.execute` already takes a MAP of seeds (multi-source shipped for the job lane, T32 Phase C), and seeded `{map_CALL, map_SMS}` it walked both trees and committed both branches (`committedBranches=[sink_CALL, sink_SMS]`, quarantine correctly skipped as control-fed). (2) 🔴 **And no multi-seed is needed at all: `UnionModeIngester:122-168` already loops PER SEGMENT**, materialising `transformed_<KEY>` and calling `writeAndTrace(… dbDir=database/<segKey>, writeScope=segKey)` once per segment — so every call is already ONE seed to ONE sink. The defect is only that the admission lifts the WHOLE pipeline on each such call and compares 3 sink nodes against 1 destination: **it asks at pipeline granularity while the caller works at segment granularity.** ⇒ the row is **no longer design-first and is much smaller than filed** — thread the segment key into the admission and admit the `map_<segKey> → sink_<segKey>` sub-chain. ⚠ `writeScope` is NOT usable as that key unguarded: it is `""` whole-batch (`CsvIngestStrategy:182`), the chunk base name when chunked (`NativeCsvStreamingEngine:279`), the segment key only in `UnionModeIngester:157` — discriminate on `cfg.schemas().segments().keySet()`. ⛔ **ONE operator call is owed first (§1): does `auto` start diverting multi-schema writes to the graph lane, or does only `-Dingest.lane=graph` carry them?** The gate goes green either way; the first flips the live write path for every `segments:` pipeline, the second creates a path only the gate exercises. Design: `archived-documents/plans-archive/graph-lane-multischema-design.md`. Files: `ConsignmentIngestStrategy.java` (`admittedLift`, `graphLaneCarries`, `seedFeedingTheWrite`, `flatReason`). **Verify:** `ConsignmentIngestorPluginTest`, `ConsignmentIngestorPluginDeepTest`, `TypedRecordIngesterTest` green under `-Dingest.lane=graph` (12 of the 13; `DecisionRuleWiringTest` waits on the sibling row). Blocks §2 Row 15's deletion half. → `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.4 · `okf/backend/pipeline-graph/pipeline-graph-design.md` §8
 > ⚠ **READING RULE for struck rows — the INDENTED bullet under a struck row is the ORIGINAL row text,
@@ -1515,48 +1534,11 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   decision owed first is whether the two readers should share one vocabulary at all.
   → `okf/backend/engine/catalog-vs-executors.md`
 
-- **P3** · **`ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1` — one setting, two sources of truth** (filed
-  2026-09-16 from the Completeness KPI K4 design pass). `AcquisitionLedgers.build(...)` (`:152`) resolves
-  `acquire.ledger.backend` through its **own** `System.getProperty`, duplicating the `OperationalDb.Family`
-  declaration at `OperationalDb.java:147` (`ACQUISITION_LEDGER(…, "acquire.ledger.backend", "memory",
-  Mode.DB_FLAG, …)`) and bypassing `OperationalDb.resolve()`. 🔴 **This also corrects a correction**: this
-  page previously asserted the acquisition ledger is *"not an `OperationalDb.Family` member at all"* — it
-  **is**; the real defect was always the duplicated resolution, not an absent declaration. ⚠ The practical
-  consequence is the one K4 tripped over: `AcquisitionLedgers.shared()` **never returns null** (it falls
-  back to `InMemoryAcquisitionLedger`), so a caller cannot tell memory from durable by nullness and must ask
-  `StoreHealth.of(spaceId)` — the one place the resolved backend is still known.
-
-  🔴 **REFUTED 2026-09-16 — the remedy is IMPOSSIBLE and the defect framing is wrong. This is the
-  THIRD successive framing of this row to fail grounding** (first *“not a `Family` member at all”*, then
-  *“duplicated resolution bypassing `resolve()`”*). The narrow fact is true — `AcquisitionLedgers.java:152`
-  and `OperationalDb.java:147` both name `acquire.ledger.backend`. Everything built on top of it is not:
-  ① **Routing the leaf through `OperationalDb` is a MODULE CYCLE.** `inspecto-acquire` is a deliberate
-  leaf (its pom says so); `OperationalDb` lives in `inspecto/`, whose `pom.xml:96` depends **on
-  `inspecto-acquire`** — `OperationalDb.java:3` even imports `com.gamma.acquire.SecretResolver`.
-  ② **There is no public API to route through**: `resolve()` is `public` but returns
-  `record Resolved` (`OperationalDb.java:209`), which is **package-private** ⇒ effectively
-  `com.gamma.service`-only.
-  ③ **“Bypassing `OperationalDb.resolve()`” is not a defect signature — it describes ALL ELEVEN
-  families.** `resolve()`/`resolveAll()` have exactly ONE caller in the repo, the diagnostic
-  `OperationalDbReport.java:47`; **no store opener calls it**, and `ServiceStores.java:62` says outright
-  *“Mirrors OperationalDb.resolve”*. `resolve()` is a MIRROR of the openers, not their implementation, so
-  the acquisition ledger is the eleventh instance of the house idiom, not an outlier.
-  ④ **The URL half is already centralised**: `SpaceBootstrap.java:37-39` resolves it via
-  `OperationalDb.urlFor(Family.ACQUISITION_LEDGER, …)` like every other family ⇒ the ledger already
-  participates in the roster at the production seam.
-  ⚠ Also not value-identical: `Resolved` discards the raw backend string, which `:154-156` needs verbatim
-  for its `StoreHealth` message, so even inside `com.gamma.service` the substitution would change an
-  invalid-value message.
-  ⇒ **What a real row would say:** one source of truth for `*.backend` is a **systemic 11-site** change
-  needing a public, `SpaceRoot`-free accessor (e.g. `backendOf(Family)` returning the raw trimmed string)
-  in a module **below** `inspecto-acquire`, since `Family` cannot today be referenced from a leaf.
-  ⛔ That is an architecture decision, not a de-duplication, and nothing on this board authorises it.
-  ⇒ **Disposition: this row is CLOSED as refuted.** Re-file only as the systemic question above.
-  ⚠ The same text in `superpower/completeness-kpi-k4-design.md` §R3 carries the refuted framing too.
-
 - ~~**P3** · **`ACQUIRE-LEDGER-SHARED-URL-1`**~~ ✅ **BUILT + VERIFIED 2026-09-16** (3805/0/0/8 in the MAIN checkout, `ServiceBootstrapLedgerTest` 3/3 observed to RUN). Fixed at `ServiceBootstrap.buildFrom` by resolving through `OperationalDb.urlFor` and registering, gated on `root.config() == null` so a per-space boot does not double-register. 🔴 **Reachability is what made it a live bug, not a theoretical one:** `SpaceBootstrap.java:39` was the ONLY registration site in the repo, and the legacy/CLI space never passes through it (`SpaceManager.single():74-79` ← `ServiceBootstrap.build:41` ← `CollectorService.fromArgs:1815`) ⇒ a single-tenant Standard deployment on a shared operational DB kept its dedup ledger in a local working-directory DuckDB file, SILENTLY, while every other family moved. ⚠ **The parent row's Maven cycle is REAL and was re-confirmed** (`inspecto/pom.xml:96`; `inspecto-acquire` is a leaf and `SpaceRoot` is invisible to it) — it does NOT block this row, because the resolution happens on the `inspecto` side and never inside the leaf. ⇒ **That distinction is the lesson: a refuted PARENT does not refute a child row; ground the child's own seam.** Original row follows.
   - **P3** · **`ACQUIRE-LEDGER-SHARED-URL-1` — a second source of truth for the ledger URL** (filed
-  2026-09-16 from the row above, and genuinely distinct from it: it is the **URL**, not the backend).
+  2026-09-16 from `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1` — which stood here until it was refuted and swept
+  to [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §5.0-b — and genuinely distinct
+  from it: it is the **URL**, not the backend).
   `AcquisitionLedgers.shared()` (`:39-41`) lazily builds from
   `System.getProperty("acquire.ledger.db.url", DEFAULT_DB_URL)`, **bypassing `OperationalDb.urlFor`** — so
   a space that was never run through `SpaceBootstrap` resolves a DIFFERENT url: no `-Dinspecto.db.url`

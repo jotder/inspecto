@@ -97,7 +97,12 @@ if (!expectedWord) {
 
 // ── 2. the prose ────────────────────────────────────────────────────────────────────
 const problems = [];
-const PROSE = /\b([a-z]+)(?:\s+|-)famil(?:y|ies)\b/gi;
+// ⚠ The `\**` are load-bearing, not decoration: until 2026-09-16 this pattern required the number word to
+// touch "famil…" directly, so a BOLDED count — `the **fourteen** families` — matched nothing and the guard
+// went GREEN on it. That is exactly how `db-layer.md` came to say fourteen on one line and fifteen on
+// another, in the same file, with this guard passing. ⛔ A guard that skips the emphasised statements
+// skips the ones an author was most deliberate about.
+const PROSE = /\b([a-z]+)\**(?:\s+|-)\**famil(?:y|ies)\b/gi;
 
 for (const file of DOC_FILES) {
     const text = readFileSync(file, 'utf8');

@@ -91,11 +91,15 @@ was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provena
   `scheduler.toon` → `-Dprocessing.duckdb.memory_limit` → **DuckDB's own default** with no numeric fallback,
   and no `scheduler.toon` ships. The board is right. Both pages corrected with this spec.
 - **The Postgres store count was stated as 6, 7, 10 and 11 across one page.** Measured: `OperationalDb.Family`
-  is **fourteen** families (twelve until 2026-09-12, when D6 added `EVENTS` and B1 added `RUN_LEASE`);
+  is **fifteen** families (twelve until 2026-09-12, when D6 added `EVENTS` and B1 added `RUN_LEASE`;
+  `INBOX_REGISTRY` followed on 2026-09-13);
   `PostgresStateStoreTest` (`inspecto-ops/src/test/java/com/gamma/service/`) round-trips
-  **thirteen** store classes — note, tag assignment, job run, file stage, consignment output, status, provenance,
-  object, link, and since 2026-09-12 event, delivery receipt, dedup ledger and the run lease — leaving only the
-  acquisition ledger uncovered. ⛔ All of them SKIP without a configured server, so this is coverage, not evidence. The page
+  **fifteen** store classes — note, tag assignment, job run, file stage, consignment output, status, provenance,
+  object, link, and since 2026-09-12 event, delivery receipt, dedup ledger and the run lease, plus the
+  acquisition ledger and the inbox registry — ✅ **so nothing is uncovered** (re-measured 2026-09-16; this
+  bullet said *fourteen / thirteen / "leaving only the acquisition ledger uncovered"*, and all three were
+  stale — see [`db-layer.md`](../../backend/engine/db-layer.md) §*Proving the JDBC stores on real
+  PostgreSQL (DAT-6)* for how the probe that "confirmed" the gap was itself blind). ⛔ All of them SKIP without a configured server, so this is coverage, not evidence. The page
   is corrected to those numbers.
 - **`status.backend` defaults to `db`**, not `file` (`OperationalDb.java:132`, flipped 2026-08-31); `db-layer.md`
   §2 still said `file` and its "exactly one store defaults on" paragraph predates two more defaults.

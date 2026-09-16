@@ -207,6 +207,27 @@ prose more than once or twice, the restatements need a guard, not a convention.*
 Falsified in both directions before wiring: drifted prose and a drifted tripwire each fail with the file,
 line and both numbers named.
 
+### 2026-09-16 — and its pattern was BLIND to the emphasised statements
+
+🔴 **It went GREEN for four days on `db-layer.md` saying fourteen on one line and fifteen on another, in
+one file.** The pattern was `\b([a-z]+)(?:\s+|-)famil(?:y|ies)\b`: it required the number word to touch
+`famil…` directly, so **`the **fourteen** families` matched nothing** — the `**` sit between them. The
+fix is two `\**`, and it is the whole change.
+
+⛔ **The general shape: a prose guard that skips MARKDOWN EMPHASIS skips the sentences its authors were
+most deliberate about.** Bold is what a writer reaches for on the load-bearing number, so the blind spot
+is anti-correlated with the statements that matter.
+
+⚠ **Widening it immediately found a second drifted file** (`data-plane.md`) plus a stale coverage claim
+riding along with the count — *"leaving only the acquisition ledger uncovered"*, false since 2026-09-12.
+⇒ **When a guard's reach grows, re-run it before assuming the one case you were chasing is the only one.**
+
+🔴 **The measurement that "confirmed" the stale claim was itself blind, in the same shift.** Counting
+`Db*.open(` call sites in `PostgresStateStoreTest` returns fourteen and silently drops `DbDedupLedger`,
+which is built with `new DbDedupLedger(conn)`. ⛔ Two construction idioms, one probe — the absence it
+reports is an artifact of the probe. Grep the **type name**, then explain each hit; do not grep one call
+shape and count.
+
 ## Instance, 2026-09-07: a guard scoped to one directory
 
 `CapabilityManifestTest` finds `withCapability(` registration sites by regex-scanning **one directory**,
