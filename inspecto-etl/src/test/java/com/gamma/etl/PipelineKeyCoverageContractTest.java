@@ -1,7 +1,7 @@
 package com.gamma.etl;
 
+import com.gamma.config.spec.AcceptedConfigKeys;
 import com.gamma.config.spec.ConfigSpecs;
-import com.gamma.config.spec.FieldSpec;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -65,29 +65,14 @@ class PipelineKeyCoverageContractTest {
      * <p>18 when this landed (2026-08-31); <b>17</b> after gap 8 declared {@code output_store} the same
      * day — the ratchet caught that one for real, not in a probe; <b>16</b> after CONSIGNMENT-HOME-1
      * declared {@code collector.consignment.max_files} (2026-09-02).
+     *
+     * <p>🔴 <b>Moved into production code 2026-09-16 (`DUCKLE-C3-DEAD-PROPERTY-1`)</b> as
+     * {@link AcceptedConfigKeys#PARSER_ONLY}, and this test now ratchets THAT field rather than a copy
+     * of it. The dead-property checker enforces the same list and the generated accepted-names doc is
+     * rendered from it, so the ratchet, the gate and the doc cannot disagree — a second copy here is
+     * exactly the drift this class exists to catch.
      */
-    private static final Set<String> UNDECLARED_BLOCKS = Set.of(
-            // ── top-level ────────────────────────────────────────────────────────
-            "active",              // the arming switch itself — authored on every runnable pipeline
-            // "collector" left the list 2026-09-02: CONSIGNMENT-HOME-1 declared collector.consignment.max_files
-            // (16 remain). ⚠ Only ONE leaf of the block is declared — the rest of collector.* is still
-            // form-invisible, which the BLOCK granularity cannot express; that residue is gap-10 debt too.
-            "route",               // gap 9's block — the branch-aware ingest lane
-            "sinks",               // the plural destination block
-            "steps",               // the ordered Stage-2 chain (gap 11)
-            "template",            // template: true ⇒ never registered, so never runnable
-            "trigger",             // schedule / on:dataset
-            // ── processing.* ─────────────────────────────────────────────────────
-            "processing.dedup",
-            "processing.disabled_steps",
-            "processing.duplicate_check",
-            "processing.ingester_config",
-            "processing.join",
-            "processing.map",
-            "processing.mapping_file",
-            "processing.schemas",
-            "processing.segments",
-            "processing.summarize");
+    private static final Set<String> UNDECLARED_BLOCKS = AcceptedConfigKeys.PARSER_ONLY;
 
     /**
      * The methods that bind a local {@code raw} to something that is NOT the pipeline root. Pinned by
@@ -201,15 +186,11 @@ class PipelineKeyCoverageContractTest {
         return out.replaceAll("//[^\\n]*", "");
     }
 
-    /** Blocks {@code ConfigSpecs.pipeline()} declares: a leaf {@code a.b.c} declares {@code a} and {@code a.b}. */
+    /** Blocks {@code ConfigSpecs.pipeline()} declares: a leaf {@code a.b.c} declares {@code a} and {@code a.b}.
+     *  The derivation moved to {@link AcceptedConfigKeys#declaredBlocks} 2026-09-16 so the checker and
+     *  this ratchet judge "declared" identically. */
     private static Set<String> declaredBlocks() {
-        Set<String> blocks = new TreeSet<>();
-        for (FieldSpec f : ConfigSpecs.pipeline().fields()) {
-            String[] parts = f.path().split("\\.");
-            blocks.add(parts[0]);
-            if (parts.length > 1) blocks.add(parts[0] + "." + parts[1]);
-        }
-        return blocks;
+        return AcceptedConfigKeys.declaredBlocks(ConfigSpecs.pipeline());
     }
 
     /** Walk up from the module's CWD to the repo root, so the path works under surefire and an IDE alike. */

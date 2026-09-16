@@ -5,6 +5,7 @@ import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.safety.SchemaCompatibility;
+import com.gamma.config.spec.AcceptedConfigKeys;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
@@ -80,6 +81,10 @@ final class ConfigWriteRoutes implements RouteModule {
         // ERROR: a collector bound to a connection this space does not have cannot acquire anything —
         // it throws once per poll cycle instead. Bundle import already refuses it; a save now agrees.
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
+        // ERROR: a block no component reads is a SILENT LOSS — the save answers written:true and the
+        // engine never looks at it (`DUCKLE-C3-DEAD-PROPERTY-1`). An `x-` block is the author's own
+        // annotation and passes through untouched; a type with no census produces nothing.
+        findings.addAll(AcceptedConfigKeys.unknownKeyFindings(type, draft, Severity.ERROR));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
@@ -370,6 +375,9 @@ final class ConfigWriteRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.stepDisableFindings(type, merged));                // and can add disabled_steps too
         findings.addAll(ConfigRoutes.dedupWindowFindings(type, merged));               // and a windowed dedup (D-9)
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
+        // A patch can ADD a dead block as easily as a write can, and over the merged draft so a block
+        // the patch did not touch is judged too (`DUCKLE-C3-DEAD-PROPERTY-1`).
+        findings.addAll(AcceptedConfigKeys.unknownKeyFindings(type, merged, Severity.ERROR));
         // TYPEFLOW-CONSUMERS-1 (a): a patch can drop a column a route predicate reads, or retype a field a
         // summarize measure sums — both of which the write path now refuses. ⚠ Unlike /config/write this
         // needs no second gate: `target` is already resolved above, so these sit inside the existing one.

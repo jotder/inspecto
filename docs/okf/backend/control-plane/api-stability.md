@@ -70,6 +70,20 @@ above the generated commit list.
 - `ApiContext.withCapability` returns a marked `Gated` handler rather than a bare lambda. Call sites are
   unchanged; anything that *wrapped or unwrapped* the returned handler by identity is not.
 
+**Breaking — config writes refuse unknown keys (2026-09-16, `DUCKLE-C3-DEAD-PROPERTY-1`)**
+- `POST /config/write` and `PATCH /config/patch` now return **422** for a key no component reads, with the
+  stable code `ERR_UNKNOWN_CONFIG_KEY` and a near-name suggestion when one is close (no suggestion when
+  nothing is). ⚠ Breaking for configs that **previously saved silently**: `version:` and `source:` — the two
+  keys `pipeline-config-keys.md` itself lists under *"appear in docs, read by nothing"* — are now refused,
+  and `source:` in particular looked like it still worked. Turning that silent loss into a refusal is the
+  point of the change; see `PROJECT_NOTES` for the silent-config-loss defects it closes.
+- Keys prefixed `x-` are accepted and round-trip untouched — that is the escape hatch.
+- ⛔ Granularity is the **block**, not the leaf: `dirs`, `collector`, `parsing`, `output` and `reference` are
+  accepted whole, because they carry engine-read keys with no `FieldSpec`. Only top-level and `processing.*`
+  are censused today; the other eight config types are still fail-open by omission.
+- Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
+  run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
+
 **Breaking — configuration and CLI**
 - `-Dauth.oidc.tokenEndpoint` is **required** under `authMode: oidc` (D15, 2026-07-25); there is no IdP
   vendor of record and `OidcTokenRelay` will not guess the endpoint.

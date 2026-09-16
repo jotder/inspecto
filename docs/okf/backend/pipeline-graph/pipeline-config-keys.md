@@ -170,3 +170,90 @@ top-level and `processing.*` read and compares against `ConfigSpecs.pipeline()`:
 - the list **only ever shrinks** — its size (16) is the remaining gap-10 debt;
 - the scan is **self-falsifying**: pinned certainly-read blocks, a minimum count (≥ 35), and a pinned
   count of the two `raw`-shadowing locals guard against the scan silently matching nothing.
+
+## The accepted-names table (generated)
+
+The census above is a narrative; this table is the **machine-readable answer to "which blocks may a
+`<name>_pipeline.toon` carry?"** — every block some component reads, which is exactly what
+`AcceptedConfigKeys.acceptedBlocks("pipeline")` returns and exactly what the dead-property gate at
+`POST /config/write` / `POST /config/patch` enforces (`DUCKLE-C3-DEAD-PROPERTY-1`). A block that is
+not here is a **silent loss**: the engine ignores it, so the save refuses it with
+`ERR_UNKNOWN_CONFIG_KEY` and, when one is close, the name the author probably meant.
+
+⛔ **Do not hand-edit the block below.** It is rendered from `AcceptedConfigKeys` by
+`AcceptedConfigKeysDocContractTest`, which fails with the exact expected text when the two disagree —
+that is what makes this doc incapable of drifting from the checker.
+
+⚠ Only the two censused scopes are listed, and only those are enforced: **top-level** and
+**`processing.*`**. Every other block is accepted WHOLE (`dirs`, `collector`, `parsing`, `output`,
+`reference`), because their leaves are not censused — `dirs.quarantine` and a connector's own
+`collector.*` keys are engine-read with no `FieldSpec`, so a leaf-granular gate would refuse configs
+that run today. A block named `x-…` is the author's own annotation: always accepted, never suggested
+against, round-tripped untouched.
+
+<!-- generated:accepted-config-keys -->
+
+| Accepted block | Declared by |
+|---|---|
+| `active` | parser-only |
+| `collector` | spec |
+| `collector.consignment` | spec |
+| `description` | spec |
+| `dirs` | spec |
+| `dirs.backup` | spec |
+| `dirs.database` | spec |
+| `dirs.poll` | spec |
+| `dirs.status_dir` | spec |
+| `dirs.temp` | spec |
+| `id` | spec |
+| `name` | spec |
+| `output` | spec |
+| `output.compression` | spec |
+| `output.filename_column` | spec |
+| `output.format` | spec |
+| `output_store` | spec |
+| `parsing` | spec |
+| `parsing.grammar` | spec |
+| `processing` | spec |
+| `processing.batch` | spec |
+| `processing.chunking` | spec |
+| `processing.csv_settings` | spec |
+| `processing.dedup` | parser-only |
+| `processing.disabled_steps` | parser-only |
+| `processing.duckdb` | spec |
+| `processing.duckdb_threads` | spec |
+| `processing.duplicate_check` | parser-only |
+| `processing.file_pattern` | spec |
+| `processing.grammar` | spec |
+| `processing.ingester` | spec |
+| `processing.ingester_config` | parser-only |
+| `processing.intake` | spec |
+| `processing.join` | parser-only |
+| `processing.map` | parser-only |
+| `processing.mapping_file` | parser-only |
+| `processing.priority` | spec |
+| `processing.profile` | spec |
+| `processing.schema_file` | spec |
+| `processing.schemas` | parser-only |
+| `processing.segments` | parser-only |
+| `processing.streaming` | spec |
+| `processing.summarize` | parser-only |
+| `processing.threads` | spec |
+| `processing.unpack` | spec |
+| `produces` | spec |
+| `reference` | spec |
+| `reference.key` | spec |
+| `reference.load` | spec |
+| `reference.refresh_seconds` | spec |
+| `route` | parser-only |
+| `sinks` | parser-only |
+| `steps` | parser-only |
+| `stream` | spec |
+| `template` | parser-only |
+| `trigger` | parser-only |
+
+<!-- /generated:accepted-config-keys -->
+
+⚠ `version:` and `source:` (the two "appear in docs, read by nothing" keys above) are **not** on this
+table and are therefore now refused at the authoring gate — which is the row's point: both were
+silently ignored, and `source:` in particular looked like it still worked.

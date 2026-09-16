@@ -72,4 +72,17 @@ public final class FindingCodes {
 
     // ── Parsing ──────────────────────────────────────────────────────────────────────────────
     // (PipelineCompileException / parser refusal codes register here as they migrate)
+
+    // ── Config keys ──────────────────────────────────────────────────────────────────────────
+    // Its own category on purpose: the five above are about a config that is WRONG; this one is
+    // about a config that is IGNORED (`DUCKLE-C3-DEAD-PROPERTY-1`).
+
+    /** A config block no component reads — the engine ignores it, so what it configures is lost
+     *  ({@link AcceptedConfigKeys}). ERROR at an authoring gate: the save is the last moment the
+     *  author is present to be told. */
+    public static final String ERR_UNKNOWN_CONFIG_KEY = "ERR_UNKNOWN_CONFIG_KEY";
+
+    /** The same dead-key finding where a config already on disk is merely being read, not authored —
+     *  refusing there would brick a deployed pipeline over a key that was never load-bearing. */
+    public static final String WARN_UNKNOWN_CONFIG_KEY = "WARN_UNKNOWN_CONFIG_KEY";
 }
