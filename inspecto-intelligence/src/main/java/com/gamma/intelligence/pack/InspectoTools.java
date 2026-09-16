@@ -1242,7 +1242,10 @@ final class InspectoTools {
      * {@code PUT /components/schema/&#123;id&#125;} still writes {@code registry/schemas/<id>.toon}, the very
      * file the engine parses for a {@code schema_file: schema/<id>} ref. What made the unification safe is
      * that both writers now speak the config TOON shape, and {@code ComponentRoutes.validateKind} applies
-     * the same structural + safety gates {@code /config/write} does. Retiring the type is NOT a free
+     * the same structural + safety gates {@code /config/write} does <b>for this kind</b>. ⛔ Read that
+     * narrowly: {@code validateKind} special-cases {@code schema}, {@code mapping}, and the key census
+     * for {@code widget}/{@code dashboard}. It is NOT a blanket equivalence for every component kind, and
+     * assuming otherwise is how a bulk writer gets taken for gated. Retiring the type is NOT a free
      * simplification: {@code validateType} guards {@code list}/{@code read}/{@code versions} as well.
      */
     private static ConfigSpec specFor(String kind) {

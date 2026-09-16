@@ -43,6 +43,13 @@ class ControlApiBiTemplatesTest {
         }
     }
 
+    private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Content-Type", "application/json");
+        return client.send(b.method(method, body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body))
+                .build(), BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
@@ -79,6 +86,47 @@ class ControlApiBiTemplatesTest {
             assertEquals(200, post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"sales_ds\",\"prefix\":\"q3\"}").statusCode());
             assertTrue(reg.get("dashboard", "q3_kpi_board").isPresent());
+        }
+    }
+
+    /**
+     * COMPONENT-BULK-WRITERS-UNGATED-1: {@code BiTemplates.apply} writes through {@code ComponentStore}
+     * directly, so no {@code ComponentRoutes.validateKind} gate — and therefore no {@code widget}/
+     * {@code dashboard} top-level key census — ever runs over a curated template. The gate cannot be
+     * called from here ({@code validateKind} is private), and a runtime check over content that is
+     * entirely hardcoded would be the wrong shape anyway: the only operator input is the {@code dataset}
+     * and {@code prefix} VALUES, and the census refuses KEYS. So pin the property at build time instead —
+     * every component a template writes must be one the authoring route would accept, or the gallery
+     * ships boards the Studio cannot re-save.
+     */
+    @Test
+    void everyTemplateWritesABodyTheAuthoringRouteAccepts(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "sales_ds", Map.of("physicalRef", "sales"));
+
+            JsonNode gallery = V1Body.of(send(c.port, "GET", "/bi/templates", null).body());
+            assertTrue(gallery.size() >= 3, "gallery is non-empty, or this test proves nothing");
+
+            int checked = 0;
+            for (JsonNode t : gallery) {
+                String templateId = t.get("id").asText();
+                HttpResponse<String> applied = post(c.port, "/bi/templates/" + templateId + "/apply",
+                        "{\"dataset\":\"sales_ds\",\"prefix\":\"" + templateId.replace('-', '_') + "\"}");
+                assertEquals(200, applied.statusCode(), templateId + " apply: " + applied.body());
+
+                for (JsonNode created : V1Body.of(applied.body()).at("/created")) {
+                    String kind = created.get("kind").asText();
+                    String id = created.get("id").asText();
+                    JsonNode stored = V1Body.of(send(c.port, "GET", "/components/" + kind + "/" + id, null).body());
+                    HttpResponse<String> resave = send(c.port, "PUT", "/components/" + kind + "/" + id,
+                            JSON.writeValueAsString(stored.get("content")));
+                    assertEquals(200, resave.statusCode(),
+                            templateId + " wrote a " + kind + " '" + id + "' the authoring route refuses: "
+                                    + resave.body());
+                    checked++;
+                }
+            }
+            assertTrue(checked >= 9, "every curated template's components were re-saved, got " + checked);
         }
     }
 
