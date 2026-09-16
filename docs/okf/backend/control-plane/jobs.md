@@ -655,6 +655,30 @@ committed configs.
   `JobRoutes:381` uses the Space root: one value, two gates, two answers.
 - **`JOB-PATH-GATE-BLIND-KEYS-1`** — `RawConfig.str(raw, "job."+k)` is a dotted path from the root, so 11
   values under `params:` are invisible to the gate; `archive_dir` is resolved at run time but is not in
-  `JOB_PATH_KEYS`; `out_dir` is covered by neither.
-- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point all 33 committed values space-relative. ⛔ Land it with
-  whichever runtime row lands last, or the configs refuse in between.
+  `JOB_PATH_KEYS`. *(The `out_dir` third of this row was discharged 2026-09-16 — see the shipped row
+  below. The other two blind spots stand.)*
+- ~~**`JOB-PATH-REPORT-ENRICH-SPLIT-1`**~~ ✅ **SHIPPED 2026-09-16** — see below.
+- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining **32** committed values space-relative.
+  ⛔ Land it with whichever runtime row lands last, or the configs refuse in between. *(33 → 32: the one
+  `out_dir` value moved with its runtime. ⛔ Not licence to re-point the rest early.)*
+
+### `JOB-PATH-REPORT-ENRICH-SPLIT-1` — the last two readers, and what they taught
+
+`out_dir` (`ReportJob`) was on the plain `PathJail.requireUnderAny` — containment only,
+working-directory-relative — and `config` (`EnrichJob`) went to `EnrichmentConfig.load` with **no jail
+call at all**, a containment hole rather than a base mismatch. Both now go through
+`PathJail.requireJobPathUnderAny(allowedRoots(), SpaceConfigRoot.current(), …)`, and **only then** did the
+two keys join `JOB_PATH_KEYS`.
+
+⛔ **The ordering is the durable rule, and it is now stated in that field's javadoc: reader first, then
+the list.** Adding a key to `JOB_PATH_KEYS` while its runtime still resolves against the process working
+directory manufactures precisely the gate/runtime split `PathJail.resolveJobPath` exists to end — the
+gate would refuse, or accept, a draft the run then treats differently.
+
+🔴 **`resolveJobPath` refuses the ambiguous case only when the old path EXISTS.** This is documented
+behaviour, but its consequence was not: on a *fresh* tree — no old directory — a stale value does not
+refuse, it **silently re-points**, and for an output directory that means an artifact written where
+nobody looks while the job reports SUCCESS. The survey's fresh/deployed columns say this; a row written
+from the deployed column alone called `maintenance_report_job.toon` a refusal, and it is not one here.
+⚠ When judging a value's blast radius, read the column that matches the tree you are on, and check
+`Files.exists` on the CWD-relative path — that single predicate is what picks the column.

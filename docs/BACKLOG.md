@@ -1896,12 +1896,55 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
 
 - **P2** · **`JOB-PATH-GATE-BLIND-KEYS-1` — the gate cannot see the keys it claims to cover.** Dotted-path
   blindness hides **11** values under `params:` from `RawConfig.str(raw, "job."+k)`; `archive_dir` is
-  resolved with the NEW rule at run time (`CleanupTask:47`) but is absent from `JOB_PATH_KEYS`; `out_dir`
-  (`ReportJob:125`) is covered by neither. → `okf/backend/control-plane/jobs.md`
+  resolved with the NEW rule at run time (`CleanupTask:47`) but is absent from `JOB_PATH_KEYS`.
+  ✅ **The `out_dir` third of this row is DISCHARGED 2026-09-16** by `JOB-PATH-REPORT-ENRICH-SPLIT-1`
+  below — it is now in `JOB_PATH_KEYS` *and* on the new rule at run. The other two blind spots stand.
+  → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point all 33 committed values space-relative.** The
-  remedy half of the survey. ⛔ Do it in the same change as whichever runtime row lands last, or the
-  configs refuse in between. → `okf/backend/control-plane/jobs.md`
+- ~~**P2** · **`JOB-PATH-REPORT-ENRICH-SPLIT-1`**~~ ✅ **FILED AND SHIPPED 2026-09-16.** The last two
+  path-shaped job keys whose readers disagreed with the gate. `ReportJob:122` resolved `out_dir` through
+  the plain `PathJail.requireUnderAny` (containment only, working-directory-relative) when
+  `JOB-DIR-CWD-CONTAINMENT-1` moved everything else; `EnrichJob:59` handed `config` to
+  `EnrichmentConfig.load` with **no `PathJail` call at all** — a containment hole, not merely a base
+  mismatch, and independent of that row. Both now call
+  `PathJail.requireJobPathUnderAny(allowedRoots(), SpaceConfigRoot.current(), …)`, and **only then** were
+  `out_dir` + `config` added to `JOB_PATH_KEYS` — reader first, then the list, which is the order the
+  field's javadoc now states for any further addition.
+
+  🔴 **The row's own blast-radius claim was WRONG, and wrong in the more dangerous direction.** It said
+  `maintenance_report_job.toon:6` (`out_dir: spaces/demo/data/reports`, the ONE committed `out_dir`, and
+  `config` appears in zero — both re-confirmed, the latter against a `target:` positive control) *refuses*
+  under the Space-root rule. **It does not refuse on a fresh tree: it silently re-points.** Driven, not
+  mirrored — `PathJail` compiled from the working tree (`-sourcepath inspecto-config;inspecto-api`) and
+  the real `resolveJobPath` called: the old value under the new rule returns
+  `…/spaces/demo/config/spaces/demo/data/reports`, the doubled path, with **no throw**, because
+  `resolveJobPath` only refuses when the CWD-relative path *exists* — and `spaces/demo/data/reports` is
+  absent in this checkout. A report delivered to a path nobody watches, reporting SUCCESS, is worse than
+  a refusal. ⇒ The ⛔ "land it with the re-point or it breaks in between" held for a different reason
+  than the one stated.
+
+  ⇒ Landed with the repoint of **that one value** (`out_dir: ../data/reports`), *not* all 33:
+  `JOB-PATH-DEMO-CONFIG-REPOINT-1`'s other 32 belong to runtimes that have **not** moved
+  (`PipelineJobRunner`, the compactors), and re-pointing those now would break them at run — which is
+  exactly what that row's own ⛔ warns against. Driven: the new value resolves to
+  `…/spaces/demo/data/reports`, **byte-identical** to what the legacy CWD rule produced from the repo
+  root, so the re-point is behaviour-preserving.
+
+  ⚠ **One instruction in the row could not be carried out: there is no ⛔ paragraph to delete.** The row
+  said `JOB_PATH_KEYS`' javadoc "explains why they are held out"; it never did — it said only that
+  unnamed keys "still get their run-time check", which for `config` was false. The javadoc now records
+  the ordering constraint instead. Pinned by `ConfigSafetyValidatorTest.theReportAndEnrichPathKeysAreContained`
+  (gate membership), `ReportJobDeliveryTest.aRelativeOutDirResolvesAgainstTheSpaceRootNotTheWorkingDirectory`
+  (asserts the CWD path stays ABSENT, not merely that the Space path is populated) and
+  `JobPathContainmentTest.enrichRefusesAConfigOutsideTheAllowedRoots` (a REAL readable file outside the
+  jail, so the loader cannot refuse it for the wrong reason). → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **32** committed values
+  space-relative.** The remedy half of the survey. ⛔ Do it in the same change as whichever runtime row
+  lands last, or the configs refuse in between. *(33 → 32 on 2026-09-16: `maintenance_report_job.toon:6`
+  was re-pointed with `JOB-PATH-REPORT-ENRICH-SPLIT-1`, whose runtime moved in the same change. ⛔ Do
+  **not** read that as licence to re-point the rest early — their readers are still on the old rule.)*
+  → `okf/backend/control-plane/jobs.md`
 
 - **P2** · **`COMPONENT-KIND-KEY-CENSUS-1` — `widget` and `dashboard` can never be censused by
   `AcceptedConfigKeys`.** Filed 2026-09-16 out of `DUCKLE-C3-DEAD-PROPERTY-1`, which had listed them among

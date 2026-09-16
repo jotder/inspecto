@@ -102,7 +102,7 @@ expansion.
 | `spaces/demo/config/jobs/config_backup_job.toon:7` | `params.backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | no (gate-blind) | `BackupTask:83` → **old rule** (split) |
 | `spaces/demo/config/jobs/orders_rollup_job.toon:4` | `pipeline_config` | `spaces/demo/config/orders/orders_pipeline.toon` | **NOW REFUSES** | **NOW REFUSES** | yes | `PipelineJobRunner:242` → **no jail at all** |
 | `spaces/demo/config/jobs/orders_weekly_compact_job.toon:7` | `dir` | `data/orders` | BROKEN | **NOW REFUSES** | yes | `PartitionCompactor:57` → **raw `Path.of`, no jail at all** |
-| `spaces/demo/config/jobs/maintenance_report_job.toon:6` | `out_dir` | `spaces/demo/data/reports` | BROKEN | NOW REFUSES *(if it were covered)* | **no — key not gated** | `ReportJob:125` → **old rule** |
+| ~~`spaces/demo/config/jobs/maintenance_report_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `../data/reports` | `out_dir` | ~~`spaces/demo/data/reports`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | ~~no~~ **yes** (in `JOB_PATH_KEYS`) | `ReportJob:127` → **new rule** |
 | `spaces/demo/config/jobs/retention_job_template.toon:11` | template `dir` | `${dir}` | n/a — unexpanded placeholder | n/a | no (gate-blind) | expanded before use |
 | `spaces/demo/config/jobs/chained_backup_job_template.toon:13,14` | template `dir`,`backup_dir` | `${dir}`,`${backup_dir}` | n/a | n/a | no (gate-blind) | expanded before use |
 
@@ -212,7 +212,12 @@ delivered somewhere no one looks — all reporting success.
 ### DEFECTS — recommended new rows
 
 **(a) `JOB-PATH-DEMO-CONFIG-REPOINT-1` (P2) — re-point every committed job config to a space-relative
-value.** All 33 values are authored either space-root-prefixed (`spaces/demo/…`) or CWD-prefixed
+value.** *(**32 remain** as of 2026-09-16: `maintenance_report_job.toon:6`'s `out_dir` was re-pointed to
+`../data/reports` in the same change that moved its reader, `JOB-PATH-REPORT-ENRICH-SPLIT-1`. Driven
+proof it is behaviour-preserving: the new value resolves to `…/spaces/demo/data/reports`, byte-identical
+to what the legacy CWD rule returned from the repo root. ⛔ That is the pattern — **one value moves when
+its reader moves** — not licence to re-point the other 32 while `PipelineJobRunner` and the compactors
+are still on the old rule.)* All 33 values are authored either space-root-prefixed (`spaces/demo/…`) or CWD-prefixed
 (`out/…`, `data/orders`). Under the new rule the correct spelling is relative **to the Space config
 root** — e.g. `spaces/demo/config/jobs/orders_rollup_job.toon` should carry `orders/orders_pipeline.toon`,
 not `spaces/demo/config/orders/orders_pipeline.toon`. ⚠ **Do this in the same change as
@@ -253,8 +258,16 @@ javadoc says the gate and the jail must not diverge; here **two gates** diverge 
   "`config_backup_job.toon` is now UNSAVABLE" claim is false.
 * `archive_dir` is resolved with the **new** rule at run (`CleanupTask:47`) but is absent from
   `JOB_PATH_KEYS` — checked at run, never at save.
-* `out_dir` is a real delivery directory (`ReportJob:122-125`, jailed CWD-relative) and is in neither
-  list, so the operator's decision does not reach it at all. One committed config uses it.
+* ~~`out_dir` is a real delivery directory (`ReportJob:122-125`, jailed CWD-relative) and is in neither
+  list, so the operator's decision does not reach it at all. One committed config uses it.~~
+  ✅ **CLOSED 2026-09-16 by `JOB-PATH-REPORT-ENRICH-SPLIT-1`**, together with a third blind key this
+  survey missed: **`config`** (`EnrichJob:59` → `EnrichmentConfig.load`) reached the filesystem with **no
+  `PathJail` call at all**. §2's "path-shaped keys neither covers" named `out_dir` and `store` but not
+  `config`, because the census keyed on the *authored* configs — and `config` appears in **zero** of them
+  (re-confirmed against a `target:` positive control). ⚠ **A key census over committed values cannot find
+  a key nobody has authored yet**; the reader side has to be censused too. `store` remains uncovered.
+  Both moved onto `requireJobPathUnderAny` **before** joining `JOB_PATH_KEYS`, which is now the stated
+  order in that field's javadoc.
 
 ### Not a defect, but record it
 

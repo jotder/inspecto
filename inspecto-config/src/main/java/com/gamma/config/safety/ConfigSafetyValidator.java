@@ -117,9 +117,18 @@ public final class ConfigSafetyValidator {
      * Before this the job save skipped containment entirely and the tasks re-checked at RUN time —
      * which stays as belt; this is the braces, at the one moment the author is present. Task-specific
      * keys this list does not name still get their run-time check.
+     *
+     * <p>{@code out_dir} (the report job's delivery directory) and {@code config} (the enrich job's
+     * enrichment path) joined the list with {@code JOB-PATH-REPORT-ENRICH-SPLIT-1}, and ⛔ <b>only once
+     * their readers had moved</b>: adding a key here while its runtime still resolved against the
+     * process working directory would have manufactured exactly the gate/runtime split
+     * {@link PathJail#resolveJobPath} exists to end. {@code ReportJob} was on the plain
+     * {@link PathJail#requireUnderAny} and {@code EnrichJob} called no jail at all. That is the order
+     * any further addition has to follow — reader first, then this list.
      */
     private static final List<String> JOB_PATH_KEYS =
-            List.of("data_dir", "pipeline_config", "dir", "backup_dir", "archive", "target_dir");
+            List.of("data_dir", "pipeline_config", "dir", "backup_dir", "archive", "target_dir",
+                    "out_dir", "config");
 
     /**
      * ⚠ {@code configDir} here is the <b>Space config root</b>, and unlike every other kind it is USED:

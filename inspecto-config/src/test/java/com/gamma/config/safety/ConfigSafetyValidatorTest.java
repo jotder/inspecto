@@ -132,6 +132,25 @@ class ConfigSafetyValidatorTest {
                 "task", "noop", "store", "../whatever")), SafetyPolicy.withRoots(root)).isEmpty());
     }
 
+    /**
+     * {@code JOB-PATH-REPORT-ENRICH-SPLIT-1}: the report job's {@code out_dir} and the enrich job's
+     * {@code config} are gated too. ⚠ This pins MEMBERSHIP of {@code JOB_PATH_KEYS}, which is the half a
+     * run-time test cannot see — and it may only assert this because both readers moved onto
+     * {@link PathJail#requireJobPathUnderAny} in the same change. Dropping either reader back would make
+     * this test pass while the gate and the runtime disagreed again.
+     */
+    @Test
+    void theReportAndEnrichPathKeysAreContained(@TempDir Path root) {
+        Map<String, Object> ok = Map.of("job", Map.of("name", "r", "type", "report",
+                "out_dir", root.resolve("data/reports").toString()));
+        assertTrue(ConfigSafetyValidator.check("job", ok, SafetyPolicy.withRoots(root)).isEmpty());
+        Map<String, Object> bad = Map.of("job", Map.of("name", "r", "type", "report",
+                "out_dir", "//nas/reports", "config", "//nas/enrich.toon"));
+        List<Finding> f = ConfigSafetyValidator.check("job", bad, SafetyPolicy.withRoots(root));
+        assertTrue(f.stream().anyMatch(x -> x.fieldPath().equals("job.out_dir")), f.toString());
+        assertTrue(f.stream().anyMatch(x -> x.fieldPath().equals("job.config")), f.toString());
+    }
+
     @Test
     void cleanDraftUnderRootPasses(@TempDir Path root) {
         List<Finding> f = ConfigSafetyValidator.check("pipeline", pipeline(safeDirs(root)),
