@@ -644,18 +644,24 @@ final class ComponentRoutes implements RouteModule {
         if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
     }
 
-    // ── widget / dashboard top-level key census ──────────────────────────────────
+    // ── widget / dashboard / expectation top-level key census ────────────────────
 
     /**
-     * The two component kinds whose top-level keys are censused on write.
+     * The component kinds whose top-level keys are censused on write.
      *
-     * <p>🔴 {@code AcceptedConfigKeys} can never do this: neither kind is ever written through
-     * {@code /config/write} — the Studio saves both through {@code POST|PUT /components/{kind}}
+     * <p>🔴 {@code AcceptedConfigKeys} can never do this: no such kind is ever written through
+     * {@code /config/write} — the Studio saves them through {@code POST|PUT /components/{kind}}
      * ({@code components.service.ts}), which never reaches that class — so a table there is a NO-OP
      * for them. The gate belongs here, and this is the same per-kind seam the {@code schema} branch
      * above already uses, not a new one.
+     *
+     * <p>⚠ {@code expectation} joined 2026-09-16 and is the only one with a SECOND authoring route:
+     * the Studio saves it through {@code /expectations} ({@code ExpectationRoutes}), and this route is
+     * a raw-body back door that skipped {@code Expectation.fromMap} entirely. Both call
+     * {@link #refuseUnknownComponentKeys}; gating only one of them leaves the other wide open, which is
+     * why each has its own mutation-proven test.
      */
-    private static final Set<String> CENSUSED_COMPONENT_KINDS = Set.of("widget", "dashboard");
+    private static final Set<String> CENSUSED_COMPONENT_KINDS = Set.of("widget", "dashboard", "expectation");
 
     /**
      * Keys the <em>store</em> adds to a persisted component body, which no {@link ConfigSpec}
@@ -689,14 +695,25 @@ final class ComponentRoutes implements RouteModule {
      *   <li>{@code dashboard.dataset} / {@code datasetId} / {@code widget} / {@code widgetId} /
      *       {@code widgets} — {@code ShareRoutes.walk} is deliberately shape-tolerant ("dashboards are
      *       authored UI-side") and reads all five off a dashboard's own top level.</li>
+     *   <li>{@code expectation.when} — the {@code condition} kind's predicate tree, read by
+     *       {@code Expectation.fromMap} and compiled by {@code ConditionSql}, but
+     *       {@code ConfigSpecs.expectation()} still predates the 2026-07-18 {@code condition} promotion
+     *       and declares neither {@code when} nor {@code condition} in its {@code kind} enum. Exactly the
+     *       {@code dashboard.description} trap: undeclared and load-bearing.</li>
+     *   <li>{@code expectation.lastResult} / {@code createdAt} / {@code updatedAt} — the bookkeeping
+     *       {@code ExpectationRoutes} stamps onto the persisted body ({@code create}/{@code update}/
+     *       {@code runAndPersist}) and reads back ({@code breachedCount} reads {@code lastResult.status},
+     *       {@code update} carries {@code createdAt} forward). Kind-specific rather than in
+     *       {@link #COMPONENT_ENVELOPE_KEYS}, because no {@code widget}/{@code dashboard} body has them.</li>
      * </ul>
      */
     private static final Map<String, Set<String>> COMPONENT_PARSER_ONLY_KEYS = Map.of(
             "widget", Set.of("dataset"),
-            "dashboard", Set.of("description", "dataset", "datasetId", "widget", "widgetId", "widgets"));
+            "dashboard", Set.of("description", "dataset", "datasetId", "widget", "widgetId", "widgets"),
+            "expectation", Set.of("when", "lastResult", "createdAt", "updatedAt"));
 
     /**
-     * Refuse a top-level key of a {@code widget}/{@code dashboard} body that nothing reads — neither
+     * Refuse a top-level key of a {@link #CENSUSED_COMPONENT_KINDS} body that nothing reads — neither
      * spec-declared, nor store envelope, nor parser-only, nor the author's {@code x-} extension marker.
      *
      * <p>Deliberately a KEY census only: the kind's {@link ConfigSpec} supplies the accepted NAMES but
@@ -705,8 +722,13 @@ final class ComponentRoutes implements RouteModule {
      * that are silently dropped, not about required fields. One level only, for the same reason
      * {@code AcceptedConfigKeys} accepts a block whole: {@code controls} and {@code options} are
      * viz-plugin-defined open maps with no census at all.
+     *
+     * <p>Package-private, not private, because {@code expectation} has a <b>second</b> authoring route:
+     * {@code ExpectationRoutes} ({@code POST|PUT /expectations}) is what the SPA actually saves through,
+     * while {@code POST|PUT /components/expectation} is the raw-body back door this class guards. Both
+     * call this one method so the accepted set cannot drift between them.
      */
-    private static void refuseUnknownComponentKeys(String type, Map<String, Object> content) {
+    static void refuseUnknownComponentKeys(String type, Map<String, Object> content) {
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) return;   // no spec ⇒ no accepted set ⇒ fail open, never refuse blind
         Set<String> declared = spec.fields().stream()

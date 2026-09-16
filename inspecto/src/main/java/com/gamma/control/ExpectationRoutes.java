@@ -97,6 +97,7 @@ final class ExpectationRoutes implements RouteModule {
 
     private Object create(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
+        census(body);
         Expectation exp = parse(body);
         if (RouteErrors.exists(store, TYPE, exp.name()))
             throw new ApiException(409, "expectation '" + exp.name() + "' already exists (use PUT to update)");
@@ -111,6 +112,7 @@ final class ExpectationRoutes implements RouteModule {
     private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         Map<String, Object> prev = RouteErrors.existing(store, TYPE, "expectation", name);
+        census(body);
         Expectation exp = parse(body);
         Map<String, Object> content = exp.toMap();
         content.put("lastResult", prev.get("lastResult"));                       // preserve last evaluation
@@ -233,6 +235,34 @@ final class ExpectationRoutes implements RouteModule {
 
     private ComponentStore store(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "expectation").resolve("registry"));
+    }
+
+    /**
+     * DUCKLE-C3 / COMPONENT-KIND-KEY-CENSUS-1, {@code expectation} third: refuse a top-level key of an
+     * upsert body that nothing reads, instead of <b>silently dropping</b> it.
+     *
+     * <p>🔴 The loss mode here is not the one {@code widget}/{@code dashboard} have. Those persist the
+     * raw body, so a dead key rots on disk. This route never persists the body at all — it rebuilds the
+     * content from {@link Expectation#toMap()} — so before this gate a typo'd {@code patern:} returned
+     * <b>200 with the key gone</b> and the author had no way to tell. Same census, opposite symptom.
+     *
+     * <p>Deliberately a KEY census only, exactly as for {@code widget}/{@code dashboard}: the accepted
+     * NAMES come from {@code ConfigSpecs.expectation()} but its required-field and cross-field rules are
+     * NOT run here, so a draft that saves today still saves. {@link Expectation}'s own constructor remains
+     * the only value validator.
+     *
+     * <p>Applied on the two AUTHORING paths only, never in {@link #parse} — {@code runAndPersist} parses
+     * <em>stored</em> content, and censusing there would make a legacy expectation carrying a dead key
+     * (one written through the {@code /components/expectation} back door before that was gated)
+     * un-evaluatable rather than merely un-editable.
+     */
+    private static void census(Map<String, Object> body) {
+        if (body == null) return;   // parse() owns the "missing body" message
+        try {
+            ComponentRoutes.refuseUnknownComponentKeys(TYPE, body);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, e.getMessage());
+        }
     }
 
     private static Expectation parse(Map<String, Object> body) {
