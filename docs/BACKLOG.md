@@ -1939,11 +1939,44 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `JobPathContainmentTest.enrichRefusesAConfigOutsideTheAllowedRoots` (a REAL readable file outside the
   jail, so the loader cannot refuse it for the wrong reason). → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **32** committed values
-  space-relative.** The remedy half of the survey. ⛔ Do it in the same change as whichever runtime row
-  lands last, or the configs refuse in between. *(33 → 32 on 2026-09-16: `maintenance_report_job.toon:6`
-  was re-pointed with `JOB-PATH-REPORT-ENRICH-SPLIT-1`, whose runtime moved in the same change. ⛔ Do
-  **not** read that as licence to re-point the rest early — their readers are still on the old rule.)*
+- **P2** · 🔴 **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **32** committed values
+  space-relative — and THREE of them are now ORPHANED BY A MOVED RUNTIME.** The remedy half of the
+  survey. ⛔ Do it in the same change as whichever runtime row lands last, or the configs refuse in
+  between. *(33 → 32 on 2026-09-16: `maintenance_report_job.toon:6` was re-pointed with
+  `JOB-PATH-REPORT-ENRICH-SPLIT-1`, whose runtime moved in the same change. ⛔ Do **not** read that as
+  licence to re-point the rest early — their readers are still on the old rule.)*
+  🔴 **The ⛔ above was VIOLATED the same day, in the other direction.**
+  `JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`) moved `BackupTask` onto
+  `PathJail.requireJobPathUnderAny(…, SpaceConfigRoot.current(), …)` **without** re-pointing the three
+  committed values that runtime reads. A runtime that moves ahead of its configs is the same break as
+  configs that move ahead of their runtime — this marker only ever named one of the two orders.
+  **Driven 2026-09-16, not mirrored:** `PathJail` compiled from the working tree
+  (`javac -sourcepath "inspecto-config/src/main/java;inspecto-api/src/main/java"`), the real
+  `PathJail.resolveJobPath(base, value, field)` called with `base = spaces/demo/config`; both positive
+  controls re-fired (the `spaces/demo/config/jobs` refusal, and the absolute no-op). ⚠ `resolveJobPath`
+  refuses **only when the CWD-relative path EXISTS**, so `Files.exists` was run on each — the column a
+  value falls in is a property of the TREE, not of the value:
+  - `config_backup_job.toon:6` `params.dir: spaces/demo/config` — CWD-relative path **exists** (it is a
+    committed directory), so it **REFUSES in both columns**, state-independently. 🔴 **`config_backup`
+    now FAILS AT RUN**, at `BackupTask:93` on field `dir`, where before `3f384182` it succeeded. It is
+    **gate-blind** (under `params:`), so nothing refused it at save and nothing will.
+  - `backup_verify_job.toon:6` `backup_dir: spaces/demo/data/backups` — CWD-relative path **absent on
+    this tree**, so **fresh column**: a silent re-point to `…/config/spaces/demo/data/backups`.
+    `BackupTask.verify` (`:182`) finds no `.zip` there and returns `JobResult.ok("no archive to
+    verify…")`. 🔴 **A green pass that verifies nothing** — worse than the refusal, and the failure
+    class §4 of the survey names.
+  - `config_backup_job.toon:7` `params.backup_dir` — same value, same **fresh** column, but ⚠ **never
+    reached**: `:93` resolves `dir` first and throws, masking it. A fix for `:6` alone would expose it.
+  - *(`backup_retention_job.toon:5` `params.dir` is the fourth backup value but is **not** affected by
+    `3f384182` — its reader is `CleanupTask`, moved by `JOB-DIR-CWD-CONTAINMENT-1`. Fresh column,
+    silent re-point, unchanged.)*
+  ⚠ `restore`'s two moved keys (`archive`, `target_dir`, `BackupTask:269-270`) classify **no committed
+  value** — the survey's §2.1 proven absence stands. ⚠ `BackupTask:191` is deliberately **not** moved.
+  ⇒ **Those three values are now unblocked and owed**, by this row's own stated pattern (a value moves
+  when its reader moves). ⛔ **Still not licence for the other 29** — `PipelineJobRunner` and the
+  compactors have not moved. ⚠ **Rank left at P2 deliberately, not by omission:** this is a live run
+  failure, but only in the `demo` sample Space, so the re-rank is an operator call — flagged, not taken.
+  §3.1 of `docs/superpower/job-path-compat-survey.md` carries the driven table.
   → `okf/backend/control-plane/jobs.md`
 
 - **P2** · **`COMPONENT-KIND-KEY-CENSUS-1` — `widget` and `dashboard` can never be censused by

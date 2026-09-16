@@ -661,6 +661,11 @@ committed configs.
 - **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining **32** committed values space-relative.
   ⛔ Land it with whichever runtime row lands last, or the configs refuse in between. *(33 → 32: the one
   `out_dir` value moved with its runtime. ⛔ Not licence to re-point the rest early.)*
+  🔴 **Three of the 32 are now orphaned the OTHER way** — `JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`)
+  moved `BackupTask` without them, so `config_backup` fails at run (`BackupTask:93`, `dir`, refused
+  state-independently because `spaces/demo/config` is a committed directory) and `backup_verify`
+  silently re-points and returns a green "no archive to verify". **The marker only ever named one of
+  the two orders.** Driven, not mirrored — see the BACKLOG row and §3.1 of the survey.
 
 ### `JOB-PATH-REPORT-ENRICH-SPLIT-1` — the last two readers, and what they taught
 

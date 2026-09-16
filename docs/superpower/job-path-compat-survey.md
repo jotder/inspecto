@@ -97,9 +97,9 @@ expansion.
 | File:line | Key | Value | fresh | deployed | Gate sees it? | Runtime rule |
 |---|---|---|---|---|---|---|
 | `spaces/demo/config/jobs/backup_retention_job.toon:5` | `params.dir` | `spaces/demo/data/orders/backup` | BROKEN (re-points to `…/config/spaces/demo/data/orders/backup`) | **NOW REFUSES** | no (gate-blind) | `CleanupTask` → new rule |
-| `spaces/demo/config/jobs/backup_verify_job.toon:6` | `backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | yes | `BackupTask:172` → **old rule** (split) |
-| `spaces/demo/config/jobs/config_backup_job.toon:6` | `params.dir` | `spaces/demo/config` | **NOW REFUSES** | **NOW REFUSES** | no (gate-blind) | `BackupTask:82` → **old rule** (split) |
-| `spaces/demo/config/jobs/config_backup_job.toon:7` | `params.backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | no (gate-blind) | `BackupTask:83` → **old rule** (split) |
+| `spaces/demo/config/jobs/backup_verify_job.toon:6` | `backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | yes | ~~`BackupTask:172` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:182` → **new rule** |
+| `spaces/demo/config/jobs/config_backup_job.toon:6` | `params.dir` | `spaces/demo/config` | **NOW REFUSES** | **NOW REFUSES** | no (gate-blind) | ~~`BackupTask:82` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:93` → **new rule** |
+| `spaces/demo/config/jobs/config_backup_job.toon:7` | `params.backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | no (gate-blind) | ~~`BackupTask:83` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:94` → **new rule** |
 | `spaces/demo/config/jobs/orders_rollup_job.toon:4` | `pipeline_config` | `spaces/demo/config/orders/orders_pipeline.toon` | **NOW REFUSES** | **NOW REFUSES** | yes | `PipelineJobRunner:242` → **no jail at all** |
 | `spaces/demo/config/jobs/orders_weekly_compact_job.toon:7` | `dir` | `data/orders` | BROKEN | **NOW REFUSES** | yes | `PartitionCompactor:57` → **raw `Path.of`, no jail at all** |
 | ~~`spaces/demo/config/jobs/maintenance_report_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `../data/reports` | `out_dir` | ~~`spaces/demo/data/reports`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | ~~no~~ **yes** (in `JOB_PATH_KEYS`) | `ReportJob:127` → **new rule** |
@@ -109,8 +109,29 @@ expansion.
 🔴 **The board's headline claim is WRONG.** `docs/BACKLOG.md` says `config_backup_job.toon:6-7` is a
 "LOUD REFUSAL — this committed job is now UNSAVABLE". It **refuses**, yes — but **not at save**: the
 value lives under `params:`, which the dotted-path gate cannot see, so the job saves fine. The refusal is
-a *run-time* one, and only once `BackupTask` is moved onto `resolveJobPath` (`JOB-PATH-BACKUPTASK-SPLIT-1`).
-Today that job still runs, CWD-relative, exactly as before.
+a *run-time* one, ~~and only once `BackupTask` is moved onto `resolveJobPath`
+(`JOB-PATH-BACKUPTASK-SPLIT-1`). Today that job still runs, CWD-relative, exactly as before.~~
+✅ **AS OF 2026-09-16 (`3f384182`) `BackupTask` IS on `resolveJobPath`, and the run-time refusal is now
+LIVE.** ⚠ The three rows above were re-driven on this tree after that commit — same method as §1, the
+real `PathJail` compiled from the working tree, both positive controls re-fired (the
+`spaces/demo/config/jobs` refusal and the absolute no-op). **The fresh/deployed verdicts did not move**;
+what moved is that they are now reached by the *runtime*, not only hypothetically by a gate that cannot
+see these values anyway. Driven on this checkout (fresh — neither `spaces/demo/data/backups` nor
+`spaces/demo/data/orders/backup` exists):
+
+| Value | `Files.exists` CWD-relative | Column it falls in **on this tree** | What the job now does |
+|---|---|---|---|
+| `backup_verify_job.toon:6` `backup_dir` | **absent** | **fresh** — silent re-point to `…/config/spaces/demo/data/backups` | `BackupTask.verify` finds no `.zip` there and returns `JobResult.ok("no archive to verify…")` — 🔴 **a green pass that verifies nothing** |
+| `config_backup_job.toon:6` `params.dir` | **present** (it is `spaces/demo/config`, committed) | **refuses in BOTH columns** — state-independent | `BackupTask.backup` throws at `:93` on field `dir`; 🔴 the job **fails at run**, where before `3f384182` it succeeded |
+| `config_backup_job.toon:7` `params.backup_dir` | **absent** | **fresh** — silent re-point | ⚠ **never reached**: `:93` resolves `dir` first and throws, so this value is masked by the row above |
+| `backup_retention_job.toon:5` `params.dir` | **absent** | **fresh** — silent re-point | unchanged by `3f384182` — its reader is `CleanupTask`, moved by `JOB-DIR-CWD-CONTAINMENT-1` |
+
+⚠ `restore`'s two moved keys (`archive`, `target_dir`, `BackupTask:269-270`) classify **no committed
+value**: §2.1's proven absence stands — neither key appears in any committed job config.
+⚠ `BackupTask:191` is **deliberately not** on the new rule: verify's `archive` names a file *inside* the
+already-resolved `backup_dir` and is jailed against **that**, not the Space root.
+⚠ As §6 already records, `SpaceConfigRoot.current()` returning `spaces/demo/config` under a booted demo
+Space is read from the call sites, not observed — this re-drive passed that base in directly.
 
 ### 3.2 `spaces/default` (base `spaces/default/config`, CWD repo root)
 
@@ -220,10 +241,16 @@ its reader moves** — not licence to re-point the other 32 while `PipelineJobRu
 are still on the old rule.)* All 33 values are authored either space-root-prefixed (`spaces/demo/…`) or CWD-prefixed
 (`out/…`, `data/orders`). Under the new rule the correct spelling is relative **to the Space config
 root** — e.g. `spaces/demo/config/jobs/orders_rollup_job.toon` should carry `orders/orders_pipeline.toon`,
-not `spaces/demo/config/orders/orders_pipeline.toon`. ⚠ **Do this in the same change as
+not `spaces/demo/config/orders/orders_pipeline.toon`. ~~⚠ **Do this in the same change as
 `JOB-PATH-BACKUPTASK-SPLIT-1`**, not before: re-pointing the four backup values while `BackupTask` still
-resolves CWD-relative makes those jobs fail at run instead of at save. Includes `spaces/default`'s five,
-which the board does not currently list.
+resolves CWD-relative makes those jobs fail at run instead of at save.~~ 🔴 **OVERTAKEN 2026-09-16
+(`3f384182`): the runtime moved WITHOUT the re-point, the other way round.** So the three backup values
+`BackupTask` reads are now the *opposite* case — their reader has moved and they have not, which is the
+condition this row's own ⛔ marker exists to prevent. Re-pointing them is no longer premature; it is
+**owed**, and until it lands `config_backup` fails at run and `backup_verify` reports a green pass over
+an empty doubled directory (§3.1, driven). ⛔ **Still not licence for the other 29** —
+`PipelineJobRunner` and the compactors have not moved. Includes `spaces/default`'s five, which the board
+does not currently list.
 
 **(b) `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` (P2) — the gate and the *pipeline-job* runtime disagree,
 and nobody has counted this one.** `PipelineJobRunner.java:242` passes `pipeline_config` straight to
@@ -300,8 +327,9 @@ javadoc says the gate and the jail must not diverge; here **two gates** diverge 
 
 ## 7. Where this doc belongs
 
-It is here in `docs/superpower/` because its work is **in flight** — five follow-up rows in §5 and
-`JOB-PATH-BACKUPTASK-SPLIT-1` are all open. ⛔ **When those ship**, distil §1 (the four surfaces and
+It is here in `docs/superpower/` because its work is **in flight** — five follow-up rows in §5 are
+open. *(`JOB-PATH-BACKUPTASK-SPLIT-1` ✅ **SHIPPED 2026-09-16** `3f384182`; its config half is the
+re-point tracked under `JOB-PATH-DEMO-CONFIG-REPOINT-1`.)* ⛔ **When those ship**, distil §1 (the four surfaces and
 their bases), §2.1 (the real key list and its three blind spots) and §4's "MEANING CHANGED is empty"
 finding into [`okf/backend/config/config-safety.md`](../okf/backend/config/config-safety.md) beside the
 existing path-containment section, move anything still open to `docs/BACKLOG.md`, `git mv` this file to
