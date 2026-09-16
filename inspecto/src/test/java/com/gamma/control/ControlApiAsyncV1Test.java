@@ -71,7 +71,7 @@ class ControlApiAsyncV1Test {
     @Test
     void idempotencyKeyReplaysTheFirstResponse(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, List.of())) {
-            String widget = "{\"id\":\"w1\",\"kind\":\"bar\"}";
+            String widget = "{\"id\":\"w1\",\"vizType\":\"bar\"}";
             HttpResponse<String> first = post(c.port, "/components/widget", widget, "Idempotency-Key", "k1");
             assertEquals(200, first.statusCode(), first.body());
             assertTrue(first.headers().firstValue("Idempotency-Replayed").isEmpty());

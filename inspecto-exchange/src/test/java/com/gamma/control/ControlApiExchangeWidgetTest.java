@@ -56,7 +56,7 @@ class ControlApiExchangeWidgetTest {
             assertEquals(200, send(c.port, "POST", "/spaces/finance/components/dataset",
                     "{\"id\":\"tax_receipts\",\"physicalRef\":\"tax_receipts\"}").statusCode());
             assertEquals(200, send(c.port, "POST", "/spaces/finance/components/widget",
-                    "{\"id\":\"receipts_chart\",\"type\":\"bar\",\"dataset\":\"tax_receipts\"}").statusCode());
+                    "{\"id\":\"receipts_chart\",\"vizType\":\"bar\",\"dataset\":\"tax_receipts\"}").statusCode());
 
             // offering the widget before its dataset → 409 (closure)
             assertEquals(409, send(c.port, "POST", "/exchange/offers",

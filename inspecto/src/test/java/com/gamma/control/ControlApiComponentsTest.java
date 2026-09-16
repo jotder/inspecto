@@ -641,6 +641,63 @@ class ControlApiComponentsTest {
         }
     }
 
+    /**
+     * COMPONENT-KIND-KEY-CENSUS-1: a {@code widget}/{@code dashboard} top-level key that nothing reads
+     * is refused at the component route — the one place it CAN be refused.
+     *
+     * <p>🔴 {@code AcceptedConfigKeys} is structurally unable to census these two kinds: the Studio
+     * saves them through {@code POST|PUT /components/{kind}}, which never reaches {@code /config/write}.
+     * A table there would be a no-op, so this gate lives in {@code ComponentRoutes.validateKind}.
+     *
+     * <p>⚠ The negative half matters more than the positive one: the accepted set is NOT just the
+     * {@code ConfigSpec}'s fields. It also carries the store envelope ({@code name}/{@code owner}/
+     * {@code shares}) and the parser-only keys no spec declares — {@code dashboard.description} is read
+     * by {@code MetadataGraphBuilder} and declared nowhere, so a naive spec-derived refusal would have
+     * rejected it.
+     */
+    @Test
+    void widgetAndDashboardRefuseATopLevelKeyNothingReads(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            // a key no reader reads ⇒ 422, named in the message, and nothing is written
+            HttpResponse<String> bad = send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"w1\",\"vizType\":\"kpi\",\"datasetId\":\"orders\",\"refreshInterval\":30}");
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("refreshInterval"), bad.body());
+            assertEquals(404, send(c.port, "GET", "/components/widget/w1", null).statusCode(),
+                    "a refused widget must not be written");
+
+            // the real Studio save shape — spec keys plus the store envelope — still writes
+            HttpResponse<String> ok = send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"w1\",\"name\":\"W1\",\"vizType\":\"kpi\",\"datasetId\":\"orders\","
+                            + "\"controls\":{},\"options\":{\"title\":\"T\"},\"description\":\"d\","
+                            + "\"owner\":\"u1\",\"shares\":[]}");
+            assertEquals(200, ok.statusCode(), ok.body());
+
+            // the author's declared extra-engine marker is the escape hatch, as everywhere else
+            assertEquals(200, send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"w2\",\"vizType\":\"kpi\",\"datasetId\":\"orders\",\"x-mine\":1}").statusCode());
+
+            // UPDATE is the same back door as CREATE
+            HttpResponse<String> badUpdate = send(c.port, "PUT", "/components/widget/w1",
+                    "{\"vizType\":\"kpi\",\"datasetId\":\"orders\",\"refreshInterval\":30}");
+            assertEquals(422, badUpdate.statusCode(), badUpdate.body());
+
+            // dashboard: `description` is spec-UNDECLARED but MetadataGraphBuilder-read ⇒ must pass
+            assertEquals(200, send(c.port, "POST", "/components/dashboard",
+                    "{\"id\":\"d1\",\"name\":\"D1\",\"tiles\":[{\"widgetId\":\"w1\",\"span\":1}],"
+                            + "\"description\":\"board\"}").statusCode());
+            HttpResponse<String> badBoard = send(c.port, "POST", "/components/dashboard",
+                    "{\"id\":\"d2\",\"tiles\":[{\"widgetId\":\"w1\",\"span\":1}],\"autoRefresh\":true}");
+            assertEquals(422, badBoard.statusCode(), badBoard.body());
+            assertTrue(badBoard.body().contains("autoRefresh"), badBoard.body());
+
+            // ⛔ NOT widened to other kinds: a grammar keeps taking whatever it is given
+            assertEquals(200, send(c.port, "POST", "/components/grammar",
+                    "{\"id\":\"g1\",\"delimiter\":\"|\",\"refreshInterval\":30}").statusCode());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

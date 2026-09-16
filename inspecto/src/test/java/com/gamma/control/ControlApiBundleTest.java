@@ -62,7 +62,7 @@ class ControlApiBundleTest {
     void exportsRealContentWithHashAndReportsMissing(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             seed(c.port, "dataset", "sales", "title", "Sales");
-            seed(c.port, "widget", "sales_bar", "kind", "bar");
+            seed(c.port, "widget", "sales_bar", "vizType", "bar");
 
             JsonNode out = json(send(c.port, "POST", "/bundle/export",
                     "{\"items\":[{\"kind\":\"dataset\",\"id\":\"sales\"},"
@@ -203,7 +203,7 @@ class ControlApiBundleTest {
         String bundle;
         try (Ctx src = open(source, source.resolve("wr"))) {
             seed(src.port, "dataset", "sales", "title", "Sales");
-            seed(src.port, "widget", "sales_bar", "kind", "bar");
+            seed(src.port, "widget", "sales_bar", "vizType", "bar");
             bundle = JSON.writeValueAsString(json(send(src.port, "POST", "/bundle/export",
                     "{\"items\":[{\"kind\":\"widget\",\"id\":\"sales_bar\"},"
                     + "{\"kind\":\"dataset\",\"id\":\"sales\"}]}")).get("bundle"));

@@ -4,6 +4,7 @@ import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.safety.SchemaCompatibility;
+import com.gamma.config.spec.AcceptedConfigKeys;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
@@ -25,6 +26,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import static com.gamma.util.Values.mapAt;
 
 /**
@@ -634,5 +636,88 @@ final class ComponentRoutes implements RouteModule {
                         .map(f -> (f.fieldPath().isEmpty() ? "" : f.fieldPath() + ": ") + f.message())
                         .collect(java.util.stream.Collectors.joining("; ")));
         }
+
+        if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
+    }
+
+    // ── widget / dashboard top-level key census ──────────────────────────────────
+
+    /**
+     * The two component kinds whose top-level keys are censused on write.
+     *
+     * <p>🔴 {@code AcceptedConfigKeys} can never do this: neither kind is ever written through
+     * {@code /config/write} — the Studio saves both through {@code POST|PUT /components/{kind}}
+     * ({@code components.service.ts}), which never reaches that class — so a table there is a NO-OP
+     * for them. The gate belongs here, and this is the same per-kind seam the {@code schema} branch
+     * above already uses, not a new one.
+     */
+    private static final Set<String> CENSUSED_COMPONENT_KINDS = Set.of("widget", "dashboard");
+
+    /**
+     * Keys the <em>store</em> adds to a persisted component body, which no {@link ConfigSpec}
+     * declares. Refusing these would reject essentially every real save, so they are accepted for
+     * every censused kind:
+     * <ul>
+     *   <li>{@code name} — canonicalised by {@code ComponentStore.write} ({@code name == id}); the
+     *       Studio also sends it in the body ({@code widgets.service.ts} / {@code dashboards.service.ts}
+     *       {@code toContent}).</li>
+     *   <li>{@code owner} — stamped by {@link ComponentAccess#onCreate} <em>before</em>
+     *       {@link #writeComponent} runs this check, and carried forward on update.</li>
+     *   <li>{@code shares} — the R3 sharing envelope, carried forward on update.</li>
+     * </ul>
+     * ({@code id} is not here because {@link #writeComponent} strips it before validating, and
+     * {@code tags} is not here because it is spec-declared on {@code widget} — it is projected by
+     * {@link WidgetTags} after this check, never read from the body.)
+     */
+    private static final Set<String> COMPONENT_ENVELOPE_KEYS = Set.of("name", "owner", "shares");
+
+    /**
+     * Keys a Java reader reads but the kind's {@link ConfigSpec} does not declare — the
+     * {@code ALERT_PARSER_ONLY} discipline: a census may only refuse a key once every reader's reads
+     * are accounted for, or it refuses configs that work today.
+     * <ul>
+     *   <li>{@code widget.dataset} — {@code ShareRoutes.allowedDatasets} and {@code ExchangeRoutes.findKey}
+     *       both match {@code Set.of("dataset","datasetId")} anywhere in the content tree, top level
+     *       included.</li>
+     *   <li>{@code dashboard.description} — read by {@code MetadataGraphBuilder} (catalog node
+     *       description) although {@code ConfigSpecs.dashboard()} declares no such field. Confirmed
+     *       undeclared-but-read; the exact trap this list exists for.</li>
+     *   <li>{@code dashboard.dataset} / {@code datasetId} / {@code widget} / {@code widgetId} /
+     *       {@code widgets} — {@code ShareRoutes.walk} is deliberately shape-tolerant ("dashboards are
+     *       authored UI-side") and reads all five off a dashboard's own top level.</li>
+     * </ul>
+     */
+    private static final Map<String, Set<String>> COMPONENT_PARSER_ONLY_KEYS = Map.of(
+            "widget", Set.of("dataset"),
+            "dashboard", Set.of("description", "dataset", "datasetId", "widget", "widgetId", "widgets"));
+
+    /**
+     * Refuse a top-level key of a {@code widget}/{@code dashboard} body that nothing reads — neither
+     * spec-declared, nor store envelope, nor parser-only, nor the author's {@code x-} extension marker.
+     *
+     * <p>Deliberately a KEY census only: the kind's {@link ConfigSpec} supplies the accepted NAMES but
+     * its field types and cross-field rules are NOT enforced here, because that would be a second,
+     * wider change — today a draft widget with no {@code vizType} saves, and this row is about keys
+     * that are silently dropped, not about required fields. One level only, for the same reason
+     * {@code AcceptedConfigKeys} accepts a block whole: {@code controls} and {@code options} are
+     * viz-plugin-defined open maps with no census at all.
+     */
+    private static void refuseUnknownComponentKeys(String type, Map<String, Object> content) {
+        ConfigSpec spec = ConfigSpecs.forType(type);
+        if (spec == null) return;   // no spec ⇒ no accepted set ⇒ fail open, never refuse blind
+        Set<String> declared = spec.fields().stream()
+                .map(f -> { int dot = f.path().indexOf('.'); return dot < 0 ? f.path() : f.path().substring(0, dot); })
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        List<String> unknown = content.keySet().stream()
+                .filter(k -> !declared.contains(k))
+                .filter(k -> !COMPONENT_ENVELOPE_KEYS.contains(k))
+                .filter(k -> !COMPONENT_PARSER_ONLY_KEYS.getOrDefault(type, Set.of()).contains(k))
+                .filter(k -> !k.startsWith(AcceptedConfigKeys.EXTENSION_PREFIX))
+                .sorted()
+                .toList();
+        if (!unknown.isEmpty())
+            throw new IllegalArgumentException(type + " has unknown key(s) " + unknown
+                    + " that nothing reads — remove them, or prefix with '"
+                    + AcceptedConfigKeys.EXTENSION_PREFIX + "' to mark them as deliberately extra-engine");
     }
 }

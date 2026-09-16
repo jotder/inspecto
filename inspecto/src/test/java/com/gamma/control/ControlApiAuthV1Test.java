@@ -82,7 +82,7 @@ class ControlApiAuthV1Test {
     void writeRouteWithoutCredentialsIs401(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}");
             assertEquals(401, r.statusCode());
             assertEquals("UNAUTHENTICATED", V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
@@ -92,7 +92,7 @@ class ControlApiAuthV1Test {
     void writeRouteWithoutCapabilityIs403(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}",
                     "Authorization", "Bearer limited");
             assertEquals(403, r.statusCode());
             assertEquals("PERMISSION_DENIED", V1Body.of(r.body()).get("error").get("errorCode").asText());
@@ -112,7 +112,7 @@ class ControlApiAuthV1Test {
     void anUnauthenticatedRefusalIsAudited(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            assertEquals(401, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}").statusCode());
+            assertEquals(401, post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}").statusCode());
             assertTrue(deniedWithStatus(c, "/components/widget", 401),
                     "a 401 on a matched route is recorded as ACCESS_DENIED");
             // Negative control for step 4a: a 401 never reached a capability check, so the row must NOT
@@ -126,7 +126,7 @@ class ControlApiAuthV1Test {
     void aCapabilityRefusalIsAudited(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            assertEquals(403, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
+            assertEquals(403, post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}",
                     "Authorization", "Bearer limited").statusCode());
             assertTrue(deniedWithStatus(c, "/components/widget", 403),
                     "a capability 403 is recorded as ACCESS_DENIED");
@@ -186,7 +186,7 @@ class ControlApiAuthV1Test {
     void writeRouteWithCapabilitySucceedsAndEnvelopeCarriesPermissions(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}",
                     "Authorization", "Bearer valid");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode permissions = V1Body.envelope(r.body()).get("permissions");
@@ -212,7 +212,7 @@ class ControlApiAuthV1Test {
     @Test
     void anUngatedWriteOnPersonalCarriesNoCapability(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            assertEquals(200, post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}").statusCode(),
+            assertEquals(200, post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}").statusCode(),
                     "Personal: the route is open, no capability check runs");
             JsonNode audited = auditEvent(c, "/components/widget", 200);
             assertNotNull(audited, "the write is still audited");
@@ -292,7 +292,7 @@ class ControlApiAuthV1Test {
     void personalEditionUnaffectedWhenNoAuthenticatorIsRegistered(@TempDir Path cfg, @TempDir Path root) throws Exception {
         // No Authenticators.forTest call — Authenticators.active() resolves empty, exactly like Personal.
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}");
             assertEquals(200, r.statusCode(), "no credential required when no Authenticator is present");
             assertNull(V1Body.envelope(r.body()).get("permissions"), "no Subject ⇒ no permissions block");
         }

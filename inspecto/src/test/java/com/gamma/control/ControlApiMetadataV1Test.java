@@ -62,7 +62,7 @@ class ControlApiMetadataV1Test {
             // CREATE — widget is now a WRITABLE_TYPE (was mock-only before W3).
             HttpResponse<String> created = client.send(
                     req(c.port, "/components/widget")
-                            .method("POST", BodyPublishers.ofString("{\"id\":\"sales\",\"kind\":\"bar\",\"title\":\"Sales\"}"))
+                            .method("POST", BodyPublishers.ofString("{\"id\":\"sales\",\"vizType\":\"bar\",\"description\":\"Sales\"}"))
                             .build(),
                     BodyHandlers.ofString());
             assertEquals(200, created.statusCode(), created.body());
@@ -93,7 +93,7 @@ class ControlApiMetadataV1Test {
             // If-Match stale → 409 CONFLICT_STALE_VERSION.
             HttpResponse<String> stale = client.send(
                     req(c.port, "/components/widget/sales", "If-Match", "\"sha256:deadbeef\"")
-                            .method("PUT", BodyPublishers.ofString("{\"kind\":\"line\",\"title\":\"Sales\"}"))
+                            .method("PUT", BodyPublishers.ofString("{\"vizType\":\"line\",\"description\":\"Sales\"}"))
                             .build(),
                     BodyHandlers.ofString());
             assertEquals(409, stale.statusCode());
@@ -103,7 +103,7 @@ class ControlApiMetadataV1Test {
             // If-Match current → 200, new ETag differs.
             HttpResponse<String> ok = client.send(
                     req(c.port, "/components/widget/sales", "If-Match", etag)
-                            .method("PUT", BodyPublishers.ofString("{\"kind\":\"line\",\"title\":\"Sales\"}"))
+                            .method("PUT", BodyPublishers.ofString("{\"vizType\":\"line\",\"description\":\"Sales\"}"))
                             .build(),
                     BodyHandlers.ofString());
             assertEquals(200, ok.statusCode(), ok.body());
