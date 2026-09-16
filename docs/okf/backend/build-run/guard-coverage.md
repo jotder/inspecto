@@ -266,3 +266,60 @@ Three things make this worth recording:
 four directions"; the flag combinations are what actually needed enumerating. The fix was re-checked
 across seven: `--ui` with and without UI data, `--backend` with and without jacoco, `--backend` with
 jacoco above and below the floors, and no-arg with only one half present and with neither.
+
+## A fourth shape: the guard whose SCAN ROOT includes what the repository is not
+
+Shapes 1-3 are about a guard's *rules*. This one is about the **set of files it looks at**, which is
+just as load-bearing and is almost never reviewed. A generator that walks the tree to derive its
+subject is only as correct as its skip list — and a skip list is written once, against the directories
+that existed that day.
+
+`tools/route-gating-report.mjs` derives the mutating-route inventory in
+`compliance/evidence/route-gating.md` by walking for `.java` files, skipping `target`, `node_modules`
+and `.git`. It did **not** skip `.claude/`. This sandbox keeps agent worktrees there — seventeen of
+them on 2026-09-16, each a full second copy of the source — so on any machine with one checked out the
+scan saw every route twice and wrote the citations pointing at the copy. **63 of the 172 rows in that
+document cited `.claude/worktrees/agent-<id>/inspecto/src/main/java/...`**: paths that exist in no
+clone, no bundle, and not on the CI runner.
+
+What makes this its own shape rather than an ordinary bug:
+
+- **The guard was working perfectly.** It compared committed output against generated output and they
+  matched — *on the machine that generated them*. Both sides were wrong together, which is the one
+  disagreement a self-comparing guard structurally cannot report.
+- **The output is auditor-facing, and `compliance/controls-matrix.md` cites it as "CI-enforced against
+  drift, never hand-typed."** The enforcement was real; what it enforced was environment-dependent.
+- **The fix moved no numbers.** Still 172 routes, 109 gated, 63 exempt, 0 undeclared — strip the
+  worktree prefix from the 63 old rows and they are byte-identical to the new ones. ⇒ A count-based
+  check would never have caught it. Only the *paths* were wrong, and nothing was checking those.
+
+⛔ **When a tool walks the tree to derive its subject, its skip list is part of the contract.** Exclude
+scratch and worktree roots (`.claude/`) explicitly, and prefer deriving the file set from
+`git ls-files` — what the repository *is* — over `readdirSync`, which reports what a working copy
+*happens to contain*.
+
+## Instance, 2026-09-16: three unrelated defects behind ONE red gate
+
+`master` CI was red all day — at least six runs from 08:33 onward — and every one read as the same
+known failure. It was not one failure. It was three, stacked, each invisible until the one above it
+was cleared:
+
+1. `ci.yml:64` — the Step Processors board was stale against its contract (a shipped feature the board
+   had not caught up with). Cheap guard, trivial fix.
+2. `ci.yml:163` — the route-gating evidence carried the 63 phantom citations above. **Never ran** while
+   step 1 was red.
+3. `ci.yml:291` — `Run tests (all editions)`. **The reactor had not executed a single test all day.**
+   When it finally did, it surfaced a real failure: `PipelineDocumentXlsxTest.writesARealWorkbook`
+   erroring because DuckDB's `excel` extension cannot load on a clean runner — which in turn falsified
+   the premise `D-8` had been closed on the day before.
+
+The mechanism is ordinary GitHub Actions semantics — a job stops at its first failing step — and that
+is exactly why it is dangerous. **The guards are ordered cheapest-first, so the cheapest possible
+failure buys silence for everything behind it**, including the expensive signal the pipeline exists to
+produce. A stale generated table, which nobody would rank above P3, suppressed the entire test suite.
+
+⛔ **Do not read "CI is red" as "CI has one problem."** The only honest reading of a red gate is *"the
+first failing step failed, and everything after it is UNKNOWN"* — and "unknown" gets wider the earlier
+the step sits. ⚠ Recorded rather than fixed: making the doc guards non-aborting (collect all, fail at
+the end) or moving them *after* the test step would have surfaced all three in one run instead of three.
+That is a real change to `ci.yml` job structure and is owed a decision, not a drive-by edit.
