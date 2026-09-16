@@ -218,7 +218,25 @@ build fault**. Both editions pass with `-NoRuntime`. Re-prove jlink on a box wit
 
 **It fails closed in both directions**, because a filter that also drops wanted docs is worse than the defect it fixes. After the copy, step 7 throws `DOCS TIER LEAK` if any excluded tree reached the bundle, and `DOCS OVER-FILTERED` if any of `$docsRequiredEntries` (`okf`, `stakeholders`, `api`, `ui`, `ops`, `roadmap`, `wiki`, `INDEX.md`, `GLOSSARY.md`, `USER_GUIDE.md`, `ADVANCED_GUIDE.md`, `EDITIONS.md`) is missing. Packaging then prints the staged / withheld counts.
 
-⚠ **Known consequence, not yet decided: 198 dangling links.** Current-tier docs link *into* the withheld trees **187 times to `archived-documents/` and 11 times to `superpower/`** — including `INDEX.md` (which lists both trees as sections), `GLOSSARY.md`, `ADVANCED_GUIDE.md` and `BACKLOG.md`. Withholding the trees does not rewrite those links, so the shipped `INDEX.md` now points at documents the customer does not have. ⛔ This is a real residual and needs an operator call of its own: rewrite/strip the inbound links at package time, ship a marked stub, or accept them.
+⚠ **Known consequence, not yet decided: the shipped docs carry 323 links that resolve to nothing.** Withholding a tree does not rewrite the documents that pointed into it. **Recounted 2026-09-16 with `tools/check-bundle-doc-links.mjs`** (the first count, 198, was by hand and was low — it counted only the two *tier* trees, and only from `docs/`):
+
+| what the link points at | links | note |
+|---|---|---|
+| `docs/archived-documents/**` | 181 | withheld tier |
+| `docs/superpower/**` | 13 | withheld tier |
+| `docs/BACKLOG.md` | 22 | withheld audience — **the first count missed these entirely** |
+| `docs/PROJECT_NOTES.md` | 8 | withheld audience — likewise |
+| a repo path that exists but never ships (`inspecto/**` source citations, `compliance/**`) | 66 | **not** caused by the withholding decision |
+| climbs above the bundle root (`examples/README.md` moved up one level) | 4 | caused by step 4b's relocation |
+| **broken in the repository too** | 29 | pre-existing rot, see below |
+
+**224 of the 323 are the withholding decision's own doing**, across **124 distinct withheld target files**. The concentration matters more than the total: **97 are in `INDEX.md` alone** — the front door, which lists both withheld trees as sections — and 41 in `okf/backend/engine/db-layer.md`. `GLOSSARY.md` and `ADVANCED_GUIDE.md` are among the rest.
+
+🔴 **29 of them are broken in the repo as well, and nothing was watching.** They are almost all in `inspecto/README.md` — the file step 7 copies to the **bundle root** as the customer's first page — pointing at `docs/architecture.md`, `docs/configuration.md`, `docs/operations.md`, `docs/plugins.md`, `docs/v3-agent-mvp.md` and friends — every one a dead path that does not exist since the docs consolidation. `tools/check-doc-links.mjs` cannot see them: its `ROOTS` are `docs`, `compliance`, `.claude` + root `*.md`, and `inspecto/` is in none of them. ⛔ This is **not** part of the withholding decision and must not be folded into it — it needs no product call, only the correct targets.
+
+⛔ The remaining 224 need an operator call: rewrite/neutralise the inbound links at package time · ship a marked stub per withheld target · accept them and say so in the bundle README. → `BUNDLE-DANGLING-LINKS-1`
+
+**`tools/check-bundle-doc-links.mjs` is how this is measured, and re-measured.** It has two modes. By default it **simulates** the bundle from `git ls-files` plus the exclusion lists **parsed out of `package.ps1` itself** — no `pwsh`, no build, so CI and a sandboxed agent can both run it; `--bundle <dir>` walks a **real** staged bundle and is the verdict. ⛔ The guard never restates the exclusion lists: a check that keeps its own copy of what it checks drifts from it silently. A failed parse or an empty list exits **2 (cannot run)**, and an emptiness floor fails a run that scanned almost nothing — the recurring failure here is a probe that could not return a hit reporting "absent" and exiting 0. ⚠ **Not wired into `ci.yml` or pre-push**: it is red on `master` today, and wiring it is part of whichever option wins, not a way to make an undecided question loud.
 
 ✅ **`BACKLOG.md` and `PROJECT_NOTES.md` are ALSO withheld, by operator decision 2026-09-16** — but through a **second, separate list**, `$docsExcludedFiles`, with its own assertion (`DOCS AUDIENCE LEAK`). ⛔ **The two lists are deliberately not merged.** These two files are current-tier by `CLAUDE.md`'s own canon list and are accurate and maintained; they are withheld because of **audience** — `BACKLOG.md` is the internal defect board, naming open P1s by identifier in the product the customer just installed. A tier exclusion and an audience exclusion are different claims, and collapsing them into one list would lose why either tree is out. ⚠ This paragraph read *"Still shipping … a separate product call"* until that decision landed the same day.
 
@@ -232,6 +250,16 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 - **`REACTOR-VERDICT-CI-1`** — wire `check-reactor-verdict.mjs` into `ci.yml`. ⛔ Deliberately NOT
   pre-push: it judges a *build*, not repo state, and producing a log at push time means a ~20-minute
   reactor per push. CI already runs one, so the log is free there.
-- **`BUNDLE-DANGLING-LINKS-1`** — the bundle now withholds two doc trees, but current-tier docs link
-  **into** them 198 times (`INDEX.md` included), so a shipped index points at documents the customer does
-  not have. Rewrite at package time · ship marked stubs · accept and say so in the bundle README.
+- **`BUNDLE-DANGLING-LINKS-1`** — 323 links in the shipped docs resolve to nothing, **224** of them
+  because of the withheld trees/files (97 in `INDEX.md` alone, 124 distinct targets). Measured by
+  `tools/check-bundle-doc-links.mjs`, which is NOT yet wired into CI. Rewrite at package time · ship
+  marked stubs · accept and say so in the bundle README — an owed call. ⚠ A separate, *unowed* half fell
+  out of the same measurement: 29 of the 323 are broken in the repo too, nearly all in
+  `inspecto/README.md`, which becomes the bundle's root page and which `check-doc-links.mjs` does not
+  scan.
+
+- **`README-LINKS-BROKEN-IN-REPO-1`** — 29 links are dead in the repository itself, nearly all in
+  `inspecto/README.md` (still tracked), which step 7 copies to the **bundle root as the customer's first page**. ⛔
+  `check-doc-links.mjs` cannot see them: its `ROOTS` are `docs`, `compliance`, `.claude` and root `*.md`,
+  and `inspecto/` is in none of them. ⚠ Fix the targets and widen the scope — do **not** let the
+  package-time neutralisation swallow these, or repo rot survives behind a bundle rewrite.
