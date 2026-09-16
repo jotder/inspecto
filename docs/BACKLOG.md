@@ -1541,6 +1541,26 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
 
 - **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**
+  ✅ **THE `enrichment` TYPE LANDED 2026-09-16 (BREAKING) — census is now FOUR of nine**: `pipeline`,
+  `alert`, `meta`, `enrichment`. Ratchet `EnrichmentKeyCoverageContractTest` (12 tests);
+  `ENRICHMENT_PARSER_ONLY = {references}`; censused parents `input`/`output`/`triggers` — which is where
+  the value is, since a top-level-only census would accept `input: {databse: …}` whole.
+  🔴 **This row's premise was wrong for enrichment, and so was the OKF doc:** both listed several
+  "undeclared-but-engine-read" keys, but `ConfigSpecs.enrichment()` declares all of them except **one**
+  (`references`). That is why enrichment was cheap — not because it was next in line. ⚠ Every other reader
+  of an enrich map was checked too (`PipelineGraphRoutes`, `PipelineBundleRoutes`, `PipelineRenameRoutes`),
+  not just the parser.
+  ⚠ **All four mutations went red here, unlike `meta`** — adding/removing a censused parent DOES fail,
+  because `input`/`output`/`triggers` have declared sub-blocks. And the falsify-the-scan test earned its
+  place for real rather than by mutation: the first run failed because the nested scan matched only
+  `local.get("…")` and missed reads going through a `req(in, …)` helper.
+  ⛔ **`schema` and `expectation` should be RE-FRAMED, not merely "still needs a census".** `schema` has no
+  single parser — a dozen readers across `inspecto-etl` — so the ratchet idiom cannot be written for it.
+  `expectation` is authored through `/expectations*` and its persisted content carries
+  `lastResult`/`createdAt`/`updatedAt`, so it belongs under `COMPONENT-KIND-KEY-CENSUS-1` beside
+  `widget`/`dashboard`. ⇒ **On that reading `AcceptedConfigKeys` has exactly ONE genuinely remaining type:
+  `job`** (still gated on a job-type registry).
+  ⇒ Regression found and filed separately: `PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1`.
   ✅ **THE `meta` TYPE LANDED 2026-09-16 (`c3b3fc5f`, BREAKING)** — census now covers **three of nine**:
   `pipeline`, `alert`, `meta`. `meta` has **no parser-only list at all**: all five of `SemanticModel.load`'s
   top-level reads are already spec-declared. Ratchet: `MetaKeyCoverageContractTest`. Verified in the MAIN
@@ -1883,27 +1903,128 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   a `checkJob`; one of the two is wrong and the discrepancy is itself the finding. ⇒ Ranked P1: an
   unjailed path read is a containment defect, not a consistency nit. → `okf/backend/control-plane/jobs.md`
 
-- **P2** · 🔴 **`JOB-PATH-COMPACTOR-UNJAILED-1` — two compactors walk and DELETE under a raw, unjailed
-  path.** `PartitionCompactor.java:57` and `ReferenceCompactor.java:91` do `Path.of(cfg.require("dir"))`
-  and then `Files.walk` + merge/delete. **Every other `dir` reader jails.** ⚠ Predates the 2026-09-16
-  semantics change — it is not a regression, which is exactly why nobody found it while looking at that
-  change. → `okf/backend/control-plane/jobs.md`
+- ~~**P2** · **`JOB-PATH-COMPACTOR-UNJAILED-1`**~~ ✅ **SHIPPED 2026-09-16.** Both sites now use the JOB
+  rule — `requireJobPathUnderAny(…, SpaceConfigRoot.current(), …)` — matching the three siblings
+  (`CleanupTask`, `PartitionPruneTask`, `StorageReportTask`) reached from the same `MaintenanceJob` switch.
+  ⛔ Plain `requireUnderAny` was rejected deliberately: it would make `dir:` mean one thing in `compact`
+  and another in `cleanup`, which is the split the seam exists to prevent. ⛔ `ReferenceCompactor.compact(Path,long)`
+  is deliberately left UNJAILED — `CollectorService:1276` feeds it a pipeline's own resolved dirs, not an
+  operator-authored value. `inspecto-engine` 1668/0/0/0; mutation red on exactly the two refusal
+  assertions while the two "still runs" controls stayed green. ⚠ **This row is rare: every claim in it
+  held up, including the "every other `dir` reader jails" half** — worth noting against the base rate.
+  🔴 **Its committed-config check was wrong, and I corrected it.** The lane reported none of three
+  candidate paths existed; `spaces/demo/data/orders` **does**. Per `PathJail.java:182-189` the refusal
+  fires when the Space-relative path is absent AND the CWD-relative one exists — so
+  `orders_weekly_compact_job.toon`'s bare `dir: data/orders` refuses or not **depending on the launch
+  directory**: safe from the repo root (what was tested), refusing when served from `spaces/demo`, which
+  is where that data actually lives. ⇒ **"No committed config refuses" was CWD-dependent and stated as
+  unconditional.** Add it to `JOB-PATH-DEMO-CONFIG-REPOINT-1` — it is the only *bare* relative `dir` among
+  the demo jobs. ⚠ `JobService.java:437` cites `PartitionCompactor:59`, which this change shifts.
+  → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1` — a THIRD base for the same value.**
-  `ConfigWriteRoutes.java:370` passes `target.getParent()` (`…/config/jobs`) where `JobRoutes:381` passes
-  the Space root. Driven: `spaces/demo/data/backups` resolves to two different places through the two
-  gates. ⇒ One value, two gates, two answers. → `okf/backend/control-plane/jobs.md`
+- ~~**P2** · **`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`**~~ ✅ **SHIPPED 2026-09-16 — and the defect was NOT the
+  one this row named.** `ConfigWriteRoutes.safetyBase(type, writeRoot, target)` now dispatches on TYPE:
+  a job is judged from the Space config root (`api.writeRoot()` — the same value `SpaceBootstrap:46`
+  registers for `JobRoutes` to read back), a pipeline/schema keeps `target.getParent()` so its
+  `schema_file`/`grammar` refs resolve as the loader resolves them. ⛔ **"Make them the same" was the wrong
+  fix** — `configDir` legitimately carries two meanings by config type, which is why the call site looks
+  correct at a glance.
+  🔴 **The real third base was elsewhere in the same file: `/config/write:71` passed NO base at all**
+  (`null`), judging a job against the **process working directory** — the exact rule the operator retired.
+  Fixed in the same change; leaving it would have kept this row's own defect alive one call site over.
+  ⚠ **The row's description only reproduces in one shape:** `target.getParent()` equals `…/config/jobs`
+  only when the caller passes `subdir:"jobs"`; with no subdir it *coincidentally equals* the config root.
+  ⇒ **Severity was lower than filed and that is now established, not assumed:** `/config/patch` has **no
+  production caller at all** and nothing anywhere sends `type:"job"` to either route — both are armed but
+  uncalled for jobs, so this was latent, never live. **No committed config changes meaning.** Evidence:
+  pre-fix `PUT /jobs/sweep` → 422 while `/config/patch` → 200 `written:true` for the same escaping
+  `backup_dir`. Pinned by `ControlApiJobPathBaseTest`; `inspecto` 3828/0/0/8, 545 surefire reports fresh.
+  ⚠ **Two probes passed for the WRONG reason first:** the parent POM grants `java.io.tmpdir` as an allowed
+  root (`pom.xml:418`) so every `@TempDir` resolved contained, and `DiscoveredRoots` is process-global
+  static and leaks roots between test classes. → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PATH-GATE-BLIND-KEYS-1` — the gate cannot see the keys it claims to cover.** Dotted-path
-  blindness hides **11** values under `params:` from `RawConfig.str(raw, "job."+k)`; `archive_dir` is
-  resolved with the NEW rule at run time (`CleanupTask:47`) but is absent from `JOB_PATH_KEYS`; `out_dir`
-  (`ReportJob:125`) is covered by neither. → `okf/backend/control-plane/jobs.md`
+- ~~**P2** · **`JOB-PATH-GATE-BLIND-KEYS-1`**~~ ✅ **PARTLY SHIPPED, PARTLY REFUTED 2026-09-16 — and the
+  refuted part was MY error in filing it.**
+  ✅ **`archive_dir` ADDED to `JOB_PATH_KEYS` (now seven).** It is the one key where gate and jail already
+  agreed and only the gate was not looking: `CleanupTask:47` resolves it through the identical
+  `requireJobPathUnderAny`. Blast radius **zero** — no committed config carries it.
+  🔴 **The "11 values under `params:`" claim is REFUTED, wrong twice over.** The real figure is **5** real
+  values plus 4 `${…}` placeholders. ⛔ **The 11 was the survey's TOTAL gate-blind count across all
+  causes**, which I copied onto the dotted-path cause alone — a derived row inheriting no grounding, again.
+  ⛔ **And the defect is UNREACHABLE anyway:** all five live in Job Template instances, which carry no
+  `job.type`, and `job.type` is `FieldSpec.required` (`ConfigSpecs.java:507`) run beside the safety gate on
+  every gated route — the body is refused first. Widening `checkJob` to `job.params.*` would refuse nothing
+  any route can accept. Not widened; the reason is pinned by a test instead.
+  🔴 **`out_dir` "covered by neither" is HALF refuted** — it IS jailed (`ReportJob:125`,
+  `requireUnderAny`), just not Space-relative. ⛔ Adding it to the gate would MANUFACTURE the very split
+  the list exists to close, and would refuse one committed config. Held out deliberately.
+  ⇒ **The sweep is the lasting value: there are TEN path-shaped job keys, and both the operator decision
+  (five) and this row undercounted.** 🔴 It also surfaced a key nobody had named — **`config` on
+  `EnrichJob:59` is ungated at save AND unjailed at run**, a containment hole with zero committed values.
+  ⇒ Residual re-filed as `JOB-PATH-REPORT-ENRICH-SPLIT-1`. `inspecto-config` 157/0/0/0, both mutants
+  meaningful. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PATH-REPORT-ENRICH-SPLIT-1` — two job keys read paths under the WRONG rule or none at
+  all.** Filed 2026-09-16 from the ten-key sweep. Move `ReportJob:125` (`out_dir`, currently
+  `requireUnderAny` = CWD-relative) and `EnrichJob:59` (`config`, **no jail at all**) onto
+  `requireJobPathUnderAny`, and only THEN list both in `JOB_PATH_KEYS` — listing first manufactures a
+  gate/jail split. ⛔ Land it with `JOB-PATH-DEMO-CONFIG-REPOINT-1` or `maintenance_report_job.toon`
+  breaks in between. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-CONFIG-THIRD-PRODUCER-1` — bundle import writes job configs whose path values no gate
+  ever sees.** Filed 2026-09-16 while closing `JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`, which found it.
+  `BundleRoutes.java:477` writes `<write-root>/jobs/<name>_job.toon` directly on import (reached from
+  `bundle-transfer.service.ts:211`). ⚠ **Narrower than first reported:** the FILE's location *is* contained
+  — `WriteGates.jail(api.writeRoot(), …)` — so "bypasses both gates entirely" is wrong. What is missing is
+  that the job's own path VALUES (`dir`, `backup_dir`, …) never reach `ConfigSafetyValidator`. ⇒ A bundle
+  can land a job config whose paths point anywhere the file jail does not cover. **A third producer of job
+  config files that was on no row.** → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1` — two bulk writers bypass every `validateKind` gate.**
+  Filed 2026-09-16 from the `widget`/`dashboard` census. `BiTemplates.apply` (`BiTemplates.java:125`) and
+  bundle import (`BundleRoutes.java:425`) call `store.write` directly, so no component gate runs — not the
+  new key census and not the pre-existing `schema` validation. ⚠ Same "gate on one route, not its sibling"
+  shape as the finding that started this thread. The authoring route is the UI's only door, so the
+  reachable half is closed; this is the rest. → `okf/backend/config/config-safety.md`
+
+- **P2** · 🔴 **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1` — 36 committed sample pipelines cannot be
+  re-saved.** Filed 2026-09-16 from the `enrichment` census. `*_pipeline.toon` samples carry a top-level
+  `version:` that the pipeline spec does NOT declare (`version` is declared on `meta()`,
+  `ConfigSpecs.java:737`, not `pipeline()`), so **re-saving any shipped sample pipeline through
+  `/config/write` has 422'd since the pipeline census landed at `2c310d1c`**. ⚠ **24 under `spaces/` and
+  12 more under `inspecto/examples/`** — the lane that found it scoped to `spaces/` and undercounted by a
+  third; the examples tree is the same one whose advertised jobs were found broken a day earlier.
+  ⛔ **The root cause is a missing guard, not a missing fix:** the pipeline census shipped with no
+  "no committed config regresses" test. `meta` escaped only because it happens to declare `version`;
+  `enrichment` added that test and cleaned its one sample. ⇒ Owed call: strip the key from 36 files, or
+  declare it on the pipeline spec and say why. → `okf/backend/config/config-safety.md`
 
 - **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point all 33 committed values space-relative.** The
   remedy half of the survey. ⛔ Do it in the same change as whichever runtime row lands last, or the
   configs refuse in between. → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`COMPONENT-KIND-KEY-CENSUS-1` — `widget` and `dashboard` can never be censused by
+- ~~**P2** · **`COMPONENT-KIND-KEY-CENSUS-1`**~~ ✅ **SHIPPED 2026-09-16** — the `widget`/`dashboard`
+  top-level key census landed in `ComponentRoutes.validateKind` (`:640`, helpers `:654-720`), where it
+  *can* work; `AcceptedConfigKeys` stays correctly a no-op for both. Accepted = `ConfigSpec` fields ∪ store
+  envelope (`name`/`owner`/`shares`) ∪ a documented parser-only set ∪ the `x-` extension marker.
+  🔴 **This row's envelope list was incomplete in exactly the way that mattered:** `dashboard.description`
+  is read by `MetadataGraphBuilder:308` and declared by NO `ConfigSpec`, so a spec-derived accepted set
+  would have refused a live read — mutation-proven, not theoretical.
+  🔴 **And copying the `schema` branch's idiom would have shipped a gate that refuses nothing:**
+  `ConfigLoader.validate` (`:57-69`) walks DECLARED fields only and never emits an unknown-key finding.
+  The census had to be written explicitly. ⛔ **Two seams that look equivalent are not** — this is the
+  second time today a "just extend the existing pattern" reading was wrong.
+  ✅ **The gate immediately found SEVEN dead-key fixtures in the repo's own control-plane tests** — every
+  widget fixture in four test classes saved `kind`/`title`, which nothing reads (`kind` is the bundle
+  manifest's field; `title` lives under `options.title`). Repaired. ⇒ **the row's defect demonstrated on
+  committed code, not hypothetically.** `inspecto` module green, 1033/0/0/0 in `inspecto-processor`; two
+  mutations each red on their own assertion.
+  ⚠ Deliberately NOT done: running `ConfigLoader.validate`'s field-type/cross-field rules here, which
+  would start refusing drafts (a widget with no `vizType` saves today). This row is about keys nothing
+  reads, not required fields. ⚠ Census is ONE level only, matching `AcceptedConfigKeys`' "an accepted
+  block is accepted whole". ⇒ Residual filed as `COMPONENT-BULK-WRITERS-UNGATED-1`.
+  → `okf/backend/config/config-safety.md` · original row follows.
+  - **P2** · **`COMPONENT-KIND-KEY-CENSUS-1` — `widget` and `dashboard` can never be censused by
   `AcceptedConfigKeys`.** Filed 2026-09-16 out of `DUCKLE-C3-DEAD-PROPERTY-1`, which had listed them among
   its "remaining seven". They never reach `/config/write` at all: the UI saves both through
   `POST|PUT /components/{kind}` (`components.service.ts:173,194` → `ComponentRoutes`). A table in
