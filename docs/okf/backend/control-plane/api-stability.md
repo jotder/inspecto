@@ -79,8 +79,18 @@ above the generated commit list.
   point of the change; see `PROJECT_NOTES` for the silent-config-loss defects it closes.
 - Keys prefixed `x-` are accepted and round-trip untouched — that is the escape hatch.
 - ⛔ Granularity is the **block**, not the leaf: `dirs`, `collector`, `parsing`, `output` and `reference` are
-  accepted whole, because they carry engine-read keys with no `FieldSpec`. Only top-level and `processing.*`
-  are censused today; the other eight config types are still fail-open by omission.
+  accepted whole, because they carry engine-read keys with no `FieldSpec`. For `pipeline`, only top-level
+  and `processing.*` are censused.
+- **Extended to the `alert` config type (2026-09-16).** ⚠ Also breaking, in the same way: a dead key inside
+  an `alert:` block — say `thresold:` for `threshold:` — now returns **422** where it previously saved
+  silently, which for an Alert Rule meant a threshold that never took effect. The census descends one level
+  into `alert:` (the whole file is that one block, so a top-level-only census would catch nothing), and the
+  three parser-only leaves `alert.dataset`, `alert.measure`, `alert.when` are accepted — refusing those
+  would have broken every BI-5 measure rule authored today.
+- The remaining **seven** config types (`enrichment`, `job`, `schema`, `meta`, `expectation`, `widget`,
+  `dashboard`) are still fail-open by omission. ⛔ They cannot simply be switched on: four of them have
+  confirmed undeclared-but-engine-read keys, and `job` funnels any unrecognised key into an open `params`
+  bag. See [config safety](../config/config-safety.md) §"The accepted-key census" for the per-type blockers.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
 

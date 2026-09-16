@@ -144,10 +144,80 @@ class AcceptedConfigKeysTest {
 
     @Test
     void aTypeWithNoCensusIsCheckedNotAtAll() {
-        // Fail-open BY OMISSION and stated: `alert` has no parser census, so nothing is known to be dead.
-        assertFalse(AcceptedConfigKeys.hasCensus("alert"));
-        assertTrue(AcceptedConfigKeys.unknownKeyFindings("alert",
+        // Fail-open BY OMISSION and stated: `widget` has no parser census, so nothing is known to be
+        // dead. (This test used `alert` as its example until alert GAINED a census — see below.)
+        assertFalse(AcceptedConfigKeys.hasCensus("widget"));
+        assertTrue(AcceptedConfigKeys.unknownKeyFindings("widget",
                 new LinkedHashMap<>(Map.of("banana", "yellow")), Severity.ERROR).isEmpty());
+    }
+
+    // ── the `alert` census (the second type to get one) ──────────────────────────
+
+    private static Map<String, Object> alertDraft(Map<String, Object> alertBlock) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("alert", new LinkedHashMap<>(alertBlock));
+        return raw;
+    }
+
+    @Test
+    void theAlertTypeHasACensus() {
+        assertTrue(AcceptedConfigKeys.hasCensus("alert"));
+    }
+
+    @Test
+    void aLiveLedgerMetricAlertIsAccepted() {
+        // spaces/demo/config/orders/orders_stream_failures_alert.toon, verbatim.
+        Map<String, Object> raw = alertDraft(Map.of(
+                "name", "orders_stream_failures", "metric", "rejected_files", "comparator", "gt",
+                "threshold", 3, "window", "1h", "onPipeline", "orders", "severity", "CRITICAL"));
+        assertTrue(AcceptedConfigKeys.unknownKeyFindings("alert", raw, Severity.ERROR).isEmpty(),
+                "a shipped sample alert config must not be refused by its own census");
+    }
+
+    @Test
+    void aLiveMeasureAlertIsAccepted() {
+        // spaces/demo/config/orders/orders_volume_alert.toon — the BI-5 shape, whose `dataset:` and
+        // `measure:` keys the spec does NOT declare. This is the case a spec-only census would break.
+        Map<String, Object> raw = alertDraft(Map.of(
+                "name", "orders_low_volume", "dataset", "orders_dataset", "measure", "count",
+                "comparator", "lt", "threshold", 10, "severity", "WARNING"));
+        assertTrue(AcceptedConfigKeys.unknownKeyFindings("alert", raw, Severity.ERROR).isEmpty(),
+                "alert.dataset/alert.measure are parser-only but LIVE — refusing them would break "
+                        + "every measure rule authored today");
+    }
+
+    @Test
+    void aDeadAlertKeyIsRefusedWithASuggestion() {
+        Map<String, Object> raw = alertDraft(Map.of(
+                "name", "x", "metric", "error_rate", "comparator", "gt", "threshold", 1,
+                "window", "1h", "severity", "WARNING", "thresold", 5));
+        List<Finding> findings = AcceptedConfigKeys.unknownKeyFindings("alert", raw, Severity.ERROR);
+        assertEquals(1, findings.size(), "exactly the one dead key is refused: " + findings);
+        Finding f = findings.get(0);
+        assertEquals("alert.thresold", f.fieldPath());
+        assertEquals(FindingCodes.ERR_UNKNOWN_CONFIG_KEY, f.code());
+        assertTrue(f.guidance().contains("alert.threshold"),
+                "a near-name typo must be suggested at the right depth, got: " + f.guidance());
+    }
+
+    @Test
+    void anExtensionKeyInsideTheAlertBlockRoundTrips() {
+        Map<String, Object> raw = alertDraft(Map.of(
+                "name", "x", "metric", "error_rate", "comparator", "gt", "threshold", 1,
+                "window", "1h", "severity", "WARNING", "x-owner", "platform-team"));
+        assertTrue(AcceptedConfigKeys.unknownKeyFindings("alert", raw, Severity.ERROR).isEmpty(),
+                "the x- escape hatch must work one level down, not only at the top level");
+    }
+
+    @Test
+    void theAlertCensusDoesNotLeakIntoPipelineConfigs() {
+        // A pipeline carrying a top-level `alert:` block is dead-key territory for the PIPELINE census;
+        // the alert census must not quietly accept it. Guards the per-type censused-parent switch.
+        Map<String, Object> raw = pipelineDraft();
+        raw.put("alert", new LinkedHashMap<>(Map.of("name", "x")));
+        List<Finding> findings = AcceptedConfigKeys.unknownKeyFindings("pipeline", raw, Severity.ERROR);
+        assertTrue(findings.stream().anyMatch(f -> "alert".equals(f.fieldPath())),
+                "a top-level alert: block in a pipeline must still be refused, got: " + findings);
     }
 
     @Test

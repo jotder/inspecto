@@ -31,10 +31,16 @@ import java.util.TreeSet;
  * leaf-granular checker would refuse configs that run correctly today. ⇒ <b>an accepted block is
  * accepted whole and never descended into.</b> Anything finer needs the leaf census to exist first.
  *
- * <p>⚠ <b>Only {@code pipeline} has a table.</b> The other config types have no parser census, so
- * their accepted set is unknown and {@link #unknownKeyFindings} returns nothing for them. That is a
- * stated fail-open, not an omission: deriving a set from {@code ConfigSpecs} alone would refuse the
- * keys those parsers read, which is exactly the mistake the block granularity above rules out.
+ * <p>⚠ <b>Two of the nine config types have a table: {@code pipeline} and {@code alert}.</b> The
+ * other seven ({@code enrichment}, {@code job}, {@code schema}, {@code meta}, {@code expectation},
+ * {@code widget}, {@code dashboard}) have no parser census, so their accepted set is unknown and
+ * {@link #unknownKeyFindings} returns nothing for them. That is a stated fail-open, not an omission:
+ * deriving a set from {@code ConfigSpecs} alone would refuse the keys those parsers read, which is
+ * exactly the mistake the block granularity above rules out — {@code job}, {@code expectation},
+ * {@code schema} and {@code enrichment} each have confirmed undeclared-but-engine-read keys today, and
+ * {@code job} funnels every unrecognised key into an open {@code params} bag, so it cannot be censused
+ * without a job-type registry. {@code alert} is censusable precisely because that objection can be
+ * ANSWERED for it — see {@link #ALERT_PARSER_ONLY}.
  *
  * <p>⚠ A block named {@code x-…} is the author's declared "this is mine, not the engine's" marker: it
  * is accepted unconditionally, never suggested against, and round-trips through {@code ConfigCodec}
@@ -69,7 +75,16 @@ public final class AcceptedConfigKeys {
      * ⚠ Adding an entry here is only sound once that block's leaves are censused the way
      * {@code processing.*} is. Until then, accepted-whole is the honest answer.
      */
-    private static final Set<String> CENSUSED_PARENTS = Set.of("processing");
+    private static Set<String> censusedParents(String type) {
+        return switch (type == null ? "" : type) {
+            case "pipeline" -> Set.of("processing");
+            // The whole alert file is ONE block — `alert:` — so a census that stopped at the top level
+            // would accept every alert config whole and catch nothing. `alert` is censused because its
+            // leaves ARE enumerable: `AlertRule.fromMap` reads a fixed, literal list of them.
+            case "alert" -> Set.of("alert");
+            default -> Set.of();
+        };
+    }
 
     /**
      * The blocks {@code PipelineConfigParser} reads that {@link ConfigSpecs#pipeline()} does not
@@ -107,6 +122,29 @@ public final class AcceptedConfigKeys {
             "processing.summarize");
 
     /**
+     * The {@code alert.*} leaves {@code AlertRule.fromMap} reads that {@link ConfigSpecs#alert()} does
+     * not declare — the alert type's counterpart to {@link #PARSER_ONLY}.
+     *
+     * <p>🔴 <b>Why alert can be censused when the other seven types cannot.</b> The fail-open on this
+     * class is not squeamishness: deriving an accepted set from {@code ConfigSpecs} ALONE would refuse
+     * the keys a hand-written parser reads but the spec never declared. That objection is answerable
+     * exactly where the parser's reads are ENUMERABLE, and {@code AlertRule.fromMap}
+     * ({@code AlertRule.java:115-128}) is a flat, literal list of ten {@code alert.get("…")} calls with
+     * no dynamic key access at all. Seven of the ten are declared by the spec; these three are not, and
+     * they are all live — {@code dataset}/{@code measure} are the BI-5 measure-rule shape and
+     * {@code when} scopes ledger rows (both enforced in the compact constructor at
+     * {@code AlertRule.java:91-99}). ⚠ This list may only ever SHRINK, for the same reason
+     * {@link #PARSER_ONLY} may: a block leaving it means the spec now declares it.
+     *
+     * <p>⚠ The FLAT {@code alert-rule} component shape is a different config type written through
+     * {@code AlertRoutes}, not {@code /config/write}, so it never reaches this census.
+     */
+    public static final Set<String> ALERT_PARSER_ONLY = Set.of(
+            "alert.dataset",   // BI-5 measure rule: the Dataset the Measure is read from
+            "alert.measure",   // BI-5 measure rule: count or agg(field)
+            "alert.when");     // the ledger-row scope filter
+
+    /**
      * The blocks {@code spec} declares: a leaf {@code a.b.c} declares {@code a} and {@code a.b}.
      * (Lifted from {@code PipelineKeyCoverageContractTest}, which now calls this rather than holding a
      * second copy of the derivation.)
@@ -127,9 +165,18 @@ public final class AcceptedConfigKeys {
      * census (which {@link #unknownKeyFindings} reads as "check nothing", never as "accept nothing").
      */
     public static Set<String> acceptedBlocks(String type) {
-        if (!"pipeline".equals(type)) return Set.of();
-        Set<String> all = new TreeSet<>(declaredBlocks(ConfigSpecs.pipeline()));
-        all.addAll(PARSER_ONLY);
+        Set<String> all = new TreeSet<>();
+        switch (type == null ? "" : type) {
+            case "pipeline" -> {
+                all.addAll(declaredBlocks(ConfigSpecs.pipeline()));
+                all.addAll(PARSER_ONLY);
+            }
+            case "alert" -> {
+                all.addAll(declaredBlocks(ConfigSpecs.alert()));
+                all.addAll(ALERT_PARSER_ONLY);
+            }
+            default -> { /* no parser census ⇒ nothing is KNOWN to be dead; see the class doc. */ }
+        }
         return all;
     }
 
@@ -159,7 +206,7 @@ public final class AcceptedConfigKeys {
                 continue;
             }
             // One level down, and ONLY inside a block whose second level is itself censused.
-            if (!CENSUSED_PARENTS.contains(key) || !(raw.get(key) instanceof Map<?, ?> nested)) continue;
+            if (!censusedParents(type).contains(key) || !(raw.get(key) instanceof Map<?, ?> nested)) continue;
             Set<String> subs = subBlocksOf(accepted, key);
             if (subs.isEmpty()) continue;
             for (String sub : orderedKeys(nested)) {

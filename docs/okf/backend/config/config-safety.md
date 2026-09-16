@@ -243,3 +243,52 @@ now runs both (ERRORs 422 with `field: message`), `ConfigSafetyValidator` gained
 (b) `requireTopLevelSinks` is a rule about literal directory nesting ("no store inside another store's tree"),
 not a jail; resolving real paths would change its answer for the wrong reason. **Decided:** keep as designed —
 a standing refusal (BACKLOG §6).
+
+## The accepted-key census — which config types have one, and why not the rest
+
+`AcceptedConfigKeys` (`inspecto-config/src/main/java/com/gamma/config/spec/AcceptedConfigKeys.java`) is the
+second gate folded into the same 422 at `/config/write` and `/config/patch`
+(`ConfigWriteRoutes.java:87`, `:380`): **a key no component reads is refused** with
+`ERR_UNKNOWN_CONFIG_KEY` and a near-name suggestion (`DUCKLE-C3-DEAD-PROPERTY-1`). A dead key is a
+*silent loss* — the save answers `written: true` and the engine never looks at it.
+
+**Two of the nine config types have a census: `pipeline` and `alert`.** The other seven
+(`enrichment`, `job`, `schema`, `meta`, `expectation`, `widget`, `dashboard`) are **fail-open by
+omission, and that is stated rather than accidental**: `unknownKeyFindings` returns nothing for a type
+with no census.
+
+🔴 **Why the missing seven cannot simply be switched on.** Two authorities read every config: what
+`ConfigSpecs` *declares*, and what the engine's hand-written parser *navigates*. An accepted set derived
+from `ConfigSpecs` **alone is unsound** — it would refuse keys the engine honours today. This is not
+hypothetical; each of these has confirmed undeclared-but-engine-read keys:
+
+| Type | Undeclared keys the engine reads | Blocker |
+|---|---|---|
+| `job` | `on_signal`, `when`, `catch_up`, `args`, `bind` | `JobConfig.fromMap` also funnels **any** other key into an open `params` bag — a census needs a job-type registry, not a parser walk |
+| `expectation` | `when` (required for `kind: condition`) | needs a parser census |
+| `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | needs a parser census |
+| `enrichment` | `input`, `output`, `references`, `triggers.*`, `transform`/`transform_file` | `EnrichmentConfig.fromMap` is a full hand-written navigator |
+| `meta`, `widget`, `dashboard` | none found | *plausibly* spec-driven, but **unproven** — no ratchet exists to show no hidden reader touches an undeclared block |
+
+⇒ **A type earns a census only when its parser's reads can be PROVEN from source**, and the proof is a
+ratchet test that fails when the two authorities drift.
+
+**`alert` earned one (2026-09-16).** `AlertRule.fromMap` (`inspecto-engine/.../alert/AlertRule.java:115-128`)
+is the easiest case in the codebase: one flat block of literal `alert.get("…")` calls, no dynamic key
+access, no nested sub-parsers. Seven of its ten keys are declared by `ConfigSpecs.alert()`; the other
+three are `AcceptedConfigKeys.ALERT_PARSER_ONLY` — `alert.dataset`, `alert.measure` (the BI-5
+measure-rule shape) and `alert.when` (the ledger-row scope filter). All three are **live**, which is
+exactly why a spec-only census would have broken every measure rule authored today.
+
+⚠ **Granularity differs per type, and must.** For `pipeline` the census stops at the top level and
+descends only into `processing.*`. An alert file is **one** block — `alert:` — so a top-level-only
+census would accept every alert config whole and catch nothing; `alert` is therefore a *censused parent*
+and the checker descends one level into it. `censusedParents(type)` is per-type for this reason.
+
+⚠ The **flat** `alert-rule` component shape (`AlertRoutes`, `ComponentStore`) is a *different config
+type string* and is written through `/alerts/rules*`, not `/config/write` — it never reaches this census.
+
+Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest` and
+`PipelineKeyCoverageContractTest` (the two source-derived ratchets), and
+`AcceptedConfigKeysDocContractTest` (the generated pipeline table). Each ratchet includes a
+*falsify-the-scan* test, because a scan that silently matches nothing passes every other assertion.
