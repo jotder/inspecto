@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **54<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
+> **54<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 38<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
 > shift, which filed four rows (it was 50 / 35 / 14 on the way in). ⚠ **The board grew while four items
 > were worked**, and that is the honest result, not a failure: all four were already SHIPPED or REFUTED,
 > and grounding them produced five residuals that were previously invisible. ✅ **The one row that was
@@ -139,8 +139,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 14<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 38<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 15<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
 > backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
@@ -342,16 +342,35 @@ further adopters · Pipeline graph intake-cap flip (soak) · `SPACES-FROM-PARTIT
 table further down — but the same sitting produced **six operator INPUTS that are owed and not supplied**,
 and the route-gating grounding later that day added **three more** (the route calls the compliance plan needs).
 ⚠ **An owed input is a pending item exactly like a decision**: work stops on it just the same, and the only
-reason §1 has never carried one is that nobody thought to file one here. Four of the six block rows whose
-CODE IS ALREADY COMPLETE — ⛔ so a shift reading those rows will look for something to build and find
-nothing, which is the shape that kept `DEPLOY-SERVICE-WRAPPER-1` looking open for days.
+reason §1 had never carried one is that nobody thought to file one here.
+⛔ **The paragraph above is the HISTORY of how this table filled up — the live count is the one below it,
+and only that one.** It said "four of the six" long after both numbers were false; two counts in one
+section is how the drift started.
 
-✅ **The table is NINE live rows as of 2026-09-16** (everything else in it is struck). ⚠ It read ELEVEN
-until that sweep: **two answered inputs had been re-filed as new rows instead of striking the answered
-ones** — *job path semantics* and the *pre-materialise cap*, both answered earlier the same day, each
-appearing once struck-and-answered and once open. ⛔ **Answer an owed input by STRIKING its row, never by
-adding a second one** — §0's "nine owed inputs" was right the whole time while this table said eleven,
-which is the same census failure §0 records against itself, one section down.
+✅ **The table is FOUR live rows as of 2026-09-16 (second sweep)** — everything else in it is struck.
+**Counted from the table, not asserted:** `awk '/^\| Owed input/,/^$/' docs/BACKLOG.md | grep '^| ' | grep -vc '^| ~~'`
+minus the header and separator rows. ⚠ The first draft of this very paragraph said FIVE and was wrong by
+one — ⛔ **derive this number, never carry it forward by hand**; every count in this table that was
+hand-maintained has drifted at least once.
+⚠ It read NINE that morning, and **two of those nine were never owed inputs at all**: the stray `master`
+branch had **already been deleted upstream** (verified: `refs/heads/main` is the only ref) and the four
+route calls were **already drained in code** (`CapabilityManifest.java:324` = `List.of()`). Two more —
+the **framework** call and the **`ref:` pin** — were answered and shipped the same day, and the third,
+`SPEC-DEADSEAM-1`'s last two verdicts, closed its §4 row outright.
+🔴 **Three census failures in this one table in two days, each a different shape**: two answered inputs
+**re-filed instead of struck** (*job path semantics*, the *pre-materialise cap* — swept earlier today);
+two rows **discharged elsewhere and never swept back here** (the route calls, in code); and one row
+**dissolved by an event nobody probed for**, because its only exit was someone else's action.
+⛔ **The rules that follow from those three:** answer an owed input by **striking its row**, never by
+adding a second one; when a §1 row's answer lands in CODE, **strike §1 in the same change**; and
+**re-ground a row whose exit is external before reporting it owed** — "blocked on someone else" is not
+a reason to stop checking, it is the reason a row rots unnoticed.
+
+**What is left — FOUR, and not one of them is a question a shift can answer for you:** two dates
+(`SEC-INCIDENT-1`), the per-tier RTO/RPO commitment, the three access details, and the `s3://`
+`dirs.database` eager-vs-lazy design call. ⚠ **Three of the four block rows whose CODE IS ALREADY
+COMPLETE** — a shift reading them will look for something to build and find nothing, which is the shape
+that kept `DEPLOY-SERVICE-WRAPPER-1` looking open for days.
 
 | Owed input | Blocks | Why only the operator can supply it |
 |---|---|---|
@@ -363,14 +382,14 @@ which is the same census failure §0 records against itself, one section down.
 | ~~**Dead-seam verdict (2) — `temporalColumn`**~~ ✅ **ANSWERED 2026-09-16: KEEP it.** ⇒ `TYPEFLOW-DATASET-COLUMNS-1` steps 3+4 are UNBLOCKED and are again the only **M**-size row on the board; the `temporalColumn` clause of Consignment addressing stands; `SPEC-DEADSEAM-1` still owes verdicts (1) and (3) | — | Recorded here rather than struck so the other two verdicts stay visible |
 | ~~**A spreadsheet library** for `D-8` XLSX export~~ ✅ **ANSWERED 2026-09-16: Apache POI**, and the feature is WANTED (the row was demand-gated and the demand arrived) | `D-8` XLSX export (§3) — now unblocked | ⚠ POI is the conventional JVM choice and the widest on format support, but it pulls a sizeable transitive tree into a reactor that today has **no spreadsheet dependency at all**, and every edition bundle grows with it. ⛔ Add it to ONE module, not the parent, and check the bundle-size and dependency-review guards before assuming it lands quietly | ✅ **SUPERSEDED BY THE BUILD, 2026-09-16 — D-8 IS SHIPPED AND NO LIBRARY WAS ADDED.** 🔴 The POI answer above was overtaken the same day: `PipelineDocumentXlsx` writes the workbook with **DuckDB's `excel` extension** (`COPY … TO … (FORMAT xlsx)`) — already bundled and already staged for air-gapped installs, because it is the same extension the `xlsx` PARSER reads with. Its javadoc states *“⛔ No new dependency”* outright. **Verified: there is NO `org.apache.poi` declaration in any pom**, and `PipelineDocumentXlsxTest` is 4/4 with `writesARealWorkbook` genuinely executing (1.297s of real I/O, no skip element). ⚠ **A `grep poi` over the poms returns NINE hits and every one is a substring of “point”/“policy”** — a false POSITIVE, the mirror of the false-zero trap; match `org.apache.poi` or `<artifactId>poi`. ⇒ The dependency question was never answered by picking a library; it was DISSOLVED by finding the capability already in the bundle. ⛔ Do not add POI.
 | ~~**Job path semantics**~~ ✅ **ANSWERED 2026-09-16: a relative path in a Job config resolves against the SPACE'S CONFIG ROOT**, never the process working directory | `JOB-DIR-CWD-CONTAINMENT-1` — now unblocked | Consistent with the path-jail model and portable across hosts; ⚠ a Job whose meaning depends on how the server was launched is the defect this closes. Check for configs relying on the old behaviour before shipping |
-| **Delete the stray `master` branch** on `jotder/inspect-agent` | nothing directly — it is a live trap | Needs a permission no shift has had. ⚠ Neither `ci.yml` nor `release.yml` pins a `ref:`, so both follow that repo's **default** branch; a commit pushed to the stray branch reaches no CI and looks landed |
-| **FOUR route calls** (was three — `POST /objects` added 2026-09-15 when step 2b found manual Incident/Case creation is the `/recon/promote` question again; all four sit in `CapabilityManifest.PENDING_OPERATOR_CALLS`, and step 3 waits on them) — `POST /spaces/import` (does the `POST /spaces` "additive, recovery route" decision extend to bundle import?) · `POST /tags/rules/{id}/apply` (operate action → `canOperateRuns`, or collaboration act → open, like assignments?) · `POST /recon/promote` (which family owns *manually opening an Incident*? — `canAuthorWorkbench` has no precedent, `DecisionRoutes` uses `canOperateRuns`, `ExpectationRoutes` is ungated, no Incident capability exists) | `ROUTE-UNGATED-DEFAULT-1` step 2 → **step 3 (the fail-closed default) cannot land until these are decided**. ✅ **THREE OF THE FOUR ANSWERED 2026-09-16:** `POST /spaces/import` → **yes, the `POST /spaces` additive/recovery posture extends to bundle import** (stays open, exempted explicitly by step 3) · `POST /tags/rules/{id}/apply` → **collaboration act, leave OPEN** (consistent with assignments, not with run operation) · `POST /recon/promote` → **create the Incident capability the domain lacks** rather than borrowing `canOperateRuns` or `canAuthorWorkbench`; ⚠ it also gives the currently-ungated `ExpectationRoutes` a home, and ⛔ its dedupe lines are the ones the `(type, key, column)` decision rewrites — do both in one change. ✅ **AND `POST /objects` ANSWERED 2026-09-16: the same new Incident capability**, deliberately — it is the same act as `/recon/promote` (manually opening an Incident) and must not acquire a second precedent. ⇒ **ALL FOUR ROUTE CALLS ARE ANSWERED; `ROUTE-UNGATED-DEFAULT-1` step 3 is UNBLOCKED.** ⛔ Step 3 is still not a pure code change: the Incident capability does not exist in `Roles` yet, so it is created first, and the two Incident routes plus `ExpectationRoutes` adopt it together with the `(type, key, column)` dedupe rewrite. | Each was grounded 2026-09-15 and is a genuine question, not a formality — the handler, the comment and the tests point different ways. ⚠ `/recon/promote`'s dedupe lines are the same ones the `(type, key, column)` decision rewrites; do both in one change. → `archived-documents/plans-archive/route-gating-compliance-plan.md` §2a |
+| ~~**Delete the stray `master` branch** on `jotder/inspect-agent`~~ ✅ **DISSOLVED — VERIFIED GONE 2026-09-16.** `GET repos/jotder/inspect-agent/git/refs/heads` returns **`refs/heads/main` and nothing else**, and the repo's `default_branch` is `main`. The trap this row describes cannot fire | ~~nothing — a live trap~~ | ⛔ **This is an owed-input row that stopped being owed without anybody checking.** It asked for a permission no shift had, so no shift ever probed whether the act was still needed — a row whose only exit is someone else's action still has to be RE-GROUNDED, or it sits forever describing a world that has moved. ⚠ It was never load-bearing for the `ref:` decision either: that one turns on release **reproducibility**, not on branch ambiguity, and stands unchanged |
+| ~~**FOUR route calls**~~ ✅ **ALL ANSWERED — ROW SWEPT 2026-09-16** (was three — `POST /objects` added 2026-09-15 when step 2b found manual Incident/Case creation is the `/recon/promote` question again; all four sat in `CapabilityManifest.PENDING_OPERATOR_CALLS`, and step 3 waits on them) — `POST /spaces/import` (does the `POST /spaces` "additive, recovery route" decision extend to bundle import?) · `POST /tags/rules/{id}/apply` (operate action → `canOperateRuns`, or collaboration act → open, like assignments?) · `POST /recon/promote` (which family owns *manually opening an Incident*? — `canAuthorWorkbench` has no precedent, `DecisionRoutes` uses `canOperateRuns`, `ExpectationRoutes` is ungated, no Incident capability exists) | `ROUTE-UNGATED-DEFAULT-1` step 2 → **step 3 (the fail-closed default) cannot land until these are decided**. ✅ **THREE OF THE FOUR ANSWERED 2026-09-16:** `POST /spaces/import` → **yes, the `POST /spaces` additive/recovery posture extends to bundle import** (stays open, exempted explicitly by step 3) · `POST /tags/rules/{id}/apply` → **collaboration act, leave OPEN** (consistent with assignments, not with run operation) · `POST /recon/promote` → **create the Incident capability the domain lacks** rather than borrowing `canOperateRuns` or `canAuthorWorkbench`; ⚠ it also gives the currently-ungated `ExpectationRoutes` a home, and ⛔ its dedupe lines are the ones the `(type, key, column)` decision rewrites — do both in one change. ✅ **AND `POST /objects` ANSWERED 2026-09-16: the same new Incident capability**, deliberately — it is the same act as `/recon/promote` (manually opening an Incident) and must not acquire a second precedent. ⇒ **ALL FOUR ROUTE CALLS ARE ANSWERED; `ROUTE-UNGATED-DEFAULT-1` step 3 is UNBLOCKED.** ⛔ Step 3 is still not a pure code change: the Incident capability does not exist in `Roles` yet, so it is created first, and the two Incident routes plus `ExpectationRoutes` adopt it together with the `(type, key, column)` dedupe rewrite. | ✅ **SWEPT 2026-09-16 — NOTHING IS OWED HERE ANY MORE, and the CODE says so**: `CapabilityManifest.java:324` is now `PENDING_OPERATOR_CALLS = List.of()`. All four answers landed in the manifest; what remains (create the Incident capability in `Roles`, adopt it on the two Incident routes plus `ExpectationRoutes`, do the `(type, key, column)` dedupe rewrite in the same change) is **build work already tracked on `ROUTE-UNGATED-DEFAULT-1` (§5)** — ⛔ an answered row left unstruck in §1 is exactly the shape that made a shift look for work and find none. Each was grounded 2026-09-15 and was a genuine question, not a formality — the handler, the comment and the tests pointed different ways. → `archived-documents/plans-archive/route-gating-compliance-plan.md` §2a |
 | ~~**Confirm reads-open-by-policy as the COMPLIANCE position**~~ ✅ **AFFIRMED 2026-09-16** — write it into `compliance/controls-matrix.md` CC6: read routes are open **by policy**, because confidentiality is enforced at the Space/ABAC layer. ⇒ the route-gating plan's §3e is unblocked | `archived-documents/plans-archive/route-gating-compliance-plan.md` §3e · `controls-matrix.md` CC6 | ⚠ This is now an auditor-facing CLAIM, not only an engineering posture: if reads are ever gated, the matrix line moves with the code |
-| **Which framework(s) the evidence is written against** | the route-gating evidence report under `compliance/evidence/` (step 4e, not yet written) · the `controls-matrix.md` row mapping | SOC 2 Type II is assumed throughout the plan; ISO 27001 A.9 maps onto the same evidence but the matrix rows differ |
+| ~~**Which framework(s) the evidence is written against**~~ ✅ **ANSWERED + SHIPPED 2026-09-16: SOC 2 `CC6.1`/`CC6.3` AND ISO 27001:2022 `A.5.15`/`A.5.18`/`A.8.3`**, declared on one `Control:` header line per the pattern `compliance/evidence/release-verification.md` already set (SOC 2 CC8 · ISO 27001 8.24 · NIST SI-2/SR). ⛔ **The Annex A mapping stays in `controls-matrix.md` §2 and is NOT restated in the evidence document** — §2 already declares the ISO Statement of Applicability is an *export* of that table, so a second copy is the drift its own rule 4 exists to prevent | ~~route-gating evidence · `controls-matrix.md` §4a~~ — both updated | 🔴 **This had effectively been answered in-repo for weeks and nobody noticed**: the matrix declares the multi-framework posture at its top and `release-verification.md` practises it; route-gating was the lone document still calling it an assumption. ⚠ **And the "A.9" in the question was the retired 2013 numbering** — ISO/IEC 27001:2022 dissolved old A.9 into A.5.15/5.16/5.18 and A.8.2/8.3, and `controls-matrix.md` §2 is *headed* "ISO 27001:2022", so citing A.9 would have contradicted the very table it points at. ⚠ **Still open and deliberately separate:** the HIPAA/PCI **certification** choice (§2), gated on a named prospect — which frameworks the evidence is *written against* is not which the org *certifies to* |
 | ~~**Job path semantics**~~ ✅ **SWEPT 2026-09-16 — this was an UNSTRUCK DUPLICATE** of the answered entry above, and doubly stale: the call was ANSWERED 2026-09-16 *and* `JOB-DIR-CWD-CONTAINMENT-1` **SHIPPED** the same day (§5, struck) | — | Its grounding survives on the shipped row, which is why this could be struck rather than migrated: *"the row's own fix (pass `configDir`) is a no-op"* is discharged by `ConfigSafetyValidator.checkJob` now USING `configDir`, and *"the gate and the run-time tasks BOTH resolve against the CWD"* by `PathJail.resolveJobPath` being the single rule called from both sides. ⛔ Checked before striking — a duplicate is only safe to strike when the surviving copy carries its grounding too |
 | **Eager or deferred resolution of an `s3://` `dirs.database`** — validate a profile at PARSE time (forces the deployment-root / pipeline-field split, because `CollectorService` parses every pipeline before `loadConnections` runs) or resolve at FIRST WRITE-TIME USE (no split; `dirs.database` is a plain `String` nothing resolves at parse) | scale-out phase C §5.4 bullet 6 (the credential surface that `AIRGAP-S3-EXTENSIONS-1` left behind when it closed 2026-09-15) | The bootstrap order is measured (`ServiceBootstrap.buildFrom:69` vs `:73-74`); which side of it to build on is a design posture only the operator sets. |
-| **Three verdicts for `SPEC-DEADSEAM-1`'s survivors** — (1) `ExpressionProvider`: retire the never-registered THIRD-PARTY extension point (the interface itself is the live expression engine) or keep it as SPI; (2) `DatasetRelation.temporalColumn`: keep unwired (an active plan's Q2 tie-break depends on its throw-on-two behaviour) or wire it; (3) `LegacyVendorFunctions`: it is in-repo load-bearing (ServiceLoader-registered, called by `RTDMS_ASN_Test`, the PLUGIN_GUIDE's worked example) — document it as the canonical plugin, or nothing | `SPEC-DEADSEAM-1` (§4) | The standing verdict ("DELETE all four") was refuted for three of four; two deletions would have removed live code. Each survivor is a different kind of question and no default is safe. |
-| **Approve or decline pinning a `ref:`** in `ci.yml` / `release.yml` | nothing yet — filed here so the question is not lost | 🔴 The 2026-09-15 decision to keep building eoiagent from its upstream tree makes the unpinned `ref:` **permanent rather than temporary**, which changes it from a tolerable shortcut into a standing exposure. Offered at the sitting; not answered |
+| ~~**Three verdicts for `SPEC-DEADSEAM-1`'s survivors**~~ ✅ **ALL THREE ANSWERED — (2) on 2026-09-16, (1) and (3) the same day. `SPEC-DEADSEAM-1` IS CLOSED (§4).** (1) `ExpressionProvider` → **KEEP the SPI unchanged.** 🔴 The question's own premise was wrong: "never-registered third-party extension point" is not the state. `ServiceLoader.load(ExpressionProvider.class)` is called TWICE — `JobService.java:562` (base classpath) and **`JobPackManager.java:209`, registering per-pack at `:243` through an isolated classloader** — and `JobPackManagerTest.java:421` compiles a synthetic provider into a fake pack jar to prove that path works end to end. ⇒ **zero in-repo registrants is the DESIGNED state of a hot-deploy seam**, not evidence of death; Job Packs register at runtime from outside the repo. Retiring it would have deleted a capability with a passing test. (3) `LegacyVendorFunctions` → **NOTHING TO DO — the documentation the verdict asked for already exists**: `PLUGIN_GUIDE.md:41` names the module "the worked example", `:58` and `:74` extend it, `:81` points readers at its test, and `asn-decoders/README.md:105` + `CONFIG_REFERENCE.md:77` carry it too. ⛔ Do not do doc work to satisfy a premise grounding refuted. | ~~`SPEC-DEADSEAM-1` (§4)~~ — CLOSED | 🔴 **TWO of this row's OWN supporting citations were false, and both are corrected on the §4 row**: `RTDMS_ASN_Test` is **not a test** (no `@Test`; its one uncommented `main()` path, `pgwParse()`, never touches `LegacyVendorFunctions`) — the real automated links are `asn-golden`'s runtime-scope dependency (`pom.xml:43-47`) and `LegacyVendorFunctionsTest`'s own `@Test`s; and the `*_tx.json` configs calling `ccnEventType(...)` are **untracked** (`asn-parser/.gitignore:12`). ⚠ `LegacyVendorFunctionsTest` is plain JUnit, not environment-gated, and DOES run — but in **CI's 26-module coverage run**, not in the 14-non-asn-module local baseline, so a green local gate says nothing about it. → `RTDMS-ASN-HARNESS-1` filed (§4) for the dead harness itself |
+| ~~**Approve or decline pinning a `ref:`** in `ci.yml` / `release.yml`~~ ✅ **ANSWERED + SHIPPED 2026-09-16: pin `release.yml` ONLY** — `ref: a24817ba6151245c3f0ddacf9886954ef68f260d` (upstream `main` @ 2026-09-14, whose pom declares the `0.2.0-SNAPSHOT` this repo's `<eoiagent.version>` requires). **`ci.yml` stays unpinned DELIBERATELY**, and both files now carry the reason so nobody "fixes" the asymmetry | ~~nothing~~ → `compliance/evidence/release-verification.md` (SOC 2 CC8 · NIST SI-2/SR) | **CI is the canary, the release is the contract.** ⛔ The real exposure was never the stray branch — it is that **re-running the release workflow for one tag could emit different bytes**, i.e. no tagged release has ever been reproducible. Pinning both would hide upstream drift until release day, the expensive place to find it. ⚠ **Do not pin to the upstream `v0.1.0` tag**: it predates `0.2.0-SNAPSHOT` and was NOT verified to satisfy the dependency — bumping the SHA means re-checking upstream's pom first |
 | ~~**Pre-materialise cap: the UNIT and the REMAINDER policy**~~ ✅ **SWEPT 2026-09-16 — this was an UNSTRUCK DUPLICATE** of the answered entry above (bytes; the remainder defers) | — | ⚠ Unlike the job-path duplicate, this one carried grounding the answered copy did **not** have, so it was **migrated, not deleted**: *"nothing exists to extend — `IntakeGovernor` caps AFTER listing, a pre-fetch cap is a connector-SPI question"* now lives on the **§3 Pipeline graph** row that has to build it |
 
 ✅ **Every DECISION is answered.** The six queued on 2026-09-14 were answered that day; the duckle triage
@@ -1265,7 +1284,8 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
 These four are the **classes** behind roughly half of the consolidation's findings. Each is one guard, not N
 fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-archive/post-consolidation-sprints.md`.
 
-- **P2** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**
+- ~~**P2** · **`SPEC-DEADSEAM-1` — four declared seams with no implementation or no caller.**~~
+  ✅ **CLOSED 2026-09-16 — three KEEP, one deleted. Kept for the two corrected citations at the end.**
   `ExpressionProvider` has no registration in any module; `DatasetRelation.temporalColumn` has no caller; a
   vendor-transform plugin registers **30** legacy functions through a real seam (🔴 this said "~40" until 2026-09-09; counted from `LegacyVendorFunctions`' 30 `f.put(` registrations — ⚠ and note this is a DIFFERENT set from the 23 SQL mapping functions, which is why `check-doc-counts.mjs` names its id `sql-mapping-functions` rather than the ambiguous noun) and **reaches no bundle and no
   document**; `AssistDialog` is dead code whose doc comment describes an unwired flow. Each needs a
@@ -1321,9 +1341,52 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   survivors are three DIFFERENT questions: retire an unused extension point (Expression), keep or wire an
   unwired reader (temporal), and document a live-but-undocumented plugin (vendor).
 
-  ⛔ **BLOCKED on the operator (2026-09-15 §4 pass) — the three questions are filed in §1 as one owed
-  decision.** Nothing here is buildable until they are answered: two of the three "deletions" would have
-  removed live code, so the standing DELETE verdict is void and no default is safe to assume.
+  ~~⛔ **BLOCKED on the operator (2026-09-15 §4 pass)**~~ ✅ **ALL THREE VERDICTS IN — ROW CLOSED
+  2026-09-16. KEEP ALL THREE SURVIVORS; NO CODE CHANGES.** (1) `ExpressionProvider` **KEEP the SPI**;
+  (2) `DatasetRelation.temporalColumn` **KEEP unwired** (answered earlier the same day); (3)
+  `LegacyVendorFunctions` **KEEP, and it is already documented** — nothing to write.
+  ⇒ Of four seams the standing verdict said to DELETE, **exactly one was deletable**, and it was deleted.
+  🔴 **The lesson is not "three were alive" — it is that the ROW'S OWN EVIDENCE was wrong twice while
+  reaching the right conclusion**, and both errors are corrected here rather than left to be re-cited:
+  - ⛔ **"Deleting it breaks `RTDMS_ASN_Test`" is FALSE.** `asn-parser/src/test/java/com/gamma/skybase/
+    decoder/asn2/RTDMS_ASN_Test.java` has **no `@Test` method at all** — it is a `main()` harness with
+    hardcoded `/home/gamma/...` paths whose only uncommented call, `pgwParse()`, never builds a
+    `Transformer` and never touches `LegacyVendorFunctions`. The real automated links are `asn-golden`'s
+    **runtime-scope dependency** (`asn-parser/asn-decoders/asn-golden/pom.xml:43-47`) and
+    `LegacyVendorFunctionsTest`'s own `@Test`s, including `discoveredViaServiceLoader`, which asserts the
+    `META-INF/services` entry resolves. ⚠ That test is plain JUnit, **not** environment-gated — but it runs
+    in **CI's 26-module coverage build**, not in the 14-non-asn-module local baseline, so a green local
+    gate proves nothing about it. → the dead harness is now `RTDMS-ASN-HARNESS-1` below.
+  - ⚠ **`ExpressionProvider`'s SPI is not a speculative third-party hook — it is the Job Pack seam.**
+    `ServiceLoader.load(ExpressionProvider.class)` runs at `JobService.java:562` (base classpath, finds
+    none by design) **and at `JobPackManager.java:209`, registering per-pack at `:243` through an isolated
+    classloader**; `JobPackManagerTest.java:421` compiles a synthetic provider into a fake pack jar to
+    prove that path end to end. ⇒ **zero in-repo registrants is the DESIGNED state of a hot-deploy seam.**
+    ⛔ Do not re-file this as a dead SPI — "no `META-INF/services` file in the repo" is the expected
+    reading, not a finding. `BuiltinExpressions` never depended on ServiceLoader anyway: it is registered
+    by direct call at `ExpressionRegistry.java:34-35`.
+  ⚠ **Offered and NOT taken** (no build was authorised, and neither pays for itself today): a test pinning
+  that the base build discovers zero providers, so `JobService.java:561`'s comment stops being an unchecked
+  claim; and dropping that base-classpath loop, which would cut a real capability — a bundled edition module
+  could ship a provider through it — for no measured gain.
+
+- **P3** · **`RTDMS-ASN-HARNESS-1` — `RTDMS_ASN_Test` is a dead manual harness shaped like a test.**
+  `asn-parser/src/test/java/com/gamma/skybase/decoder/asn2/RTDMS_ASN_Test.java` sits under `src/test/java`
+  and is named `*Test`, but carries **no `@Test` annotation**: it is a package-private class with a
+  `public static void main(String[] args)` (`:15`) dispatching to manual harness methods, **most of them
+  commented out**, against hardcoded absolute `/home/gamma/...` paths that exist on no machine this team
+  runs (the sandbox is win32). The one active call is `pgwParse()` (`:117`).
+  🔴 **Why this is worth a row rather than a shrug: it has already caused one false citation.**
+  `SPEC-DEADSEAM-1` recorded "deleting `LegacyVendorFunctions` breaks `RTDMS_ASN_Test`" as evidence the
+  plugin was load-bearing — a claim that reads as an automated-test dependency and is not one. The name
+  did the lying; anything under `src/test/java` called `*Test` is assumed to run.
+  **Verdict needed, not a build** — and unlike the `SPEC-DEADSEAM-1` survivors this one is genuinely
+  low-stakes: (a) delete it; (b) rename to `*Harness` / move out of `src/test/java` so the name stops
+  claiming coverage; (c) keep verbatim as an operator-side reproduction aid, documented as such.
+  ⚠ **Ground it before deleting** — the same gate that saved the vendor plugin. Its commented-out methods
+  build a `Transformer(txConf)` over the **untracked** `asn-parser/config/rtdms/mtna` tx configs
+  (`.gitignore:12`), so it may be a deliberate operator-side harness, which is precisely the case that
+  refuted three of four deletions last time. ⛔ Do not sweep it in with a tidy-up.
 ## 5. Docs & hygiene
 
 - **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down.**
