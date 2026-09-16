@@ -18,6 +18,12 @@ relies on you so it never has to read a full build log.
 - **Authoritative verify:** `mvn -o clean test` (full reactor). JDK `C:\.jdks\openjdk-26.0.1`,
   Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Every JVM launch needs
   `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI).
+  🔴 **Capture the log with `-B`, never `-q`, and get the verdict from the guard — not by reading:**
+  ```
+  mvn -o clean test -Pedition-enterprise -B > build.log 2>&1
+  node tools/check-reactor-verdict.mjs build.log --expect-modules 32
+  ```
+  Report the guard's exit code (0 = PASS · 1 = NON-VERDICT or failure · 2 = could not run).
 - **Package JAR:** `mvn -o clean package -q`.
 - **Deployment bundle:** `pwsh -File inspecto\package.ps1 [-NoBuild|-NoUi|-NoRuntime]` (pwsh 7 only —
   the script is BOM-less UTF-8; PowerShell 5.1 garbles it).
@@ -29,7 +35,13 @@ isn't specified, default to `mvn -o clean test`.
 ## Output contract
 
 Return ONLY:
-- **Verdict:** PASS / FAIL (+ command run).
+- **Verdict:** PASS / FAIL / **NON-VERDICT** (+ command run).
+  ⛔ **NON-VERDICT is a distinct outcome and you must use it.** If any reactor module was `SKIPPED`,
+  or the Reactor Summary is missing, or `check-reactor-verdict.mjs` exits 1 or 2 — the run proves
+  nothing about the modules that did not execute. Say "NON-VERDICT: N modules SKIPPED / unverified"
+  and name them. **Never report a skipped module as passing, and never report "no failures" for a
+  build that halted** — a halted reactor leaves stale green surefire reports behind that read exactly
+  like a clean run.
 - **If FAIL:** failing module/test names and the smallest set of error lines that explain it (quote
   them — do not paraphrase away the actual error). Point to `path:line` when the log gives it.
 - **Timing/notes:** one line, optional.

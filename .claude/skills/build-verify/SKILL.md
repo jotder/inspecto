@@ -40,8 +40,33 @@ Compare against the current baseline, report regressions verbatim before fixing 
 **Never stage `inspecto/pom.xml`.** Prefer the `verify-runner` agent so build logs stay out of the
 main context.
 
-✅ **Don't parse the log at all — SUM THE SUREFIRE REPORTS.** They are the authoritative record, one file
-per test class, and reading them sidesteps every trap below in one step:
+### ✅ THE VERDICT STEP — run the guard, don't eyeball anything
+
+```powershell
+mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
+node tools/check-reactor-verdict.mjs build.log --expect-modules 32
+```
+
+`tools/check-reactor-verdict.mjs` is the only thing in this file that can actually *refuse* a verdict.
+It cross-checks the exit code, Maven's Reactor Summary, and the surefire reports' mtimes against the
+build window, and exits non-zero unless **every** reactor module is `SUCCESS` and **every** surefire
+report was written by *that* build. Exit 0 = pass; exit 1 = NON-VERDICT or real failure; exit 2 = could
+not run. Read its output, not the log.
+
+🔴 **WHY IT EXISTS — and why the recipe below is NOT sufficient on its own**
+(`REACTOR-HALT-IS-A-SILENT-PASS-1`, reproduced 2026-09-16 on Maven 3.9.16 / surefire 3.2.5):
+`mvn clean` only cleans the modules the reactor **reaches**. When an upstream module fails, every
+downstream module keeps its `target/surefire-reports/*.txt` from the **previous** run — green, plausible,
+unmarked. Measured with an upstream *compile* error, the recipe below reported `failures=0 errors=0`
+for a tree on which the downstream module ran **not one test**. ⛔ Summing surefire reports silently
+mixes two different runs. And `-q` makes it worse twice over: on a green build it writes a **zero-byte
+log** (indistinguishable from a build that never started), and it **suppresses the Reactor Summary** —
+the only place Maven names the `SKIPPED` modules. ⚠ `-fae` does not rescue you either: `--fail-at-end`
+still skips modules that *depend* on a failed one. **A `SKIPPED` module is UNVERIFIED, never passing.**
+
+✅ **For an EXPLORATORY count (not a verdict) — sum the surefire reports.** They are one file per test
+class and reading them sidesteps every *log-parsing* trap below in one step. ⚠ But run the guard above
+first: on a halted reactor this recipe is a false green, for the reason just stated.
 
 ```bash
 python - <<'EOF'

@@ -84,6 +84,39 @@ that proves an optional module is **self-contained**. `inspecto-ops` ships in St
 direction still PASSED locally off a stale `~/.m2`. A run that stops at a failing module reports a PARTIAL sum and SKIPS the trailing modules —
 do not read that as the total, and do not conclude a module "failed" when the build never reached it.
 
+### 🔴 A halted reactor is a SILENT PASS — check it mechanically, not by reading
+
+`REACTOR-HALT-IS-A-SILENT-PASS-1`, filed 2026-09-16 after it nearly landed a false verdict twice in one
+day. The paragraph above ("a run that stops at a failing module reports a PARTIAL sum") has been in this
+doc since 2026-09-08 and **did not prevent either occurrence** — which is why there is now a guard:
+
+```
+mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
+node tools/check-reactor-verdict.mjs build.log --expect-modules 32
+```
+
+Reproduced deliberately on 2026-09-16 with the real toolchain (Maven 3.9.16 / surefire 3.2.5). Three
+distinct mechanisms, all of which read as "no failures":
+
+1. **`mvn -q` on a green build writes a ZERO-BYTE log and exits 0** — indistinguishable from a build
+   that never started (this repo has already recorded a no-op build doing exactly that).
+2. **`-q` suppresses the Reactor Summary**, which is the *only* place Maven names the `SKIPPED`
+   modules. Without it, a halted reactor and a full green run produce the same evidence.
+3. 🔴 **The load-bearing one — `mvn clean` only cleans modules the reactor REACHES.** When an upstream
+   module fails, every downstream module keeps `target/surefire-reports/*.txt` from the *previous*
+   run: green reports, plausible counts, no marker of any kind. Measured with an upstream **compile**
+   error (which writes no report of its own, so the failure leaves no trace in the reports either),
+   the `build-verify` skill's own authoritative recipe — *"don't parse the log at all, SUM THE SUREFIRE
+   REPORTS"* — reported `failures=0 errors=0` for a tree on which the downstream module ran not one
+   test. ⛔ **The recipe that exists to defeat log-parsing traps is the delivery mechanism for this
+   one**, because summing reports silently mixes two different runs.
+
+⇒ **A `SKIPPED` module is UNVERIFIED, never passing, and a surefire report older than the build is a
+leftover, never evidence.** The guard cross-checks all three sources — exit code, Reactor Summary, and
+report mtimes against the build window it computes from Maven's own `Finished at` / `Total time`
+footer — and refuses a pass unless every module is `SUCCESS` and every report was written by *that*
+build. ⚠ `-fae` does not help: `--fail-at-end` still skips modules that *depend* on a failed one.
+
 🔴 **Check for a live build BEFORE every `mvn`, not just when you remember.** ⚠ Recorded twice on
 2026-09-08 because writing it down once did not prevent the second occurrence: a targeted
 `mvn -pl asn-parser/asn-decoders/asn-core test` was fired while a full-reactor coverage run was in
