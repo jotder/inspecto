@@ -26,7 +26,7 @@ function routeFiles(root = '.') {
   const out = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
-      if (name === 'target' || name === 'node_modules' || name === '.git') continue;
+      if (name === 'target' || name === 'node_modules' || name === '.git' || name === '.claude') continue;
       const p = join(dir, name);
       const st = statSync(p);
       if (st.isDirectory()) walk(p);
