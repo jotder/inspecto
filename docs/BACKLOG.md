@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **56<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
+> **55<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
 > shift, which filed four rows (it was 50 / 35 / 14 on the way in). ⚠ **The board grew while four items
 > were worked**, and that is the honest result, not a failure: all four were already SHIPPED or REFUTED,
 > and grounding them produced five residuals that were previously invisible. ⛔ One row
@@ -137,8 +137,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 1<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 15<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1723,14 +1723,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⛔ This is the verification-discipline half of what `WORKTREE-PROVISIONING-1` exposed, and it OUTLIVES
   that row — it is not worktree-specific.
 
-- **P3** · ⚠ **`BACKLOG-STALE-LEGACY-POM-1` — two rows cite a `legacy-code/pom.xml` that DOES NOT EXIST.**
-  Filed 2026-09-16. Two places on this page assert *“`asn-parser/src/main/java` is NOT dead (it is compiled
-  by `legacy-code/pom.xml`)”*. There is **no `legacy-code/` directory in the repo** (verified) and no pom
-  references `asn-parser/src`. ⇒ Either the claim is stale or `asn-parser/src` is genuinely dead code with
-  no build home — ⛔ ground WHICH before actioning either row, because **both use this claim to justify
-  keeping the tree**. ⚠ Note `asn-parser/asn-decoders` (the reactor module, 70 files) is a DIFFERENT thing
-  and is definitely live; do not conflate them.
-
   - **P3** · ⚠ **`WORKTREE-PROVISIONING-1` — every fresh git worktree is a FALSE RED, twice over.** Filed
   2026-09-16 after four parallel agents each hit one. **(1)** `asn-parser/asn-decoders/` is **untracked**
   (`git ls-tree HEAD` returns 0 files under `asn-parser`), so worktree creation never populates it and
@@ -1768,7 +1760,35 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ✅ What stays true: the trigger is `DiscoveredRoots` being a process-wide static set (the
   `SPACE-UNKEYED-STATICS-1` family), and the shipped-shape path is sound (CI refuses correctly). P3 holds.
 
-- **Doc-lifecycle archival OWED from 2026-09-16** — two plans whose work SHIPPED that day are still in `docs/superpower/`: `route-gating-compliance-plan.md` (steps 1 · 2a/2b/2c · 3 · 4a–4e ALL done) and `dataset-column-derivation-plan.md` (all four steps done). ⛔ **Deferred deliberately, not forgotten**: archiving a plan requires editing `docs/INDEX.md`, and at handoff a **peer session held INDEX dirty AND was editing the derivation plan itself** — moving either would have swept their uncommitted work into someone else's commit, which has happened in this tree before. ⇒ do it on a clean tree: distil the as-built into the matching `okf/` concept (the route-gating control is already written up in `compliance/evidence/route-gating.md`), `git mv` both to `plans-archive/`, update `INDEX.md`, then `graphify update .`.
+- ~~**P3** · **`BACKLOG-STALE-LEGACY-POM-1`**~~ 🔴 **REFUTED 2026-09-16 — the pom EXISTS, and the row is
+  itself an instance of the false-zero it sits next to.** `legacy-code/pom.xml` is real: it is
+  **`asn-parser/asn-decoders/legacy-code/pom.xml`**, a declared `<module>` of `asn-parser/asn-decoders/pom.xml:21`,
+  which is itself root-reactor module `pom.xml:44`. Its `<sourceDirectory>../../src/main/java</sourceDirectory>`
+  resolves to exactly `asn-parser/src/main/java` — **so the two rows this row accused (§2 `DATA-GOV-1` and
+  §3 Parsing/Stage-1) are CORRECT and must be left alone**, and `asn-parser/src` is live, compiled code.
+  ⛔ **The row's probe looked for a TOP-LEVEL `legacy-code/` directory** and read the empty result as
+  absence — the same class as `WORKTREE-PROVISIONING-1`'s `git ls-tree` zero directly above. A pom is
+  found by a repo-ROOT `pom.xml` sweep, never by `ls` at one guessed depth.
+  ✅ Re-measured: `asn-parser/asn-decoders` = **70 tracked files** (the row's own figure, accurate);
+  `asn-parser/src` = **66 tracked files**, all reached through that `sourceDirectory`.
+  ⚠ The pom's own description is worth carrying forward: *Phase 0 only… deleted with them after Phase 4* —
+  so `asn-parser/src` is **deliberately temporary**, not dead. That is a lifecycle fact, not a defect.
+
+  - **P3** · ⚠ **`BACKLOG-STALE-LEGACY-POM-1` — two rows cite a `legacy-code/pom.xml` that DOES NOT EXIST.**
+    Filed 2026-09-16. Two places on this page assert *“`asn-parser/src/main/java` is NOT dead (it is compiled
+    by `legacy-code/pom.xml`)”*. There is **no `legacy-code/` directory in the repo** (verified) and no pom
+    references `asn-parser/src`. ⇒ Either the claim is stale or `asn-parser/src` is genuinely dead code with
+    no build home — ⛔ ground WHICH before actioning either row, because **both use this claim to justify
+    keeping the tree**. ⚠ Note `asn-parser/asn-decoders` (the reactor module, 70 files) is a DIFFERENT thing
+    and is definitely live; do not conflate them.
+
+- ~~**Doc-lifecycle archival OWED from 2026-09-16**~~ ✅ **DISCHARGED 2026-09-16 — both plans are ARCHIVED.**
+  `docs/archived-documents/plans-archive/route-gating-compliance-plan.md` (`f000598f`, *"archive the route-gating plan, distil the control into auth-security"*) and
+  `docs/archived-documents/plans-archive/dataset-column-derivation-plan.md` (`7dbdc75c`, *"archive the dataset-column derivation plan, distilled"*).
+  Re-measured: **neither name exists under `docs/superpower/` any more** (9 entries remain there, none of them these two).
+  ⚠ The row's deferral reasoning was sound and is worth keeping — it is the *state* that moved on. Original row follows.
+
+  - **Doc-lifecycle archival OWED from 2026-09-16** — two plans whose work SHIPPED that day are still in `docs/superpower/`: `route-gating-compliance-plan.md` (steps 1 · 2a/2b/2c · 3 · 4a–4e ALL done) and `dataset-column-derivation-plan.md` (all four steps done). ⛔ **Deferred deliberately, not forgotten**: archiving a plan requires editing `docs/INDEX.md`, and at handoff a **peer session held INDEX dirty AND was editing the derivation plan itself** — moving either would have swept their uncommitted work into someone else's commit, which has happened in this tree before. ⇒ do it on a clean tree: distil the as-built into the matching `okf/` concept (the route-gating control is already written up in `compliance/evidence/route-gating.md`), `git mv` both to `plans-archive/`, update `INDEX.md`, then `graphify update .`.
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
   - ✅ `living-operational-system.md` — **DISTILLED + ARCHIVED 2026-09-07.** The north star is now the OKF
@@ -1784,8 +1804,12 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     status table). Discharged by ONE authoritative archive banner enumerating every superseded site, which is
     more robust than a dozen scattered edits that can each miss one. Thirteen durable facts distilled into six
     OKF concepts.
-  - ~~`compliance-certifications-plan.md`~~ — **NOT a violation.** Only C2 of six workstreams is delivered; C1/C3/C5/C6
-    are open and org-gated (§2). It stays live; `INDEX.md` already records the C2 half correctly.
+  - ~~`compliance-certifications-plan.md`~~ — **NOT a violation** *(as of 2026-09-07)*. ⚠ **Superseded 2026-09-09: it was
+    ARCHIVED anyway** — `docs/archived-documents/plans-archive/compliance-certifications-plan.md`, and `INDEX.md:177`
+    records it there with a banner enumerating what it got wrong (⛔ *"do not quote it as a decision of record"*), the
+    distillation targets (`okf/capabilities/compliance/compliance.md` §3.10/§3.2) and the still-open `N1`–`N7` on §2.
+    ⇒ Re-measured: **nothing named `compliance-certifications-plan.md` exists under `docs/superpower/`.** The 2026-09-07
+    text below ("it stays live") is kept only to show why the earlier pass declined to move it.
   - ~~`step-workbench-design.md`~~ — **was already archived 2026-09-06.** Row was doubly stale (file moved; decision made).
   - ✅ `pipeline-spec.md` + `pipeline-waves-drain-plan.md` + `elt-final-amendment-plan.md` — **ARCHIVED
     2026-09-10** (operator: archive now, after a distillation diff; row 15 stays on this board). ⚠ The
@@ -1801,8 +1825,13 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   decisions: ~~SEC-8~~ (reconciled 2026-09-08 — `okf/capabilities/security/security.md` §2 owns the row),
   ~~**OPS-2**~~ (reconciled 2026-09-08 — `okf/capabilities/observability/observability.md` §2 owns the row; its cell said `S/E`, not `All`), ~~**INV-2**~~ (reconciled 2026-09-08 — `okf/capabilities/studio/studio.md` §2 owns the row; like `OPS-2` its cell said `S/E`, not `All`, and EDITIONS `CP-09` had already gated it; ~~INC-2/3/4~~ reconciled 2026-09-08 — `okf/capabilities/incidents/incidents.md` §2 owns those rows), and ~~**DAT-6** wants a caveat that
   the multi-user half is unbuilt~~ (the caveat is in the REQUIREMENTS cell; retired 2026-09-08). ⚠ ACQ-4's *other* half is unresolved and needs grounding, not a doc edit:
-  EDITIONS' generated board marks `SP-ACQ-06`/`SP-ACQ-08` (S3/GCS) planned while the **connectors** ship with tests
-  — check whether the *Step processor* exists before flipping `ProcessorCatalog`, because a connector is not a Step.
+  ~~EDITIONS' generated board marks `SP-ACQ-06`/`SP-ACQ-08` (S3/GCS) planned while the **connectors** ship with tests
+  — check whether the *Step processor* exists before flipping `ProcessorCatalog`, because a connector is not a Step.~~
+  ✅ **DISCHARGED 2026-09-16 — re-measured, and the board does NOT say what the row says.** `EDITIONS.md:193`/`:195`
+  mark both **🟡 PARTIAL, not 🔲 planned**, in all three edition columns, and the source of that generated board —
+  `ProcessorCatalog.java:66,68` — already carries the exact grounding this row asked for:
+  *"Connection kind exists (… connector …); no proven end-to-end acquisition-node run"*. ⇒ Nothing to flip and
+  nothing to check: the connector-is-not-a-Step distinction is already encoded in the cell. ACQ-4 is closed whole.
   → `REQUIREMENTS.md` · `EDITIONS.md`
 - **Compliance repo-side artifacts (moved out of §2, 2026-09-07)** — these are file-existence checks, not
   external gates, and sitting in "externally gated" made them look unactionable: the **customer
@@ -1814,9 +1843,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `quality-monitor`, `trend-monitor` today. → `okf/frontend/features/studio.md`
 - **`-Dassist.token` / `-Dassist.read.token` mentions in the docs — LEAVE THEM** (from `DOC-DEADTOKEN-1`,
   closed 2026-09-14; recorded here 2026-09-15 when that row was deleted). ⚠ **Every remaining mention in
-  the tree is a HISTORICAL record and was deliberately left alone** — `security.md`, `control-api.md`,
-  `auth-security.md`, `EDITIONS.md` and `incidents.md` all describe the flag as *removed*, which is true
-  and worth keeping. ⛔ A symbol sweep that "fixes" those five files is undoing the closure.
+  the tree is a HISTORICAL record and was deliberately left alone** — which is true and worth keeping.
+  ⛔ A symbol sweep that "fixes" them is undoing the closure.
+  🔴 **The row's file list was WRONG and is corrected here (re-measured 2026-09-16, repo-root sweep for
+  `assist.token` / `assist.read.token`).** Stated: five files — `security.md`, `control-api.md`,
+  `auth-security.md`, `EDITIONS.md`, `incidents.md`. Derived: **one of those five** carries the symbol
+  (`EDITIONS.md:61`). The current-tier mention sites are `EDITIONS.md:61` ·
+  `okf/backend/build-run/operations-reference.md` · `PROJECT_NOTES.md`, plus two LIVE scripts —
+  `inspecto/package.ps1:917` and `tools/run-backend.ps1:97` (both comments recording the 2026-09-14 removal).
+  Three archived files also carry it and are out of scope by tier.
+  ⛔ **Why the wrong list is dangerous, not merely untidy:** `security.md`, `auth-security.md` and
+  `control-api.md` match on `assist` only because they document **`-Dassist.write.root`** — a DIFFERENT,
+  **shipped and live** key (`security.md` §`SEC-9` marks it ✅ SHIPPED, all editions). A sweep steered by
+  this row's list would have edited the live write-gate docs while missing three of the five real sites.
+  ⇒ The rule stands, the addresses did not: **grep the symbol from the repo root, never re-use a list a
+  previous pass wrote down.**
   → `okf/backend/build-run/operations-reference.md`
 - **A capability with no committed example is a capability nobody has ever run** (rule recorded 2026-09-15
   from `COLLECTOR-SPACE-ROOT-1`). Twice in one shift the same shape appeared — `task: materialize` had no
