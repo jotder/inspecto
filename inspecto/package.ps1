@@ -1583,15 +1583,62 @@ $readme = Get-Content "$adjParserDir\README.md" -Raw
 $readme = $readme -replace '\.\./docs/', 'docs/'
 Set-Content -Path "$bundleDir\README.md" -Value $readme -NoNewline
 $docsSrc = Join-Path $sandboxRoot 'docs'
+
+# BUNDLE-SHIPS-THE-ARCHIVE-1 (2026-09-16). Until this date the copy below staged ALL of docs/
+# recursively with nothing excluded, so every customer bundle carried the two NON-CURRENT doc
+# tiers that CLAUDE.md defines (measured from the entry table of the 2026-09-15 inspecto-deploy.zip:
+# 491 docs files, of which 246 were archived-documents/ and 26 were superpower/ - i.e. 55% of the
+# shipped documentation was material the project itself declares not current).
+#
+# The tiers are CLAUDE.md's, not this script's:
+#   tier 1  current knowledge  -> okf/ + the root canon + stakeholders/ api/ ui/ ops/ roadmap/ wiki/   SHIPS
+#   tier 2  active plans       -> superpower/        "a plan lives here ONLY while its work is in flight"  DOES NOT SHIP
+#   tier 3  history            -> archived-documents/ "never maintained, never linked as current"         DOES NOT SHIP
+#
+# Excluded by NAME, one entry per tree, so the next shift can audit the list by reading it.
+# Do NOT replace this with a pattern/glob: the reason each tree is out is a tier decision, and a
+# glob records no reason. Adding a tree here is a product call, not a refactor.
+$docsExcludedTrees = @(
+    'archived-documents',  # CLAUDE.md tier 3 - provenance only, ~570 known-broken internal links,
+                           # superseded designs and retracted claims. Shipping it publishes stale
+                           # statements under the product's name.
+    'superpower'           # CLAUDE.md tier 2 - in-flight plans. These describe work that is NOT
+                           # built yet; a customer reading one would read a roadmap as a manual.
+)
+# Withheld for a DIFFERENT reason than the trees above, and kept in its own list so the two reasons
+# are never conflated. These two ARE current-tier by CLAUDE.md's canon list - they are accurate and
+# maintained. They are withheld because of AUDIENCE: they are written for the team working ON the
+# product, not for the operator running it. Operator decision 2026-09-16.
+$docsExcludedFiles = @(
+    'BACKLOG.md',       # the internal defect board - it names open P1s, by identifier, in the very
+                        # product the customer has just installed, together with their severity.
+    'PROJECT_NOTES.md'  # internal working notes, same audience argument.
+)
+# Trees/files that MUST survive the exclusion. A filter that also drops wanted docs is worse than
+# shipping the archive, so this is asserted after the copy rather than trusted.
+$docsRequiredEntries = @(
+    'okf', 'stakeholders', 'api', 'ui', 'ops', 'roadmap', 'wiki',
+    'INDEX.md', 'GLOSSARY.md', 'USER_GUIDE.md', 'ADVANCED_GUIDE.md', 'EDITIONS.md'
+)
+
 if (Test-Path $docsSrc) {
     # Copy file-by-file (not one Copy-Item -Recurse) so a single locked/inaccessible
     # file (e.g. held by another process/AV) can't silently truncate the rest of the
     # tree under $ErrorActionPreference = 'Stop' — a whole-tree recursive copy was
     # observed to abort at the first such file and skip every remaining item.
     $docsOut = "$bundleDir\docs"
+    $docsSkipped = 0
     Get-ChildItem -Path $docsSrc -Recurse -File | ForEach-Object {
         $srcFile = $_
-        $destPath = Join-Path $docsOut $srcFile.FullName.Substring($docsSrc.Length + 1)
+        $relPath = $srcFile.FullName.Substring($docsSrc.Length + 1)
+        # Match the FIRST path segment only: an exclusion is a top-level tree under docs/, never a
+        # substring anywhere in the path (which would also drop e.g. okf/.../compliance notes).
+        # For a file sitting directly under docs/, the first segment IS the file name, so one
+        # comparison serves both lists.
+        $topSegment = ($relPath -split '[\\/]')[0]
+        if ($docsExcludedTrees -contains $topSegment) { $docsSkipped++; return }
+        if ($docsExcludedFiles -contains $topSegment) { $docsSkipped++; return }
+        $destPath = Join-Path $docsOut $relPath
         try {
             $destDir = Split-Path $destPath -Parent
             if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
@@ -1600,6 +1647,26 @@ if (Test-Path $docsSrc) {
             Write-Warning "docs copy: skipped '$($srcFile.FullName)' ($($_.Exception.Message))"
         }
     }
+
+    # Fail closed in BOTH directions. The point of the row is auditability, so packaging asserts the
+    # outcome it intends instead of leaving it to be re-derived from this source later.
+    foreach ($tree in $docsExcludedTrees) {
+        if (Test-Path (Join-Path $docsOut $tree)) {
+            throw "DOCS TIER LEAK: '$tree' is on the non-current list but was staged into the bundle at docs\$tree. See BUNDLE-SHIPS-THE-ARCHIVE-1."
+        }
+    }
+    foreach ($file in $docsExcludedFiles) {
+        if (Test-Path (Join-Path $docsOut $file)) {
+            throw "DOCS AUDIENCE LEAK: '$file' is withheld from customer bundles by the 2026-09-16 operator decision but was staged at docs\$file. See BUNDLE-SHIPS-THE-ARCHIVE-1."
+        }
+    }
+    foreach ($entry in $docsRequiredEntries) {
+        if (-not (Test-Path (Join-Path $docsOut $entry))) {
+            throw "DOCS OVER-FILTERED: the bundle is missing docs\$entry, which is current-tier documentation that MUST ship. The exclusion in step 7 is too wide. See BUNDLE-SHIPS-THE-ARCHIVE-1."
+        }
+    }
+    $docsShipped = (Get-ChildItem -Path $docsOut -Recurse -File).Count
+    Write-Host "  docs: staged $docsShipped files; withheld $docsSkipped (tiers: $($docsExcludedTrees -join ', '); audience: $($docsExcludedFiles -join ', '))" -ForegroundColor DarkGray
 }
 
 # ── step 8: zip (Windows bundle, then swap runtime/ and zip again for Linux) ───

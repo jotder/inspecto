@@ -204,4 +204,22 @@ build fault**. Both editions pass with `-NoRuntime`. Re-prove jlink on a box wit
 
 ### Bundle contents — the docs tree
 
-`package.ps1` stages the **entire** `docs/` tree recursively into every edition bundle, file by file (not one recursive copy, so a single locked file cannot truncate the rest). ⚠ That means **248 of the 498 docs files — half the tree — are `docs/archived-documents/`**, the never-maintained tier, complete with its ~570 known-broken internal links, superseded designs and refuted claims. Whether a customer bundle should carry that tier at all is an open product call tracked as `BUNDLE-SHIPS-THE-ARCHIVE-1` in `BACKLOG.md`; the filter itself is a few lines in step 7 once the decision exists. 🔴 Found 2026-09-16 while REFUTING `GAP-10`, which had worried that 13 archived files were MISSING from the bundle — the real exposure is the exact inverse, and 248 files wide.
+`package.ps1` step 7 stages the `docs/` tree into every edition bundle, file by file (not one recursive copy, so a single locked file cannot truncate the rest) — **but only the CURRENT tier**. The two non-current tiers that `CLAUDE.md` defines are withheld by name:
+
+| tier | tree | in the bundle |
+|---|---|---|
+| 1 — current knowledge | `okf/` + the root canon + `stakeholders/ api/ ui/ ops/ roadmap/ wiki/` | **ships** |
+| 2 — active plans | `superpower/` | **withheld** |
+| 3 — history | `archived-documents/` | **withheld** |
+
+🔴 **Until 2026-09-16 step 7 shipped all of `docs/` with nothing excluded.** Measured from the entry table of the 2026-09-15 `inspecto-deploy.zip`: **491 docs files, of which 246 were `archived-documents/` and 26 were `superpower/`** — i.e. **55 % of the shipped documentation was material the project itself declares not current**, complete with the archive's ~570 known-broken internal links, superseded designs and refuted claims. Found while REFUTING `GAP-10`, which had worried that 13 archived files were *missing* from the bundle; the real exposure was the exact inverse.
+
+**How the exclusion is written, and why that shape.** `$docsExcludedTrees` is an explicit **list of names**, one entry per tree with the tier reason beside it, matched against the **first path segment only** — never a substring anywhere in the path, which would also have swept e.g. OKF files whose own path contains one of those words. ⛔ Do not collapse it into a pattern or a glob: the reason a tree is out is a *tier decision*, and a glob records no reason. Adding a tree to the list is a product call, not a refactor.
+
+**It fails closed in both directions**, because a filter that also drops wanted docs is worse than the defect it fixes. After the copy, step 7 throws `DOCS TIER LEAK` if any excluded tree reached the bundle, and `DOCS OVER-FILTERED` if any of `$docsRequiredEntries` (`okf`, `stakeholders`, `api`, `ui`, `ops`, `roadmap`, `wiki`, `INDEX.md`, `GLOSSARY.md`, `USER_GUIDE.md`, `ADVANCED_GUIDE.md`, `EDITIONS.md`) is missing. Packaging then prints the staged / withheld counts.
+
+⚠ **Known consequence, not yet decided: 198 dangling links.** Current-tier docs link *into* the withheld trees **187 times to `archived-documents/` and 11 times to `superpower/`** — including `INDEX.md` (which lists both trees as sections), `GLOSSARY.md`, `ADVANCED_GUIDE.md` and `BACKLOG.md`. Withholding the trees does not rewrite those links, so the shipped `INDEX.md` now points at documents the customer does not have. ⛔ This is a real residual and needs an operator call of its own: rewrite/strip the inbound links at package time, ship a marked stub, or accept them.
+
+⚠ **Still shipping, and arguably also not customer material: `BACKLOG.md` and `PROJECT_NOTES.md`.** Both are current-tier by `CLAUDE.md`'s own list, so they were deliberately **left in** rather than silently dropped — but `BACKLOG.md` is the internal defect board, naming open P1s in the product the customer just installed. Whether an *audience* filter belongs beside the *tier* filter is a separate product call. ⛔ Do not resolve it by quietly extending `$docsExcludedTrees`.
+
+Root `compliance/` is **not** under `docs/` and has never shipped in the bundle — verified from the same zip entry table. → `BUNDLE-SHIPS-THE-ARCHIVE-1` in `BACKLOG.md`
