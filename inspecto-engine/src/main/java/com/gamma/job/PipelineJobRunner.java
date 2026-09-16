@@ -239,6 +239,15 @@ public final class PipelineJobRunner implements Job {
         // enrich job's `config:`); the Stage-2 remainder is lifted at RUN time (PipelineLift.stageTwo),
         // so the flat file stays the single truth — no derived graph is persisted to the pipeline store.
         // Mutually exclusive with `pipeline:`/`flow:` — carrying both leaves the graph source undefined.
+        // 🔴 `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`, 2026-09-16: `pipeline_config` (below) and `data_dir` (the `cfg.opt("data_dir", dataDir)` read) are
+        // both in `ConfigSafetyValidator.JOB_PATH_KEYS`, so a job SAVED through a route resolves them with
+        // PathJail.resolveJobPath against the Space config root and jails them against the policy roots —
+        // while the two reads below still resolve CWD-relative and jail nothing at all. ⛔ The reader
+        // cannot be moved onto resolveJobPath yet: DRIVEN over the real rule, ALL 19 committed values
+        // behind these two keys break — 12 `pipeline_config` refuse in BOTH columns (the authored value is
+        // already space-root-prefixed, or names a file beside the job, so the old path always exists and
+        // the ambiguous-case branch always fires) and 7 `data_dir: out` refuse once served / re-point
+        // silently on a fresh tree. `JOB-PATH-DEMO-CONFIG-REPOINT-1` has to land first.
         String flatPath = cfg.opt("pipeline_config", null);
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
         // read only, kept for existing *_job.toon files that were never resaved.
@@ -505,8 +514,20 @@ public final class PipelineJobRunner implements Job {
      * pointed inside another store's tree (the UAT double-count shape), or a slashed {@code store}
      * name — would be swept by recursive dataset reads over the enclosing store, so the run fails
      * closed before any bytes are written. A root fully outside the space data root (an external
-     * {@code data_dir} export) stays allowed. Job configs bypass {@code ConfigSafetyValidator}, so
-     * this is enforced here at run time.
+     * {@code data_dir} export) stays allowed.
+     *
+     * <p>🔴 <b>This javadoc claimed "job configs bypass {@code ConfigSafetyValidator}" until 2026-09-16,
+     * and it had been false since 2026-09-06.</b> Written with this method (`ddb644a2`, 2026-07-18), when
+     * it was true; `ad558216` (JOB-SPEC-1) then added the {@code case "job" -> checkJob} arm, and
+     * {@code JobRoutes:381} / {@code ConfigWriteRoutes:370} both call it. A job saved through a route
+     * <b>does</b> reach that validator. ⛔ The stale claim mattered: it is the sentence that made this
+     * method look like the only run-time gate a job gets, and `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` was
+     * filed on it.
+     *
+     * <p>What is still true is narrower, and is why this check stays: {@code checkJob} gates the
+     * <b>path containment</b> of {@code JOB_PATH_KEYS} and says nothing at all about <b>sink nesting</b>
+     * — a {@code data_dir} that is perfectly contained can still put a sink inside another store's tree.
+     * That is this method's subject, and no gate anywhere else covers it.
      */
     private void requireTopLevelSinks(PipelineGraph g, String dir) {
         Path root = Path.of(dataDir).toAbsolutePath().normalize();

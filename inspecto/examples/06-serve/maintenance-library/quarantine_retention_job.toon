@@ -2,6 +2,6 @@ job:
   name: quarantine_retention
   template: retention-sweep
   params:
-    dir: out/quarantine
+    dir: ../quarantine
     retention_days: "14"
   cron: "0 4 * * *"

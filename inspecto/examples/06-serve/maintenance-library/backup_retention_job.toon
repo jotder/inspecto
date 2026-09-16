@@ -2,5 +2,5 @@ job:
   name: backup_retention
   template: retention-sweep
   params:
-    dir: out/backup
+    dir: ../backup
     retention_days: "30"

@@ -96,7 +96,7 @@ expansion.
 
 | File:line | Key | Value | fresh | deployed | Gate sees it? | Runtime rule |
 |---|---|---|---|---|---|---|
-| `spaces/demo/config/jobs/backup_retention_job.toon:5` | `params.dir` | `spaces/demo/data/orders/backup` | BROKEN (re-points to `…/config/spaces/demo/data/orders/backup`) | **NOW REFUSES** | no (gate-blind) | `CleanupTask` → new rule |
+| ~~`spaces/demo/config/jobs/backup_retention_job.toon:5`~~ ✅ **RE-POINTED 2026-09-16** to `../data/orders/backup` | `params.dir` | ~~`spaces/demo/data/orders/backup`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~**NOW REFUSES**~~ **UNAFFECTED** | no (gate-blind) | `CleanupTask:36` → new rule (moved by `JOB-DIR-CWD-CONTAINMENT-1` itself) |
 | ~~`spaces/demo/config/jobs/backup_verify_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `../data/backups` | `backup_dir` | ~~`spaces/demo/data/backups`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | yes | ~~`BackupTask:172` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:182` → **new rule** |
 | ~~`spaces/demo/config/jobs/config_backup_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `.` | `params.dir` | ~~`spaces/demo/config`~~ | ~~NOW REFUSES~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | no (gate-blind) | ~~`BackupTask:82` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:93` → **new rule** |
 | ~~`spaces/demo/config/jobs/config_backup_job.toon:7`~~ ✅ **RE-POINTED 2026-09-16** to `../data/backups` | `params.backup_dir` | ~~`spaces/demo/data/backups`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | no (gate-blind) | ~~`BackupTask:83` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:94` → **new rule** |
@@ -180,8 +180,8 @@ so the "deployed" column is the only one that applies to a served example.
 
 | File:line | Key | Value | Verdict (served) | Gate sees it? | Runtime rule |
 |---|---|---|---|---|---|
-| `06-serve/maintenance-library/backup_retention_job.toon:5` | `params.dir` | `out/backup` | **NOW REFUSES** | no (gate-blind) | `CleanupTask` → new rule ⇒ **this example is BROKEN at run** |
-| `06-serve/maintenance-library/quarantine_retention_job.toon:5` | `params.dir` | `out/quarantine` | **NOW REFUSES** | no (gate-blind) | `CleanupTask` → new rule ⇒ **BROKEN at run** |
+| ~~`06-serve/maintenance-library/backup_retention_job.toon:5`~~ ✅ **RE-POINTED 2026-09-16** to `../backup` | `params.dir` | ~~`out/backup`~~ | ~~**NOW REFUSES**~~ **UNAFFECTED** | no (gate-blind) | `CleanupTask:36` → new rule ⇒ ~~**this example is BROKEN at run**~~ **FIXED** |
+| ~~`06-serve/maintenance-library/quarantine_retention_job.toon:5`~~ ✅ **RE-POINTED 2026-09-16** to `../quarantine` | `params.dir` | ~~`out/quarantine`~~ | ~~**NOW REFUSES**~~ **UNAFFECTED** | no (gate-blind) | `CleanupTask:36` → new rule ⇒ ~~**BROKEN at run**~~ **FIXED** |
 | `06-serve/maintenance-library/compact_job.toon:6` | `dir` | `out/database` | **NOW REFUSES** (gate) | yes | `PartitionCompactor:57` → no jail ⇒ still runs |
 | `06-serve/maintenance-library/compact_job.toon:9` | `store` | `out/database` | not covered | no | `JobService:1407` — plain string |
 | `06-serve/maintenance-library/retention_job_template.toon:11` | template `dir` | `${dir}` | n/a | no | expanded |
@@ -196,23 +196,41 @@ against the tree the runner actually builds, **every one of them REFUSES** — t
 guard-only-fires-when-the-old-path-exists insight is right; its conclusion that the examples escape it
 is wrong, because the runner is what creates the path.
 
-🔴 **Two maintenance-library examples are BROKEN AT RUN TODAY, not just at save.**
-`backup_retention` and `quarantine_retention` are `task: cleanup` ⇒ `CleanupTask.java:36`, which already
-calls `requireJobPathUnderAny(..., SpaceConfigRoot.current(), ...)`. With `base = out/write` their
-`out/backup` / `out/quarantine` refuse. These are two of the five jobs the example's own `probes.txt`
-advertises. **This is the one place where shipped, documented behaviour is broken right now** — nothing
-else in this survey is worse than a save-time refusal.
+~~🔴 **Two maintenance-library examples are BROKEN AT RUN TODAY, not just at save.**~~
+✅ **FIXED 2026-09-16 under `JOB-PATH-DEMO-CONFIG-REPOINT-1`.** `backup_retention` and
+`quarantine_retention` are `task: cleanup` ⇒ `CleanupTask.java:36`, which already calls
+`requireJobPathUnderAny(..., SpaceConfigRoot.current(), ...)`. With `base = out/write` their
+`out/backup` / `out/quarantine` refused. These are two of the five jobs the example's own `probes.txt`
+advertises — **the one place where shipped, documented behaviour was broken at run**; nothing else in
+this survey is worse than a save-time refusal. ⚠ The correct spelling is `../backup` / `../quarantine`,
+**not** `backup` / `quarantine`: the base here is `<example>/out/write` (the `assist.write.root`
+fallback, §1), not a Space config root, so the value has to climb out of `write/` to reach its sibling.
+⛔ **This is the trap in re-pointing an example** — the same authored key takes a different spelling on
+the two surfaces because they do not share a base. Driven and pinned by
+`RetentionSweepJobPathsResolveUnderTheSpaceRootTest` (`inspecto-config`), whose doubling control shows
+`out/backup` landing on `…/out/write/out/backup`.
 
 ---
 
 ## 4. Counts
 
 ⚠ **This is the AS-SURVEYED snapshot (2026-09-16, `caea50ff`) and is deliberately NOT re-tallied as
-values move.** **Four of the 33 have since been re-pointed** and are now UNAFFECTED in both columns:
-`maintenance_report_job.toon:6` (`JOB-PATH-REPORT-ENRICH-SPLIT-1`) and the three backup values
-(`backup_verify_job.toon:6`, `config_backup_job.toon:6` and `:7`). §3.1 carries the current state per
-value; `JOB-PATH-DEMO-CONFIG-REPOINT-1` carries the live remaining count (**29**). ⛔ Read the numbers
-below as the finding that justified the work, not as today's inventory.
+values move.** **Seven of the 33 have since been re-pointed** and are now UNAFFECTED in both columns:
+`maintenance_report_job.toon:6` (`JOB-PATH-REPORT-ENRICH-SPLIT-1`), the three backup values
+(`backup_verify_job.toon:6`, `config_backup_job.toon:6` and `:7`) and the three `task: cleanup` values
+(`spaces/demo/.../backup_retention_job.toon:5`, `06-serve/maintenance-library/{backup,quarantine}_retention_job.toon:5`).
+§3.1/§3.3 carry the current state per value; `JOB-PATH-DEMO-CONFIG-REPOINT-1` carries the live remaining
+count (**26**, of which **4 are `${…}` placeholders and 22 are real values**). ⛔ Read the numbers below
+as the finding that justified the work, not as today's inventory.
+
+🔴 **The re-derivation of 2026-09-16 confirms the 33 exactly, from the symbol** — a full key census over
+the 37 job configs yields `pipeline_config` 12 + `dir` 12 + `data_dir` 7 + `backup_dir` 4 + `store` 1 +
+`out_dir` 1 = **37 occurrences**, minus the **4 empty `params:` declarations** in the two
+`retention_job_template.toon` files and `chained_backup_job_template.toon` (a parameter *name*, not a
+value) = **33**. ⚠ `flow:` (1) and `target:` (1) are **names, not paths**, and are correctly excluded.
+**⛔ Every remaining value is blocked on its reader, not on effort**: 19 on `PipelineJobRunner` (which
+still calls no `PathJail` at `:242`/`:266` — re-verified, not taken from this survey), 2 + 1 on the
+compactors and `store`. The row cannot close before §5(b) and §5(c).
 
 By **value** (33 relative path values in 24 files; **0 absolute values anywhere**):
 
@@ -258,7 +276,8 @@ delivered somewhere no one looks — all reporting success.
 ### DEFECTS — recommended new rows
 
 **(a) `JOB-PATH-DEMO-CONFIG-REPOINT-1` (P2) — re-point every committed job config to a space-relative
-value.** *(**29 remain** as of 2026-09-16 — 33 → 32 → 29: `maintenance_report_job.toon:6`'s `out_dir` was re-pointed to
+value.** *(**26 remain** as of 2026-09-16 — **22 real values plus 4 `${…}` placeholders** — 33 → 32 → 29
+→ 26; the three `task: cleanup` values followed their reader last, see §3.1/§3.3. `maintenance_report_job.toon:6`'s `out_dir` was re-pointed to
 `../data/reports` in the same change that moved its reader, `JOB-PATH-REPORT-ENRICH-SPLIT-1`. Driven
 proof it is behaviour-preserving: the new value resolves to `…/spaces/demo/data/reports`, byte-identical
 to what the legacy CWD rule returned from the repo root. ⛔ That is the pattern — **one value moves when
