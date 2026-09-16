@@ -149,7 +149,7 @@ copy is how the three drift apart.
 **What must be true before a start date is written here**
 
 1. ✅ **MET 2026-09-16 — the route-gating control is in place, not in flight.** This was the stated blocker
-   (`docs/superpower/route-gating-compliance-plan.md` §5: the window should observe the control for its whole
+   (`docs/archived-documents/plans-archive/route-gating-compliance-plan.md` §5: the window should observe the control for its whole
    duration, not watch it being introduced). Step 3 shipped: a mutating route declaring neither a capability
    nor a recorded exemption fails the server's boot, with a CI scan ahead of it — see the CC6 row above and
    [`evidence/route-gating.md`](evidence/route-gating.md).

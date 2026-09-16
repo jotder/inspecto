@@ -288,6 +288,47 @@ those routes return **`503`**; present → writes are jailed to that root and va
 [`ConfigSafetyValidator`](../config/config-safety.md). It is an ops decision about whether this instance may
 write — not authentication.
 
+## An undeclared mutating route does not boot either (`ROUTE-UNGATED-DEFAULT-1`, 2026-09-16)
+
+Route gating used to be **fail-OPEN**: `withCapability` was opt-in, so a route that declared nothing was
+simply open to every authenticated caller. The audit that opened this found **83 ungated mutating routes**
+and — the finding that mattered more — that only 12 could be *expressed* with the capability vocabulary that
+existed: there was no name meaning "administrator", so `DELETE /spaces/{id}` could not be gated even in
+principle. `canAdminister` closed the vocabulary gap; this closes the mechanism one.
+
+**The rule.** A mutating route (`POST`/`PUT`/`PATCH`/`DELETE`) must declare a posture — a capability, or a
+recorded `CapabilityManifest` exemption carrying a **category and a reason**. One that declares neither
+**fails `ControlApi`'s construction**, naming the route and both ways out. ⛔ **No warn-only switch, by
+decision**: a control with an off switch is not a control. CI catches an undeclared route before it can
+refuse a boot in a customer's bundle; the boot check is what makes the guarantee true of the *deployed*
+artifact rather than of the repository.
+
+**Reads are open BY POLICY**, and that is a stated position rather than an omission: confidentiality sits at
+the Space/ABAC layer, where a caller's data scopes decide what a read can see. Affirmed as the **compliance**
+position 2026-09-16 knowing it becomes an auditor-facing claim (`controls-matrix.md` CC6). ⚠ If reads are
+ever gated, that matrix line moves with the code.
+
+**Three enforcement points, answering different questions** — none replaces another:
+
+| Mechanism | Sees | Where |
+|---|---|---|
+| Boot refusal | what was **deployed**, incl. modules discovered from other jars | `ControlApi.requireDeclaredPosture` |
+| CI scan | **any module's source**, before it can refuse anyone's boot | `CapabilityManifestTest` · `tools/route-gating-report.mjs --check` |
+| Runtime inventory | what a **specific running server** registered, digested once per boot | `GET /audit/route-inventory` · the `route.inventory.snapshot` audit event |
+
+⚠ The scan and the inventory genuinely disagree in count, and that is correct: the test classpath carries no
+optional modules, so only the scan sees all source, and only the server knows what it loaded.
+
+⛔ **Two traps this cost, both cheap to repeat.** (1) `CapabilityManifestTest` matches the capability as a
+**string literal** at the registration site — passing `Roles.CAN_…` compiles and then reports drift. (2) A
+capability gate **wraps** the data-scope guard, so adding one to a scoped route turns an out-of-scope request
+from **404 into 403**: existence-hiding now answers second. Tests that exercise the scope guard must carry the
+new capability, or they silently start asserting the gate instead.
+
+**Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
+`tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
+code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.
+
 ## A Standard/Enterprise bundle does not boot without OIDC configuration
 
 Discovered 2026-09-07 by the packaging boot smoke, and worth stating plainly because it is a deployment

@@ -225,7 +225,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `CapabilityManifestTest` sees only registrations that already wrap. Two whole route classes
   (`EventRoutes`, `AssistRoutes`) had no gate and no manifest entry — a *file nobody opened*, not a *route
   nobody listed*. For compliance that is a **mechanism** finding: per-route fixes pass a point-in-time review
-  and fail a Type II window. The fix is a fail-closed default (`docs/superpower/route-gating-compliance-plan.md`
+  and fail a Type II window. The fix is a fail-closed default (`docs/archived-documents/plans-archive/route-gating-compliance-plan.md`
   step 3), ⛔ landed only after every mutating route is a capability or a categorized exemption — a ratchet
   over an unreviewed list freezes the wrong baseline. ⚠ The audit's "sibling is gated ⇒ this one was
   forgotten" inference failed **six** times; read the handler, the comment and the tests, every time.
