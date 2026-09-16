@@ -432,7 +432,7 @@ Per `angular-ui` §3/§4/§10 — service → signal → template, no business l
 
 Canonical per `docs/GLOSSARY.md`. A **Step** is the user-facing name for a pipeline node — the config
 keys stay `transform.filter` / `transform.join` (internal `BuiltinNodeType` names are documented as
-KEPT), but every user-visible string says **Step**. A **Pipeline**, never a *Flow*. `transform.filter`'s
+KEPT), but every user-visible string says **Step**. A **Pipeline**, never a *Flow*. <!-- vocab-allow: the banned term is named here only to forbid it --> `transform.filter`'s
 `where` is a **row predicate** (the step catalog's own words) — ⛔ not a "rule", which is reserved for
 Expectation / Alert Rule / Decision Rule.
 
