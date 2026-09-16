@@ -126,13 +126,45 @@ answer, not a way to invent one. ⚠ Keep the literal row prefix — BACKLOG §2
 | # | Item | Workstream | State |
 |---|---|---|---|
 | NFR-7 · N1 | SOC 2 in-scope service list + ISO 27001 ISMS boundary (applicability statements) | C1 | ⬜ open — org input, plan §6 Q4/Q5; see §5 |
-| NFR-7 · N2 | Auditor engagement (firm named, window agreed) | C1 | ⬜ open — org action. ⚠ The SOC 2 Type II observation window has **no recorded start date**, so its 6-month end cannot be computed; recording that date is a separate BACKLOG §2 row whose first action is NOT external. ✅ **Recorded 2026-09-15 (operator): the window is NOT STARTED.** ⛔ Do not open it until the route-gating control is in place — an undeclared mutating route refusing at boot and failing CI (`docs/superpower/route-gating-compliance-plan.md` step 3, which waits on step 2's three route decisions). The window should observe the control for its whole duration, not watch it being introduced (plan §5). ✅ **THAT BLOCKER LIFTED 2026-09-16: step 3 SHIPPED** — step 2's route decisions were all answered and the fail-closed default is in place and enforced at boot. ⇒ the window MAY now be opened, and the remaining gate is the org action this row names (firm named, window agreed). ⚠ Still *not started* until someone records a start date here |
+| NFR-7 · N2 | Auditor engagement (firm named, window agreed) | C1 | ⬜ open — org action: name the firm, agree the window. The observation window's own state (start date, end-date arithmetic, preconditions) is recorded ONCE, in **[§4a below](#4a-soc-2-type-ii-observation-window--not-started)** — ⛔ do not restate it here or in BACKLOG §2, or the two copies drift |
 | NFR-7 · N3 | Penetration test (scope, vendor, report) | C3 | ⬜ open — external party |
 | NFR-7 · N4 | C5 policy content (the written policies themselves, not the controls) | C5 | ⬜ open — org authorship |
 | NFR-7 · N5 | C6 FedRAMP package | C6 | ⬜ open — demand-gated; ⛔ do not start unscoped |
 | NFR-7 · N6 | C6 FIPS-mode leg (the verification half is G9 above) | C6 | ⬜ open — demand-gated |
 | NFR-7 · N7 | ISO 27001 A.8.8 advisory-watch process (who watches, how often, where recorded) | C3 | ⬜ open — org process. ⚠ Cheapest of the seven and the only one with no external dependency: it needs a named owner and a cadence, not a vendor |
 
+### 4a. SOC 2 Type II observation window — NOT STARTED
+
+**This is the single record of the window's state.** BACKLOG §2 and NFR-7 · N2 above point here and must not
+restate it — §7 of BACKLOG already records those two rows as the same window described twice, and a third
+copy is how the three drift apart.
+
+| Field | Value (2026-09-16) |
+|---|---|
+| State | ⬜ **NOT STARTED.** Recorded by the operator 2026-09-15. No observation window is running and no evidence is being collected against one. |
+| Start date | *(none — operator to fill: `YYYY-MM-DD`)*. ⛔ **Do not backdate it to the 2026-09-06 decision to open a window.** An auditor asks what was being observed on day one; on 2026-09-06 the route-gating control did not yet exist. The date to record is the day observation actually begins. |
+| End date | **= start + 6 months.** Not computable today because no start date exists; the moment the field above is filled in it is arithmetic, not a judgement call. |
+| Category scope, when it opens | As §1 of this table: Security (common criteria) mandatory; Availability and Processing Integrity included; Confidentiality/Privacy deferred to demand (plan §2b-1). |
+
+**What must be true before a start date is written here**
+
+1. ✅ **MET 2026-09-16 — the route-gating control is in place, not in flight.** This was the stated blocker
+   (`docs/superpower/route-gating-compliance-plan.md` §5: the window should observe the control for its whole
+   duration, not watch it being introduced). Step 3 shipped: a mutating route declaring neither a capability
+   nor a recorded exemption fails the server's boot, with a CI scan ahead of it — see the CC6 row above and
+   [`evidence/route-gating.md`](evidence/route-gating.md).
+2. ⬜ **OPEN, external — auditor engaged: firm named and window agreed** (NFR-7 · N2 above, org action, C1).
+   The start date is theirs to agree, not ours to assert.
+3. ⬜ **OPEN, operator input — which framework the report is written against.** The route-gating plan assumes
+   SOC 2 Type II throughout and its §7 still lists this as owed; ISO 27001 A.9 maps onto the same evidence but
+   different matrix rows. Recorded as a precondition because it is unanswered, not because it is hard.
+4. ⚠ **Related, not asserted as a gate:** the C1 applicability statements (NFR-7 · N1 — in-scope service list,
+   ISMS boundary) are org input per §5 below. Whether an auditor requires them *before* the window opens is
+   the auditor's call; this table cannot settle it.
+
+⚠ **Why "not started" is written down at all.** Until this entry existed, a window that had never begun and a
+window nobody had checked read identically from the repo. Stating NOT STARTED converts an invisible gap into a
+**checkable state**: the BACKLOG §2 row stays open either way, but it can now be run in both directions.
 
 ## 5. What this file does NOT cover
 
