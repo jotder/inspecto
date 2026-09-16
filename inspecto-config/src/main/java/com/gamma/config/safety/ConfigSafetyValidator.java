@@ -120,18 +120,21 @@ public final class ConfigSafetyValidator {
      * keys this list does not name still get their run-time check.
      *
      * <p>⚠ <b>A key belongs here only when the run-time reader resolves it the SAME way</b> — through
-     * {@link PathJail#requireJobPathUnderAny} against the Space config root. {@code archive_dir}
-     * qualifies ({@code CleanupTask:47}); it was simply missed by {@code JOB-SPEC-1}, whose decision text
-     * named five keys while the code shipped six. ⛔ Two path-shaped job keys deliberately stay OUT,
-     * because adding them would MANUFACTURE the very gate/runtime split this list exists to close
-     * ({@code JOB-PATH-GATE-BLIND-KEYS-1}): {@code out_dir} ({@code ReportJob:125}) is jailed at run with
-     * the plain {@link PathJail#requireUnderAny} — containment only, working-directory-relative — and
-     * {@code config} ({@code EnrichJob:59}) reaches {@code EnrichmentConfig.load} with no jail at all.
-     * Each needs its reader moved onto {@code requireJobPathUnderAny} in the same change that lists it
-     * here.
+     * {@link PathJail#requireJobPathUnderAny} against the Space config root. ⛔ <b>Reader first, then
+     * this list</b> — adding a key here while its runtime still resolved against the process working
+     * directory would manufacture exactly the gate/runtime split {@link PathJail#resolveJobPath} exists
+     * to end. That order is not advice; it is why {@code out_dir} and {@code config} were held OUT by
+     * {@code JOB-PATH-GATE-BLIND-KEYS-1} and only joined with
+     * {@code JOB-PATH-REPORT-ENRICH-SPLIT-1}, once {@code ReportJob} had moved off the plain
+     * {@link PathJail#requireUnderAny} and {@code EnrichJob} had gained a jail at all.
+     *
+     * <p>{@code archive_dir} ({@code CleanupTask:47}) already resolved the right way and was simply
+     * missed — {@code JOB-SPEC-1}'s decision text named five keys while the code shipped six. The list is
+     * now nine, and ⚠ <b>every enumeration of it outside this file has undercounted at least once</b>.
      */
     private static final List<String> JOB_PATH_KEYS =
-            List.of("data_dir", "pipeline_config", "dir", "archive_dir", "backup_dir", "archive", "target_dir");
+            List.of("data_dir", "pipeline_config", "dir", "archive_dir", "backup_dir", "archive",
+                    "target_dir", "out_dir", "config");
 
     /**
      * ⚠ {@code configDir} here is the <b>Space config root</b>, and unlike every other kind it is USED:

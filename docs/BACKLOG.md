@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **60<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 41<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> **59<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 40<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
 > five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
 > re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
 > building**: three of the five refuted part of their own row's premise, and the refutations produced
@@ -149,9 +149,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 41<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 40<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 60<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 59<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1964,13 +1964,6 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⇒ Residual re-filed as `JOB-PATH-REPORT-ENRICH-SPLIT-1`. `inspecto-config` 157/0/0/0, both mutants
   meaningful. → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PATH-REPORT-ENRICH-SPLIT-1` — two job keys read paths under the WRONG rule or none at
-  all.** Filed 2026-09-16 from the ten-key sweep. Move `ReportJob:125` (`out_dir`, currently
-  `requireUnderAny` = CWD-relative) and `EnrichJob:59` (`config`, **no jail at all**) onto
-  `requireJobPathUnderAny`, and only THEN list both in `JOB_PATH_KEYS` — listing first manufactures a
-  gate/jail split. ⛔ Land it with `JOB-PATH-DEMO-CONFIG-REPOINT-1` or `maintenance_report_job.toon`
-  breaks in between. → `okf/backend/control-plane/jobs.md`
-
 - **P2** · **`JOB-CONFIG-THIRD-PRODUCER-1` — bundle import writes job configs whose path values no gate
   ever sees.** Filed 2026-09-16 while closing `JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`, which found it.
   `BundleRoutes.java:477` writes `<write-root>/jobs/<name>_job.toon` directly on import (reached from
@@ -1999,9 +1992,106 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `enrichment` added that test and cleaned its one sample. ⇒ Owed call: strip the key from 36 files, or
   declare it on the pipeline spec and say why. → `okf/backend/config/config-safety.md`
 
-- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point all 33 committed values space-relative.** The
-  remedy half of the survey. ⛔ Do it in the same change as whichever runtime row lands last, or the
-  configs refuse in between. → `okf/backend/control-plane/jobs.md`
+- ~~**P2** · **`JOB-PATH-REPORT-ENRICH-SPLIT-1`**~~ ✅ **FILED AND SHIPPED 2026-09-16.** The last two
+  path-shaped job keys whose readers disagreed with the gate. `ReportJob:122` resolved `out_dir` through
+  the plain `PathJail.requireUnderAny` (containment only, working-directory-relative) when
+  `JOB-DIR-CWD-CONTAINMENT-1` moved everything else; `EnrichJob:59` handed `config` to
+  `EnrichmentConfig.load` with **no `PathJail` call at all** — a containment hole, not merely a base
+  mismatch, and independent of that row. Both now call
+  `PathJail.requireJobPathUnderAny(allowedRoots(), SpaceConfigRoot.current(), …)`, and **only then** were
+  `out_dir` + `config` added to `JOB_PATH_KEYS` — reader first, then the list, which is the order the
+  field's javadoc now states for any further addition.
+
+  🔴 **The row's own blast-radius claim was WRONG, and wrong in the more dangerous direction.** It said
+  `maintenance_report_job.toon:6` (`out_dir: spaces/demo/data/reports`, the ONE committed `out_dir`, and
+  `config` appears in zero — both re-confirmed, the latter against a `target:` positive control) *refuses*
+  under the Space-root rule. **It does not refuse on a fresh tree: it silently re-points.** Driven, not
+  mirrored — `PathJail` compiled from the working tree (`-sourcepath inspecto-config;inspecto-api`) and
+  the real `resolveJobPath` called: the old value under the new rule returns
+  `…/spaces/demo/config/spaces/demo/data/reports`, the doubled path, with **no throw**, because
+  `resolveJobPath` only refuses when the CWD-relative path *exists* — and `spaces/demo/data/reports` is
+  absent in this checkout. A report delivered to a path nobody watches, reporting SUCCESS, is worse than
+  a refusal. ⇒ The ⛔ "land it with the re-point or it breaks in between" held for a different reason
+  than the one stated.
+
+  ⇒ Landed with the repoint of **that one value** (`out_dir: ../data/reports`), *not* all 33:
+  `JOB-PATH-DEMO-CONFIG-REPOINT-1`'s other 32 belong to runtimes that had **not** moved
+  *(29 as of later that day — the three backup values followed their reader, see that row)*
+  (`PipelineJobRunner`, the compactors), and re-pointing those now would break them at run — which is
+  exactly what that row's own ⛔ warns against. Driven: the new value resolves to
+  `…/spaces/demo/data/reports`, **byte-identical** to what the legacy CWD rule produced from the repo
+  root, so the re-point is behaviour-preserving.
+
+  ⚠ **One instruction in the row could not be carried out: there is no ⛔ paragraph to delete.** The row
+  said `JOB_PATH_KEYS`' javadoc "explains why they are held out"; it never did — it said only that
+  unnamed keys "still get their run-time check", which for `config` was false. The javadoc now records
+  the ordering constraint instead. Pinned by `ConfigSafetyValidatorTest.theReportAndEnrichPathKeysAreContained`
+  (gate membership), `ReportJobDeliveryTest.aRelativeOutDirResolvesAgainstTheSpaceRootNotTheWorkingDirectory`
+  (asserts the CWD path stays ABSENT, not merely that the Space path is populated) and
+  `JobPathContainmentTest.enrichRefusesAConfigOutsideTheAllowedRoots` (a REAL readable file outside the
+  jail, so the loader cannot refuse it for the wrong reason). → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **29** committed values
+  space-relative.** The remedy half of the survey. ✅ **Three of the 32 were DISCHARGED 2026-09-16** —
+  see the struck block below. ⛔ Do it in the same change as whichever runtime row lands last, or the configs refuse in
+  between. *(33 → 32 on 2026-09-16: `maintenance_report_job.toon:6` was re-pointed with
+  `JOB-PATH-REPORT-ENRICH-SPLIT-1`, whose runtime moved in the same change. ⛔ Do **not** read that as
+  licence to re-point the rest early — their readers are still on the old rule.)*
+  ~~🔴 **The ⛔ above was VIOLATED the same day, in the other direction.**~~
+  ✅ **CLOSED 2026-09-16 — the three backup values are RE-POINTED** (`backup_verify_job.toon:6` and
+  `config_backup_job.toon:7` → `../data/backups`; `config_backup_job.toon:6` → `.`). Each new value was
+  driven to land **byte-identically** on the target the legacy CWD rule produced from the repo root — the
+  same behaviour-preservation proof `maintenance_report_job.toon:6` used — and each was read back through
+  the real `ConfigCodec` before being trusted, because a TOON edit that parses while losing its value has
+  happened in this repo before. Now pinned by `DemoBackupJobPathsResolveUnderTheSpaceRootTest`
+  (`inspecto-config`, 5 tests, runs in the DEFAULT build). Mutation-proven: reverting `dir: .` alone turns
+  `configBackupBacksUpTheSpaceConfigRootItself` red with the doubled path in the message.
+  Verified `mvn -o -pl inspecto-config -am test` **161/0/0/0** (all 5 observed to RUN) and
+  `mvn -o -pl inspecto-backup -am test -Pedition-standard` **BUILD SUCCESS** with
+  `BackupJobPathResolutionTest` 6, `BackupPathContainmentTest` 3, `BackupTaskTest` 6 observed to RUN.
+  🔴 **The first version of that pin was RED, and the reason is the trap this whole row is about.**
+  Its control asserted the OLD value still throws `PathJail.Escape` — but `resolveJobPath` refuses only
+  when the **CWD-relative** path EXISTS, and surefire's working directory is the MODULE directory, where
+  `spaces/demo/config` does not exist. ⛔ **A refusal assertion pins the test's working directory, not
+  the rule.** The control now asserts the *doubling* (true in both columns) plus a separate reachability
+  control — one value that DOES exist CWD-relative (refuses), one that does not (re-points) — so the
+  branch cannot go dead without a test going red.
+  ⚠ **`docs/ops/backup-restore-runbook.md` taught the broken spelling** and was corrected in the same
+  change: its backup example, its retention bullet, its containment preamble, and — the one that cannot
+  be fixed by symmetry — **restore-into-a-new-space**, where the base is the config root of the Space the
+  restore JOB lives in, not of the Space being restored into, so crossing spaces means `../../<new>/config`
+  or an absolute path under a declared root. *(Original finding follows.)*
+  ~~`JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`) moved `BackupTask` onto
+  `PathJail.requireJobPathUnderAny(…, SpaceConfigRoot.current(), …)` **without** re-pointing the three
+  committed values that runtime reads. A runtime that moves ahead of its configs is the same break as
+  configs that move ahead of their runtime — this marker only ever named one of the two orders.
+  **Driven 2026-09-16, not mirrored:** `PathJail` compiled from the working tree
+  (`javac -sourcepath "inspecto-config/src/main/java;inspecto-api/src/main/java"`), the real
+  `PathJail.resolveJobPath(base, value, field)` called with `base = spaces/demo/config`; both positive
+  controls re-fired (the `spaces/demo/config/jobs` refusal, and the absolute no-op). ⚠ `resolveJobPath`
+  refuses **only when the CWD-relative path EXISTS**, so `Files.exists` was run on each — the column a
+  value falls in is a property of the TREE, not of the value:
+  - `config_backup_job.toon:6` `params.dir: spaces/demo/config` — CWD-relative path **exists** (it is a
+    committed directory), so it **REFUSES in both columns**, state-independently. 🔴 **`config_backup`
+    now FAILS AT RUN**, at `BackupTask:93` on field `dir`, where before `3f384182` it succeeded. It is
+    **gate-blind** (under `params:`), so nothing refused it at save and nothing will.
+  - `backup_verify_job.toon:6` `backup_dir: spaces/demo/data/backups` — CWD-relative path **absent on
+    this tree**, so **fresh column**: a silent re-point to `…/config/spaces/demo/data/backups`.
+    `BackupTask.verify` (`:182`) finds no `.zip` there and returns `JobResult.ok("no archive to
+    verify…")`. 🔴 **A green pass that verifies nothing** — worse than the refusal, and the failure
+    class §4 of the survey names.
+  - `config_backup_job.toon:7` `params.backup_dir` — same value, same **fresh** column, but ⚠ **never
+    reached**: `:93` resolves `dir` first and throws, masking it. A fix for `:6` alone would expose it.
+  - *(`backup_retention_job.toon:5` `params.dir` is the fourth backup value but is **not** affected by
+    `3f384182` — its reader is `CleanupTask`, moved by `JOB-DIR-CWD-CONTAINMENT-1`. Fresh column,
+    silent re-point, unchanged.)*
+  ⚠ `restore`'s two moved keys (`archive`, `target_dir`, `BackupTask:269-270`) classify **no committed
+  value** — the survey's §2.1 proven absence stands. ⚠ `BackupTask:191` is deliberately **not** moved.
+  ⇒ **Those three values were unblocked and owed**, by this row's own stated pattern (a value moves
+  when its reader moves) — and are now done.~~ ⛔ **Still not licence for the other 29** —
+  `PipelineJobRunner` and the compactors have not moved, so their values stay as authored.
+  §3.1 of `docs/superpower/job-path-compat-survey.md` carries the driven table.
+  → `okf/backend/control-plane/jobs.md`
 
 - ~~**P2** · **`COMPONENT-KIND-KEY-CENSUS-1`**~~ ✅ **SHIPPED 2026-09-16** — the `widget`/`dashboard`
   top-level key census landed in `ComponentRoutes.validateKind` (`:640`, helpers `:654-720`), where it

@@ -1,11 +1,13 @@
 package com.gamma.job;
 
+import com.gamma.config.safety.PathJail;
 import com.gamma.enrich.EnrichmentAuditWriter;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.EnrichmentEngine;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.pipeline.SpaceConfigRoot;
 
 import java.util.List;
 
@@ -56,7 +58,13 @@ final class EnrichJob implements Job {
      */
     @Override
     public JobResult run(JobContext ctx) throws Exception {
-        EnrichmentConfig job = EnrichmentConfig.load(cfg.require("config"));
+        // JOB-PATH-REPORT-ENRICH-SPLIT-1: `config` is an operator-authored filesystem path that
+        // EnrichmentConfig.load hands straight to the TOON reader. It reached the filesystem with NO
+        // jail at all — a containment hole independent of JOB-DIR-CWD-CONTAINMENT-1, not merely a base
+        // mismatch. It now resolves and is contained by the same one rule as every other job path.
+        String configPath = PathJail.requireJobPathUnderAny(
+                PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("config"), "config").toString();
+        EnrichmentConfig job = EnrichmentConfig.load(configPath);
         String consignmentId = cfg.name().toLowerCase().replace(' ', '_') + "-job-" + EnrichmentAuditWriter.runStamp();
         String start = EnrichmentAuditWriter.now();
         long t0 = System.nanoTime();

@@ -37,6 +37,37 @@ class ReportJobDeliveryTest {
         return new JobConfig("weekly_sales", JobType.REPORT, null, null, true, false, params);
     }
 
+    /**
+     * {@code JOB-PATH-REPORT-ENRICH-SPLIT-1}: a RELATIVE {@code out_dir} resolves against the Space
+     * config root, not the process working directory — the rule {@code JOB-DIR-CWD-CONTAINMENT-1} set
+     * for every other job path and that this delivery site was left out of.
+     *
+     * <p>⚠ The assertion that matters is the NEGATIVE one: nothing may appear at the CWD-relative path.
+     * Asserting only that the artifact landed under the write root would also pass if the old rule had
+     * been kept and the test happened to run with the write root as its working directory.
+     */
+    @Test
+    void aRelativeOutDirResolvesAgainstTheSpaceRootNotTheWorkingDirectory(@TempDir Path writeRoot)
+            throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        Path cwdRelative = Path.of("reports-spacerule-probe").toAbsolutePath();
+        assertFalse(Files.exists(cwdRelative), "fixture: the CWD-relative path must not pre-exist");
+
+        JobResult r = new ReportJob(job(Map.of(
+                "scope", "dataset", "dataset", "sales_ds",
+                "out_dir", "reports-spacerule-probe")), null).run();
+
+        assertEquals("SUCCESS", r.status(), r.message());
+        Path spaceRelative = writeRoot.resolve("reports-spacerule-probe");
+        assertTrue(Files.isDirectory(spaceRelative), "delivered under the Space root: " + r.message());
+        try (Stream<Path> files = Files.list(spaceRelative)) {
+            assertTrue(files.findFirst().isPresent(), "the artifact itself must be there, not just the dir");
+        }
+        assertFalse(Files.exists(cwdRelative),
+                "the old working-directory rule must be gone, not merely shadowed: " + cwdRelative);
+    }
+
     @Test
     void datasetScopeDeliversAggregatedCsv(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seedSales(writeRoot);

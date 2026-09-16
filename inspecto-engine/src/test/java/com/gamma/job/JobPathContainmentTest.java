@@ -180,4 +180,29 @@ class JobPathContainmentTest {
         }
     }
 
+    // ── enrich ───────────────────────────────────────────────────────────────────
+
+    /**
+     * {@code JOB-PATH-REPORT-ENRICH-SPLIT-1}: the enrich job's {@code config} reached
+     * {@code EnrichmentConfig.load} — and so the filesystem — with <b>no jail call at all</b>. That is a
+     * containment hole in its own right, independent of {@code JOB-DIR-CWD-CONTAINMENT-1}'s base
+     * question, which is why it is asserted as an escape rather than as a resolution.
+     *
+     * <p>⚠ The escape file is REAL and readable. A probe naming a non-existent path could be refused by
+     * the loader for the wrong reason and the test would pass without a jail present at all.
+     */
+    @Test
+    void enrichRefusesAConfigOutsideTheAllowedRoots(@TempDir Path root) throws Exception {
+        jailTo(root);
+        Path outside = root.getParent().resolve("exfil-enrich");
+        Files.createDirectories(outside);
+        Path real = Files.writeString(outside.resolve("e.toon"), "name: e\ntransform: SELECT 1\n");
+        assertFalse(PathJail.contains(root, real), "fixture is not an escape — the test would be vacuous");
+
+        PathJail.Escape e = assertThrows(PathJail.Escape.class,
+                () -> new EnrichJob(new JobConfig("e", JobType.ENRICH, null, null, true, false,
+                        Map.of("config", real.toString())), null).run());
+        assertEquals("config", e.field(), "the message must name the offending field");
+    }
+
 }

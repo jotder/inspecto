@@ -3,6 +3,6 @@ job:
   template: chained-backup
   params:
     after: db_maintenance
-    dir: spaces/demo/config
-    backup_dir: spaces/demo/data/backups
+    dir: .
+    backup_dir: ../data/backups
     prefix: demo_config

@@ -672,11 +672,42 @@ committed configs.
   `ConfigSpecs.job()` — so `POST/PUT /jobs`, `/config/write` and `/config/patch` all refuse the whole body
   before the safety gate's blindness can matter. A template instance reaches the system only through
   `ServiceBootstrap`, which expands `params:` into the flat `job:` block before the run-time jails read it.
-  Widening `checkJob` to `job.params.*` would refuse nothing any route can accept. ⛔ **`out_dir` stays
-  OUT, deliberately** — `ReportJob:125` jails it with the plain `PathJail.requireUnderAny` (containment
-  only, working-directory-relative), so listing it would *manufacture* a gate/runtime split. **And the row
-  missed a second key of the same shape: `config` (`EnrichJob:59`) reaches `EnrichmentConfig.load` with no
-  jail at all.** Both need their reader moved onto `requireJobPathUnderAny` in the same change that lists
-  them → `JOB-PATH-REPORT-ENRICH-SPLIT-1`.
-- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point all 33 committed values space-relative. ⛔ Land it with
-  whichever runtime row lands last, or the configs refuse in between.
+  Widening `checkJob` to `job.params.*` would refuse nothing any route can accept. ⚠ **`out_dir` was held
+  OUT deliberately** — `ReportJob` jailed it with the plain `PathJail.requireUnderAny` (containment only,
+  working-directory-relative), so listing it would have *manufactured* a gate/runtime split — **and the
+  row missed a second key of the same shape: `config` (`EnrichJob:59`) reached `EnrichmentConfig.load`
+  with no jail at all.** ✅ **Both were discharged the same day by `JOB-PATH-REPORT-ENRICH-SPLIT-1`,
+  reader first and only then the list** — see that section below. ⇒ `JOB_PATH_KEYS` is now **nine**:
+  the seven after `archive_dir` joined, plus `out_dir` and `config`.
+- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining **29** committed values space-relative.
+  ⛔ Land it with whichever runtime row lands last, or the configs refuse in between. *(33 → 32: the one
+  `out_dir` value moved with its runtime. ⛔ Not licence to re-point the rest early.)*
+  ~~🔴 **Three of the 32 are now orphaned the OTHER way**~~ ✅ **CLOSED 2026-09-16, same day.**
+  `JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`) moved `BackupTask` without the three configs it reads, so
+  `config_backup` failed at run and `backup_verify` returned a green "no archive to verify" over a
+  doubled directory. **The marker only ever named one of the two orders** — configs ahead of their
+  runtime — and a runtime ahead of its configs is the same break. Re-pointed to `dir: .` and
+  `backup_dir: ../data/backups`, each driven to land byte-identically on the legacy target, and now
+  pinned by `DemoBackupJobPathsResolveUnderTheSpaceRootTest` — the first thing in the repo that holds
+  a committed config value and its reader's rule together.
+
+### `JOB-PATH-REPORT-ENRICH-SPLIT-1` — the last two readers, and what they taught
+
+`out_dir` (`ReportJob`) was on the plain `PathJail.requireUnderAny` — containment only,
+working-directory-relative — and `config` (`EnrichJob`) went to `EnrichmentConfig.load` with **no jail
+call at all**, a containment hole rather than a base mismatch. Both now go through
+`PathJail.requireJobPathUnderAny(allowedRoots(), SpaceConfigRoot.current(), …)`, and **only then** did the
+two keys join `JOB_PATH_KEYS`.
+
+⛔ **The ordering is the durable rule, and it is now stated in that field's javadoc: reader first, then
+the list.** Adding a key to `JOB_PATH_KEYS` while its runtime still resolves against the process working
+directory manufactures precisely the gate/runtime split `PathJail.resolveJobPath` exists to end — the
+gate would refuse, or accept, a draft the run then treats differently.
+
+🔴 **`resolveJobPath` refuses the ambiguous case only when the old path EXISTS.** This is documented
+behaviour, but its consequence was not: on a *fresh* tree — no old directory — a stale value does not
+refuse, it **silently re-points**, and for an output directory that means an artifact written where
+nobody looks while the job reports SUCCESS. The survey's fresh/deployed columns say this; a row written
+from the deployed column alone called `maintenance_report_job.toon` a refusal, and it is not one here.
+⚠ When judging a value's blast radius, read the column that matches the tree you are on, and check
+`Files.exists` on the CWD-relative path — that single predicate is what picks the column.

@@ -23,8 +23,14 @@ and `out_dir` on reports) must resolve under an **allowed root** — as must a p
 same list the control plane's 422 write gate enforces, so a value refused at authoring is refused at
 run time for the same reason.
 
-Values like `spaces/<space>/data/backups` are already under the default root and need nothing. But a
-backup destination **outside** the server root — a mount, a NAS, another drive — must be declared:
+⚠ **A relative value on a job resolves against that job's Space config root**, not the server's
+working directory (`JOB-DIR-CWD-CONTAINMENT-1`, operator 2026-09-16). From
+`spaces/<space>/config` that makes the backup destination `../data/backups`. ⛔ **Do not write
+`spaces/<space>/data/backups`** — the Space prefix is already in the base, so the old spelling doubles
+to `spaces/<space>/config/spaces/<space>/data/backups`, and on a server whose working directory makes
+the old path exist it is REFUSED outright rather than resolved silently. Either way it stays under the
+default root. But a backup destination **outside** the server root — a mount, a NAS, another drive —
+must be declared:
 
 ```
 java ... -Dassist.safety.roots="/opt/inspecto;/mnt/backups" -cp inspecto.jar com.gamma.control.ControlApi
@@ -46,8 +52,8 @@ job:
   type: maintenance
   task: backup
   cron: "0 4 * * *"
-  dir: spaces/<space>/config
-  backup_dir: spaces/<space>/data/backups
+  dir: .
+  backup_dir: ../data/backups
   prefix: <space>_config
 ```
 
@@ -63,7 +69,7 @@ the SHA-256 of the archive and of every file inside it, appends one row to the
   CHECKPOINT.
 - **Backup retention:** a `task: cleanup` job on the backup dir; ALWAYS set `min_keep` so a
   retention sweep can never delete the last backups
-  (`dir: …/backups`, `retention_days: 30`, `min_keep: 5`).
+  (`dir: ../data/backups`, `retention_days: 30`, `min_keep: 5`).
 
 ## Verify
 
@@ -87,8 +93,11 @@ extracted file is re-hashed against the manifest.
 
 1. Create the space (`POST /spaces` or `spaces/<new>/space.toon`) — this lays down the
    `config/ data/ audit/ duckdb/` axes.
-2. Run a restore job: `archive: <backup zip>`, `target_dir: spaces/<new>/config` (empty target →
-   zero conflicts).
+2. Run a restore job: `archive: <backup zip>`, `target_dir: ../../<new>/config` (empty target →
+   zero conflicts). ⚠ **The base is the config root of the Space the restore JOB lives in, not of the
+   Space being restored into** — there is no "the new space" for a relative value to hang off, so
+   crossing spaces means climbing out (`../../`) or writing an absolute path under a declared root.
+   ⛔ `target_dir: spaces/<new>/config` is the pre-2026-09-16 spelling and now doubles or refuses.
 3. Restart or hot-load: job/pipeline configs register on boot; components are picked up by the
    registry scan.
 4. Smoke it: `GET /spaces/<new>/health`, `GET /spaces/<new>/jobs`, one representative pipeline

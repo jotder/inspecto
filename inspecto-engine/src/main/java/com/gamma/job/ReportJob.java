@@ -122,7 +122,13 @@ final class ReportJob implements Job {
         String outDir = cfg.opt("out_dir", null);
         if (outDir == null) return null;
         String format = cfg.opt("format", rows != null ? "csv" : "json").toLowerCase();
-        Path dir = PathJail.requireUnderAny(PathJail.allowedRoots(), outDir, "out_dir");
+        // JOB-PATH-REPORT-ENRICH-SPLIT-1: the SAME rule the 422 gate and every other job path reader
+        // applies — a relative `out_dir` resolves against the Space config root, not the process
+        // working directory (JOB-DIR-CWD-CONTAINMENT-1, operator 2026-09-16). This site was left on the
+        // plain `requireUnderAny` when that landed, so a report delivered somewhere the gate had not
+        // checked. ⛔ Do not reintroduce a second rule here; see PathJail.resolveJobPath's javadoc.
+        Path dir = PathJail.requireJobPathUnderAny(
+                PathJail.allowedRoots(), SpaceConfigRoot.current(), outDir, "out_dir");
         Files.createDirectories(dir);
         Path artifact = dir.resolve(cfg.name() + "_" + TS.format(LocalDateTime.now())
                 + ("csv".equals(format) ? ".csv" : "png".equals(format) ? ".png"

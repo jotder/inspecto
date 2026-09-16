@@ -3,6 +3,6 @@ job:
   type: report
   scope: status
   format: json
-  out_dir: spaces/demo/data/reports
+  out_dir: ../data/reports
   on_signal: job.run.completed
   when: "$signal.job == backup_verify && $signal.outcome == SUCCESS"
