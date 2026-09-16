@@ -54,6 +54,16 @@ jobs:
       - name: Guard — no committed secrets
         run: node tools/check-secrets.mjs
 
+      # Path-jail root guard (SAFETY-ROOTS-UNDECLARED-1, 2026-09-16). The one-shot ETL CLI and
+      # single-tenant serve host no space, so `SpaceManager` pushes nothing into `DiscoveredRoots` and
+      # `-Dassist.safety.roots` is their ONLY source of allowed roots — drop it and `defaultPolicy()`
+      # returns an EMPTY list, killing every jailed value with "no allowed roots configured". All six
+      # launchers declare it today; nothing enforced that, and each also NAMES the flag in its own
+      # comments, so a grep-shaped check would stay green after the real declaration was deleted. This
+      # strips comments first and asserts against code lines. Pure Node, <1s.
+      - name: Guard — space-less launchers declare their path-jail root
+        run: node tools/check-safety-roots-declared.mjs
+
       # Step Processors board guard (CONNECTORS-BUNDLE-1 follow-up, 2026-09-07). docs/EDITIONS.md's
       # `| SP-*` rows are GENERATED from inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json
       # (itself written by ProcessorCatalogContractTest), plus the per-edition decisions the renderer holds

@@ -19,9 +19,16 @@ on Personal; see EDITIONS `OPS-06`.
 Every path field on a maintenance job (`dir`, `backup_dir`, `archive_dir`, `archive`, `target_dir`,
 and `out_dir` on reports) must resolve under an **allowed root** — as must a pipeline's
 `schema_file` / `grammar` / `mapping_file`, which are now enforced when the config loads. The roots come from
-`-Dassist.safety.roots` (a `;`-separated list) and default to the server's working directory — the
+`-Dassist.safety.roots` (a `;`-separated list) plus every hosted Space base — the
 same list the control plane's 422 write gate enforces, so a value refused at authoring is refused at
 run time for the same reason.
+
+⛔ **There is no working-directory default.** With the property unset and no Space hosted the root list
+is **empty**, and every jailed value then fails with `no allowed roots configured for '<field>'` — not
+with a containment error. That is fail-closed by design (a CWD fallback existed until 2026-08-14 and
+silently granted the server's working directory to every containment check). A single-tenant server —
+the one-shot ETL CLI, or serve over a flat config dir — hosts no Space and so registers no root of its
+own: for it the property is the **only** source, and declaring it is a required deployment step.
 
 ⚠ **A relative value on a job resolves against that job's Space config root**, not the server's
 working directory (`JOB-DIR-CWD-CONTAINMENT-1`, operator 2026-09-16). From

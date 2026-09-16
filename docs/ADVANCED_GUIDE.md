@@ -407,7 +407,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | `assist.sql.memory_limit` | `1GB` | SQL sandbox memory cap |
 | `assist.sql.threads` | `2` | SQL sandbox thread cap |
 | `assist.sql.timeout_seconds` | `30` | SQL sandbox per-query timeout |
-| `assist.safety.roots` | `""` (→ CWD) | comma-separated allowed config-safety path roots |
+| `assist.safety.roots` | `""` (→ **no roots**, ⛔ not CWD) | `;`-separated allowed config-safety path roots |
 
 Secrets: `SecretResolver` resolves `SYS:<key>` via `System.getProperty(key)` — any property can be a secret source.
 
