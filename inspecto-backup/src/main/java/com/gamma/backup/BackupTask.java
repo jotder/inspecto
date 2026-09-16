@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.Checksums;
 import com.gamma.config.safety.PathJail;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.signal.Severity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,15 @@ import java.util.zip.ZipOutputStream;
  * sidecar manifest must exist and the archive hash must match before anything is written, extraction is
  * path-jailed under {@code target_dir} (zip-slip), existing files block unless {@code overwrite: true},
  * and every extracted file is re-hashed against the manifest.
+ *
+ * <p>⚠ <b>Relative path values resolve against the Space config root</b>, never the process working
+ * directory ({@code JOB-DIR-CWD-CONTAINMENT-1}, operator 2026-09-16) — {@code dir}, {@code backup_dir},
+ * {@code archive} and {@code target_dir} all go through {@link PathJail#requireJobPathUnderAny}, the same
+ * rule the 422 write gate ({@code ConfigSafetyValidator.checkJob}) applies. ⛔ Do not revert any of them to
+ * the plain {@link PathJail#requireUnderAny}: this module was left out of the original change and the gate
+ * then refused at SAVE what the run still read CWD-relative ({@code JOB-PATH-BACKUPTASK-SPLIT-1}). The one
+ * deliberate exception is {@code archive} on {@code backup_verify}, which names a file <i>inside</i>
+ * {@code backup_dir} and is jailed against that resolved directory, not against the Space root.
  */
 final class BackupTask {
 
@@ -79,8 +89,9 @@ final class BackupTask {
 
     static JobResult backup(JobConfig cfg, JobContext ctx, boolean dryRun, String dataDir) throws IOException {
         List<Path> roots = PathJail.allowedRoots();
-        Path dir = PathJail.requireUnderAny(roots, cfg.require("dir"), "dir");
-        Path backupDir = PathJail.requireUnderAny(roots, cfg.require("backup_dir"), "backup_dir");
+        Path space = SpaceConfigRoot.current();
+        Path dir = PathJail.requireJobPathUnderAny(roots, space, cfg.require("dir"), "dir");
+        Path backupDir = PathJail.requireJobPathUnderAny(roots, space, cfg.require("backup_dir"), "backup_dir");
         String prefix = cfg.opt("prefix",
                 dir.getFileName() == null ? "backup" : dir.getFileName().toString());
         long t0 = System.nanoTime();
@@ -168,8 +179,8 @@ final class BackupTask {
     /** Read-only: verify the newest archive in {@code backup_dir} (or one named {@code archive}, or
      *  {@code all: true}) against its sidecar manifest — archive hash first, then every entry hash. */
     static JobResult verify(JobConfig cfg, JobContext ctx) throws IOException {
-        Path backupDir = PathJail.requireUnderAny(
-                PathJail.allowedRoots(), cfg.require("backup_dir"), "backup_dir");
+        Path backupDir = PathJail.requireJobPathUnderAny(
+                PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("backup_dir"), "backup_dir");
         String one = cfg.opt("archive", null);
         boolean all = Boolean.parseBoolean(cfg.opt("all", "false"));
         long t0 = System.nanoTime();
@@ -254,8 +265,9 @@ final class BackupTask {
 
     static JobResult restore(JobConfig cfg, JobContext ctx, boolean dryRun) throws IOException {
         List<Path> roots = PathJail.allowedRoots();
-        Path zip = PathJail.requireUnderAny(roots, cfg.require("archive"), "archive");
-        Path target = PathJail.requireUnderAny(roots, cfg.require("target_dir"), "target_dir");
+        Path space = SpaceConfigRoot.current();
+        Path zip = PathJail.requireJobPathUnderAny(roots, space, cfg.require("archive"), "archive");
+        Path target = PathJail.requireJobPathUnderAny(roots, space, cfg.require("target_dir"), "target_dir");
         boolean overwrite = Boolean.parseBoolean(cfg.opt("overwrite", "false"));
         long t0 = System.nanoTime();
         // Fail-closed (MNT-6): restore never bypasses validation — the sidecar manifest must exist and
