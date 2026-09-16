@@ -1427,7 +1427,30 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   → `CapabilityManifest.java` · `CapabilityManifestTest.java` · `ObjectRoutes.java:56-75` ·
   `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
 
-- **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.** Adopted
+- **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**
+  ✅ **THE `alert` TYPE LANDED 2026-09-16 (`f0ad2ffc`, BREAKING), verified 16 modules / no skips.** The
+  census now covers **two of nine** config types: `pipeline` and `alert`. An `alert` config carrying a key
+  that neither `ConfigSpecs.alert()` declares nor `AlertRule.fromMap` reads now produces an unknown-key
+  finding where it previously validated clean. `CENSUSED_PARENTS` became a per-type `censusedParents(type)`,
+  because the whole alert file is ONE block and a census stopping at the top level would accept every alert
+  config whole and catch nothing.
+  🔴 **Why `alert` could be censused and the other seven still cannot — this is the reusable test.** The
+  fail-open is not squeamishness: deriving an accepted set from `ConfigSpecs` ALONE would refuse the keys a
+  hand-written parser reads but the spec never declared. That objection is answerable exactly where the
+  parser's reads are **ENUMERABLE**, and `AlertRule.fromMap` is a flat literal list of ten `alert.get("…")`
+  calls with **no dynamic key access** (verified: `keySet`/`entrySet` appear nowhere in the class). Seven of
+  the ten are spec-declared, three sit in `ALERT_PARSER_ONLY` ⇒ ten reads, ten accounted for, so no key the
+  parser reads can be wrongly refused. ⛔ **Apply that same test before censusing any further type.**
+  ⚠ **`job` may be the one type that can NEVER be censused**: it funnels every unrecognised key into an open
+  `params` bag, so it needs a job-type registry first. `expectation`, `schema` and `enrichment` each have
+  confirmed undeclared-but-engine-read keys today.
+  ⚠ **Expectations are not protected by this at all** — `Expectation`'s own record constructor is the whole
+  validator, so `AcceptedConfigKeys` never sees them (found while grounding `DUCKLE-C8`).
+  ⚠ A new key must be **DECLARED in `ConfigSpecs`** or added to `ALERT_PARSER_ONLY`, never both — that rule
+  bit immediately: `alert.maximumAge` (the freshness shape, `a9c97369`) is declared, deliberately.
+  ⇒ **Still open:** the remaining seven types, and the plan's §4 deferral (the WARNING seam at
+  `RecipeCompiler`). → `superpower/dead-property-validation-plan.md` stays ACTIVE for those.
+  (original row) — Adopted
   by the operator 2026-09-15 from duckle §1 C3.
 
   ✅ **~TWO-THIRDS BUILT 2026-09-16 (`2c310d1c`) — the row STAYS OPEN.** Shipped: the accepted-names map

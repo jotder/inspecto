@@ -1264,6 +1264,49 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ---
 
+- 🔴 **A PROBE THAT CANNOT RETURN A HIT REPORTS "ABSENT" AND EXITS 0. Silence is not evidence.**
+  Three instances in one shift (2026-09-16), two of them by the same person, one committed before it was
+  caught:
+  - `git ls-tree HEAD asn-parser/` run from a **module subdirectory** prints nothing and **exits 0**,
+    because `ls-tree` pathspecs are CWD-relative. The subtree is fully tracked (70 files). That false claim
+    reached five agent briefings, a board row and a commit message — and **five agents independently
+    "confirmed" it, because they all ran the probe they were given.**
+  - `ls -d legacy-code` at the repo root, for a claim about `asn-parser/asn-decoders/legacy-code/`. The pom
+    exists, is a declared `<module>`, and its `<sourceDirectory>../../src/main/java</sourceDirectory>` is
+    exactly the tree the rows said it compiles. A row was FILED and COMMITTED on that zero, then retracted.
+  - The mirror error: `grep poi` over the poms returns **nine hits, every one a substring of
+    "point"/"policy"** — a false POSITIVE. Match `org.apache.poi` or `<artifactId>poi`.
+  ⇒ **Three rules.** (1) Run probes from the repo ROOT, and scope the probe to the claim — a claim about a
+  nested path is not tested at the root. (2) Before believing a zero, **prove the probe can return a hit**
+  (run it against something you know is there). (3) ⛔ **Agreement between agents is not corroboration when
+  they share a probe.** Independent confirmation means a *different* method, not another caller.
+  ⚠ Prior art, same class: the grep helper whose quoted-pathspec default produced literal-quote false zeros
+  for a whole batch.
+
+- 🔴 **A COMPILE IS NOT A VERIFICATION, and a reactor halt reads as a pass.**
+  A lane reported "core shipped" on a clean `test-compile`; the first real run was **5 errors**. Separately,
+  a red in an UPSTREAM module **halts the reactor**, leaving downstream modules `SKIPPED` — and under
+  `mvn -q` that reads as a clean run. One agent came within a sentence of certifying tests that never
+  executed. ⇒ **Demand per-module `Tests run` totals and treat a SKIPPED module as a NON-VERDICT.**
+  ⚠ `-DfailIfNoTests=false` is NOT the flag — `-Dsurefire.failIfNoSpecifiedTests=false` is, and the wrong
+  one turns every upstream module into a reactor-halting red. ⚠ `mvn -q` can also emit an EMPTY log that
+  reads as success; do not use `-q` to verify.
+
+- ⚠ **On a long-lived board, the failure modes are structural, not random.** Measured over 21 grounded
+  items: **14 were already shipped, impossible, or misdescribed.** The recurring shapes, each of which cost
+  at least one round-trip: a **headline** goes stale while its detail block is updated (one row said
+  "nothing retries" while a table 500 lines away said SHIPPED — same file); a row **title misreads its own
+  source** (GAP-10 said "bundle missing 13 docs"; the spec described an NTFS deny-ACL needing no repo
+  change); **superseded text kept as an indented sub-bullet** reads as live status (status is the STRUCK
+  line ABOVE it); and worst, a stale **INSTRUCTION** ("take the shape as written and do not improvise it")
+  describing work that had shipped the day before — an instruction outliving its facts gets ACTED on.
+  ⇒ The durable answer is not more sweeps but **derived guards**: `check-doc-counts` (rank census),
+  `route-gating-report --check` (route inventory) and `check-backlog-homes` (owning-doc pointers) each went
+  RED on real drift within hours of existing. ⚠ `check-backlog-homes` can only check **14 of 54** pointers,
+  because 32 of 55 rows carry no identifier — and the rows that had rotted were disproportionately the
+  ungreppable ones. **Requiring an id on every row is the outstanding structural fix.**
+
+
 ## 5. Engine seams & performance (durable; current in `inspecto/`)
 
 - **Single ingestion SPI:** `StreamingFileIngester` (emit-based) is the **only** ingestion SPI. Per-batch the
