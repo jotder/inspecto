@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **59<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> **60<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
 > five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
 > re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
 > building**: three of the five refuted part of their own row's premise, and the refutations produced
@@ -150,8 +150,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 3<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 17<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 59<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 18<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 60<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -2159,7 +2159,27 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   the package-time neutralisation — hiding repo rot behind a bundle rewrite is how it survives.
   → `okf/backend/build-run/build-test.md`
 
-- **P2** · 🔴 **`FENCE-STORE-SILENTLY-INERT-1` — a job's `store:` that names nothing disarms the delete
+- **P2** · **`FENCE-STORE-SILENTLY-INERT-1` — DETECTION SHIPPED 2026-09-17 (`29065137`); the PLACEMENT of
+  a warning is an owed call.** `DeletionFence.coverage(...)` now separates the three reasons a store is
+  skipped — `FENCED` / `VIEW_ONLY` / `CONSUMED_ONLY` / `UNMATCHED` — sharing one private `Topology` record
+  with `check` so "has a resting producer" is defined once and cannot drift. Purely additive; nothing
+  consumes it yet.
+  🔴 **This row's premise is REFUTED.** It said the silent skip exists because a store may legitimately
+  not exist yet. **The fence never touches the filesystem** — it is derived from configuration alone, so a
+  configured pipeline that has NEVER RUN still arms it. That reason does not reach the `continue` at all.
+  Only `UNMATCHED` is genuinely ambiguous, conflating a typo with a not-yet-authored pipeline — and that
+  residual is what makes the warning a decision rather than an obvious fix.
+  ⚠ **Severity is LOWER than this row implied, and should stay stated that way:** the fence is
+  **advisory** — `CollectorService:1122-1132` logs and emits `STORE_DELETE_CONFLICT`, then **the delete
+  proceeds regardless**. Two months of inertness cost **observability, not data integrity**.
+  ⛔ **Owed call — placement:** registration-time warn is NEW WIRING (`fenceDelete` runs at
+  `JobService:1205`, run time only) and false-positives on a not-yet-authored pipeline; check-time needs no
+  wiring but repeats per run. ⚠ **The corpus cannot break the tie: there is exactly ONE job-level `store:`
+  in the whole repo** — the broken one. N=1, and no number was invented from it.
+  ⚠ **Whatever the call, the message must print the PRODUCED SET:** store ids are *derived at lift*
+  (`PipelineLift:433-434`) from the schema, never written literally in the config, so an operator cannot
+  grep their own configs to check the match. → `okf/backend/control-plane/jobs.md` · original row follows.
+  - **P2** · 🔴 **`FENCE-STORE-SILENTLY-INERT-1` — a job's `store:` that names nothing disarms the delete
   fence, with no error, no warning and no event.** Filed 2026-09-16 from the ten-key sweep, and found the
   hard way: `DeletionFence.check` (`DeletionFence.java:67`) `continue`s past a target store with no
   resting producer, so a typo, a renamed pipeline or a miscopied `dir:` silently turns the fence off.
@@ -2173,6 +2193,36 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⛔ Silently-inert safety is the one option the evidence already rules out.
   → `okf/backend/control-plane/jobs.md`
 
+- **P2** · **`EDITION-GATED-TESTS-IN-WRONG-HOME-1` — six test classes guard CORE behaviour from a module the
+  default reactor never builds.** Filed 2026-09-17. ⚠ **Severity is LOW and must stay stated that way:**
+  `ci.yml:303` runs `-Pedition-enterprise` **with tests**, and Enterprise is the superset, so all of these
+  DO run on every CI build. **The exposure is the LOCAL `mvn -o clean test` loop only** — a developer's
+  pre-push run cannot see them. The first framing of this called it a CI gap; it is not.
+  ✅ `RepoSpacesConfigValidationTest` is **CLOSED** (`f0d16a5d`) — moved to `inspecto`, falsified red then
+  green, with `RepoSpacesOpsConfigLoadTest` retained in ops so the three ops-owned kinds keep real-loader
+  coverage. Measured with a positive control: a 23-module default run produced zero surefire reports for
+  it while the sibling `ShippedCatalogSamplesTest` produced one.
+  ⇒ **Six remain, and each names the core thing it guards:** `ControlApiDbBrowserTest`
+  (`DbBrowserRoutes`/`SqlGuard`/`QueryExecutor` — *the only test of any of them*),
+  `ControlApiDecisionRulesTest` (`DecisionRoutes` + `ConditionTree` — *no other test exists*),
+  `ControlApiScopedObjectsTest` (**the only test of `RowScope` in the repo**), `ControlApiAccessDeciderTest`
+  (the core authorize stage), `ControlApiReconPromoteTest` (`ReconRoutes.promote` grain), and
+  `PostgresStateStoreTest` (Postgres dialect for **eight** core stores).
+  ⛔ **Do NOT fix by adding `inspecto-ops` to the default `<modules>`** — that reverses signed decision
+  EDG-01 cell 7 and adds ~240 tests plus a Postgres dependency to every Personal build. Four of the six
+  need a core test vehicle built first, so this is real work, not a move.
+  → `okf/backend/build-run/build-test.md`
+
+- **P3** · **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1` — a broken compactor config reports SUCCESS.**
+  Filed 2026-09-17 while building the job smoke. `PartitionCompactor:69` returns
+  `JobResult.ok("directory not present, nothing to do")` when `dir` is absent. ⚠ Today's regression threw
+  only because `serve-example.sh:52` **pre-creates** `out/database`, which made `resolveJobPath` refuse —
+  **on a tree where the directory does not exist, the same broken config returns SUCCESS.** ⇒ The third
+  "silently inert" case in this subsystem in one day, after `DeletionFence` and the non-failing `probe()`.
+  ⛔ The fix is not obviously "throw": a compactor with nothing to compact is a legitimate no-op. The
+  question is whether an UNRESOLVABLE dir is distinguishable from an EMPTY one — it is, and only the
+  first should be an error. → `okf/backend/control-plane/jobs.md`
+
 - **P2** · **`JOB-PARAM-UNDECLARED-UNREPORTED-1` — nothing reports a job param no descriptor declares.**
   Filed 2026-09-17 from the `job` census ruling. `ParameterResolver` reports `missingRequired`,
   `invalidType` and `unknownExpression` — but an **undeclared** param is silently accepted, which is the
@@ -2184,7 +2234,26 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ That asymmetry is itself worth recording: a descriptor is a UI/API contract, not the read set.
   → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1` — `ConfigSpecs.expectation()` predates the kind it is
+- ~~**P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1`**~~ ✅ **SHIPPED 2026-09-17 (`f30d39c5`).**
+  `when` is declared `FieldType.MAP` — the `widget.controls` / `dashboard.filter` precedent, which
+  validates an open map's envelope and leaves the inner tree to the parser — and `condition` is in the
+  `kind` enum.
+  🔴 **This row said "if anyone ever runs the spec's VALUE rules" — they ARE run, and it was LIVE.**
+  `POST /validate` and `POST /config/write` both resolve `ConfigSpecs.forType("expectation")` from the
+  request body, with no allow-list narrowing either. Driven over real HTTP: pre-fix a condition body
+  returned `clean:false` on **two** errors, post-fix `clean:true`. ⛔ **I filed this as latent; it was
+  refusing real saves.**
+  ⚠ **The second error was a contradiction nobody had named:** `column` was `FieldSpec.required` while
+  `Expectation:58-59` exempts exactly the `condition` kind — so fixing only `when` and the enum, which is
+  all this row asked for, would have left condition expectations refused anyway. Moved to a
+  `column-needed-unless-condition` cross-field rule. Strictly FEWER refusals.
+  🔴 **And the fix caused a regression only the FULL reactor caught:** re-homing `column` re-anchored the
+  missing-column finding from `column` to `kind`, because `CrossFieldRule` anchors on
+  `affectedPaths.get(0)`. `InspectoToolsTest` — three modules downstream, and named for asserting these
+  findings are *anchored* — went red. A form would have highlighted the field that is already correct.
+  ⛔ **A per-module green is not a tree green, for the fourth time this shift.**
+  → `okf/backend/config/config-safety.md` · original row follows.
+  - **P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1` — `ConfigSpecs.expectation()` predates the kind it is
   supposed to describe.** Filed 2026-09-16 out of the expectation census. The spec declares **no `when`
   field** and its `kind` enum still omits `condition`, though the `condition` kind was promoted
   2026-07-18; `when` is its predicate tree, read at `Expectation.java:95` and compiled by `ConditionSql`.

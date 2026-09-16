@@ -263,3 +263,12 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   `check-doc-links.mjs` cannot see them: its `ROOTS` are `docs`, `compliance`, `.claude` and root `*.md`,
   and `inspecto/` is in none of them. ⚠ Fix the targets and widen the scope — do **not** let the
   package-time neutralisation swallow these, or repo rot survives behind a bundle rewrite.
+
+- **`EDITION-GATED-TESTS-IN-WRONG-HOME-1`** — six test classes guard CORE behaviour from inside
+  `inspecto-ops`, which the default reactor never builds (`mvn -o -pl inspecto-ops -am test` does not even
+  resolve without `-Pedition-standard`). ⚠ **Severity is LOW:** `ci.yml:303` runs `-Pedition-enterprise`
+  with tests, so they all run on CI — the exposure is the local `mvn -o clean test` loop only.
+  ✅ `RepoSpacesConfigValidationTest` is closed (moved to `inspecto`). Remaining: `ControlApiDbBrowserTest`,
+  `ControlApiDecisionRulesTest`, `ControlApiScopedObjectsTest`, `ControlApiAccessDeciderTest`,
+  `ControlApiReconPromoteTest`, `PostgresStateStoreTest`. ⛔ Not fixable by adding the module to the
+  default `<modules>` — that reverses signed decision EDG-01 cell 7.

@@ -726,3 +726,10 @@ from the deployed column alone called `maintenance_report_job.toon` a refusal, a
   edition-varying `maintenance` tasks). ⛔ Any check belongs at `JobService`/`ParameterResolver` where the
   descriptor is known, and must WARN rather than refuse — built-in jobs read params their own descriptors
   do not declare, so a descriptor is a UI/API contract, not the read set.
+
+- **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`** — `PartitionCompactor:69` returns
+  `JobResult.ok("directory not present, nothing to do")` when `dir` is absent, so on a tree where the
+  directory does not exist a **broken** config reports SUCCESS. Today's regression surfaced only because
+  `serve-example.sh:52` pre-creates the directory. ⛔ The fix is not simply "throw" — a compactor with
+  nothing to compact is a legitimate no-op; the question is whether an UNRESOLVABLE dir is distinguishable
+  from an EMPTY one, and it is.
