@@ -242,3 +242,41 @@ system: the evidence cannot say something the code does not.
 | POST | `/validate` | exempt | read-shaped | `.claude/worktrees/agent-a1c87e592ba95c08d/inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:40` |
 
 <!--route-gating:end-->
+
+## Exporting the evidence
+
+The control above is enforced at boot, but the *record* that it held — who was refused, and when — lives
+in the audit event stream. Two routes serve it, and the type is a **closed set**: `AUDITABLE` is exactly
+`{AUDIT, ACCESS_DENIED}` (`AuditLogRoutes.java:40`). A type outside that set is refused, and a **blank**
+type is refused too, because on this feed "blank" would mean *every type* and would turn an audit-only
+route into the whole event stream. Absent is refused exactly like wrong.
+
+```
+GET /audit/export?format=csv&type=ACCESS_DENIED&from=<ISO>&to=<ISO>
+GET /audit/export?format=csv&type=AUDIT&from=<ISO>&to=<ISO>
+```
+
+`ACCESS_DENIED` is the refusal record — a caller who lacked the capability a route demanded. `AUDIT` is the
+mutating-action record. The CSV carries seven base columns plus one per `AuditAttrs` key; both auditable
+types get the audit columns. `GET /audit/search` is the same projection for interactive use.
+
+### ⚠ Retention is stated POLICY, not enforced — state it that way to an auditor
+
+The operator's audit-retention window is **one year** (decision of 2026-08-30). ⛔ **Do not tell an auditor
+that window is enforced today, because it is not.** The mechanism exists — `event_prune` (COMPLY-3,
+controls-matrix gap G5) drops whole `level/year/month/day` Parquet partitions older than `retention_days`,
+a partition file-delete and never a SQL `DELETE` — but:
+
+- `retention_days` is **required with no default**, deliberately: "a window that silently defaults is a
+  window the code does not apply" (`EventPruneTask`).
+- **No committed configuration schedules `event_prune`.** Checked 2026-09-16: the task name appears in no
+  `*.toon` in this repository.
+
+⇒ Two consequences, and they pull in opposite directions, so state both. **(1)** No audit evidence is
+being aged out today, so an export taken now reaches back as far as the store goes — the "export before
+the prune reaches it" urgency does not currently apply. **(2)** The one-year *commitment* is therefore
+unmet as a control: it is policy the code would honour if scheduled, not behaviour an auditor can observe.
+`EventPruneTask`'s own javadoc carries this instruction — "an auditor must not be told it is enforced".
+
+Closing the gap is a deployment act, not a code change: schedule `event_prune` with an explicit
+`retention_days`, then this section can say *enforced* and cite a run. Until then it says *policy*.
