@@ -1,6 +1,6 @@
 # Backlog — every OPEN item, one page
 
-**Updated:** 2026-09-16 (five-task parallel shift — `TYPEFLOW-DATASET-COLUMNS-1` **CLOSED** (⛔ steps 3+4 had ALREADY shipped and this page still called them unbuilt; the real gap was Q4's **declared-but-unenforced** `coarseTypes` key), `DUCKLE-C3-DEAD-PROPERTY-1` **~2/3 BUILT** and BREAKING (`version:`/`source:` now 422), the SOC 2 window recorded **NOT STARTED** so it is falsifiable, and three design passes landed — each of which **refuted its own row's premise**. Two new rows filed: `COLUMN-TYPE-SECOND-INTERPRETER-1`, `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`. ⚠ **Four drifted citations corrected, one of them a correction that was itself wrong** — the acquisition ledger IS an `OperationalDb.Family` member. 🔴 **Standing lesson: ground a row against the CODE before starting it, never against its board text — four of five briefings drawn from this page were stale.** Baseline at `e6b32e25`: 4228/0/0/17 over the 14 non-asn modules, module and class sums cross-checked.) (earlier) — (✅ **the ELT §6 step-2 PARITY GATE IS MET** — first time ever: whole suite under `-Dingest.lane=graph` 4603/0/0/28, zero refusals) — both graph-lane rows shipped, and step 1's converter `inspecto migrate-configs` is built and driven. ⚠ Step 1 is not dischargeable for a space owning an enrich config: `MIGRATE-ENRICH-1` + `MIGRATE-MATERIALIZE-1` filed, both waiting on ONE §1 call, because `GLOSSARY.md` records BOTH sides of it. (earlier the same day) — `GRAPH-LANE-MULTISCHEMA-1` was filed, designed, decided by the operator and built in one sitting: `-Dingest.lane=auto` now diverts multi-schema segment writes to the graph lane, and 12 of the 13 parity-gate refusals are green. ⚠ Both readings of that gap — the row's and the design's first — were wrong; what was actually broken is that the admission asked its question at pipeline granularity while the caller works per segment. the two gaps the §6 step-2 parity gate exposed now carry rows: `GRAPH-LANE-MULTISCHEMA-1` and `GRAPH-LANE-RULE-ROUTED-1` (§3, both **design-first**, both blocking §2 Row 15's deletion half). ⚠ The gate was **re-run** before filing rather than filed off the previous shift's note — the 13 refusals and both messages reproduce, but the multi-schema one's stated cause (an arity mismatch) is **not the whole gap**: the seeding contract is violated structurally, so widening the count would admit an unsafe write. (M tier drained) — `HOME-TILES-1` CLOSED (two cheap count routes + two tiles, hidden on failure), `DUCKLE-C2-RUN-DIFF-1` CLOSED (`GET /jobs/{name}/runs/{a}/diff/{b}`, six kinds, absent≠zero, three kinds honestly "not compared"); `AGT-5` RE-GATED external (`PlatformBuilder` has no `dryRunProvider` — upstream ask recorded); the §6 step-2 **parity gate was RUN for the first time and is NOT met** (13 engine tests, two graph-lane gaps named); pre-materialise cap → §1 owed input. (earlier the same day) — five M rows CLOSED and as-built homed: `RECON-CARDINALITY-2` (rows behind a break, on demand), `STALE-TILES-PRECISION-1` (store granularity), `INCIDENT-KPI-MTTD-1` (narrower anchor, no placeholder), `DUCKLE-C4-PARAM-PROVENANCE-1` (a `params` run artifact), `AGT-ARTIFACT-1` (four draft skills answer with a `draft` artifact; `pipeline_author` stays out). (dependency pass, 2026-09-15) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), `HOME-VERSION-1` SHIPPED (manifest → `/bootstrap` → sign-in footer), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
+**Updated:** 2026-09-16 (five-task parallel shift — `TYPEFLOW-DATASET-COLUMNS-1` **CLOSED** (⛔ steps 3+4 had ALREADY shipped and this page still called them unbuilt; the real gap was Q4's **declared-but-unenforced** `coarseTypes` key), `DUCKLE-C3-DEAD-PROPERTY-1` **~2/3 BUILT** and BREAKING (`version:`/`source:` now 422), the SOC 2 window recorded **NOT STARTED** so it is falsifiable, and three design passes landed — each of which **refuted its own row's premise**. Two new rows filed: `COLUMN-TYPE-SECOND-INTERPRETER-1`, `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`. ⚠ **Four drifted citations corrected, one of them a correction that was itself wrong** — the acquisition ledger IS an `OperationalDb.Family` member. 🔴 **Standing lesson: ground a row against the CODE before starting it, never against its board text — four of five briefings drawn from this page were stale.** Baseline at `e6b32e25`: 4228/0/0/17 over the 14 non-asn modules, module and class sums cross-checked. ✅ **Census RECOUNTED 2026-09-16 (fifth pass): 50 rows — 1 × P1 · 35 × P2 · 14 × P3.** 🔴 The header had said 71 / 53 / 17 for two days, and the queued-work paragraph underneath it carried three further numbers of its own; both are corrected and the drift named in place.) (earlier) — (✅ **the ELT §6 step-2 PARITY GATE IS MET** — first time ever: whole suite under `-Dingest.lane=graph` 4603/0/0/28, zero refusals) — both graph-lane rows shipped, and step 1's converter `inspecto migrate-configs` is built and driven. ⚠ Step 1 is not dischargeable for a space owning an enrich config: `MIGRATE-ENRICH-1` + `MIGRATE-MATERIALIZE-1` filed, both waiting on ONE §1 call, because `GLOSSARY.md` records BOTH sides of it. (earlier the same day) — `GRAPH-LANE-MULTISCHEMA-1` was filed, designed, decided by the operator and built in one sitting: `-Dingest.lane=auto` now diverts multi-schema segment writes to the graph lane, and 12 of the 13 parity-gate refusals are green. ⚠ Both readings of that gap — the row's and the design's first — were wrong; what was actually broken is that the admission asked its question at pipeline granularity while the caller works per segment. the two gaps the §6 step-2 parity gate exposed now carry rows: `GRAPH-LANE-MULTISCHEMA-1` and `GRAPH-LANE-RULE-ROUTED-1` (§3, both **design-first**, both blocking §2 Row 15's deletion half). ⚠ The gate was **re-run** before filing rather than filed off the previous shift's note — the 13 refusals and both messages reproduce, but the multi-schema one's stated cause (an arity mismatch) is **not the whole gap**: the seeding contract is violated structurally, so widening the count would admit an unsafe write. (M tier drained) — `HOME-TILES-1` CLOSED (two cheap count routes + two tiles, hidden on failure), `DUCKLE-C2-RUN-DIFF-1` CLOSED (`GET /jobs/{name}/runs/{a}/diff/{b}`, six kinds, absent≠zero, three kinds honestly "not compared"); `AGT-5` RE-GATED external (`PlatformBuilder` has no `dryRunProvider` — upstream ask recorded); the §6 step-2 **parity gate was RUN for the first time and is NOT met** (13 engine tests, two graph-lane gaps named); pre-materialise cap → §1 owed input. (earlier the same day) — five M rows CLOSED and as-built homed: `RECON-CARDINALITY-2` (rows behind a break, on demand), `STALE-TILES-PRECISION-1` (store granularity), `INCIDENT-KPI-MTTD-1` (narrower anchor, no placeholder), `DUCKLE-C4-PARAM-PROVENANCE-1` (a `params` run artifact), `AGT-ARTIFACT-1` (four draft skills answer with a `draft` artifact; `pipeline_author` stays out). (dependency pass, 2026-09-15) — a §0 dependency map over every P-ranked row (37 unblocked / 8 operator / 7 design-first / 12 external / 2 row-chained); the S-size unblocked rows taken: `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1`, `SCHEMA-FORM-EMPTY-LIST-1` SHIPPED, `SIGNIN-PREVIEW-1` closed (page seen at two widths via `run-backend.ps1 -AuthMode oidc`), `HOME-VERSION-1` SHIPPED (manifest → `/bootstrap` → sign-in footer), API v1 jlink re-verified; two shipped-but-unstruck §3 rows swept. (§4 pass, earlier) — six §4 rows CLOSED (`ENRICH-SILENT-FULL-RECOMPUTE-1` fixed, `NODE-TYPE-MIRRORS-1` three mirrors derived, `OPENAPI-GEN-1` skeleton generated + enforced, `COLLECTOR-DATASET-UNPROVEN-1` proven live, `SPEC-COUNTS-1` last count derived), `SPEC-DEADSEAM-1` → §1; two rows FILED from the live run. (§5 sweep, earlier) — seven more shipped §5 rows swept (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`, `DATASET-SELF-TRIGGER-1`, `LEDGER-PRUNE-EATS-RESUME-STATE-1`, `PRUNE-PREVIEW-DRIFT-1`, `DUCKLE-C9`, `AIRGAP-S3-EXTENSIONS-1`, `SPEC-ORPHANPAGE-1`; each as-built homed in OKF first), the P1's steps 2b+2c shipped, §1 gained two owed inputs. Earlier the same day — all 20 closed rows swept off the page (~470 lines, each as-built verified homed);
 every P2 grounded against code (5 closed, 2 shrank); `AUDIT-REFUSAL-GAP-1` and
 `DATASET-PUBLISH-ON-FAILURE-1` BUILT; `CONSIGNMENT-OUTPUTS-NULLRUN-1` (P1),
 `ENRICH-SILENT-FULL-RECOMPUTE-1`, `SPEC-JAVALANE-RATIO-1` and `COLLECTOR-DATASET-UNPROVEN-1` filed.
@@ -14,8 +14,22 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 2026-09-07, its retirement trigger having fired), the remainders of every plan still in
 `docs/superpower/`, and the last handoff's next steps.
 
-> **Where the board stands — recounted 2026-09-16 (FIFTH pass) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the §3–§5 slice) and fails if a stated figure drifts from them again.
-> **50<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 35<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3.**
+> **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
+> **54<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 37<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
+> shift, which filed four rows (it was 50 / 35 / 14 on the way in). ⚠ **The board grew while four items
+> were worked**, and that is the honest result, not a failure: all four were already SHIPPED or REFUTED,
+> and grounding them produced five residuals that were previously invisible. ⛔ One row
+> (`ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`, closed as refuted) is still counted above and is **pending
+> sweep** — its refutation text must land in an owning doc BEFORE the row is deleted.
+>
+> 🔴 **This line read “71 rows: 1 × P1 · 53 × P2 · 17 × P3” until 2026-09-16, and had been wrong for two days.**
+> That census dated from the 2026-09-15 fourth pass; the two shifts since closed, swept or re-ranked
+> **eighteen P2 rows and three P3 rows** without recounting. ⚠ The rows were current the whole time —
+> only the census lied, which is exactly the failure mode this block warns about three paragraphs down and
+> had already recorded happening on 2026-09-14 and 2026-09-15. ⛔ **Third occurrence: recount on the way
+> out of EVERY shift that closes or files a row**, not only on a grounding sweep.
+> ⛔ Re-derived here from the rows and nothing else — `grep -cE '^- \*\*P2\*\*'` /
+> `grep -cE '^- \*\*P3( |\*)'` between the `## 3.` and `## 6.` headings, per §0's own rule.
 >
 > 🔴 **The headline is not any single answer: SIXTEEN P3 rows stopped being demand-gated in one sitting.**
 > §0 defines P3 as *demand-gated — build only when someone asks by name*. On 2026-09-15 the operator was
@@ -122,9 +136,17 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 35<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 14<!--count:backlog-p3--> are a list of things deliberately *not* being built, not a backlog
-> to burn down. Reading all 50<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 37<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 42%.
+> ⚠ **One P3 is NOT demand-gated** — `GLOSSARY-CASE-1` spells its rank
+> `- **P3 · RELEASE-GATED (next MAJOR), not demand-gated**`: it is queued work whose gate is the next MAJOR
+> tag. ⛔ So “P3 ⇒ nobody is waiting on it” holds for 15 of the 16, not all of them — and that same
+> spelling is why §0's P3 pattern is the looser one.
+> 🔴 **This paragraph was internally inconsistent before this fix**, carrying “38 P2”, “those 31” and
+> “all 70” against a header of 53/17/71 — four numbers for two counts, in the very block that tells the
+> next shift to count the rows. ⛔ A census sentence that is not re-derived alongside the header is
+> decoration, not arithmetic.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a
@@ -167,9 +189,30 @@ cannot is a decision (§1) or a design (P2).
 mutating route now fails the BOOT (`ControlApi.register`), with no `warn` escape hatch: “we reviewed the
 routes” became “an undeclared mutating route cannot exist in a running server”, which an auditor can test
 by trying to add one. All four of step 2a's operator calls were answered the same day, and
-`CapabilityManifest.PENDING_OPERATOR_CALLS` is EMPTY. ⚠ **Steps 4c/4d/4e (the derived inventory and the
-evidence report) are what remain of the row** — and ⛔ the SOC 2 observation window may now be opened,
-which was explicitly gated on this step landing. → `archived-documents/plans-archive/route-gating-compliance-plan.md`
+`CapabilityManifest.PENDING_OPERATOR_CALLS` is EMPTY. ✅ **Steps 4c/4d/4e SHIPPED TOO, in `6c216a56`** —
+the boot inventory event (`ControlApi.java:506`, `route.inventory.snapshot`), `GET /audit/route-inventory`
+(`AuditLogRoutes.java:48`, pinned by `RouteInventoryTest`), and the GENERATED evidence table in
+`compliance/evidence/route-gating.md` (`tools/route-gating-report.mjs`, wired into `ci.yml:145` and
+`.githooks/pre-push:211`). ⇒ **the row's remaining BUILD work is NOTHING**; the block above said 4c/4d/4e
+were outstanding and was stale by a commit. ⛔ The SOC 2 observation window's state is recorded in exactly
+ONE place, `controls-matrix.md` §4a — do not restate it here.
+🔴 **What the grounding DID find: the derived-evidence guard was RED on the committed tree.**
+`2c310d1c` moved two registrations in `ConfigWriteRoutes.java` by one line (`44→45`, `48→49`) and nobody
+regenerated, so the auditor-facing table asserted line numbers the code did not have — exactly the drift
+the guard exists to catch, caught only because someone RAN it. Regenerated 2026-09-16; green.
+⛔ **`node tools/route-gating-report.mjs --check` is not optional after any change to a route class.**
+✅ **The guard was falsified in BOTH directions before being trusted**: flipping one row's posture in the
+doc fails with *“its table differs from the code”*, while adding an undeclared `api.post` fails with a
+DIFFERENT message, *“1 mutating route(s) declare no posture”* ⇒ it is not merely a text diff.
+Clean-tree inventory: **172 mutating routes — 109 gated, 63 exempt, 0 undeclared.**
+⬜ **One operator item is still owed, and it now blocks only WORDING:** which framework the evidence is
+written against. It is written against **SOC 2 Type II** (CC6.1/CC6.3) as an ASSUMPTION, labelled as such
+at the top of `evidence/route-gating.md`; ⛔ no ISO 27001 A.9 mapping has been invented, because the same
+evidence maps onto A.9 with DIFFERENT matrix rows and inventing it would hand an auditor a claim nobody
+decided. If the answer is ISO, or both, only that header block and the criterion references change.
+⚠ **Plan step 4g is NOT done and is not in the evidence document**: the audit-event export procedure
+(`GET /audit/export` before the 1-year prune reaches the evidence). Worth a row if the window opens.
+→ `archived-documents/plans-archive/route-gating-compliance-plan.md`
 
 Do next, in order (refreshed **2026-09-11** — four P1s queued from the whitepaper review; each names the file it changes):
 0. **Sprint 8 — make the brochure true.** In this order, smallest first, each independently shippable:
@@ -1365,6 +1408,44 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   back to `InMemoryAcquisitionLedger`), so a caller cannot tell memory from durable by nullness and must ask
   `StoreHealth.of(spaceId)` — the one place the resolved backend is still known.
 
+  🔴 **REFUTED 2026-09-16 — the remedy is IMPOSSIBLE and the defect framing is wrong. This is the
+  THIRD successive framing of this row to fail grounding** (first *“not a `Family` member at all”*, then
+  *“duplicated resolution bypassing `resolve()`”*). The narrow fact is true — `AcquisitionLedgers.java:152`
+  and `OperationalDb.java:147` both name `acquire.ledger.backend`. Everything built on top of it is not:
+  ① **Routing the leaf through `OperationalDb` is a MODULE CYCLE.** `inspecto-acquire` is a deliberate
+  leaf (its pom says so); `OperationalDb` lives in `inspecto/`, whose `pom.xml:96` depends **on
+  `inspecto-acquire`** — `OperationalDb.java:3` even imports `com.gamma.acquire.SecretResolver`.
+  ② **There is no public API to route through**: `resolve()` is `public` but returns
+  `record Resolved` (`OperationalDb.java:209`), which is **package-private** ⇒ effectively
+  `com.gamma.service`-only.
+  ③ **“Bypassing `OperationalDb.resolve()`” is not a defect signature — it describes ALL ELEVEN
+  families.** `resolve()`/`resolveAll()` have exactly ONE caller in the repo, the diagnostic
+  `OperationalDbReport.java:47`; **no store opener calls it**, and `ServiceStores.java:62` says outright
+  *“Mirrors OperationalDb.resolve”*. `resolve()` is a MIRROR of the openers, not their implementation, so
+  the acquisition ledger is the eleventh instance of the house idiom, not an outlier.
+  ④ **The URL half is already centralised**: `SpaceBootstrap.java:37-39` resolves it via
+  `OperationalDb.urlFor(Family.ACQUISITION_LEDGER, …)` like every other family ⇒ the ledger already
+  participates in the roster at the production seam.
+  ⚠ Also not value-identical: `Resolved` discards the raw backend string, which `:154-156` needs verbatim
+  for its `StoreHealth` message, so even inside `com.gamma.service` the substitution would change an
+  invalid-value message.
+  ⇒ **What a real row would say:** one source of truth for `*.backend` is a **systemic 11-site** change
+  needing a public, `SpaceRoot`-free accessor (e.g. `backendOf(Family)` returning the raw trimmed string)
+  in a module **below** `inspecto-acquire`, since `Family` cannot today be referenced from a leaf.
+  ⛔ That is an architecture decision, not a de-duplication, and nothing on this board authorises it.
+  ⇒ **Disposition: this row is CLOSED as refuted.** Re-file only as the systemic question above.
+  ⚠ The same text in `superpower/completeness-kpi-k4-design.md` §R3 carries the refuted framing too.
+
+- **P3** · **`ACQUIRE-LEDGER-SHARED-URL-1` — a second source of truth for the ledger URL** (filed
+  2026-09-16 from the row above, and genuinely distinct from it: it is the **URL**, not the backend).
+  `AcquisitionLedgers.shared()` (`:39-41`) lazily builds from
+  `System.getProperty("acquire.ledger.db.url", DEFAULT_DB_URL)`, **bypassing `OperationalDb.urlFor`** — so
+  a space that was never run through `SpaceBootstrap` resolves a DIFFERENT url: no `-Dinspecto.db.url`
+  shared fallback, and a working-directory-relative `jdbc:duckdb:inspecto-acquisition.db`.
+  ⚠ Unlike its parent row this one does **not** require crossing the module boundary — `urlFor` is already
+  called from `SpaceBootstrap`, so the question is which seam `shared()` should use, not where the
+  declaration lives. ⛔ Ground it before starting: the parent row was wrong three times.
+
 - **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` — Dataset freshness on a CLOCK, not on failures.** Adopted
   2026-09-15 from duckle §1 C1.
   ⛔ **SHARED BLOCKER — do not answer it here.** This row, `DUCKLE-C4-PARAM-PROVENANCE-1` and the deleted
@@ -1454,6 +1535,53 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   → Lineage · `docs/api` breaking-change record · CI
 
 - ~~**P3** · **`JOB-DIR-CWD-CONTAINMENT-1`**~~ ✅ **SHIPPED 2026-09-16.** The semantics call was answered (operator: a job's relative path resolves against the **Space config root**, never the process working directory) and built on BOTH sides in one change, as the 2026-09-15 re-grounding said it had to be: `PathJail.resolveJobPath` is the single rule, called by the 422 gate (`ConfigSafetyValidator.checkJob`, which now USES `configDir` instead of ignoring it) and by all four run-time jail sites (`CleanupTask:35,46`, `PartitionPruneTask:39`, `StorageReportTask:45`). ⛔ **The ambiguous case REFUSES** — a value that does not exist under the Space root but DOES where the old rule would have put it throws naming BOTH paths, so a change in what an existing job MEANS is fixed deliberately rather than silently read elsewhere. A null Space root keeps legacy behaviour. 🔴 **Consequence worth keeping: relative `..` traversal is no longer an escape by itself**, because it climbs from a deeper base — containment is still enforced, the jail just judges a different resolved path. `ControlApiJobCrudTest`'s probe had to change with it: `../../outside` resolved from the Space root lands back INSIDE the allowed roots, so asserting 422 on it would have asserted a falsehood — and it was the layout-dependent probe that created this row (escaped from `%TEMP%`, did not from `C:/sandbox`). It now uses an absolute path off the filesystem root, which escapes under every layout. Pinned by `JobPathResolutionTest` (6 tests). Original row follows.
+  🔴 **TWO RESIDUALS FOUND 2026-09-16 by grounding this row AFTER it shipped — the “all four run-time
+  jail sites” claim above is WRONG, and both the commit message and this row carry it.** Filed as the two
+  rows below. ⚠ The claim counts four call sites in `inspecto-engine` and misses **five in
+  `inspecto-backup`**; and the compatibility survey the commit's own message called a precondition was
+  never performed. ⛔ **A row struck as SHIPPED is where open work hides** — this is the second time that
+  has been recorded on this board.
+
+- **P2** · 🔴 **`JOB-PATH-BACKUPTASK-SPLIT-1` — the gate and the backup RUNTIME now disagree, which
+  `resolveJobPath`'s own javadoc says must never happen.** Filed 2026-09-16. `BackupTask`
+  (`inspecto-backup/.../BackupTask.java`) handles **four of the five keys the operator decision names** and
+  still resolves every one CWD-relative through the plain jail — `:81-83` (`dir`, `backup_dir`),
+  `:171-172` (`backup_dir`, verify), `:257-258` (`archive`, `target_dir`, restore) — calling
+  `PathJail.requireUnderAny(PathJail.allowedRoots(), …)`, **not** `PathJail.resolveJobPath`.
+  `BackupTaskProvider` is a live ServiceLoader job type shipping on Standard+
+  (`NoBackupTaskShipsInThePersonalBuildTest`). ⇒ the 422 SAVE gate resolves `backup_dir`/`archive`/
+  `target_dir` against the Space config root while the backup RUNTIME resolves them against the CWD.
+  ⚠ **Not a mechanical fix, and this is why it was not just done:** `SpaceConfigRoot` lives in
+  `inspecto-engine` (`com.gamma.pipeline`). Whether `inspecto-backup` may depend on it is a **module-graph
+  call** — ⛔ ground it before starting: one report says there is no such dependency, while a grep finds a
+  single `inspecto-engine` mention in `inspecto-backup/pom.xml` that nobody has confirmed is a dependency
+  rather than a comment. The alternative is pushing the Space-root lookup DOWN into `inspecto-config`
+  beside `PathJail`, the push-don't-pull shape `DiscoveredRoots` already uses.
+
+- **P2** · 🔴 **`JOB-PATH-COMPAT-SURVEY-1` — committed job configs changed meaning, and most of them
+  changed SILENTLY.** Filed 2026-09-16; the survey below is the first on record, though `a7ab607b`'s own
+  message called it a precondition. ⛔ **The loud-refusal guard only fires when the OLD path EXISTS on
+  disk** — every value pointing at a not-yet-created directory re-points under `config/` with no refusal:
+  • `spaces/demo/config/jobs/config_backup_job.toon:6-7` (`dir: spaces/demo/config`) ⇒ **LOUD REFUSAL —
+  this committed job is now UNSAVABLE** • `backup_retention_job.toon:5`, `backup_verify_job.toon:6`,
+  `orders_weekly_compact_job.toon:7` ⇒ **silent re-point** • `inspecto/examples/**/*_job.toon` (11 files,
+  `data_dir: out`, `dir: out/backup`, …) ⇒ **silent re-point**.
+  ⚠ **Three of the four demo rows are BACKUP jobs**, so they are exactly the ones hitting
+  `JOB-PATH-BACKUPTASK-SPLIT-1` — refused at save while still running CWD-relative. ⇒ do both rows in one
+  change, and re-point the demo/example configs to space-relative values as part of it.
+
+- **P3** · ⚠ **`WORKTREE-PROVISIONING-1` — every fresh git worktree is a FALSE RED, twice over.** Filed
+  2026-09-16 after four parallel agents each hit one. **(1)** `asn-parser/asn-decoders/` is **untracked**
+  (`git ls-tree HEAD` returns 0 files under `asn-parser`), so worktree creation never populates it and
+  `inspecto-engine` fails to compile with *“package com.gamma.asn.facade does not exist”* until the subtree
+  is copied in by hand. **(2)** Any checkout at `.claude/worktrees/<name>/<module>` sits at **path depth 6**,
+  which coincides with the `@TempDir` depth, so `JobPathResolutionTest.theAmbiguousCaseIsRefusedAndNames
+  BothPaths` reconstructs the authored path byte-for-byte and its `!spaceRelative.equals(cwdRelative)` guard
+  at `PathJail.java:186` suppresses the throw ⇒ **red in any worktree, green in the main checkout** (depth 3)
+  and green in CI. ⛔ **Do NOT make either test robust to its own location** — that hides the seam.
+  ⇒ Either track the asn corpus, or teach worktree creation to copy it, and pick a worktree root whose
+  depth does not collide. ⚠ Standing rule meanwhile: **isolate the CONTENT but keep the checkout under the
+  same parent path**, and treat these two reds as environmental until proven otherwise.
   - **P3** · **`JOB-DIR-CWD-CONTAINMENT-1` — a job's `dir` containment resolves against the JVM's CWD, not the Space root, and is decided by a process-wide static set.** Filed 2026-09-15 after `ControlApiJobCrudTest.snakeCaseTriggersAndFlatParamsRoundTrip` failed (422 expected, 200 returned) in every clean worktree created under `%TEMP%` — at `41aa5267`, `87a4d97c` AND `a831172f`, i.e. it predates all of that day's work.
   🔴 **It is NOT a flaky test and NOT a live containment defect — it is a real seam worth fixing.** `JobRoutes.parseJob` calls `ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy())` with **no `configDir`**, so `ConfigSafetyValidator.resolveRef` (`:489-495`) resolves a relative `dir` via `toAbsolutePath()` — against the **process working directory**. The candidate is then tested against `SafetyPolicy.defaultPolicy()`'s allowed roots, which include `DiscoveredRoots` — a **process-wide static set** every test's `SpaceManager` populates with space bases under `java.io.tmpdir`. When the checkout (hence surefire's CWD) is itself under `%TEMP%`, `../../outside` normalises to a path that can share a prefix with another test's leaked `%TEMP%` root ⇒ **accepted**. Under `C:\sandbox` it cannot ⇒ refused.
   ✅ **Proven by relocation, not by argument:** a worktree at the *same* commit with *zero* uncommitted changes PASSES when created under `C:\sandbox` and FAILS under `%TEMP%`. ✅ GitHub CI at `6770d031` refuses correctly, so **the shipped-shape path is sound — P3, not a security regression**.
