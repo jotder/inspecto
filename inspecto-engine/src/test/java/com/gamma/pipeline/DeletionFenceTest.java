@@ -73,4 +73,83 @@ class DeletionFenceTest {
         List<PipelineGraph> flows = List.of(producer("orders_etl", "orders", "sink.persistent"));
         assertTrue(DeletionFence.check(List.of("nonexistent"), flows, Set.of("orders_etl")).isEmpty());
     }
+
+    // ---- coverage: the distinction check() deliberately does not draw -------------------------------
+    // A miscopied store id made the shipped compact_job.toon's fence inert for two months (ffeb95dc →
+    // 819e597b) because check() returns "clear" both for a store that is genuinely quiet and for one that
+    // names nothing at all. These pin that coverage() separates the two without changing check().
+
+    /**
+     * 🔴 The load-bearing case. A store whose pipeline is configured but has <b>never run</b> (no bytes rest
+     * yet) must NOT look like a typo: the fence is derived from the authored topology, never the filesystem,
+     * so a not-yet-produced store is still {@code FENCED}. A store no pipeline mentions is {@code UNMATCHED}.
+     * {@code check} cannot tell them apart — both are "clear" — which is exactly the false negative.
+     */
+    @Test
+    void aNeverRunStoreIsFencedWhileATypoIsUnmatched() {
+        // 'orders' is produced by a configured pipeline that is NOT running and may never have run.
+        List<PipelineGraph> flows = List.of(producer("orders_etl", "orders", "sink.persistent"));
+
+        // check() conflates them: both delete targets come back clear.
+        assertTrue(DeletionFence.check(List.of("orders"), flows, Set.of()).isEmpty());
+        assertTrue(DeletionFence.check(List.of("odrers"), flows, Set.of()).isEmpty());
+
+        // coverage() separates them.
+        assertEquals(DeletionFence.Coverage.FENCED,
+                DeletionFence.coverage(List.of("orders"), flows).get("orders"),
+                "a configured producer arms the fence even before the pipeline has ever run");
+        assertEquals(DeletionFence.Coverage.UNMATCHED,
+                DeletionFence.coverage(List.of("odrers"), flows).get("odrers"),
+                "a store no pipeline produces or consumes can never be flagged — the typo class");
+    }
+
+    /** A {@code sink.view} target is skipped by design, and must not be reported as a typo. */
+    @Test
+    void viewOnlyStoreIsCoveredNotUnmatched() {
+        List<PipelineGraph> flows = List.of(producer("kpi_flow", "active_subs", "sink.view"));
+        assertEquals(DeletionFence.Coverage.VIEW_ONLY,
+                DeletionFence.coverage(List.of("active_subs"), flows).get("active_subs"));
+    }
+
+    /** A store read but not produced here (the producer lives elsewhere) is attested — not a typo. */
+    @Test
+    void consumedOnlyStoreIsCoveredNotUnmatched() {
+        List<PipelineGraph> flows = List.of(consumer("orders_rollup", "orders"));
+        assertEquals(DeletionFence.Coverage.CONSUMED_ONLY,
+                DeletionFence.coverage(List.of("orders"), flows).get("orders"));
+    }
+
+    /** The real regression: the value the shipped job actually carried, against the pipeline it sits beside. */
+    @Test
+    void theShippedMiscopiedValueWouldHaveBeenReportedUnmatched() {
+        List<PipelineGraph> flows = List.of(producer("sales_pipeline", "sales", "sink.persistent"));
+        Map<String, DeletionFence.Coverage> c =
+                DeletionFence.coverage(List.of("out/database", "sales"), flows);
+        assertEquals(DeletionFence.Coverage.UNMATCHED, c.get("out/database"),
+                "'store: out/database' was the dir: value copied one line down — the fence was dead");
+        assertEquals(DeletionFence.Coverage.FENCED, c.get("sales"),
+                "positive control: the corrected value does arm the fence");
+    }
+
+    /** coverage() must not disturb check(): same topology, conflicts still reported. */
+    @Test
+    void coverageDoesNotChangeCheck() {
+        List<PipelineGraph> flows = List.of(
+                producer("orders_etl", "orders", "sink.persistent"),
+                consumer("orders_rollup", "orders"));
+        DeletionFence.coverage(List.of("orders", "ghost"), flows);
+        List<DeletionFence.Conflict> c = DeletionFence.check(List.of("orders"), flows, Set.of("orders_etl"));
+        assertEquals(1, c.size());
+        assertEquals(List.of("orders_etl"), c.get(0).activeProducers());
+    }
+
+    /** Duplicate and repeated targets collapse to one entry each, in encounter order. */
+    @Test
+    void coverageIsKeyedByDistinctStoreInEncounterOrder() {
+        List<PipelineGraph> flows = List.of(producer("orders_etl", "orders", "sink.persistent"));
+        Map<String, DeletionFence.Coverage> c =
+                DeletionFence.coverage(List.of("ghost", "orders", "ghost"), flows);
+        assertEquals(List.of("ghost", "orders"), List.copyOf(c.keySet()));
+        assertEquals(2, c.size());
+    }
 }
