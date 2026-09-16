@@ -1417,6 +1417,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ✅ What stays true: the trigger is `DiscoveredRoots` being a process-wide static set (the
   `SPACE-UNKEYED-STATICS-1` family), and the shipped-shape path is sound (CI refuses correctly). P3 holds.
 
+- **Doc-lifecycle archival OWED from 2026-09-16** — two plans whose work SHIPPED that day are still in `docs/superpower/`: `route-gating-compliance-plan.md` (steps 1 · 2a/2b/2c · 3 · 4a–4e ALL done) and `dataset-column-derivation-plan.md` (all four steps done). ⛔ **Deferred deliberately, not forgotten**: archiving a plan requires editing `docs/INDEX.md`, and at handoff a **peer session held INDEX dirty AND was editing the derivation plan itself** — moving either would have swept their uncommitted work into someone else's commit, which has happened in this tree before. ⇒ do it on a clean tree: distil the as-built into the matching `okf/` concept (the route-gating control is already written up in `compliance/evidence/route-gating.md`), `git mv` both to `plans-archive/`, update `INDEX.md`, then `graphify update .`.
 - **Doc-lifecycle violations** (shipped work still in `docs/superpower/`; the rule is distil → `git mv` to
   `plans-archive/` → update `INDEX.md`). Re-grounded 2026-09-07 — **two of the four listed rows were wrong**:
   - ✅ `living-operational-system.md` — **DISTILLED + ARCHIVED 2026-09-07.** The north star is now the OKF

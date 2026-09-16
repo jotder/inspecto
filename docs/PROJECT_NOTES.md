@@ -140,6 +140,24 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **WRITING A FILE THROUGH A PYTHON/HEREDOC LAYER CORRUPTED THREE FILES IN ONE SHIFT** (2026-09-16).
+  Three separate traps, one root cause — an escape interpreted by the *writer* instead of landing as text:
+  (a) `"🔴"` in a Python string is two **lone surrogates**, which cannot be UTF-8 encoded; `open(w)`
+  had already **truncated** `docs/BACKLOG.md` to **0 bytes** before the write raised, and the same command
+  chain then `git add -A`'d the empty file into a commit. ⚠ **Every doc guard passed on the empty file** — an
+  empty file has no violations — and `git add -A` stages destruction as readily as an edit. It was caught only
+  because a `grep -c` that should have returned 5 returned 0. (b) A `\\` inside a bash heredoc **collapsed** to
+  `\`, producing `replace('\', '/')` — an unclosed character literal. (c) a unicode escape for NUL landed as a **real NUL byte**, which the pre-push guard refused (a NUL makes the whole file invisible to recursive ripgrep).
+  ⇒ **Use `Edit` for existing files**, especially large tracked docs; if a script must write one, `wc -c` it
+  before staging, and never `git add -A` after a script that touched a doc.
+- 🔴 **THE SHARED TREE HAD A PEER'S UNCOMMITTED WORK DURING HANDOFF — AND IT BLOCKED THE ARCHIVAL STEP**
+  (2026-09-16). At shift end `git status` showed 10 modified + 8 untracked files from another session
+  (dead-property validation, accepted-config-keys, two new designs). Two of them were load-bearing for MY
+  handoff: the peer was **editing `dataset-column-derivation-plan.md`**, the very plan the doc lifecycle said
+  to archive, and had **`docs/INDEX.md` dirty** — and archiving a plan *requires* an INDEX edit. ⇒ the
+  archival was **deferred, not skipped**, and recorded as owed. ⛔ Do not `git mv` a plan or edit `INDEX.md`
+  while a peer has either dirty: that is how a peer's work gets swept into someone else's commit (it has
+  happened here before). Stage by PATH, never `-A`, and read `git diff --cached` before committing.
 - 🔴 **"THE UPSTREAM SEAM HAS SHIPPED" WAS CHECKED ON THE TYPE, NOT THE SEAM** (2026-09-16). `AGT-5`'s
   external gate was discharged on 2026-09-08 because `DryRunProvider.class` is in the pinned eoiagent jar. It
   is — but `javap -public` on `eoiagent-platform`'s `PlatformBuilder` shows no `dryRunProvider(...)`; the only
