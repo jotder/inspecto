@@ -396,9 +396,16 @@ Table**. **Amendment v1.0 (D-4):** the `transform` Step verb covers filter / der
 (`transform: {join: references/x, on: k}`) — the join formerly called "enrichment".
 
 **Enrichment** — Augments each record via lookup against reference data. ⚠ **Retiring user-facing (amendment
-v1.0, D-4):** the *operation* is the reference **join inside a `transform` Step**; the *file kind*
-`*_enrich.toon` becomes a **table-entry Pipeline** (amendment Phases 3/6, §13 row). Existing enrich files
-keep running until migration; author no new user-facing "Enrichment" copy.
+v1.0, D-4):** the *operation* is the reference **join inside a `transform` Step**; author no new
+user-facing "Enrichment" copy. ✅ **But the FILE KIND stays put — operator, 2026-09-16.** This entry used to
+say `*_enrich.toon` *"becomes a table-entry Pipeline (amendment Phases 3/6)"* and that existing files
+*"keep running until migration"*. 🔴 That was the **pre-reversal** position and it contradicted §*Job* and the
+§13 row in this same file: the 2026-08-06 reversal cancelled the **file-format migration**, not merely the
+vocabulary. `enrich` is a shipped, registered **Job** type (`EnrichJob`, one of the four built-ins) with its
+own audit trail, and a periodic enrich is Job work. ⇒ there is **no migration pending** for this file kind,
+and the amendment's §6 step-1 clause converting it is **STRUCK** (as is the `materialize` → `summarize`
+clause: that task lives in a Job and registers a Dataset, which no recipe can express).
+`inspecto migrate-configs` passes enrich configs over in silence by that decision.
 
 **Guarantee** — A declared property of a Pipeline that the runtime honors regardless of chain shape:
 `file_dedup` (path / fingerprint / marker), `backup`, `quarantine` (always on — keys only tune

@@ -25,14 +25,16 @@ import java.util.stream.Stream;
  * and a refusal fails the whole migration before anything is written — a half-migrated space is the one
  * outcome worse than an unmigrated one. The known refusals:
  * <ul>
- *   <li>🔴 {@code *_enrich.toon} — the plan's "→ a table-entry recipe" has <b>no implemented target</b>. It
- *       is named here rather than skipped, because a silent skip would leave the enrichment running off a
- *       legacy file the deletion half is about to remove.</li>
- *   <li>🔴 A {@code materialize} maintenance task — it lives in a JOB, not in a config file this walker can
- *       see, so "every {@code materialize} task → a {@code summarize} recipe" cannot be discharged from
- *       here at all. Reported as an un-migratable class when the space declares one.</li>
+ *   <li>A pipeline whose projected recipe would not COMPILE — see {@link #whyTheRecipeWouldNotCompile}.</li>
  *   <li>A target path that already exists (the space is part-migrated, or two legacy files claim one name).</li>
  * </ul>
+ *
+ * <p>⚠ <b>{@code *_enrich.toon} and the {@code materialize} task are OUT OF SCOPE, by decision</b>
+ * (operator, 2026-09-16): the amendment's clauses converting them are <b>struck</b>. The 2026-08-06
+ * reversal that made <b>Job</b> canonical again cancelled the file-format migration as well as the
+ * vocabulary — {@code enrich} is a shipped, registered Job type ({@code EnrichJob}) with its own audit
+ * trail, and {@code materialize} is a Job task that registers a Dataset, which no recipe can express. So
+ * this walker passes enrich files over in silence; they are not a lossy case, they are someone else's.
  *
  * <p>⚠ <b>Schemas are TOON, not CSV.</b> The amendment's §6 wording — <i>"every {@code *_schema.toon} splits
  * → {@code schemas/*.csv} + {@code mappings/*.csv}"</i> — is wrong for the first half as the code stands:
@@ -88,11 +90,14 @@ public final class ConfigMigrator {
                     plan(conversions, refusals, claimed, src, "schema",
                             List.of(outRoot.resolve("schemas").resolve(name + ".toon"),
                                     outRoot.resolve("mappings").resolve(name + ".csv")));
-                } else if (file.endsWith("_enrich.toon")) {
-                    refusals.add(new Refusal(src, "an enrichment config has no table-entry recipe target "
-                            + "implemented (amendment §6 step 1) - migrate it by hand or leave this space "
-                            + "on the legacy path until that conversion exists"));
                 }
+                // *_enrich.toon is deliberately NOT converted (operator, 2026-09-16): the amendment's
+                // "every *_enrich.toon -> a table-entry recipe" clause is STRUCK. The 2026-08-06 reversal
+                // that made Job canonical again cancelled the file-format migration too, not only the
+                // vocabulary - `enrich` is a shipped, registered Job type (EnrichJob) with its own audit
+                // trail, and a periodic enrich is Job work. So an enrich config is out of scope here, and
+                // skipping it is correct rather than lossy. Same call struck the `materialize` clause: that
+                // task lives in a Job and registers a Dataset, which no recipe can express.
             } catch (Exception e) {
                 refusals.add(new Refusal(src, e.getClass().getSimpleName() + ": " + e.getMessage()));
             }

@@ -51,24 +51,51 @@ class ConfigMigratorTest {
     }
 
     /**
-     * ⛔ A refusal fails the WHOLE migration before anything is written. A half-migrated space - some
-     * pipelines on recipes, some still legacy - is the one outcome worse than an unmigrated one.
+     * An enrichment config is OUT OF SCOPE, not a refusal (operator, 2026-09-16 — the amendment's clause is
+     * struck: {@code enrich} is a shipped Job type and the 2026-08-06 reversal cancelled the file migration
+     * too). It must not block the space around it.
      */
     @Test
-    void anEnrichConfigIsRefusedAndNothingAtAllIsWritten(@TempDir Path dir) throws Exception {
+    void anEnrichConfigIsPassedOverAndDoesNotBlockTheSpace(@TempDir Path dir) throws Exception {
         Path config = legacySpace(dir);
         Files.writeString(config.resolve("orders_daily_enrich.toon"), "name: ORDERS_DAILY\n");
         Path out = dir.resolve("registry");
 
         ConfigMigrator.Plan plan = ConfigMigrator.migrate(config, out, true);
 
-        assertFalse(plan.ok(), "the enrichment config has no implemented target");
-        assertFalse(plan.applied());
-        assertFalse(Files.exists(out), "and the pipeline that COULD convert was not written either");
+        assertTrue(plan.ok(), "an enrich config is someone else's work, not a lossy case");
+        assertTrue(plan.applied());
+        assertEquals(2, plan.conversions().size(), "the pipeline and the schema still convert");
+        assertTrue(Files.exists(out.resolve("pipelines/orders.toon")));
+        assertTrue(Files.exists(config.resolve("orders_daily_enrich.toon")),
+                "and the enrich config is left exactly where the Job expects it - NOT archived");
+    }
+
+    /**
+     * ⛔ A refusal still fails the WHOLE migration before anything is written. A half-migrated space - some
+     * pipelines on recipes, some still legacy - is the one outcome worse than an unmigrated one.
+     */
+    @Test
+    void aRefusalStopsTheWholeMigrationBeforeAnythingIsWritten(@TempDir Path dir) throws Exception {
+        Path config = legacySpace(dir);
+        Files.writeString(config.resolve("schemaless_pipeline.toon"), """
+                name: SCHEMALESS
+                active: true
+                dirs:
+                  poll: /tmp/in
+                  database: /tmp/db
+                output:
+                  format: CSV
+                processing:
+                  threads: 1
+                """);
+        Path out = dir.resolve("registry");
+
+        ConfigMigrator.Plan plan = ConfigMigrator.migrate(config, out, true);
+
+        assertFalse(plan.ok());
+        assertFalse(Files.exists(out), "the pipeline that COULD convert was not written either");
         assertTrue(Files.exists(config.resolve("orders_pipeline.toon")), "nor was any original moved");
-        assertEquals(1, plan.refusals().size());
-        assertTrue(plan.refusals().get(0).reason().contains("table-entry recipe"),
-                "the refusal names what is missing: " + plan.refusals().get(0).reason());
     }
 
     @Test
