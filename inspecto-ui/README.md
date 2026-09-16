@@ -3,7 +3,7 @@
 Angular SPA on the gamma-analytics admin template (Angular 21 + Angular Material + Tailwind),
 with **ag-Grid Community** for grids, **Chart.js** for the dashboard charts and **AntV G6** for
 the catalog metadata graph. Replaced the original DevExtreme app in v4.1 — the phase-by-phase
-port is documented in [`docs/devextreme-migration-plan.md`](docs/devextreme-migration-plan.md).
+port plan was deleted with the other superseded migration docs (`8172de90`) and has no successor.
 
 > The template is a licensed ThemeForest product (see `package.json` / `CREDITS`) — don't
 > redistribute `src/@gamma/` outside this project.
@@ -28,7 +28,7 @@ npm start          # ng serve on :4204; /api/* proxied to ControlApi on :8080 (p
 Start the backend with CORS for the dev origin (`-Dcontrol.cors=http://localhost:4204`), open
 `http://localhost:4204/` and paste your operator token(s) on the Connect screen. There is no
 username/password login — see the
-[Operator Console guide](../docs/operator-console.md).
+[User Guide](../docs/USER_GUIDE.md).
 
 ## Test & build
 

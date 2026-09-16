@@ -139,6 +139,26 @@ code, not text), so interpolations are now stripped. ⚠ Both were caught by **m
 separately**, not by reading. ⛔ **A guard that passes proves nothing until it has been proven red** —
 once per rule, not once per guard.
 
+✅ **A fifth instance, 2026-09-16 — the ALLOW-LIST was the bug, and it had been green over the
+customer's first page.** `tools/check-doc-links.mjs` scanned `ROOTS = ['docs', 'compliance', '.claude']`
+plus root `*.md`. `inspecto/` was in none of them — and `inspecto/README.md` is the file `package.ps1`
+step 7 copies to the **bundle root**, the first page a customer opens. It carried **29 dead links**
+(`README-LINKS-BROKEN-IN-REPO-1`) across **13 distinct dead targets**, every one of them a doc the July
+consolidation `f6faeae3` *relocated into* `okf/` — link rot created by the doc lifecycle's own
+reorganisation, exactly the flavour the guard's own header records for `superpower/`. The guard reported
+✓ the whole time, and printed its scope honestly on every run; nobody read the three roots as a list of
+what was **not** covered. 🔴 **An allow-list answers "did we remember to add this tree?"; a deny-list
+answers "is there a reason to skip this tree?"** — and only the second fails loudly when a fourth
+doc-bearing directory appears. `ROOTS` is now `['.']`, the whole repo minus `SKIP_DIRS`
+(`node_modules`/`.git`/`worktrees`/`dist`/`target`/`graphify-out`), which also folded away the separate
+root-`*.md` pass. ⚠ **Widening cost nothing in noise**: 451 → 529 files, 1,802 checked links, and only
+**3** further breaks (`inspecto-ui/README.md` ×2 — one to a plan deleted in `8172de90` with no successor;
+`tools/templates/nodetype/README.md`, off by one directory level, the same mistake the header records for
+the seven `SKILL.md` links). ⛔ One trap in the widening itself: with `ROOTS = ['.']` every path reads
+`./docs/…`, so the `ARCHIVE_PREFIX` `startsWith` test stops matching and the 570-link archive exemption
+silently evaporates — `slash()` now strips the `./`. Falsified both ways: RED at 32 on the pre-fix tree,
+and RED again from a one-line mutation in `asn-parser/docs/` (a tree the old scope could never see).
+
 ## A third shape: the guard whose subject is a NUMBER a human wrote
 
 The two shapes above are about a guard that cannot fail. This one is about work that **has no guard at all

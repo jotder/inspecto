@@ -57,11 +57,30 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
 import { checkoutIndex } from './tracked-paths.mjs';
 
-/** Trees scanned for links. Root-level `*.md` (CLAUDE.md, README) is added separately. */
-const ROOTS = ['docs', 'compliance', '.claude'];
+/**
+ * Scope: the WHOLE repository, as a DENY-list (`SKIP_DIRS`), not an allow-list of trees.
+ *
+ * ⛔ Until 2026-09-16 this read `['docs', 'compliance', '.claude']` + root `*.md`, and that allow-list
+ * was itself the bug (`README-LINKS-BROKEN-IN-REPO-1`). `inspecto/README.md` — the file `package.ps1`
+ * step 7 copies to the BUNDLE ROOT as the customer's first page — carried **29 dead links**, 13 distinct
+ * dead targets, every one of them a doc the July consolidation (`f6faeae3`) relocated into `okf/`. The
+ * guard was green throughout, because `inspecto/` was in none of its three roots.
+ *
+ * An allow-list answers "did we remember to add this tree?"; a deny-list answers "is there a reason to
+ * skip this tree?" — and only the second fails loudly when someone adds a fourth doc-bearing directory.
+ * Widening to the whole repo cost 3 further findings (`inspecto-ui/README.md` ×2,
+ * `tools/templates/nodetype/README.md`) and no noise: every markdown file in the tree is tracked.
+ */
+const ROOTS = ['.'];
 
 /** Never walked: build output and the git worktrees, which contain whole second copies of the repo. */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out']);
+// ⚠ `inspecto-deploy` is the packaged BUNDLE — gitignored build output that carries a stale COPY of the
+// whole docs tree. Scanning it reports thousands of breaks in generated files nobody edits, which is how
+// a guard teaches the next shift to ignore it; `check-family-count.mjs` records the same exemption for
+// the same reason. ⛔ It is absent from a fresh clone, so widening this scope looked green to the author
+// and went red the moment it met a checkout that had ever built a bundle.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out',
+                           'inspecto-deploy']);
 
 /** The archive is exempt AS A SOURCE only — see the header. Kept as a prefix so it reads at the call site. */
 const ARCHIVE_PREFIX = 'docs/archived-documents/';
@@ -80,7 +99,12 @@ const LINK = /\[[^\]]*\]\(\s*([^)\s]+?)(?:\s+"[^"]*")?\s*\)/g;
 
 const EXTERNAL = /^(https?:|mailto:|tel:|ftp:|data:|#)/i;
 
-const slash = (p) => p.split(sep).join('/');
+/**
+ * Repo-relative, forward-slashed. ⚠ The `./` strip is load-bearing now that ROOTS is `['.']`: without
+ * it every path reads `./docs/…`, and the ARCHIVE_PREFIX test below — a plain `startsWith` — would stop
+ * matching, silently un-exempting the 570-link archive tier and turning every run red.
+ */
+const slash = (p) => p.split(sep).join('/').replace(/^\.\//, '');
 
 function fail(message) {
     console.error(`✗ Doc-link guard: ${message}`);
@@ -130,8 +154,8 @@ function collect(dir, out) {
 }
 
 const files = [];
+// The `.` walk subsumes what used to be a separate root-level `*.md` pass.
 for (const root of ROOTS) if (existsSync(root)) collect(root, files);
-for (const name of readdirSync('.')) if (name.endsWith('.md')) files.push(name);
 
 if (files.length < MIN_FILES) {
     fail(
@@ -195,7 +219,7 @@ if (checked < MIN_LINKS) {
 
 // The exemption is stated on every run, pass or fail. An unprinted scope is an unaudited one.
 const scopeNote =
-    `scope: ${files.length} file(s) under ${ROOTS.join(', ')} + root *.md; ` +
+    `scope: ${files.length} file(s) — the WHOLE repo minus ${[...SKIP_DIRS].join('/')}; ` +
     `${archiveSourceBroken} broken link(s) inside ${ARCHIVE_PREFIX}** IGNORED (never-maintained tier, ` +
     `CLAUDE.md doc-lifecycle §3 — links pointing INTO it are still checked)`;
 
