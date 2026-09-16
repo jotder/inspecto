@@ -12,6 +12,7 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineDocument;
+import com.gamma.pipeline.PipelineDocumentXlsx;
 import com.gamma.pipeline.PipelineCompileException;
 import com.gamma.pipeline.PipelineEditable;
 import com.gamma.pipeline.PipelineGraph;
@@ -113,6 +114,25 @@ final class PipelineGraphRoutes implements RouteModule {
         String fingerprint = ContentHash.of(hashed);
 
         ex.getResponseHeaders().set("X-Config-Fingerprint", fingerprint);
+
+        // D-8: `?format=xlsx` renders the SAME model as a workbook, for the sign-off surface that wants
+        // one. ⛔ Both renderings take every value - and every mask - from PipelineDocumentModel; the
+        // fingerprint above is unaffected because it hashes the recipe and components, never the rendering.
+        if ("xlsx".equalsIgnoreCase(ApiContext.query(ex, "format"))) {
+            java.nio.file.Path tmp = java.nio.file.Files.createTempFile("pipeline-document-", ".xlsx");
+            try {
+                PipelineDocumentXlsx.write(cfg.identity().pipelineName(), recipe, components, fingerprint, tmp);
+                return ApiContext.respondBinary(ex, java.nio.file.Files.readAllBytes(tmp),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        cfg.identity().pipelineName() + ".xlsx");
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ApiException(500, "could not render the workbook: " + e.getMessage());
+            } finally {
+                java.nio.file.Files.deleteIfExists(tmp);
+            }
+        }
         return ApiContext.respondText(ex,
                 PipelineDocument.render(cfg.identity().pipelineName(), recipe, components, fingerprint),
                 "text/markdown; charset=utf-8");

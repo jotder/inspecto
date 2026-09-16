@@ -446,6 +446,20 @@ public interface ApiContext {
         return HANDLED;
     }
 
+    /**
+     * Write {@code bytes} with an explicit {@code Content-Type} and a download filename; returns
+     * {@link #HANDLED}. ⚠ Deliberately NOT gzipped: an xlsx is already a zip container, so a second
+     * encoding costs CPU and saves nothing.
+     */
+    static Object respondBinary(HttpExchange ex, byte[] bytes, String contentType, String filename)
+            throws IOException {
+        ex.getResponseHeaders().set("Content-Type", contentType);
+        ex.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+        ex.sendResponseHeaders(200, bytes.length);
+        ex.getResponseBody().write(bytes);
+        return HANDLED;
+    }
+
     /** Decode the first captured path segment (the {@code id} in {@code /things/{id}}). */
     static String name(Matcher m) {
         return URLDecoder.decode(m.group(1), StandardCharsets.UTF_8);

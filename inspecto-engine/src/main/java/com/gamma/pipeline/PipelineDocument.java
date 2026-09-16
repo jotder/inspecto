@@ -25,7 +25,7 @@ import static com.gamma.util.Values.strOrEmpty;
  *
  * <p><b>Nothing is silently dropped.</b> Every step key §5.1 does not give a dedicated table still
  * renders through {@link #configTable} — a sign-off document that quietly omitted config would be
- * worse than no document at all. Values under a secret-shaped key are masked ({@link #SECRET_KEYS}).
+ * worse than no document at all. Values under a secret-shaped key are masked ({@link PipelineDocumentModel#SECRET_KEYS}).
  *
  * <p>Sample rows per Step (§5.1's "worked examples") are <b>deliberately not here</b>: they require
  * a live dry-run, which is neither pure nor deterministic. They belong to the S6b import/diff loop,
@@ -36,16 +36,9 @@ public final class PipelineDocument {
 
     private PipelineDocument() {}
 
-    /** §5.1 "connection (secrets masked)" — any key whose name contains one of these never renders verbatim. */
-    private static final Set<String> SECRET_KEYS = Set.of(
-            "password", "secret", "token", "credential", "passphrase", "private_key", "access_key");
-
-    private static final String MASK = "\u2022\u2022\u2022\u2022";
-
-    /** Verb → section heading, in the pipeline order {@link RecipeConverter} emits. */
-    private static final Map<String, String> VERB_LABEL = Map.of(
-            "collect", "Collect", "parse", "Parse", "map", "Map", "transform", "Transform",
-            "dedup", "Dedup", "summarize", "Summarize", "route", "Route", "sink", "Sink");
+    // ⛔ The content decisions — which keys are secret-shaped, how a value reads, what a Step's summary
+    // says — live in PipelineDocumentModel and are NOT repeated here (D-8). This class decides Markdown
+    // SHAPE only. A second copy of the masking rule is how a credential reaches a workbook.
 
     /**
      * Render {@code recipe} as Markdown.
@@ -99,6 +92,115 @@ public final class PipelineDocument {
         return md.toString();
     }
 
+    /**
+     * The document as STRUCTURE — the single source both renderings walk (D-8).
+     *
+     * <p>⚠ Markdown is still emitted by {@link #render}'s own emitters, which stay byte-for-byte what they
+     * were; this model is what the XLSX renderer consumes, and it takes every VALUE (and every mask) from
+     * {@link PipelineDocumentModel}. ⛔ So the two renderings can differ in shape but never in content —
+     * and content is where a leaked secret would live.
+     */
+    public static PipelineDocumentModel.Doc model(String id, Map<String, Object> recipe,
+                                                  Map<String, Map<String, Object>> components,
+                                                  String fingerprint) {
+        String title = strOrEmpty(id).isEmpty() ? strOrEmpty(recipe.get("name")) : strOrEmpty(id);
+        String configured = strOrEmpty(recipe.get("name"));
+        List<PipelineDocumentModel.Section> sections = new ArrayList<>();
+
+        List<List<String>> head = new ArrayList<>();
+        head.add(List.of("Pipeline", title));
+        if (!configured.isEmpty() && !configured.equals(title)) head.add(List.of("Name", configured));
+        head.add(List.of("Status", Boolean.FALSE.equals(recipe.get("active")) ? "Inactive" : "Active"));
+        if (recipe.get("trigger") != null)
+            head.add(List.of("Trigger", PipelineDocumentModel.value(recipe.get("trigger"))));
+        head.add(List.of("Config fingerprint", strOrEmpty(fingerprint)));
+        sections.add(new PipelineDocumentModel.Section(1,
+                "Pipeline: " + (title.isEmpty() ? "(unnamed)" : title),
+                List.of("Generated from configuration — never hand-authored. The fingerprint above binds "
+                        + "this document to the exact configuration that produced it: if it no longer "
+                        + "matches, the configuration has changed and this document's sign-off is stale."),
+                List.of(new PipelineDocumentModel.Table("Pipeline", List.of("", ""), head))));
+
+        List<Map<String, Object>> steps = steps(recipe.get("steps"));
+        List<List<String>> overview = new ArrayList<>();
+        int n = 1;
+        for (Map<String, Object> step : steps)
+            for (Map.Entry<String, Object> e : step.entrySet())
+                overview.add(List.of(String.valueOf(n++), PipelineDocumentModel.label(e.getKey()),
+                        PipelineDocumentModel.summarize(e.getKey(), asMap(e.getValue()))));
+        sections.add(new PipelineDocumentModel.Section(2, "Steps",
+                steps.isEmpty() ? List.of("No steps.") : List.of(),
+                overview.isEmpty() ? List.of()
+                        : List.of(new PipelineDocumentModel.Table("Steps",
+                                List.of("#", "Step", "Summary"), overview))));
+
+        n = 1;
+        for (Map<String, Object> step : steps)
+            for (Map.Entry<String, Object> e : step.entrySet())
+                stepSections(sections, n++, e.getKey(), asMap(e.getValue()), components, 3);
+
+        Map<String, Object> g = asMap(recipe.get("guarantees"));
+        List<List<String>> grows = new ArrayList<>();
+        for (Map.Entry<String, Object> e : g.entrySet())
+            grows.add(List.of(PipelineDocumentModel.label(e.getKey()),
+                    PipelineDocumentModel.masked(e.getKey(), e.getValue())));
+        sections.add(new PipelineDocumentModel.Section(2, "Guarantees",
+                grows.isEmpty() ? List.of("None configured.") : List.of(),
+                grows.isEmpty() ? List.of()
+                        : List.of(new PipelineDocumentModel.Table("Guarantees",
+                                List.of("Guarantee", "Configuration"), grows))));
+
+        if (!components.isEmpty()) {
+            List<List<String>> crows = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Object>> e : components.entrySet())
+                crows.add(List.of(e.getKey(),
+                        e.getValue() == null || e.getValue().isEmpty() ? "not resolved" : "yes"));
+            sections.add(new PipelineDocumentModel.Section(2, "Referenced components", List.of(),
+                    List.of(new PipelineDocumentModel.Table("References",
+                            List.of("Reference", "Resolved"), crows))));
+        }
+        return new PipelineDocumentModel.Doc(title, sections);
+    }
+
+    /** One Step's section, and — for a route — its branches' sub-sections, in reading order. */
+    private static void stepSections(List<PipelineDocumentModel.Section> out, int n, String verb,
+                                     Map<String, Object> cfg,
+                                     Map<String, Map<String, Object>> components, int depth) {
+        List<PipelineDocumentModel.Table> tables = new ArrayList<>();
+        switch (verb) {
+            case "map" -> {
+                PipelineDocumentModel.Table f = PipelineDocumentModel.fieldTable(cfg, components);
+                if (f != null) tables.add(f);
+                PipelineDocumentModel.Table c = PipelineDocumentModel.configTable(cfg, Set.of("schema", "mapping"));
+                if (c != null) tables.add(c);
+            }
+            case "route" -> {
+                PipelineDocumentModel.Table b = PipelineDocumentModel.branchTable(cfg);
+                if (b != null) tables.add(b);
+                PipelineDocumentModel.Table c = PipelineDocumentModel.configTable(cfg, Set.of("branches"));
+                if (c != null) tables.add(c);
+            }
+            default -> {
+                PipelineDocumentModel.Table c = PipelineDocumentModel.configTable(cfg, Set.of());
+                if (c != null) tables.add(c);
+            }
+        }
+        out.add(new PipelineDocumentModel.Section(depth, n + ". " + PipelineDocumentModel.label(verb),
+                tables.isEmpty() && !"route".equals(verb) && !"map".equals(verb)
+                        ? List.of("No configuration.") : List.of(), tables));
+
+        if ("route".equals(verb)) {
+            int sub = 1;
+            for (Map.Entry<String, Object> b : PipelineDocumentModel.branches(cfg).entrySet()) {
+                out.add(new PipelineDocumentModel.Section(depth + 1, "Branch: " + b.getKey(),
+                        List.of(), List.of()));
+                for (Map<String, Object> step : steps(asMap(b.getValue()).get("steps")))
+                    for (Map.Entry<String, Object> e : step.entrySet())
+                        stepSections(out, sub++, e.getKey(), asMap(e.getValue()), components, depth + 2);
+            }
+        }
+    }
+
     // ── steps ────────────────────────────────────────────────────────────────────
 
     /** The chain at a glance, before the per-Step detail — what a reviewer reads first. */
@@ -114,20 +216,8 @@ public final class PipelineDocument {
         md.append("\n");
     }
 
-    /** One line naming what this Step actually does, drawn from the keys that carry its intent. */
     private static String summarize(String verb, Map<String, Object> cfg) {
-        return switch (verb) {
-            case "collect" -> first(cfg, "connection", "dir", "path", "files");
-            case "parse" -> first(cfg, "grammar", "format");
-            case "map" -> first(cfg, "schema", "mapping");
-            case "transform" -> cfg.containsKey("join") ? "join " + value(cfg.get("join"))
-                    : cfg.containsKey("filter") ? "filter " + value(cfg.get("filter")) : "";
-            case "dedup" -> cfg.containsKey("key") ? "key " + value(cfg.get("key")) : "";
-            case "summarize" -> cfg.containsKey("group_by") ? "by " + value(cfg.get("group_by")) : "";
-            case "route" -> branches(cfg).size() + " branch(es)";
-            case "sink" -> first(cfg, "database", "table", "format");
-            default -> "";
-        };
+        return PipelineDocumentModel.summarize(verb, cfg);
     }
 
     private static void stepSection(StringBuilder md, int n, String verb, Map<String, Object> cfg,
@@ -265,19 +355,9 @@ public final class PipelineDocument {
         md.append("| ").append(k).append(" | ").append(cell(v)).append(" |\n");
     }
 
-    private static String label(String key) {
-        String known = VERB_LABEL.get(key);
-        if (known != null) return known;
-        String spaced = key.replace('_', ' ');
-        return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
-    }
+    private static String label(String key) { return PipelineDocumentModel.label(key); }
 
-    /** A secret-shaped key never renders its value (§5.1). */
-    private static String masked(String key, Object v) {
-        String k = key.toLowerCase(Locale.ROOT);
-        for (String s : SECRET_KEYS) if (k.contains(s)) return MASK;
-        return value(v);
-    }
+    private static String masked(String key, Object v) { return PipelineDocumentModel.masked(key, v); }
 
     /** Scalars plainly; a list comma-joined; a map as {@code k=v} pairs — always single-line, table-safe. */
     private static String value(Object v) {
