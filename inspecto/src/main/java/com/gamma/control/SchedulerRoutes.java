@@ -132,7 +132,12 @@ final class SchedulerRoutes implements RouteModule {
         system.put("intakeSource", anyStored ? "file"
                 : (System.getProperty("ingest.maxFilesPerCycle") != null ? "property" : "default"));
         // BACKLOG D11's resource pair, with the same provenance contract as the cap above: a stored file
-        // value wins, else the -D bootstrap default, else the built-in default that now ships on.
+        // value wins, else the -D bootstrap default, else NULL -- there is NO built-in default and the
+        // limit is OFF unless configured, so DuckDB's own ~80%-of-RAM default applies (DuckDbUtil
+        // .memoryLimit returns null at the end of that chain). Note "duckdbMemoryLimitSource" still
+        // reports "default" in that case, which means "nothing was configured", NOT "a default applied".
+        // GAP-4 is the open row to give it one; the signed 2GB was refuted 2026-09-16 as not derivable
+        // from editions.md's own rule (~25-50% RAM / concurrency), so do not reinstate that number here.
         String storedMem = ss.duckdbMemoryLimit();
         String propMem = System.getProperty(com.gamma.util.DuckDbUtil.PROP_MEMORY_LIMIT);
         system.put("duckdbMemoryLimit", storedMem != null ? storedMem
