@@ -113,13 +113,25 @@ public final class ConfigSafetyValidator {
     /**
      * The path-shaped keys a {@code job:} carries at its top level, across the built-in Job Types
      * (JOB-SPEC-1, decided 2026-09-06): the pipeline job's {@code data_dir} / {@code pipeline_config},
-     * the maintenance tasks' {@code dir} / {@code backup_dir} / {@code archive} / {@code target_dir}.
+     * the maintenance tasks' {@code dir} / {@code archive_dir} / {@code backup_dir} / {@code archive} /
+     * {@code target_dir}.
      * Before this the job save skipped containment entirely and the tasks re-checked at RUN time —
      * which stays as belt; this is the braces, at the one moment the author is present. Task-specific
      * keys this list does not name still get their run-time check.
+     *
+     * <p>⚠ <b>A key belongs here only when the run-time reader resolves it the SAME way</b> — through
+     * {@link PathJail#requireJobPathUnderAny} against the Space config root. {@code archive_dir}
+     * qualifies ({@code CleanupTask:47}); it was simply missed by {@code JOB-SPEC-1}, whose decision text
+     * named five keys while the code shipped six. ⛔ Two path-shaped job keys deliberately stay OUT,
+     * because adding them would MANUFACTURE the very gate/runtime split this list exists to close
+     * ({@code JOB-PATH-GATE-BLIND-KEYS-1}): {@code out_dir} ({@code ReportJob:125}) is jailed at run with
+     * the plain {@link PathJail#requireUnderAny} — containment only, working-directory-relative — and
+     * {@code config} ({@code EnrichJob:59}) reaches {@code EnrichmentConfig.load} with no jail at all.
+     * Each needs its reader moved onto {@code requireJobPathUnderAny} in the same change that lists it
+     * here.
      */
     private static final List<String> JOB_PATH_KEYS =
-            List.of("data_dir", "pipeline_config", "dir", "backup_dir", "archive", "target_dir");
+            List.of("data_dir", "pipeline_config", "dir", "archive_dir", "backup_dir", "archive", "target_dir");
 
     /**
      * ⚠ {@code configDir} here is the <b>Space config root</b>, and unlike every other kind it is USED:

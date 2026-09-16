@@ -648,13 +648,35 @@ committed configs.
   `pipeline_config` and `data_dir` on with **no `PathJail` call at either site**: 19 of 33 values gated
   under one rule and run under another, and a containment hole. ⚠ Its javadoc at `:508` claims job configs
   bypass `ConfigSafetyValidator`, which contradicts that validator having a `checkJob`.
-- **`JOB-PATH-COMPACTOR-UNJAILED-1`** — `PartitionCompactor:57` and `ReferenceCompactor:91` walk and
-  delete under a raw `Path.of(cfg.require("dir"))`. Predates the change, which is why looking at the
-  change did not find it.
-- **`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`** — `ConfigWriteRoutes:370` uses `target.getParent()` where
-  `JobRoutes:381` uses the Space root: one value, two gates, two answers.
-- **`JOB-PATH-GATE-BLIND-KEYS-1`** — `RawConfig.str(raw, "job."+k)` is a dotted path from the root, so 11
-  values under `params:` are invisible to the gate; `archive_dir` is resolved at run time but is not in
-  `JOB_PATH_KEYS`; `out_dir` is covered by neither.
+- ~~**`JOB-PATH-COMPACTOR-UNJAILED-1`**~~ ✅ **SHIPPED 2026-09-16** — both compactors now use the job rule,
+  matching the three `MaintenanceJob` siblings. ⛔ `ReferenceCompactor.compact(Path,long)` stays unjailed
+  on purpose: `CollectorService:1276` feeds it a pipeline's own resolved dirs, not an authored value.
+- ~~**`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`**~~ ✅ **SHIPPED 2026-09-16, and the defect was not the one the
+  row named.** `ConfigWriteRoutes.safetyBase` dispatches on TYPE, because `configDir` legitimately means
+  two different things: a pipeline/schema resolves its `schema_file`/`grammar` refs against the config
+  file's own directory, a job against the Space config root. ⛔ "Make them the same" was the wrong fix.
+  The real third base was `/config/write:71`, which passed **no base at all** and judged a job against the
+  process working directory. ⚠ Neither route has ever had a `type:"job"` caller — latent, never live.
+- **`JOB-CONFIG-THIRD-PRODUCER-1`** — `BundleRoutes:477` writes a job config on bundle import. The file's
+  location IS contained (`WriteGates.jail`), but the job's own path VALUES never reach
+  `ConfigSafetyValidator` — a third producer of job configs that no gate inspects.
+- **`JOB-PATH-GATE-BLIND-KEYS-1`** — ✅ **one third SHIPPED 2026-09-16, one third REFUTED, one third
+  re-filed.** `archive_dir` is now in `JOB_PATH_KEYS` (seven keys): `CleanupTask:47` already resolved it
+  through `requireJobPathUnderAny` against the Space root, so the gate and the jail agreed on the rule and
+  only the gate was not looking — and **no committed job config carries the key**, so listing it refuses
+  nothing that exists. 🔴 **The dotted-path half is REFUTED as a reachable defect.** `RawConfig.str` does
+  walk a dotted path from the root, and 5 committed path values (not 11 — 11 was the survey's *total*
+  gate-blind count, which also included `out_dir` and `store`, blind for a different reason) plus 4 `${…}`
+  placeholders do sit where `"job."+k` cannot reach. But that shape is a **Job Template instance**
+  (`template:` + `params:`), which carries no `job.type`, and `job.type` is `FieldSpec.required` on
+  `ConfigSpecs.job()` — so `POST/PUT /jobs`, `/config/write` and `/config/patch` all refuse the whole body
+  before the safety gate's blindness can matter. A template instance reaches the system only through
+  `ServiceBootstrap`, which expands `params:` into the flat `job:` block before the run-time jails read it.
+  Widening `checkJob` to `job.params.*` would refuse nothing any route can accept. ⛔ **`out_dir` stays
+  OUT, deliberately** — `ReportJob:125` jails it with the plain `PathJail.requireUnderAny` (containment
+  only, working-directory-relative), so listing it would *manufacture* a gate/runtime split. **And the row
+  missed a second key of the same shape: `config` (`EnrichJob:59`) reaches `EnrichmentConfig.load` with no
+  jail at all.** Both need their reader moved onto `requireJobPathUnderAny` in the same change that lists
+  them → `JOB-PATH-REPORT-ENRICH-SPLIT-1`.
 - **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point all 33 committed values space-relative. ⛔ Land it with
   whichever runtime row lands last, or the configs refuse in between.

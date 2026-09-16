@@ -132,6 +132,65 @@ class ConfigSafetyValidatorTest {
                 "task", "noop", "store", "../whatever")), SafetyPolicy.withRoots(root)).isEmpty());
     }
 
+    /**
+     * `JOB-PATH-GATE-BLIND-KEYS-1`: {@code archive_dir} was resolved at RUN with the Space-root rule
+     * ({@code CleanupTask:47}) and checked at SAVE by nobody — the one key where the gate and the jail
+     * already agreed on the rule and the gate simply did not look. ⚠ Zero committed job config carries
+     * it (proven against the same probe that finds {@code backup_dir} 4×), so listing it refuses nothing
+     * that exists today; it closes the hole before the first author opens it.
+     */
+    @Test
+    void aCleanupArchiveDirIsContainedAtSave(@TempDir Path root) {
+        Map<String, Object> ok = Map.of("job", Map.of("name", "sweep", "type", "maintenance",
+                "task", "cleanup", "dir", root.resolve("quarantine").toString(),
+                "archive_dir", root.resolve("attic").toString()));
+        assertTrue(ConfigSafetyValidator.check("job", ok, SafetyPolicy.withRoots(root)).isEmpty());
+
+        Map<String, Object> bad = Map.of("job", Map.of("name", "sweep", "type", "maintenance",
+                "task", "cleanup", "dir", root.resolve("quarantine").toString(),
+                "archive_dir", "../../outside"));
+        List<Finding> f = ConfigSafetyValidator.check("job", bad, SafetyPolicy.withRoots(root));
+        assertTrue(f.stream().anyMatch(x -> x.fieldPath().equals("job.archive_dir")), f.toString());
+    }
+
+    /**
+     * 🔴 The REFUTATION `JOB-PATH-GATE-BLIND-KEYS-1` claimed as a defect, pinned so it stays true.
+     *
+     * <p>{@link com.gamma.config.spec.RawConfig#str} walks a dotted path from the root, so a value under
+     * {@code job.params.dir} is genuinely invisible to {@code checkJob}'s {@code "job." + k} lookup —
+     * and five committed values do live there. ⛔ But that shape is a <b>Job Template instance</b>
+     * ({@code template:} + {@code params:}), which carries no {@code job.type}, and {@code job.type} is
+     * {@code FieldSpec.required} on {@link com.gamma.config.spec.ConfigSpecs#job()}. Every gated route
+     * — {@code POST/PUT /jobs}, {@code /config/write}, {@code /config/patch} — runs that spec beside
+     * this validator and refuses the whole body first. A template instance reaches the system only
+     * through the BOOT loader, which expands {@code params:} into the template's flat {@code job:} block
+     * before the run-time jails see it. So the gate cannot see those values because they can never
+     * arrive — widening {@code checkJob} to read {@code job.params.*} would refuse nothing that any
+     * route can accept today.
+     */
+    @Test
+    void aTemplateInstanceIsRefusedBeforeItsParamsCouldBeGateBlind() {
+        Map<String, Object> instance = Map.of("job", Map.of("name", "config_backup",
+                "template", "chained-backup",
+                "params", Map.of("dir", "spaces/demo/config", "backup_dir", "spaces/demo/data/backups")));
+
+        List<Finding> spec = new com.gamma.config.io.ConfigLoader(null)
+                .validate(com.gamma.config.spec.ConfigSpecs.job(), instance);
+
+        assertTrue(spec.stream().anyMatch(f -> f.severity() == Severity.ERROR
+                        && f.fieldPath().equals("job.type")),
+                "the required job.type is what refuses a template instance: " + spec);
+        // positive control: the same body WITH a type clears the spec, so the assertion above is the
+        // missing key firing and not the probe failing to reach the spec at all.
+        Map<String, Object> typed = Map.of("job", Map.of("name", "config_backup", "type", "maintenance",
+                "template", "chained-backup",
+                "params", Map.of("dir", "spaces/demo/config")));
+        assertTrue(new com.gamma.config.io.ConfigLoader(null)
+                        .validate(com.gamma.config.spec.ConfigSpecs.job(), typed).stream()
+                        .noneMatch(f -> f.severity() == Severity.ERROR),
+                "control: a typed job body must clear the spec");
+    }
+
     @Test
     void cleanDraftUnderRootPasses(@TempDir Path root) {
         List<Finding> f = ConfigSafetyValidator.check("pipeline", pipeline(safeDirs(root)),
