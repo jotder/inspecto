@@ -389,4 +389,104 @@ class ConfigSpecsTest {
                 "EST5EDT, by contrast, IS a real zone id — so the rule asks ZoneId.of rather than "
                         + "guessing from a value's shape");
     }
+
+    // ── expectation: the 'condition' kind (promoted 2026-07-18) ───────────────────
+
+    /**
+     * The real {@code condition}-kind save shape, validated through the very loop
+     * {@code POST /validate} and {@code POST /config/write} run ({@code ConfigLoader.validate}).
+     *
+     * <p>🔴 This is not hypothetical reachability: both routes take {@code type} from the request
+     * body and {@code ConfigSpecs.forType("expectation")} is non-null, so before this spec was
+     * brought forward a condition expectation drew TWO errors from a spec that had never heard of
+     * its kind — {@code kind} not in the enum, and {@code column} "missing" although
+     * {@code Expectation} deliberately exempts this one kind from it. The {@code /expectations}
+     * route is unaffected only because it runs the spec's field NAMES and not its value rules.
+     */
+    @Test
+    void expectationSpecAcceptsTheConditionKindsRealSaveShape() {
+        Map<String, Object> draft = new java.util.LinkedHashMap<>();
+        draft.put("name", "e_cond");
+        draft.put("targetType", "pipeline");
+        draft.put("target", "orders");
+        draft.put("kind", "condition");
+        draft.put("when", Map.of("kind", "group", "op", "AND", "items",
+                List.of(Map.of("kind", "condition", "field", "ID", "operator", "is_null"))));
+        draft.put("severity", "MINOR");
+        draft.put("enabled", true);
+
+        List<Finding> errors = com.gamma.config.io.ConfigLoader.filesystem()
+                .validate(ConfigSpecs.expectation(), draft).stream()
+                .filter(f -> f.severity() == Severity.ERROR).toList();
+        assertEquals(List.of(), errors,
+                "a condition expectation the engine evaluates must not be refused by its own spec");
+    }
+
+    /**
+     * The Studio sends {@code when: null} on EVERY save ({@code expectation-form.dialog.ts}), the four
+     * kinds that ignore it included — so declaring {@code when} must not turn every non-condition save
+     * into a type error. {@code RawConfig.present} treats null as absent, which is what makes the
+     * declaration safe; this pins that rather than trusting it.
+     */
+    @Test
+    void expectationWhenIsAnOptionalMapAndANullWhenIsNotAFinding() {
+        FieldSpec when = ConfigSpecs.expectation().field("when").orElseThrow(
+                () -> new AssertionError("the 'condition' kind's predicate tree must be declared"));
+        assertEquals(FieldType.MAP, when.type(), "a when-clause is a condition TREE, not a scalar");
+        assertFalse(when.required(), "the other four kinds carry no when");
+
+        Map<String, Object> studioSave = new java.util.LinkedHashMap<>();
+        studioSave.put("name", "e_ok");
+        studioSave.put("target", "orders");
+        studioSave.put("column", "ID");
+        studioSave.put("kind", "range");
+        studioSave.put("min", 1);
+        studioSave.put("max", 9);
+        studioSave.put("when", null);          // ← the Studio's literal every-save shape
+        studioSave.put("severity", "MINOR");
+
+        List<Finding> errors = com.gamma.config.io.ConfigLoader.filesystem()
+                .validate(ConfigSpecs.expectation(), studioSave).stream()
+                .filter(f -> f.severity() == Severity.ERROR).toList();
+        assertEquals(List.of(), errors, "when: null is absent, not a malformed map");
+    }
+
+    /** {@code condition} is a live kind — the spec's enum must offer all five the record accepts. */
+    @Test
+    void expectationKindEnumOffersEveryKindTheRecordAccepts() {
+        FieldSpec kind = ConfigSpecs.expectation().field("kind").orElseThrow();
+        assertEquals(List.of("non_null", "range", "regex", "referential", "condition"), kind.enumValues());
+    }
+
+    /**
+     * {@code column} is required for the four column-checking kinds and irrelevant to {@code condition},
+     * whose tree names its own field(s). {@link FieldSpec} has no conditional-required, so the
+     * requirement lives where the other three kind rules already live — a {@link CrossFieldRule}.
+     */
+    @Test
+    void expectationColumnIsRequiredForEveryKindExceptCondition() {
+        ConfigSpec e = ConfigSpecs.expectation();
+        String rule = "column-needed-unless-condition";
+        assertFalse(e.field("column").orElseThrow().required(),
+                "a flat required would refuse every condition expectation");
+
+        for (String k : List.of("non_null", "range", "regex", "referential")) {
+            assertTrue(fire(e, rule, Map.of("kind", k)).isPresent(), k + " checks one column");
+            assertTrue(fire(e, rule, Map.of("kind", k, "column", "ID")).isEmpty(), k + " with a column");
+        }
+        assertTrue(fire(e, rule, Map.of("kind", "condition")).isEmpty(),
+                "the condition kind's tree names its own field(s)");
+        assertTrue(fire(e, rule, Map.of("kind", "CONDITION")).isEmpty(), "kind is matched case-insensitively");
+    }
+
+    /** The fourth kind rule, mirroring range/regex/referential: a condition with no tree has no predicate. */
+    @Test
+    void expectationConditionNeedsAWhenTree() {
+        ConfigSpec e = ConfigSpecs.expectation();
+        String rule = "condition-needs-a-when";
+        assertTrue(fire(e, rule, Map.of("kind", "condition")).isPresent());
+        assertTrue(fire(e, rule, Map.of("kind", "condition", "when", Map.of("kind", "group"))).isEmpty());
+        assertTrue(fire(e, rule, Map.of("kind", "non_null", "column", "ID")).isEmpty(),
+                "the other four kinds ignore when");
+    }
 }

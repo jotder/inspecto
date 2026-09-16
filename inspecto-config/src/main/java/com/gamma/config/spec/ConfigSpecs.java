@@ -596,7 +596,25 @@ public final class ConfigSpecs {
 
     // ── expectation (ING-6) ──────────────────────────────────────────────────────
 
-    /** The authored data-quality {@code expectation} component evaluated by the Expectation engine. */
+    /**
+     * The authored data-quality {@code expectation} component evaluated by the Expectation engine.
+     *
+     * <p>🔴 <b>The {@code condition} kind (promoted 2026-07-18) is the reason three of these
+     * declarations do not look like the other kinds'.</b> A {@code condition} expectation carries an
+     * arbitrary {@code when} predicate tree that {@code ConditionSql} compiles straight to the
+     * violation predicate, and therefore needs no {@code column} — the tree names its own field(s).
+     * So {@code column} is declared OPTIONAL and its requirement moved into the
+     * {@code column-needed-unless-condition} cross-field rule, beside the three kind rules that were
+     * already there ({@link FieldSpec} has no conditional-required). {@code when} is a MAP for the
+     * same reason {@code widget.controls} is: the spec model describes an open map's envelope, not
+     * its inner tree.
+     *
+     * <p>Until then this spec contradicted {@code Expectation} in both directions — it listed four of
+     * the five kinds the record accepts and declared {@code when} nowhere — so any caller that ran its
+     * VALUE rules ({@code POST /validate}, {@code POST /config/write}; both take {@code type} from the
+     * body) refused every condition expectation the engine happily evaluates. The {@code /expectations}
+     * authoring route was unaffected only because its census runs the spec's field NAMES, not its rules.
+     */
     public static ConfigSpec expectation() {
         List<FieldSpec> fields = List.of(
                 FieldSpec.required("name", "Expectation name", FieldType.STRING,
@@ -606,10 +624,13 @@ public final class ConfigSpecs {
                         "Whether the target's at-rest data comes from a pipeline or a job."),
                 FieldSpec.required("target", "Target", FieldType.STRING,
                         "Name of the pipeline/job whose at-rest Parquet is scanned."),
-                FieldSpec.required("column", "Column", FieldType.STRING, "The column the check applies to."),
+                FieldSpec.of("column", "Column", FieldType.STRING,
+                        "The column the check applies to (required for every kind except condition, "
+                                + "whose when tree names its own fields)."),
                 FieldSpec.enumField("kind", "Kind",
-                        List.of("non_null", "range", "regex", "referential"), "non_null",
-                        "The data-quality constraint: not-null, numeric range, regex match, or referential lookup."),
+                        List.of("non_null", "range", "regex", "referential", "condition"), "non_null",
+                        "The data-quality constraint: not-null, numeric range, regex match, referential "
+                                + "lookup, or an arbitrary condition tree."),
                 FieldSpec.of("min", "Min", FieldType.STRING, "Range lower bound (range kind)."),
                 FieldSpec.of("max", "Max", FieldType.STRING, "Range upper bound (range kind)."),
                 FieldSpec.of("pattern", "Pattern", FieldType.STRING, "Regex the value must match (regex kind)."),
@@ -617,6 +638,9 @@ public final class ConfigSpecs {
                         "Lookup relation the value must exist in (referential kind)."),
                 FieldSpec.of("refColumn", "Reference column", FieldType.STRING,
                         "Column in the reference dataset (referential kind)."),
+                FieldSpec.of("when", "When", FieldType.MAP,
+                        "The violation predicate tree (condition kind) — the same query-types shape a "
+                                + "Decision Rule authors; compiled to SQL by ConditionSql."),
                 FieldSpec.enumField("severity", "Severity", List.of("MINOR", "MAJOR", "CRITICAL"), "MAJOR",
                         "Severity of the Incident raised on failure."),
                 FieldSpec.withDefault("enabled", "Enabled", FieldType.BOOL, true,
@@ -642,7 +666,27 @@ public final class ConfigSpecs {
                         Severity.ERROR,
                         List.of("kind", "refDataset", "refColumn"),
                         raw -> !"referential".equalsIgnoreCase(str(raw, "kind"))
-                                || (present(raw, "refDataset") && present(raw, "refColumn")))
+                                || (present(raw, "refDataset") && present(raw, "refColumn"))),
+                new CrossFieldRule(
+                        "condition-needs-a-when",
+                        "A condition expectation needs a 'when' condition tree.",
+                        Severity.ERROR,
+                        List.of("kind", "when"),
+                        raw -> !"condition".equalsIgnoreCase(str(raw, "kind")) || present(raw, "when")),
+                // The requirement a flat FieldSpec.required cannot express: every COLUMN-checking kind
+                // needs one, and 'condition' — which checks a tree, not a column — must not be asked for
+                // one. Mirrors Expectation's own constructor check.
+                new CrossFieldRule(
+                        "column-needed-unless-condition",
+                        "Every expectation kind except 'condition' needs a column.",
+                        Severity.ERROR,
+                        // ⛔ `column` FIRST, and the order is load-bearing: CrossFieldRule anchors the
+                        // finding on affectedPaths.get(0), and the field the author must supply is the
+                        // column, not the kind. Anchoring on `kind` sends a form to highlight the field
+                        // that is already correct — caught by InspectoToolsTest, which asserts these
+                        // findings are anchored, on the FULL reactor and not by this module's own suite.
+                        List.of("column", "kind"),
+                        raw -> "condition".equalsIgnoreCase(str(raw, "kind")) || present(raw, "column"))
         );
         return new ConfigSpec("expectation", fields, rules);
     }

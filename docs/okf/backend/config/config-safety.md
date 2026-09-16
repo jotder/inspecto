@@ -265,7 +265,7 @@ hypothetical; each of these has confirmed undeclared-but-engine-read keys:
 | Type | Undeclared keys the engine reads | Blocker |
 |---|---|---|
 | `job` | `on_signal`, `when`, `catch_up`, `args`, `bind` | `JobConfig.fromMap` also funnels **any** other key into an open `params` bag — a census needs a job-type registry, not a parser walk |
-| `expectation` | `when` (required for `kind: condition`, which `ConfigSpecs.expectation()`'s `kind` enum does not even list) | ⛔ **a census here is close to a no-op too**: expectations are authored through `/expectations*` (`ExpectationRoutes`), not `/config/write`, and the persisted content carries `lastResult` / `createdAt` / `updatedAt` bookkeeping (`ExpectationRoutes.java:105-117`) that no `ConfigSpec` declares — the same shape that struck `widget`/`dashboard` |
+| `expectation` | `when` (required for `kind: condition`; ⚠ the spec's `kind` enum omitted `condition` entirely until 2026-09-17) | ⛔ **a census here is close to a no-op too**: expectations are authored through `/expectations*` (`ExpectationRoutes`), not `/config/write`, and the persisted content carries `lastResult` / `createdAt` / `updatedAt` bookkeeping (`ExpectationRoutes.java:105-117`) that no `ConfigSpec` declares — the same shape that struck `widget`/`dashboard` |
 | `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | ⛔ **there is no single schema parser to census.** Its blocks are navigated by a dozen classes across `inspecto-etl` — `Identifiers.validateSchema:124-170`, `DataTransformer:96,169,239,267`, `PartitionDef:95`, `ParserSpec:28`, `SourceZones:84`, `TypeFlow:125`, `BoundaryScanner:115`, `SchemaMappingDrift:74,84`, `DuckDbCsvIngester:698`, `ConsignmentPlanner:152`, `PipelineConfigParser:1262-1884` — so "the reads" are not enumerable from one source file and the ratchet idiom cannot be written |
 | `widget`, `dashboard` | none found in a Java reader | ⛔ **a census here would be a no-op**: neither type is ever written through `/config/write`. The UI saves both through the component-store routes (`POST`/`PUT /components/{kind}`), which never call this class. A gate belongs in `ComponentRoutes` — and it is not a table away, because the persisted body also carries `name`, `owner` and `shares`, which no `ConfigSpec` declares |
 
@@ -363,8 +363,13 @@ Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`
   `enrichment` added the test and cleaned its one sample. ⇒ Owed call: strip the key from 36 files, or
   declare it and say why.
 
-- **`EXPECTATION-SPEC-STALE-VS-CONDITION-1`** — `ConfigSpecs.expectation()` declares no `when` field and
-  its `kind` enum omits `condition`, though that kind was promoted 2026-07-18. `when` is read at
-  `Expectation.java:95` and compiled by `ConditionSql`. ⚠ Today it costs only a parser-only census entry;
-  if the spec's VALUE rules are ever run on an expectation, every condition expectation 422s. ⛔ `when` is
-  a predicate TREE — declaring it as a scalar swaps one lie for another.
+- ~~**`EXPECTATION-SPEC-STALE-VS-CONDITION-1`**~~ ✅ **CLOSED 2026-09-17.** `ConfigSpecs.expectation()` now
+  declares `when` as `FieldType.MAP` — the `widget.controls` / `dashboard.filter` precedent, which
+  validates the envelope and leaves the tree to the parser — and lists `condition` in its `kind` enum.
+  🔴 **It was LIVE, not latent, and the row said otherwise.** `POST /validate` and `POST /config/write`
+  both resolve `ConfigSpecs.forType("expectation")` from the request body, so the value rules already ran:
+  driven over real HTTP, a condition body returned `clean:false` on **two** errors. ⛔ The second was a
+  contradiction nobody had named — `column` was declared `required` although `Expectation` exempts the
+  `condition` kind, so fixing only `when` and the enum would have left condition expectations refused
+  anyway. It moved to a `column-needed-unless-condition` cross-field rule, since `FieldSpec` has no
+  conditional-required. No new refusals: a widened enum and an optional field cannot refuse more.

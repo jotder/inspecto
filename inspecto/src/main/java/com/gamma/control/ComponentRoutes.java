@@ -697,9 +697,10 @@ final class ComponentRoutes implements RouteModule {
      *       authored UI-side") and reads all five off a dashboard's own top level.</li>
      *   <li>{@code expectation.when} — the {@code condition} kind's predicate tree, read by
      *       {@code Expectation.fromMap} and compiled by {@code ConditionSql}, but
-     *       {@code ConfigSpecs.expectation()} still predates the 2026-07-18 {@code condition} promotion
-     *       and declares neither {@code when} nor {@code condition} in its {@code kind} enum. Exactly the
-     *       {@code dashboard.description} trap: undeclared and load-bearing.</li>
+     *       ⚠ {@code ConfigSpecs.expectation()} predated the 2026-07-18 {@code condition} promotion and
+     *       declared neither {@code when} nor {@code condition}; both were added 2026-09-17, so {@code when}
+     *       is now spec-declared as well. This entry is KEPT as belt-and-braces: the census must not depend
+     *       on the spec staying current, which is the very thing that failed here.</li>
      *   <li>{@code expectation.lastResult} / {@code createdAt} / {@code updatedAt} — the bookkeeping
      *       {@code ExpectationRoutes} stamps onto the persisted body ({@code create}/{@code update}/
      *       {@code runAndPersist}) and reads back ({@code breachedCount} reads {@code lastResult.status},
