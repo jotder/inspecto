@@ -524,6 +524,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // bus here (before start()) so the first terminal batch is recorded as a structured event.
         this.events = ServiceStores.openEventStore(root);
         this.eventLog.installStore(events);
+        // DUCKLE-C1: the freshness clock for Dataset alert rules. Wired HERE, not beside measureProbe
+        // above, because it reads the event store — which only exists from the line above. The probe
+        // keeps itself current from the bus; the store is its cold-start recovery for publications that
+        // happened before this process started.
+        com.gamma.query.DatasetFreshnessProbe freshness = new com.gamma.query.DatasetFreshnessProbe(events);
+        this.eventLog.addSubscriber(freshness.subscriber());
+        alerting.freshnessProbe(freshness);
         bus.subscribe(this::onConsignmentEvent);
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
         // Subscribed on the EventLog (the unified event stream, so it sees BATCH_FAILED/SEQUENCE_GAP/…);

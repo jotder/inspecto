@@ -1502,7 +1502,39 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   called from `SpaceBootstrap`, so the question is which seam `shared()` should use, not where the
   declaration lives. ⛔ Ground it before starting: the parent row was wrong three times.
 
-- **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` — Dataset freshness on a CLOCK, not on failures.** Adopted
+- **P2** · ✅ **`DUCKLE-C1-DATASET-FRESHNESS-1` — CORE SHIPPED + VERIFIED 2026-09-16** (all 16 modules,
+  no skips; `FreshnessAlertTest` 8/8, `DatasetFreshnessProbeTest` 5/5, `AlertKeyCoverageContractTest` 3/3).
+  Freshness is a new Alert Rule shape — `dataset:` + `maximumAge:` (`Ns/Nm/Nh/Nd`) — evaluated each sweep
+  against the last `dataset.write` Signal (`DatasetFreshnessProbe`).
+  🔴 **The row's own substrate was REFUTED:** a Dataset is a READ (`DatasetRelation:53-90`) with no
+  producing pipeline and **no schedule**, and `CatalogOverlay:60` gives `NodeKind.DATASET`
+  `OperationalOverlay.NONE` ⇒ no `latestRunTime`. ⛔ So **`expectedAfterSchedule`, and “a disabled or
+  missing schedule makes the Dataset stale”, are NOT BUILDABLE as written** and are not built — reopen only
+  behind a Dataset→producer link, which does not exist.
+  ⚠ **“A failed or partial run does not count as a refresh” needed NO code** —
+  `DATASET-PUBLISH-ON-FAILURE-1` already moved `dataset.write` to after the whole chain completes, so the
+  check INHERITS it. ⛔ Building a second implementation would have been a second answer to one question.
+  ✅ **An all-clear EXISTS now — the first recovery path `AlertService` has ever had.** `clear(...)` emits
+  `ALERT_CLEARED` + an INFO `alert-rule.cleared` Signal on the same correlation key as `alert-rule.fired`,
+  is never cooldown-held, and **RESETS** the firing key so a second outage inside the first cooldown still
+  alerts. ⛔ **It cannot resolve the managed ALERT object**: `ObjectAccess` has `open`/`hasActive*`/`link`
+  and **no transition method at all** — adding one is a design pass on that interface, deliberately not
+  smuggled in here. `stale_since` is in-memory ON PURPOSE (the `stale-tiles.ts:1-34` objection stands).
+  🔴 **A defect was found ONLY by running the tests, and it is the lesson of this batch.** The lane
+  reported “core shipped” on a clean **compile**; the first real run was **5 errors** — `AlertService`'s
+  ledger loop processed freshness rules, which carry no `window:` by construction, so
+  `inWindow → batchWindow` NPE'd on a null window. `isMeasureRule()` does NOT cover them: it was narrowed
+  to `dataset != null && maximumAge == null` because BOTH shapes use `dataset:`, so the skip had to be
+  stated separately. ⛔ **A compile is not a verification**, and a worktree cannot supply one here
+  (`REACTOR-HALT-IS-A-SILENT-PASS-1`).
+  ⚠ **Still open:** the once-a-minute dedicated thread (the existing `alert.evaluate` Job is today's
+  cadence seam) · owner-routed alerting · duckle **S2** retention · the Catalog Dataset badge (UI).
+  ⚠ Pre-existing and untouched: `ConfigSpecs.alert()` marks `metric`/`threshold`/`window` **required**,
+  which a freshness rule omits — exactly as a BI-5 measure rule already does. The flat `alert-rule`
+  component is written through `AlertRoutes`, not `/config/write`, so that required-ness never gates it;
+  ⛔ if a freshness rule ever goes through `/config/write`, the mismatch bites BOTH shapes at once.
+
+- **P2** · **`DUCKLE-C1-DATASET-FRESHNESS-1` (original row)** — Adopted
   2026-09-15 from duckle §1 C1.
   ⛔ **SHARED BLOCKER — do not answer it here.** This row, `DUCKLE-C4-PARAM-PROVENANCE-1` and the deleted
   `ROUTE-OWNERSHIP-SCOPE-1` all bottom out in the **same missing thing: there is no ownership/identity model
@@ -1539,7 +1571,18 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   retention) is still cheapest to honour while building this, not after. And the standing objection
   stands: `stale-tiles.ts:1-34` — ⛔ *"Do not 'improve' this by persisting a flag."*
 
-- **P3** · **`DUCKLE-C8-BASELINE-EXPECTATION-1` — a baseline QA Expectation kind.** Adopted 2026-09-15 from
+- **P3** · 🔴 **`DUCKLE-C8-BASELINE-EXPECTATION-1` — GROUNDED 2026-09-16: still STORAGE-BLOCKED, and
+  `transform.profile` did NOT discharge it.** `RowShaper:483-518` does `CREATE TABLE <prefix_DATA> AS
+  <select>` and returns an ordinary `Relation(PipelineRel.DATA, …)`, so a profile flows to the pipeline's
+  normal output store. ⛔ **There is NO profile-history store, no accepted-profile store, and no
+  `accept`/`clear` op anywhere** — `com.gamma.expectation` has neither verb ⇒ the row's *“median of the
+  last N **accepted** profiles”* has **no substrate**, and this row's first action is **profile storage**,
+  not the Expectation kind. ⚠ The kind itself is cheap once storage exists — four hand sites:
+  `Expectation.java:46` `KINDS`, its compact-constructor switch at `:69-77`,
+  `ExpectationEvaluator.columnPredicate:69-79`, and `expectation-attributes.ts`.
+  ⚠ **Expectations are NOT covered by `AcceptedConfigKeys`** — the record's own constructor is the whole
+  validator, so the `alert`/`pipeline` census does not protect this type. Original row follows.
+  - **P3** · **`DUCKLE-C8-BASELINE-EXPECTATION-1` — a baseline QA Expectation kind.** Adopted 2026-09-15 from
   duckle §1 C8. Profile the current input against the **median of the last N *accepted* profiles** (row
   count; per column null count/rate, distinct, min, max, mean); limits in either direction, % or absolute;
   `groupBy` + `requireExistingGroups` catches a missing partition when totals look normal; a profile is

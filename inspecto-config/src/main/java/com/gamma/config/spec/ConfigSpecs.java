@@ -555,7 +555,14 @@ public final class ConfigSpecs {
                 FieldSpec.enumField("alert.severity", "Severity",
                         List.of("INFO", "WARNING", "CRITICAL"), "WARNING", "Operator-facing severity."),
                 FieldSpec.of("alert.onPipeline", "Pipeline", FieldType.STRING,
-                        "Restrict to one pipeline (display or normalized name); blank = every pipeline.")
+                        "Restrict to one pipeline (display or normalized name); blank = every pipeline."),
+                // DUCKLE-C1 freshness rule: authored with alert.dataset and NOTHING else from the
+                // ledger-metric vocabulary. ⚠ Nd/Nh/Nm/Ns only — a batch (Nb) window is not a clock,
+                // and freshness is the one check whose trigger is the passage of time.
+                FieldSpec.of("alert.maximumAge", "Maximum age", FieldType.STRING,
+                        "Dataset freshness limit: Ns/Nm/Nh/Nd since the Dataset last published "
+                                + "(e.g. 6h, 1d). Requires alert.dataset; takes no metric, window or "
+                                + "threshold. Absent = this rule does not check freshness.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(

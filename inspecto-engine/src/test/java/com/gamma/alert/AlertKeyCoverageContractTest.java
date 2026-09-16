@@ -92,7 +92,8 @@ class AlertKeyCoverageContractTest {
         Set<String> read = keysTheParserReads();
         for (String certain : List.of("alert.name", "alert.metric", "alert.comparator",
                                       "alert.threshold", "alert.window", "alert.severity",
-                                      "alert.onPipeline", "alert.dataset", "alert.measure", "alert.when"))
+                                      "alert.onPipeline", "alert.dataset", "alert.measure", "alert.when",
+                                      "alert.maximumAge"))
             assertTrue(read.contains(certain),
                     "the scan no longer sees '" + certain + "', which AlertRule.fromMap certainly reads "
                             + "— so the scan is broken, not the parser. Re-check the regex before "

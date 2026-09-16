@@ -72,6 +72,19 @@ public final class AlertService {
     private final Map<String, Long> lastFired = new ConcurrentHashMap<>();
     /** BI-5: evaluates {@code (dataset, measure)} → current scalar value; {@code null} disables measure rules. */
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalDouble> measureProbe;
+    /** DUCKLE-C1: {@code dataset id} → epoch millis of its last publication; {@code null} disables
+     *  freshness rules (which is NOT the same as reporting them fresh — see {@link #evaluateFreshness}). */
+    private volatile java.util.function.Function<String, java.util.OptionalLong> freshnessProbe;
+    /**
+     * DUCKLE-C1: when each currently-stale {@code rule|dataset} first went stale, so {@code stale_since}
+     * survives across evaluations and the fresh→stale EDGE is distinguishable from "still stale".
+     *
+     * <p>⛔ In memory ON PURPOSE, and it must stay that way. {@code stale-tiles.ts:1-34} carries a
+     * standing objection to persisting a stale flag anywhere: staleness is a FUNCTION of the clock and
+     * the last publication, so a stored flag can only ever disagree with them. This map is a re-fire
+     * edge detector with the same lifetime as {@link #lastFired}, not a record of anything.
+     */
+    private final Map<String, Long> staleSince = new ConcurrentHashMap<>();
 
     public AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status) {
         this(rules, configs, status, (ObjectAccess) null);
@@ -104,6 +117,15 @@ public final class AlertService {
     /** Wire the BI-5 measure evaluator (BiFunction so this engine stays decoupled from the query layer). */
     public void measureProbe(java.util.function.BiFunction<String, String, java.util.OptionalDouble> probe) {
         this.measureProbe = probe;
+    }
+
+    /**
+     * Wire the DUCKLE-C1 freshness clock: {@code dataset id} → epoch millis of that Dataset's last
+     * publication, empty when it has never published. A {@link java.util.function.Function} for the
+     * same reason {@link #measureProbe} is a BiFunction — this engine does not name the event layer.
+     */
+    public void freshnessProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
+        this.freshnessProbe = probe;
     }
 
     /** The loaded rules, JSON-ready — backs {@code GET /alerts/rules}. */
@@ -180,6 +202,11 @@ public final class AlertService {
         // have changed the data, or the manual POST /alerts/evaluate) re-reads the current value; the
         // cooldown suppresses repeats. Skipped silently when no probe is wired (lean/unit paths).
         for (AlertRule rule : rules) {
+            if (!rule.isFreshnessRule()) continue;
+            evaluateFreshness(rule, nowMs, out);
+        }
+
+        for (AlertRule rule : rules) {
             if (!rule.isMeasureRule()) continue;
             var probe = measureProbe;
             if (probe == null) continue;
@@ -196,6 +223,12 @@ public final class AlertService {
             List<Map<String, String>> ledger = null;
             for (AlertRule rule : rules) {
                 if (rule.isMeasureRule()) continue;
+                // ⛔ Freshness rules are evaluated by their OWN pass above (evaluateFreshness) and must
+                // never reach the ledger path: they carry no `window:` by construction (AlertRule refuses
+                // one), so inWindow -> batchWindow would NPE on a null window. isMeasureRule() does NOT
+                // cover them -- it was deliberately narrowed to `dataset != null && maximumAge == null`
+                // because BOTH shapes use `dataset:`, so this skip has to be stated separately.
+                if (rule.isFreshnessRule()) continue;
                 if (rule.onPipeline() != null && !matches(rule.onPipeline(), display, id)) continue;
                 if (ledger == null) ledger = status.batches(cfg);   // one read per pipeline pass
                 List<Map<String, String>> rows = inWindow(rule, ledger, nowMs);
@@ -207,6 +240,108 @@ public final class AlertService {
             }
         }
         return out;
+    }
+
+    /**
+     * DUCKLE-C1 - evaluate one Dataset freshness rule ON THE CLOCK.
+     *
+     * <p>This is the whole point of the row: every other rule kind in this service is driven by
+     * something HAPPENING (a terminal batch, a measure over data a run just wrote), so a Dataset that
+     * simply <em>stops</em> being published - its pipeline disarmed, its schedule removed, its upstream
+     * silent - produces no event and therefore no alert. Freshness is the one check whose trigger is the
+     * passage of time, so it is evaluated on every sweep whether or not anything ran.
+     *
+     * <h3>The three states, and why {@code unknown} is not {@code fresh}</h3>
+     * <ul>
+     *   <li><b>unknown</b> - no probe wired, or the Dataset has never published. Nothing fires and
+     *       nothing clears. Do NOT "simplify" this to fresh: a Dataset with no publication history
+     *       reading green forever is the exact failure a freshness rule exists to catch. It is not
+     *       stale either - there is no {@code stale_since} to name - so it returns silently rather
+     *       than guessing.</li>
+     *   <li><b>stale</b> - {@code now - lastPublication > maximumAge}. Fires, cooldown-guarded like
+     *       every other breach, and stamps {@code stale_since} at the first sweep that saw it.</li>
+     *   <li><b>fresh</b> - within {@code maximumAge}. Clears, but only on the stale-to-fresh EDGE.</li>
+     * </ul>
+     *
+     * <p><b>A failed or partial run does not count as a refresh, and that is not enforced here.</b>
+     * It is enforced at the emission point: {@code DATASET-PUBLISH-ON-FAILURE-1} (2026-09-15) moved
+     * {@code dataset.write} out of {@code persistSummaries} to the end of the whole chain precisely so
+     * a write a later step could still abandon is never announced. So this check INHERITS that
+     * guarantee from the Signal it reads; it does not re-derive it, and a second implementation here
+     * would be a second answer to one question.
+     */
+    private void evaluateFreshness(AlertRule rule, long nowMs, List<Alert> out) {
+        var probe = freshnessProbe;
+        if (probe == null) return;                       // unknown: no clock wired (lean / unit paths)
+        java.util.OptionalLong last = probe.apply(rule.dataset());
+        if (last.isEmpty()) return;                      // unknown: never published - never "fresh"
+
+        String key = rule.name() + "|" + rule.dataset();
+        long ageMs = Math.max(0, nowMs - last.getAsLong());
+        if (ageMs > rule.maximumAgeDuration().toMillis()) {
+            staleSince.putIfAbsent(key, nowMs);          // carries across evaluations; first sweep wins
+            // The reported VALUE is the age in seconds, so the alert feed shows how far past the limit
+            // it is rather than a bare boolean.
+            fire(rule, rule.dataset(), rule.dataset(), ageMs / 1000.0, nowMs, out);
+        } else if (staleSince.remove(key) != null) {
+            clear(rule, rule.dataset(), key, ageMs, nowMs);
+        }
+    }
+
+    /**
+     * The <b>all-clear</b> (DUCKLE-C1) - a condition that had fired has recovered.
+     *
+     * <p>Before this, {@code AlertService} was <b>fire-only</b>: there was no recovery path in any
+     * form, and the cooldown only suppressed re-fires. That is why a clock-based freshness rule could
+     * not be built as a variation on the {@code maximumAge} comparison alone - without a recovery edge,
+     * a Dataset that came back would leave its operator staring at a breach that had already healed.
+     *
+     * <p><b>The all-clear is never held by a cooldown.</b> The cooldown exists to stop a persisting
+     * breach shouting on every sweep; suppressing the recovery would mean the opposite - the alarm was
+     * delivered and the reassurance was dropped. It also CLEARS the firing key, so a Dataset that goes
+     * stale again alerts immediately instead of waiting out the cooldown of a breach that is over.
+     *
+     * <p>The managed ALERT object opened by {@link #persistAlertObject} is <b>not</b> resolved here,
+     * deliberately: {@code ObjectAccess} exposes {@code open}, the {@code hasActive*} checks and
+     * {@code link}, but no transition - there is no seam through which this service can move an object
+     * to a terminal state. Adding one is a design pass on that interface, not a detail of this row. The
+     * all-clear is therefore delivered as an Event + Signal, which is what the notification layer
+     * routes on; the object is left for an operator to resolve.
+     */
+    private void clear(AlertRule rule, String scope, String cooldownKey, long ageMs, long nowMs) {
+        lastFired.remove(cooldownKey);   // not merely ignored - the next breach must fire at once
+        String message = String.format(Locale.ROOT,
+                "CLEARED: dataset %s published %ds ago, within its %s freshness limit",
+                scope, ageMs / 1000, rule.maximumAge());
+        log.info("[ALERT-CLEARED] {}", message);
+        Event cleared = Event.builder(EventType.ALERT_CLEARED)
+                .level(EventLevel.INFO)
+                .source(AlertService.class.getName())
+                .pipeline(scope)
+                .message(message)
+                .attr("rule", rule.name())
+                .attr("dataset", rule.dataset())
+                .attr("maximumAge", rule.maximumAge())
+                .attr("severity", rule.severity())
+                .build();
+        EventLog.current().emit(cleared);
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("rule", rule.name());
+            payload.put("dataset", rule.dataset());
+            payload.put("ageSeconds", ageMs / 1000);
+            payload.put("maximumAge", rule.maximumAge());
+            // INFO, not the rule's severity: a recovery is never itself critical, and emitting it at
+            // CRITICAL would page the on-call to tell them everything is fine.
+            Signal s = new Signal(null, "alert-rule.cleared", Instant.ofEpochMilli(nowMs),
+                    Severity.INFO, Ref.of("alert-rule", rule.name()), Ref.of("dataset", rule.dataset()),
+                    // The same correlation key the fired signal uses, so triage pairs the two.
+                    "alert:" + rule.name() + "|" + scope,
+                    null, null, null, message, payload, 1);
+            EventLog.current().emit(s.toEvent());
+        } catch (RuntimeException e) {
+            log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
+        }
     }
 
     /** Fire one breached rule for a scope (a pipeline, or a measure rule's dataset), cooldown-guarded. */

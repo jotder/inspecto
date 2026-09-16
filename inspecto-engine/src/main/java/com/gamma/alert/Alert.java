@@ -12,6 +12,16 @@ public record Alert(String rule, String severity, String pipeline, String metric
                     String message) {
 
     static Alert of(AlertRule r, String pipeline, double value, long epochMillis) {
+        // A freshness rule (DUCKLE-C1) has no metric, measure, window or threshold — its value is the
+        // AGE in seconds, so it gets its own sentence rather than being forced through the comparator
+        // phrasing, which would read "freshness is 7200 (threshold gt 0 over 1h)".
+        if (r.isFreshnessRule()) {
+            String freshMsg = String.format(java.util.Locale.ROOT,
+                    "%s: dataset %s has not published for %ss (freshness limit %s)",
+                    r.severity(), pipeline, trim(value), r.maximumAge());
+            return new Alert(r.name(), r.severity(), pipeline, "freshness", value, r.comparator(),
+                    r.threshold(), r.maximumAge(), epochMillis, freshMsg);
+        }
         // A measure rule (BI-5) has no ledger metric/window: label it by its measure over its dataset.
         String metricLabel = r.metric() != null ? r.metric() : r.measure();
         String windowLabel = r.window() != null ? r.window() : "current data";

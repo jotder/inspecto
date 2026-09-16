@@ -59,7 +59,7 @@ import java.util.Set;
  */
 public record AlertRule(String name, String metric, String comparator, double threshold,
                         String window, String severity, String onPipeline,
-                        String dataset, String measure, Object when) {
+                        String dataset, String measure, Object when, String maximumAge) {
 
     public static final Set<String> METRICS =
             Set.of("error_rate", "failed_batches", "rejected_files", "duration_ms");
@@ -69,14 +69,21 @@ public record AlertRule(String name, String metric, String comparator, double th
     /** The historic ledger-metric rule shape (every pre-BI-5 caller). */
     public AlertRule(String name, String metric, String comparator, double threshold,
                      String window, String severity, String onPipeline) {
-        this(name, metric, comparator, threshold, window, severity, onPipeline, null, null, null);
+        this(name, metric, comparator, threshold, window, severity, onPipeline, null, null, null, null);
     }
 
     /** The BI-5 measure-rule shape (every pre-{@code when} caller). */
     public AlertRule(String name, String metric, String comparator, double threshold,
                      String window, String severity, String onPipeline,
                      String dataset, String measure) {
-        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, null);
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, null, null);
+    }
+
+    /** Every pre-{@code maximumAge} (pre-freshness) caller. */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, null);
     }
 
     public AlertRule {
@@ -88,7 +95,26 @@ public record AlertRule(String name, String metric, String comparator, double th
         dataset = (dataset == null || dataset.isBlank()) ? null : dataset.trim();
         measure = (measure == null || measure.isBlank()) ? null : measure.trim();
         when = (when instanceof Map<?, ?> m && !m.isEmpty()) ? when : null;
-        if (dataset != null) {
+        maximumAge = (maximumAge == null || maximumAge.isBlank()) ? null : maximumAge.trim().toLowerCase(Locale.ROOT);
+        if (maximumAge != null) {
+            // Freshness rule (DUCKLE-C1): "this Dataset must have published within maximumAge".
+            // It is evaluated on a CLOCK against the last dataset.write Signal, so none of the
+            // ledger-metric vocabulary applies — and a batch (Nb) window is not a clock at all,
+            // which is why the shape here is \d+[smhd] and not the metric window's \d+[smhdb].
+            require(dataset != null, "alert.maximumAge requires alert.dataset");
+            require(measure == null, "a freshness alert (maximumAge:) must not also declare a measure");
+            require(metric == null, "a freshness alert (maximumAge:) must not also declare a ledger metric");
+            require(window == null, "a freshness alert (maximumAge:) takes no window (maximumAge IS the window)");
+            require(when == null, "alert.when scopes ledger rows; a freshness alert has none");
+            require(maximumAge.matches("\\d+[smhd]"), "alert.maximumAge must be Ns/Nm/Nh/Nd (e.g. 6h, 1d)");
+            require(Long.parseLong(maximumAge.substring(0, maximumAge.length() - 1)) > 0,
+                    "alert.maximumAge must be a positive duration");
+            // A freshness breach is "age exceeded", not a comparator over a threshold: both are fixed
+            // here rather than demanded of the author, so no rule can declare a comparator that would
+            // silently invert the check.
+            comparator = "gt";
+            threshold = 0;
+        } else if (dataset != null) {
             // Measure rule (BI-5): a scalar Measure over a Dataset; the ledger window does not apply.
             require(metric == null, "a measure alert (dataset:) must not also declare a ledger metric");
             require(window == null, "a measure alert (dataset:) takes no window (it reads current data)");
@@ -102,13 +128,35 @@ public record AlertRule(String name, String metric, String comparator, double th
         }
         require(COMPARATORS.contains(comparator), "alert.comparator must be one of " + COMPARATORS);
         require(SEVERITIES.contains(severity), "alert.severity must be one of " + SEVERITIES);
-        require(threshold > 0, "alert.threshold must be a positive number");
+        if (maximumAge == null) require(threshold > 0, "alert.threshold must be a positive number");
         onPipeline = (onPipeline == null || onPipeline.isBlank()) ? null : onPipeline.trim();
     }
 
     /** Whether this is a BI-5 measure rule (a Dataset measure) vs a ledger-metric rule. */
     public boolean isMeasureRule() {
-        return dataset != null;
+        return dataset != null && maximumAge == null;
+    }
+
+    /**
+     * Whether this is a DUCKLE-C1 <b>freshness</b> rule — a Dataset that must have published within
+     * {@link #maximumAge}. ⚠ Deliberately disjoint from {@link #isMeasureRule()}: both are authored
+     * with {@code dataset:}, and an evaluator that tested only {@code dataset != null} would run a
+     * freshness rule through the measure probe with a null measure.
+     */
+    public boolean isFreshnessRule() {
+        return maximumAge != null;
+    }
+
+    /** The elapsed-time span a freshness rule allows between publications. */
+    public Duration maximumAgeDuration() {
+        long n = Long.parseLong(maximumAge.substring(0, maximumAge.length() - 1));
+        return switch (maximumAge.charAt(maximumAge.length() - 1)) {
+            case 's' -> Duration.ofSeconds(n);
+            case 'm' -> Duration.ofMinutes(n);
+            case 'h' -> Duration.ofHours(n);
+            case 'd' -> Duration.ofDays(n);
+            default -> throw new IllegalStateException("not a duration: " + maximumAge);
+        };
     }
 
     /** Parse + validate from the decoded {@code alert { … }} map (or, since the ComponentStore
@@ -119,13 +167,14 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("name")),
                 str(alert.get("metric")),
                 str(alert.get("comparator")),
-                number(alert.get("threshold")),
+                alert.get("maximumAge") == null ? number(alert.get("threshold")) : 0,
                 str(alert.get("window")),
                 str(alert.get("severity")),
                 str(alert.get("onPipeline")),
                 str(alert.get("dataset")),
                 str(alert.get("measure")),
-                alert.get("when"));
+                alert.get("when"),
+                str(alert.get("maximumAge")));
     }
 
     /**
@@ -182,6 +231,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         if (metric != null) m.put("metric", metric);
         if (dataset != null) m.put("dataset", dataset);
         if (measure != null) m.put("measure", measure);
+        if (maximumAge != null) m.put("maximumAge", maximumAge);
         m.put("comparator", comparator);
         m.put("threshold", threshold);
         if (window != null) m.put("window", window);

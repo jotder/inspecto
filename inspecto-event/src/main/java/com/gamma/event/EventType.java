@@ -129,6 +129,10 @@ public final class EventType {
 
     // ── operational-object bridge (Phase 2 ties back to here) ───────────────────────
     public static final String ALERT_FIRED     = "ALERT_FIRED";
+    /** A fired Alert Rule's condition RECOVERED (DUCKLE-C1) — the all-clear. ⛔ Never cooldown-held:
+     *  suppressing a recovery would deliver the alarm and drop the reassurance. Emitted alongside the
+     *  {@code alert-rule.cleared} Signal; carries {@code rule}/{@code dataset}/{@code maximumAge}. */
+    public static final String ALERT_CLEARED   = "ALERT_CLEARED";
     /** A scheduled report/export artifact was produced (BI-4); {@code attributes.path} points at it. */
     public static final String REPORT_READY    = "REPORT_READY";
     /** A data-quality {@code Expectation} evaluated with violating records (ING-6) — raises an Incident + notifies. */
