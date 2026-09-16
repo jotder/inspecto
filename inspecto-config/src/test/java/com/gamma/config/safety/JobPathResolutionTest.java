@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,19 +48,35 @@ class JobPathResolutionTest {
      * deliberately. A fallback here would be the bug, not the kindness.
      */
     @Test
-    void theAmbiguousCaseIsRefusedAndNamesBothPaths(@TempDir Path space, @TempDir Path cwdSide) throws Exception {
+    void theAmbiguousCaseIsRefusedAndNamesBothPaths(@TempDir Path space) throws Exception {
+        // ⚠ The probe MUST be authored the way a job authors one — a plain relative name, resolved by the
+        // reader against whatever its CWD is. It must NOT be built as
+        // `Path.of("").toAbsolutePath().relativize(<a TempDir>)`: that spells the value as a ladder of `..`
+        // segments exactly as deep as the module's CWD, so when the CWD and the @TempDir root happen to sit
+        // at the SAME depth the ladder climbs the Space root clean out to the filesystem root and
+        // reconstructs the authored path byte-for-byte. `resolveJobPath` then finds the value present under
+        // the Space root (line 183) and returns instead of refusing — the refusal under test silently
+        // stops being exercised. That is a property of where the checkout lives, not of the code, and it
+        // made every git worktree at depth 6 a false red (`WORKTREE-PROVISIONING-1`).
+        // This stays a CWD-relative path — that is the whole point of the case — but its MEANING no longer
+        // depends on how deep the checkout is. The assertion below is unchanged.
+        Path cwd = Path.of("").toAbsolutePath().normalize();
+        Path authored = cwd.resolve("target").resolve("job-path-probe-" + UUID.randomUUID());
         // exists where the OLD rule would have looked, absent under the Space root
-        Path authored = cwdSide.resolve("legacy-data");
         Files.createDirectories(authored);
-        Path relativeToCwd = Path.of("").toAbsolutePath().relativize(authored);
+        try {
+            String relativeToCwd = "target/" + authored.getFileName();
 
-        PathJail.Escape e = assertThrows(PathJail.Escape.class,
-                () -> PathJail.resolveJobPath(space, relativeToCwd.toString(), "job.dir"));
+            PathJail.Escape e = assertThrows(PathJail.Escape.class,
+                    () -> PathJail.resolveJobPath(space, relativeToCwd, "job.dir"));
 
-        assertTrue(e.getMessage().contains("Space config root"), e.getMessage());
-        assertTrue(e.getMessage().contains(authored.toAbsolutePath().normalize().toString()),
-                "the message must name the path the job USED to mean: " + e.getMessage());
-        assertTrue(e.getMessage().contains("not resolved silently"), e.getMessage());
+            assertTrue(e.getMessage().contains("Space config root"), e.getMessage());
+            assertTrue(e.getMessage().contains(authored.toAbsolutePath().normalize().toString()),
+                    "the message must name the path the job USED to mean: " + e.getMessage());
+            assertTrue(e.getMessage().contains("not resolved silently"), e.getMessage());
+        } finally {
+            Files.deleteIfExists(authored);
+        }
     }
 
     /**
