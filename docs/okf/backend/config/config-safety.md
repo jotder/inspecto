@@ -362,3 +362,9 @@ Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`
   *"no committed config regresses"* test. `meta` escaped only because it happens to declare `version`;
   `enrichment` added the test and cleaned its one sample. ⇒ Owed call: strip the key from 36 files, or
   declare it and say why.
+
+- **`EXPECTATION-SPEC-STALE-VS-CONDITION-1`** — `ConfigSpecs.expectation()` declares no `when` field and
+  its `kind` enum omits `condition`, though that kind was promoted 2026-07-18. `when` is read at
+  `Expectation.java:95` and compiled by `ConditionSql`. ⚠ Today it costs only a parser-only census entry;
+  if the spec's VALUE rules are ever run on an expectation, every condition expectation 422s. ⛔ `when` is
+  a predicate TREE — declaring it as a scalar swaps one lie for another.

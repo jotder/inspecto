@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **56<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 37<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> **58<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 38<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
 > five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
 > re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
 > building**: three of the five refuted part of their own row's premise, and the refutations produced
@@ -149,9 +149,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 37<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 38<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 17<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 58<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1541,6 +1541,22 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
 
 - **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**
+  ✅ **THE `expectation` KIND LANDED 2026-09-16 (`300e8c7a`, BREAKING) — and the component census now
+  covers THREE kinds** (`widget`, `dashboard`, `expectation`) beside the four in `AcceptedConfigKeys`.
+  ⇒ **`AcceptedConfigKeys` has exactly ONE type left: `job`.**
+  🔴 **The reframing that sent that work was right but UNDER-COUNTED THE ROUTES.** TWO routes persist an
+  expectation and they lost keys in **opposite** ways: `/expectations` rebuilds from `toMap()` so an
+  unknown key was **silently dropped** (200, gone, no diagnostic); `/components/expectation` persists the
+  **raw body**, so the key was **stored dead** and then served back by `GET /expectations`. Proven live
+  before anything changed. ⛔ Gating only the named route would have left the back door open. Both now
+  share one `ComponentRoutes.refuseUnknownComponentKeys`.
+  ⚠ **The envelope is NINETEEN keys, not the three the reframing named** — dumped empirically over real
+  HTTP rather than read off `toMap()`. 🔴 **`when` is the `dashboard.description` trap repeating:**
+  `ConfigSpecs.expectation()` predates the 2026-07-18 `condition` promotion, so a spec-derived accepted set
+  would have 422'd every condition expectation **and the Studio's own save shape** (mutation-proven).
+  ⚠ **Recorded because it weakens the guard:** the two enforcement sites are INDEPENDENT, so dropping
+  `expectation` from `CENSUSED_COMPONENT_KINDS` turns only ONE test red. Each site carries its own test.
+  ⇒ Residual filed: `EXPECTATION-SPEC-STALE-VS-CONDITION-1`.
   ✅ **THE `enrichment` TYPE LANDED 2026-09-16 (BREAKING) — census is now FOUR of nine**: `pipeline`,
   `alert`, `meta`, `enrichment`. Ratchet `EnrichmentKeyCoverageContractTest` (12 tests);
   `ENRICHMENT_PARSER_ONLY = {references}`; censused parents `input`/`output`/`triggers` — which is where
@@ -1894,7 +1910,28 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `JOB-PATH-BACKUPTASK-SPLIT-1` — refused at save while still running CWD-relative. ⇒ do both rows in one
   change, and re-point the demo/example configs to space-relative values as part of it.
 
-- **P1** · 🔴 **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` — 19 of 33 committed path values are gated under one
+- **P1** · 🔴 **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` — CONFIRMED, and the BLOCKER CHANGED TWICE. It is a
+  two-root DESIGN call, not a policy one.** 🔴 **The recorded blocker was refuted 2026-09-16 (`da55eaca`):**
+  it said single-tenant serve registers no allowed roots, so the jail would throw *"no allowed roots
+  configured"* and the only workaround was fail-open, which `SafetyPolicy` forbids. **False.**
+  `serve-example.sh:65` has passed `-Dassist.safety.roots=$(pwd)` since `296e4fc7`; a real JVM over a
+  replica of the serve layout yields `defaultPolicy()` **size=1**, with a negative control proving the
+  probe CAN return the predicted empty result. ⛔ **The fail-open dilemma never existed.**
+  ⇒ **The actual obstacle is the BASE.** `SpaceManager.single():74` never calls `SpaceBootstrap.load`, so
+  single-tenant registers nothing in `SpaceConfigRoot`, and `forSpace("default")` falls through to
+  `-Dassist.write.root` = `out/write`. Job paths then resolve under `<example>/out/write/…`.
+  ⛔ **Owed call: single-tenant needs a config-READ root distinct from its WRITE root.** Registering the
+  launch dir naively moves `currentRegistry()` from `out/write/registry` to `<dir>/registry` and breaks
+  API-authored components. `SpaceRoot.legacy().config()` returns `null` precisely because legacy
+  single-tenant has no single config root — the codebase already admits this is two roots, not one.
+  ⚠ Blast radius if the reader moves: **19 of 19 committed values break, 0 unaffected in either column**
+  (driven, three positive controls). Only **6** traverse the save gate; the other 13 live in single-tenant
+  examples that never reach it — a different and worse class, ungated AND unjailed.
+  ✅ **The `:508` javadoc half is DONE** (`d433ac0a`): the javadoc was wrong, not the validator — stale
+  since `ad558216` added the `job` arm. ⚠ A census correction from the same grounding: "19 committed
+  values" could not be reproduced; the sweep derives **27** across both trees, reducing to 5 distinct
+  strings. → `okf/backend/control-plane/jobs.md` · original row follows.
+  - **P1** · 🔴 **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` — 19 of 33 committed path values are gated under one
   rule and RUN under another, and it is also a containment hole.** Filed 2026-09-16 from the survey;
   **bigger than `JOB-PATH-BACKUPTASK-SPLIT-1`, which is now shipped.** `PipelineJobRunner:242` passes
   `pipeline_config` straight to `PipelineConfig.load(flatPath)` and `:266` passes `data_dir` on, **with no
@@ -2072,7 +2109,24 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `JobPathContainmentTest.enrichRefusesAConfigOutsideTheAllowedRoots` (a REAL readable file outside the
   jail, so the loader cannot refuse it for the wrong reason). → `okf/backend/control-plane/jobs.md`
 
-- **P2** · 🔴 **`README-LINKS-BROKEN-IN-REPO-1` — the bundle's front page points at five documents that do
+- ~~**P2** · **`README-LINKS-BROKEN-IN-REPO-1`**~~ ✅ **SHIPPED 2026-09-16 (`0e6f9a78`).** ⚠ **Thirteen dead
+  targets, not the five this row named** — every one a doc `f6faeae3` relocated into `okf/`, traced by git
+  **rename detection** (93-98% similarity) rather than guessed. Where the content genuinely has no
+  successor the link was REMOVED, not pointed somewhere plausible.
+  ⛔ **The guard was the real fix, and it was fixed at the SHAPE.** `check-doc-links.mjs` had
+  `ROOTS = ['docs','compliance','.claude']` — an **allow-list** — so `inspecto/` was never scanned and the
+  customer's first page rotted green. Now `ROOTS = ['.']`, the whole repo minus a deny-list. Adding a
+  fourth tree would only have postponed the fifth blind spot.
+  🔴 **Two traps inside the widening, one caught late:** (1) with `ROOTS = ['.']` every path reads
+  `./docs/…`, so the archive exemption's `startsWith` stopped matching and **570 ignored links silently
+  became visible** — caught because the scope line still printed the exemption count; (2) `inspecto-deploy`,
+  the gitignored bundle output holding a **stale copy of the whole docs tree**, was not in `SKIP_DIRS`, so
+  the widening was green in a tree that had never built a bundle and **2417-red** in one that had.
+  ⛔ **A deny-list validated on a tree that lacks the thing it should deny looks complete.**
+  Falsified by planting a break in `asn-parser/docs/` — a tree the old scope could never reach.
+  ⇒ Residual filed: `README-HARDWARE-PROFILE-CLAIM-1`.
+  → `okf/backend/build-run/guard-coverage.md` · original row follows.
+  - **P2** · 🔴 **`README-LINKS-BROKEN-IN-REPO-1` — the bundle's front page points at five documents that do
   not exist, and our doc-link guard structurally cannot see it.** Filed 2026-09-16 out of the bundle
   re-measurement. 29 links are dead **in the repository itself**, nearly all in `inspecto/README.md` — the
   file `package.ps1` step 7 copies to the **bundle root as the customer's first page** — pointing at
@@ -2083,6 +2137,37 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   modules. ⚠ Needs NO product call: fix the targets and widen the scope. ⛔ Deliberately NOT folded into
   the package-time neutralisation — hiding repo rot behind a bundle rewrite is how it survives.
   → `okf/backend/build-run/build-test.md`
+
+- **P2** · 🔴 **`FENCE-STORE-SILENTLY-INERT-1` — a job's `store:` that names nothing disarms the delete
+  fence, with no error, no warning and no event.** Filed 2026-09-16 from the ten-key sweep, and found the
+  hard way: `DeletionFence.check` (`DeletionFence.java:67`) `continue`s past a target store with no
+  resting producer, so a typo, a renamed pipeline or a miscopied `dir:` silently turns the fence off.
+  ⛔ **It shipped that way.** `compact_job.toon` carried `store: out/database` — a copy of the `dir:` line
+  above it — from `ffeb95dc` (2026-07-08) until `819e597b`, while the only produced store is `sales`, and
+  the example's own `probes.txt` advertised fencing that could never fire. **Over two months dead.**
+  ✅ The committed value is fixed and `ShippedJobStoreKeyNamesARealStoreTest` now walks every shipped
+  `*_job.toon`, but **operator configs have no such guard**. ⚠ The hard part is that a store may
+  LEGITIMATELY have no producer yet — a pipeline not run, a store created later — which is why the silent
+  skip was written. ⇒ Owed call: warn on an unmatched store at job registration, or leave it silent.
+  ⛔ Silently-inert safety is the one option the evidence already rules out.
+  → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1` — `ConfigSpecs.expectation()` predates the kind it is
+  supposed to describe.** Filed 2026-09-16 out of the expectation census. The spec declares **no `when`
+  field** and its `kind` enum still omits `condition`, though the `condition` kind was promoted
+  2026-07-18; `when` is its predicate tree, read at `Expectation.java:95` and compiled by `ConditionSql`.
+  ⚠ Today this costs only a parser-only census entry — but **if anyone ever runs the spec's VALUE rules on
+  an expectation, every condition expectation 422s**, and the Studio sends `when` on every save.
+  ⛔ Do not "fix" it by declaring `when` as a scalar: it is a TREE, and a spec that misdescribes its shape
+  is a new lie for an old one. → `okf/backend/config/config-safety.md`
+
+- **P3** · **`README-HARDWARE-PROFILE-CLAIM-1` — the README claims a behaviour no current doc supports.**
+  Filed 2026-09-16 while repairing the bundle's front page. `inspecto/README.md` states assist model tiers
+  "auto-select per hardware profile (dev-laptop / cpu-only / production)". **No current-tier doc mentions
+  any of those three profiles**; the only source was the archived `v3-agent-mvp.md`. The citation was
+  removed rather than pointed at a doc that does not say it. ⇒ Either the behaviour exists and is
+  undocumented, or the claim is stale — one grep of the assist tier selection settles it.
+  → `okf/capabilities/assistant/assistant.md`
 
 - **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — 24 left, and the remainder is BLOCKED ON SEQUENCING, not
   effort.** ✅ **Five re-pointed 2026-09-16**: the three `retention-sweep` instances, plus the **two

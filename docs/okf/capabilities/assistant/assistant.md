@@ -586,3 +586,11 @@ One archived plan also cites a reflex-layer history file that **does not exist**
 * **Guards** — `node tools/check-vocabulary.mjs`, `node tools/check-doc-links.mjs`,
   `node tools/check-gate-tally.mjs`, from the repo root. ⚠ Stage a new doc (`git add -N`) before
   trusting a green vocabulary run: the local guard reads tracked files only.
+
+## Open row this concept owns
+
+- **`README-HARDWARE-PROFILE-CLAIM-1`** — `inspecto/README.md` claims assist model tiers "auto-select per
+  hardware profile (dev-laptop / cpu-only / production)". No current-tier doc mentions those profiles; the
+  only source was the archived `v3-agent-mvp.md`, and the citation was removed 2026-09-16 rather than
+  pointed at a doc that does not support it. ⇒ Either the behaviour exists and is undocumented, or the
+  claim is stale.

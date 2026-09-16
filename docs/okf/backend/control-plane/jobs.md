@@ -711,3 +711,10 @@ nobody looks while the job reports SUCCESS. The survey's fresh/deployed columns 
 from the deployed column alone called `maintenance_report_job.toon` a refusal, and it is not one here.
 ⚠ When judging a value's blast radius, read the column that matches the tree you are on, and check
 `Files.exists` on the CWD-relative path — that single predicate is what picks the column.
+
+- **`FENCE-STORE-SILENTLY-INERT-1`** — `DeletionFence.check` (`:67`) `continue`s past a target store with
+  no resting producer, so a job's `store:` naming nothing disarms the fence with **no error, no warning
+  and no event**. ⛔ It shipped that way: `compact_job.toon` carried a miscopied `store: out/database` from
+  2026-07-08 until `819e597b` while the only produced store was `sales`, and the example's `probes.txt`
+  advertised fencing that could never fire. ⚠ A store may LEGITIMATELY have no producer yet, which is why
+  the silent skip exists — the open call is warn-at-registration versus stay silent.
