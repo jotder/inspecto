@@ -36,9 +36,27 @@ import java.util.TreeSet;
  * {@code widget}, {@code dashboard}) have no parser census, so their accepted set is unknown and
  * {@link #unknownKeyFindings} returns nothing for them. That is a stated fail-open, not an omission:
  * deriving a set from {@code ConfigSpecs} alone would refuse the keys those parsers read, which is
- * exactly the mistake the block granularity above rules out. {@code job} funnels every unrecognised
- * key into an open {@code params} bag, so it cannot be censused without a job-type registry;
- * {@code schema} has no single parser at all (its blocks are navigated by a dozen classes across
+ * exactly the mistake the block granularity above rules out.
+ *
+ * <p>⛔ <b>{@code job} is RULED OUT, and the reason is NOT "no job-type registry" — that sentence stood
+ * here until 2026-09-17 and had the causality backwards.</b> The registry exists ({@code JobTypeRegistry}
+ * + {@code JobTypeProvider}/{@code JobTypeDescriptor} in {@code inspecto-engine}, served by
+ * {@code GET /jobs/types}), and its existence is what rules a census OUT. {@code JobConfig.fromMap}
+ * funnels every non-frame key into an open {@code params} bag, so the accepted set is <b>per job type</b>,
+ * and per-type is not statically enumerable four ways: the registry is <b>runtime-mutable</b> (Job Packs
+ * register and deregister), <b>extensible by {@code ServiceLoader}</b> ({@code inspecto-ops} ships
+ * {@code caserule.evaluate} and {@code objects.analytics} — and {@code spaces/demo} commits a config using
+ * the latter), <b>config-derived</b> for {@code sql.template} (the {@code $name} tokens in the authored
+ * SQL <i>are</i> its parameter contract), and <b>edition-varying</b> ({@code maintenance}'s task list is
+ * derived from whatever the classpath contributed, so a static table would 422 valid Enterprise configs on
+ * a Personal build). ⚠ Nor could a ratchet read it: this module depends only on {@code inspecto-api}, and
+ * the registry is a per-{@code JobService} runtime object, not a compile-time table.
+ * ⚠ Measured 2026-09-17: <b>34 of 34</b> committed job configs carry at least one non-frame key, across 34
+ * distinct param keys — a frame-only census would refuse every one of them, and a top-level-only census
+ * (the root map holds the single key {@code job:}) would catch nothing. Both available granularities are
+ * wrong and there is no third. {@code JOB_PATH_KEYS} is hand-maintained for exactly this reason.
+ *
+ * <p>{@code schema} has no single parser at all (its blocks are navigated by a dozen classes across
  * {@code inspecto-etl} — {@code DataTransformer}, {@code Identifiers}, {@code PartitionDef},
  * {@code ParserSpec}, {@code SourceZones}, {@code TypeFlow}, … — so "the reads" are not enumerable
  * from one source); {@code expectation} is authored through {@code /expectations*} rather than

@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **58<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 38<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> **59<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
 > five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
 > re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
 > building**: three of the five refuted part of their own row's premise, and the refutations produced
@@ -149,9 +149,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 38<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 17<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 58<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 59<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1541,6 +1541,27 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
 
 - **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**
+  ✅ **THE CENSUS HALF OF THIS ROW IS CLOSED 2026-09-17. `AcceptedConfigKeys` is DONE at FOUR types** —
+  `pipeline`, `alert`, `meta`, `enrichment`. `widget`/`dashboard`/`expectation` belong to
+  `COMPONENT-KIND-KEY-CENSUS-1`; `schema` and `job` are **ruled out on enumerability**, with reasons.
+  🔴 **`job`'s stated blocker was REFUTED, and the causality was backwards.** The row said it was "blocked
+  on a job-type registry". **The registry exists** (`JobTypeRegistry` + `JobTypeProvider`/
+  `JobTypeDescriptor` in `inspecto-engine`, served by `GET /jobs/types`) — ⛔ **and its existence is what
+  rules the census OUT, not what would enable it.** `JobConfig.fromMap` funnels every non-frame key into an
+  open `params` bag, so the accepted set is **per job type**, and per-type is not statically enumerable
+  four ways: the registry is **runtime-mutable** (Job Packs register *and deregister*), **extensible by
+  `ServiceLoader`** (`inspecto-ops` ships `caserule.evaluate`/`objects.analytics`, and `spaces/demo`
+  commits a config using the latter), **config-derived** for `sql.template` (the `$name` tokens in the
+  authored SQL *are* its parameter contract), and **edition-varying** (`maintenance`'s task list comes from
+  whatever the classpath contributed, so a static table would 422 valid Enterprise configs on Personal).
+  ⚠ **Measured, not argued: 34 of 34 committed job configs carry ≥1 non-frame key**, across 34 distinct
+  param keys — a frame-only census refuses every one of them, and a top-level-only census catches nothing.
+  **Both available granularities are wrong and there is no third.** ⇒ That is also why `JOB_PATH_KEYS` is a
+  hand-maintained list rather than a derived one. The false rationale is corrected in
+  `AcceptedConfigKeys`'s own javadoc.
+  ⇒ Residual filed: `JOB-PARAM-UNDECLARED-UNREPORTED-1`. ⚠ Also found, NOT fixed (a parallel lane owns that
+  file): `ConfigSpecs.job()` describes the built-ins as *"enrich, report, maintenance, pipeline"* — there
+  are **ten**.
   ✅ **THE `expectation` KIND LANDED 2026-09-16 (`300e8c7a`, BREAKING) — and the component census now
   covers THREE kinds** (`widget`, `dashboard`, `expectation`) beside the four in `AcceptedConfigKeys`.
   ⇒ **`AcceptedConfigKeys` has exactly ONE type left: `job`.**
@@ -2150,6 +2171,17 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   LEGITIMATELY have no producer yet — a pipeline not run, a store created later — which is why the silent
   skip was written. ⇒ Owed call: warn on an unmatched store at job registration, or leave it silent.
   ⛔ Silently-inert safety is the one option the evidence already rules out.
+  → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PARAM-UNDECLARED-UNREPORTED-1` — nothing reports a job param no descriptor declares.**
+  Filed 2026-09-17 from the `job` census ruling. `ParameterResolver` reports `missingRequired`,
+  `invalidType` and `unknownExpression` — but an **undeclared** param is silently accepted, which is the
+  dead-property risk the census would have covered and cannot. The registry-aware place for it is
+  `JobService`/`ParameterResolver`, where the type's `JobTypeDescriptor.parameters()` is actually known.
+  ⛔ **It must be WARNING, never fail-closed:** built-in jobs read params their own descriptors never
+  declare — `pipeline_config`, `data_dir`, `on_pipeline_gate`, `template`, `store` all go through
+  `config.require()`/`opt()` directly — so a strict version refuses working configs on day one.
+  ⚠ That asymmetry is itself worth recording: a descriptor is a UI/API contract, not the read set.
   → `okf/backend/control-plane/jobs.md`
 
 - **P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1` — `ConfigSpecs.expectation()` predates the kind it is

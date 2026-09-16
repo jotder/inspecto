@@ -718,3 +718,11 @@ from the deployed column alone called `maintenance_report_job.toon` a refusal, a
   2026-07-08 until `819e597b` while the only produced store was `sales`, and the example's `probes.txt`
   advertised fencing that could never fire. ⚠ A store may LEGITIMATELY have no producer yet, which is why
   the silent skip exists — the open call is warn-at-registration versus stay silent.
+
+- **`JOB-PARAM-UNDECLARED-UNREPORTED-1`** — `ParameterResolver` reports missing, mistyped and
+  unknown-expression params, but never an **undeclared** one. This is the dead-property risk for jobs, and
+  it cannot be closed by `AcceptedConfigKeys`: `job`'s accepted set is per-type and not statically
+  enumerable (runtime-mutable registry, `ServiceLoader` types, config-derived `sql.template` params,
+  edition-varying `maintenance` tasks). ⛔ Any check belongs at `JobService`/`ParameterResolver` where the
+  descriptor is known, and must WARN rather than refuse — built-in jobs read params their own descriptors
+  do not declare, so a descriptor is a UI/API contract, not the read set.
