@@ -14,8 +14,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 2026-09-07, its retirement trigger having fired), the remainders of every plan still in
 `docs/superpower/`, and the last handoff's next steps.
 
-> **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves).**
-> **54 rows: 1 × P1 · 37 × P2 · 16 × P3** — recounted again on the way OUT of the 2026-09-16 parallel
+> **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
+> **54<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 37<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
 > shift, which filed four rows (it was 50 / 35 / 14 on the way in). ⚠ **The board grew while four items
 > were worked**, and that is the honest result, not a failure: all four were already SHIPPED or REFUTED,
 > and grounding them produced five residuals that were previously invisible. ⛔ One row
@@ -136,12 +136,12 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1 P1 + 35 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 14 are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 50 as pending work overstates what is owed by roughly 28%.
+> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 37<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 42%.
 > ⚠ **One P3 is NOT demand-gated** — `GLOSSARY-CASE-1` spells its rank
 > `- **P3 · RELEASE-GATED (next MAJOR), not demand-gated**`: it is queued work whose gate is the next MAJOR
-> tag. ⛔ So “P3 ⇒ nobody is waiting on it” holds for 13 of the 14, not all of them — and that same
+> tag. ⛔ So “P3 ⇒ nobody is waiting on it” holds for 15 of the 16, not all of them — and that same
 > spelling is why §0's P3 pattern is the looser one.
 > 🔴 **This paragraph was internally inconsistent before this fix**, carrying “38 P2”, “those 31” and
 > “all 70” against a header of 53/17/71 — four numbers for two counts, in the very block that tells the
