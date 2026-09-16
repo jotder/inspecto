@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **59<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 40<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> **56<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 37<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
 > five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
 > re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
 > building**: three of the five refuted part of their own row's premise, and the refutations produced
@@ -149,9 +149,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 40<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 37<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 59<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1964,7 +1964,19 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⇒ Residual re-filed as `JOB-PATH-REPORT-ENRICH-SPLIT-1`. `inspecto-config` 157/0/0/0, both mutants
   meaningful. → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-CONFIG-THIRD-PRODUCER-1` — bundle import writes job configs whose path values no gate
+- ~~**P2** · **`JOB-CONFIG-THIRD-PRODUCER-1`**~~ ✅ **SHIPPED 2026-09-16.** `JobBundleSource.write` ran
+  `JobConfig.fromMap` (structural only) and jailed the FILE via `WriteGates.jail`, but never called
+  `ConfigSafetyValidator` — while its sibling `JobRoutes.parseJob` runs both. Now gated.
+  🔴 **Sharper than the row: this is direct residue of `JOB-DIR-CWD-CONTAINMENT-1` shipping onto `/jobs`
+  the SAME DAY and leaving the bundle sibling behind** — not an independent finding.
+  ✅ **The abort-vs-per-item question needed no operator call** — the existing contract already answers it:
+  the whole-bundle 422 is reserved for CROSS-ITEM concerns checked before any write, so a bad path value,
+  intrinsic to one item, lands as a per-item `failed` before the write and before hot-registration.
+  Nothing half-applies and a clean sibling still imports. RED proof: with the gate off, a bundle carrying
+  `dir: ../../../../../../evil_escape` reported `"status":"imported"`.
+  ⚠ Severity is lower than "ungated" implies — all three routes require `canAuthorWorkbench` — ⛔ but that
+  gate is documented as **a no-op on Personal**, which is the ceiling. Original row follows.
+  - **P2** · **`JOB-CONFIG-THIRD-PRODUCER-1` — bundle import writes job configs whose path values no gate
   ever sees.** Filed 2026-09-16 while closing `JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`, which found it.
   `BundleRoutes.java:477` writes `<write-root>/jobs/<name>_job.toon` directly on import (reached from
   `bundle-transfer.service.ts:211`). ⚠ **Narrower than first reported:** the FILE's location *is* contained
@@ -1973,14 +1985,43 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   can land a job config whose paths point anywhere the file jail does not cover. **A third producer of job
   config files that was on no row.** → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1` — two bulk writers bypass every `validateKind` gate.**
+- ~~**P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1`**~~ ✅ **HALF SHIPPED 2026-09-16; the other half's
+  refutation does NOT hold.** `ComponentBundleSource.write` — the only `BundleSource` whose write
+  validated nothing — now calls `ComponentRoutes.validateKind`, made **package-private** for exactly this
+  (one modifier, no logic change). ⛔ **Reuse over a second accepted-set: two copies of an accepted-set is
+  how the widget/dashboard census came to be needed in the first place.** It matters because `schema` and
+  `mapping` are both in `WRITABLE_TYPES` and both gated on the authoring route, so a bundle could plant a
+  component that `POST /components/schema/{id}` refuses with 422 — and a registry schema is engine-parsed.
+  ⚠ **`BiTemplates` was reported REFUTED, and that does not hold on master.** The lane argued
+  `validateKind` covers only `findings-spec`/`schema`/`mapping`, making a widget/dashboard route-through a
+  no-op. True of its tree; false here — `afaa4005` added the census at `ComponentRoutes:640`.
+  🔴 **The lane was not careless: its worktree branched from `a6c30568` and genuinely lacked that commit.**
+  Its second argument (hardcoded template content, only `dataset`/`prefix` substituted) still holds and
+  keeps severity low. ⇒ the `BiTemplates` half stays OPEN. Original row follows.
+  - **P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1` — two bulk writers bypass every `validateKind` gate.**
   Filed 2026-09-16 from the `widget`/`dashboard` census. `BiTemplates.apply` (`BiTemplates.java:125`) and
   bundle import (`BundleRoutes.java:425`) call `store.write` directly, so no component gate runs — not the
   new key census and not the pre-existing `schema` validation. ⚠ Same "gate on one route, not its sibling"
   shape as the finding that started this thread. The authoring route is the UI's only door, so the
   reachable half is closed; this is the rest. → `okf/backend/config/config-safety.md`
 
-- **P2** · 🔴 **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1` — 36 committed sample pipelines cannot be
+- ~~**P2** · **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1`**~~ ✅ **SHIPPED 2026-09-16 — and this row was
+  RIGHT, count and 24/12 split both, which is worth recording against the base rate.**
+  ✅ **The 422 was DRIVEN, not inferred** — the gap it was filed with. A real-HTTP `POST /config/write` of
+  three committed samples, one per tree, returned 422 with a single ERROR (`ERR_UNKNOWN_CONFIG_KEY` on
+  `version`), and the strip-and-repost control returned **200 `written:true`**. **Nothing reads a
+  pipeline's `version`** — parser, specs, SPA and tooling all checked, with a positive control proving the
+  grep finds the real reader of `active`. ⇒ option (a) followed from evidence; 36 files, one line each.
+  ⛔ **The guard was the deliverable, not the 36 edits:** the pipeline census had shipped with **no
+  "no committed config regresses" test** — `meta` escaped only because it happens to declare `version`.
+  `PipelineKeyCoverageContractTest` now WALKS both trees (rather than hardcoding paths as the `meta` and
+  `enrichment` guards do, which would miss a newly added sample), plus a falsification test so an empty
+  sweep fails loudly. Mutation-proven RED.
+  ⚠ Two facts for the next row: `okf/backend/engine/plugins.md` was **teaching** the dead key in a sample
+  (fixed); and `mvn -pl inspecto-ops -am` **does not resolve without `-Pedition-standard`**, so the repo's
+  only sweep over every committed space config never runs in a default-profile reactor — the third
+  edition-gating blind spot found today. Original row follows.
+  - **P2** · 🔴 **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1` — 36 committed sample pipelines cannot be
   re-saved.** Filed 2026-09-16 from the `enrichment` census. `*_pipeline.toon` samples carry a top-level
   `version:` that the pipeline spec does NOT declare (`version` is declared on `meta()`,
   `ConfigSpecs.java:737`, not `pipeline()`), so **re-saving any shipped sample pipeline through
@@ -2031,7 +2072,36 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `JobPathContainmentTest.enrichRefusesAConfigOutsideTheAllowedRoots` (a REAL readable file outside the
   jail, so the loader cannot refuse it for the wrong reason). → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **29** committed values
+- **P2** · 🔴 **`README-LINKS-BROKEN-IN-REPO-1` — the bundle's front page points at five documents that do
+  not exist, and our doc-link guard structurally cannot see it.** Filed 2026-09-16 out of the bundle
+  re-measurement. 29 links are dead **in the repository itself**, nearly all in `inspecto/README.md` — the
+  file `package.ps1` step 7 copies to the **bundle root as the customer's first page** — pointing at
+  five targets under `docs/` that no longer exist (architecture, configuration, operations,
+  plugins and v3-agent-mvp — all deleted in the docs consolidation). ⛔ **`check-doc-links.mjs` has been green throughout because its
+  `ROOTS = ['docs', 'compliance', '.claude']` and `inspecto/` is in none of them** — the fourth
+  guard-scope blind spot in two days, after the bolded-count regex, surefire freshness and edition-gated
+  modules. ⚠ Needs NO product call: fix the targets and widen the scope. ⛔ Deliberately NOT folded into
+  the package-time neutralisation — hiding repo rot behind a bundle rewrite is how it survives.
+  → `okf/backend/build-run/build-test.md`
+
+- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — 24 left, and the remainder is BLOCKED ON SEQUENCING, not
+  effort.** ✅ **Five re-pointed 2026-09-16**: the three `retention-sweep` instances, plus the **two
+  compactor** values the lane held back because in ITS worktree `PartitionCompactor` was still unjailed —
+  ⛔ **on master `ea862d1b` had already moved it hours earlier, so those two were orphaned by US.** Each
+  driven to land byte-identically on its legacy target; pinned by
+  `RetentionSweepJobPathsResolveUnderTheSpaceRootTest` (4 tests, mutation-proven — the old value resolves
+  to the doubled `spaces/demo/config/data/orders`).
+  🔴 **That is the one-sided break for the THIRD time in one day, and every time the reader was ours:**
+  `3f384182` → `BackupTask`, `JOB-DIR-CWD-CONTAINMENT-1` → `CleanupTask`, `ea862d1b` → the compactors.
+  ⛔ **Moving a reader is not done until its committed configs move with it** — and a lane on a stale base
+  cannot see that it is the one who moved it.
+  ⚠ **The examples' base is NOT a Space config root** — `serve-example.sh:66` passes
+  `-Dassist.write.root=out/write` and registers no Space, so the base is `<example>/out/write` and the
+  correct spelling is `../backup`, not `backup`. That is the trap for whoever re-points the rest.
+  ⇒ **Remaining 24 = 20 real values + 4 `${…}` placeholders that are not values at all.** 19 belong to
+  `PipelineJobRunner` (unmoved, and blocked itself) and 1 is `store`, which **no rule covers at all**.
+  *(Original wording follows.)*
+  - **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **29** committed values
   space-relative.** The remedy half of the survey. ✅ **Three of the 32 were DISCHARGED 2026-09-16** —
   see the struck block below. ⛔ Do it in the same change as whichever runtime row lands last, or the configs refuse in
   between. *(33 → 32 on 2026-09-16: `maintenance_report_job.toon:6` was re-pointed with
@@ -2132,7 +2202,24 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   already runs a full reactor, so the log is free there. Operator's call to wire.
   → `okf/backend/build-run/build-test.md`
 
-- **P2** · **`BUNDLE-DANGLING-LINKS-1` — the shipped INDEX points at documents the customer does not
+- ~~**P2** · **`BUNDLE-DANGLING-LINKS-1`**~~ ✅ **RE-MEASURED AND FIXED 2026-09-16 under option (a).**
+  🔴 **The row's 198 was wrong three ways — it is 323.** Wrong on its own terms (181/13, not 187/11); it
+  counted **no audience links at all** though `BACKLOG.md` (22) + `PROJECT_NOTES.md` (8) were withheld the
+  same day by the same decision; and it missed 70 that break because the bundle ships no source tree.
+  **97 of the 323 are in `INDEX.md` alone** — the customer's front door.
+  ⛔ **Option (b) was REFUTED by this project's own assertions**, not merely costed out: every marked stub
+  would land under `docs/archived-documents/` or `docs/superpower/`, which the `DOCS TIER LEAK` /
+  `DOCS AUDIENCE LEAK` throws shipped the day before exist to forbid. ⇒ **a fail-closed guard refusing a
+  DESIGN, not just a bug** — worth knowing they do that.
+  ✅ **(a) shipped**: `package.ps1` step 7 rewrites a markdown link whose target is withheld, keeping the label and
+  appending `(internal document - not shipped)` in place of the link, fence-aware so quoted examples are not corrupted. Driven
+  against the live tree: **224 neutralised** — the exact figure measured independently — and
+  `tools/check-bundle-doc-links.mjs` (new, falsified both ways) goes **323 → 67** over the staged bundle.
+  ⚠ **Deliberately scoped to the withheld set only.** The remaining 67 cite repo source paths that never
+  ship — a customer reading *"see `ControlApi.java`"* loses nothing — and papering those over at package
+  time would hide real rot from the repo's own guard. ⇒ The guard is **NOT wired into CI**: red on master
+  by design until the source-path class is decided. Original row follows.
+  - **P2** · **`BUNDLE-DANGLING-LINKS-1` — the shipped INDEX points at documents the customer does not
   have.** Residual of `BUNDLE-SHIPS-THE-ARCHIVE-1`, which now withholds two doc trees from the bundle.
   Current-tier docs link INTO those trees **198 times** (187 `archived-documents`, 11 `superpower`),
   `INDEX.md` — which lists both as sections — `GLOSSARY.md` and `ADVANCED_GUIDE.md` among them.
