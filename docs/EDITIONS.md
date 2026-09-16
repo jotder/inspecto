@@ -230,7 +230,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-DQ-06 | 🧬 Schema drift & new-field detector (`quality.schema.drift`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `parser` | the header each file carries vs `raw.fields[]` — width always, names when the schema was authored from the header; one `quality.schema_drift` WARN Signal per batch |
 | SP-DQ-07 | 🔍 Cluster & edit value normalizer (`quality.cluster.edit`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-08 | 🔍 Fuzzy string (Jaro-Winkler) matcher (`quality.match.fuzzy`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
-| SP-DQ-09 | 🧮 Inline stream profiler & statistics (`quality.profiler.inline`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `storage_report` | storage/completeness KPIs exist; no per-column profile step |
+| SP-DQ-09 | 🧮 Inline stream profiler & statistics (`quality.profiler.inline`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.profile` | per-column row/null/distinct counts and min/max, as a Step (2026-09-15) |
 | SP-DQ-10 | 📊 Statistical & reservoir sampler (`quality.sample.reservoir`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-11 | 🔤 Character map & code page transcoder (`quality.cleanse.transcode`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
 | SP-DQ-12 | 🔒 PII masking & tokenization (`quality.pii.mask`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Enterprise only |
@@ -305,7 +305,7 @@ E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for P
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | 🟡 | 🟡 | `channel` | webhook notification channel exists; not a chain sink |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 119 processors — 35 delivered, 17 partial, 67 planned.
+**Count:** 119 processors — 36 delivered, 16 partial, 67 planned.
 
 | ~~SP-DQ-09~~ | ~~🧹 Whitespace & string sanitizer (`quality.cleanse.trim`)~~ | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 (Record Transformer) 2026-09-04** — it is the `text.trim` / `text.pad_left` / `text.replace` rows of that grid, no longer a separate catalog entry |
 | ~~SP-XFM-02~~ | ~~🔄 Field type cast & renamer matrix (`transform.cast`)~~ | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 2026-09-04** — cast is the `convert.type` row, rename is the Field-name alias |
