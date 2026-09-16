@@ -87,10 +87,17 @@ above the generated commit list.
   into `alert:` (the whole file is that one block, so a top-level-only census would catch nothing), and the
   three parser-only leaves `alert.dataset`, `alert.measure`, `alert.when` are accepted — refusing those
   would have broken every BI-5 measure rule authored today.
-- The remaining **seven** config types (`enrichment`, `job`, `schema`, `meta`, `expectation`, `widget`,
+- **Extended to the `meta` config type (2026-09-16).** ⚠ Also breaking: a key outside
+  `name` / `version` / `tables` / `kpis` / `reports` / `domain` in a `*_meta.toon` now returns **422**.
+  ⛔ The census stops at the **top level** for this type — author-chosen KPI, table and report names one
+  level down are never checked, because `SemanticModel.load` iterates them by `entrySet()` and they are an
+  unbounded namespace. Both committed `*_meta.toon` files pass unchanged.
+- The remaining **six** config types (`enrichment`, `job`, `schema`, `expectation`, `widget`,
   `dashboard`) are still fail-open by omission. ⛔ They cannot simply be switched on: four of them have
   confirmed undeclared-but-engine-read keys, and `job` funnels any unrecognised key into an open `params`
-  bag. See [config safety](../config/config-safety.md) §"The accepted-key census" for the per-type blockers.
+  bag. ⚠ `widget` and `dashboard` are a different case again — they never reach `/config/write` at all
+  (the UI saves them through `POST`/`PUT /components/{kind}`), so a census here would change nothing.
+  See [config safety](../config/config-safety.md) §"The accepted-key census" for the per-type blockers.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
 

@@ -157,10 +157,16 @@ Not built. The design, so the next shift does not re-derive it:
 
 ## 6. Deliberate deferrals (do not read these as oversights)
 
-- **Only `pipeline` has an accepted-names table.** `alert`/`job`/`widget`/`dashboard`/`expectation`/
-  `enrichment`/`schema`/`meta` have no parser census, so their accepted set is unknown and the checker
-  returns nothing for them. Inventing one by reading `ConfigSpecs` alone would refuse keys those
-  parsers read — the exact leaf-granularity mistake §1.1 rules out. Each needs its own census first.
+- **Three types have an accepted-names table: `pipeline`, `alert` (2026-09-16) and `meta`
+  (2026-09-16).** `job`/`widget`/`dashboard`/`expectation`/`enrichment`/`schema` have no parser census,
+  so their accepted set is unknown and the checker returns nothing for them. Inventing one by reading
+  `ConfigSpecs` alone would refuse keys those parsers read — the exact leaf-granularity mistake §1.1
+  rules out. Each needs its own census first.
+  ⛔ **`widget` and `dashboard` are NOT a census away** and should be struck from the "remaining" list:
+  neither is ever written through `/config/write` (the UI saves both through `POST`/`PUT
+  /components/{kind}`), so a table for them would be a no-op. Their gate belongs in `ComponentRoutes`,
+  and the persisted body carries `name`/`owner`/`shares`, which no `ConfigSpec` declares.
+  ⇒ the real remaining census list is **four**: `enrichment`, `job`, `schema`, `expectation`.
 - **Leaf-level checking inside a declared block.** Blocked on the leaf census (§1.1).
 - **`PipelineGraphRoutes`.** Blocked on a migration pass (§2.5).
 - **The `RecipeCompiler` WARNING seam.** Blocked on a non-fatal diagnostic sink (§4).

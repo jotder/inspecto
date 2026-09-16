@@ -220,6 +220,60 @@ class AcceptedConfigKeysTest {
                 "a top-level alert: block in a pipeline must still be refused, got: " + findings);
     }
 
+    // ── the `meta` census (the third type to get one) ────────────────────────────
+
+    /** {@code spaces/demo/config/orders/orders_meta.toon}'s top level, verbatim. */
+    private static Map<String, Object> metaDraft() {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", "orders_semantics");
+        raw.put("version", 1);
+        raw.put("tables", new LinkedHashMap<>(Map.of("orders", Map.of("description", "d", "grain", "g"))));
+        raw.put("kpis", new LinkedHashMap<>(Map.of("gross_revenue", Map.of("definition", "sum(amount)"))));
+        raw.put("reports", new LinkedHashMap<>(Map.of("daily_orders", Map.of("description", "d"))));
+        raw.put("domain", new LinkedHashMap<>(Map.of("currency", "USD")));
+        return raw;
+    }
+
+    @Test
+    void theMetaTypeHasACensus() {
+        assertTrue(AcceptedConfigKeys.hasCensus("meta"));
+    }
+
+    @Test
+    void aShippedMetaConfigIsAccepted() {
+        assertTrue(AcceptedConfigKeys.unknownKeyFindings("meta", metaDraft(), Severity.ERROR).isEmpty(),
+                "both committed *_meta.toon files carry exactly these six keys — the census must not "
+                        + "refuse a config that runs today");
+    }
+
+    @Test
+    void aDeadMetaKeyIsRefusedWithASuggestion() {
+        Map<String, Object> raw = metaDraft();
+        raw.put("kpi", Map.of("x", "y"));
+        List<Finding> findings = AcceptedConfigKeys.unknownKeyFindings("meta", raw, Severity.ERROR);
+        assertEquals(1, findings.size(), "exactly the one dead key is refused: " + findings);
+        Finding f = findings.getFirst();
+        assertEquals("kpi", f.fieldPath());
+        assertEquals(FindingCodes.ERR_UNKNOWN_CONFIG_KEY, f.code());
+        assertTrue(f.guidance().contains("kpis"),
+                "a near-name typo must be suggested, got: " + f.guidance());
+    }
+
+    @Test
+    void authorChosenKpiAndReportNamesAreNeverDescendedInto() {
+        // 🔴 The load-bearing constraint for `meta`: `SemanticModel.load` iterates entrySet() over
+        // `tables`/`kpis`/`reports`, whose keys are names the AUTHOR invents. Descending one level
+        // would refuse every one of them. `censusedParents("meta")` is empty for exactly this reason.
+        // ⚠ Honest scope, mutation-checked: adding `meta` to `censusedParents` ALONE does NOT turn this
+        // red, because the checker skips a parent with no accepted sub-blocks. It goes red as soon as
+        // that is paired with a declared `kpis.*` leaf — which is precisely the change this guards.
+        Map<String, Object> raw = metaDraft();
+        raw.put("kpis", new LinkedHashMap<>(Map.of("a_kpi_nobody_could_predict", Map.of("definition", "1"))));
+        raw.put("tables", new LinkedHashMap<>(Map.of("some_table_ref", Map.of("grain", "day"))));
+        assertTrue(AcceptedConfigKeys.unknownKeyFindings("meta", raw, Severity.ERROR).isEmpty(),
+                "author-chosen KPI/table names must not be flagged");
+    }
+
     @Test
     void theWarningSeverityCarriesTheWarnCode() {
         Map<String, Object> raw = pipelineDraft();

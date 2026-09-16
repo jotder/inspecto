@@ -31,16 +31,25 @@ import java.util.TreeSet;
  * leaf-granular checker would refuse configs that run correctly today. ⇒ <b>an accepted block is
  * accepted whole and never descended into.</b> Anything finer needs the leaf census to exist first.
  *
- * <p>⚠ <b>Two of the nine config types have a table: {@code pipeline} and {@code alert}.</b> The
- * other seven ({@code enrichment}, {@code job}, {@code schema}, {@code meta}, {@code expectation},
- * {@code widget}, {@code dashboard}) have no parser census, so their accepted set is unknown and
- * {@link #unknownKeyFindings} returns nothing for them. That is a stated fail-open, not an omission:
- * deriving a set from {@code ConfigSpecs} alone would refuse the keys those parsers read, which is
- * exactly the mistake the block granularity above rules out — {@code job}, {@code expectation},
- * {@code schema} and {@code enrichment} each have confirmed undeclared-but-engine-read keys today, and
- * {@code job} funnels every unrecognised key into an open {@code params} bag, so it cannot be censused
- * without a job-type registry. {@code alert} is censusable precisely because that objection can be
- * ANSWERED for it — see {@link #ALERT_PARSER_ONLY}.
+ * <p>⚠ <b>Three of the nine config types have a table: {@code pipeline}, {@code alert} and
+ * {@code meta}.</b> The other six ({@code enrichment}, {@code job}, {@code schema},
+ * {@code expectation}, {@code widget}, {@code dashboard}) have no parser census, so their accepted set
+ * is unknown and {@link #unknownKeyFindings} returns nothing for them. That is a stated fail-open, not
+ * an omission: deriving a set from {@code ConfigSpecs} alone would refuse the keys those parsers read,
+ * which is exactly the mistake the block granularity above rules out — {@code job},
+ * {@code expectation}, {@code schema} and {@code enrichment} each have confirmed
+ * undeclared-but-engine-read keys today, and {@code job} funnels every unrecognised key into an open
+ * {@code params} bag, so it cannot be censused without a job-type registry. {@code alert} and
+ * {@code meta} are censusable precisely because that objection can be ANSWERED for them — see
+ * {@link #ALERT_PARSER_ONLY} and {@link #acceptedBlocks}.
+ *
+ * <p>⚠ <b>{@code widget} and {@code dashboard} are a different shape of fail-open and censusing them
+ * here would be a no-op.</b> Neither is ever written through {@code /config/write}: the UI saves both
+ * through the component-store routes ({@code POST|PUT /components/{kind}}, see
+ * {@code ComponentsService}), which never call this class. A gate for them belongs in
+ * {@code ComponentRoutes}, and it is NOT a table away: the persisted body also carries {@code name},
+ * {@code owner} and {@code shares}, which no {@code ConfigSpec} declares, so a spec-derived refusal
+ * would reject essentially every real save.
  *
  * <p>⚠ A block named {@code x-…} is the author's declared "this is mine, not the engine's" marker: it
  * is accepted unconditionally, never suggested against, and round-trips through {@code ConfigCodec}
@@ -82,6 +91,10 @@ public final class AcceptedConfigKeys {
             // would accept every alert config whole and catch nothing. `alert` is censused because its
             // leaves ARE enumerable: `AlertRule.fromMap` reads a fixed, literal list of them.
             case "alert" -> Set.of("alert");
+            // ⛔ `meta` is deliberately NOT here. `SemanticModel.load` reads its five top-level keys
+            // literally, but ONE LEVEL DOWN inside `tables`, `kpis` and `reports` it iterates
+            // `entrySet()` over AUTHOR-CHOSEN names (a table ref, a KPI name, a report name). Those are
+            // an unbounded namespace, so descending would refuse every KPI an author ever names.
             default -> Set.of();
         };
     }
@@ -175,6 +188,12 @@ public final class AcceptedConfigKeys {
                 all.addAll(declaredBlocks(ConfigSpecs.alert()));
                 all.addAll(ALERT_PARSER_ONLY);
             }
+            // 🔴 `meta` has NO parser-only list, and that is a result, not an omission. The one reader
+            // of a `*_meta.toon` is `SemanticModel.load` (the only caller is `ServiceBootstrap:154`),
+            // and every top-level key it reads — name, tables, kpis, reports, domain — is already
+            // declared by the spec. Five reads, five accounted for, so the declared set alone cannot
+            // refuse a key the engine honours. `MetaKeyCoverageContractTest` ratchets that from source.
+            case "meta" -> all.addAll(declaredBlocks(ConfigSpecs.meta()));
             default -> { /* no parser census ⇒ nothing is KNOWN to be dead; see the class doc. */ }
         }
         return all;

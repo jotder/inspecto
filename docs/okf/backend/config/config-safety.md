@@ -252,12 +252,12 @@ second gate folded into the same 422 at `/config/write` and `/config/patch`
 `ERR_UNKNOWN_CONFIG_KEY` and a near-name suggestion (`DUCKLE-C3-DEAD-PROPERTY-1`). A dead key is a
 *silent loss* — the save answers `written: true` and the engine never looks at it.
 
-**Two of the nine config types have a census: `pipeline` and `alert`.** The other seven
-(`enrichment`, `job`, `schema`, `meta`, `expectation`, `widget`, `dashboard`) are **fail-open by
+**Three of the nine config types have a census: `pipeline`, `alert` and `meta`.** The other six
+(`enrichment`, `job`, `schema`, `expectation`, `widget`, `dashboard`) are **fail-open by
 omission, and that is stated rather than accidental**: `unknownKeyFindings` returns nothing for a type
 with no census.
 
-🔴 **Why the missing seven cannot simply be switched on.** Two authorities read every config: what
+🔴 **Why the missing six cannot simply be switched on.** Two authorities read every config: what
 `ConfigSpecs` *declares*, and what the engine's hand-written parser *navigates*. An accepted set derived
 from `ConfigSpecs` **alone is unsound** — it would refuse keys the engine honours today. This is not
 hypothetical; each of these has confirmed undeclared-but-engine-read keys:
@@ -268,7 +268,7 @@ hypothetical; each of these has confirmed undeclared-but-engine-read keys:
 | `expectation` | `when` (required for `kind: condition`) | needs a parser census |
 | `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | needs a parser census |
 | `enrichment` | `input`, `output`, `references`, `triggers.*`, `transform`/`transform_file` | `EnrichmentConfig.fromMap` is a full hand-written navigator |
-| `meta`, `widget`, `dashboard` | none found | *plausibly* spec-driven, but **unproven** — no ratchet exists to show no hidden reader touches an undeclared block |
+| `widget`, `dashboard` | none found in a Java reader | ⛔ **a census here would be a no-op**: neither type is ever written through `/config/write`. The UI saves both through the component-store routes (`POST`/`PUT /components/{kind}`), which never call this class. A gate belongs in `ComponentRoutes` — and it is not a table away, because the persisted body also carries `name`, `owner` and `shares`, which no `ConfigSpec` declares |
 
 ⇒ **A type earns a census only when its parser's reads can be PROVEN from source**, and the proof is a
 ratchet test that fails when the two authorities drift.
@@ -285,10 +285,25 @@ descends only into `processing.*`. An alert file is **one** block — `alert:` �
 census would accept every alert config whole and catch nothing; `alert` is therefore a *censused parent*
 and the checker descends one level into it. `censusedParents(type)` is per-type for this reason.
 
+**`meta` earned one (2026-09-16), and it is the case that shows the test is about GRANULARITY, not
+about the word `entrySet`.** The one reader of a `*_meta.toon` is `SemanticModel.load`
+(`inspecto-engine/.../catalog/SemanticModel.java:95-138`; its only caller is `ServiceBootstrap:154`),
+and at the level the census works — the **top level** — it is five literal `raw.get("…")` reads:
+`name`, `tables`, `kpis`, `reports`, `domain`. All five are declared by `ConfigSpecs.meta()`, so
+**`meta` has no parser-only list at all** — five reads, five accounted for.
+
+🔴 `SemanticModel.load` **does** call `entrySet()`, three times — but one level DOWN, over `tables`,
+`kpis` and `reports`, whose keys are names the **author invents** (a table ref, a KPI name, a report
+name). That is an unbounded namespace, so `meta` is deliberately **not** a censused parent: descending
+would refuse every KPI anyone ever names. A scan that merely asked *"does this file contain
+`entrySet`?"* would have refused the type for the wrong reason. ⚠ Both committed `*_meta.toon` files
+carry exactly the six declared keys, so nothing on disk regresses — pinned, not assumed.
+
 ⚠ The **flat** `alert-rule` component shape (`AlertRoutes`, `ComponentStore`) is a *different config
 type string* and is written through `/alerts/rules*`, not `/config/write` — it never reaches this census.
 
-Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest` and
-`PipelineKeyCoverageContractTest` (the two source-derived ratchets), and
+Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`,
+`MetaKeyCoverageContractTest` and `PipelineKeyCoverageContractTest` (the three source-derived
+ratchets), and
 `AcceptedConfigKeysDocContractTest` (the generated pipeline table). Each ratchet includes a
 *falsify-the-scan* test, because a scan that silently matches nothing passes every other assertion.
