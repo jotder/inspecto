@@ -1029,6 +1029,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   parent, and re-check the bundle-size and dependency-review guards — POI's transitive tree grows every edition
   bundle. 🔴 §1 also still carries an **unstruck duplicate** of this same owed input (line ~350, the
   pre-answer wording); that line is outside this sweep's edit range and is reported to the caller.
+
+  ✅ **SHIPPED 2026-09-16 — and NO LIBRARY WAS ADDED, so the POI paragraph above is superseded, not
+  pending.** `PipelineDocumentXlsx` writes the workbook with DuckDB's `excel` extension
+  (`COPY … TO … (FORMAT xlsx)`), the same extension the `xlsx` PARSER reads with. ⛔ **Do not add POI** —
+  verified there is no `org.apache.poi` declaration in any pom. ⚠ `grep poi` over the poms returns nine
+  hits and **every one is a substring of "point"/"policy"**; match `org.apache.poi` or `<artifactId>poi`.
+
+  🔴 **RESIDUAL, FOUND 2026-09-16 WHEN THE SUITE FIRST RAN IN CI — the premise this row was closed on is
+  NOT PROVEN.** The dependency question was dissolved by the claim that the capability is *"already
+  bundled and already staged for air-gapped installs"*. On a clean CI runner the extension **cannot
+  load**: `PipelineDocumentXlsxTest.writesARealWorkbook` errored with *"DuckDB's 'excel' extension is
+  required for frontend 'xlsx' but could not be loaded"* (`DuckDbExtension.ensureLoaded:55`). The
+  original 4/4 green — 1.3s of real I/O — was a **warm developer cache**, which is exactly the evidence
+  shape that cannot distinguish "bundled" from "cached here".
+  ✅ **Operator call 2026-09-16: GATE THE TEST on extension availability**, done — the method now calls
+  `requireExcelExtension()` and SKIPS rather than fails, mirroring `XlsxParsingTest#open`; the other three
+  methods stay ungated. ⛔ **The gate buys an honest build, not a working feature.** XLSX export is now
+  proven only where the extension is already warm, and **whether it works in a shipped or air-gapped
+  bundle is OPEN and owed to the operator** — two standing lessons point the same way: no release has ever
+  shipped a DuckDB extension because CI populates no cache, and *staged is not loadable* (autoload ignores
+  `-Dduckdb.extension.dir`). ⚠ A green reactor is **not** evidence this works for a customer.
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
   ⬜ **RE-CONFIRMED NOT FIRED 2026-09-15** — every business relation in play is already expressed by

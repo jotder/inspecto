@@ -1,10 +1,14 @@
 package com.gamma.pipeline;
 
+import com.gamma.etl.ExcelExtension;
+import com.gamma.util.DuckDbUtil;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,8 +21,38 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>⛔ The load-bearing test here is the masking one: a workbook travels further than a Markdown file, and
  * the whole reason this renderer reads a shared model rather than projecting the recipe itself is that a
  * duplicated masking rule would eventually drift and put a credential in a spreadsheet.
+ *
+ * <p>⚠ <b>Only {@link #writesARealWorkbook} is assumption-gated</b>, and only on the {@code excel}
+ * extension — mirroring {@code XlsxParsingTest#open}. The other three touch no DuckDB at all (model,
+ * masking, sheet naming) and must stay ungated: they are what still proves something on a box where the
+ * extension cannot load. ⛔ Do not widen the gate to the class.
+ *
+ * <p>🔴 <b>What this gate COSTS, stated so it is not rediscovered as a surprise.</b> D-8's XLSX export was
+ * closed on the premise that no spreadsheet library was needed because DuckDB's {@code excel} extension is
+ * *“already bundled and already staged for air-gapped installs”*. On a clean CI runner it is **not
+ * loadable**, which is how this test went red the first time the suite ran past the guards above it.
+ * Gating makes the build honest — a skip is visible in the reactor's skip count — but it **does not make
+ * the premise true**, and it means the writer is now proven only where the extension happens to be warm.
+ * ⛔ Do not read a green reactor as evidence that XLSX export works in a shipped bundle; that question is
+ * open on `D-8` in BACKLOG §3 and is the operator's, not this test's.
  */
 class PipelineDocumentXlsxTest {
+
+    /**
+     * Skip — never pass — when DuckDB's {@code excel} extension cannot load here.
+     *
+     * <p>Probes on a throwaway database rather than trusting a flag, because the three layers
+     * {@code DuckDbExtension} tries (cached {@code LOAD} → staged file → networked {@code INSTALL})
+     * can each succeed or fail independently of anything this test can see.
+     */
+    private static void requireExcelExtension() throws Exception {
+        boolean loaded;
+        try (Connection conn = DuckDbUtil.openConnection(DuckDbUtil.tempDbFile("xlsxdoc_"))) {
+            loaded = ExcelExtension.tryLoad(conn);
+        }
+        Assumptions.assumeTrue(loaded, "DuckDB 'excel' extension unavailable on this box — run once "
+                + "with network (caches under ~/.duckdb/extensions) or set -D" + ExcelExtension.DIR_PROPERTY);
+    }
 
     private static Map<String, Object> recipe() {
         return Map.of(
@@ -32,6 +66,7 @@ class PipelineDocumentXlsxTest {
 
     @Test
     void writesARealWorkbook(@TempDir Path dir) throws Exception {
+        requireExcelExtension();
         Path out = dir.resolve("doc.xlsx");
 
         PipelineDocumentXlsx.write("cdr_ingest", recipe(), Map.of(), "abc123", out);
