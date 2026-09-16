@@ -194,7 +194,7 @@ interface ConsignmentIngestStrategy {
         if (cfg.routeConfig() != null) {
             com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
             if (com.gamma.pipeline.exec.ConsignmentGraphRunner.engages(routed)) lifted = routed;
-        } else if (applied.outputs().isEmpty() && graphLaneCarries(cfg, segKey)) {
+        } else if (graphLaneCarries(cfg, segKey)) {
             lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         }
         String mode = System.getProperty(LANE_PROPERTY, "auto").trim().toLowerCase(java.util.Locale.ROOT);
@@ -222,7 +222,9 @@ interface ConsignmentIngestStrategy {
     /** As above, scoped to the segment {@code segKey} when this call writes one segment of a batch. */
     static String flatReason(PipelineConfig cfg, DecisionRuleApplier.Result applied, String segKey) {
         if (cfg.routeConfig() != null) return "the authored route does not engage the graph lane";
-        if (!applied.outputs().isEmpty()) return "a Decision Rule routed rows, which the graph lane does not implement";
+        if (!applied.outputs().isEmpty() && cfg.sinks().size() > 1)
+            return "a Decision Rule routed rows and this pipeline declares " + cfg.sinks().size()
+                    + " destinations - routing writes to a single destination (the flat lane refuses this too)";
         if (scratchDir(cfg) == null) return "no scratch dir (dirs.temp / duckdb.temp_directory) for the branch-commit ledger";
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         List<com.gamma.pipeline.PipelineNode> sinks = writeSinks(lifted, segKey);
@@ -344,9 +346,20 @@ interface ConsignmentIngestStrategy {
                                               com.gamma.pipeline.PipelineGraph lifted,
                                               DecisionRuleApplier.Result applied,
                                               String writeScope, String segKey) throws Exception {
-        if (!applied.outputs().isEmpty())
-            throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
-                    + "it with a route: pipeline's branches is not supported");
+        // Rule routing coexists with this lane: DecisionRuleApplier ran ABOVE the fork, wrote the routed
+        // rows itself and DELETEd them from the relation, so both lanes see the identical remainder and the
+        // routed outputs only have to be merged into this method's Written (the flat path does the same, by
+        // seeding its list with applied.outputs()). Quarantine and drop rules - which remove rows and produce
+        // no outputs - have always run here for exactly that reason. What stays refused is the pair the flat
+        // path also refuses, by the same words: routing combined with a write that has somewhere else to go.
+        if (!applied.outputs().isEmpty()) {
+            if (cfg.routeConfig() != null)
+                throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
+                        + "it with a route: pipeline's branches is not supported");
+            if (cfg.sinks().size() > 1)
+                throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
+                        + "it with a multi-destination sinks: pipeline is not yet supported");
+        }
         // Reference Phase-2 P1/P2, carried here in slice C2. Combining it with route BRANCHES stays
         // refused — one version history across branches is ill-defined (the same rule as sinks:>1 at
         // prepare(), and a permanent posture since 2026-08-28). Without a route there are no branches,
@@ -397,7 +410,13 @@ interface ConsignmentIngestStrategy {
                     }
                     ParkedBranches.record(batchId, node.id(), parkTable);
                 });
-        return new Written(writer.outputs(), writer.lineage(), writer.bounds());
+        // The routed rows were written above the fork; carry their outputs and lineage out with this write's,
+        // in the flat path's order (routed first), so IngestOutcome sees one batch either lane it took.
+        List<PartitionOutput> outputs = new java.util.ArrayList<>(applied.outputs());
+        outputs.addAll(writer.outputs());
+        List<LineageRow> lineage = new java.util.ArrayList<>(applied.lineage());
+        lineage.addAll(writer.lineage());
+        return new Written(outputs, lineage, writer.bounds());
     }
 
     /**

@@ -56,6 +56,68 @@ class IngestLaneFlagTest {
         return PipelineConfig.load(toon.toString());
     }
 
+    /**
+     * A Decision Rule that ROUTED rows no longer keeps a non-route pipeline on the flat lane
+     * (`GRAPH-LANE-RULE-ROUTED-1`, 2026-09-16). {@code DecisionRuleApplier} runs ABOVE the lane fork: it
+     * writes the routed rows itself and DELETEs them from the relation, so both lanes see the identical
+     * remainder and the routed outputs only have to be merged into the batch's {@code Written}. Quarantine
+     * and drop rules - which remove rows and produce no outputs - have always been admitted for that reason.
+     */
+    @Test
+    void routedRowsNoLongerKeepANonRoutePipelineFlat(@TempDir Path dir) throws Exception {
+        DecisionRuleApplier.Result routed = new DecisionRuleApplier.Result(
+                List.of(new com.gamma.etl.PartitionOutput("d=2020-04-03", "dest/part-0.csv", 2L)), List.of());
+
+        assertNotNull(ConsignmentIngestStrategy.admittedLift(config(dir, true), routed),
+                "the routed rows are already written and gone from the relation - the remaining write is "
+                        + "the same one the flat lane would perform");
+    }
+
+    /** ⚠ What stays refused is the pair the FLAT path also refuses: routing plus somewhere else to go. */
+    @Test
+    void routedRowsStillRefuseAWriteThatHasSomewhereElseToGo(@TempDir Path dir) throws Exception {
+        DecisionRuleApplier.Result routed = new DecisionRuleApplier.Result(
+                List.of(new com.gamma.etl.PartitionOutput("d=2020-04-03", "dest/part-0.csv", 2L)), List.of());
+
+        String reason = ConsignmentIngestStrategy.flatReason(twoDestinations(dir), routed);
+        assertTrue(reason.contains("routed rows") && reason.contains("destinations"),
+                "a multi-destination pipeline still names the refusal the flat path uses: " + reason);
+    }
+
+    /** The same pipeline declaring TWO destinations, for the refusal above. */
+    private static PipelineConfig twoDestinations(Path dir) throws Exception {
+        Files.createDirectories(dir);
+        String d = dir.toString().replace("\\", "/");
+        Path schema = dir.resolve("mini_schema.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Path toon = dir.resolve("two_dest_pipeline.toon");
+        Files.writeString(toon, """
+            name: LANE_FLAG_2D
+            active: true
+            dirs:
+              poll: %1$s/inbox
+              database: %1$s/db
+              backup: %1$s/backup
+              temp: %1$s/temp
+              quarantine: %1$s/quarantine
+              status_dir: %1$s/status
+            output:
+              format: CSV
+            sinks[2]{database,format}:
+              "%1$s/db",CSV
+              "%1$s/db2",CSV
+            processing:
+              threads: 1
+              schema_file: "%2$s"
+              csv_settings:
+                delimiter: ","
+                skip_header_lines: 0
+                date_formats[1]: "%%Y-%%m-%%d"
+                timestamp_formats[1]: "%%Y-%%m-%%d"
+            """.formatted(d, schema.toString().replace("\\", "/")));
+        return PipelineConfig.load(toon.toString());
+    }
+
     @Test
     void autoIsTheAdmissionAsDesigned(@TempDir Path dir) throws Exception {
         assertNotNull(ConsignmentIngestStrategy.admittedLift(config(dir.resolve("a"), true), NO_RULES),
