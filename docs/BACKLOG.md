@@ -261,7 +261,7 @@ Q2 · "a spreadsheet library" → D-8 XLSX · "access details" → `DEPLOY-SERVI
 · commission the SES/SNS adapter review → Notifications + `D8-SUPPRESS-1`. "Eager/deferred `s3://`", the two
 dates, RTO/RPO, the stray `master`, the `ref:` pin unblock no §3–§5 row directly.
 
-**Design-first (a decision pass before code, by the row's own words):** ~~`GRAPH-LANE-MULTISCHEMA-1`~~ ✅ **design pass DONE 2026-09-16** (`archived-documents/plans-archive/graph-lane-multischema-design.md`) — the executor question was answered empirically and the row shrank; it is now **operator-blocked on one call**, below · `GRAPH-LANE-RULE-ROUTED-1` (where does a rule-routed destination become a graph node, when the lift cannot see the rules?) · AI drafting on non-schema kinds ·
+**Design-first (a decision pass before code, by the row's own words):** ~~`GRAPH-LANE-MULTISCHEMA-1`~~ ✅ **design pass DONE 2026-09-16** (`archived-documents/plans-archive/graph-lane-multischema-design.md`) — the executor question was answered empirically, the row shrank, the operator answered the one call it then needed (`auto` flips), and it SHIPPED the same day — off the board · `GRAPH-LANE-RULE-ROUTED-1` (where does a rule-routed destination become a graph node, when the lift cannot see the rules?) · AI drafting on non-schema kinds ·
 Onboarding D5-ref (ground the real delete-feed first) · Branch-aware residuals (b)(c) · `PIPELINE-DRYRUN-1` (which
 seam enforces the mode) · `STREAM-CONSUMER-1` (where the loop lives) · Bundle/Exchange load-as-draft ·
 Completeness KPI (b) sequence-template source · `AUTHORING-REDESIGN-1` (e).
