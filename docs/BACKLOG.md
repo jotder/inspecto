@@ -15,8 +15,18 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **54<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 38<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** — recounted again on the way OUT of the 2026-09-16 parallel
-> shift, which filed four rows (it was 50 / 35 / 14 on the way in). ⚠ **The board grew while four items
+> **60<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 41<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
+> re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
+> building**: three of the five refuted part of their own row's premise, and the refutations produced
+> residuals that were previously invisible. ⛔ **A parallel shift that closes more rows than it files is
+> the suspicious outcome, not this one.** 🔴 **P1 tripled** — `JOB-PATH-COMPAT-SURVEY-1` was re-ranked
+> after its survey found that on a deployed tree the 2026-09-16 containment change refuses EVERY relative
+> path in EVERY committed job config, and `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` was filed as a containment
+> hole beside it. ⚠ These numbers are DERIVED — set from what `tools/check-doc-counts.mjs` computes, never
+> hand-counted; a hand-count during this very pass disagreed with the guard by one in two directions.
+> *(recounted earlier the same day on the way OUT of the 2026-09-16 parallel
+> shift, which filed four rows — it was 50 / 35 / 14 on the way in.)* ⚠ **The board grew while four items
 > were worked**, and that is the honest result, not a failure: all four were already SHIPPED or REFUTED,
 > and grounding them produced five residuals that were previously invisible. ✅ **The one row that was
 > pending sweep is now SWEPT** (2026-09-16): `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1`, closed as refuted,
@@ -139,9 +149,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 38<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 15<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 41<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 60<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1191,7 +1201,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · **AGT-5 per-tool dry-run seam — 🔴 RE-GATED 2026-09-16: BLOCKED-EXTERNAL again, on a DIFFERENT fact.** The 2026-09-08 discharge verified the TYPE ships; it never checked the SEAM. `javap` on the pinned `eoiagent-platform` jar: `PlatformBuilder` has `approvalHandler(...)`, `approvalDecisionStore(...)` and **no `dryRunProvider(...)`** — the only setter lives on `CallbackApprovalGate.Builder`, which `PlatformBuilder` constructs internally, so inspecto cannot supply a per-tool `DryRunProvider` without an upstream change. **Upstream ask (to `jotder/inspect-agent`): expose `PlatformBuilder.dryRunProvider(DryRunProvider)` and thread it to the gate builder.** Nothing built here; `AgentApprovals` stays as the previewer. ⛔ Do not re-discharge on the presence of the type — check the builder. *(Original text, kept for the trail:)* This sat in §2 as externally gated on eoiagent shipping a per-tool `DryRunProvider`. **It has shipped**: `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunProvider.java`, `eoiagent-core/src/main/java/com/eoiagent/safety/DryRunResult.java`, and four per-tool dry-run tools, under an **Accepted** ADR-0008 enforcing approval + dry-run in the runtime (upstream `jotder/inspect-agent`, verified via the git-tree API 2026-09-08). ⚠ The gate was not "waiting" — it was **held shut by a broken check**: the `gh search code` probe it named returns 0 for every term in that repo, control included. **What this unblocks:** inspecto can now drop its parallel `AgentApprovals` previewer and consume the upstream per-tool seam on `PlatformBuilder`. ⛔ Still separately gated: `incident_explain` waits on the eoiagent **host** seam, and the local-models-only scope cut stands. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
 - **P2** · **Deployment topology gaps** — ~~GAP-3 service wrappers (SCR-3)~~ → own P1 row `DEPLOY-SERVICE-WRAPPER-1` (2026-09-11) · GAP-4 DuckDB `memory_limit` default · ~~GAP-5 T15 surge admission~~ 🔴 **REFUTED 2026-09-16 — ALREADY SHIPPED.** The plan's *“the admission cap + hysteresis controller is deliberately deferred”* is FALSE: `IntakeGovernor` implements the per-cycle cap (`capFor:186`, `-Dingest.maxFilesPerCycle`) AND the hysteresis controller (`observeCycle:212-229`, 2× band), plus per-pipeline `processing.intake` overrides, Space-keying and hot-apply via `PUT /system/scheduler`. Its javadoc `:39-49` records the DELIBERATE divergence from §3.5's sketch — inbox lag is *positive* feedback and would pin a healthy pipeline at the floor, so it closes the loop on cycle overrun instead. ⚠ The only residual is `baseCap=0` (off by default), which is **already tracked on the §3 Pipeline graph row** (*“flip the intake cap on by default — needs a soak”*) ⇒ ⛔ do not re-file it here.ge admission · ~~GAP-6 Vault/KMS (SEC-8)~~ → **DEMAND-GATED, not buildable** (2026-09-16). `okf/capabilities/security/security.md` §5 is the owner and says Enterprise-only, **only when a client policy requires it**, *“nothing else is designed”*; building needs a live Vault/KMS host this repo does not have. ⚠ The seam ALREADY EXISTS (`SecretsProvider` SPI + `SecretResolver.java:59-67` ServiceLoader discovery), so there is **no preparatory work** either — a provider drops in as another ServiceLoader module with no core change. ⛔ Reopen only on a NAMED client policy; do not carry as open build work. · ~~GAP-10 bundle missing 13 archived docs (SCR-10)~~ → 🔴 **REFUTED 2026-09-16 — the ROW TITLE MISREAD ITS OWN SPEC.** `plans-archive/deployment-topology-plan.md:420` describes a machine-local NTFS **deny-ACL** on 13 files, whose remedy was Administrator `takeown`+`icacls` — **never a repo change and never “add docs to the bundle”**. `package.ps1:1585-1602` already stages the WHOLE `docs/` tree recursively with nothing excluded, and a byte-level read of all **498** docs files returns exit 0, zero unreadable (`plans-archive/` = 162 entries, all readable). Condition observed once on one host at `d998ae8b` (2026-07-24), not reproducible. ⚠ A real bundle diff is **verification owed**, but confirmatory only — the failure mode it named (unreadable sources) demonstrably no longer exists.
 
-- **P2** · 🔴 **`BUNDLE-SHIPS-THE-ARCHIVE-1` — every customer bundle contains the entire never-maintained docs tier.** Filed 2026-09-16, found while REFUTING GAP-10 — which had worried that 13 of these files were *missing*. ⚠ **The real exposure is the exact inverse, and it is 248 files wide:** `package.ps1:1585-1602` stages all of `docs/` recursively, and **248 of the 498 files — half the tree — are `docs/archived-documents/`**, the tier CLAUDE.md defines as *“kept for provenance, never maintained, never linked as current”*, carrying ~570 known-broken internal links, superseded designs and refuted claims. ⛔ **Needs an operator call BEFORE any code** — three options: ship none of the archive · ship it under a clearly-marked subtree with a *not maintained* banner · keep shipping as-is. The filter in `package.ps1` step 7 is cheap once decided; **the decision is the work.** ⇒ §1. Phases 0–5 all unbuilt. ✅ **This row is ALSO the board home of the thirteen plan items `SPEC-DEPLOY-ROWS-1` counted (closed 2026-09-15 by naming them here rather than filing thirteen rows that would duplicate the spec):** the preflight tool · the acceptance script · the off-site backup copy · upgrade/rollback automation · the sizing table · the disaster-recovery pack · phases 0–5 (six) · the platform list · the government-variant refusal · **`SCR-4`** (nginx/IIS proxy + TLS reference configs — TLS, HSTS, static-UI gzip, `/metrics` + `/health/details` restricted to the monitoring network; ⚠ still the one item whose only statement anywhere else is its acceptance line). Their durable specification is `okf/capabilities/editions/editions.md` §3.9–§3.14; this row tracks the BUILD. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `okf/backend/build-run/build-test.md` §11
+- **P2** · ✅ **`BUNDLE-SHIPS-THE-ARCHIVE-1` — BUILD HALF SHIPPED 2026-09-16 (`f8ede68a`); the row stays open on two residuals only.** The operator answered on 2026-09-16: **ship none of the non-current tiers**, and **withhold `BACKLOG.md` + `PROJECT_NOTES.md` as well** on audience grounds — they are current-tier and accurate, but the defect board names open P1s in the product the customer just installed. Two SEPARATE named lists (tier vs audience) so the reasons are never conflated, matched on the FIRST path segment only, with the reason inline per entry — ⛔ not a glob, because a glob records no reason. Fails closed BOTH ways: `DOCS TIER LEAK`, `DOCS AUDIENCE LEAK`, `DOCS OVER-FILTERED`, each mutation-proven to fire. Result: **staged 217, withheld 280**; zero archive, zero `superpower`, neither internal file, every required current-tier tree present. 🔴 **The exposure was WIDER than this row measured: 272 of 491 shipped docs files (55%) were non-current** — the archive *plus* 26 in-flight `superpower/` plans, which the row had only flagged as worth checking. ⛔ **Residual 1 — the AFTER bundle build is UNRUN**: PowerShell is blocked in the agent sandbox, so step 7 was extracted and driven verbatim against the live tree and the script parse-checked whole, but no `package.ps1` end-to-end run has happened. The next shift with `pwsh` must run it once and confirm the `docs: staged N … withheld N` line and a zip with zero `archived-documents` entries. ⛔ **Residual 2 — `BUNDLE-DANGLING-LINKS-1`** (new row): 198 inbound links from current-tier docs into the withheld trees. ⚠ Also settled in passing: root `compliance/` is **not** in the bundle at all (it is not under `docs/`). *(Original row text follows.)* Filed 2026-09-16, found while REFUTING GAP-10 — which had worried that 13 of these files were *missing*. ⚠ **The real exposure is the exact inverse, and it is 248 files wide:** `package.ps1:1585-1602` stages all of `docs/` recursively, and **248 of the 498 files — half the tree — are `docs/archived-documents/`**, the tier CLAUDE.md defines as *“kept for provenance, never maintained, never linked as current”*, carrying ~570 known-broken internal links, superseded designs and refuted claims. ⛔ **Needs an operator call BEFORE any code** — three options: ship none of the archive · ship it under a clearly-marked subtree with a *not maintained* banner · keep shipping as-is. The filter in `package.ps1` step 7 is cheap once decided; **the decision is the work.** ⇒ §1. Phases 0–5 all unbuilt. ✅ **This row is ALSO the board home of the thirteen plan items `SPEC-DEPLOY-ROWS-1` counted (closed 2026-09-15 by naming them here rather than filing thirteen rows that would duplicate the spec):** the preflight tool · the acceptance script · the off-site backup copy · upgrade/rollback automation · the sizing table · the disaster-recovery pack · phases 0–5 (six) · the platform list · the government-variant refusal · **`SCR-4`** (nginx/IIS proxy + TLS reference configs — TLS, HSTS, static-UI gzip, `/metrics` + `/health/details` restricted to the monitoring network; ⚠ still the one item whose only statement anywhere else is its acceptance line). Their durable specification is `okf/capabilities/editions/editions.md` §3.9–§3.14; this row tracks the BUILD. *(Re-grounded 2026-09-08. The "(after §1 D1–D8 are signed)" gate is dropped — §1 records all 28 decided 2026-09-06, which §7 already flagged. **GAP-2 and GAP-8 were shipped work this row had inherited as open** and are struck: Enterprise is a real `package.ps1` flavour (EDG-01) and the Postgres driver rides the bundle as `postgresql.jar` (PG-1). ⚠ **GAP-4 verified STILL OPEN** — D11 shipped as a pair and only the concurrency half is on by default; `DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships, and the committed corpus sets `memory_limit: ""`. Do not close it off the D11 row.)* → `okf/backend/build-run/build-test.md` §11
 
   ⚠ **GAP-4 RE-GROUNDED 2026-09-16 — still OPEN, but it is an OWED §1 CALL, not buildable work, and the
   signed D3 VALUE is REFUTED.** The gap is real: `DuckDbUtil.memoryLimit(configured)` (`:215-221`) falls
@@ -1531,6 +1541,24 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
 
 - **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**
+  ✅ **THE `meta` TYPE LANDED 2026-09-16 (`c3b3fc5f`, BREAKING)** — census now covers **three of nine**:
+  `pipeline`, `alert`, `meta`. `meta` has **no parser-only list at all**: all five of `SemanticModel.load`'s
+  top-level reads are already spec-declared. Ratchet: `MetaKeyCoverageContractTest`. Verified in the MAIN
+  checkout — `inspecto-config` 155/0/0/0, `inspecto-engine` 1656/0/0/0, both new test classes observed to
+  RUN, both mutation-proven RED first.
+  ⚠ **The subtlety worth keeping:** `SemanticModel.load` DOES call `entrySet()` three times — but one
+  level **down**, over `tables`/`kpis`/`reports`, whose keys are **author-invented names**. So `meta` is
+  censused at the top level and deliberately is **not** a censused parent; descending would refuse every
+  KPI anyone names. ⛔ **A scan that merely asked "does this file contain `entrySet`?" would have refused
+  the type for the wrong reason** — apply the reusable test at the granularity the checker actually uses.
+  🔴 **Recorded because it weakens a guard I shipped:** adding `meta` to `censusedParents` *alone* does
+  **not** go red — `unknownKeyFindings` skips a parent with no accepted sub-blocks, so the descent-guard
+  test cannot return a hit for that mutation on its own. The scope limit is written into the test comment
+  rather than left to read as a stronger guard than it is.
+  ⛔ **`widget` and `dashboard` are STRUCK from "the remaining seven"** — they never reach `/config/write`;
+  see the new `COMPONENT-KIND-KEY-CENSUS-1`. ⇒ **Still open: four types** (`enrichment`, `job`, `schema`,
+  `expectation`), plus the unchanged `RecipeCompiler` WARNING seam and `PipelineGraphRoutes` blockers,
+  both of which were re-grounded 2026-09-16 and are still genuinely blocked.
   ✅ **THE `alert` TYPE LANDED 2026-09-16 (`f0ad2ffc`, BREAKING), verified 16 modules / no skips.** The
   census now covers **two of nine** config types: `pipeline` and `alert`. An `alert` config carrying a key
   that neither `ConfigSpecs.alert()` declares nor `AlertRule.fromMap` reads now produces an unknown-key
@@ -1770,7 +1798,27 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   never performed. ⛔ **A row struck as SHIPPED is where open work hides** — this is the second time that
   has been recorded on this board.
 
-- **P2** · 🔴 **`JOB-PATH-BACKUPTASK-SPLIT-1` — the gate and the backup RUNTIME now disagree, which
+- ~~**P2** · **`JOB-PATH-BACKUPTASK-SPLIT-1`**~~ ✅ **SHIPPED 2026-09-16** (`3f384182`). All five backup
+  sites now call `PathJail.requireJobPathUnderAny(…, SpaceConfigRoot.current(), …)` — `dir` +
+  `backup_dir` (backup), `backup_dir` (verify), `archive` + `target_dir` (restore). No second rule
+  invented; the ambiguous-case refusal and the null-Space legacy branch are `resolveJobPath`'s, reached
+  unchanged and pinned. ⛔ **One site deliberately NOT moved** — verify's `archive` (`:191`) names a file
+  *inside* the already-resolved `backup_dir` and is jailed against **that**, not the Space root; moving it
+  would reopen the `../outside.zip` read-out. Verified in the MAIN checkout under the profile that
+  actually compiles the module (a default build never does): `mvn -o -pl inspecto-backup -am test
+  -Pedition-standard` = **15/0/0/0**, all three test classes observed to RUN. Mutation-proven: reverting
+  to `requireUnderAny` gives 1 failure + 4 errors, each field failing at its own act line.
+  🔴 **The row's stated blocker was REFUTED, and it was the reason the row sat deferred.** The
+  module-graph question was never open: the `inspecto-engine` mention in `inspecto-backup/pom.xml` is in
+  the `<description>` **prose**, not a `<dependency>`, and `BackupTask` **already imported**
+  `com.gamma.pipeline.ComponentStore` — same package and jar as `SpaceConfigRoot`. No `inspecto-config`
+  push-down was needed. ⛔ **A blocker stated as two contradicting reports is a question nobody asked the
+  compiler.** ⚠ Line numbers on this row were also off by one on restore.
+  ⚠ **`JOB-DIR-CWD-CONTAINMENT-1`'s struck row and commit `a7ab607b`'s message both still say "all four
+  run-time jail sites". It is now NINE** (4 engine + 5 backup) — corrected here; the commit message
+  cannot be.
+  → `okf/backend/control-plane/jobs.md` · original row follows.
+  - **P2** · 🔴 **`JOB-PATH-BACKUPTASK-SPLIT-1` — the gate and the backup RUNTIME now disagree, which
   `resolveJobPath`'s own javadoc says must never happen.** Filed 2026-09-16. `BackupTask`
   (`inspecto-backup/.../BackupTask.java`) handles **four of the five keys the operator decision names** and
   still resolves every one CWD-relative through the plain jail — `:81-83` (`dir`, `backup_dir`),
@@ -1786,7 +1834,35 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   rather than a comment. The alternative is pushing the Space-root lookup DOWN into `inspecto-config`
   beside `PathJail`, the push-don't-pull shape `DiscoveredRoots` already uses.
 
-- **P2** · 🔴 **`JOB-PATH-COMPAT-SURVEY-1` — committed job configs changed meaning, and most of them
+- **P1** · 🔴 **`JOB-PATH-COMPAT-SURVEY-1` — SURVEY DONE 2026-09-16 (`6c3dbd6e`), and it RE-RANKS this
+  row from P2 to P1: on a deployed tree the change refuses EVERY relative path in EVERY committed job
+  config.** Full survey: [`superpower/job-path-compat-survey.md`](superpower/job-path-compat-survey.md).
+  37 configs, 24 carrying 33 relative values, **zero absolute values anywhere**. Deployed: **28 NOW
+  REFUSE** — that is every covered value, because once the old path exists no committed value can resolve
+  identically, so the ambiguous-case branch fires for all of them. Fresh checkout: **15 silently
+  re-point**. **UNAFFECTED = 0 in both columns.**
+  ⇒ **Ranked P1 because it is a regression in work that shipped the SAME DAY** (`JOB-DIR-CWD-CONTAINMENT-1`),
+  not a longstanding gap — and because two of the five jobs `inspecto/examples/06-serve/maintenance-library`
+  advertises in its own `probes.txt` are broken right now, not merely at save.
+  ⚠ **Method — the reason these numbers are trustworthy:** `PathJail` was **compiled from the tree and the
+  real `resolveJobPath` CALLED** twice per value, rather than re-implemented in a script; a hand-mirrored
+  copy of a rule has drifted four times in this repo. Four positive controls, each proven to fire — the
+  load-bearing one being that the **zero** hits for `archive`/`target_dir` are a *proven* absence, since
+  the same regex finds 35 `backup_dir` hits.
+  🔴 **Three of this row's own claims are REFUTED.** (1) `config_backup_job.toon` is **not** "unsavable" —
+  its values sit under `params:` and the gate reads `RawConfig.str(raw, "job."+k)`, a dotted path from the
+  root, so `job.params.dir` is invisible to it; it saves fine and the refusal is run-time only. (2) The
+  `inspecto/examples/**` values do **not** re-point silently — `serve-example.sh:50` pre-creates the old
+  paths before boot, so they REFUSE. (3) `spaces/default`'s **five** `pipeline_config` values are missing
+  from this row entirely and refuse unconditionally.
+  ⛔ **`JOB_PATH_KEYS` is SIX keys, not the five the operator decision named** (`ConfigSafetyValidator.java:122`,
+  verified independently) — the extra one is `pipeline_config`, the most common path key in committed
+  configs (12 of 33) and the largest single source of refusals. **A decision that enumerates its own scope
+  can still be narrower than the code that implements it.**
+  ⇒ Remedy is `JOB-PATH-DEMO-CONFIG-REPOINT-1` plus the four defects below. Not verified: no job was
+  actually RUN — consequences are read off call sites, and a live `SMOKE` over `spaces/demo` would settle
+  it. → `okf/backend/control-plane/jobs.md` · original row follows.
+  - **P2** · 🔴 **`JOB-PATH-COMPAT-SURVEY-1` — committed job configs changed meaning, and most of them
   changed SILENTLY.** Filed 2026-09-16; the survey below is the first on record, though `a7ab607b`'s own
   message called it a precondition. ⛔ **The loud-refusal guard only fires when the OLD path EXISTS on
   disk** — every value pointing at a not-yet-created directory re-points under `config/` with no refusal:
@@ -1797,6 +1873,61 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ **Three of the four demo rows are BACKUP jobs**, so they are exactly the ones hitting
   `JOB-PATH-BACKUPTASK-SPLIT-1` — refused at save while still running CWD-relative. ⇒ do both rows in one
   change, and re-point the demo/example configs to space-relative values as part of it.
+
+- **P1** · 🔴 **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` — 19 of 33 committed path values are gated under one
+  rule and RUN under another, and it is also a containment hole.** Filed 2026-09-16 from the survey;
+  **bigger than `JOB-PATH-BACKUPTASK-SPLIT-1`, which is now shipped.** `PipelineJobRunner:242` passes
+  `pipeline_config` straight to `PipelineConfig.load(flatPath)` and `:266` passes `data_dir` on, **with no
+  `PathJail` call at either site** — verified independently, not taken from the survey. ⚠ Its own javadoc
+  (`:508`) states *"Job configs bypass `ConfigSafetyValidator`"*, which contradicts that validator having
+  a `checkJob`; one of the two is wrong and the discrepancy is itself the finding. ⇒ Ranked P1: an
+  unjailed path read is a containment defect, not a consistency nit. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · 🔴 **`JOB-PATH-COMPACTOR-UNJAILED-1` — two compactors walk and DELETE under a raw, unjailed
+  path.** `PartitionCompactor.java:57` and `ReferenceCompactor.java:91` do `Path.of(cfg.require("dir"))`
+  and then `Files.walk` + merge/delete. **Every other `dir` reader jails.** ⚠ Predates the 2026-09-16
+  semantics change — it is not a regression, which is exactly why nobody found it while looking at that
+  change. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1` — a THIRD base for the same value.**
+  `ConfigWriteRoutes.java:370` passes `target.getParent()` (`…/config/jobs`) where `JobRoutes:381` passes
+  the Space root. Driven: `spaces/demo/data/backups` resolves to two different places through the two
+  gates. ⇒ One value, two gates, two answers. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PATH-GATE-BLIND-KEYS-1` — the gate cannot see the keys it claims to cover.** Dotted-path
+  blindness hides **11** values under `params:` from `RawConfig.str(raw, "job."+k)`; `archive_dir` is
+  resolved with the NEW rule at run time (`CleanupTask:47`) but is absent from `JOB_PATH_KEYS`; `out_dir`
+  (`ReportJob:125`) is covered by neither. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point all 33 committed values space-relative.** The
+  remedy half of the survey. ⛔ Do it in the same change as whichever runtime row lands last, or the
+  configs refuse in between. → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`COMPONENT-KIND-KEY-CENSUS-1` — `widget` and `dashboard` can never be censused by
+  `AcceptedConfigKeys`.** Filed 2026-09-16 out of `DUCKLE-C3-DEAD-PROPERTY-1`, which had listed them among
+  its "remaining seven". They never reach `/config/write` at all: the UI saves both through
+  `POST|PUT /components/{kind}` (`components.service.ts:173,194` → `ComponentRoutes`). A table in
+  `AcceptedConfigKeys` is a **no-op** for them. ⚠ And their persisted body carries `name`, `owner` and
+  `shares` (`ComponentAccess.java:54-55,95-96`), which no `ConfigSpec` declares — a naive spec-derived
+  refusal would reject essentially every real save. ✅ **Smaller than first reported, though:** the agent
+  called this "a different and bigger change", but `ComponentRoutes.java:605` **already calls**
+  `ConfigSafetyValidator.check("schema", …)`, so the per-kind validation seam exists at `:602-611` and
+  this is an extension of a live pattern, not a new one. → `okf/backend/config/config-safety.md`
+
+- **P3** · **`REACTOR-VERDICT-CI-1` — wire `check-reactor-verdict.mjs` into `ci.yml`.** Residual of
+  `REACTOR-HALT-IS-A-SILENT-PASS-1`. ⛔ **NOT pre-push**, deliberately: every other guard is a ~1s
+  argument-free repo-state check, this one judges a BUILD, and producing a log at push time means a
+  20-minute reactor per push — which the hook's own header says gets `core.hooksPath` unset entirely. CI
+  already runs a full reactor, so the log is free there. Operator's call to wire.
+  → `okf/backend/build-run/build-test.md`
+
+- **P2** · **`BUNDLE-DANGLING-LINKS-1` — the shipped INDEX points at documents the customer does not
+  have.** Residual of `BUNDLE-SHIPS-THE-ARCHIVE-1`, which now withholds two doc trees from the bundle.
+  Current-tier docs link INTO those trees **198 times** (187 `archived-documents`, 11 `superpower`),
+  `INDEX.md` — which lists both as sections — `GLOSSARY.md` and `ADVANCED_GUIDE.md` among them.
+  Withholding does not rewrite them. Three options: rewrite at package time · ship a marked stub per
+  withheld target · accept and say so in the bundle README. ⇒ Owed call.
+  → `okf/backend/build-run/build-test.md`
 
 - ~~**P3** · **`WORKTREE-PROVISIONING-1`**~~ ✅ **CLOSED 2026-09-16 — one half FIXED, the other half
   REFUTED, and the refuted half was MY OWN claim.**
@@ -1827,7 +1958,31 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   by luck, not design. A preflight check was also rejected: after this fix there is no mis-provisioned
   state left for it to detect.
 
-- **P2** · 🔴 **`REACTOR-HALT-IS-A-SILENT-PASS-1` — an upstream red makes downstream tests report as
+- ~~**P2** · **`REACTOR-HALT-IS-A-SILENT-PASS-1`**~~ ✅ **SHIPPED 2026-09-16** (`eae6fd7f`) as
+  `tools/check-reactor-verdict.mjs` — it cross-checks exit code, Reactor Summary and surefire-report
+  **mtimes** against the build window read from Maven's own footer. `NON-VERDICT` is now a distinct
+  required outcome for the `verify-runner` agent: **a SKIPPED module is UNVERIFIED, not passing.**
+  🔴 **The premise was real and WIDER than filed, and the third mechanism is the one that matters:
+  `mvn clean` only cleans modules the reactor REACHES**, so a halted build leaves every downstream
+  module's `target/surefire-reports/*.txt` from the PREVIOUS run — green, plausible, unmarked.
+  ⛔ **Which makes this project's own authoritative verify recipe the delivery mechanism.** `build-verify`
+  said *"do not parse the log — SUM THE SUREFIRE REPORTS"*; measured on the real 32-module reactor, a
+  build forced to die at `asn-core` with **30 modules SKIPPED** reported `MODULES=25 TOTAL=4667
+  failures=0` against a true green of `MODULES=26 TOTAL=4694`. A clean sheet, 27 tests off baseline. That
+  recipe is **demoted to an exploratory count, never a verdict**.
+  ⚠ **The row's own remedy was insufficient**: requiring a per-module `Tests run` total does not help —
+  the halted tree HAS those totals for 25 modules, they are merely stale. **Report FRESHNESS is the
+  load-bearing check** and the row never mentioned it.
+  🔴 **The guard shipped the very trap it exists to catch, and only testing on reality found it:** its
+  first row regex required a `…` dot leader, but Maven emits **zero dots** when a module name is long, so
+  it parsed 12 of 32 rows and called them all SUCCESS — blind to 20 modules. It now self-checks its parse
+  against Maven's *Reactor Build Order* and fails rather than under-report. Falsified both ways on the
+  real reactor plus four synthetic reds.
+  ⚠ `build-test.md` had carried this warning **as prose since 2026-09-08** and it prevented neither
+  2026-09-16 occurrence. ⛔ **A third prose warning was never going to be the fix.**
+  ⇒ Residual filed as `REACTOR-VERDICT-CI-1` (wiring). Not verified: `-fae` with multiple failing
+  modules; non-English Maven locale. → `okf/backend/build-run/build-test.md` · original row follows.
+  - **P2** · 🔴 **`REACTOR-HALT-IS-A-SILENT-PASS-1` — an upstream red makes downstream tests report as
   “no failures”.** Filed 2026-09-16, and it nearly landed a false verdict TWICE today. A red in an upstream
   module (e.g. `inspecto-config`) **halts the reactor**, so every module under test is `SKIPPED` — and under
   `mvn -q` that reads as a clean run. One agent came within a sentence of reporting a pass on tests that

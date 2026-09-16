@@ -220,6 +220,18 @@ build fault**. Both editions pass with `-NoRuntime`. Re-prove jlink on a box wit
 
 ⚠ **Known consequence, not yet decided: 198 dangling links.** Current-tier docs link *into* the withheld trees **187 times to `archived-documents/` and 11 times to `superpower/`** — including `INDEX.md` (which lists both trees as sections), `GLOSSARY.md`, `ADVANCED_GUIDE.md` and `BACKLOG.md`. Withholding the trees does not rewrite those links, so the shipped `INDEX.md` now points at documents the customer does not have. ⛔ This is a real residual and needs an operator call of its own: rewrite/strip the inbound links at package time, ship a marked stub, or accept them.
 
-⚠ **Still shipping, and arguably also not customer material: `BACKLOG.md` and `PROJECT_NOTES.md`.** Both are current-tier by `CLAUDE.md`'s own list, so they were deliberately **left in** rather than silently dropped — but `BACKLOG.md` is the internal defect board, naming open P1s in the product the customer just installed. Whether an *audience* filter belongs beside the *tier* filter is a separate product call. ⛔ Do not resolve it by quietly extending `$docsExcludedTrees`.
+✅ **`BACKLOG.md` and `PROJECT_NOTES.md` are ALSO withheld, by operator decision 2026-09-16** — but through a **second, separate list**, `$docsExcludedFiles`, with its own assertion (`DOCS AUDIENCE LEAK`). ⛔ **The two lists are deliberately not merged.** These two files are current-tier by `CLAUDE.md`'s own canon list and are accurate and maintained; they are withheld because of **audience** — `BACKLOG.md` is the internal defect board, naming open P1s by identifier in the product the customer just installed. A tier exclusion and an audience exclusion are different claims, and collapsing them into one list would lose why either tree is out. ⚠ This paragraph read *"Still shipping … a separate product call"* until that decision landed the same day.
 
 Root `compliance/` is **not** under `docs/` and has never shipped in the bundle — verified from the same zip entry table. → `BUNDLE-SHIPS-THE-ARCHIVE-1` in `BACKLOG.md`
+
+## Open rows this concept owns
+
+⚠ Listed here so the concept knows what it owes; the board carries the detail. A pointer from a row to
+this file is a claim, checked by `tools/check-backlog-homes.mjs`.
+
+- **`REACTOR-VERDICT-CI-1`** — wire `check-reactor-verdict.mjs` into `ci.yml`. ⛔ Deliberately NOT
+  pre-push: it judges a *build*, not repo state, and producing a log at push time means a ~20-minute
+  reactor per push. CI already runs one, so the log is free there.
+- **`BUNDLE-DANGLING-LINKS-1`** — the bundle now withholds two doc trees, but current-tier docs link
+  **into** them 198 times (`INDEX.md` included), so a shipped index points at documents the customer does
+  not have. Rewrite at package time · ship marked stubs · accept and say so in the bundle README.

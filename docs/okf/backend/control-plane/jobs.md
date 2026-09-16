@@ -632,3 +632,29 @@ see the partition-drift rule in [consignment-addressing](../engine/consignment-a
 builders, or `Batch`/`PipelineNode`. Each omission is a decision, not an oversight.
 
 *Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*
+
+## Open rows this concept owns — the job-path semantics change (2026-09-16)
+
+`JOB-DIR-CWD-CONTAINMENT-1` made `PathJail.resolveJobPath` the single rule for a job's relative paths.
+The survey that followed ([`superpower/job-path-compat-survey.md`](../../../superpower/job-path-compat-survey.md))
+found the change reaches further than the decision that authorised it. ⛔ **`JOB_PATH_KEYS` is SIX keys,
+not the five the decision names** — the extra one is `pipeline_config`, the most common path key in
+committed configs.
+
+- **`JOB-PATH-COMPAT-SURVEY-1`** (P1) — on a deployed tree, **every** relative path value in **every**
+  committed job config now refuses: once the old path exists, no committed value resolves identically, so
+  the deliberate ambiguous-case branch fires for all 28. On a fresh checkout 15 silently re-point instead.
+- **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`** (P1) — `PipelineJobRunner:242` and `:266` pass
+  `pipeline_config` and `data_dir` on with **no `PathJail` call at either site**: 19 of 33 values gated
+  under one rule and run under another, and a containment hole. ⚠ Its javadoc at `:508` claims job configs
+  bypass `ConfigSafetyValidator`, which contradicts that validator having a `checkJob`.
+- **`JOB-PATH-COMPACTOR-UNJAILED-1`** — `PartitionCompactor:57` and `ReferenceCompactor:91` walk and
+  delete under a raw `Path.of(cfg.require("dir"))`. Predates the change, which is why looking at the
+  change did not find it.
+- **`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`** — `ConfigWriteRoutes:370` uses `target.getParent()` where
+  `JobRoutes:381` uses the Space root: one value, two gates, two answers.
+- **`JOB-PATH-GATE-BLIND-KEYS-1`** — `RawConfig.str(raw, "job."+k)` is a dotted path from the root, so 11
+  values under `params:` are invisible to the gate; `archive_dir` is resolved at run time but is not in
+  `JOB_PATH_KEYS`; `out_dir` is covered by neither.
+- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point all 33 committed values space-relative. ⛔ Land it with
+  whichever runtime row lands last, or the configs refuse in between.

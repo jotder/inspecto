@@ -307,3 +307,12 @@ Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`
 ratchets), and
 `AcceptedConfigKeysDocContractTest` (the generated pipeline table). Each ratchet includes a
 *falsify-the-scan* test, because a scan that silently matches nothing passes every other assertion.
+
+## Open rows this concept owns
+
+- **`COMPONENT-KIND-KEY-CENSUS-1`** — `widget` and `dashboard` can never be censused by
+  `AcceptedConfigKeys`: they never reach `/config/write`, because the UI saves them through
+  `POST|PUT /components/{kind}`. ⚠ Their persisted body also carries `name`, `owner` and `shares`, which
+  no `ConfigSpec` declares, so a naive spec-derived refusal would reject essentially every real save.
+  ✅ The seam already exists — `ComponentRoutes.java:605` calls `ConfigSafetyValidator.check("schema", …)`
+  at `:602-611`, so this extends a live pattern rather than inventing one.
