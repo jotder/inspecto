@@ -140,6 +140,40 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **A GUARD FAILS IN THE DIRECTION OF PASSING — five instances in two days** (2026-09-16/17). Each was
+  green while blind: a prose regex that required the number word to touch its noun, so a **bolded** count
+  matched nothing; surefire reports surviving `mvn clean` (which only cleans modules the reactor REACHES),
+  so a halted build summed a previous run's greens; an allow-list scope (`ROOTS`) that never scanned
+  `inspecto/`, hiding a broken customer-facing README for months; a deny-list validated on a tree that
+  lacked the thing it should deny (the packaged bundle output), so it was green for its author and
+  2417-red on a checkout that had ever built one; and a shipped `probe()` written as
+  `curl -fsS … || echo "(request failed)"` — **a probe that cannot fail**. ⇒ **Falsify every guard BOTH
+  ways before trusting it**, and prove the probe returns a hit on a positive control. A guard you have
+  only ever seen pass is not verified. ⛔ When a guard's reach is WIDENED, re-run it before assuming the
+  case you were chasing is the only one — every widening this shift found more.
+
+- 🔴 **MOVING A READER IS NOT DONE UNTIL ITS COMMITTED CONFIGS MOVE WITH IT** (2026-09-16). The one-sided
+  break happened THREE times in one day, and every time the reader was ours: `BackupTask`, `CleanupTask`,
+  then the compactors. The symptoms are quiet — a cleanup sweeping an empty doubled directory and
+  reporting success; a verify returning a green "no archive to verify". ⚠ A lane working from a stale base
+  **cannot see that it is the one who moved the reader**. ⇒ Land the reader and its configs in one change,
+  or sequence them explicitly on the row.
+
+- ⛔ **THE GIT INDEX AND WORKING TREE ARE SHARED BETWEEN SESSIONS** (2026-09-17). A peer's `git add` stages
+  into *your* staging area, and their uncommitted file can turn *your* pre-push red — in one case failing
+  a different guard depending on whether it was staged. Use `git commit --only <paths>`. ⚠ And when you
+  find a file that is not yours: **UNSTAGE it, never delete it** — `git restore --staged` leaves it on
+  disk. `rm` plus `git checkout --` destroyed a peer's uncommitted plan this shift; it survived only
+  because they re-created it. ⚠ `git apply -3` also writes to the index, and swept another lane's files
+  into the wrong commit twice in one day.
+
+- ⚠ **A PER-MODULE GREEN IS NOT A TREE GREEN** (2026-09-16/17, hit four times). `inspecto-exchange` is
+  edition-gated, so no lane's `mvn -o -pl inspecto -am test` compiles it — it failed a combined run every
+  lane had passed. A cross-field rule change in `inspecto-config` went red three modules downstream in
+  `inspecto-intelligence`. ⛔ `mvn -o -pl inspecto-ops -am` does not even RESOLVE without
+  `-Pedition-standard`, which is why the repo's only sweep over every committed Space config never ran in
+  a default build. ⇒ Gate on `tools/check-reactor-verdict.mjs`, never on a sum of surefire reports.
+
 - 🔴 **WRITING A FILE THROUGH A PYTHON/HEREDOC LAYER CORRUPTED THREE FILES IN ONE SHIFT** (2026-09-16).
   Three separate traps, one root cause — an escape interpreted by the *writer* instead of landing as text:
   (a) `"🔴"` in a Python string is two **lone surrogates**, which cannot be UTF-8 encoded; `open(w)`
