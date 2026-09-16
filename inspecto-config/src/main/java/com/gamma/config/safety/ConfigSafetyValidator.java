@@ -102,7 +102,7 @@ public final class ConfigSafetyValidator {
         switch (type) {
             case "pipeline" -> checkPipeline(raw, p, configDir, out);
             case "enrichment" -> checkEnrichment(raw, p, out);
-            case "job" -> checkJob(raw, p, out);
+            case "job" -> checkJob(raw, p, configDir, out);
             default -> { /* schema / meta: no path/numeric/output surface to gate */ }
         }
         return out;
@@ -121,8 +121,28 @@ public final class ConfigSafetyValidator {
     private static final List<String> JOB_PATH_KEYS =
             List.of("data_dir", "pipeline_config", "dir", "backup_dir", "archive", "target_dir");
 
-    private static void checkJob(Map<String, Object> raw, SafetyPolicy p, List<Finding> out) {
-        for (String k : JOB_PATH_KEYS) checkPath(raw, "job." + k, p, out);
+    /**
+     * ⚠ {@code configDir} here is the <b>Space config root</b>, and unlike every other kind it is USED:
+     * a job's relative path resolves against it ({@code JOB-DIR-CWD-CONTAINMENT-1}, operator
+     * 2026-09-16), through the same {@link PathJail#resolveJobPath} the run-time tasks call. ⛔ The two
+     * must not diverge — a gate that resolved differently from the jail would pass a draft the run then
+     * refuses, which is the split the whole row was about. A {@code null} root leaves the legacy
+     * working-directory behaviour, for a caller with no Space.
+     */
+    private static void checkJob(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
+        for (String k : JOB_PATH_KEYS) {
+            String field = "job." + k;
+            String v = RawConfig.str(raw, field);
+            if (v == null || v.isBlank()) continue;
+            Path resolved;
+            try {
+                resolved = PathJail.resolveJobPath(configDir, v, field);
+            } catch (RuntimeException ex) {
+                out.add(Finding.error(field, ex.getMessage()));
+                continue;
+            }
+            checkPathValue(field, resolved.toString(), p, out);
+        }
     }
 
     // ── pipeline ─────────────────────────────────────────────────────────────────────

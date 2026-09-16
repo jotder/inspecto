@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.config.safety.PathJail;
+import com.gamma.pipeline.SpaceConfigRoot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ final class CleanupTask {
 
     static JobResult run(JobConfig cfg, boolean dryRun) {
         List<Path> jailRoots = PathJail.allowedRoots();
-        Path dir = PathJail.requireUnderAny(jailRoots, cfg.require("dir"), "dir");
+        Path dir = PathJail.requireJobPathUnderAny(jailRoots, SpaceConfigRoot.current(), cfg.require("dir"), "dir");
         long days = Long.parseLong(cfg.opt("retention_days", "7"));
         String glob = cfg.opt("glob", "*");
         int maxCount = Integer.parseInt(cfg.opt("max_count", "0"));    // 0 = no count cap
@@ -43,7 +44,7 @@ final class CleanupTask {
         boolean archive = Boolean.parseBoolean(cfg.opt("archive_instead_of_delete", "false"));
         // Archiving needs an explicit destination — no silent default that a later cleanup would re-walk.
         Path archiveDir = archive
-                ? PathJail.requireUnderAny(jailRoots, cfg.require("archive_dir"), "archive_dir") : null;
+                ? PathJail.requireJobPathUnderAny(jailRoots, SpaceConfigRoot.current(), cfg.require("archive_dir"), "archive_dir") : null;
         long t0 = System.nanoTime();
         if (!Files.isDirectory(dir)) {
             return JobResult.ok("cleanup: directory not present, nothing to do (" + dir + ")", 0L);

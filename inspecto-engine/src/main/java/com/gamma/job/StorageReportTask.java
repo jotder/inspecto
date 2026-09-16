@@ -42,7 +42,7 @@ final class StorageReportTask {
     static JobResult run(JobConfig cfg, String dataDir, JobContext ctx) {
         // Read-only, but still jailed: the walk logs the largest files by full path, so an unjailed
         // `dir` is directory enumeration of anywhere the server can read.
-        Path dir = PathJail.requireUnderAny(PathJail.allowedRoots(), cfg.require("dir"), "dir");
+        Path dir = PathJail.requireJobPathUnderAny(PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("dir"), "dir");
         long warnBytes = Long.parseLong(cfg.opt("warn_bytes", "0"));   // 0 = no threshold
         int top = Integer.parseInt(cfg.opt("top", "5"));
         long t0 = System.nanoTime();

@@ -375,7 +375,11 @@ final class JobRoutes implements RouteModule {
         // tasks' own run-time jail stays as belt. ERRORs refuse; warnings pass.
         Map<String, Object> raw = Map.of("job", body);
         List<Finding> findings = new java.util.ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.job(), raw));
-        findings.addAll(ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy()));
+        // JOB-DIR-CWD-CONTAINMENT-1: the Space config root is what a job's relative path resolves
+        // against (operator 2026-09-16) - the same base the run-time tasks use, so the 422 gate and the
+        // jail cannot disagree. A null root (no Space) keeps the legacy working-directory behaviour.
+        findings.addAll(ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy(),
+                com.gamma.pipeline.SpaceConfigRoot.current()));
         List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
                 .map(f -> f.fieldPath() + ": " + f.message()).toList();
         if (!errors.isEmpty()) throw new ApiException(422, "job refused at save: " + errors);

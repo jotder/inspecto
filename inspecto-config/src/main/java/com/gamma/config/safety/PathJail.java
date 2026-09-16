@@ -148,6 +148,57 @@ public final class PathJail {
      * @throws Escape if the value is a UNC path, is unparseable, escapes the root, or reaches
      *                outside it through a symlink
      */
+    /**
+     * <b>Resolve a JOB's path value (`JOB-DIR-CWD-CONTAINMENT-1`, operator 2026-09-16).</b> A relative
+     * path in a job config resolves against the <b>Space's config root</b>, never the process working
+     * directory — a job whose meaning depends on how the server happened to be launched is the defect
+     * this closes.
+     *
+     * <p>⛔ <b>This is the ONE place that rule lives.</b> The 422 write gate
+     * ({@code ConfigSafetyValidator.checkJob}) and the run-time tasks both call it, because a validator
+     * that resolved against the Space root while the tasks kept resolving against the CWD would pass a
+     * draft the run then jails — the exact split this method exists to end.
+     *
+     * <p>⚠ <b>The ambiguous case is REFUSED, not silently relocated</b> (operator's call): when the
+     * value does not exist under the Space root but DOES exist where the old working-directory rule
+     * would have put it, this throws and names BOTH paths. That turns a change in what every existing
+     * job's relative path MEANS into something an operator fixes deliberately, rather than a job that
+     * quietly starts reading somewhere else. ⛔ Do not "helpfully" fall back — the fallback is the bug.
+     *
+     * @param base the Space config root; {@code null} leaves the legacy working-directory behaviour in
+     *             place for a context that genuinely has no Space (the job runner outside a Space).
+     */
+    public static Path resolveJobPath(Path base, String value, String field) {
+        String s = value == null ? "" : value.trim();
+        if (s.isEmpty()) throw new Escape(field, value == null ? "null" : value, "is blank");
+        Path authored;
+        try {
+            authored = Paths.get(s);
+        } catch (RuntimeException ex) {
+            throw new Escape(field, s, "is not a valid path: " + ex.getMessage());
+        }
+        if (base == null || authored.isAbsolute()) return authored.toAbsolutePath().normalize();
+
+        Path spaceRelative = base.toAbsolutePath().normalize().resolve(authored).normalize();
+        if (Files.exists(spaceRelative)) return spaceRelative;
+
+        Path cwdRelative = authored.toAbsolutePath().normalize();
+        if (!spaceRelative.equals(cwdRelative) && Files.exists(cwdRelative))
+            throw new Escape(field, s, "is relative, and a job's relative path now resolves against the "
+                    + "Space config root (" + spaceRelative + ") — but nothing exists there, while "
+                    + cwdRelative + " does. That is the path this job used to mean. Make it absolute, or "
+                    + "move it under the Space root; it is not resolved silently either way");
+        return spaceRelative;
+    }
+
+    /** {@link #resolveJobPath} + the containment check, for a run-time task holding the Space root. */
+    public static Path requireJobPathUnderAny(List<Path> roots, Path base, String value, String field) {
+        if (roots == null || roots.isEmpty())
+            throw new IllegalArgumentException("no allowed roots configured for '" + field + "'");
+        Path resolved = resolveJobPath(base, value, field);
+        return requireUnderAny(roots, resolved.toString(), field);
+    }
+
     public static Path require(Path root, String value, String field) {
         String s = value == null ? "" : value.trim();
         if (s.isEmpty()) throw new Escape(field, value == null ? "null" : value, "is blank");

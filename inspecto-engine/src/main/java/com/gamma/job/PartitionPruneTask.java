@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.config.safety.PathJail;
+import com.gamma.pipeline.SpaceConfigRoot;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,7 +37,7 @@ final class PartitionPruneTask {
     private static final int MAX_DEPTH = 6;
 
     static JobResult run(JobConfig cfg, boolean dryRun) throws IOException {
-        Path dir = PathJail.requireUnderAny(PathJail.allowedRoots(), cfg.require("dir"), "dir");
+        Path dir = PathJail.requireJobPathUnderAny(PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("dir"), "dir");
         long days = Long.parseLong(cfg.require("retention_days"));   // required: forgetting is deliberate
         if (days < 1) throw new IllegalArgumentException("partition_prune retention_days must be >= 1");
         long t0 = System.nanoTime();

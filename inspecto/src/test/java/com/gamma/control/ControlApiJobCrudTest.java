@@ -56,9 +56,20 @@ class ControlApiJobCrudTest {
 
             // JOB-SPEC-1 (2026-09-06): the save runs containment — a job naming a directory outside the
             // space is refused HERE, not at the task's run-time jail (which stays as belt).
+            //
+            // 🔴 The probe was `../../outside` until 2026-09-16 and had to change with
+            // JOB-DIR-CWD-CONTAINMENT-1: a job's relative path now resolves against the SPACE CONFIG
+            // ROOT rather than the process working directory, and from there `../../outside` lands back
+            // INSIDE the allowed roots — so it stopped being an escape and the test would have been
+            // asserting 422 on a value that is legitimately contained. ⚠ It was also exactly the kind of
+            // layout-dependent probe that made this row: the same string escaped from a %TEMP% checkout
+            // and did not from C:/sandbox. An ABSOLUTE path off the filesystem root escapes under every
+            // layout, which is what the assertion is actually about.
+            String outsideAnyRoot = (java.io.File.listRoots()[0].toPath().resolve("outside-the-jail"))
+                    .toString().replace(java.io.File.separatorChar, '/');
             HttpResponse<String> escaping = send(c.port, "POST", base + "/jobs", """
                     {"name":"evil_sweep","type":"maintenance","task":"cleanup",
-                     "dir":"../../outside","retention_days":"30"}""");
+                     "dir":"%s","retention_days":"30"}""".formatted(outsideAnyRoot));
             assertEquals(422, escaping.statusCode(), escaping.body());
             assertTrue(escaping.body().contains("job.dir"), escaping.body());
             assertEquals(404, send(c.port, "GET", base + "/jobs/evil_sweep", null).statusCode(), "nothing was written");
