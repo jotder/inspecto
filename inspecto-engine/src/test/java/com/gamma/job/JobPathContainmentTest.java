@@ -105,6 +105,48 @@ class JobPathContainmentTest {
                 "read-only is not exempt — the walk logs every largest file by full path");
     }
 
+    // ── compact / reference_compact (JOB-PATH-COMPACTOR-UNJAILED-1) ──────────────
+
+    /**
+     * {@code compact} MERGES AND DELETES the files it walks, so an unjailed {@code dir} was the most
+     * destructive of the four maintenance tasks that read that key — and the last one to be jailed
+     * (2026-09-16). It predates the job-path semantics change, which is why looking at that change did
+     * not find it.
+     */
+    @Test
+    void compactRefusesADirOutsideTheAllowedRoots(@TempDir Path root) throws Exception {
+        jailTo(root);
+        String outside = escapesTo(root, "compact-exfil");
+        PathJail.Escape e = assertThrows(PathJail.Escape.class,
+                () -> new MaintenanceJob(job(Map.of("task", "compact", "dir", outside))).run());
+        assertEquals("dir", e.field(), "the message must name the offending field");
+    }
+
+    @Test
+    void compactStillRunsWhenTheDirIsInsideTheRoots(@TempDir Path root) throws Exception {
+        jailTo(root);
+        Path store = Files.createDirectories(root.resolve("store"));
+        JobResult r = new MaintenanceJob(job(Map.of("task", "compact", "dir", store.toString()))).run();
+        assertTrue(r.success(), () -> "a contained compact must not be refused: " + r.message());
+    }
+
+    @Test
+    void referenceCompactRefusesADirOutsideTheAllowedRoots(@TempDir Path root) throws Exception {
+        jailTo(root);
+        String outside = escapesTo(root, "refcompact-exfil");
+        PathJail.Escape e = assertThrows(PathJail.Escape.class,
+                () -> new MaintenanceJob(job(Map.of("task", "reference_compact", "dir", outside))).run());
+        assertEquals("dir", e.field());
+    }
+
+    @Test
+    void referenceCompactStillRunsWhenTheDirIsInsideTheRoots(@TempDir Path root) throws Exception {
+        jailTo(root);
+        Path store = Files.createDirectories(root.resolve("refstore"));
+        JobResult r = new MaintenanceJob(job(Map.of("task", "reference_compact", "dir", store.toString()))).run();
+        assertTrue(r.success(), () -> "a contained reference_compact must not be refused: " + r.message());
+    }
+
     // ── backup / backup_verify / restore ─────────────────────────────────────────
     // MOVED 2026-09-07 (EDG-01 cell 2) to inspecto-backup/src/test/java/com/gamma/job/BackupPathContainmentTest.java
     // with the tasks themselves (OPS-06 is "not for Personal"). The verify case that used to sit after

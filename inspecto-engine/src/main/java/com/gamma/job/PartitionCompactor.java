@@ -1,6 +1,8 @@
 package com.gamma.job;
 
+import com.gamma.config.safety.PathJail;
 import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +56,12 @@ final class PartitionCompactor {
     private PartitionCompactor() {}
 
     static JobResult run(JobConfig cfg) throws Exception {
-        Path root = Path.of(cfg.require("dir"));
+        // Same rule, same seam as every other maintenance task that reads `dir` (CleanupTask,
+        // PartitionPruneTask, StorageReportTask): a job's relative path resolves against the Space
+        // config root and must land under the allowed roots. This walk MERGES AND DELETES, so an
+        // unjailed `dir` was the most destructive of the four.
+        Path root = PathJail.requireJobPathUnderAny(
+                PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("dir"), "dir");
         long minAgeDays = Long.parseLong(cfg.opt("min_age_days", "1"));
         int minFiles = Integer.parseInt(cfg.opt("min_files", "4"));
         if (minFiles < 2) throw new IllegalArgumentException("compact min_files must be >= 2");

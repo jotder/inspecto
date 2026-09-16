@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.config.safety.PathJail;
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -88,7 +90,11 @@ public final class ReferenceCompactor {
 
     /** {@code reference_compact} maintenance-task adapter (see class doc for the params). */
     static JobResult run(JobConfig cfg) throws Exception {
-        Path root = Path.of(cfg.require("dir"));
+        // The jail belongs on the CONFIG adapter, not on compact(Path,..): that overload is also
+        // called programmatically by CollectorService with a pipeline's own dirs.database, which is
+        // not an operator-authored value and is resolved by the pipeline lane.
+        Path root = PathJail.requireJobPathUnderAny(
+                PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("dir"), "dir");
         long historyDays = Long.parseLong(cfg.opt("history_days", "0"));
         long t0 = System.nanoTime();
         Result r = compact(root, historyDays);
