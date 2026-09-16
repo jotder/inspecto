@@ -420,7 +420,7 @@ the missing third answer is often a way to make the choice cheap** — that is `
 | **Scale-out §5.4 — how does a PIPELINE name object-store credentials?** | **(a) a pipeline field naming an existing `ConnectionProfile` id** | `superpower/enterprise-scale-out-plan.md` §5.4 |
 | **`STUDIO-HALVES-1` — how does a Dataset page invoke a materialization?** | **(a) add a materialize route** | its §3 row |
 | **`AGT-ARTIFACT-1` — which artifact kind carries a draft?** | **(a) add a `draft` kind** | its §3 row |
-| **`TYPEFLOW-DATASET-COLUMNS-1` Q2 — temporal tie-break** | **(a) several date columns ⇒ derive `temporal` for NONE** | `superpower/dataset-column-derivation-plan.md` §6 |
+| **`TYPEFLOW-DATASET-COLUMNS-1` Q2 — temporal tie-break** | **(a) several date columns ⇒ derive `temporal` for NONE** | `archived-documents/plans-archive/dataset-column-derivation-plan.md` §6 |
 | **`TYPEFLOW-DATASET-COLUMNS-1` Q3 — a stored column the derivation stops producing** | **mark `hidden`** | same, §6 |
 | **`TYPEFLOW-DATASET-COLUMNS-1` Q4 — scope of the contract pin** | **both the heuristic AND the coarse type vocabulary** | same, §6 |
 
@@ -839,7 +839,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
   ✅ **BOTH of the design's first two steps have SHIPPED, and this row's statement of them was STALE**
   (re-grounded 2026-09-13; the same two sentences were still present-tense in
-  `superpower/dataset-column-derivation-plan.md` §2 and are corrected there too):
+  `archived-documents/plans-archive/dataset-column-derivation-plan.md` §2 and are corrected there too):
   - ⛔ ~~"the role heuristic exists in three unpinned copies"~~ — **collapsed to one per language and
     PINNED.** `inspecto/viz/result-set.ts:49` owns `roleFor`; `studio/datasets/dataset-types.ts:85-91`
     now *delegates* to it and says so in its own comment. Pinned by `column-role.contract.json` +
@@ -1151,7 +1151,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   narrower and worth stating precisely: **no `META-INF/services` file registers an EXTERNAL provider**. The
   dead thing is the third-party extensibility, not the seam.
   ⛔ **`DatasetRelation.temporalColumn` — an ACTIVE plan depends on it.**
-  `superpower/dataset-column-derivation-plan.md` cites it as a design constraint (its §2.3 turns on
+  `archived-documents/plans-archive/dataset-column-derivation-plan.md` cites it as a design constraint (its §2.3 turns on
   `temporalColumn` throwing on two temporal columns), **already records that it has zero production
   callers**, and carries an operator decision of 2026-09-14 (Q2, temporal tie-break) built on that
   behaviour. ⚠ It also has a live javadoc cross-reference from `SinkPartitions.java:30`. ⇒ It is

@@ -316,3 +316,36 @@ slices, UI-only, no new endpoint. As-built:
 takes its inputs as a positional list the executor builds from the graph edges, so a picker would have written
 a key nothing reads. The 2026-09-06 grounding above still holds for why no endpoint was needed — the input
 relation is implicit in the authored `edges[]`, which the editor already holds.
+
+## A Dataset's columns are derived from the Parquet, not from the pipeline shape (2026-09-16)
+
+A `DatasetColumn` is `{name, type, role}`. `MaterializeTask` is the one place a Dataset is registered by
+code rather than by a human, and it used to write no `columns` at all.
+
+* **The derivation reads the WRITTEN artifact, not a predicted shape.** It is `DESCRIBE` over the Parquet
+  the task just wrote. ⛔ It deliberately does **not** go through `TypeFlow`: the task already holds the
+  real relation, so describing what was actually written is truthful where a statically-derived shape is
+  only a prediction. `TypeFlow.Column` stays `(name, type)` for this reason — ⚠ a board row demanded a
+  `role` carry-through here for months, and the design rejects it.
+* **One coarse-type vocabulary, one role heuristic, both pinned.** `ResultSetDescriptor.columnType`
+  (`:54-73`) maps a DuckDB type name to the coarse vocabulary; `roleFor` (`inspecto/viz/result-set.ts:49`)
+  owns the role heuristic and the Studio copy delegates to it. Pinned across both languages by
+  `column-role.contract.json` + `ColumnRoleContractTest` + `column-role.spec.ts`.
+* **Deliberate calls:** several date columns ⇒ derive `temporal` for **NONE** (an ambiguous tie-break is
+  worse than none); `INTERVAL` and composite types (`STRUCT`, `MAP`, arrays) ⇒ `string`; a stored column
+  the derivation stops producing ⇒ marked `hidden`, never deleted.
+* **Refresh MERGES keys by owner** (`MaterializeTask.mergeColumns`, `:218-250`): the stored document is
+  seeded first and only the job-owned keys are restated, so hand-authored roles and labels ride through a
+  refresh untouched. The code carries that rule as a comment precisely so a future field list cannot
+  silently start dropping keys.
+
+🔴 **The gotcha worth keeping: a declared contract key that no checker reads is not a pin.** `"coarseTypes"`
+was added to `column-role.contract.json` and *nothing on either side read it* — a single grep hit, the
+declaration itself — so the contract looked whole from the board while covering only the role heuristic.
+Half a pin and a whole pin are indistinguishable until something reads the key.
+
+⚠ **Two accepted limitations, stated rather than papered over.** Hidden columns accumulate with no pruning
+story. And `query/query-columns.ts:60` `dbColumnType` is a **second** client-side interpreter of the same
+DuckDB spellings that disagrees on four (`BIGINT[]`/`STRUCT`/`MAP` → `number`, `LOGICAL` → `string`); it
+serves the query builder rather than stored Datasets, so it is pinned as a **documented exclusion** — see
+`COLUMN-TYPE-SECOND-INTERPRETER-1`.
