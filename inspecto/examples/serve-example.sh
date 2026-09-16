@@ -15,22 +15,24 @@
 #
 # JAR resolution: $INSPECTO_JAR -> ../inspecto.jar (bundle) -> ../target/inspecto-processor-*.jar.
 #
-# Usage: bash serve-example.sh 06-serve/sequence-gap [--demo] [--port N] [--poll N] [--wait N] [--clean]
+# Usage: bash serve-example.sh 06-serve/sequence-gap [--demo] [--check-jobs] [--port N] [--poll N] [--wait N] [--clean]
 set -euo pipefail
 EXAMPLES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PORT=18080; POLL=3; WAIT=0; DEMO=0; CLEAN=0; EX=""
+PORT=18080; POLL=3; WAIT=0; DEMO=0; CLEAN=0; CHECK_JOBS=0; EX=""
+USAGE="usage: serve-example.sh <example-dir> [--demo] [--check-jobs] [--port N] [--poll N] [--wait N] [--clean]"
 while [ $# -gt 0 ]; do
   case "$1" in
     --port)  PORT="$2"; shift 2;;
     --poll)  POLL="$2"; shift 2;;
     --wait)  WAIT="$2"; shift 2;;
     --demo)  DEMO=1; shift;;
+    --check-jobs) CHECK_JOBS=1; DEMO=1; shift;;
     --clean) CLEAN=1; shift;;
-    -h|--help) echo "usage: serve-example.sh <example-dir> [--demo] [--port N] [--poll N] [--wait N] [--clean]"; exit 0;;
+    -h|--help) echo "$USAGE"; exit 0;;
     *) EX="$1"; shift;;
   esac
 done
-[ -n "$EX" ] || { echo "usage: serve-example.sh <example-dir> [--demo] [--port N] [--poll N] [--wait N] [--clean]" >&2; exit 2; }
+[ -n "$EX" ] || { echo "$USAGE" >&2; exit 2; }
 
 resolve_jar() {
   if [ -n "${INSPECTO_JAR:-}" ] && [ -f "$INSPECTO_JAR" ]; then echo "$INSPECTO_JAR"; return; fi
@@ -108,6 +110,13 @@ fi
 
 # API-5: business routes are served only under /api/v1, so the version is applied here (the single
 # choke point) and probes.txt keeps listing version-free route paths. /health stays unversioned.
+# ⚠ probes.txt is PRINTED, never asserted — a failed probe prints "(request failed)" and the script
+# still exits 0. That is deliberate and was re-confirmed 2026-09-17 rather than "fixed": the generic
+# /events probe legitimately answers 503 CAPABILITY_UNAVAILABLE on a Personal bundle (the feed lives in
+# the optional inspecto-events module, Standard and above), so a fatal probe would make the release
+# smoke edition-dependent — a check that gets disabled beats no check only in the wrong direction.
+# ⛔ So do NOT read probes.txt as a gate. The exit code below is decided by --check-jobs alone.
+FAILURES=0
 probe(){ echo "# GET $1"; curl -fsS "$BASE/api/v1$1" 2>/dev/null || echo "  (request failed)"; echo; echo; }
 probe "/pipelines"
 probe "/events?limit=20"
@@ -118,7 +127,54 @@ if [ -f probes.txt ]; then
   done < probes.txt
 fi
 
+# ── --check-jobs: the only thing that exercises a job's CONFIG ────────────────────────────────────
+# 🔴 Measured 2026-09-17, and it is the whole reason this mode exists: with `compact_job.toon` carrying
+# the pre-fix `dir: out/database`, GET /jobs is BYTE-IDENTICAL to the healthy run — all jobs registered,
+# enabled, lastStatus "". The mis-pointed path is only discovered when the task RESOLVES it, i.e. when
+# the job runs. These jobs are on weekly/daily crons, so a demo never fires one. ⛔ Therefore listing
+# jobs (what probes.txt does) proves nothing; the run is the evidence, and it has to be triggered.
+#
+# jq is NOT assumed — it is absent from this project's Git-Bash sandbox, so parsing is grep/sed only.
+if [ "$CHECK_JOBS" = 1 ]; then
+  echo "── Checking jobs: trigger every registered job, require a non-FAILED run ──"
+  jobs_json="$(curl -fsS "$BASE/api/v1/jobs" 2>/dev/null || true)"
+  # Every element of /jobs carries "name"; the metadata/links/diagnostics envelopes carry none.
+  names="$(printf '%s' "$jobs_json" | grep -o '"name":"[^"]*"' | sed 's/^"name":"//;s/"$//' || true)"
+  if [ -z "$names" ]; then
+    # A sweep that finds nothing must fail loudly rather than pass vacuously.
+    echo "  !! /api/v1/jobs registered NO job — this example carries none, or the route failed."
+    FAILURES=$((FAILURES + 1))
+  fi
+  for j in $names; do
+    trig="$(curl -fsS -X POST "$BASE/api/v1/jobs/$j/trigger" 2>/dev/null || true)"
+    run="$(printf '%s' "$trig" | grep -o '"runId":"[^"]*"' | sed 's/^"runId":"//;s/"$//' | head -1 || true)"
+    if [ -z "$run" ]; then
+      echo "  !! $j: trigger returned no runId — $trig"; FAILURES=$((FAILURES + 1)); continue
+    fi
+    status=""; body=""
+    for _ in $(seq 1 60); do
+      body="$(curl -fsS "$BASE/api/v1/jobs/runs/$run" 2>/dev/null || true)"
+      status="$(printf '%s' "$body" | grep -o '"status":"[^"]*"' | head -1 | sed 's/^"status":"//;s/"$//' || true)"
+      case "$status" in SUCCESS|FAILED|SKIPPED) break;; esac
+      sleep 1
+    done
+    case "$status" in
+      SUCCESS|SKIPPED) echo "  ok   $j -> $status";;
+      *)
+        echo "  FAIL $j -> ${status:-<no terminal status within 60s>}"
+        # The message is the diagnosis (e.g. a job path that no longer denotes the directory it names).
+        printf '%s' "$body" | grep -o '"message":"[^"]*"' | sed 's/^/       /'
+        FAILURES=$((FAILURES + 1));;
+    esac
+  done
+  echo
+fi
+
 if [ "$DEMO" = 1 ]; then
+  if [ "$FAILURES" -gt 0 ]; then
+    echo "JOB CHECK FAILED: $FAILURES job(s) did not reach a non-FAILED run; stopping server."
+    exit 1
+  fi
   echo "Demo complete; stopping server."
 else
   echo "--- Server is running at $BASE ---"

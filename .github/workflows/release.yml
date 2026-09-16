@@ -142,6 +142,29 @@ jobs:
           n=$(find inspecto-deploy/examples/01-ingest/hello-csv/out/database -type f -name '*.parquet' | wc -l)
           [ "$n" -gt 0 ] || { echo "::error::hello-csv ran but produced no parquet under out/database"; exit 1; }
           rm -rf inspecto-deploy/examples/01-ingest/hello-csv/out
+      # EXAMPLES-JOBS-SMOKE-1 (2026-09-17). 🔴 The smoke above carries NO job config, and until this step
+      # NOTHING automated — here or in ci.yml — ever ran one. That is how 06-serve/maintenance-library
+      # shipped broken for part of 2026-09-16: `compact_job.toon` still said `dir: out/database` after
+      # ea862d1b moved PartitionCompactor onto PathJail.requireJobPathUnderAny, so the path no longer
+      # denoted the directory it names.
+      #
+      # ⛔ Listing jobs does NOT detect this, which is why the step triggers them. Measured: with the
+      # broken value, GET /jobs is byte-identical to a healthy run — all five registered, enabled,
+      # lastStatus "". The mis-pointed path surfaces only when the task RESOLVES it, i.e. in a RUN, and
+      # every job here is on a weekly/daily cron so a plain --demo never fires one.
+      #
+      # ⚠ Personal ONLY, and deliberately placed under the Personal bundle: POST /jobs/{n}/trigger is
+      # behind canOperateRuns, a no-op on Personal (no Subject is ever attached) but a real capability
+      # on Standard/Enterprise — the same step after those packages would 401/403 for a reason that has
+      # nothing to do with the examples.
+      #
+      # ⚠ Proven RED and GREEN from the command line on Windows (re-point `dir` to `out/database` ->
+      # compact_sales FAILED, exit 1; restore -> five SUCCESS, exit 0). It has NOT been executed on
+      # ubuntu-latest; the runner is plain POSIX (curl + background java + kill), but if this step is
+      # the one that goes red on the first tag, read out/logs/serve.err.log in the job output before
+      # assuming the examples regressed.
+      - name: Smoke - a job-bearing example runs its jobs against the packaged jar
+        run: bash inspecto-deploy/examples/serve-example.sh 06-serve/maintenance-library --check-jobs --clean
       - name: Collect Personal artifacts
         run: |
           set -euo pipefail
