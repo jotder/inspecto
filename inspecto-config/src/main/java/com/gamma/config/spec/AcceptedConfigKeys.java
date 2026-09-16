@@ -31,17 +31,22 @@ import java.util.TreeSet;
  * leaf-granular checker would refuse configs that run correctly today. ⇒ <b>an accepted block is
  * accepted whole and never descended into.</b> Anything finer needs the leaf census to exist first.
  *
- * <p>⚠ <b>Three of the nine config types have a table: {@code pipeline}, {@code alert} and
- * {@code meta}.</b> The other six ({@code enrichment}, {@code job}, {@code schema},
- * {@code expectation}, {@code widget}, {@code dashboard}) have no parser census, so their accepted set
- * is unknown and {@link #unknownKeyFindings} returns nothing for them. That is a stated fail-open, not
- * an omission: deriving a set from {@code ConfigSpecs} alone would refuse the keys those parsers read,
- * which is exactly the mistake the block granularity above rules out — {@code job},
- * {@code expectation}, {@code schema} and {@code enrichment} each have confirmed
- * undeclared-but-engine-read keys today, and {@code job} funnels every unrecognised key into an open
- * {@code params} bag, so it cannot be censused without a job-type registry. {@code alert} and
- * {@code meta} are censusable precisely because that objection can be ANSWERED for them — see
- * {@link #ALERT_PARSER_ONLY} and {@link #acceptedBlocks}.
+ * <p>⚠ <b>Four of the nine config types have a table: {@code pipeline}, {@code alert}, {@code meta}
+ * and {@code enrichment}.</b> The other five ({@code job}, {@code schema}, {@code expectation},
+ * {@code widget}, {@code dashboard}) have no parser census, so their accepted set is unknown and
+ * {@link #unknownKeyFindings} returns nothing for them. That is a stated fail-open, not an omission:
+ * deriving a set from {@code ConfigSpecs} alone would refuse the keys those parsers read, which is
+ * exactly the mistake the block granularity above rules out. {@code job} funnels every unrecognised
+ * key into an open {@code params} bag, so it cannot be censused without a job-type registry;
+ * {@code schema} has no single parser at all (its blocks are navigated by a dozen classes across
+ * {@code inspecto-etl} — {@code DataTransformer}, {@code Identifiers}, {@code PartitionDef},
+ * {@code ParserSpec}, {@code SourceZones}, {@code TypeFlow}, … — so "the reads" are not enumerable
+ * from one source); {@code expectation} is authored through {@code /expectations*} rather than
+ * {@code /config/write} and its persisted content carries {@code lastResult}/{@code createdAt}/
+ * {@code updatedAt} bookkeeping no spec declares, the same shape that struck {@code widget} and
+ * {@code dashboard}. {@code alert}, {@code meta} and {@code enrichment} are censusable precisely
+ * because that objection can be ANSWERED for them — see {@link #ALERT_PARSER_ONLY},
+ * {@link #ENRICHMENT_PARSER_ONLY} and {@link #acceptedBlocks}.
  *
  * <p>⚠ <b>{@code widget} and {@code dashboard} are a different shape of fail-open and censusing them
  * here would be a no-op.</b> Neither is ever written through {@code /config/write}: the UI saves both
@@ -91,6 +96,14 @@ public final class AcceptedConfigKeys {
             // would accept every alert config whole and catch nothing. `alert` is censused because its
             // leaves ARE enumerable: `AlertRule.fromMap` reads a fixed, literal list of them.
             case "alert" -> Set.of("alert");
+            // `EnrichmentConfig.fromMap` reads these three blocks through plain locals (`in`, `out`,
+            // `tr`) with a literal key each and no dynamic access, and every leaf it reads is
+            // spec-declared — so descending one level is sound and catches the keys that matter
+            // (`input.*`, `output.*`, `triggers.*` are where an enrichment's real settings live).
+            // ⛔ `references` is deliberately NOT here: `fromMap` iterates its `entrySet()` over
+            // AUTHOR-CHOSEN view names, so descending would refuse every reference anyone names —
+            // the same shape that keeps `meta` off this list.
+            case "enrichment" -> Set.of("input", "output", "triggers");
             // ⛔ `meta` is deliberately NOT here. `SemanticModel.load` reads its five top-level keys
             // literally, but ONE LEVEL DOWN inside `tables`, `kpis` and `reports` it iterates
             // `entrySet()` over AUTHOR-CHOSEN names (a table ref, a KPI name, a report name). Those are
@@ -158,6 +171,29 @@ public final class AcceptedConfigKeys {
             "alert.when");     // the ledger-row scope filter
 
     /**
+     * The top-level blocks {@code EnrichmentConfig} reads that {@link ConfigSpecs#enrichment()} does
+     * not declare — the enrichment type's counterpart to {@link #PARSER_ONLY}.
+     *
+     * <p>🔴 <b>Why enrichment can be censused.</b> The soundness condition is that the parser's reads
+     * be ENUMERABLE at the granularity the checker uses. {@code EnrichmentConfig.load}/{@code fromMap}
+     * ({@code EnrichmentConfig.java:143-236}) reach the root map through exactly seven literal reads —
+     * {@code name}, {@code transform}, {@code transform_file}, {@code references}, {@code triggers}
+     * and {@code ToonHelper.requireSection(raw, "input"|"output")} — with no {@code keySet}/
+     * {@code entrySet}/{@code forEach} over the root at all. Six are spec-declared; {@code references}
+     * is not, and it is live (it registers each join/lookup view). Seven reads, seven accounted for.
+     * ⚠ Every OTHER component that reads a {@code *_enrich.toon} map reads a subset of the same
+     * declared blocks: {@code PipelineGraphRoutes:349-352} ({@code triggers.on_pipeline},
+     * {@code name}), {@code PipelineBundleRoutes:539-560} + {@code :608-612} ({@code name},
+     * {@code triggers}, {@code input.database}, {@code output.database}),
+     * {@code PipelineRenameRoutes:505-515} ({@code triggers.on_pipeline}).
+     *
+     * <p>⚠ This list may only ever SHRINK, for the same reason {@link #PARSER_ONLY} may: a block
+     * leaving it means the spec now declares it.
+     */
+    public static final Set<String> ENRICHMENT_PARSER_ONLY = Set.of(
+            "references");   // name → {path|ref, format, as_of}: the join/lookup views registered by name
+
+    /**
      * The blocks {@code spec} declares: a leaf {@code a.b.c} declares {@code a} and {@code a.b}.
      * (Lifted from {@code PipelineKeyCoverageContractTest}, which now calls this rather than holding a
      * second copy of the derivation.)
@@ -194,6 +230,10 @@ public final class AcceptedConfigKeys {
             // declared by the spec. Five reads, five accounted for, so the declared set alone cannot
             // refuse a key the engine honours. `MetaKeyCoverageContractTest` ratchets that from source.
             case "meta" -> all.addAll(declaredBlocks(ConfigSpecs.meta()));
+            case "enrichment" -> {
+                all.addAll(declaredBlocks(ConfigSpecs.enrichment()));
+                all.addAll(ENRICHMENT_PARSER_ONLY);
+            }
             default -> { /* no parser census ⇒ nothing is KNOWN to be dead; see the class doc. */ }
         }
         return all;

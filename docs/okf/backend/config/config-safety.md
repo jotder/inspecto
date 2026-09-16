@@ -252,12 +252,12 @@ second gate folded into the same 422 at `/config/write` and `/config/patch`
 `ERR_UNKNOWN_CONFIG_KEY` and a near-name suggestion (`DUCKLE-C3-DEAD-PROPERTY-1`). A dead key is a
 *silent loss* — the save answers `written: true` and the engine never looks at it.
 
-**Three of the nine config types have a census: `pipeline`, `alert` and `meta`.** The other six
-(`enrichment`, `job`, `schema`, `expectation`, `widget`, `dashboard`) are **fail-open by
+**Four of the nine config types have a census: `pipeline`, `alert`, `meta` and `enrichment`.** The
+other five (`job`, `schema`, `expectation`, `widget`, `dashboard`) are **fail-open by
 omission, and that is stated rather than accidental**: `unknownKeyFindings` returns nothing for a type
 with no census.
 
-🔴 **Why the missing six cannot simply be switched on.** Two authorities read every config: what
+🔴 **Why the missing five cannot simply be switched on.** Two authorities read every config: what
 `ConfigSpecs` *declares*, and what the engine's hand-written parser *navigates*. An accepted set derived
 from `ConfigSpecs` **alone is unsound** — it would refuse keys the engine honours today. This is not
 hypothetical; each of these has confirmed undeclared-but-engine-read keys:
@@ -265,9 +265,8 @@ hypothetical; each of these has confirmed undeclared-but-engine-read keys:
 | Type | Undeclared keys the engine reads | Blocker |
 |---|---|---|
 | `job` | `on_signal`, `when`, `catch_up`, `args`, `bind` | `JobConfig.fromMap` also funnels **any** other key into an open `params` bag — a census needs a job-type registry, not a parser walk |
-| `expectation` | `when` (required for `kind: condition`) | needs a parser census |
-| `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | needs a parser census |
-| `enrichment` | `input`, `output`, `references`, `triggers.*`, `transform`/`transform_file` | `EnrichmentConfig.fromMap` is a full hand-written navigator |
+| `expectation` | `when` (required for `kind: condition`, which `ConfigSpecs.expectation()`'s `kind` enum does not even list) | ⛔ **a census here is close to a no-op too**: expectations are authored through `/expectations*` (`ExpectationRoutes`), not `/config/write`, and the persisted content carries `lastResult` / `createdAt` / `updatedAt` bookkeeping (`ExpectationRoutes.java:105-117`) that no `ConfigSpec` declares — the same shape that struck `widget`/`dashboard` |
+| `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | ⛔ **there is no single schema parser to census.** Its blocks are navigated by a dozen classes across `inspecto-etl` — `Identifiers.validateSchema:124-170`, `DataTransformer:96,169,239,267`, `PartitionDef:95`, `ParserSpec:28`, `SourceZones:84`, `TypeFlow:125`, `BoundaryScanner:115`, `SchemaMappingDrift:74,84`, `DuckDbCsvIngester:698`, `ConsignmentPlanner:152`, `PipelineConfigParser:1262-1884` — so "the reads" are not enumerable from one source file and the ratchet idiom cannot be written |
 | `widget`, `dashboard` | none found in a Java reader | ⛔ **a census here would be a no-op**: neither type is ever written through `/config/write`. The UI saves both through the component-store routes (`POST`/`PUT /components/{kind}`), which never call this class. A gate belongs in `ComponentRoutes` — and it is not a table away, because the persisted body also carries `name`, `owner` and `shares`, which no `ConfigSpec` declares |
 
 ⇒ **A type earns a census only when its parser's reads can be PROVEN from source**, and the proof is a
@@ -299,12 +298,46 @@ would refuse every KPI anyone ever names. A scan that merely asked *"does this f
 `entrySet`?"* would have refused the type for the wrong reason. ⚠ Both committed `*_meta.toon` files
 carry exactly the six declared keys, so nothing on disk regresses — pinned, not assumed.
 
+**`enrichment` earned one (2026-09-16), and it is the first type where the DESCENT carries the value.**
+🔴 The premise this table carried until that day was **wrong**: it listed `input`, `output`,
+`triggers.*` and `transform`/`transform_file` as *undeclared keys the engine reads*, and
+`ConfigSpecs.enrichment()` declares **every one of them**. Grounded against the code, exactly **one**
+top-level block is undeclared — `references` — and that is the whole of
+`AcceptedConfigKeys.ENRICHMENT_PARSER_ONLY`.
+
+`EnrichmentConfig` (`inspecto-engine/.../enrich/EnrichmentConfig.java:143-236`) reaches the root map
+through seven literal reads — `name`, `transform`, `transform_file`, `references`, `triggers`, and
+`ToonHelper.requireSection(raw, "input"|"output")` — with no `keySet`/`entrySet`/`forEach` over the
+root. Seven reads, seven accounted for. Every **other** component that reads a `*_enrich.toon` map
+reads a subset of the same declared blocks: `PipelineGraphRoutes:349-352`,
+`PipelineBundleRoutes:539-560` + `:608-612`, `PipelineRenameRoutes:505-515`.
+
+⚠ **`input`, `output` and `triggers` are censused parents**, and unlike `alert` that is about value
+rather than necessity: an enrichment's real settings live one level down, so a top-level-only census
+would accept `input: {databse: …}` whole. The descent is sound because `fromMap` reads those three
+blocks through plain locals (`in`, `out`, `tr`) with a literal key each — via **two** spellings,
+`local.get("…")` *and* the `req(local, "…", …)` helper — and every leaf it reads is spec-declared.
+🔴 The `req(…)` half is why the falsify-the-scan test is not ceremony: the first version of the ratchet
+scanned only `local.get(…)`, missed `input.database` / `output.database`, and **the falsify test is
+what caught it**.
+
+⛔ `references` is accepted **whole** and is deliberately not a censused parent: `fromMap` iterates its
+`entrySet()` over view names the author invents. Same shape as `meta`'s `tables`/`kpis`/`reports`.
+
+⚠ **BREAKING, and one committed file moved.** `spaces/demo/config/orders/orders_daily_enrich.toon`
+carried `version: 1`, which no component reads — the same dead key `pipeline` started refusing on
+2026-09-16 — so it is removed rather than declared, and
+`EnrichmentKeyCoverageContractTest.everyCommittedEnrichmentConfigSurvivesTheCensus` pins that nothing
+on disk regresses. 🔴 **The committed `*_pipeline.toon` samples were NOT given the same treatment when
+`pipeline` was censused**: **24** of them still carry `version:`, so re-saving any sample pipeline
+through `/config/write` 422s today. Worth a row.
+
 ⚠ The **flat** `alert-rule` component shape (`AlertRoutes`, `ComponentStore`) is a *different config
 type string* and is written through `/alerts/rules*`, not `/config/write` — it never reaches this census.
 
 Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`,
-`MetaKeyCoverageContractTest` and `PipelineKeyCoverageContractTest` (the three source-derived
-ratchets), and
+`MetaKeyCoverageContractTest`, `EnrichmentKeyCoverageContractTest` and
+`PipelineKeyCoverageContractTest` (the four source-derived ratchets), and
 `AcceptedConfigKeysDocContractTest` (the generated pipeline table). Each ratchet includes a
 *falsify-the-scan* test, because a scan that silently matches nothing passes every other assertion.
 
@@ -316,3 +349,16 @@ ratchets), and
   no `ConfigSpec` declares, so a naive spec-derived refusal would reject essentially every real save.
   ✅ The seam already exists — `ComponentRoutes.java:605` calls `ConfigSafetyValidator.check("schema", …)`
   at `:602-611`, so this extends a live pattern rather than inventing one.
+
+- **`COMPONENT-BULK-WRITERS-UNGATED-1`** — `BiTemplates.apply` (`BiTemplates.java:125`) and bundle import
+  (`BundleRoutes.java:425`) call `store.write` directly, so **no** `validateKind` gate runs on that path —
+  not the 2026-09-16 key census and not the pre-existing `schema` validation. ⚠ The same "gate on one
+  route, not its sibling" shape that produced the census in the first place. The authoring route is the
+  UI's only door, so the reachable half is closed; this is the rest.
+- **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1`** — 36 committed `*_pipeline.toon` samples (24 under `spaces/`,
+  12 under `inspecto/examples/`) carry a top-level `version:` that `ConfigSpecs.pipeline()` does not
+  declare, so re-saving any shipped sample pipeline through `/config/write` has 422'd since the pipeline
+  census landed. ⛔ **The root cause is a missing guard, not a missing fix:** that census shipped without a
+  *"no committed config regresses"* test. `meta` escaped only because it happens to declare `version`;
+  `enrichment` added the test and cleaned its one sample. ⇒ Owed call: strip the key from 36 files, or
+  declare it and say why.

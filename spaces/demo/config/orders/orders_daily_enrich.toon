@@ -1,5 +1,4 @@
 name: ORDERS_DAILY
-version: 1
 
 input:
   database: spaces/demo/data/orders/database
