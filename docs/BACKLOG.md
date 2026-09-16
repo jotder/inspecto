@@ -14,8 +14,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 2026-09-07, its retirement trigger having fired), the remainders of every plan still in
 `docs/superpower/`, and the last handoff's next steps.
 
-> **Where the board stands — recounted 2026-09-15 (FOURTH pass, after the thirty-eight-decision sitting).**
-> **71 rows: 1 × P1 · 53 × P2 · 17 × P3.**
+> **Where the board stands — recounted 2026-09-16 (FIFTH pass) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the §3–§5 slice) and fails if a stated figure drifts from them again.
+> **50<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 35<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3.**
 >
 > 🔴 **The headline is not any single answer: SIXTEEN P3 rows stopped being demand-gated in one sitting.**
 > §0 defines P3 as *demand-gated — build only when someone asks by name*. On 2026-09-15 the operator was
@@ -122,9 +122,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1 P1 + 38 P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 31 are a list of things deliberately *not* being built, not a backlog
-> to burn down. Reading all 70 as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 35<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 14<!--count:backlog-p3--> are a list of things deliberately *not* being built, not a backlog
+> to burn down. Reading all 50<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 >
 > The sweep deleted **10 rows whose work was already shipped** (each verified in code, not by commit
 > message) and corrected stale claims inside several survivors. 🔴 **The lesson worth keeping:** a

@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACTS = 'inspecto-ui/src/app/inspecto/contracts';
+const BACKLOG = 'docs/BACKLOG.md';
 
 // ── the manifest: id -> how to DERIVE it from the repo. Never a literal. ─────────────────────────
 // `floor` is the number of marked statements that must exist, and it is set EQUAL to the number
@@ -189,6 +190,28 @@ const MANIFEST = {
     // wrong numbers from one right one.
     // ⚠ Counts the LOCK, not a `mvn dependency:list` run: the lock is the committed baseline a reviewer
     // diffs, it is what `check-dependencies.mjs` enforces, and it needs no network or build to read.
+    // -- The BACKLOG rank census -- "N rows: A x P1 / B x P2 / C x P3", stated twice on one page and
+    // drifted THREE times (2026-09-14, 2026-09-15, corrected 2026-09-16 after standing wrong by 18 P2
+    // rows for two days). The two statements had also drifted INDEPENDENTLY of each other, which is the
+    // same class this guard exists for: the rows themselves are the contract, so derive from them.
+    // /!\ SELF-REFERENCE HAZARD, and it is the failure shape this file's header records (a guard that
+    // counted its own documentation). The file being counted also CARRIES the markers, and section 0's
+    // "Rules of use" quotes these very grep patterns literally. Two things keep the derive off its own
+    // documentation:
+    //   * the slice -- only lines strictly between the `## 3.` and `## 6.` headings are counted, and
+    //     section 0 (which quotes the patterns) and the census block (which carries the markers) both
+    //     live ABOVE `## 3.`;
+    //   * the anchors -- a quoted pattern sits inside a `> ` blockquote and backticks, so it cannot
+    //     match a `^- **P...` row anchor even if the slice ever moved.
+    // THE P3 PATTERN IS DELIBERATELY LOOSER than the other two: one row spells its rank
+    // `- **P3 . RELEASE-GATED (next MAJOR), not demand-gated**`, and a strict `^- \*\*P3\*\*`
+    // silently undercounts by one. Do not "tidy" it.
+    'backlog-p1': { floor: 2, what: 'P1 rows on the board (sections 3-5)', derive: () => backlogRanks().p1, source: BACKLOG },
+    'backlog-p2': { floor: 2, what: 'P2 rows on the board (sections 3-5)', derive: () => backlogRanks().p2, source: BACKLOG },
+    'backlog-p3': { floor: 2, what: 'P3 rows on the board (sections 3-5)', derive: () => backlogRanks().p3, source: BACKLOG },
+    // Derived, never summed by hand -- and cross-checked inside backlogRanks() against a rank-agnostic
+    // count, so a row spelled with an unrecognised rank FAILS rather than silently vanishing.
+    'backlog-rows': { floor: 2, what: 'P-ranked rows on the board (sections 3-5)', derive: () => backlogRanks().total, source: BACKLOG },
     'locked-dependencies': {
         floor: 4,
         what: 'third-party artifacts in the committed dependency lock',
@@ -197,6 +220,30 @@ const MANIFEST = {
         source: 'tools/dependencies.lock',
     },
 };
+
+
+/**
+ * Count the board's rows by rank, using section 0's OWN authoritative patterns, over the slice between
+ * the `## 3.` and `## 6.` headings. See the manifest comment for why the slice -- rather than a
+ * whole-file grep -- is what keeps this guard from counting its own documentation.
+ */
+function backlogRanks() {
+    const lines = read(BACKLOG).split('\n');
+    const from = lines.findIndex(l => /^## 3\./.test(l));
+    const to = lines.findIndex(l => /^## 6\./.test(l));
+    if (from < 0 || to < 0 || to <= from) {
+        throw new Error('BACKLOG.md: the `## 3.` / `## 6.` headings did not bound a slice -- re-anchor this parse');
+    }
+    const rows = lines.slice(from + 1, to);
+    const n = re => rows.filter(l => re.test(l)).length;
+    const p1 = n(/^- \*\*P1\*\*/), p2 = n(/^- \*\*P2\*\*/), p3 = n(/^- \*\*P3( |\*)/);
+    const total = n(/^- \*\*P/);
+    if (p1 + p2 + p3 !== total) {
+        throw new Error(`BACKLOG.md: ${total} P-ranked rows but P1+P2+P3 = ${p1 + p2 + p3} -- a row `
+            + "spells its rank in a way section 0's patterns do not match; fix the ROW, not this parse");
+    }
+    return { p1, p2, p3, total };
+}
 
 /** Every .java under an inspecto* module's src/main, repo-relative. */
 function javaMainFiles(out = []) {
