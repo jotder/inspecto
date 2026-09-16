@@ -60,6 +60,16 @@ MAJOR" row, moved here so it accrues in one place; add a line in the same commit
 The GitHub release is cut by `.github/workflows/release.yml` with `--generate-notes`; paste this section
 above the generated commit list.
 
+**Breaking — route registration (2026-09-16, `ROUTE-UNGATED-DEFAULT-1` step 3)**
+- A **mutating route** (`POST`/`PUT`/`PATCH`/`DELETE`) that declares neither a capability
+  (`ApiContext.withCapability`) nor a recorded `CapabilityManifest` exemption now **fails the server's
+  boot**, naming the route. ⚠ This is breaking for **route modules discovered from other jars**
+  (EDG-01 cell 3a): a module that registered an undeclared mutating route used to run it open to every
+  authenticated caller, and now refuses to start. ⛔ There is deliberately **no warn-only switch** — a
+  control with an off switch is not a control. Reads are unaffected and stay open by policy.
+- `ApiContext.withCapability` returns a marked `Gated` handler rather than a bare lambda. Call sites are
+  unchanged; anything that *wrapped or unwrapped* the returned handler by identity is not.
+
 **Breaking — configuration and CLI**
 - `-Dauth.oidc.tokenEndpoint` is **required** under `authMode: oidc` (D15, 2026-07-25); there is no IdP
   vendor of record and `OidcTokenRelay` will not guess the endpoint.
