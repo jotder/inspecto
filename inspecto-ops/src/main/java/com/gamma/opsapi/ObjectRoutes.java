@@ -52,7 +52,8 @@ public final class ObjectRoutes implements RouteModule {
         api.get("/objects", (e, m) -> objectsList(api, e));
         // Registered before the /objects/{id} catch-all so "analytics" is not read as an id (C4).
         api.get("/objects/analytics", (e, m) -> OpsEngine.of(api).analytics(parseObjectType(ApiContext.query(e, "type"))));
-        api.post("/objects", (e, m) -> createObject(api, e, api.body(e)));
+        api.post("/objects", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> createObject(api, e, api.body(e))));
         // Every by-id route runs behind the SEC-7d data-scope guard: an object whose caseType is outside
         // the caller's dataScopes answers 404, indistinguishable from absence (existence-hiding).
         //
@@ -63,8 +64,10 @@ public final class ObjectRoutes implements RouteModule {
         // `canAdminister`; comment / attach / link / RCA-seed stay open as collaboration and are recorded
         // as such in CapabilityManifest.EXEMPTIONS. ⚠ The capability gate wraps the scope guard, so a
         // caller lacking the capability gets 403 before existence-hiding gets to answer 404.
-        // ⚠ `POST /objects` (create) is NOT decided here: it is the same question as `POST /recon/promote`
-        // — which family manually opening an Incident belongs to — and is on the operator (step 2a).
+        // ✅ `POST /objects` (create) is gated by `canManageIncidents` (operator, 2026-09-16) — the same
+        // answer as `POST /recon/promote`, deliberately: both perform the one act of OPENING an Incident,
+        // and a second precedent for one concept is what the call was made to avoid. ⚠ Distinct from the
+        // `canAdminister` gates on ack/resolve below: opening is triage, resolving is administration.
         api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, api.body(e)))));
         api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, api.body(e)))));
         api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transitionFromBody(api, ApiContext.name(m), api.body(e)))));

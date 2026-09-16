@@ -225,11 +225,22 @@ public interface ApiContext {
     /** Wrap {@code h} so it first runs the {@link #requireCapability} gate for {@code capability} — the
      *  one-line opt-in a write route uses to declare "this action needs X" (W6, guideline 13: capability
      *  verbs, never roles). Route registration otherwise unchanged. */
-    static Handler withCapability(String capability, Handler h) {
-        return (ex, m) -> {
+    /**
+     * A handler that CARRIES the capability it demands (route-gating plan step 3a). It used to return a
+     * bare lambda, which made the gate invisible to the router: the manifest test's regex over source was
+     * the only inventory anyone had. A marked handler gives the running server its own inventory, which is
+     * what {@code ControlApi.register} needs to refuse an undeclared mutating route at boot.
+     */
+    record Gated(String capability, Handler inner) implements Handler {
+        @Override public Object handle(com.sun.net.httpserver.HttpExchange ex, java.util.regex.Matcher m)
+                throws Exception {
             requireCapability(ex, capability);
-            return h.handle(ex, m);
-        };
+            return inner.handle(ex, m);
+        }
+    }
+
+    static Handler withCapability(String capability, Handler h) {
+        return new Gated(capability, h);
     }
 
     void get(String pattern, Handler h);

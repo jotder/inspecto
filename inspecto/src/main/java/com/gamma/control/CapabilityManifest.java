@@ -21,6 +21,9 @@ final class CapabilityManifest {
     record Entry(String method, String pattern, String capability) {}
 
     static final List<Entry> ENTRIES = List.of(
+            // Incident creation (operator, 2026-09-16) — one act, one capability, two routes
+            new Entry("POST", "/recon/promote", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/objects", Roles.CAN_MANAGE_INCIDENTS),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),
@@ -275,9 +278,13 @@ final class CapabilityManifest {
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),
+            new Exemption("POST", "/spaces/import", "recovery-route",
+                    "operator 2026-09-16: the POST /spaces additive/recovery posture extends to importing a config tree"),
+            new Exemption("POST", "/tags/rules/([^/]+)/apply", "collaboration",
+                    "operator 2026-09-16: applying a tag rule is a collaboration act like assignments, not run operation"),
             new Exemption("POST", "/queries/([^/]+)/run", "read-shaped", "runs a saved read query"),
             new Exemption("POST", "/pipelines/authored/([^/]+)/dry-run", "read-shaped", "a dry run writes nothing (PIPELINE-DRYRUN-1)"),
-            new Exemption("POST", "/expectations/evaluate", "read-shaped", "evaluates and reports; a breach may open an Incident — re-classify with the pending Incident-creation call (POST /recon/promote)"),
+            new Exemption("POST", "/expectations/evaluate", "read-shaped", "evaluates and reports; a breach may open an Incident — canManageIncidents now exists (2026-09-16), but evaluating is not opening and gating it would stop Operations checking data quality: a separate call, deliberately not folded into that one"),
             new Exemption("POST", "/expectations/([^/]+)/evaluate", "read-shaped", "evaluates one Expectation; same caveat as /expectations/evaluate"),
             new Exemption("POST", "/alerts/evaluate", "read-shaped", "evaluates Alert Rules now; the same evaluation the scheduler runs unattended"),
             // §7 self-limiting — the agent surface gates itself per tool (the assistant refuses mutating
@@ -303,11 +310,18 @@ final class CapabilityManifest {
             new Exemption("POST", "/notes/([^/]+)/([^/]+)/comments", "collaboration", "adds a comment on any note-bearing object"),
             new Exemption("POST", "/notes/([^/]+)/([^/]+)/attachments", "collaboration", "attaches evidence on any note-bearing object"));
 
-    static final List<Pending> PENDING_OPERATOR_CALLS = List.of(
-            new Pending("POST", "/spaces/import", "does the POST /spaces recovery-route exemption extend to importing a whole config tree?"),
-            new Pending("POST", "/tags/rules/([^/]+)/apply", "operate action (canOperateRuns, like DecisionRoutes' rule-apply) or collaboration (open, like assignments)?"),
-            new Pending("POST", "/recon/promote", "which family does manually opening an Incident belong to? no Incident capability exists"),
-            new Pending("POST", "/objects", "same question as /recon/promote: manual Incident/Case creation has no family yet"));
+    /**
+     * ✅ <b>EMPTY since 2026-09-16 — all four calls were answered in one sitting</b> (route-gating plan §2a):
+     * {@code POST /recon/promote} and {@code POST /objects} now share the NEW {@link Roles#CAN_MANAGE_INCIDENTS}
+     * (both are the one act of opening an Incident, so neither borrows a neighbouring capability);
+     * {@code POST /spaces/import} inherits the {@code POST /spaces} additive/recovery posture and
+     * {@code POST /tags/rules/{id}/apply} is a collaboration act like assignments — both recorded as
+     * EXEMPTIONS with the decision on the line, not left absent.
+     *
+     * <p>⛔ Keep this table and its test: "ungated" must stay a RECORDED state. The next unlisted mutating
+     * route belongs here, not nowhere.
+     */
+    static final List<Pending> PENDING_OPERATOR_CALLS = List.of();
 
     /** The declared capability gating {@code method path}, or null when the route is ungated —
      *  the A3 authorize stage classifies {@code operate} actions off this (a state-changing call
@@ -319,6 +333,17 @@ final class CapabilityManifest {
     }
 
     /** The capability vocabulary — every capability some route gate demands. */
+    /**
+     * Whether {@code (method, pattern)} is a recorded exemption — the lookup {@code ControlApi.register}'s
+     * boot check uses. Matching is on the registered pattern STRING, exactly as the route class spells it,
+     * so an exemption can never accidentally widen to a route it was not written for.
+     */
+    static boolean isExempt(String method, String pattern) {
+        for (Exemption e : EXEMPTIONS)
+            if (e.method().equals(method) && e.pattern().equals(pattern)) return true;
+        return false;
+    }
+
     static Set<String> capabilities() {
         Set<String> out = new LinkedHashSet<>();
         for (Entry e : ENTRIES) out.add(e.capability());

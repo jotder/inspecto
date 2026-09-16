@@ -130,7 +130,34 @@ IS the audit's bucket taxonomy, so nothing is invented:
 
 ---
 
-## 3. Step 3 — Flip the default: undeclared mutating route ⇒ REFUSED (BUILD, after step 2)
+## 3. Step 3 — Flip the default: undeclared mutating route ⇒ REFUSED ✅ **SHIPPED 2026-09-16**
+
+✅ **Step 2a's four operator calls were answered first, in one sitting** (2026-09-16), which is what
+released this step: `POST /recon/promote` and `POST /objects` share a NEW `Roles.CAN_MANAGE_INCIDENTS`
+(one act, one capability — neither borrows `canOperateRuns` or `canAuthorWorkbench`);
+`POST /spaces/import` inherits the `POST /spaces` additive/recovery posture and
+`POST /tags/rules/{id}/apply` is a collaboration act like assignments — both recorded as EXEMPTIONS
+carrying the decision, never left absent. `PENDING_OPERATOR_CALLS` is now EMPTY (the table and its test
+stay: “ungated” must remain a recorded state).
+
+**As built:** 3a `ApiContext.Gated` (a marked handler, so the ROUTER holds the runtime inventory) ·
+3b `EXEMPTIONS` + `CapabilityManifest.isExempt` · 3c the boot refusal in `ControlApi.register`, no
+`warn` escape hatch · 3d the CI scan already generalised in step 1 · 3e reads stay open, now pinned by a
+test that fails if a GET ever starts needing a declaration. Acceptance is
+`UndeclaredMutatingRouteTest` (5 tests: every mutating method refused, a gated route and a recorded
+exemption accepted, a read untouched).
+
+🔴 **Two live interactions the build surfaced, both kept as lessons.** (1) `CapabilityManifestTest`
+refused the first cut because `ReconRoutes` passed `Roles.CAN_MANAGE_INCIDENTS` — the CONSTANT — while
+the scan matches the string LITERAL in `withCapability("…")`. The drift guard did its job; route
+classes must spell the capability literally. (2) Gating `POST /objects` moved an out-of-scope create
+from **404 to 403**, because the capability gate wraps the data-scope guard — existence-hiding now
+answers second. `ControlApiScopedObjectsTest`'s subjects carry the new capability for the same reason
+they already carried `canAdminister` since 2026-09-15: that class tests the scope guard BENEATH the
+gate. ⚠ Any future capability on a scoped route needs the same treatment, or the test silently starts
+asserting the gate instead of the guard.
+
+### 3.1 The original step-3 specification (as written, for provenance)
 
 **Compliance purpose:** this is **the control**. It turns "we reviewed the routes" (a point in time) into
 "an undeclared mutating route cannot exist in a running server" (a property an auditor can test by trying to
@@ -170,7 +197,10 @@ module's undeclared route at build time — before it can refuse a boot in a cus
 checks are complementary, not redundant: the scan sees **all** modules' code (the test classpath does not
 carry optional modules, `ApiContractTest:190-226`); the boot check sees **what is actually deployed**.
 
-**3e. Reads stay open — as a stated decision.** Per the operator (2026-09-15): reads are not
+**3e. Reads stay open — as a stated decision.** ✅ **AFFIRMED AS THE COMPLIANCE POSITION 2026-09-16** — the
+operator re-affirmed it knowing that `controls-matrix.md` CC6 turns it from an engineering posture into a
+claim an auditor holds you to. ⚠ If reads are ever gated, that matrix line moves with the code.
+Per the operator (2026-09-15): reads are not
 capability-gated on any edition; confidentiality sits at the Space/ABAC layer. The boot check therefore
 covers mutating methods only, and the plan says so here so an auditor reads a decision, not an omission.
 

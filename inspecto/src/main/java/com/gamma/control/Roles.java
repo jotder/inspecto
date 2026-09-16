@@ -84,6 +84,27 @@ public final class Roles {
      */
     public static final String CAN_ADMINISTER          = "canAdminister";
 
+    /**
+     * Manually opening an <b>Incident</b> — {@code POST /recon/promote} (promote a Break) and
+     * {@code POST /objects} (create one outright). Created 2026-09-16 on the operator's call, in preference
+     * to borrowing {@code canOperateRuns} (what {@code DecisionRoutes} does) or {@code canAuthorWorkbench}
+     * (which has no precedent for this act): both routes perform the SAME act, and lending them a
+     * neighbouring capability would have set two different precedents for one concept.
+     *
+     * <p>⚠ Distinct from the {@code canAdminister} transitions already on {@code /objects/{id}/ack} and
+     * {@code /resolve}: this gates <em>opening</em> an Incident, which anyone triaging data quality does,
+     * while acknowledging and resolving one is an installation-administration act. ⛔ Do not widen this to
+     * cover those — the audit's whole finding was that one coarse capability had to stand in for names
+     * that did not exist, and this is one of the names.
+     *
+     * <p>⚠ Still open: {@code POST /expectations/evaluate} and {@code /expectations/{id}/evaluate} are
+     * exempt as read-shaped, with a recorded caveat that a breach MAY open an Incident. Now that this
+     * capability exists they can be re-classified — but evaluating is not opening, and gating evaluation
+     * would stop Operations from checking data quality at all, so that is a separate call, not a
+     * consequence of this one.
+     */
+    public static final String CAN_MANAGE_INCIDENTS    = "canManageIncidents";
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -126,7 +147,8 @@ public final class Roles {
 
     private static Map<String, Def> seed() {
         Set<String> builder = Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_REQUEST_SHARES);
-        Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES);
+        // Opening an Incident is triage work, so Operations/Support get it with their run duties.
+        Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES, CAN_MANAGE_INCIDENTS);
         Map<String, Def> m = new LinkedHashMap<>();
         m.put("pipeline-developer", new Def(builder, null));
         m.put("app-developer", new Def(builder, null));
@@ -134,9 +156,10 @@ public final class Roles {
         m.put("operations", new Def(ops, null));
         m.put("support", new Def(ops, null));
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
-                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER), null));
+                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
+                CAN_MANAGE_INCIDENTS), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
-                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS), null));
+                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order

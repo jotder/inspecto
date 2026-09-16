@@ -48,7 +48,11 @@ final class ReconRoutes implements RouteModule {
         // RECON-CARDINALITY-2: the raw rows behind ONE key — read-shaped like its siblings (recorded so in
         // CapabilityManifest.EXEMPTIONS); fetched on demand when a reader expands a cardinality break.
         api.post("/recon/rows", (e, m) -> rows(api, api.body(e)));
-        api.post("/recon/promote", (e, m) -> promote(api, api.body(e)));
+        // Opening an Incident from a Break: gated by `canManageIncidents` (operator, 2026-09-16). The
+        // capability was CREATED for this act rather than borrowed from `canOperateRuns` (DecisionRoutes'
+        // choice) or `canAuthorWorkbench` — `POST /objects` performs the same act and shares the gate.
+        api.post("/recon/promote", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> promote(api, api.body(e))));
         api.get("/recon/promoted", (e, m) -> promoted(api, ApiContext.query(e, "reconciliation")));
     }
 

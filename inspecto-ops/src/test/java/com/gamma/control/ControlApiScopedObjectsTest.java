@@ -41,10 +41,13 @@ class ControlApiScopedObjectsTest {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
         // canAdminister: assign/merge became capability-gated 2026-09-15 (ROUTE-UNGATED-DEFAULT-1 step 2b);
         // this class tests the DATA-SCOPE guard beneath that gate, so its subjects carry the capability.
+        // canManageIncidents: same reason, 2026-09-16 — `POST /objects` (opening an Incident) gained its own
+        // capability, and the gate wraps the scope guard, so without it the create-with-links case would
+        // answer 403 before existence-hiding ever got to answer 404, testing the wrong thing.
         if ("Bearer fraud".equals(auth))
-            return Optional.of(new Subject("ana", Set.of("canOperateRuns", "canAdminister"), Set.of("fraud")));
+            return Optional.of(new Subject("ana", Set.of("canOperateRuns", "canAdminister", "canManageIncidents"), Set.of("fraud")));
         if ("Bearer all".equals(auth))
-            return Optional.of(new Subject("root", Set.of("canOperateRuns", "canAdminister")));   // dataScopes null = unscoped
+            return Optional.of(new Subject("root", Set.of("canOperateRuns", "canAdminister", "canManageIncidents")));   // dataScopes null = unscoped
         return Optional.empty();
     };
 

@@ -1143,8 +1143,40 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                     + "second registration would never match (first-match dispatch). If an optional module "
                     + "added it, that module collides with a built-in route or registered after the stubs.");
         }
+        requireDeclaredPosture(method, pattern, h);
         routes.add(new Route(method, Pattern.compile("^" + pattern + "$"), h));
     }
+
+    /**
+     * <b>The control (route-gating plan step 3c, 2026-09-16).</b> A mutating route must declare its posture:
+     * either it is {@link ApiContext.Gated} (it demands a capability) or it is recorded in
+     * {@link CapabilityManifest#EXEMPTIONS} with a category and a reason. Anything else fails the BOOT.
+     *
+     * <p>This is what turns "we reviewed the routes" — true at a point in time — into "an undeclared
+     * mutating route cannot exist in a running server", which an auditor can test by trying to add one.
+     *
+     * <p>⛔ <b>No {@code -D…=warn} escape hatch, deliberately:</b> a control with an off switch is not a
+     * control. CI is where an undeclared route is meant to be caught ({@code CapabilityManifestTest}, which
+     * sees every module's source); this check sees what is actually DEPLOYED, which the test cannot — the
+     * test classpath does not carry the optional modules. The two are complementary, not redundant.
+     *
+     * <p>⛔ Reads are not covered, and that is a decision, not an omission: reads are open on every edition
+     * because confidentiality sits at the Space/ABAC layer (operator, 2026-09-15, re-affirmed for compliance
+     * 2026-09-16). Absent-module stubs go through {@link #stub}, never here, so they are exempt by
+     * construction.
+     */
+    private static void requireDeclaredPosture(String method, String pattern, Handler h) {
+        if (!MUTATING_METHODS.contains(method)) return;
+        if (h instanceof ApiContext.Gated) return;
+        if (CapabilityManifest.isExempt(method, pattern)) return;
+        throw new IllegalStateException("undeclared mutating route " + method + " " + pattern
+                + " - declare a capability with ApiContext.withCapability, or an Exemption in "
+                + "CapabilityManifest with a category and a reason. An undeclared mutating route is open to "
+                + "every authenticated caller, which is the state this check exists to make impossible.");
+    }
+
+    private static final java.util.Set<String> MUTATING_METHODS =
+            java.util.Set.of("POST", "PUT", "PATCH", "DELETE");
 
     /**
      * The always-unversioned infra probes: the <em>only</em> paths {@link #routeDispatch} will match outside

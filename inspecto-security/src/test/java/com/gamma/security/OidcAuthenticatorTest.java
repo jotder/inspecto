@@ -196,7 +196,7 @@ class OidcAuthenticatorTest {
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
-                Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS,
+                Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS, Roles.CAN_MANAGE_INCIDENTS,
                 Roles.CAN_ADMINISTER), admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
@@ -210,8 +210,10 @@ class OidcAuthenticatorTest {
         Subject ana = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + scoped).orElseThrow();
         assertTrue(ana.scoped());
         assertEquals(Set.of("fraud"), ana.dataScopes());
-        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES), ana.capabilities(),
-                "case role grants no capability");
+        // canManageIncidents joined the ops grant 2026-09-16: opening an Incident is triage work, which is
+        // what this role does. The assertion still pins the CASE role as granting nothing of its own.
+        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS),
+                ana.capabilities(), "case role grants no capability");
 
         String plain = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");
         assertFalse(authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + plain)
@@ -288,7 +290,7 @@ class OidcAuthenticatorTest {
         // module; widening them for a test was judged the wrong trade. Keep the list in sync.
         String jwt = token(Instant.now().plusSeconds(60), List.of("super"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Optional<Subject> subject = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt);
-        assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS,
+        assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS, Roles.CAN_MANAGE_INCIDENTS,
                         Roles.CAN_TRIAGE_REQUIREMENTS, Roles.CAN_ONBOARD_CONNECTIONS,
                         Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
                         Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,
@@ -444,7 +446,8 @@ class OidcAuthenticatorTest {
         Subject olly = authenticateWithHeaders(gatewayAuthenticator(),
                 Map.of("X-JWT-Assertion", assertion), null).orElseThrow();
         assertEquals("olly", olly.id());
-        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES), olly.capabilities());
+        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS),
+                olly.capabilities());
     }
 
     @Test

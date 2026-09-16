@@ -73,7 +73,11 @@ class RouteModuleDiscoveryTest {
             assertTrue(e.getMessage().contains("registered twice"), e.getMessage());
             // ⚠ The negative test needs a probe that would otherwise SUCCEED: a different method on the same
             // pattern is a different route and must still be allowed, or the guard is over-broad.
-            assertDoesNotThrow(() -> c.api.post(TestDiscoveredRoutes.PATH, (ex, m) -> "ok"));
+            // ⚠ The probe declares a capability since 2026-09-16: a mutating route with no declared posture
+            // is now refused at registration (route-gating step 3c), so a bare POST here would throw for a
+            // reason this test is not about — and the probe would stop proving what it exists to prove.
+            assertDoesNotThrow(() -> c.api.post(TestDiscoveredRoutes.PATH,
+                    ApiContext.withCapability("canAdminister", (ex, m) -> "ok")));
         }
     }
 
