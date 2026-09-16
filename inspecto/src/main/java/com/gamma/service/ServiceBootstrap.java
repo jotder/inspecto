@@ -1,5 +1,6 @@
 package com.gamma.service;
 
+import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.inspector.MultiCollectorProcessor;
@@ -49,6 +50,7 @@ final class ServiceBootstrap {
      * space has no sources yet), so {@code SpaceBootstrap} passes {@code false}.
      */
     static CollectorService buildFrom(SpaceRoot root, String[] paths, boolean exitIfEmpty) throws IOException {
+        if (root.config() == null) registerLegacyAcquisitionLedger(root);
         List<Path> registry = MultiCollectorProcessor.resolveConfigs(paths);
         List<EnrichmentConfig> enrichJobs = loadEnrichJobs(resolveBySuffix(paths, "_enrich.toon"));
         // Job templates (PIP-6) resolve at load: jobs referencing `template:` are expanded here, so the
@@ -80,6 +82,36 @@ final class ServiceBootstrap {
         List<Path> opsConfigs = resolveBySuffix(paths, ".toon");   // resolved OUTSIDE the lambda: it throws IOException
         svc.objectEngine().ifPresent(engine -> engine.loadConfigs(opsConfigs));
         return svc;
+    }
+
+    /**
+     * Register the {@linkplain SpaceRoot#legacy() legacy} (single-tenant / CLI) space's acquisition ledger,
+     * resolving its URL through {@link OperationalDb#urlFor} — the single-tenant analogue of the same three
+     * lines in {@link SpaceBootstrap}, and the reason a {@code config() == null} root is the discriminator:
+     * only the legacy root reaches {@code AcquisitionLedgers} without a per-space registration.
+     *
+     * <p>⛔ <b>The bug this closes.</b> Without it the legacy space is the one space that never registers, so
+     * {@link AcquisitionLedgers#shared()} falls through to its own lazy resolution — a second source of truth
+     * that reads {@code -Dacquire.ledger.db.url} and then a <b>working-directory-relative</b> DuckDB literal.
+     * That path has <b>no {@code -Dinspecto.db.url} step</b>, so a single-tenant Standard deployment pointed
+     * at PostgreSQL kept its dedup ledger in a local DuckDB file — silently, with no warning — while every
+     * other operational family moved. It also made the ledger's file location depend on the directory the
+     * service was launched from.
+     *
+     * <p>⚠ The resolution cannot move into {@code AcquisitionLedgers} itself: {@code inspecto-acquire} is a
+     * deliberate leaf that this module depends <b>on</b> ({@code inspecto/pom.xml}), so calling
+     * {@link OperationalDb} from there would be a Maven cycle. It has to happen on this side of the boundary.
+     *
+     * <p>⚠ Eager rather than lazy, exactly as {@link SpaceBootstrap} is: with the default {@code memory}
+     * backend this allocates an in-memory ledger and touches no disk, and with {@code -Dacquire.ledger.backend=db}
+     * it opens the same handle the first poll would have opened — but a failure is now reported to
+     * {@code StoreHealth} for the {@code default} space at boot rather than on whichever thread happened to
+     * ask first.
+     */
+    private static void registerLegacyAcquisitionLedger(SpaceRoot root) {
+        String url = OperationalDb.urlFor(
+                OperationalDb.Family.ACQUISITION_LEDGER, root.acquisitionLedgerDbUrl());
+        AcquisitionLedgers.register(root.id(), AcquisitionLedgers.build(url, root.id()));
     }
 
     /** Walk CLI paths for files ending in {@code suffix} (file args matched directly). */
