@@ -3,6 +3,11 @@ package com.gamma.control;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
+import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.spec.ConfigSpecs;
+import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.Severity;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.event.SavedView;
 import com.gamma.event.SavedViewStore;
@@ -422,6 +427,13 @@ final class BundleRoutes implements RouteModule {
         }
         public boolean exists(String id) { return store.exists(kind, id); }
         public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
+            // COMPONENT-BULK-WRITERS-UNGATED-1: the only BundleSource whose write validated nothing,
+            // while POST|PUT /components/{kind} runs validateKind. `schema` and `mapping` are both in
+            // WRITABLE_TYPES and both gated there, so a bundle could plant a component the authoring
+            // route refuses with 422 - and a registry schema is engine-parsed. Per-item by design: an
+            // IllegalArgumentException lands as status `failed` for THIS item, before the write and
+            // before hot-registration, and the rest of the batch still imports.
+            ComponentRoutes.validateKind(kind, id, content);
             return store.write(kind, id, content).content();
         }
     }
@@ -472,6 +484,21 @@ final class BundleRoutes implements RouteModule {
             } catch (RuntimeException ex) {
                 throw new IllegalArgumentException(ex.getMessage());
             }
+            // JOB-CONFIG-THIRD-PRODUCER-1: this is the THIRD producer of a `<name>_job.toon` (after
+            // /jobs write and /config/write), and it was the only one that never checked the job's own
+            // path VALUES. The FILE's location was already contained (WriteGates.jail below), but a
+            // bundle could carry `dir`/`backup_dir`/`archive_dir` pointing outside the Space — the run
+            // would then fail (or escape) at run time instead of being refused at import. Mirror
+            // JobRoutes.parseJob's gate exactly: same spec, same SafetyPolicy, same Space config root,
+            // ERRORs refuse and warnings pass. An IllegalArgumentException here is the documented
+            // per-item `failed` result (see the BundleSource javadoc) — it never aborts the batch.
+            Map<String, Object> raw = Map.of("job", stamped);
+            List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.job(), raw));
+            findings.addAll(ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy(),
+                    com.gamma.pipeline.SpaceConfigRoot.current()));
+            List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
+                    .map(f -> f.fieldPath() + ": " + f.message()).toList();
+            if (!errors.isEmpty()) throw new IllegalArgumentException("job refused at import: " + errors);
             String safe = WriteGates.safeName(c.name(), "job name");
             Path target = WriteGates.jail(api.writeRoot(),
                     api.writeRoot().resolve("jobs").resolve(safe + "_job.toon"), "resolved path");

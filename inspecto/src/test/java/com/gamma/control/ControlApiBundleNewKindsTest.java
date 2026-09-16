@@ -104,6 +104,43 @@ class ControlApiBundleNewKindsTest {
         }
     }
 
+    /**
+     * JOB-CONFIG-THIRD-PRODUCER-1 — bundle import is the THIRD producer of a {@code <name>_job.toon},
+     * and the only one that used to skip {@link com.gamma.config.safety.ConfigSafetyValidator}. The
+     * FILE's location was always jailed; the job's own path VALUES were not, so a bundle could plant a
+     * job whose {@code dir} points outside the Space and only fail (or escape) at run time.
+     *
+     * <p>Two halves, both load-bearing: the bad item is refused (a per-item {@code failed}, never a
+     * write + never a hot-registration), and — because import is a BULK path — a good item in the SAME
+     * bundle still lands. A refusal that aborted the batch would be the worse bug.
+     */
+    @Test
+    void jobImportRefusesAnEscapingPathValueWithoutAbortingTheBatch(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String bad = "{\"name\":\"escaper\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"cron\":\"0 3 * * *\","
+                    + "\"dir\":\"../../../../../../evil_escape\"}";
+            String good = "{\"name\":\"wellbehaved\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"cron\":\"0 4 * * *\"}";
+            String bundle = "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,"
+                    + "\"exportedAt\":\"2026-09-16T00:00:00Z\",\"sourceSpace\":null,\"items\":["
+                    + "{\"kind\":\"job\",\"id\":\"escaper\",\"content\":" + bad + "},"
+                    + "{\"kind\":\"job\",\"id\":\"wellbehaved\",\"content\":" + good + "}]}";
+
+            JsonNode imp = json(send(c.port, "POST", "/bundle/import", bundle));
+            assertEquals(1, imp.get("failed").asInt(), "the escaping job must be refused: " + imp);
+            assertEquals(1, imp.get("imported").asInt(), "the clean sibling must still import: " + imp);
+
+            JsonNode escaperRow = imp.get("results") == null ? null : imp.get("results").get(0);
+            if (escaperRow != null)
+                assertTrue(escaperRow.get("message").asText().contains("refused at import"),
+                        "the per-item message names the gate: " + escaperRow);
+
+            assertEquals(404, send(c.port, "GET", "/jobs/escaper", null).statusCode(),
+                    "refused before the write AND before the hot-registration");
+            assertEquals(200, send(c.port, "GET", "/jobs/wellbehaved", null).statusCode(),
+                    "the batch did not abort");
+        }
+    }
+
     // ── enrichment (pipeline spec gap 6b) ────────────────────────────────────────
 
     /**
