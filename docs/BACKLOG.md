@@ -1924,7 +1924,8 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   than the one stated.
 
   ⇒ Landed with the repoint of **that one value** (`out_dir: ../data/reports`), *not* all 33:
-  `JOB-PATH-DEMO-CONFIG-REPOINT-1`'s other 32 belong to runtimes that have **not** moved
+  `JOB-PATH-DEMO-CONFIG-REPOINT-1`'s other 32 belong to runtimes that had **not** moved
+  *(29 as of later that day — the three backup values followed their reader, see that row)*
   (`PipelineJobRunner`, the compactors), and re-pointing those now would break them at run — which is
   exactly what that row's own ⛔ warns against. Driven: the new value resolves to
   `…/spaces/demo/data/reports`, **byte-identical** to what the legacy CWD rule produced from the repo
@@ -1939,14 +1940,37 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `JobPathContainmentTest.enrichRefusesAConfigOutsideTheAllowedRoots` (a REAL readable file outside the
   jail, so the loader cannot refuse it for the wrong reason). → `okf/backend/control-plane/jobs.md`
 
-- **P2** · 🔴 **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **32** committed values
-  space-relative — and THREE of them are now ORPHANED BY A MOVED RUNTIME.** The remedy half of the
-  survey. ⛔ Do it in the same change as whichever runtime row lands last, or the configs refuse in
+- **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — re-point the remaining **29** committed values
+  space-relative.** The remedy half of the survey. ✅ **Three of the 32 were DISCHARGED 2026-09-16** —
+  see the struck block below. ⛔ Do it in the same change as whichever runtime row lands last, or the configs refuse in
   between. *(33 → 32 on 2026-09-16: `maintenance_report_job.toon:6` was re-pointed with
   `JOB-PATH-REPORT-ENRICH-SPLIT-1`, whose runtime moved in the same change. ⛔ Do **not** read that as
   licence to re-point the rest early — their readers are still on the old rule.)*
-  🔴 **The ⛔ above was VIOLATED the same day, in the other direction.**
-  `JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`) moved `BackupTask` onto
+  ~~🔴 **The ⛔ above was VIOLATED the same day, in the other direction.**~~
+  ✅ **CLOSED 2026-09-16 — the three backup values are RE-POINTED** (`backup_verify_job.toon:6` and
+  `config_backup_job.toon:7` → `../data/backups`; `config_backup_job.toon:6` → `.`). Each new value was
+  driven to land **byte-identically** on the target the legacy CWD rule produced from the repo root — the
+  same behaviour-preservation proof `maintenance_report_job.toon:6` used — and each was read back through
+  the real `ConfigCodec` before being trusted, because a TOON edit that parses while losing its value has
+  happened in this repo before. Now pinned by `DemoBackupJobPathsResolveUnderTheSpaceRootTest`
+  (`inspecto-config`, 5 tests, runs in the DEFAULT build). Mutation-proven: reverting `dir: .` alone turns
+  `configBackupBacksUpTheSpaceConfigRootItself` red with the doubled path in the message.
+  Verified `mvn -o -pl inspecto-config -am test` **161/0/0/0** (all 5 observed to RUN) and
+  `mvn -o -pl inspecto-backup -am test -Pedition-standard` **BUILD SUCCESS** with
+  `BackupJobPathResolutionTest` 6, `BackupPathContainmentTest` 3, `BackupTaskTest` 6 observed to RUN.
+  🔴 **The first version of that pin was RED, and the reason is the trap this whole row is about.**
+  Its control asserted the OLD value still throws `PathJail.Escape` — but `resolveJobPath` refuses only
+  when the **CWD-relative** path EXISTS, and surefire's working directory is the MODULE directory, where
+  `spaces/demo/config` does not exist. ⛔ **A refusal assertion pins the test's working directory, not
+  the rule.** The control now asserts the *doubling* (true in both columns) plus a separate reachability
+  control — one value that DOES exist CWD-relative (refuses), one that does not (re-points) — so the
+  branch cannot go dead without a test going red.
+  ⚠ **`docs/ops/backup-restore-runbook.md` taught the broken spelling** and was corrected in the same
+  change: its backup example, its retention bullet, its containment preamble, and — the one that cannot
+  be fixed by symmetry — **restore-into-a-new-space**, where the base is the config root of the Space the
+  restore JOB lives in, not of the Space being restored into, so crossing spaces means `../../<new>/config`
+  or an absolute path under a declared root. *(Original finding follows.)*
+  ~~`JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`) moved `BackupTask` onto
   `PathJail.requireJobPathUnderAny(…, SpaceConfigRoot.current(), …)` **without** re-pointing the three
   committed values that runtime reads. A runtime that moves ahead of its configs is the same break as
   configs that move ahead of their runtime — this marker only ever named one of the two orders.
@@ -1972,10 +1996,9 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     silent re-point, unchanged.)*
   ⚠ `restore`'s two moved keys (`archive`, `target_dir`, `BackupTask:269-270`) classify **no committed
   value** — the survey's §2.1 proven absence stands. ⚠ `BackupTask:191` is deliberately **not** moved.
-  ⇒ **Those three values are now unblocked and owed**, by this row's own stated pattern (a value moves
-  when its reader moves). ⛔ **Still not licence for the other 29** — `PipelineJobRunner` and the
-  compactors have not moved. ⚠ **Rank left at P2 deliberately, not by omission:** this is a live run
-  failure, but only in the `demo` sample Space, so the re-rank is an operator call — flagged, not taken.
+  ⇒ **Those three values were unblocked and owed**, by this row's own stated pattern (a value moves
+  when its reader moves) — and are now done.~~ ⛔ **Still not licence for the other 29** —
+  `PipelineJobRunner` and the compactors have not moved, so their values stay as authored.
   §3.1 of `docs/superpower/job-path-compat-survey.md` carries the driven table.
   → `okf/backend/control-plane/jobs.md`
 

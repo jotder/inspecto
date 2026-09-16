@@ -97,9 +97,9 @@ expansion.
 | File:line | Key | Value | fresh | deployed | Gate sees it? | Runtime rule |
 |---|---|---|---|---|---|---|
 | `spaces/demo/config/jobs/backup_retention_job.toon:5` | `params.dir` | `spaces/demo/data/orders/backup` | BROKEN (re-points to `…/config/spaces/demo/data/orders/backup`) | **NOW REFUSES** | no (gate-blind) | `CleanupTask` → new rule |
-| `spaces/demo/config/jobs/backup_verify_job.toon:6` | `backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | yes | ~~`BackupTask:172` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:182` → **new rule** |
-| `spaces/demo/config/jobs/config_backup_job.toon:6` | `params.dir` | `spaces/demo/config` | **NOW REFUSES** | **NOW REFUSES** | no (gate-blind) | ~~`BackupTask:82` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:93` → **new rule** |
-| `spaces/demo/config/jobs/config_backup_job.toon:7` | `params.backup_dir` | `spaces/demo/data/backups` | BROKEN | **NOW REFUSES** | no (gate-blind) | ~~`BackupTask:83` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:94` → **new rule** |
+| ~~`spaces/demo/config/jobs/backup_verify_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `../data/backups` | `backup_dir` | ~~`spaces/demo/data/backups`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | yes | ~~`BackupTask:172` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:182` → **new rule** |
+| ~~`spaces/demo/config/jobs/config_backup_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `.` | `params.dir` | ~~`spaces/demo/config`~~ | ~~NOW REFUSES~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | no (gate-blind) | ~~`BackupTask:82` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:93` → **new rule** |
+| ~~`spaces/demo/config/jobs/config_backup_job.toon:7`~~ ✅ **RE-POINTED 2026-09-16** to `../data/backups` | `params.backup_dir` | ~~`spaces/demo/data/backups`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | no (gate-blind) | ~~`BackupTask:83` → **old rule** (split)~~ ✅ **MOVED 2026-09-16** (`3f384182`): `BackupTask:94` → **new rule** |
 | `spaces/demo/config/jobs/orders_rollup_job.toon:4` | `pipeline_config` | `spaces/demo/config/orders/orders_pipeline.toon` | **NOW REFUSES** | **NOW REFUSES** | yes | `PipelineJobRunner:242` → **no jail at all** |
 | `spaces/demo/config/jobs/orders_weekly_compact_job.toon:7` | `dir` | `data/orders` | BROKEN | **NOW REFUSES** | yes | `PartitionCompactor:57` → **raw `Path.of`, no jail at all** |
 | ~~`spaces/demo/config/jobs/maintenance_report_job.toon:6`~~ ✅ **RE-POINTED 2026-09-16** to `../data/reports` | `out_dir` | ~~`spaces/demo/data/reports`~~ | ~~BROKEN~~ **UNAFFECTED** | ~~NOW REFUSES~~ **UNAFFECTED** | ~~no~~ **yes** (in `JOB_PATH_KEYS`) | `ReportJob:127` → **new rule** |
@@ -132,6 +132,24 @@ value**: §2.1's proven absence stands — neither key appears in any committed 
 already-resolved `backup_dir` and is jailed against **that**, not the Space root.
 ⚠ As §6 already records, `SpaceConfigRoot.current()` returning `spaces/demo/config` under a booted demo
 Space is read from the call sites, not observed — this re-drive passed that base in directly.
+
+✅ **ALL THREE RE-POINTED 2026-09-16, later the same day** — the table above is now the *before*
+picture, kept because it is the evidence the re-point was owed. `backup_dir` → `../data/backups`
+(both files), `dir` → `.`. Each new value was driven to land **byte-identically** on the target the
+legacy CWD rule produced from the repo root, the same behaviour-preservation proof
+`maintenance_report_job.toon:6` used — and each was read back through the real `ConfigCodec` first,
+because a TOON edit that parses but loses its value has happened in this repo before. ⚠ The values
+are now pinned by `DemoBackupJobPathsResolveUnderTheSpaceRootTest` (`inspecto-config`, 5 tests),
+mutation-proven: reverting `dir: .` alone turns `configBackupBacksUpTheSpaceConfigRootItself` red
+with the doubled path in the message.
+🔴 **The first version of that test was RED for an instructive reason, recorded here because §1's
+method has the same exposure.** Its control asserted that the OLD value still `Escape`s — but
+`resolveJobPath` refuses only when the **CWD-relative** path exists, and surefire's working directory
+is the *module* directory, where `spaces/demo/config` does not exist. The same authored value refuses
+from the repo root and re-points silently from `inspecto-config/`. ⛔ **A refusal assertion pins the
+test's working directory, not the rule.** The control now asserts the *doubling*, which holds in both
+columns, plus a separate reachability control (a value that DOES exist CWD-relative refuses; one that
+does not, re-points) — so the branch cannot be dead without a test going red.
 
 ### 3.2 `spaces/default` (base `spaces/default/config`, CWD repo root)
 
@@ -189,6 +207,13 @@ else in this survey is worse than a save-time refusal.
 
 ## 4. Counts
 
+⚠ **This is the AS-SURVEYED snapshot (2026-09-16, `caea50ff`) and is deliberately NOT re-tallied as
+values move.** **Four of the 33 have since been re-pointed** and are now UNAFFECTED in both columns:
+`maintenance_report_job.toon:6` (`JOB-PATH-REPORT-ENRICH-SPLIT-1`) and the three backup values
+(`backup_verify_job.toon:6`, `config_backup_job.toon:6` and `:7`). §3.1 carries the current state per
+value; `JOB-PATH-DEMO-CONFIG-REPOINT-1` carries the live remaining count (**29**). ⛔ Read the numbers
+below as the finding that justified the work, not as today's inventory.
+
 By **value** (33 relative path values in 24 files; **0 absolute values anywhere**):
 
 Two scenarios, both driven. **A** = a fresh checkout with the examples never served (no `out/`, no
@@ -233,12 +258,13 @@ delivered somewhere no one looks — all reporting success.
 ### DEFECTS — recommended new rows
 
 **(a) `JOB-PATH-DEMO-CONFIG-REPOINT-1` (P2) — re-point every committed job config to a space-relative
-value.** *(**32 remain** as of 2026-09-16: `maintenance_report_job.toon:6`'s `out_dir` was re-pointed to
+value.** *(**29 remain** as of 2026-09-16 — 33 → 32 → 29: `maintenance_report_job.toon:6`'s `out_dir` was re-pointed to
 `../data/reports` in the same change that moved its reader, `JOB-PATH-REPORT-ENRICH-SPLIT-1`. Driven
 proof it is behaviour-preserving: the new value resolves to `…/spaces/demo/data/reports`, byte-identical
 to what the legacy CWD rule returned from the repo root. ⛔ That is the pattern — **one value moves when
-its reader moves** — not licence to re-point the other 32 while `PipelineJobRunner` and the compactors
-are still on the old rule.)* All 33 values are authored either space-root-prefixed (`spaces/demo/…`) or CWD-prefixed
+its reader moves** — not licence to re-point the other 29 while `PipelineJobRunner` and the compactors
+are still on the old rule. The three backup values followed the same pattern later that day, once
+`3f384182` had moved their reader: `backup_verify_job.toon:6`, `config_backup_job.toon:6` and `:7`.)* All 33 values are authored either space-root-prefixed (`spaces/demo/…`) or CWD-prefixed
 (`out/…`, `data/orders`). Under the new rule the correct spelling is relative **to the Space config
 root** — e.g. `spaces/demo/config/jobs/orders_rollup_job.toon` should carry `orders/orders_pipeline.toon`,
 not `spaces/demo/config/orders/orders_pipeline.toon`. ~~⚠ **Do this in the same change as
