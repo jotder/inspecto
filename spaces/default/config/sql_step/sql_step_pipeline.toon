@@ -1,6 +1,5 @@
 name: sql_step
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/sql_step

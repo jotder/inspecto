@@ -1,6 +1,5 @@
 name: SALES_PIPELINE
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

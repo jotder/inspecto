@@ -1,6 +1,5 @@
 name: orders_by_region_feed
 active: true
-version: 1
 
 trigger:
   type: event

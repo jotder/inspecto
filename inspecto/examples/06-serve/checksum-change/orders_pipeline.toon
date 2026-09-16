@@ -1,6 +1,5 @@
 name: CHECKSUM_ORDERS
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

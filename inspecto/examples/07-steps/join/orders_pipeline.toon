@@ -1,6 +1,5 @@
 name: STEP_JOIN
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

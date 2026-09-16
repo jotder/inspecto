@@ -2,17 +2,23 @@ package com.gamma.etl;
 
 import com.gamma.config.spec.AcceptedConfigKeys;
 import com.gamma.config.spec.ConfigSpecs;
+import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.Severity;
+import com.gamma.util.ToonHelper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -144,6 +150,82 @@ class PipelineKeyCoverageContractTest {
                 "a local named 'raw' that is not the pipeline root was added or removed. The scan treats "
                         + "every raw.get(\"…\") as a root read, so a new shadow makes it report a key the "
                         + "pipeline config does not have. Re-scope the scan, then update SHADOWED_RAW_SITES.");
+    }
+
+    // ── the BREAKING half: no committed pipeline may regress ─────────────────────
+
+    /** The committed sample trees. Both — scoping to one of them is how this was undercounted by a third. */
+    private static final List<String> SAMPLE_TREES = List.of("spaces", "inspecto/examples");
+
+    /**
+     * 🔴 <b>No committed {@code *_pipeline.toon} may be refused by the census that judges it.</b>
+     *
+     * <p>This test did not exist when the dead-property checker shipped ({@code 2c310d1c}), and the
+     * omission cost exactly what it was worth: all 36 committed samples carried a top-level
+     * {@code version:} that {@code ConfigSpecs.pipeline()} has never declared and no component reads,
+     * so re-saving ANY shipped sample through {@code POST /config/write} answered 422
+     * {@code ERR_UNKNOWN_CONFIG_KEY} from that commit until {@code PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1}
+     * stripped the key. {@code meta} escaped the same fate only because {@code ConfigSpecs.meta()}
+     * happens to declare {@code version}. A key added to the census, a key dropped from a spec, or a new
+     * sample authored against an older convention all land here now instead of in a 422 nobody drives.
+     *
+     * <p>⚠ The sweep WALKS the trees rather than naming files: a list would go stale the first time a
+     * sample was added, which is the half of the risk a hand-written list cannot cover.
+     */
+    @Test
+    void everyCommittedPipelineConfigSurvivesTheCensus() throws IOException {
+        List<Path> samples = committedSamples();
+        List<String> refused = new ArrayList<>();
+        for (Path sample : samples) {
+            Map<String, Object> raw = ToonHelper.load(sample.toString());
+            List<Finding> findings = AcceptedConfigKeys.unknownKeyFindings("pipeline", raw, Severity.ERROR);
+            if (!findings.isEmpty()) refused.add(sample + " -> " + findings);
+        }
+        assertTrue(refused.isEmpty(),
+                "a committed sample pipeline would be refused by its own census — re-saving it through "
+                        + "/config/write answers 422. Either the key is dead and belongs out of the "
+                        + "sample, or something reads it and ConfigSpecs.pipeline() must declare it:\n  "
+                        + String.join("\n  ", refused));
+    }
+
+    /**
+     * 🔴 Falsify the sweep. A walk that finds nothing passes the test above while gating nothing — this
+     * repo has shipped at least three probes that reported "absent" because they could not return a hit.
+     */
+    @Test
+    void theSweepStillSeesTheCommittedSamples() throws IOException {
+        List<Path> samples = committedSamples();
+        assertTrue(samples.size() >= 36,
+                "the sweep found only " + samples.size() + " committed *_pipeline.toon files; there were "
+                        + "36 when this landed (24 under spaces/, 12 under inspecto/examples/). A large "
+                        + "drop means the walk stopped finding the trees, not that the corpus shrank.");
+        for (String tree : SAMPLE_TREES)
+            assertTrue(samples.stream().anyMatch(p -> p.toString().replace('\\', '/').contains("/" + tree + "/")),
+                    "the sweep found no sample under '" + tree + "' — that tree is not being gated.");
+    }
+
+    /**
+     * Every committed {@code *_pipeline.toon} under {@link #SAMPLE_TREES}.
+     *
+     * <p>⚠ {@code spaces/uat} and {@code spaces/_shared} are skipped: both are gitignored runtime state
+     * ({@code tools/seed-uat.ps1} clones the former from {@code spaces/demo}), so in a working tree that
+     * has been seeded they would make this gate red for something nobody committed. Same exclusion, same
+     * reason, as {@code RepoSpacesConfigValidationTest}.
+     */
+    private static List<Path> committedSamples() throws IOException {
+        List<Path> out = new ArrayList<>();
+        for (String tree : SAMPLE_TREES) {
+            Path root = repoFile(tree);
+            try (Stream<Path> walk = Files.walk(root)) {
+                walk.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().endsWith("_pipeline.toon"))
+                    .filter(p -> { String s = root.relativize(p).toString().replace('\\', '/');
+                                   return !s.startsWith("uat/") && !s.startsWith("_shared/"); })
+                    .sorted()
+                    .forEach(out::add);
+            }
+        }
+        return out;
     }
 
     // ── the scan ─────────────────────────────────────────────────────────────────

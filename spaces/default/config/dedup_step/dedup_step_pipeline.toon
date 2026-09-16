@@ -1,6 +1,5 @@
 name: dedup_step
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/dedup_step

@@ -1,6 +1,5 @@
 name: collect_step
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/collect_step

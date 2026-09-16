@@ -1,6 +1,5 @@
 name: fixedwidth_example
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/fixedwidth_example

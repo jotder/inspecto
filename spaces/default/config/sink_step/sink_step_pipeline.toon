@@ -1,6 +1,5 @@
 name: sink_step
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/sink_step

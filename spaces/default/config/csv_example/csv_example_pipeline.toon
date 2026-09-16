@@ -1,6 +1,5 @@
 name: csv_example
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/csv_example

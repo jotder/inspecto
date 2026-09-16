@@ -1,6 +1,5 @@
 name: topups
 active: true
-version: 1
 
 dirs:
   poll:       spaces/ucc/data/inbox/topups

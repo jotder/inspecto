@@ -1,6 +1,5 @@
 name: SEQ_GAP_FEED
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

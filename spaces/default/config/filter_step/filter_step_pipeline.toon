@@ -1,6 +1,5 @@
 name: filter_step
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/filter_step

@@ -1,6 +1,5 @@
 name: WATERMARK_FEED
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

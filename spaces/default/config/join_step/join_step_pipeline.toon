@@ -1,6 +1,5 @@
 name: join_step
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/join_step

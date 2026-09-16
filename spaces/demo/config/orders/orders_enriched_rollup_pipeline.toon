@@ -1,6 +1,5 @@
 name: orders_enriched_rollup
 active: false
-version: 1
 
 dirs:
   poll:       spaces/demo/data/inbox/orders

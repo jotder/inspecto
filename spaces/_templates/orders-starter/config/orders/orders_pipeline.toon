@@ -1,6 +1,5 @@
 name: orders
 active: true
-version: 1
 
 dirs:
   poll:       spaces/${SPACE}/data/inbox/orders

@@ -1,6 +1,5 @@
 name: shipments
 active: true
-version: 1
 
 dirs:
   poll:       spaces/demo/data/inbox/shipments

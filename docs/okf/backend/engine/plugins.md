@@ -138,7 +138,6 @@ Replace `schema_file:` with `ingester:` and `segments:`. The `duplicate_check:` 
 
 ```yaml
 name: EVENTS_ETL
-version: 1
 
 dirs:
   poll:       inbox/events

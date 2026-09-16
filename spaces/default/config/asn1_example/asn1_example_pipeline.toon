@@ -1,6 +1,5 @@
 name: asn1_example
 active: true
-version: 1
 
 dirs:
   poll:       spaces/default/data/inbox/asn1_example
