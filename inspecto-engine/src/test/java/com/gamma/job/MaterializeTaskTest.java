@@ -141,6 +141,19 @@ class MaterializeTaskTest {
             assertThrows(IllegalArgumentException.class, () -> new MaintenanceJob(
                     job(Map.of("task", "materialize", "dataset", "sales_ds", "target", "../evil")),
                     dataDir.toString()).run(), "path-escaping target rejected");
+            // ⛔ `target` is a SINGLE SEGMENT (a dataset id that doubles as its store dir under the
+            // DATA root), NOT a job path — which is why it is deliberately absent from
+            // ConfigSafetyValidator's JOB_PATH_KEYS: PathJail.resolveJobPath bases on the Space
+            // CONFIG root, a different base, so listing it there would resolve it somewhere the
+            // runtime never writes. Containment therefore rests entirely on SAFE_TARGET being a
+            // FULL match with no separator in its class — pinned here per rejected shape, because
+            // "it's only a segment" is a claim about a regex and regexes drift.
+            for (String bad : List.of("a/b", "a\\b", "/abs", "C:/evil", "..", ".hidden", "", " ",
+                    "a b", "a:b", "out/database")) {
+                assertThrows(IllegalArgumentException.class, () -> new MaintenanceJob(
+                        job(Map.of("task", "materialize", "dataset", "sales_ds", "target", bad)),
+                        dataDir.toString()).run(), "target '" + bad + "' must be refused as a non-segment");
+            }
             assertThrows(IllegalArgumentException.class, () -> new MaintenanceJob(
                     job(Map.of("task", "materialize", "dataset", "ghost", "target", "t")),
                     dataDir.toString()).run(), "unknown source dataset rejected");

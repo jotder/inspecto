@@ -6,4 +6,4 @@ job:
   dir: ../database
   min_age_days: "7"
   min_files: "4"
-  store: out/database
+  store: sales
