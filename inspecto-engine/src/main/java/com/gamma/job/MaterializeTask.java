@@ -5,6 +5,7 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
+import com.gamma.query.ResultSetDescriptor;
 import com.gamma.query.MeasureCompiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +83,7 @@ final class MaterializeTask {
         Path tmp = outDir.resolve(snapshot + ".tmp");
 
         long rows;
+        List<ResultSetDescriptor.Column> derived;
         try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW " + q(source) + " AS " + relationSql);
@@ -91,6 +93,11 @@ final class MaterializeTask {
                 rs.next();
                 rows = rs.getLong(1);
             }
+            // `TYPEFLOW-DATASET-COLUMNS-1` step 4. DESCRIBE the Parquet that was just written, not the
+            // pipeline's static shape: this task HAS the real relation in hand, so describing it is both
+            // simpler and more truthful than deriving a shape statically — and needs no TypeFlow at all,
+            // despite the row's title (design §4, option A).
+            derived = describeWritten(st, tmp);
         }
 
         // Swap: hide prior snapshots, reveal the new one, drop the hidden ones (see class doc).
@@ -127,6 +134,7 @@ final class MaterializeTask {
         content.put("physicalRef", target);
         content.put("description", "Materialized from dataset '" + source + "' (job '" + cfg.name() + "')");
         content.put("materialized", Map.of("from", source, "at", Instant.now().toString(), "rows", rows));
+        content.put("columns", mergeColumns(content.get("columns"), derived));
         store.write("dataset", target, content);
         // S3a: the data became visible at the swap above — announce it (additive, never throws).
         // ⚠ The producer is a JOB, and saying so is the point: this site passed a bare `cfg.name()` into the
@@ -176,6 +184,69 @@ final class MaterializeTask {
 
     private static String q(String ident) {
         return "\"" + ident.replace("\"", "\"\"") + "\"";
+    }
+
+    /** The written snapshot's columns, from {@code DESCRIBE} over the Parquet itself. */
+    private static List<ResultSetDescriptor.Column> describeWritten(Statement st, Path parquet) throws Exception {
+        List<String> names = new ArrayList<>();
+        List<String> types = new ArrayList<>();
+        try (ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM read_parquet("
+                + sqlStr(parquet.toString().replace('\\', '/')) + ")")) {
+            while (rs.next()) {
+                names.add(rs.getString("column_name"));
+                types.add(rs.getString("column_type"));
+            }
+        }
+        return ResultSetDescriptor.describeTypeNames(names, types);
+    }
+
+    /**
+     * Merge derived columns into the stored ones, by name (design §5). ⛔ <b>A human's answer beats the
+     * heuristic:</b> a stored {@code role}, {@code label}, {@code format} or {@code hidden} is never
+     * overwritten — only {@code type} is refreshed, because the physical shape genuinely changed. This is
+     * the same rule the Studio editor already applies client-side
+     * ({@code dataset-editor.component.ts}: {@code bySaved.get(c.name) ?? freshlyInferred}); a server-side
+     * derivation that did not replicate it would clobber human edits on the next run.
+     *
+     * <p>✅ <b>Q3 (operator): a stored column the derivation no longer produces is MARKED {@code hidden}</b>,
+     * never dropped. Dropping discards a human's configuration for a column that may well come back;
+     * hiding keeps the configuration and stops the phantom rendering. ⚠ A column that returns is NOT
+     * un-hidden automatically — {@code hidden} is then a stored human-owned key like any other, and
+     * silently flipping it back would be this rule's own mistake in the opposite direction.
+     */
+    @SuppressWarnings("unchecked")
+    static List<Map<String, Object>> mergeColumns(Object stored, List<ResultSetDescriptor.Column> derived) {
+        List<Map<String, Object>> storedCols = stored instanceof List<?> l
+                ? (List<Map<String, Object>>) l : List.of();
+        Map<String, Map<String, Object>> byName = new LinkedHashMap<>();
+        for (Map<String, Object> c : storedCols) {
+            Object n = c.get("name");
+            if (n != null) byName.put(String.valueOf(n), new LinkedHashMap<>(c));
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (ResultSetDescriptor.Column d : derived) {
+            seen.add(d.name());
+            Map<String, Object> col = byName.get(d.name());
+            if (col == null) {
+                col = new LinkedHashMap<>();
+                col.put("name", d.name());
+                col.put("type", d.type());
+                col.put("role", d.role());          // a seed for a human, exactly as the editor treats it
+            } else {
+                col.put("type", d.type());          // the physical shape moved; the human's role did not
+            }
+            out.add(col);
+        }
+        // Stored but no longer derived: keep, and hide (Q3).
+        for (Map.Entry<String, Map<String, Object>> e : byName.entrySet()) {
+            if (seen.contains(e.getKey())) continue;
+            Map<String, Object> col = e.getValue();
+            col.put("hidden", true);
+            out.add(col);
+        }
+        return out;
     }
 
     private static String sqlStr(String s) {

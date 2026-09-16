@@ -67,6 +67,25 @@ class MaterializeTaskTest {
                     .map(ComponentRegistry.Component::content).orElseThrow();
             assertEquals("sales_by_region", content.get("physicalRef"));
 
+            // `TYPEFLOW-DATASET-COLUMNS-1` step 4, DRIVEN: the columns are derived from the Parquet the run
+            // just wrote (DESCRIBE over the real relation), not from any static shape.
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> cols = (List<Map<String, Object>>) content.get("columns");
+            assertNotNull(cols, "a code-registered dataset arrives WITH its columns");
+            assertEquals(List.of("region", "sum_amount", "count"),
+                    cols.stream().map(c -> c.get("name")).toList());
+            assertEquals("string", cols.get(0).get("type"));
+            assertEquals("dimension", cols.get(0).get("role"));
+            assertEquals("number", cols.get(1).get("type"));
+            assertEquals("measure", cols.get(1).get("role"),
+                    "an aggregate is a measure - and `count` is too, since it is not an _id column");
+
+            // a human's answer then survives the refresh below (the merge rule, end-to-end)
+            cols.get(0).put("label", "Sales region");
+            cols.get(1).put("role", "dimension");
+            content.put("columns", cols);
+            store.write("dataset", "sales_by_region", content);
+
             // the Matrix reads back through the NORMAL dataset path with the aggregated rows
             String relation = DatasetRelation.relationSql(content, dataDir, new ViewStore(writeRoot.resolve("views")));
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
@@ -81,6 +100,15 @@ class MaterializeTaskTest {
             JobResult second = new MaintenanceJob(cfg, dataDir.toString()).run();
             assertTrue(second.message().contains("refreshed"), second.message());
             assertEquals(1, parquetFiles(outDir).size(), "still exactly one visible snapshot after refresh");
+
+            // ⛔ The refresh must NOT clobber what the human just authored - the defect this row's step 2
+            // was filed for, checked here on the columns step 4 adds.
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> after = (List<Map<String, Object>>) store.get("dataset", "sales_by_region")
+                    .map(ComponentRegistry.Component::content).orElseThrow().get("columns");
+            assertEquals("Sales region", after.get(0).get("label"), "the authored label survived the re-run");
+            assertEquals("dimension", after.get(1).get("role"),
+                    "and so did the authored role, over a heuristic that still says measure");
             try (DirectoryStream<Path> junk = Files.newDirectoryStream(outDir, "*.{tmp,stale}")) {
                 assertFalse(junk.iterator().hasNext(), "no invisible leftovers after a clean swap");
             }
