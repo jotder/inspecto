@@ -202,6 +202,30 @@ if ! run_guard tools/check-doc-citations.mjs "citation guard" \
   exit 1
 fi
 
+# Backlog owning-doc guard. The SECOND HALF of the citation guard above, and placed directly after it
+# for that reason: the citation guard proves a `→` target RESOLVES, this one proves the target says
+# anything at all about the row that points at it. Two pointers were caught by hand aiming at docs
+# that never mentioned their subject (`MEASURE-SHORTHAND-ONE-HOME-1` → `catalog-vs-executors.md`,
+# `DUCKLAKE-GRAPH-LANE-1` → `db-layer.md`); a row that claims a home it does not have sends the next
+# shift to a document that will not answer it.
+#
+# ⚠ It compares the row's IDENTIFIER — an exact, repo-coined token — against the target's text. It is
+# deliberately NOT a topic/prose matcher: `check-doc-counts.mjs`'s header records what happened the one
+# time a prose scanner was built here, and a guard that is mostly exemption is worse than no guard.
+# Exemptions: NONE. Its one scope limit (rows with no id cannot be checked) is PRINTED on every run,
+# with the line number of every unverified pointer, pass or fail.
+#
+# Deliberately BELOW the UCC_RELEASE_GUARD_DISABLE override, with the vocabulary and citation guards:
+# a mis-homed board pointer is a documentation defect, and must never stand between a human and an
+# emergency security backport.
+if ! run_guard tools/check-backlog-homes.mjs "backlog owning-doc guard" \
+     "CI runs it too — a mis-homed board pointer there is a red master."; then
+  echo "pre-push: refusing to push — a BACKLOG row claims an owning doc that never names it (above)." >&2
+  echo "          Fix the POINTER or the DOC, never the guard: repoint the row at the document that" >&2
+  echo "          actually owns the detail, or write the concept up and name the row in it." >&2
+  exit 1
+fi
+
 # Doc-count guard (SPEC-COUNTS-1). Every marked count statement must equal what its owning contract
 # derives. Cheap (no build, pure file reads) and it catches the commonest doc drift there is: a
 # number that was right when it was typed. ⚠ Adding a processor or a node type changes SIX doc

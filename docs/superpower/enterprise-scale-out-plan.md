@@ -1420,3 +1420,5 @@ withdrawn.**)*
   file as binary, it was silently exempt from the repository's own `text=auto eol=lf` policy and was
   stored with CRLF — so one stray byte bought an exemption from two separate repo-wide rules at once,
   and neither rule reported it.
+
+> ⚠ The bullet above is tracked on the board as `SPACES-FROM-PARTITION-MAP-1`. Re-grounded 2026-09-16 and **still not startable**: `SpaceRoutes.java:50-56` answers from `api.spaces().all()` (this Pod's roster) and still declares `podScoped` at `:51`, alongside `BootstrapRoutes:44` and `SchedulerRoutes:70`. ⛔ Its precondition does not exist — `grep -rn "ingress" inspecto/src/main --include=*.java` is EMPTY — and D16 here is UNSIGNED, so listing Spaces this Pod does not own would ship a UI offering Spaces it cannot open.

@@ -960,3 +960,8 @@ this area has three sites whose line citations drifted (§3.2).
 **A capability-pointer check over this file** — it is **`tools/check-doc-citations.mjs`, committed 2026-09-09**
 and wired into `ci.yml` and `.githooks/pre-push`. It checks this file's backticked paths and
 class names against `git ls-files` and the module tree.
+
+
+#### Service wrappers — acceptance still owed
+
+`package.ps1` stages `inspecto.service` + `install-service.sh` (systemd) and `install-service.ps1` (a Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). ⛔ The `sc.exe` route was REFUSED on grounding: a Windows service binary must reach the service control dispatcher shortly after start and `java.exe` never does, so an `sc.exe` service fails every start with error 1053 — that installer would have looked installed and restarted nothing. WinSW is the documented alternative. ⚠ **The unit renders and both installers parse, but the acceptance test — `kill -9` → back on `/health`, plus the reboot leg — is UNRUN**, because it needs a systemd host and an elevated Windows box. Tracked as `DEPLOY-SERVICE-WRAPPER-1` in `BACKLOG.md`; it is evidence-blocked, not code-blocked, and ⛔ SCR-3's acceptance must not be marked met until someone runs both legs.

@@ -167,3 +167,8 @@ not a missing line — tracked as **PKG-5** in [BACKLOG](../../../BACKLOG.md) §
 ⚠ The **jlink embedded-runtime step is unproven as of 2026-08-27**: a stale `java.exe` held
 `runtime/bin/server/jvm.dll` and step 6c failed with an access error that was a **file lock, not a
 build fault**. Both editions pass with `-NoRuntime`. Re-prove jlink on a box with no stale JVMs.
+
+
+### Bundle contents — the docs tree
+
+`package.ps1` stages the **entire** `docs/` tree recursively into every edition bundle, file by file (not one recursive copy, so a single locked file cannot truncate the rest). ⚠ That means **248 of the 498 docs files — half the tree — are `docs/archived-documents/`**, the never-maintained tier, complete with its ~570 known-broken internal links, superseded designs and refuted claims. Whether a customer bundle should carry that tier at all is an open product call tracked as `BUNDLE-SHIPS-THE-ARCHIVE-1` in `BACKLOG.md`; the filter itself is a few lines in step 7 once the decision exists. 🔴 Found 2026-09-16 while REFUTING `GAP-10`, which had worried that 13 archived files were MISSING from the bundle — the real exposure is the exact inverse, and 248 files wide.

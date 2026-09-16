@@ -112,6 +112,25 @@ jobs:
       - name: Guard — every cited path and type name exists
         run: node tools/check-doc-citations.mjs
 
+      # Backlog owning-doc guard. The second half of the citation guard above: that one proves a `→`
+      # target RESOLVES, this one proves the target says anything about the row pointing at it. Two
+      # pointers were caught by hand aiming at documents that never mentioned their subject
+      # (MEASURE-SHORTHAND-ONE-HOME-1 → catalog-vs-executors.md, DUCKLAKE-GRAPH-LANE-1 → db-layer.md)
+      # and ~100 such pointers were unchecked. The subject compared is the row's IDENTIFIER, an exact
+      # repo-coined token — deliberately NOT a prose/topic matcher, for the reason written at length in
+      # tools/check-doc-counts.mjs: a prose scanner built here matched 14 lines over 238 docs, all of
+      # them false, while missing the real phrasings. A guard that is mostly exemption is worse than no
+      # guard. Exemptions: NONE. Its one scope limit — a row with no identifier has no exact subject —
+      # is printed with every unverified pointer's line number on every run, pass or fail, because a
+      # silent skip is an exemption by another name. `→` is also ordinary prose on that board, so the
+      # parser reads a pointer-list grammar and keeps only `.md` targets: 24 of the 78 parsed targets
+      # are Java symbols, properties or section tokens and are counted, not reported. Falsified in
+      # three directions before wiring: the real corpus state reported, a legitimately homed row
+      # repointed at a doc that does not name it went RED with its line number, and restoring it (plus
+      # homing the three genuine findings) went green.
+      - name: Guard — every BACKLOG `→` owning-doc pointer names its row
+        run: node tools/check-backlog-homes.mjs
+
       # Doc-count guard (2026-09-09, SPEC-COUNTS-1). Six product counts were each stated several
       # ways — node types five ways, maintenance tasks five, job types four, processors three,
       # transform functions three — and in every case the narrative doc was wrong and the generated
