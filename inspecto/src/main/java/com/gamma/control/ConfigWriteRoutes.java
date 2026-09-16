@@ -68,7 +68,12 @@ final class ConfigWriteRoutes implements RouteModule {
         // route, which is why it is not reordered here — moving a write gate is a bigger change than
         // the defect warrants, and doing it blind risks the ordering the gate depends on.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
-        findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
+        // ⚠ The `null` target is deliberate and is NOT a third base: a job is judged from the Space
+        // config root here too (see safetyBase), and only a NON-job falls back to the CWD-only
+        // behaviour the paragraph above describes. Without this a job draft would be judged from the
+        // process working directory — the very rule JOB-DIR-CWD-CONTAINMENT-1 retired.
+        findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(),
+                safetyBase(type, writeRoot, null)));
         // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
         // returns written:true and the config is then silently dropped from the index forever.
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
@@ -303,6 +308,42 @@ final class ConfigWriteRoutes implements RouteModule {
     }
 
     /**
+     * The base {@link ConfigSafetyValidator} resolves a config's relative values against — <b>and it
+     * means two different things depending on the kind</b>, which is the whole of
+     * {@code JOB-PATH-PATCH-ROUTE-WRONG-BASE-1}.
+     *
+     * <ul>
+     *   <li><b>pipeline / schema</b> — the config file's <em>own directory</em>, so a config
+     *       <em>reference</em> ({@code schema_file}, {@code grammar}) resolves the way the loader
+     *       resolves it: beside the config. That is what {@code getParent()} is for here.</li>
+     *   <li><b>job</b> — the <b>Space config root</b>. A job's relative path resolves against it and
+     *       nothing else ({@code JOB-DIR-CWD-CONTAINMENT-1}, operator 2026-09-16), and
+     *       {@link com.gamma.config.safety.PathJail#resolveJobPath} is the single rule the run-time
+     *       tasks call too.</li>
+     * </ul>
+     *
+     * <p>🔴 Passing a job {@code target.getParent()} judged it from {@code <space>/config/jobs} whenever
+     * the caller supplied {@code subdir:"jobs"} — the only shape that can address a job
+     * {@code POST /jobs} wrote, since that route always lands in {@code jobs/}. Driven 2026-09-16:
+     * {@code backup_dir:"../../outside/backups"} was <b>refused 422</b> by {@code PUT /jobs} and
+     * <b>written</b> by {@code /config/patch}, one directory level apart. Two gates, one value, two
+     * answers — the exact split {@code resolveJobPath}'s own javadoc forbids.
+     *
+     * <p>⚠ {@code writeRoot} <b>is</b> that root, not an approximation of it: {@code ControlApi.writeRoot()}
+     * returns the bound space's {@code root().config()}, which is precisely what {@code SpaceBootstrap}
+     * registers into {@code SpaceConfigRoot} for {@code JobRoutes} to read back — so the two gates cannot
+     * disagree. It is also the more robust of the two spellings here, because it is bound to the request's
+     * space rather than to an MDC lookup.
+     *
+     * @param target the resolved config file, or {@code null} when the gate runs before it is derived
+     *               ({@code /config/write}) — where a non-job keeps its historical CWD-only behaviour
+     */
+    private static Path safetyBase(String type, Path writeRoot, Path target) {
+        if ("job".equalsIgnoreCase(type)) return writeRoot;
+        return target == null ? null : target.getParent();
+    }
+
+    /**
      * {@code POST /config/patch} — deep-merge a partial draft over a config file's <em>current</em>
      * on-disk content and rewrite it atomically (collector-config unification, 2026-08-04). The
      * merge happens server-side, against the file as it is NOW — not against whatever the client
@@ -368,7 +409,7 @@ final class ConfigWriteRoutes implements RouteModule {
         // schema references resolve config-relative here because the file has a home directory.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, merged));
         findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy(),
-                target.getParent()));
+                safetyBase(type, writeRoot, target)));
         findings.addAll(ConfigRoutes.schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, merged));
         findings.addAll(ConfigRoutes.routeArmingFindings(type, merged));              // a patch can break arming too
