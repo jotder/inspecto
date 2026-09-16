@@ -416,12 +416,60 @@ public class CollectorProcessor {
         // edit applies next cycle and removing the block restores the -D globals (T15 follow-up).
         gov.configure(cfg.identity().pipelineName(), intakePolicy(cfg, gov.policy()));
         int cap = gov.capFor(cfg.identity().pipelineName());
-        if (cap == IntakeGovernor.UNBOUNDED || candidates.size() <= cap) return candidates;
+        long byteCap = gov.policyFor(cfg.identity().pipelineName()).maxBytesPerCycle();
+        if (cap == IntakeGovernor.UNBOUNDED && byteCap == IntakeGovernor.Policy.UNBOUNDED_BYTES) return candidates;
+
         List<File> ordered = new ArrayList<>(candidates);
         ordered.sort(java.util.Comparator.comparingLong(File::lastModified));
-        log.info("Admission cap: taking {} of {} pending file(s) for {} this cycle; the rest wait in the inbox",
-                cap, candidates.size(), cfg.identity().pipelineName());
-        return new ArrayList<>(ordered.subList(0, cap));
+        if (cap != IntakeGovernor.UNBOUNDED && ordered.size() > cap) {
+            log.info("Admission cap: taking {} of {} pending file(s) for {} this cycle; the rest wait in the inbox",
+                    cap, candidates.size(), cfg.identity().pipelineName());
+            ordered = new ArrayList<>(ordered.subList(0, cap));
+        }
+        return admitBytes(cfg, ordered, byteCap);
+    }
+
+    /**
+     * The <b>byte</b> cap, applied oldest-first over what the file cap already admitted.
+     *
+     * <p>⚠ The unit is the operator's call (2026-09-16): fetch bandwidth is the scarce resource and a file
+     * COUNT cannot bound it, since one very large file blows straight through a count. The remainder is
+     * DEFERRED, not refused — it simply stays in the inbox for the next cycle, exactly as the file cap's
+     * remainder does.
+     *
+     * <p>⛔ <b>The starvation guard is part of the rule, not an afterthought.</b> A file LARGER than the cap
+     * fits in no cycle, ever — so a plain "stop before exceeding" would leave it in the inbox permanently,
+     * silently, while every smaller file behind it kept overtaking it. When nothing fits, the oldest single
+     * file is admitted ANYWAY and the overrun is logged at WARN. A cap that can stall a pipeline forever is
+     * worse than a cap that is occasionally exceeded by one file.
+     *
+     * <p>⚠ Known limitation, stated rather than papered over: this runs where candidate sizes are known —
+     * after listing, on local {@link File}s. For a collector that fetches remotely BEFORE this point, the
+     * saving is on materialisation, not on the fetch itself. Moving it earlier needs a listing-with-sizes
+     * seam that does not exist today.
+     */
+    private static List<File> admitBytes(PipelineConfig cfg, List<File> ordered, long byteCap) {
+        if (byteCap == IntakeGovernor.Policy.UNBOUNDED_BYTES || ordered.isEmpty()) return ordered;
+
+        List<File> taken = new ArrayList<>();
+        long total = 0;
+        for (File f : ordered) {
+            long size = Math.max(0L, f.length());
+            if (!taken.isEmpty() && total + size > byteCap) break;
+            taken.add(f);
+            total += size;
+        }
+        if (taken.size() == 1 && total > byteCap) {
+            log.warn("Byte cap: '{}' is {} byte(s), over the {}-byte cap for {} — admitting it ALONE this "
+                    + "cycle rather than never. A file larger than the cap fits in no cycle, and deferring "
+                    + "it would starve it forever while smaller files overtake it.",
+                    taken.get(0).getName(), total, byteCap, cfg.identity().pipelineName());
+        } else if (taken.size() < ordered.size()) {
+            log.info("Byte cap: taking {} of {} file(s) ({} of {} bytes) for {} this cycle; the rest wait "
+                    + "in the inbox", taken.size(), ordered.size(), total, byteCap,
+                    cfg.identity().pipelineName());
+        }
+        return taken;
     }
 
     /**
@@ -433,10 +481,15 @@ public class CollectorProcessor {
     private static IntakeGovernor.Policy intakePolicy(PipelineConfig cfg, IntakeGovernor.Policy globals) {
         PipelineConfig.Intake in = cfg.intake();
         if (in == null) return null;
+        // ⚠ The byte cap INHERITS the global unconditionally: `processing.intake` has no byte key yet, and
+        // the 3-arg Policy constructor defaults it to UNBOUNDED - so building the override without this
+        // would silently switch the global byte cap OFF for every pipeline that states an intake block,
+        // which is the opposite of what stating one means.
         return new IntakeGovernor.Policy(
                 in.maxFilesPerCycle() != null ? in.maxFilesPerCycle() : globals.baseCap(),
                 in.minFilesPerCycle() != null ? in.minFilesPerCycle() : globals.minCap(),
-                in.adaptive() != null ? in.adaptive() : globals.adaptive());
+                in.adaptive() != null ? in.adaptive() : globals.adaptive(),
+                globals.maxBytesPerCycle());
     }
 
     /**

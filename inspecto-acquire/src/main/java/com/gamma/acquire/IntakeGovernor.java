@@ -57,7 +57,15 @@ public final class IntakeGovernor {
      * @param minCap   floor the controller may halve down to (never below 1, so a capped pipeline always progresses)
      * @param adaptive whether cycle overrun adjusts the cap; {@code false} pins it at {@code baseCap} (a hard cap)
      */
-    public record Policy(int baseCap, int minCap, boolean adaptive) {
+    public record Policy(int baseCap, int minCap, boolean adaptive, long maxBytesPerCycle) {
+
+        /** No byte cap — the default, and the pre-2026-09-16 behaviour. */
+        public static final long UNBOUNDED_BYTES = 0L;
+
+        /** The three-arg shape every pre-byte-cap caller used: no byte cap. */
+        public Policy(int baseCap, int minCap, boolean adaptive) {
+            this(baseCap, minCap, adaptive, UNBOUNDED_BYTES);
+        }
 
         /** {@code -Dingest.maxFilesPerCycle} (default 0 = off) · {@code -Dingest.minFilesPerCycle} (1) ·
          *  {@code -Dingest.backpressure.adaptive} (true). A malformed value falls back to the default. */
@@ -65,7 +73,22 @@ public final class IntakeGovernor {
             return new Policy(
                     intProperty("ingest.maxFilesPerCycle", 0),
                     Math.max(1, intProperty("ingest.minFilesPerCycle", 1)),
-                    !"false".equalsIgnoreCase(System.getProperty("ingest.backpressure.adaptive")));
+                    !"false".equalsIgnoreCase(System.getProperty("ingest.backpressure.adaptive")),
+                    longProperty("ingest.maxBytesPerCycle", UNBOUNDED_BYTES));
+        }
+
+        /**
+         * {@code -Dingest.maxBytesPerCycle} (default 0 = off). ⚠ <b>BYTES</b>, not files — the operator's
+         * call (2026-09-16): fetch bandwidth is the scarce resource, and a file COUNT does not bound it,
+         * because one very large file blows straight through a count cap.
+         */
+        private static long longProperty(String key, long fallback) {
+            try {
+                String v = System.getProperty(key);
+                return v == null || v.isBlank() ? fallback : Math.max(0L, Long.parseLong(v.trim()));
+            } catch (RuntimeException e) {
+                return fallback;
+            }
         }
 
         private static int intProperty(String key, int fallback) {
