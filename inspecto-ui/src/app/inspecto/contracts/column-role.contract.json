@@ -15,5 +15,30 @@
     { "name": "customer",    "type": "string",  "role": "dimension" },
     { "name": "user_id",     "type": "string",  "role": "dimension" },
     { "name": "is_active",   "type": "boolean", "role": "dimension" }
+  ],
+  "duckdbTypeCases": [
+    { "duckdbType": "TINYINT",                  "type": "number"  },
+    { "duckdbType": "BIGINT",                   "type": "number"  },
+    { "duckdbType": "HUGEINT",                  "type": "number"  },
+    { "duckdbType": "UBIGINT",                  "type": "number"  },
+    { "duckdbType": "DOUBLE",                   "type": "number"  },
+    { "duckdbType": "DECIMAL(18,2)",            "type": "number"  },
+    { "duckdbType": "BOOLEAN",                  "type": "boolean" },
+    { "duckdbType": "BOOL",                     "type": "boolean" },
+    { "duckdbType": "LOGICAL",                  "type": "boolean" },
+    { "duckdbType": "DATE",                     "type": "date"    },
+    { "duckdbType": "TIMESTAMP",                "type": "date"    },
+    { "duckdbType": "TIMESTAMPTZ",              "type": "date"    },
+    { "duckdbType": "TIMESTAMP_NS",             "type": "date"    },
+    { "duckdbType": "TIMESTAMP WITH TIME ZONE", "type": "date"    },
+    { "duckdbType": "TIME WITH TIME ZONE",      "type": "date"    },
+    { "duckdbType": "VARCHAR",                  "type": "string"  },
+    { "duckdbType": "UUID",                     "type": "string"  },
+    { "duckdbType": "BLOB",                     "type": "string"  },
+    { "duckdbType": "INTERVAL",                 "type": "string"  },
+    { "duckdbType": "VARCHAR[]",                "type": "string"  },
+    { "duckdbType": "BIGINT[]",                 "type": "string"  },
+    { "duckdbType": "STRUCT(a INTEGER)",        "type": "string"  },
+    { "duckdbType": "MAP(VARCHAR, INTEGER)",    "type": "string"  }
   ]
 }

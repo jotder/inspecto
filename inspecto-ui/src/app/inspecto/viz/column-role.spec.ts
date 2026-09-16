@@ -56,4 +56,36 @@ describe('column role contract', () => {
         expect(roleFor('order_id', 'date')).toBe('temporal');
         expect(roleFor('order_id', 'string')).toBe('dimension');
     });
+
+    /**
+     * ✅ Q4 (operator, 2026-09-14): the pin covers BOTH the heuristic and the coarse type vocabulary.
+     * The roles above are meaningless without agreement on what `number` and `date` ARE — so the four
+     * coarse types are a compatibility surface, and the client's `ColumnType` union is one half of it.
+     * A type added on the server without adding it here would re-role columns the client then can't name.
+     */
+    it('publishes exactly the coarse types the client ColumnType union can carry', () => {
+        const clientTypes: ColumnType[] = ['number', 'string', 'date', 'boolean'];
+        expect([...COLUMN_ROLE_CONTRACT.coarseTypes].sort()).toEqual([...clientTypes].sort());
+        for (const c of COLUMN_ROLE_CONTRACT.cases) expect(COLUMN_ROLE_CONTRACT.coarseTypes).toContain(c.type);
+    });
+
+    /**
+     * The DuckDB type-NAME half (step 3) is produced server-side by `ResultSetDescriptor.columnType(String)`
+     * and pinned against these same cases by `ColumnRoleContractTest`. The client never maps DuckDB names
+     * for a stored Dataset — it receives the coarse type — so what it pins here is that every published
+     * mapping lands inside the vocabulary it can actually render.
+     *
+     * ⚠ `query/query-columns.ts` `dbColumnType` is a SECOND client-side interpreter of raw SQL spellings,
+     * for the query builder rather than for a stored Dataset. It is deliberately NOT pinned to these cases
+     * yet: it disagrees on composites (`BIGINT[]`/`STRUCT`/`MAP` → `number`) and on `LOGICAL`, and
+     * reconciling it is a query-builder behaviour change outside this row.
+     */
+    it('maps every published DuckDB type into the coarse vocabulary', () => {
+        expect(COLUMN_ROLE_CONTRACT.duckdbTypeCases.length).toBeGreaterThanOrEqual(20);
+        for (const c of COLUMN_ROLE_CONTRACT.duckdbTypeCases)
+            expect(COLUMN_ROLE_CONTRACT.coarseTypes, `coarse type for ${c.duckdbType}`).toContain(c.type);
+        // Every published coarse type is exercised by a case — an unexercised one is an unpinned one.
+        for (const type of COLUMN_ROLE_CONTRACT.coarseTypes)
+            expect(COLUMN_ROLE_CONTRACT.duckdbTypeCases.some((c) => c.type === type)).toBe(true);
+    });
 });

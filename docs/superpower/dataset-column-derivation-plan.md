@@ -1,8 +1,22 @@
 # Dataset column derivation — design (`TYPEFLOW-DATASET-COLUMNS-1`)
 
-> **Status (updated 2026-09-11): steps 1 and 2 SHIPPED; steps 3 and 4 — the derivation itself — are
-> still design only.** Written as the split-out (b) of `TYPEFLOW-CONSUMERS-1`, whose (a) and (c) shipped
-> the same day.
+> **Status (updated 2026-09-16): ALL FOUR STEPS SHIPPED — this plan is done and is owed an archive.**
+> Written as the split-out (b) of `TYPEFLOW-CONSUMERS-1`, whose (a) and (c) shipped the same day.
+>
+> - ✅ **Steps 3 and 4 shipped 2026-09-16** (`9d8c2365`): `ResultSetDescriptor.columnType(String)` is the
+>   DuckDB-type-name → coarse-type mapping, `describeTypeNames` applies the Q2 set-level tie-break, and
+>   `MaterializeTask.describeWritten`/`mergeColumns` derive and merge the columns from `DESCRIBE` over the
+>   Parquet it just wrote. 🔴 **As §4 predicted, this needed NO `TypeFlow`** — `TypeFlow.Column` is still
+>   `record Column(String name, String type)` and `sinkColumns` still yields no role, deliberately: the task
+>   holds the real relation, so describing it beats deriving a shape statically. ⛔ The row's title names
+>   TypeFlow; the implementation does not, and that is the design's call, not an omission.
+> - ✅ **Q4's pin is COMPLETE as of 2026-09-16.** `9d8c2365` published `coarseTypes` in
+>   `column-role.contract.json` but **nothing read that key on either side** — the vocabulary half of Q4 was
+>   declared, not enforced. `duckdbTypeCases` now carries the mapping, and `ColumnRoleContractTest` +
+>   `column-role.spec.ts` pin closure, reachability and (Java) every case.
+> - ⚠ **Known unpinned second interpreter:** `query/query-columns.ts` `dbColumnType` maps the same raw SQL
+>   spellings for the QUERY BUILDER and disagrees on composites (`BIGINT[]`/`STRUCT`/`MAP` → `number`) and
+>   on `LOGICAL`. Reconciling it is a query-builder behaviour change, deliberately left outside this row.
 >
 > - ✅ **Step 1 — the role heuristic is pinned.** `column-role.contract.json` + `ColumnRoleContractTest`
 >   (Java) + `column-role.spec.ts`. The **two client copies were collapsed into one**: `result-set.ts`
