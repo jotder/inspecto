@@ -236,6 +236,13 @@ jobs:
       # into the runner's local ~/.m2 — the same thing a local dev does by hand. Once eoiagent cuts a
       # 0.1.0 release and starts publishing to GitHub Packages, swap this for a settings.xml repo/auth
       # step like the old agent-kernel one (see git history) and drop this checkout+build.
+      #
+      # ⛔ DELIBERATELY UNPINNED — do not add a `ref:` here (operator call, 2026-09-16). release.yml IS
+      # pinned, and the asymmetry is the point: CI is the canary that catches upstream drift on the day it
+      # lands, the release is the contract that has to be reproducible. Pinning both would hide drift until
+      # release day, which is the expensive place to find it.
+      # ⚠ This follows upstream's DEFAULT branch, which is `main` — the stray `master` that used to make
+      # that ambiguous was deleted (verified 2026-09-16: refs/heads/main is the only branch).
       - name: Checkout eoiagent (jotder/inspect-agent, pre-release — no packages yet)
         uses: actions/checkout@v4
         with:

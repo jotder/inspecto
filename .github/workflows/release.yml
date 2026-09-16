@@ -37,10 +37,21 @@ jobs:
           node-version: '22'
 
       # inspecto-agent depends on the pre-release eoiagent (same arrangement as ci.yml)
+      #
+      # ⛔ PINNED, and ci.yml deliberately is NOT (operator call, 2026-09-16). A RELEASE built from a
+      # floating branch is not reproducible: re-running this workflow for the same tag could pick up a
+      # different upstream commit and emit different bytes under the same version. That is a supply-chain
+      # property an auditor tests, not a style preference — see compliance/evidence/release-verification.md
+      # (SOC 2 CC8, NIST SI-2/SR). CI stays unpinned ON PURPOSE so it remains the canary that catches
+      # upstream drift early; pinning both would just defer the breakage to release day.
+      # ⚠ Bumping this SHA is a deliberate act: check that upstream's pom still declares the version in
+      # this repo's <eoiagent.version> (0.2.0-SNAPSHOT) before moving it. The upstream v0.1.0 TAG is not a
+      # substitute — it predates that version and was not verified to satisfy the dependency.
       - name: Checkout eoiagent (jotder/inspect-agent, pre-release — no packages yet)
         uses: actions/checkout@v4
         with:
           repository: jotder/inspect-agent
+          ref: a24817ba6151245c3f0ddacf9886954ef68f260d  # main @ 2026-09-14; pom declares 0.2.0-SNAPSHOT
           path: eoiagent-src
       - name: Build & install eoiagent into local .m2
         run: mvn --batch-mode --no-transfer-progress -DskipTests install
