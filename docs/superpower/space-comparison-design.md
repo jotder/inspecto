@@ -3,7 +3,11 @@
 **Row:** `BACKLOG.md` §3 *Job framework — Maintenance COULD tier*, trigger **FIRED 2026-09-15** (a real
 comparison was asked for). ⚠ The trigger governs the **comparison half only** — predictive maintenance stays
 deferred to AGT-5 regardless, and one firing must not discharge the other half.
-**Status:** DESIGN ONLY, written 2026-09-16. **Four decisions are owed before any code** (§5).
+**Status:** ⛔ **POSTPONED by the operator 2026-09-16 — lower priority.** DESIGN ONLY; do **not** start it.
+The four decisions in §5 are **parked, not owed** — nobody should be chased for them, and this plan should
+not be read as pending work. ⚠ The trigger having fired does not make it next: a fired trigger removes a
+*gate*, it does not set a *rank*. Re-rank it when someone asks again; the grounding below stays valid until
+`storage_trend` or `SpaceConfigRoot` changes shape.
 
 ## 1. What this actually is — narrower than the row's title
 
