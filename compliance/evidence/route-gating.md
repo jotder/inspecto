@@ -1,14 +1,22 @@
 # Evidence — route gating (CC6)
 
-⚠ **Framework — an ASSUMPTION, not a confirmed instruction.** This document is written against **SOC 2
-Type II**, criteria **CC6.1** (logical access) and **CC6.3** (role-based authorization), because that is
-what the route-gating compliance plan assumed throughout. **The operator has not yet confirmed which
-framework(s) the evidence is written against** — it is the one item of that plan still owed
-(`controls-matrix.md` §4a records it as open). ⛔ **No ISO 27001 A.9 mapping is stated here.** The same
-underlying evidence maps onto A.9, but the matrix rows differ, and inventing that mapping before the call
-is made would put a claim in an auditor's hands that nobody decided. If the answer is ISO — or both — this
-section and the criterion references above are what change; the control, the enforcement points and the
-table below do not.
+**Audience:** an auditor sampling logical-access enforcement, and the deploying organization.
+**Control:** SOC 2 **CC6.1** (logical access) · **CC6.3** (role-based authorization) · ISO 27001:2022
+**A.5.15** (access control) · **A.5.18** (access rights) · **A.8.3** (information access restriction).
+Matrix row: [`../controls-matrix.md`](../controls-matrix.md) → CC6 (logical access).
+
+✅ **Framework — ANSWERED 2026-09-16, and it was already answered in this repo.** The header above follows
+the pattern [`release-verification.md`](release-verification.md) already set: name every framework the
+evidence serves on one line, and let the **matrix** own the per-control mapping. ⛔ **Do not restate the
+Annex A mapping in this document.** `../controls-matrix.md` declares itself the single table the ISO
+Statement of Applicability is *exported* from; a second copy here is the drift its own rule 4 exists to
+prevent — if these two ever disagree, the matrix wins.
+
+🔴 **The earlier draft of this header cited "ISO 27001 A.9", which no longer exists.** ISO/IEC 27001:**2022**
+retired the 2013 Annex A structure; old A.9 (access control) is now spread across A.5.15, A.5.16, A.5.18,
+A.8.2 and A.8.3. `../controls-matrix.md` §2 is headed *"ISO 27001:2022 — Annex A"* and uses 2022 numbering
+throughout, so the 2013 citation was not merely dated — it contradicted the matrix it points at. ⚠ Only the
+criterion references changed; the control, the enforcement points and the table below are untouched.
 
 **Control:** a mutating HTTP route (`POST` / `PUT` / `PATCH` / `DELETE`) on the control plane must declare
 its posture: either it demands a **capability**, or it is a **recorded exemption** carrying a category and a
