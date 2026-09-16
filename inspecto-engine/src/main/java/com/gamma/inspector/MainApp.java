@@ -169,6 +169,43 @@ public class MainApp {
                     break;
                 }
 
+                // ── migrate-configs: the ELT §6 step-1 one-shot converter ────
+
+                case "migrate-configs": {
+                    if (subArgs.length < 1) {
+                        System.err.println("Usage: migrate-configs <config_root> [<registry_root>]");
+                        System.err.println("       plans only unless --apply is passed; --apply also moves the");
+                        System.err.println("       originals under <config_root>/archived-config/");
+                        System.exit(2);
+                    }
+                    java.nio.file.Path configRoot = java.nio.file.Paths.get(subArgs[0]);
+                    java.nio.file.Path outRoot = subArgs.length > 1
+                            ? java.nio.file.Paths.get(subArgs[1]) : configRoot.resolve("registry");
+                    // The flag is deliberately the inverse of --dry-run: this command plans by default, so a
+                    // bare invocation can never write. (§6 step 1: "deterministic, dry-run-first".)
+                    boolean apply = java.util.Arrays.asList(args).contains("--apply");
+                    com.gamma.pipeline.ConfigMigrator.Plan plan =
+                            com.gamma.pipeline.ConfigMigrator.migrate(configRoot, outRoot, apply);
+
+                    for (var c : plan.conversions())
+                        System.out.println((plan.applied() ? "converted " : "would convert ")
+                                + c.kind() + "  " + c.from() + "  ->  " + c.to());
+                    for (var r : plan.refusals())
+                        System.err.println("REFUSED  " + r.from() + "  -  " + r.reason());
+
+                    System.out.println();
+                    System.out.println(plan.conversions().size() + " file(s) "
+                            + (plan.applied() ? "converted" : "would convert") + ", "
+                            + plan.refusals().size() + " refused.");
+                    if (!plan.ok()) {
+                        System.err.println("NOTHING WAS WRITTEN - a refusal fails the whole migration, "
+                                + "because a half-migrated space is worse than an unmigrated one.");
+                        System.exit(1);
+                    }
+                    if (!apply) System.out.println("Dry run - pass --apply to write.");
+                    break;
+                }
+
                 case "help":
                     printUsage();
                     break;
@@ -258,6 +295,10 @@ public class MainApp {
         System.out.println();
         System.out.println("Options:");
         System.out.println("  --dry-run   Simulate all actions; print what would happen without touching files.");
+        System.out.println("  migrate-configs <config_root> [<registry_root>] [--apply]");
+        System.out.println("                              ELT \u00a76 step 1: *_pipeline.toon -> pipelines/*.toon");
+        System.out.println("                              recipes, *_schema.toon -> schemas/*.toon + mappings/*.csv.");
+        System.out.println("                              Plans only unless --apply; refuses rather than lose.");
         System.out.println("  help        Print this message.");
     }
 }
