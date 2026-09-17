@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -169,8 +169,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 0<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 57<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 21<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1537,7 +1537,7 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   EDITIONS.md`'s OPS-06 row now states plainly that `backup` covers files only and a Postgres operational
   database needs an external DBA backup path. Original row: `BackupTask` knows DuckDB and files only — its
   one DB reference opens an in-memory DuckDB scratch (`inspecto-backup/.../BackupTask.java:358`), so a
-  Standard/Enterprise deployment on Postgres has NO backup path for job runs, the dedup and acquisition
+  Professional/Enterprise deployment on Postgres has NO backup path for job runs, the dedup and acquisition
   ledgers, status, or the run lease. Fix offered: a `pg_dump`/COPY leg when `OperationalDb.postgres()` is
   true, or document the gap in `EDITIONS.md`.
 - ~~**P2** · **`STORE-CONFLICT-DETECTION-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's cited store lines were
@@ -1597,14 +1597,35 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   `DeliveryStatusRoutes.java:137` (a bad provider signature) tell the client a path escaped a jail. Fix: code
   the 403 sites first (`PERMISSION_DENIED` or a new constant), then sweep by file (`RunRoutes`,
   `ComponentRoutes`, `AgentRoutes` lead with 9 bare sites each).
-- **P3** · **`IFMATCH-COVERAGE-GAP-1`** — only 7 of 95 files in `com.gamma.control` reference `If-Match`;
-  Run, Job, Alert, Access and Share writes are read-modify-write with no version check. Fix: audit each for
-  real double-write exposure and extend `ETags` where one exists (append-only routes need none).
-- **P3** · **`DB-SCHEMA-VERSION-1`** — no `schema_version` table or stamp exists (repo-wide grep: none);
-  correctness on upgrade rests on every store pairing a new column with a guarded `ALTER`, a discipline
-  `DbRunLease` itself records failing once (`last_run_at`). Verified present in `DbAcquisitionLedger.java:364`
-  and `DbRunLease`; unverified in the other ~8 `Db*Store` classes. Fix: audit those, then a per-table version
-  row so a breaking change fails loudly.
+- ~~**P3** · **`IFMATCH-COVERAGE-GAP-1`**~~ ✅ **PARTIALLY SHIPPED 2026-09-17 — audited file-by-file, only 2 of
+  5 named areas were genuinely exposed.** Verdict: `RunRoutes` (action-verbs, no client-replayed full state)
+  and `ShareRoutes` (append-only token issue) need nothing. `JobRoutes` `PUT /jobs/{name}` and all four
+  `AccessRoutes` writers (`/access/roles`, `/policies`, `/catalog`, `/profiles/{id}`) were genuine
+  read-modify-write with **no precondition check at all** — fixed with the same `ETags.of`/`ETags.requireMatch`
+  idiom as the pipeline-graph save (`26a2a2f0`): 409 `CONFLICT_STALE_VERSION` on a stale `If-Match`, no-op when
+  absent. ⚠ **`AlertRoutes` `PUT /alerts/rules/{name}` is ALSO genuinely exposed but deliberately left** — no
+  per-item GET exists yet to hand a client a baseline ETag (only the list route does), so it needs a smaller
+  design step first, not a mechanical extension of this fix. Filed as a residual if picked up again.
+  `ControlApiJobIfMatchTest` (3/3) + `ControlApiAccessIfMatchTest` (4/4) + the 4 pre-existing CRUD suites they
+  sit beside, 23/23 total, BUILD SUCCESS. The row's own "7 of 95 files" count was not re-derived (out of
+  scope) — treat it as unverified if reopened.
+  - **P3** · **`IFMATCH-COVERAGE-GAP-1` (original row)** — only 7 of 95 files in `com.gamma.control` reference
+    `If-Match`; Run, Job, Alert, Access and Share writes are read-modify-write with no version check. Fix:
+    audit each for real double-write exposure and extend `ETags` where one exists (append-only routes need
+    none).
+- ~~**P3** · **`DB-SCHEMA-VERSION-1`**~~ ✅ **CLOSED 2026-09-17 — audited, no-op: no drift exists to guard.**
+  Checked `git log -p --follow` on all ~10 other `Db*Store` classes against the `DbAcquisitionLedger`/
+  `DbRunLease` guarded-`ALTER` idiom: every one of them has shipped the identical column set since its first
+  commit — nothing was ever added post-creation, so `CREATE TABLE IF NOT EXISTS` already covers every
+  install. Writing speculative no-op `ALTER ... ADD COLUMN IF NOT EXISTS` statements for columns that have
+  existed since day one would be dead code with nothing to protect against. No files changed. **Reopen this
+  the day any of these stores' column set actually changes** — that's the point at which the guard earns its
+  keep, not before.
+  - **P3** · **`DB-SCHEMA-VERSION-1` (original row)** — no `schema_version` table or stamp exists (repo-wide
+    grep: none); correctness on upgrade rests on every store pairing a new column with a guarded `ALTER`, a
+    discipline `DbRunLease` itself records failing once (`last_run_at`). Verified present in
+    `DbAcquisitionLedger.java:364` and `DbRunLease`; unverified in the other ~8 `Db*Store` classes. Fix:
+    audit those, then a per-table version row so a breaking change fails loudly.
 - ~~**P3** · **`DB-STATUS-INDEX-1`**~~ ✅ **CLOSED 2026-09-17.** Premise CONFIRMED — `DbStatusStore.initSchema`
   created six tables and **zero** indexes while the class javadoc already claimed *“plus the few columns we
   actually index on”*; the DDL contradicted its own doc. ✅ **Indexed from the CLOSED predicate set, not from
@@ -1657,7 +1678,7 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   mutation-tested by reverting to `Files.writeString`. ⚠ The first draft of that assertion was itself broken
   (`contains("Files.write(sidecar")` matches inside `AtomicFiles.write(sidecar`) and was caught only by
   running it; it is now a `(?<!Atomic)` regex with the trap recorded in a comment.
-  ⛔ **`inspecto-backup` compiles ONLY under `-Pedition-standard`/`-enterprise`** — a bare `mvn -o test` never
+  ⛔ **`inspecto-backup` compiles ONLY under `-Pedition-professional`/`-enterprise`** — a bare `mvn -o test` never
   compiles this change at all. Backup **17/0/0**. → `okf/backend/control-plane/jobs.md`
 
   - **P3** · **`BACKUP-MANIFEST-ATOMIC-1`** — the backup zip is staged and `ATOMIC_MOVE`d
@@ -1709,13 +1730,19 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   earlier edit. ⇒ Fixing this properly means settling the scaffold's dependency contract first.
   → `okf/backend/engine/node-types.md`
 
-- **P3** · **`QUEUES-USER-FACING-COPY-1` — three shipped strings still promise a capability deleted in
-  2026-09.** Filed 2026-09-17 out of `ROOT-POM-QUEUES-ROUTE-CLAIM-1`, which corrected the comments.
+- ~~**P3** · **`QUEUES-USER-FACING-COPY-1`**~~ ✅ **SHIPPED 2026-09-17 — confirmed against `EDITIONS.md`/
+  `api-stability.md` that "queues" is genuinely a deleted route family (`RETIRE-HALVES-1`, 2026-09-14), not a
+  live capability.** Dropped "and queues"/"tags and queues" → "and tags" in all three sites:
+  `AbsentObjectRoutes.java:27` (the Personal-edition 503 body), `object-mail.component.html:4`,
+  `tags.component.html:4`. No spec asserted the old string in either language. UI: `object-mail.component.spec.ts`
+  + `tags.component.spec.ts` via `npx ng test`, 22/22 passed.
+- **P3** · **`QUEUES-USER-FACING-COPY-1` (original row)** — three shipped strings still promise a capability
+  deleted in 2026-09. Filed 2026-09-17 out of `ROOT-POM-QUEUES-ROUTE-CLAIM-1`, which corrected the comments.
   ⚠ **These are product copy, not comments, and none is test-asserted:**
   `AbsentObjectRoutes.java:27` — the Personal-edition **503 body** — plus
   `inspecto-ui/…/admin/objects/object-mail.component.html:4` and `…/admin/tags/tags.component.html:4`, all
   reading "notes, links, tags **and queues** are provided by the…". ⇒ **A 503 telling an operator that a
-  deleted feature is available in Standard is a small but real defect.**
+  deleted feature is available in Professional is a small but real defect.**
   ⚠ Left out of the pom row deliberately: changing shipped copy and two Angular templates is a different
   change class and needs the `angular-ui` skill. → `okf/capabilities/editions/editions.md`
 - ~~**P2** · **`PACK-SPI-LOAD-NOT-FAULT-TOLERANT-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's MECHANISM is
@@ -1750,7 +1777,7 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   `inspecto-security/pom.xml` each excluded `logback.xml` but not `META-INF/services/org.slf4j.spi.SLF4JServiceProvider`,
   `org/slf4j/impl/**` or `ch/qos/logback/**`, unlike `inspecto-agent/pom.xml:145-147`. As-built: copied
   `inspecto-agent`'s three-line exclude block into all three sidecar poms' shade filters; built each under
-  `-Pedition-standard` and confirmed by `unzip -l` on the shaded `*-sidecar.jar` that none carries those
+  `-Pedition-professional` and confirmed by `unzip -l` on the shaded `*-sidecar.jar` that none carries those
   paths. Added the packaging smoke assertion in `inspecto/package.ps1` step 6e (before the boot-smoke
   classpath is built): scans every staged jar for `META-INF/services/org.slf4j.spi.SLF4JServiceProvider`
   and throws if more than one jar registers it.
@@ -1894,7 +1921,7 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   refused (no plaintext fallback, no `AUTH` line ever reaches it); a relay with `starttls=false` (unaffected
   control) carries no `required` property at all. Existing `SmtpEmailChannelTlsIdentityTest` (STARTTLS relay
   that DOES support it, valid cert) still passes unmodified, confirming supported relays are unaffected.
-  Verified: `mvn -o -Pedition-standard -pl inspecto-notify-channels
+  Verified: `mvn -o -Pedition-professional -pl inspecto-notify-channels
   -Dtest=SmtpEmailChannelStarttlsRequiredTest,SmtpEmailChannelTlsIdentityTest,SmtpEmailChannelTest test` — 11/0/0.
   → `okf/backend/control-plane/events-metrics.md`
 - ~~**P2** · **`BER-FRAMING-UNCHECKED-READ-1`**~~ ✅ **SHIPPED 2026-09-17 — held, with BOTH cited line numbers
@@ -2041,7 +2068,7 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   (`inspecto/package.ps1:1436`), so a release quietly loses a platform. Fix: throw unless an explicit
   `-AllowPartialRuntime` is passed.
 - ~~**P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`**~~ ✅ **SHIPPED 2026-09-17 — and BOTH options were taken.**
-  Real counts re-derived from the MODULES table rather than copied from the row: **Personal 2 / Standard 11 /
+  Real counts re-derived from the MODULES table rather than copied from the row: **Personal 2 / Professional 11 /
   Enterprise 12**, cross-checked against `check-doc-counts`'s `enterprise-first-party-jars=12`. The drift dates
   to PKG-5 adding `inspecto-agent`.
   ⛔ **Correcting the comment alone would have moved the drift to a second place**, so `check-sbom-modules.mjs`
@@ -2053,9 +2080,14 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   - **P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`** — `tools/bundle-modules.mjs:77` says "Personal 2, Standard
     10, Enterprise 11" while its own table yields 2/11/12 (and `ci.yml` agrees with the table). Fix: correct
     the comment or make `tools/check-sbom-modules.mjs` assert the stated counts.
-- **P3** · **`SFTP-RESUME-CHECKSUM-1`** — a resumed fetch treats "local size == remote length" as complete
-  (`SftpConnector.java:155-179`) with no checksum, so a truncated-then-replaced remote file of equal size
-  is accepted. Fix: verify with the module's existing `Checksums` on resume.
+- ~~**P3** · **`SFTP-RESUME-CHECKSUM-1`**~~ ✅ **SHIPPED 2026-09-17.** Confirmed at
+  `SftpConnector.java:166` (line drifted from the row's 155-179). On a size match, `fetchTo` now re-fetches
+  the remote to a sibling `.resume-verify` temp file and compares SHA-256 (via the module's existing
+  `Checksums`) against the local file before accepting it; a mismatch falls through to a full re-fetch. New
+  test `fetchToRefusesAnEqualSizeButTruncatedThenReplacedRemote`. `SftpConnectorTest` 23/23 passed.
+  - **P3** · **`SFTP-RESUME-CHECKSUM-1` (original row)** — a resumed fetch treats "local size == remote
+    length" as complete (`SftpConnector.java:155-179`) with no checksum, so a truncated-then-replaced remote
+    file of equal size is accepted. Fix: verify with the module's existing `Checksums` on resume.
 - ~~**P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`**~~ ✅ **SHIPPED 2026-09-17 — and the blind spot was MEASURED, not
   inferred.** With a hex colour planted in `layout.component.scss` and an `rgba()` in `navigation-data.ts`,
   both TRACKED files, the OLD `ROOTS` reported **green, exit 0**. The new scope names both.
@@ -2307,6 +2339,11 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   alone. ⛔ **Operator's call — do not act on this unasked.**
   ✅ The false citation this row was filed over is now **retracted at its source** (§4's `SPEC-DEADSEAM-1` row),
   not only 28 lines below it.
+  ✅ **CLOSED 2026-09-17 — verdict (c): kept verbatim, class-level javadoc added** stating plainly it is a
+  manual operator harness (not an automated test), that it compiles on no build path, and that it is kept as
+  documented provenance for `asn-golden` GoldenCapture cases. No rename/move/delete: the tree-wide naming
+  defect (five sibling files with the same lying `*Test` shape) is left for a separate operator-scoped decision,
+  as recommended above — not swept in here.
 ## 5. Docs & hygiene
 
 - ~~**P1**~~ · **`ROUTE-UNGATED-DEFAULT-1`** — ✅ **CLOSED 2026-09-17 — grounded against the code, every remaining item was already decided and shipped.** The ratchet is the boot refusal (§0). Item (a)'s "product decision first" was taken 2026-09-15/16: Incident/Case DISPOSITION (`ack/resolve/transition/assign/merge/split/PATCH`, Case-Rule `evaluate`) is `canAdminister`; opening an Incident (`POST /objects`) is `canManageIncidents`; comments/attachments/links/RCA/tag assignments are recorded `collaboration` / `target-visibility-gated` exemptions; agent governance (`feedback`, `approvals/{id}/decision`, `PUT /agent/policy`, `kill-switch`) is `canAdminister` at `AgentRoutes.java:150,177,194,199`. `CapabilityManifest.PENDING_OPERATOR_CALLS` is EMPTY. The only residue was a stale comment in the manifest still calling `POST /objects` PENDING — corrected. 🔴 **Lesson: this row sat at P1 for two days after its own work finished**, because its head paragraph was never rewritten when the sub-items closed. *(Original head:)* 🔴 **an unlisted route is OPEN, not locked down.**
@@ -2356,11 +2393,11 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     handler is wrapped in `withCapability`, and `CapabilityManifest.capabilityFor` documents `null` =
     "the route is ungated" as a legitimate outcome (`CapabilityManifest.java:157-164`).
   - ⛔ **The other gate does not cover it.** `ControlApi.authorize` (`:809-821`) is ABAC via
-    `AccessDeciders.active()`, which resolves EMPTY on Personal **and Standard** (`AccessDeciders.java:23-30`
-    — neither ships a `META-INF/services` registration), so on Standard that stage returns immediately.
+    `AccessDeciders.active()`, which resolves EMPTY on Personal **and Professional** (`AccessDeciders.java:23-30`
+    — neither ships a `META-INF/services` registration), so on Professional that stage returns immediately.
   - 🔴 **Verified example, opened and read rather than inferred:** `api.delete("/spaces/([^/]+)", …)`
     (`SpaceRoutes.java:72`) has **no capability gate** — `deleteSpace` (`:125-139`) checks only
-    `requireMultiSpace`, id validity, and a last-space-purge 409. ⇒ on Standard **any authenticated caller
+    `requireMultiSpace`, id validity, and a last-space-purge 409. ⇒ on Professional **any authenticated caller
     can deregister a Space**. ⚠ Other entries in the 75 are legitimately ungated (`/auth/exchange|refresh|
     logout` ARE the login flow; the `preview`/`test`/`probe` POSTs are read-shaped) — **the number is not a
     count of defects**, and triaging which of the 75 should be gated is the operator's call.
@@ -2627,7 +2664,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     decision owed first is whether the two readers should share one vocabulary at all.
     → `okf/backend/engine/catalog-vs-executors.md`
 
-- ~~**P3** · **`ACQUIRE-LEDGER-SHARED-URL-1`**~~ ✅ **BUILT + VERIFIED 2026-09-16** (3805/0/0/8 in the MAIN checkout, `ServiceBootstrapLedgerTest` 3/3 observed to RUN). Fixed at `ServiceBootstrap.buildFrom` by resolving through `OperationalDb.urlFor` and registering, gated on `root.config() == null` so a per-space boot does not double-register. 🔴 **Reachability is what made it a live bug, not a theoretical one:** `SpaceBootstrap.java:39` was the ONLY registration site in the repo, and the legacy/CLI space never passes through it (`SpaceManager.single():74-79` ← `ServiceBootstrap.build:41` ← `CollectorService.fromArgs:1815`) ⇒ a single-tenant Standard deployment on a shared operational DB kept its dedup ledger in a local working-directory DuckDB file, SILENTLY, while every other family moved. ⚠ **The parent row's Maven cycle is REAL and was re-confirmed** (`inspecto/pom.xml:96`; `inspecto-acquire` is a leaf and `SpaceRoot` is invisible to it) — it does NOT block this row, because the resolution happens on the `inspecto` side and never inside the leaf. ⇒ **That distinction is the lesson: a refuted PARENT does not refute a child row; ground the child's own seam.** Original row follows.
+- ~~**P3** · **`ACQUIRE-LEDGER-SHARED-URL-1`**~~ ✅ **BUILT + VERIFIED 2026-09-16** (3805/0/0/8 in the MAIN checkout, `ServiceBootstrapLedgerTest` 3/3 observed to RUN). Fixed at `ServiceBootstrap.buildFrom` by resolving through `OperationalDb.urlFor` and registering, gated on `root.config() == null` so a per-space boot does not double-register. 🔴 **Reachability is what made it a live bug, not a theoretical one:** `SpaceBootstrap.java:39` was the ONLY registration site in the repo, and the legacy/CLI space never passes through it (`SpaceManager.single():74-79` ← `ServiceBootstrap.build:41` ← `CollectorService.fromArgs:1815`) ⇒ a single-tenant Professional deployment on a shared operational DB kept its dedup ledger in a local working-directory DuckDB file, SILENTLY, while every other family moved. ⚠ **The parent row's Maven cycle is REAL and was re-confirmed** (`inspecto/pom.xml:96`; `inspecto-acquire` is a leaf and `SpaceRoot` is invisible to it) — it does NOT block this row, because the resolution happens on the `inspecto` side and never inside the leaf. ⇒ **That distinction is the lesson: a refuted PARENT does not refute a child row; ground the child's own seam.** Original row follows.
   - **P3** · **`ACQUIRE-LEDGER-SHARED-URL-1` — a second source of truth for the ledger URL** (filed
   2026-09-16 from `ACQUIRE-LEDGER-DUPLICATE-RESOLUTION-1` — which stood here until it was refuted and swept
   to [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §5.0-b — and genuinely distinct
@@ -2787,7 +2824,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   *inside* the already-resolved `backup_dir` and is jailed against **that**, not the Space root; moving it
   would reopen the `../outside.zip` read-out. Verified in the MAIN checkout under the profile that
   actually compiles the module (a default build never does): `mvn -o -pl inspecto-backup -am test
-  -Pedition-standard` = **15/0/0/0**, all three test classes observed to RUN. Mutation-proven: reverting
+  -Pedition-professional` = **15/0/0/0**, all three test classes observed to RUN. Mutation-proven: reverting
   to `requireUnderAny` gives 1 failure + 4 errors, each field failing at its own act line.
   🔴 **The row's stated blocker was REFUTED, and it was the reason the row sat deferred.** The
   module-graph question was never open: the `inspecto-engine` mention in `inspecto-backup/pom.xml` is in
@@ -2805,7 +2842,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   still resolves every one CWD-relative through the plain jail — `:81-83` (`dir`, `backup_dir`),
   `:171-172` (`backup_dir`, verify), `:257-258` (`archive`, `target_dir`, restore) — calling
   `PathJail.requireUnderAny(PathJail.allowedRoots(), …)`, **not** `PathJail.resolveJobPath`.
-  `BackupTaskProvider` is a live ServiceLoader job type shipping on Standard+
+  `BackupTaskProvider` is a live ServiceLoader job type shipping on Professional+
   (`NoBackupTaskShipsInThePersonalBuildTest`). ⇒ the 422 SAVE gate resolves `backup_dir`/`archive`/
   `target_dir` against the Space config root while the backup RUNTIME resolves them against the CWD.
   ⚠ **Not a mechanical fix, and this is why it was not just done:** `SpaceConfigRoot` lives in
@@ -3018,7 +3055,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `enrichment` guards do, which would miss a newly added sample), plus a falsification test so an empty
   sweep fails loudly. Mutation-proven RED.
   ⚠ Two facts for the next row: `okf/backend/engine/plugins.md` was **teaching** the dead key in a sample
-  (fixed); and `mvn -pl inspecto-ops -am` **does not resolve without `-Pedition-standard`**, so the repo's
+  (fixed); and `mvn -pl inspecto-ops -am` **does not resolve without `-Pedition-professional`**, so the repo's
   only sweep over every committed space config never runs in a default-profile reactor — the third
   edition-gating blind spot found today. Original row follows.
   - **P2** · 🔴 **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1` — 36 committed sample pipelines cannot be
@@ -3193,6 +3230,35 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   status-transition semantics (`ARCHIVED` vs `RESOLVED` suppression), so a map-backed fake would pass them
   WITHOUT exercising the grain they exist to pin — turning the repo's only `ReconRoutes.promote` coverage into
   a test of the fake.
+  ✅ **`ControlApiReconPromoteTest` CLOSED 2026-09-18 — moved to `inspecto`, 11/11 green under a default
+  reactor.** Grepping `ReconRoutes.promote`/`.promoted` (via `com.gamma.objects.IncidentAccess`) found they
+  touch exactly three `ObjectAccess` methods — `open`, `hasActiveMatching`, `activeAttributeIndex` — none of
+  it `com.gamma.ops` vocabulary, so the happy path is genuinely core. Built `FakeObjectEngineProvider` (a
+  minimal in-memory `ObjectAccess`, `inspecto/src/test/java/com/gamma/control/`, registered via
+  `src/test/resources/META-INF/services/com.gamma.service.ObjectEngineProvider`) with exactly one escape
+  hatch beyond the seam — `archive(id)` — because the terminal-vs-non-terminal dedupe rule this test exists
+  to pin cannot be exercised without a way to drive an object terminal. Fixture seeding/inspection moved to
+  `TestFakeObjects` (this module's twin of ops's `TestOpsEngine`). Verified in a clean worktree at HEAD
+  (`8e8106e0`) with `mvn -o -pl inspecto -am -Dtest=ControlApiReconPromoteTest test` — the live tree's own
+  `mvn` was red from two unrelated concurrent edits (`pom.xml`'s `maven.compiler.release` bumped to 27 with
+  only JDK 26 installed, and a stale `inspecto-event` jar in `~/.m2` — neither touched by this row).
+  🔴 **`ControlApiScopedObjectsTest` and `ControlApiAccessDeciderTest` do NOT move — the row's premise for
+  both was wrong, the same "imports don't establish independence" trap the three SPLIT closes above already
+  found once.** Both drive `/objects*` over real HTTP, and every one of those routes — `GET/POST /objects`,
+  `/assign`, `/merge`, `/links`, `/graph` — is registered ONLY by `com.gamma.opsapi.ObjectRoutes`
+  (`inspecto-ops`); core's own `AbsentObjectRoutes` is a 503 stub, not an implementation. `RowScope` itself is
+  declared in core, but grepping its only CALLERS finds `opsapi.ObjectRoutes` and `opsapi.NoteRoutes` —
+  nothing in `inspecto/src/main/java` invokes it. So `ControlApiScopedObjectsTest` (entirely) and
+  `ControlApiAccessDeciderTest`'s `rowScopeHidesADeniedObjectListAndById` case are tests of an ops-owned
+  route class, not of core — moving them would need faking that whole `RouteModule`, not one
+  `ObjectEngineProvider`, and a fake route class would be testing the fake's routing, not `ObjectRoutes`.
+  `ControlApiAccessDeciderTest`'s other three tests (`routeLevelDenyIs403AndAbstainFallsThrough`,
+  `actionsClassifyReadOperateWrite`, `deciderIsNeverConsultedWithoutASubject`) drive `/health`, `/objects`
+  (GET only, pre-`AccessDecider` gate) and `/runs/*`/`/access/*` — genuinely core — but splitting one test off
+  a four-test class for a P2 whose severity is already stated LOW was judged not worth a second class here;
+  left whole, in ops, alongside the row-scope case it shares fixtures with.
+  ⇒ Row narrows to a documentation fix: the six-class count and premise stand corrected above; no further
+  code work is owed.
 
 - ~~**P3** · **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's CENTRAL CLAIM
   was REFUTED, and the defect underneath it was real and FOUR times wider.**
@@ -3544,7 +3610,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   (`inspecto-config`, 5 tests, runs in the DEFAULT build). Mutation-proven: reverting `dir: .` alone turns
   `configBackupBacksUpTheSpaceConfigRootItself` red with the doubled path in the message.
   Verified `mvn -o -pl inspecto-config -am test` **161/0/0/0** (all 5 observed to RUN) and
-  `mvn -o -pl inspecto-backup -am test -Pedition-standard` **BUILD SUCCESS** with
+  `mvn -o -pl inspecto-backup -am test -Pedition-professional` **BUILD SUCCESS** with
   `BackupJobPathResolutionTest` 6, `BackupPathContainmentTest` 3, `BackupTaskTest` 6 observed to RUN.
   🔴 **The first version of that pin was RED, and the reason is the trap this whole row is about.**
   Its control asserted the OLD value still throws `PathJail.Escape` — but `resolveJobPath` refuses only
