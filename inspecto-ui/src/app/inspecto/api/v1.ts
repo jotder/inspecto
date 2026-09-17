@@ -18,7 +18,8 @@ export type V1ErrorCode =
     | 'CONTROL_PLANE_READ_ONLY'
     | 'CAPABILITY_UNAVAILABLE'
     | 'UNAUTHENTICATED'
-    | 'PERMISSION_DENIED';
+    | 'PERMISSION_DENIED'
+    | 'RATE_LIMITED';
 
 export interface V1EnvelopeMetadata {
     timestamp: string;

@@ -7283,7 +7283,7 @@
       "ErrorCode" : {
         "type" : "string",
         "description" : "Machine-readable code catalog — kept in lockstep with com.gamma.control.ErrorCodes (pinned by ApiContractTest). THROTTLED is gateway-only (WSO2), never emitted by the backend, so it is not listed here.",
-        "enum" : [ "MALFORMED_REQUEST", "NOT_FOUND", "METHOD_NOT_ALLOWED", "PATH_JAIL_VIOLATION", "CONFLICT", "CONFLICT_STALE_VERSION", "CONFIG_VALIDATION_FAILED", "INTERNAL", "CONTROL_PLANE_READ_ONLY", "CAPABILITY_UNAVAILABLE", "UNAUTHENTICATED", "PERMISSION_DENIED" ]
+        "enum" : [ "MALFORMED_REQUEST", "NOT_FOUND", "METHOD_NOT_ALLOWED", "PATH_JAIL_VIOLATION", "CONFLICT", "CONFLICT_STALE_VERSION", "CONFIG_VALIDATION_FAILED", "INTERNAL", "CONTROL_PLANE_READ_ONLY", "CAPABILITY_UNAVAILABLE", "UNAUTHENTICATED", "PERMISSION_DENIED", "RATE_LIMITED" ]
       },
       "Finding" : {
         "type" : "object",
