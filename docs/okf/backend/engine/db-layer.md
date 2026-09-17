@@ -298,7 +298,26 @@ CREATE TABLE IF NOT EXISTS inspecto_status_batches    (pipeline VARCHAR, seq BIG
 CREATE TABLE IF NOT EXISTS inspecto_status_files      (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
 CREATE TABLE IF NOT EXISTS inspecto_status_lineage    (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR);
 CREATE TABLE IF NOT EXISTS inspecto_status_quarantine (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
+CREATE TABLE IF NOT EXISTS inspecto_status_unpack     (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
+
+CREATE INDEX IF NOT EXISTS inspecto_status_commits_by_pipeline          ON inspecto_status_commits    (pipeline);
+CREATE INDEX IF NOT EXISTS inspecto_status_batches_by_pipeline          ON inspecto_status_batches    (pipeline, seq);
+CREATE INDEX IF NOT EXISTS inspecto_status_files_by_pipeline            ON inspecto_status_files      (pipeline, seq);
+CREATE INDEX IF NOT EXISTS inspecto_status_lineage_by_pipeline_batch    ON inspecto_status_lineage    (pipeline, batch_id, seq);
+CREATE INDEX IF NOT EXISTS inspecto_status_quarantine_by_pipeline       ON inspecto_status_quarantine (pipeline, seq);
+CREATE INDEX IF NOT EXISTS inspecto_status_unpack_by_pipeline           ON inspecto_status_unpack     (pipeline, seq);
 ```
+
+⚠ **The index set is derived from the predicate set, not chosen** (`DB-STATUS-INDEX-1`, 2026-09-17). Every read
+against these tables goes through the `StatusStore` seam — `committedBatches` and `readRows` in `DbStatusStore`
+are the only two SQL sites, and the list endpoints (`/runs/{p}/batches`, `/lineage`, `/quarantine`,
+`ReportService`, `MetricsService`) all reach them through it — so the predicates are closed: `WHERE pipeline = ?`
+everywhere, `AND batch_id = ?` on lineage only, `ORDER BY seq` on the five payload tables. The leading `pipeline`
+column also serves `deletePipeline` (the per-sync DELETE) and `renamePipeline`. `seq` trails deliberately: on
+Postgres the composite lets the sort be read off the index, while DuckDB's ART index serves the `pipeline`
+lookup and sorts after — the extra column is free there rather than a DuckDB-only bet.
+`DbStatusStoreTest.everyListPredicateHasABackingIndexOnTheColumnsItFilters` pins the exact (table → columns)
+set in both directions, so a new predicate without an index and an index without a predicate both fail.
 
 ⚠ **These two `batch_id` columns are deliberately NOT renamed** (consignment-ELT plan §11.3, slice 3 took the
 ledgers-and-manifest split only). Since 2026-08-04 the source ledgers spell the column `consignment_id` and
@@ -332,6 +351,21 @@ CREATE TABLE IF NOT EXISTS inspecto_job_run_sources (
 );
 CREATE INDEX IF NOT EXISTS inspecto_job_run_sources_by_consignment ON inspecto_job_run_sources (consignment_id);
 ```
+
+⚠ **This is a PROJECTION, not the audit — and that is why its write failures stay log-only**
+(`JOBRUN-STORE-SWALLOWED-WRITES-1`, decided 2026-09-17). The record of a job run is
+`jobs_runs.csv`, written by `JobRunLedger.record` and read back by `lastStartTimes` /
+`lastSuccessTime` for misfire catch-up. `DbJobRunStore.record` and `recordSources` log and swallow on
+failure by design — the same standing as `file_stages`, the deliberate best-effort index — because a
+missed row costs reporting fidelity a re-projection repairs, not a compliance record, and no caller
+could act on a throw. **The audit surface is one level up**: a failed `jobs_runs.csv` append now emits
+an `audit.write_failed` Signal at `ERROR` (`AuditWriteSignal`, payload `{audit, subject, error}`) so
+the gap is operator-visible on `/signals` and matchable by an Alert Rule — and still does not throw,
+because the run has already completed and failing it would be worse than a recorded gap.
+⛔ Do not escalate the two projection sites to the same Signal: one per missed projection row would
+drown the one that means a record was lost. `StoreHealth` is deliberately **not** the channel — it
+records what a store *opened* as, one replaceable entry per family, and throws under
+`-Dinspecto.topology=partitioned`.
 
 **`inspecto_job_run_sources` — one Consignment, one trail across the Stage-1 → Stage-2 boundary.** Until
 X2 the `pipeline_config:` job's run was linked to its input Consignments only by convention

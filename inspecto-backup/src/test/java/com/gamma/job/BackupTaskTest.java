@@ -202,4 +202,60 @@ class BackupTaskTest {
             System.clearProperty("assist.write.root");
         }
     }
+
+    /**
+     * BACKUP-MANIFEST-ATOMIC-1: the sidecar is staged and renamed, exactly as the zip already is.
+     *
+     * <p>A crash cannot be staged in a unit test, so this pins the two observable consequences of the
+     * rename: the finished directory holds ONLY the zip and the sidecar (no staging residue a later
+     * {@code backup_verify} or cleanup would trip over), and the sidecar parses whole. The third case —
+     * a direct in-place write returning — is pinned mechanically below, because it is the one this row
+     * was filed for and it is invisible to any successful run.
+     */
+    @Test
+    void theSidecarLandsCompleteAndLeavesNoStagingResidue(@TempDir Path source, @TempDir Path backupDir)
+            throws Exception {
+        new MaintenanceJob(backupCfg(source, backupDir)).run();
+        Path zip = onlyZip(backupDir);
+        Path sidecar = zip.resolveSibling(zip.getFileName() + ".manifest.json");
+
+        try (var s = Files.list(backupDir)) {
+            assertEquals(List.of(zip.getFileName().toString(), sidecar.getFileName().toString()),
+                    s.map(p -> p.getFileName().toString()).sorted().toList(),
+                    "the staging temp file must be gone — a rename leaves the zip and the sidecar, nothing else");
+        }
+        Map<?, ?> manifest = new com.fasterxml.jackson.databind.ObjectMapper().readValue(sidecar.toFile(), Map.class);
+        assertEquals(com.gamma.acquire.Checksums.of(zip, "SHA-256"), manifest.get("archiveSha256"));
+        assertEquals(2, ((List<?>) manifest.get("files")).size(), "every archived file is recorded");
+    }
+
+    /**
+     * The invariant itself: the sidecar write goes through {@code AtomicFiles}, never {@code Files.write*}
+     * against the sidecar path. A torn manifest is WORSE than a missing one here — verify and restore are
+     * fail-closed on it and re-hash the archive against it — so "absent or complete" has to be structural,
+     * and a successful run cannot tell the two implementations apart.
+     */
+    @Test
+    void theSidecarIsNeverWrittenInPlace() throws Exception {
+        String src = Files.readString(repoFile("inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java"));
+        int at = src.indexOf("Path sidecar = backupDir.resolve");
+        assertTrue(at > 0, "the sidecar write moved — re-anchor this scan before trusting it");
+        String write = src.substring(at, src.indexOf("long zipBytes", at));
+        assertTrue(write.contains("AtomicFiles.write(sidecar"),
+                "the sidecar must be staged + renamed (BACKUP-MANIFEST-ATOMIC-1), but found: " + write);
+        // (?<!Atomic) — "Files.write(sidecar" is a SUBSTRING of "AtomicFiles.write(sidecar", so a plain
+        // contains() here fails against the very fix it is meant to accept.
+        assertFalse(java.util.regex.Pattern.compile("(?<!Atomic)Files\\.write(String)?\\(sidecar").matcher(write).find(),
+                "a direct in-place write is back — a crash would leave a HALF-WRITTEN manifest: " + write);
+    }
+
+    /** Locate a repo-relative file from whichever module dir surefire started in. */
+    private static Path repoFile(String relative) {
+        Path dir = Path.of("").toAbsolutePath();
+        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent()) {
+            Path candidate = dir.resolve(relative);
+            if (Files.exists(candidate)) return candidate;
+        }
+        throw new AssertionError("cannot locate " + relative + " from " + Path.of("").toAbsolutePath());
+    }
 }

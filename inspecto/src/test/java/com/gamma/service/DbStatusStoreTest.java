@@ -244,4 +244,41 @@ class DbStatusStoreTest {
             }
         }
     }
+
+    /**
+     * {@code DB-STATUS-INDEX-1}: every list predicate this store issues has a backing index, and the
+     * indexed columns are the ones actually filtered/ordered on — not a guess. Asserting the exact
+     * (table → columns) set means adding a predicate without an index, or an index without a predicate,
+     * both fail here.
+     */
+    @Test
+    void everyListPredicateHasABackingIndexOnTheColumnsItFilters() throws Exception {
+        Map<String, String> byTable = new java.util.TreeMap<>();
+        try (var st = conn.createStatement();
+             var rs = st.executeQuery("SELECT table_name, sql FROM duckdb_indexes()")) {
+            while (rs.next()) byTable.put(rs.getString(1), rs.getString(2).toLowerCase(java.util.Locale.ROOT));
+        }
+
+        // commits is looked up by pipeline only (committedBatches); the other five also ORDER BY seq,
+        // and lineage additionally filters batch_id.
+        assertTrue(byTable.get("inspecto_status_commits").contains("(pipeline)"),
+                "commits: WHERE pipeline = ?");
+        for (String t : List.of("inspecto_status_batches", "inspecto_status_files",
+                                "inspecto_status_quarantine", "inspecto_status_unpack")) {
+            assertTrue(byTable.get(t) != null && byTable.get(t).contains("(pipeline, seq)"),
+                    t + ": WHERE pipeline = ? ORDER BY seq — got " + byTable.get(t));
+        }
+        assertTrue(byTable.get("inspecto_status_lineage").contains("(pipeline, batch_id, seq)"),
+                "lineage: WHERE pipeline = ? AND batch_id = ? ORDER BY seq");
+
+        assertEquals(Set.of("inspecto_status_commits", "inspecto_status_batches", "inspecto_status_files",
+                            "inspecto_status_lineage", "inspecto_status_quarantine", "inspecto_status_unpack"),
+                byTable.keySet(), "no index without a predicate: an unused index is dead weight on every sync");
+    }
+
+    /** The indexes are created by a guarded DDL, so re-opening the same database must not fail. */
+    @Test
+    void reopeningAnExistingDatabaseIsIdempotent() {
+        assertDoesNotThrow(() -> new DbStatusStore(conn), "CREATE INDEX IF NOT EXISTS re-runs cleanly");
+    }
 }

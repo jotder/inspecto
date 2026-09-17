@@ -70,6 +70,11 @@ final class JobRunLedger implements AutoCloseable {
             audit.append(run);
         } catch (Exception e) {
             log.warn("Could not write job audit for {}: {}", run.job(), e.getMessage());
+            // JOBRUN-STORE-SWALLOWED-WRITES-1: this file IS the record (see the field javadoc above and
+            // lastStartTimes/lastSuccessTime, which read it back). A WARN on a log nobody tails is not an
+            // operator-visible fact, so the gap is also announced on the Signal bus. Still not thrown: the
+            // run has already completed and failing it would be a worse outcome than a recorded gap.
+            com.gamma.signal.AuditWriteSignal.emit("jobs_runs.csv", run.job(), e);
         }
         history.computeIfAbsent(run.job(), k -> new BoundedHistory<>(MAX_HISTORY)).add(run);
         if (jobRunStore != null) jobRunStore.record(run);   // T27: durable, queryable projection

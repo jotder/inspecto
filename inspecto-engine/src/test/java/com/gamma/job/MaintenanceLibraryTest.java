@@ -543,6 +543,77 @@ class MaintenanceLibraryTest {
                 "forgetting must be deliberate — no default retention");
     }
 
+    // ── status_prune (STATUS-CSV-RETENTION-1) ────────────────────────────────────
+
+    /** Write a file into {@code dir}, mtime backdated by {@code ageDays}. */
+    private static Path aged(Path dir, String name, int ageDays) throws Exception {
+        Files.createDirectories(dir);
+        Path f = Files.writeString(dir.resolve(name), "a,b\n1,2\n");
+        Files.setLastModifiedTime(f, FileTime.from(Instant.now().minus(Duration.ofDays(ageDays))));
+        return f;
+    }
+
+    @Test
+    void statusPruneForgetsOldRunCsvsAcrossEveryPipelinesStatusDir(@TempDir Path data, @TempDir Path ctxDir)
+            throws Exception {
+        Path orders = data.resolve("orders").resolve("status");
+        Path payments = data.resolve("payments").resolve("status");
+        Path oldStatus  = aged(orders, "orders_status_20250101_0000.csv", 30);
+        Path oldBatches = aged(orders, "orders_batches_20250101_0000.csv", 30);
+        Path newStatus  = aged(orders, "orders_status_20260101_0000.csv", 0);
+        Path oldLineage = aged(payments, "payments_lineage_20250101_0000.csv", 30);
+
+        MaintenanceJob job = new MaintenanceJob(job(Map.of("task", "status_prune",
+                "retention_days", "7")), data.toString());
+
+        JobResult dry = job.run(dryCtx(ctxDir));
+        assertTrue(dry.message().contains("would remove 3 run status file(s)"), dry.message());
+        assertTrue(dry.message().contains("across 2 status directory(ies)"), dry.message());
+        assertTrue(Files.exists(oldStatus), "dry run must not delete");
+
+        JobResult real = job.run();
+        assertTrue(real.message().contains("removed 3 run status file(s)"), real.message());
+        assertFalse(Files.exists(oldStatus));
+        assertFalse(Files.exists(oldBatches));
+        assertFalse(Files.exists(oldLineage), "every pipeline's status dir is covered by one job");
+        assertTrue(Files.exists(newStatus), "recent runs kept");
+    }
+
+    /**
+     * ⛔ The commit log is the durable "did this batch finish" ledger and is NOT run-timestamped; the
+     * per-batch manifests are not run-scoped either. Both live in the same directory, so the filter being
+     * positive rather than "everything but" is the load-bearing part of this task.
+     */
+    @Test
+    void statusPruneNeverTouchesTheCommitLogOrTheManifests(@TempDir Path data) throws Exception {
+        Path status = data.resolve("orders").resolve("status");
+        Path commits   = aged(status, "orders_commits.log", 400);
+        Path manifest  = aged(status.resolve("manifests"), "b-1.json", 400);
+        Path prunable  = aged(status, "orders_status_20200101_0000.csv", 400);
+
+        JobResult r = new MaintenanceJob(job(Map.of("task", "status_prune",
+                "retention_days", "7")), data.toString()).run();
+
+        assertTrue(r.message().contains("removed 1 run status file(s)"), r.message());
+        assertFalse(Files.exists(prunable));
+        assertTrue(Files.exists(commits), "the commit log survives any retention window");
+        assertTrue(Files.exists(manifest), "manifests/ is per-batch, not per-run, and is not walked");
+    }
+
+    @Test
+    void statusPruneRequiresRetentionDays() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new MaintenanceJob(job(Map.of("task", "status_prune"))).run(),
+                "forgetting must be deliberate — no default retention");
+    }
+
+    @Test
+    void statusPruneWithNoDataRootIsANoOp() throws Exception {
+        JobResult r = new MaintenanceJob(job(Map.of("task", "status_prune", "retention_days", "7"))).run();
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertTrue(r.message().contains("removed 0 run status file(s)"), r.message());
+    }
+
     // ── storage_report (MNT-3) ───────────────────────────────────────────────────
 
     @Test

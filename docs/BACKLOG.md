@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **76<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 30<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **72<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 26<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -169,8 +169,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 0<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 30<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 76<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 26<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 72<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1513,15 +1513,62 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   `DbRunLease` itself records failing once (`last_run_at`). Verified present in `DbAcquisitionLedger.java:364`
   and `DbRunLease`; unverified in the other ~8 `Db*Store` classes. Fix: audit those, then a per-table version
   row so a breaking change fails loudly.
-- **P3** · **`DB-STATUS-INDEX-1`** — `DbStatusStore.java` creates no index beyond the primary keys while its
+- ~~**P3** · **`DB-STATUS-INDEX-1`**~~ ✅ **CLOSED 2026-09-17.** Premise CONFIRMED — `DbStatusStore.initSchema`
+  created six tables and **zero** indexes while the class javadoc already claimed *“plus the few columns we
+  actually index on”*; the DDL contradicted its own doc. ✅ **Indexed from the CLOSED predicate set, not from
+  guesswork:** `committedBatches` (`:123`) and `readRows` (`:165-166`) are the ONLY SQL read sites in the
+  class, and every list endpoint reaches these tables through the `StatusStore` seam (`RunRoutes:65/67/68`,
+  `:318`, `ReportService:132/133/161/177`, `MetricsService:81`) ⇒ `_commits (pipeline)` ·
+  `_batches`/`_files`/`_quarantine`/`_unpack (pipeline, seq)` · `_lineage (pipeline, batch_id, seq)`.
+  ⚠ The leading `pipeline` column is earned by the WRITE path too (`deletePipeline`'s per-sync DELETE and
+  `renamePipeline` hit all six tables), so no index rests on a read alone. `seq` trails deliberately:
+  Postgres reads the sort off the composite, DuckDB's ART index serves the lookup and sorts after, so the
+  extra column is not a DuckDB-only wager. Pinned in BOTH directions — a predicate without an index and an
+  index without a predicate each fail. `DbStatusStoreTest` 11/11, `FileStatusStoreTest` 2/2.
+  ⚠ **DuckDB-only coverage**: the assertion reads `duckdb_indexes()`, and Postgres skips in this checkout.
+  → `okf/backend/engine/db-layer.md` §3.4
+
+  - **P3** · **`DB-STATUS-INDEX-1`** — `DbStatusStore.java` creates no index beyond the primary keys while its
   batches/lineage/quarantine tables serve the list endpoints; `DbJobRunStore.java:98` and
   `DbEventStore.java:222` index their hot columns. Fix: check the list predicates and index them.
-- **P3** · **`STATUS-CSV-RETENTION-1`** — every run creates `<pipeline>_status_<ts>.csv` plus `_batches_`/
+- ~~**P3** · **`STATUS-CSV-RETENTION-1`**~~ ✅ **SHIPPED 2026-09-17 — new `status_prune` maintenance task.**
+  Premise confirmed, with two corrections: the row undercounted the families (**FOUR**, not three — `_unpack_`
+  too, `PipelineConfigParser:169-197`), and its *“28 exist today”* is **unverifiable in a clean checkout**
+  (`spaces/*/data/` is gitignored runtime data) — the mechanism claim stands regardless.
+  🔴 **The load-bearing detail the row MISSED:** `<pipeline>_commits.log` lives in the SAME directory and is
+  **NOT run-timestamped** — it is the durable *“did this batch finish”* ledger — as does per-batch
+  `manifests/`. ⛔ So the filter is **POSITIVE** (the four `_<family>_*.csv` names) and the walk one level
+  deep; a glob-by-age would have eaten the ledger. Mutation-tested: widening the filter to `.+` fails the
+  commit-log guard.
+  ⚠ **Deliberately NOT a `cleanup` job**, and the reason is scope: `cleanup` takes one `dir`, so it needs one
+  job per Pipeline and **silently misses every Pipeline added later**; `status_prune` walks
+  `<dataDir>/*/status/`. `retention_days` required with no default (matching every other prune — `cleanup`
+  stays the only one with a default), dry-run preview, unreadable mtime ⇒ never pruned. Registered in
+  `MaintenanceJob` (switch arm, `BUILT_IN_TASKS`, ids 21→22); no new `ParameterDecl` needed — the descriptor
+  is derived from `availableTasks()`, so the authoring form picks it up. Engine **131/0/0**.
+  → `okf/backend/control-plane/jobs.md`
+
+  - **P3** · **`STATUS-CSV-RETENTION-1`** — every run creates `<pipeline>_status_<ts>.csv` plus `_batches_`/
   `_lineage_` siblings (`PipelineConfigParser.java:170-176`) and nothing prunes them (`LedgerPruneTask`
   prunes the DB ledger only); 28 exist under `spaces/*/data/*/status/` today. `BACKLOG` line ~706 mentions
   this as an aside inside the Completeness-KPI row, never as work. Fix: a maintenance task that ages them out
   by `retention_days`.
-- **P3** · **`BACKUP-MANIFEST-ATOMIC-1`** — the backup zip is staged and `ATOMIC_MOVE`d
+- ~~**P3** · **`BACKUP-MANIFEST-ATOMIC-1`**~~ ✅ **SHIPPED 2026-09-17 — the sidecar is staged +
+  `ATOMIC_MOVE`d via `AtomicFiles.write`.** Premise confirmed; the cited lines had drifted (region is
+  `BackupTask.java:118-155`, the sidecar write was at `:147`, not `:148`).
+  🔴 **Why a torn manifest is WORSE than a missing one, which is the point of the row:** `verify()` and
+  `restore()` are **fail-closed ON the sidecar** — it records per-file SHA-256 plus the archive hash so
+  verification never trusts the archive it is verifying ⇒ a half-written manifest fails a GOOD archive. The
+  failure mode is now **absent or complete**, never partial. The staging temp is `.manifest-*.tmp`, which
+  `verify()`'s `.zip` listing and `backup()`'s own walk both ignore.
+  ⚠ **Pinned by a SOURCE-SCAN test**, because no *successful* run can distinguish the two implementations —
+  mutation-tested by reverting to `Files.writeString`. ⚠ The first draft of that assertion was itself broken
+  (`contains("Files.write(sidecar")` matches inside `AtomicFiles.write(sidecar`) and was caught only by
+  running it; it is now a `(?<!Atomic)` regex with the trap recorded in a comment.
+  ⛔ **`inspecto-backup` compiles ONLY under `-Pedition-standard`/`-enterprise`** — a bare `mvn -o test` never
+  compiles this change at all. Backup **17/0/0**. → `okf/backend/control-plane/jobs.md`
+
+  - **P3** · **`BACKUP-MANIFEST-ATOMIC-1`** — the backup zip is staged and `ATOMIC_MOVE`d
   (`BackupTask.java:117-148`) but its sidecar manifest at `:148` is a direct `Files.writeString`; a crash
   between the two leaves a zip with a missing or stale manifest. Fix: `AtomicFiles.write`.
 
@@ -1872,7 +1919,29 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   feature that never got a pane. Fix: a product call — wire or delete; not a mechanical delete.
 - **P3** · **`SIGN-IN-NO-SPEC-1`** — `modules/admin/session/sign-in.component.ts` has an a11y spec only;
   no behaviour spec covers the authorize/mock-code branches. Fix: add one.
-- **P3** · **`JOBRUN-STORE-SWALLOWED-WRITES-1`** — `DbJobRunStore.java:126-309` (eight sites) and
+- ~~**P3** · **`JOBRUN-STORE-SWALLOWED-WRITES-1`**~~ ✅ **CLOSED 2026-09-17 — and the row's COUNT was
+  REFUTED.** It claimed eight swallowed audit writes in `DbJobRunStore` plus three in `JobRunLedger`. Verified
+  by reading every catch: `DbJobRunStore` has **12** `catch (SQLException)`, of which only **TWO are in write
+  methods** (`recordSources:126`, `record:190`); **six are READ queries** returning an empty list or 0
+  (`:145`, `:165`, `:228`, `:268`, `:287`, `:309`), `initSchema:101` and `prune:346` **throw**, `:326` is
+  CHECKPOINT/VACUUM and `:363` is a read. And `JobRunLedger:105/131/156` are
+  `catch (RuntimeException ignore) /* skip a malformed row */` on the **READ** path. ⇒ **3 real write
+  swallows, not 11 — and only ONE of them is an audit.** ⛔ The row counted read swallows as audit writes.
+  ✅ **Resolved BOTH ways the row offered, applied to the right sites.** The two `DbJobRunStore` projection
+  writes stay **log-only BY DECISION** — the `file_stages` best-effort-index precedent: its own javadoc says
+  *“the CSV audit is the record”*, `jobs_runs.csv` is what `lastStartTimes`/`lastSuccessTime` read back as the
+  misfire baseline, a missed projection row is a reporting gap a re-projection repairs, and no caller could
+  act on a throw. `JobRunLedger.record:71` — which **is** the record of truth — now emits `audit.write_failed`
+  at ERROR via the new `AuditWriteSignal` on the existing Signal bus, reaching `/signals` and any Alert Rule.
+  ⛔ **Deliberately does NOT throw**: the run has already completed, and failing it would turn an audit
+  hiccup into a failed job.
+  ⚠ **`StoreHealth` was considered and REJECTED, reason recorded in the class doc so nobody re-litigates it:**
+  it is per-OPEN and one entry per family REPLACES the last, so a per-write failure would be overwritten by
+  the next success or falsely pin the family DEGRADED — and under `-Dinspecto.topology=partitioned`
+  `StoreHealth.record` **throws**, the exact outcome this row forbids.
+  `DbJobRunStoreTest` 7/7, `JobRunLedgerAuditSignalTest` 2/2. → `okf/backend/engine/db-layer.md` §3.5
+
+  - **P3** · **`JOBRUN-STORE-SWALLOWED-WRITES-1`** — `DbJobRunStore.java:126-309` (eight sites) and
   `JobRunLedger.java:71,107,133` log-and-swallow `SQLException` on audit writes with no signal, so an
   audit gap is invisible. Fix: emit a metric/signal on write failure, or record a design decision that
   best-effort is acceptable and close.

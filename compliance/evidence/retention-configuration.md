@@ -13,6 +13,7 @@ cron; **nothing prunes unless an operator authors the job**).
 |---|---|---|
 | `ledger_prune` | acquisition-ledger dedup fingerprints (`AcquisitionLedgers`) | `retention_days`, optional `source` scope |
 | `runlog_prune` | per-run JSONL run-log files + `JobRunLedger` rows | `retention_days`, optional `max_count` cap |
+| `status_prune` | per-run status CSVs (`_status_`/`_batches_`/`_lineage_`/`_unpack_`) under every `<dataDir>/<pipeline>/status/` | `retention_days` (the persistent `_commits.log` is never pruned) |
 | `notification_prune` | in-app `NotificationStore` | `retention_days` |
 | `receipt_prune` | delivery receipts (D8) | `retention_days` |
 | `incident_purge` | ARCHIVED Incidents past `closedAt + retention_days`, cascading notes/attachments/links/tags; **legal-hold exempt** | `retention_days`, `max_count` (default 1000) |

@@ -38,6 +38,11 @@ import java.time.Instant;
  *       JSONL files under {@code <auditDir>/runlog/} and {@code <auditDir>/artifacts/}, plus rows of the
  *       optional {@code inspecto_job_runs} projection; optional {@code max_count} caps each JSONL dir to
  *       its newest N files (System Maintenance MNT-2a). See {@link RunlogPruneTask}.</li>
+ *   <li>{@code status_prune} — delete the per-run status CSVs older than {@code retention_days}
+ *       (required) across every {@code <dataDir>/<pipeline>/status/} in the Space: the run-timestamped
+ *       {@code _status_} / {@code _batches_} / {@code _lineage_} / {@code _unpack_} files. ⛔ Never the
+ *       persistent {@code _commits.log} or {@code manifests/}. (STATUS-CSV-RETENTION-1 — these were the
+ *       one run-scoped output nothing pruned.) See {@link StatusPruneTask}.</li>
  *   <li>{@code notification_prune} — delete in-app notifications older than {@code retention_days}
  *       (required) from this space's feed, whatever their read/archived state. <b>Deliberate
  *       forgetting</b> like the other prunes. (The default feed is in-memory and self-caps, so this
@@ -110,7 +115,7 @@ import java.time.Instant;
 final class MaintenanceJob implements Job {
 
     private final JobConfig cfg;
-    private final String dataDir;   // the space's data root — needed only by the materialize task
+    private final String dataDir;   // the space's data root — materialize, the storage tasks, status_prune
     private final String auditDir;  // the space's audit root — needed only by the runlog_prune task
     /** The optional DuckDB run projection ({@code -Djobs.backend=duckdb}) runlog_prune also trims; may be null. */
     private final DbJobRunStore runStore;
@@ -151,8 +156,8 @@ final class MaintenanceJob implements Job {
     }
 
     /**
-     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 21 ids
-     * across 20 arms ({@code heartbeat} and {@code noop} share one).
+     * Every {@code task:} the switch in {@link #execute} carries, in the order it reads there — 22 ids
+     * across 21 arms ({@code heartbeat} and {@code noop} share one).
      *
      * <p>⚠ <b>This constant and that switch are two declarations of one fact.</b>
      * {@code MaintenanceTaskContractTest} re-parses this file's own {@code case} labels and fails when the
@@ -165,7 +170,7 @@ final class MaintenanceJob implements Job {
      * <p>⛔ Adding a {@code case} without adding it here, or the reverse, fails that test by design.
      */
     public static final java.util.List<String> BUILT_IN_TASKS = java.util.List.of(
-            "cleanup", "ledger_prune", "dedup_prune", "runlog_prune", "notification_prune",
+            "cleanup", "ledger_prune", "dedup_prune", "runlog_prune", "status_prune", "notification_prune",
             "event_prune", "partition_prune", "receipt_prune", "soft_bounce_retry", "storage_report", "storage_trend",
             "scheduler_audit", "metadata_validate", "file_repository_audit", "db_maintenance",
             "retire_superseded", "compact", "reference_compact", "materialize", "heartbeat", "noop");
@@ -190,6 +195,7 @@ final class MaintenanceJob implements Job {
             case "ledger_prune"       -> LedgerPruneTask.run(cfg, dryRun);
             case "dedup_prune"        -> DedupPruneTask.run(cfg, dryRun);
             case "runlog_prune"       -> RunlogPruneTask.run(cfg, auditDir, runStore, dryRun);
+            case "status_prune"       -> StatusPruneTask.run(cfg, dataDir, dryRun);
             case "notification_prune" -> NotificationPruneTask.run(cfg, host, dryRun);
             case "event_prune"        -> EventPruneTask.run(cfg, host, dryRun);
             case "partition_prune"    -> PartitionPruneTask.run(cfg, dryRun);

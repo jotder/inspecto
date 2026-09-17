@@ -10,6 +10,7 @@ import com.gamma.config.safety.PathJail;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.signal.Severity;
+import com.gamma.util.AtomicFiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,8 @@ import java.util.zip.ZipOutputStream;
  * <p><b>Archive format.</b> A plain zip of the source tree (relative paths, forward slashes) plus a
  * {@code backup-manifest.json} entry, and a <b>sidecar</b> {@code <archive>.manifest.json} next to the
  * zip recording per-file SHA-256 hashes ({@link Checksums}) and the SHA-256 of the finished archive
- * itself — so verification never has to trust the archive it is verifying.
+ * itself — so verification never has to trust the archive it is verifying. <b>Both</b> the zip and the
+ * sidecar are staged and renamed into place, so a crash leaves each of them absent or complete, never torn.
  *
  * <p><b>Catalog</b> (MNT-10): each backup appends one row to the {@code maintenance_backups} Dataset —
  * a single-row Parquet per backup in {@code <dataDir>/maintenance_backups/} (readers glob
@@ -145,8 +147,13 @@ final class BackupTask {
         }
         String zipSha = Checksums.of(zip, "SHA-256");
         Path sidecar = backupDir.resolve(zip.getFileName() + SIDECAR_SUFFIX);
-        Files.writeString(sidecar, JSON.writerWithDefaultPrettyPrinter()
-                .writeValueAsString(manifest(dir, stamp, entries, totalBytes, zipSha)));
+        // ⛔ Staged + renamed, never written in place (BACKUP-MANIFEST-ATOMIC-1). Verification and
+        // restore are fail-closed ON this sidecar — they re-hash the archive against it rather than
+        // trusting the archive — so a TORN manifest is worse than none: it would fail a good archive
+        // (or, half-written, name fewer files than the zip holds). A rename makes the only two
+        // observable states "absent" and "complete".
+        AtomicFiles.write(sidecar, JSON.writerWithDefaultPrettyPrinter()
+                .writeValueAsBytes(manifest(dir, stamp, entries, totalBytes, zipSha)), ".manifest-");
         long zipBytes = Files.size(zip);
         if (ctx != null) {
             ctx.artifacts().file("backup", zip, zipBytes);

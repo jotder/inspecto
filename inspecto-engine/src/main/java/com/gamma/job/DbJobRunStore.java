@@ -168,7 +168,18 @@ public final class DbJobRunStore implements AutoCloseable, com.gamma.util.Browsa
         }
     }
 
-    /** Append one job run. Best-effort: a write failure is logged, never thrown (the CSV audit is the record). */
+    /**
+     * Append one job run. Best-effort: a write failure is logged, never thrown (the CSV audit is the record).
+     *
+     * <p><b>Decision ({@code JOBRUN-STORE-SWALLOWED-WRITES-1}, 2026-09-17): log-only here is correct and
+     * stays.</b> This table is a <i>projection</i> of {@code jobs_runs.csv}, not an audit — the same
+     * standing as {@code file_stages}, the deliberate best-effort index whose {@code record} also logs and
+     * never throws. A missed row costs reporting fidelity a re-projection repairs, not a compliance record,
+     * and there is no caller that could act on a throw. The audit gap the row was really about is one site
+     * up, in {@code JobRunLedger.record}, and that one now emits
+     * {@link com.gamma.signal.AuditWriteSignal}. ⛔ Do not "fix" this by escalating it too: an
+     * {@code audit.write_failed} per projection miss would drown the signal that means a record was lost.
+     */
     public void record(JobRun r) {
         try {
             src.run(conn -> {

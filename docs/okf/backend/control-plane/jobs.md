@@ -394,7 +394,8 @@ mutation-guarded — it leaves the operator exactly as unable to act as the bare
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:
 `cleanup` (retention knobs `max_count`/`max_size`/`archive_dir`/`min_keep` — the newest N are never retired),
-`ledger_prune`, `runlog_prune`, `notification_prune`, `receipt_prune`, `event_prune` (COMPLY-3: the
+`ledger_prune`, `runlog_prune`, `status_prune` (the run-timestamped status CSVs under each Pipeline's
+`status/`, never the persistent `_commits.log`), `notification_prune`, `receipt_prune`, `event_prune` (COMPLY-3: the
 audit-retention window over the Parquet event store, a whole-day-partition delete via `EventStore.prune`,
 attached to `JobService` post-construction like the feed), `incident_purge` (see below —
 the only destructive task over operator business records) (`retention_days` required — deliberate forgetting;

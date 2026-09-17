@@ -328,6 +328,28 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                     // No legacy migration for this one: no ucc_status_unpack ever existed.
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_UNPACK
                             + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+
+                    // ── indexes: one per ACTUAL predicate, none speculative (DB-STATUS-INDEX-1) ──
+                    // Every read in this class is issued by `committedBatches` or `readRows` below, and the
+                    // StatusStore seam is the ONLY way the list endpoints (/runs/{p}/batches, /lineage,
+                    // /quarantine, ReportService, MetricsService) reach these tables — so the predicate set is
+                    // closed and enumerable, not guessed. It is:
+                    //   commits                        WHERE pipeline = ?
+                    //   batches/files/quarantine/unpack WHERE pipeline = ?                   ORDER BY seq
+                    //   lineage                         WHERE pipeline = ? [AND batch_id = ?] ORDER BY seq
+                    // The leading `pipeline` column also serves `deletePipeline` and `renamePipeline`, which
+                    // filter on exactly that column in all six tables — every table therefore earns its index
+                    // from the WRITE path even before a read.
+                    // ⚠ `seq` is trailing on purpose: it is the ORDER BY, and on Postgres the composite lets the
+                    // sort be read off the index. DuckDB's ART indexes serve the `pipeline` lookup and will still
+                    // sort afterwards — the composite costs nothing there and is not a DuckDB-only wager.
+                    // Same guarded idiom and same place in the schema-init path as DbJobRunStore/DbEventStore.
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_COMMITS + "_by_pipeline ON " + T_COMMITS + " (pipeline)");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_BATCHES + "_by_pipeline ON " + T_BATCHES + " (pipeline, seq)");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_FILES + "_by_pipeline ON " + T_FILES + " (pipeline, seq)");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_LINEAGE + "_by_pipeline_batch ON " + T_LINEAGE + " (pipeline, batch_id, seq)");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_QUARANTINE + "_by_pipeline ON " + T_QUARANTINE + " (pipeline, seq)");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_UNPACK + "_by_pipeline ON " + T_UNPACK + " (pipeline, seq)");
                 }
             });
         } catch (SQLException e) {
