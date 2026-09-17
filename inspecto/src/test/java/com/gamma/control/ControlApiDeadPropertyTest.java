@@ -160,4 +160,49 @@ class ControlApiDeadPropertyTest {
             assertEquals(200, r.statusCode(), r.body());
         }
     }
+
+    /**
+     * The other three censused types (`alert`, `meta`, `enrichment`) run through the SAME generic
+     * {@code AcceptedConfigKeys.unknownKeyFindings} call in {@code ConfigWriteRoutes} that the pipeline
+     * tests above prove live — this closes the row's own demand to ground that claim live rather than
+     * trust the prose that they behave the same way.
+     */
+    @Test
+    void aDeadAlertKeyIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", """
+                    {"type":"alert","config":{"alert":{
+                       "name":"rule-1","metric":"error_rate","threshold":"0.1","window":"1h",
+                       "banana":"yellow"}}}""");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(findingWithCode(r.body(), FindingCodes.ERR_UNKNOWN_CONFIG_KEY) != null,
+                    "no ERR_UNKNOWN_CONFIG_KEY finding in: " + r.body());
+        }
+    }
+
+    @Test
+    void aDeadMetaKeyIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", """
+                    {"type":"meta","config":{"name":"orders_semantics","banana":"yellow"}}""");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(findingWithCode(r.body(), FindingCodes.ERR_UNKNOWN_CONFIG_KEY) != null,
+                    "no ERR_UNKNOWN_CONFIG_KEY finding in: " + r.body());
+        }
+    }
+
+    @Test
+    void aDeadEnrichmentKeyIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", """
+                    {"type":"enrichment","config":{
+                       "name":"orders_enrich",
+                       "input":{"database":"in","partitions":[]},
+                       "output":{"database":"out","partitions":[]},
+                       "banana":"yellow"}}""");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(findingWithCode(r.body(), FindingCodes.ERR_UNKNOWN_CONFIG_KEY) != null,
+                    "no ERR_UNKNOWN_CONFIG_KEY finding in: " + r.body());
+        }
+    }
 }

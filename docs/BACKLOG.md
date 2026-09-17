@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **70<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 70<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 57<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -2429,7 +2429,23 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   → `CapabilityManifest.java` · `CapabilityManifestTest.java` · `ObjectRoutes.java:56-75` ·
   `superpower/route-gating-audit.md` §"Step 2 as-built" · `okf/capabilities/security/security.md` §capability-vocabulary
 
-- **P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**
+- ~~**P2** · **`DUCKLE-C3-DEAD-PROPERTY-1` — a config key no component reads must FAIL validation.**~~
+  ✅ **ROW CLOSED 2026-09-17 — this row's own scope is complete.** Live-grounded (not read off the prose):
+  `POST /config/write` (and `/config/patch`) 422 with `ERR_UNKNOWN_CONFIG_KEY` on an unrecognized key for
+  ALL FOUR completed census kinds — `pipeline`, `alert`, `meta`, `enrichment` — proven over real HTTP.
+  `ControlApiDeadPropertyTest` already covered `pipeline` live; `aDeadAlertKeyIsRefused`,
+  `aDeadMetaKeyIsRefused` and `aDeadEnrichmentKeyIsRefused` were added to close the gap that the other
+  three kinds were only unit/ratchet-tested (`AlertKeyCoverageContractTest`, `MetaKeyCoverageContractTest`,
+  `EnrichmentKeyCoverageContractTest`) and never proven over the actual route — all 8 tests pass
+  (`inspecto` module, `ControlApiDeadPropertyTest`, 8/0/0/0). No enforcement gap found; nothing else to fix.
+  **Everything else this row ever touched has its own home, and none of it is this row's remaining scope:**
+  `job` and `schema` are ruled out on enumerability (reasons above, unchanged); `widget`/`dashboard`/
+  `expectation` moved to `COMPONENT-KIND-KEY-CENSUS-1`; the job residual is `JOB-PARAM-UNDECLARED-UNREPORTED-1`;
+  the expectation residual is `EXPECTATION-SPEC-STALE-VS-CONDITION-1`; the `RecipeCompiler` WARNING seam and
+  `PipelineGraphRoutes` migration-pass blocker remain named but unbuilt deferrals, not open threads of THIS
+  row — `superpower/dead-property-validation-plan.md` can retire once those are triaged onto their own rows
+  or explicitly dropped.
+  (superseded history below)
   ✅ **THE CENSUS HALF OF THIS ROW IS CLOSED 2026-09-17. `AcceptedConfigKeys` is DONE at FOUR types** —
   `pipeline`, `alert`, `meta`, `enrichment`. `widget`/`dashboard`/`expectation` belong to
   `COMPONENT-KIND-KEY-CENSUS-1`; `schema` and `job` are **ruled out on enumerability**, with reasons.
