@@ -9,6 +9,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Manual operator-side reproduction harness — NOT an automated test. It compiles on no
+ * build path (asn-parser has no pom.xml / testSourceDirectory), carries no {@code @Test}
+ * annotation, and its {@code main()} dispatches to hardcoded-path methods, most commented
+ * out. Kept verbatim as documented provenance for several {@code asn-golden} GoldenCapture
+ * cases (see docs/BACKLOG.md, RTDMS-ASN-HARNESS-1) — do not delete or rename without
+ * updating those citations.
+ */
 class RTDMS_ASN_Test {
 
     static Map<String, Object> headerInfo = new LinkedHashMap<>();
