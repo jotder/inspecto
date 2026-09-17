@@ -10,6 +10,7 @@ import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.PipelineRel;
 import com.gamma.query.MeasureCompiler;
 
+import com.gamma.util.SqlIdent;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;

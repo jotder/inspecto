@@ -10,6 +10,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.JdbcRows;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -292,7 +293,7 @@ public final class EnrichmentEngine {
         StringBuilder create = new StringBuilder("CREATE TABLE input (");
         for (int i = 0; i < cols.size(); i++) {
             if (i > 0) create.append(", ");
-            create.append('"').append(cols.get(i).replace("\"", "\"\"")).append("\" VARCHAR");
+            create.append(SqlIdent.q(cols.get(i))).append(" VARCHAR");
         }
         create.append(")");
         try (Statement st = conn.createStatement()) { st.execute(create.toString()); }

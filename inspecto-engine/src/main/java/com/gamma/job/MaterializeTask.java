@@ -7,6 +7,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.query.MeasureCompiler;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -183,7 +184,7 @@ final class MaterializeTask {
     }
 
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 
     /** The written snapshot's columns, from {@code DESCRIBE} over the Parquet itself. */

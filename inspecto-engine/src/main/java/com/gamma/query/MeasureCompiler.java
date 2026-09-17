@@ -1,5 +1,6 @@
 package com.gamma.query;
 
+import com.gamma.util.SqlIdent;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -256,6 +257,6 @@ public final class MeasureCompiler {
     }
 
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 }

@@ -14,9 +14,9 @@ public final class SqlBuilder {
 
     private SqlBuilder() {}
 
-    /** Quote an identifier for DuckDB, escaping embedded double quotes. */
+    /** Quote an identifier for DuckDB, escaping embedded double quotes. Delegates to {@link SqlIdent#q}. */
     public static String quoteIdent(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 
     /**

@@ -11,6 +11,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
+import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -265,6 +266,6 @@ public final class InvRoutes implements RouteModule {
     }
 
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 }

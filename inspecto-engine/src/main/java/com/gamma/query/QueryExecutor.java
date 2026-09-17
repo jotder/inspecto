@@ -5,6 +5,7 @@ import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.LakehouseCatalog;
 
+import com.gamma.util.SqlIdent;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -258,6 +259,6 @@ public final class QueryExecutor {
     }
 
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 }

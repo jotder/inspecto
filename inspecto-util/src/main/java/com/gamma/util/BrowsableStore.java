@@ -102,6 +102,6 @@ public interface BrowsableStore {
 
     /** Double-quote an identifier for the {@code FROM} clause (table names are validated store constants). */
     private static String quoteIdent(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 }

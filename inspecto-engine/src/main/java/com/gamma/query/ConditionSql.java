@@ -1,5 +1,6 @@
 package com.gamma.query;
 
+import com.gamma.util.SqlIdent;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -178,7 +179,7 @@ public final class ConditionSql {
     // ── quoting ──────────────────────────────────────────────────────────────────
 
     private static String ident(String name) {
-        return "\"" + name.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(name);
     }
 
     private static String lit(String v) {

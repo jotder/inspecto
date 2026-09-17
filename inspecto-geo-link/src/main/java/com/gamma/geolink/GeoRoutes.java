@@ -11,6 +11,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 
+import com.gamma.util.SqlIdent;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -266,6 +267,6 @@ public final class GeoRoutes implements RouteModule {
     }
 
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 }

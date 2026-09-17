@@ -14,6 +14,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.NodeCategory;
 import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -609,7 +610,7 @@ interface ConsignmentIngestStrategy {
     private static String md5Of(List<String> cols) {
         StringBuilder hash = new StringBuilder("md5(concat_ws(chr(31)");
         for (String c : cols)
-            hash.append(", COALESCE(CAST(\"").append(c.replace("\"", "\"\"")).append("\" AS VARCHAR), '')");
+            hash.append(", COALESCE(CAST(").append(SqlIdent.q(c)).append(" AS VARCHAR), '')");
         return hash.append("))").toString();
     }
 

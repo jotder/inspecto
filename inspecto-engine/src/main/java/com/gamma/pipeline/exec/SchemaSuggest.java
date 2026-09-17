@@ -2,6 +2,7 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.util.DuckDbUtil;
 
+import com.gamma.util.SqlIdent;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -127,7 +128,7 @@ public final class SchemaSuggest {
     }
 
     private static String inferColumn(Connection conn, String column) throws SQLException {
-        String col = "\"" + column.replace("\"", "\"\"") + "\"";
+        String col = SqlIdent.q(column);
         String nonBlank = col + " IS NOT NULL AND trim(" + col + ") <> ''";
         if (count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank) == 0)
             return "VARCHAR";   // nothing to vote with — unknown is not evidence

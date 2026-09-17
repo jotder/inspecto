@@ -8,6 +8,7 @@ import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.DuckDbUtil;
 
+import com.gamma.util.SqlIdent;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;

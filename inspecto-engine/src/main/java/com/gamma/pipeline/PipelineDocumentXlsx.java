@@ -2,6 +2,7 @@ package com.gamma.pipeline;
 
 import com.gamma.etl.ExcelExtension;
 
+import com.gamma.util.SqlIdent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -117,7 +118,7 @@ public final class PipelineDocumentXlsx {
         return "'" + strOrEmpty(s).replace("'", "''") + "'";
     }
 
-    private static String quote(String s) { return "\"" + s.replace("\"", "\"\"") + "\""; }
+    private static String quote(String s) { return SqlIdent.q(s); }
 
     private static String unquote(String s) {
         return s.startsWith("\"") ? s.substring(1, s.length() - 1).replace("\"\"", "\"") : s;

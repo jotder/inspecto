@@ -170,6 +170,24 @@ class ConditionSqlTest {
         assertParity(3, group("AND", cond("cost", ">", "100"), cond("", ">", "5")));
     }
 
+    /**
+     * SQLIDENT-NINE-COPIES-1: {@code ConditionSql.ident} must BE the shared
+     * {@link com.gamma.util.SqlIdent#q}, not a private re-implementation of it.
+     *
+     * <p>Two assertions, deliberately: the literal goes red if the shared escape in
+     * {@code inspecto-util} changes (proving this module's SQL really flows from it), and the
+     * {@code SqlIdent.q} comparison goes red if this module grows a copy that drifts.
+     */
+    @Test
+    void identifierQuotingDelegatesToTheSharedPrimitive() {
+        String field = "we\"ird col";
+        String sql = ConditionSql.predicate(group("AND", cond(field, "isNull", "")));
+        assertEquals("((\"we\"\"ird col\" IS NULL OR CAST(\"we\"\"ird col\" AS VARCHAR) = ''))", sql);
+
+        String quoted = com.gamma.util.SqlIdent.q(field);
+        assertEquals("((" + quoted + " IS NULL OR CAST(" + quoted + " AS VARCHAR) = ''))", sql);
+    }
+
     private static Map<String, Object> cond(String field, String operator, String value, String value2) {
         Map<String, Object> c = cond(field, operator, value);
         c.put("value2", value2);

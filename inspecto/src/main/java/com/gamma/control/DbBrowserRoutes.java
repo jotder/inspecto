@@ -8,6 +8,7 @@ import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.BrowsableStore;
+import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -329,6 +330,6 @@ final class DbBrowserRoutes implements RouteModule {
     }
 
     private static String q(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 }

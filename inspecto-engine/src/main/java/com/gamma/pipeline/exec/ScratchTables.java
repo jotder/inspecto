@@ -2,6 +2,7 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.util.JdbcRows;
 
+import com.gamma.util.SqlIdent;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

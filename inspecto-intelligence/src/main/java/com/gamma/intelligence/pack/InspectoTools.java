@@ -39,6 +39,7 @@ import com.gamma.signal.Signals;
 import com.gamma.sql.SqlGuard;
 import com.gamma.util.BrowsableStore;
 
+import com.gamma.util.SqlIdent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1565,9 +1566,9 @@ final class InspectoTools {
         return m;
     }
 
-    /** Double-quote an identifier for server-built SQL (matches {@code BrowsableStore.quoteIdent}). */
+    /** Double-quote an identifier for server-built SQL — delegates to {@link SqlIdent#q}. */
     private static String sqlIdent(String ident) {
-        return "\"" + ident.replace("\"", "\"\"") + "\"";
+        return SqlIdent.q(ident);
     }
 
     /** Missing → null; a number or numeric string → its double value; anything else → {@code NaN}. */

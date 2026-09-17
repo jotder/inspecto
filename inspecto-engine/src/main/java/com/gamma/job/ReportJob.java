@@ -12,6 +12,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -179,7 +180,7 @@ final class ReportJob implements Job {
                 ? null   // raw export: SELECT * over the dataset (no aggregation)
                 : MeasureCompiler.parse(body, 10_000, 100_000);
         String sql = spec != null ? MeasureCompiler.compile(spec)
-                : "SELECT * FROM \"" + cfg.require("dataset").replace("\"", "\"\"") + "\" LIMIT "
+                : "SELECT * FROM " + SqlIdent.q(cfg.require("dataset")) + " LIMIT "
                         + Integer.parseInt(cfg.opt("limit", "10000"));
 
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
