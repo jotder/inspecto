@@ -53,6 +53,21 @@ jobs:
       - name: Formatting guard
         run: npm run format:check
 
+      # ESLint (UI-LINT-NOT-CONFIGURED-1, 2026-09-17). Until now `ng lint` failed with "Cannot find
+      # 'lint' target" — no builder was registered and no ESLint config had EVER been tracked in this
+      # repo — so the angular-ui skill's GAUNTLET "lint" leg ran nothing at all. The target now exists
+      # and reports.
+      # ⚠ REPORTING ONLY, exactly like the coverage step below and for the same reason: it does not
+      # pass yet. Measured at wiring time on a clean tree: 177 problems (173 errors, 4 warnings) in 80
+      # of 972 files, entirely from the UPSTREAM recommended presets — no house rules were invented and
+      # nothing was disabled to manufacture a green. Mass-fixing 173 findings would have been a large
+      # unreviewed change hiding inside a "wire up lint" task, so the split is on the BACKLOG instead.
+      # ⛔ Do not flip this to a hard gate by muting rules. Flip it by draining the findings; drop
+      # `continue-on-error` in the same change that reaches zero.
+      - name: ESLint (reporting only — see BACKLOG UI-LINT-NOT-CONFIGURED-1)
+        run: npm run lint
+        continue-on-error: true
+
       # Unit tests (Vitest via @angular/build:unit-test, jsdom); single run, no watch.
       # The guarded e2e backend smoke (src/e2e) self-skips without E2E_BASE_URL.
       # GUARD-SWEEP-1e (2026-09-07). `npm run build` type-checks ONLY tsconfig.app.json, and the unit-test

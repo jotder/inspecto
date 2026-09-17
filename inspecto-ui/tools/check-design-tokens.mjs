@@ -18,8 +18,20 @@ const uiRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const toPosix = (p) => p.split(sep).join('/');
 
 // Directories that hold inspecto-authored, design-system-consuming code.
-// (Vendored Fuse scaffolding under modules/auth/** and src/@gamma/** is intentionally out of scope.)
-const ROOTS = ['src/app/inspecto', 'src/app/modules/admin'];
+//
+// This is the WHOLE of src/app, deliberately: the guard's subject has always been "inspecto-authored
+// source", and every tree it means to exclude lives OUTSIDE src/app — the vendored gamma/Fuse scaffolding
+// at src/@gamma/**, and src/styles/splash-screen.css, whose 3 hardcoded hex values paint the pre-boot
+// splash before any --gamma-* var exists to read. (The old comment here also excluded vendored
+// modules/auth/**; that tree no longer exists, and src/app/modules now contains only admin/.)
+//
+// It was an ALLOW-list of two trees — 'src/app/inspecto' + 'src/app/modules/admin' — until 2026-09-17,
+// which left src/app/layout/** (the shell every user sees) and src/app/core/** unscanned: a new
+// directory under src/app was out of scope by DEFAULT and silently unguarded. Scoping the parent makes
+// in-scope the default and out-of-scope the thing that needs a decision. No deny-list is needed to say
+// this, because nothing under src/app is vendored; do not add one speculatively. Widening cost nothing —
+// layout/** and core/** measured 0 violations at the time of the change.
+const ROOTS = ['src/app'];
 
 // The only files permitted to hardcode colors / own the status-color mapping. These are the
 // sanctioned design-system color owners: the chart palette, the status pill, the inline alert
