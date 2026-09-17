@@ -399,3 +399,24 @@ key ⇒ 422, nothing written; gate removed ⇒ 200 and all four components plant
 ⇒ Open row: **`BITEMPLATES-GATE-ORDER-1`** — `apply` checks the 409 conflict BEFORE the 422 spec gate,
 inverting the `endpoint` skill's order. Observable only when a template is both conflicting and invalid,
 which no curated template can be today.
+
+### `BUNDLE-ESCAPE-TEST-IS-ENVIRONMENT-DEPENDENT-1` (open, P1, filed 2026-09-17)
+
+`ControlApiBundleNewKindsTest.jobImportRefusesAnEscapingPathValueWithoutAbortingTheBatch` is the only guard
+that a bundle cannot plant a job config whose `dir` escapes the Space. It **fails in a clean detached worktree**
+at `c62b46a4` and at `218d0cff` — `failed: 0`, the escaper reported `imported` — while **passing 11/11 in the
+main checkout at the same commits**.
+
+⛔ The obvious explanation was wrong and is recorded so nobody re-derives it: a peer's uncommitted work was
+NOT the cause. The commit in between (`ad29e683`) touches no bundle, `PathJail` or `ConfigSafetyValidator`
+code, and the failure reproduces at a commit that predates it.
+
+🔴 The likely mechanism is **escape depth**: the test uses `@TempDir` and climbs exactly six `..`, so
+whether the resolved path lands outside an allowed root depends on how deep the temp directory is on the
+machine running it. A security property is being pinned by a test whose verdict depends on filesystem layout,
+and a fresh clone — the CI case — is the failing side.
+
+⚠ Two possibilities must be separated before anything is changed: either the **gate** does not refuse the
+escape and the main checkout is green by accident (so `JOB-CONFIG-THIRD-PRODUCER-1`'s fix is incomplete), or
+the gate holds and only the **test** is fragile. ⛔ Do not make the test green first — that is how a real gate
+gets papered over.

@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **59<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬇ **DOWN 62 → 59, the first net
+> **56<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 38<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
 > ⛔ **The growth 56→58→60→63 was real and the "honest result" framing had become a rationalisation.**
 > Three causes, named so they can be checked: most rows filed were about our OWN guards and docs, not the
@@ -166,9 +166,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 59<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 38<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 14<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -912,28 +912,67 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     (⛔ never the original) should show **9 conversions, 0 refusals, the enrich file untouched and
     unarchived** so `EnrichJob` still finds it. Cheap, and it closes the last open thing in the §6 step-1 lane.
 
-- **P1** · 🔴 **`CONFIG-MIGRATOR-LOSES-MAPPINGS-1` — the migration tool silently DROPS every schema's
-  mapping block, and its documented `--apply` form writes to a directory called `--apply`.** Filed 2026-09-17
-  from the `MIGRATE-ENRICH-DRIVE-1` drive — **found by DRIVING it, not by reading it.** Two halves, one commit's
-  worth of work, filed together because one run surfaced both.
-  🔴 **(a) Silent data loss.** `ConfigMigrator.java:185` does `schema.remove("mapping")` unconditionally, then
-  writes the Mapping CSV only when `mapping.rules[]` is a non-empty list. **All four committed demo schemas
-  carry `mapping.fields[]`, ZERO carry `rules`** (`MappingCsv.encode` reads `targetColumn`/`sourceExpression`/
-  `transformType`; the corpus authors `name`/`from`/`fn`/`args`). On the live drive `registry/mappings/` was
-  **never created** and `registry/schemas/orders.toon` lost all 8 field mappings — including two SQL
-  expressions — while the original was archived away. **Exit 0, no refusal, no warning.**
-  ⛔ The class javadoc at `:24` says *"**Refuses rather than loses.**"* Here it loses, on 4 of 4 real files.
-  ⚠ **Why no test caught it:** `ConfigMigratorTest.anApplyWritesTheComponentsAndArchivesTheOriginals` passes
-  because its `legacySpace()` fixture is **the only corpus in the repo using `mapping.rules[]`**. The standing
-  lesson, reproduced exactly — *the unit test agrees with itself, not with the space.* ⇒ any fix must be
-  pinned against a COMMITTED schema, not a fixture.
-  🔴 **(b) `--apply` is not stripped from the positional args.** `MainApp.java:55-62` strips `--dry-run`
-  only, so `--apply` falls into `subArgsList`, `subArgs.length > 1`, and `outRoot = Paths.get("--apply")` — a
-  relative directory in the process CWD. The tool's OWN usage text (`MainApp.java:298`) prints this form. It
-  still reports `9 file(s) converted` and exit 0, and it still archives the originals, so an operator loses the
-  legacy files and finds the registry nowhere near the Space.
-  ✅ Both verified on a copy of `spaces/demo` at `36f554ae`; `spaces/` never opened for writing.
-  → `okf/backend/config/configuration.md`
+- ~~**P1** · **`CONFIG-MIGRATOR-LOSES-MAPPINGS-1`**~~ ✅ **SHIPPED 2026-09-17 — and the exposure was the WHOLE
+  corpus, not the four demo files.** Re-measured: **25 of 25** committed `*_schema.toon` carry
+  `mapping.fields[]`; **zero** carry `rules[]` — including `spaces/_templates/` and `inspecto/examples/`.
+  🔴 **Root cause, which is what decided the fix:** `mapping.rules[]` is the LEGACY spelling.
+  `MappingMigrator` had already moved the entire corpus to `fields[]` and `transform.map` was deleted
+  2026-09-05 — **the converter was written against a shape that no longer exists on disk.**
+  ✅ **Shape chosen: carry the block through.** Only what the CSV actually carries is removed; the CSV is
+  written only for a legacy `rules[]` block. ⛔ **Translate was rejected as provably NON-TOTAL** — the CSV is
+  the legacy `targetColumn,sourceExpression,transformType` triple and only **4 of 23** Record Transformer
+  catalog functions have any back-mapping, losing `args` even then; a lossy translation that looks complete is
+  worse than the silent loss it replaces. ⛔ **Refuse was rejected because nothing is lost** — a schema
+  component is loaded whole and `RowShaper.mappingSchemaOf` already reads `schema.mapping.fields`, so refusing
+  would reject every schema in the repo and extracting a CSV would DOWNGRADE the current spelling.
+  ✅ Also found: the `remove` dropped `canonicalName`/`rawName` even in the `rules[]` path, which the CSV has no
+  column for. Half (b) — `--apply` falling into the positional list and becoming a directory named `--apply` —
+  reproduced, then fixed by stripping it alongside `--dry-run`.
+  ⚠ **The regression test INVERTS the one that let this ship:** it walks the committed corpus off `../spaces`
+  and asserts non-emptiness first, so it cannot pass by finding nothing. The old test passes only because its
+  `legacySpace()` fixture is the sole `rules[]`-shaped corpus in the repo. Original row follows.
+  - **P1** · 🔴 **`CONFIG-MIGRATOR-LOSES-MAPPINGS-1` — the migration tool silently DROPS every schema's
+    mapping block, and its documented `--apply` form writes to a directory called `--apply`.** Filed 2026-09-17
+    from the `MIGRATE-ENRICH-DRIVE-1` drive — **found by DRIVING it, not by reading it.** Two halves, one commit's
+    worth of work, filed together because one run surfaced both.
+    🔴 **(a) Silent data loss.** `ConfigMigrator.java:185` does `schema.remove("mapping")` unconditionally, then
+    writes the Mapping CSV only when `mapping.rules[]` is a non-empty list. **All four committed demo schemas
+    carry `mapping.fields[]`, ZERO carry `rules`** (`MappingCsv.encode` reads `targetColumn`/`sourceExpression`/
+    `transformType`; the corpus authors `name`/`from`/`fn`/`args`). On the live drive `registry/mappings/` was
+    **never created** and `registry/schemas/orders.toon` lost all 8 field mappings — including two SQL
+    expressions — while the original was archived away. **Exit 0, no refusal, no warning.**
+    ⛔ The class javadoc at `:24` says *"**Refuses rather than loses.**"* Here it loses, on 4 of 4 real files.
+    ⚠ **Why no test caught it:** `ConfigMigratorTest.anApplyWritesTheComponentsAndArchivesTheOriginals` passes
+    because its `legacySpace()` fixture is **the only corpus in the repo using `mapping.rules[]`**. The standing
+    lesson, reproduced exactly — *the unit test agrees with itself, not with the space.* ⇒ any fix must be
+    pinned against a COMMITTED schema, not a fixture.
+    🔴 **(b) `--apply` is not stripped from the positional args.** `MainApp.java:55-62` strips `--dry-run`
+    only, so `--apply` falls into `subArgsList`, `subArgs.length > 1`, and `outRoot = Paths.get("--apply")` — a
+    relative directory in the process CWD. The tool's OWN usage text (`MainApp.java:298`) prints this form. It
+    still reports `9 file(s) converted` and exit 0, and it still archives the originals, so an operator loses the
+    legacy files and finds the registry nowhere near the Space.
+    ✅ Both verified on a copy of `spaces/demo` at `36f554ae`; `spaces/` never opened for writing.
+    → `okf/backend/config/configuration.md`
+
+- **P1** · 🔴 **`BUNDLE-ESCAPE-TEST-IS-ENVIRONMENT-DEPENDENT-1` — master's only guard against a bundle
+  planting an escaping job path passes or fails depending on WHERE the test's temp directory sits.** Filed
+  2026-09-17. `ControlApiBundleNewKindsTest.jobImportRefusesAnEscapingPathValueWithoutAbortingTheBatch` asserts
+  a job whose `dir` is `../../../../../../evil_escape` is refused per-item.
+  ✅ **Measured, three ways:** it **FAILS** in a clean detached worktree at `c62b46a4` AND at `218d0cff`
+  (`failed: 0`, the escaper reported `imported`), and **PASSES** 11/11 in the main checkout at the same
+  commits. ⛔ The difference is not a peer's uncommitted work — that hypothesis was formed and then REFUTED:
+  the peer commit in between (`ad29e683`) touches no bundle, `PathJail` or `ConfigSafetyValidator` code.
+  🔴 **The likely mechanism is the escape DEPTH.** The test uses `@TempDir` and climbs exactly six `..`, so
+  whether the resolved path lands outside an allowed root depends on how deep the temp directory is — which
+  differs between checkouts. ⇒ **a security property is being pinned by a test whose verdict depends on the
+  filesystem layout of the machine running it.**
+  ⚠ **Two possibilities and they need separating, in this order:** (1) the GATE genuinely does not refuse the
+  escape, and the main checkout only appears green by accident — in which case `JOB-CONFIG-THIRD-PRODUCER-1`'s
+  fix is incomplete and a bundle can plant an escaping job path today; or (2) the gate holds and only the TEST
+  is fragile. ⛔ Do not "fix" the test to make it green until that is settled — that is how a real gate gets
+  papered over.
+  ⚠ **This also means CI's verdict and a local verdict can disagree on a security control**, and a fresh clone
+  is the CI case. → `okf/backend/config/config-safety.md`
 
 - ~~**P3** · **`CITATION-GUARD-SCOPE-1`**~~ ✅ **FILED AND SHIPPED 2026-09-17 — recorded struck so the
   provenance exists without adding an open row.** The **seventh** instance of the allow-list shape in
@@ -1799,17 +1838,36 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⚠ `Finding` already carries an optional stable `code` (`FindingCodes`, `ERR_`/`WARN_`), so "stable error
   code" is infrastructure, not new design. Size: a §3 feature (new map, generator, two seams), not hygiene.
 
-- **P3** · **`COLUMN-TYPE-SECOND-INTERPRETER-1` — a second client-side reader of the same DuckDB type
-  spellings, and it disagrees** (filed 2026-09-16 from `TYPEFLOW-DATASET-COLUMNS-1`'s closing pass).
-  `inspecto-ui/src/app/inspecto/query/query-columns.ts:60` `dbColumnType` interprets the same DuckDB type
-  names as the Java `ResultSetDescriptor.columnType` and **disagrees on four**: `BIGINT[]`, `STRUCT(...)`
-  and `MAP(...)` → `number` where Java says `string`, and `LOGICAL` → `string` where Java says `boolean`.
-  ⚠ **It is NOT unguarded** — it is pinned as a **documented exclusion** in both `column-role.spec.ts` and
-  the derivation plan, deliberately, because it serves the **query builder** and not stored Datasets, so
-  reconciling it is a query-builder behaviour change rather than a contract widening. ⛔ Do not "fix" it by
-  widening the column-role contract: that would silently change what the query builder renders. The
-  decision owed first is whether the two readers should share one vocabulary at all.
-  → `okf/backend/engine/catalog-vs-executors.md`
+- ~~**P3** · **`COLUMN-TYPE-SECOND-INTERPRETER-1`**~~ ✅ **SHIPPED 2026-09-17 — it was ONE substring bug, not
+  five product decisions.** `dbColumnType` matched with **unanchored** regexes over the whole string, so `INT`
+  matched inside `INTERVAL`, `BIGINT[]` and `STRUCT(a INTEGER)`, and `TIME` inside `MAP(VARCHAR, TIMESTAMP)`.
+  Nobody chose those buckets. The body is now `ResultSetDescriptor.columnType`'s algorithm token for token
+  (including the `cut > 0` guard), with the already-coarse pass-through kept as explicit cases because
+  `/db/query` sends pre-normalized names and that is the LIVE path.
+  ✅ Pinned to `column-role.contract.json`'s `duckdbTypeCases` — the same fixture the Java
+  `ColumnRoleContractTest` reads — with a length guard so an emptied fixture cannot make the loop vacuous.
+  ⛔ The contract was NOT widened and the Java reader was NOT touched, which is what keeps this inside the
+  row's own ⛔.
+  🔴 **The recorded rationale was false.** `column-role.spec.ts` justified the divergence with *"the client
+  never maps DuckDB names for a stored Dataset"* — contradicted by `dataset-rows.service.ts` in the same folder.
+  Paragraph deleted. ⇒ **a stated blocker is a hypothesis too.**
+  ⚠ **Severity corrected DOWN, honestly:** all three callers hit `/db` routes that already return the coarse
+  names; raw DuckDB spellings reach the client only on `ops:*` groups, which no caller uses. An earlier claim
+  that `INTERVAL` was a LIVE broken filter was overstated — this is defence-in-depth on a live seam.
+  ⚠ Left open deliberately: under Postgres, `ops:*` groups return `int4`/`int8`/`float8`, which BOTH readers
+  now map to `string` (the old regex got them right by accident). Unreachable today; fixing it means widening
+  the contract. Original row follows.
+  - **P3** · **`COLUMN-TYPE-SECOND-INTERPRETER-1` — a second client-side reader of the same DuckDB type
+    spellings, and it disagrees** (filed 2026-09-16 from `TYPEFLOW-DATASET-COLUMNS-1`'s closing pass).
+    `inspecto-ui/src/app/inspecto/query/query-columns.ts:60` `dbColumnType` interprets the same DuckDB type
+    names as the Java `ResultSetDescriptor.columnType` and **disagrees on four**: `BIGINT[]`, `STRUCT(...)`
+    and `MAP(...)` → `number` where Java says `string`, and `LOGICAL` → `string` where Java says `boolean`.
+    ⚠ **It is NOT unguarded** — it is pinned as a **documented exclusion** in both `column-role.spec.ts` and
+    the derivation plan, deliberately, because it serves the **query builder** and not stored Datasets, so
+    reconciling it is a query-builder behaviour change rather than a contract widening. ⛔ Do not "fix" it by
+    widening the column-role contract: that would silently change what the query builder renders. The
+    decision owed first is whether the two readers should share one vocabulary at all.
+    → `okf/backend/engine/catalog-vs-executors.md`
 
 - ~~**P3** · **`ACQUIRE-LEDGER-SHARED-URL-1`**~~ ✅ **BUILT + VERIFIED 2026-09-16** (3805/0/0/8 in the MAIN checkout, `ServiceBootstrapLedgerTest` 3/3 observed to RUN). Fixed at `ServiceBootstrap.buildFrom` by resolving through `OperationalDb.urlFor` and registering, gated on `root.config() == null` so a per-space boot does not double-register. 🔴 **Reachability is what made it a live bug, not a theoretical one:** `SpaceBootstrap.java:39` was the ONLY registration site in the repo, and the legacy/CLI space never passes through it (`SpaceManager.single():74-79` ← `ServiceBootstrap.build:41` ← `CollectorService.fromArgs:1815`) ⇒ a single-tenant Standard deployment on a shared operational DB kept its dedup ledger in a local working-directory DuckDB file, SILENTLY, while every other family moved. ⚠ **The parent row's Maven cycle is REAL and was re-confirmed** (`inspecto/pom.xml:96`; `inspecto-acquire` is a leaf and `SpaceRoot` is invisible to it) — it does NOT block this row, because the resolution happens on the `inspecto` side and never inside the leaf. ⇒ **That distinction is the lesson: a refuted PARENT does not refute a child row; ground the child's own seam.** Original row follows.
   - **P3** · **`ACQUIRE-LEDGER-SHARED-URL-1` — a second source of truth for the ledger URL** (filed
@@ -2429,16 +2487,32 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     ⚠ That asymmetry is itself worth recording: a descriptor is a UI/API contract, not the read set.
     → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1` — nine job params are read but declared by nobody.**
-  Filed 2026-09-17 out of `JOB-PARAM-UNDECLARED-UNREPORTED-1`, which MEASURED them rather than inferring them:
-  `data_dir`, `batch_id`, `flow` (`PipelineJobRunner`), `on_pipeline_gate` (`JobService:769`), `sleep_ms`
-  (`MaintenanceJob:224`), `top` (`StorageReportTask`/`StorageTrendTask`), `history_days`
-  (`ReferenceCompactor:98`), `max_attempts`/`backoff_minutes` (`SoftBounceRetryTask`). Each is a descriptor
-  that **lies to the authoring form**: `MaintenanceJob`'s `sleep_ms` and `StorageReportTask`'s `top` cannot be
-  offered, typed or bounded by any UI because no `ParameterDecl` names them. Same defect class the `min_files`
-  and `materialize` comments in `JobService.java` record as already fixed — these are the survivors.
-  ⛔ **Not a drive-by:** declaring them changes the published `GET /jobs/types/{id}` contract, so it needs its
-  own call. → `okf/backend/control-plane/jobs.md`
+- ~~**P2** · **`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`**~~ ✅ **SHIPPED 2026-09-17 — seven declared, two
+  deliberately not.** Each `defaultValue` is the literal the reading code already passes to `opt()`, and a
+  bound appears ONLY where that code already throws (`max_attempts >= 1`, `backoff_minutes >= 0`).
+  ⛔ **`top` is declared UNBOUNDED on purpose** — neither `StorageReportTask` nor `StorageTrendTask` refuses any
+  value, so `.min(1)` would be a new refusal invented by a declaration rather than a description of one.
+  `data_dir`/`batch_id` carry NO `defaultValue`: their fallbacks are computed at run time, so the fallback is
+  stated in the `description`.
+  ✅ **A declaration is NOT inert** — `itemViolation` runs only over declared decls, so declaring newly switches
+  on type parsing, bounds and `$`-expression resolution, where an unregistered token ⇒ REJECTED. The corpus was
+  therefore re-derived, and **the design pass's own glob was wrong**: `*_job.toon` structurally misses
+  `*_job_template.toon` and undercounts by three files. Re-run over all **218** tracked `*.toon`: `data_dir` × 7
+  (all literal `out`, all `type: pipeline`), the other six × 0, no `$` values ⇒ **zero rejections**.
+  ✅ **Two mutants proving two INDEPENDENT things:** deleting declarations reds the per-key assertions; changing
+  `top` to `.min(1)` with the declaration intact reds *"'top' must stay UNBOUNDED"* — so the DECISION is
+  guarded, not merely the declaration. ⚠ Stated honestly: the `defaultValue` equalities are not separately
+  mutation-proven. Original row follows.
+  - **P2** · **`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1` — nine job params are read but declared by nobody.**
+    Filed 2026-09-17 out of `JOB-PARAM-UNDECLARED-UNREPORTED-1`, which MEASURED them rather than inferring them:
+    `data_dir`, `batch_id`, `flow` (`PipelineJobRunner`), `on_pipeline_gate` (`JobService:769`), `sleep_ms`
+    (`MaintenanceJob:224`), `top` (`StorageReportTask`/`StorageTrendTask`), `history_days`
+    (`ReferenceCompactor:98`), `max_attempts`/`backoff_minutes` (`SoftBounceRetryTask`). Each is a descriptor
+    that **lies to the authoring form**: `MaintenanceJob`'s `sleep_ms` and `StorageReportTask`'s `top` cannot be
+    offered, typed or bounded by any UI because no `ParameterDecl` names them. Same defect class the `min_files`
+    and `materialize` comments in `JobService.java` record as already fixed — these are the survivors.
+    ⛔ **Not a drive-by:** declaring them changes the published `GET /jobs/types/{id}` contract, so it needs its
+    own call. → `okf/backend/control-plane/jobs.md`
 
 - ~~**P3** · **`PACKHARNESS-NO-UNDECLARED-1`**~~ ✅ **SHIPPED 2026-09-17 — and the row held IN FULL, which is
   not this board's usual outcome.** `PackTestHarness.fire` already held a real `ParameterResolver.Resolution`
@@ -2488,12 +2562,26 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     DERIVED, not authored). Fixing it means lifting the check into `ReferenceCompactor.run(cfg)` — a different
     shape. → `okf/backend/control-plane/jobs.md`
 
-- **P3** · **`BITEMPLATES-GATE-ORDER-1` — `BiTemplates.apply` runs 409 before 422.**
-  Filed 2026-09-17 when the `validateKind` gate landed there. The `endpoint` skill mandates spec/422 BEFORE
-  conflict/409; `apply` checks the existing-id conflict first, so validation was placed after it to keep that
-  change surgical. ⚠ **Observable only when a template is BOTH conflicting and invalid**, which no curated
-  template can be today — severity is ordering-consistency, not behaviour.
-  → `okf/backend/config/config-safety.md`
+- ~~**P3** · **`BITEMPLATES-GATE-ORDER-1`**~~ ✅ **SHIPPED 2026-09-17 — and there were TWO inversions, not
+  one.** A single interleaved loop let component 1's 409 beat its own 422 (the row's case) **and** component
+  1's 409 beat component 2's 422. The `endpoint` skill's gates are properties of the REQUEST, not of a loop
+  iteration — which is the part the row missed. Now pass 1 validates every component (422), pass 2 checks every
+  conflict (409), then the writes run; all-or-nothing is tightened, since both refusal passes complete before
+  the first `store.write`.
+  ⛔ **No test, deliberately** — reaching the 422 branch means faking the gallery, and a test that cannot fail
+  is this repo's most-repeated failure mode. The build-time `everyTemplateWritesABodyTheAuthoringRouteAccepts`
+  already pins what keeps the branch dark.
+  🔴 **A false claim was caught BEFORE it shipped:** the lane asserted `validateKind` does not constrain
+  `widget`/`dashboard` at all. It does — its LAST line is the `CENSUSED_COMPONENT_KINDS` census, and a bogus
+  key on a template widget was mutation-proven to 422. The gate is dark because the BODIES are hardcoded and
+  valid, not because the kinds are unguarded. ⚠ That same file had already lost a day to a false claim recorded
+  in a javadoc; the corrected text is now in the code. Original row follows.
+  - **P3** · **`BITEMPLATES-GATE-ORDER-1` — `BiTemplates.apply` runs 409 before 422.**
+    Filed 2026-09-17 when the `validateKind` gate landed there. The `endpoint` skill mandates spec/422 BEFORE
+    conflict/409; `apply` checks the existing-id conflict first, so validation was placed after it to keep that
+    change surgical. ⚠ **Observable only when a template is BOTH conflicting and invalid**, which no curated
+    template can be today — severity is ordering-consistency, not behaviour.
+    → `okf/backend/config/config-safety.md`
 
 - ~~**P3** · **`DOC-COUNTS-GUARD-SCOPE-1`**~~ ✅ **SHIPPED 2026-09-17 — fixed at the SHAPE, and falsified
   THREE ways, not two.** `check-doc-counts.mjs` now walks `ROOTS = ['.']` minus the sibling's `SKIP_DIRS`,
