@@ -142,7 +142,7 @@ final class ConnectionRoutes implements RouteModule {
         } catch (AcquisitionException e) {
             throw new ApiException(502, "explore failed: " + e.getMessage());
         } catch (ConnectionWorkbench.PathEscape e) {
-            throw new ApiException(403, e.getMessage());
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, e.getMessage());
         } catch (ConnectionWorkbench.NoSuchPath e) {
             throw new ApiException(404, e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -158,7 +158,7 @@ final class ConnectionRoutes implements RouteModule {
         } catch (AcquisitionException e) {
             throw new ApiException(502, "sample failed: " + e.getMessage());
         } catch (ConnectionWorkbench.PathEscape e) {
-            throw new ApiException(403, e.getMessage());
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, e.getMessage());
         } catch (ConnectionWorkbench.NoSuchPath e) {
             throw new ApiException(404, e.getMessage());
         } catch (IllegalArgumentException e) {

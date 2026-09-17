@@ -134,7 +134,7 @@ final class DeliveryStatusRoutes implements RouteModule {
             // The audit record D8 asks for comes free: ControlApi.dispatch records every request with its
             // status, so a rejected callback lands in the trail as a 403 on this path. Nothing is written
             // to any receipt before this point.
-            throw new ApiException(403, "delivery-status callback signature rejected");
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "delivery-status callback signature rejected");
         }
 
         List<DeliveryEvent> events = adapter.parse(raw);

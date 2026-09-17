@@ -95,7 +95,7 @@ final class AgentRoutes implements RouteModule {
                 result = agentOr503(api).deriveTool(tool, prompt, mapField(body.get("args")), actorOrOperator(e))
                         .orElseThrow(() -> new ApiException(404, "unknown tool: '" + tool + "'"));
             } catch (IllegalStateException mutating) {
-                throw new ApiException(403, mutating.getMessage());
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, mutating.getMessage());
             } catch (UnsupportedOperationException noModel) {
                 throw new ApiException(503, noModel.getMessage());
             }
@@ -122,7 +122,7 @@ final class AgentRoutes implements RouteModule {
                 result = agentOr503(api).runTool(tool, mapField(api.body(e).get("args")), actorOrOperator(e))
                         .orElseThrow(() -> new ApiException(404, "unknown tool: '" + tool + "'"));
             } catch (IllegalStateException mutating) {
-                throw new ApiException(403, mutating.getMessage());
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, mutating.getMessage());
             }
             if (!Boolean.TRUE.equals(result.get("ok"))) {
                 Object error = result.get("error");

@@ -163,10 +163,16 @@ class ControlApiAuthSessionV1Test {
             assertTrue(authEvent(events, "auth.refresh", "AUDIT", 200), "a granted refresh is audited");
             assertTrue(authEvent(events, "auth.refresh", "ACCESS_DENIED", 401), "a refused refresh is audited");
             assertTrue(authEvent(events, "auth.logout", "AUDIT", 200), "a logout is audited");
+            // AUDIT-AUTH-DUPLICATE-ROW-1: exactly ONE row per session event. The generic interceptor used
+            // to classify these same requests as "auth.created"/data_mutation beside the typed row, so an
+            // auditor counting sign-ins counted each one twice.
             for (var e : events) {
                 String text = String.valueOf(e);
                 assertFalse(text.contains("good-code") || text.contains("rt-1") || text.contains("rt-2"),
                         () -> "no code or token may reach the audit log: " + text);
+                if (e.get("attributes") instanceof java.util.Map<?, ?> a)
+                    assertNotEquals("auth.created", a.get("action"),
+                            () -> "the generic interceptor must leave /auth/* to its typed emitter: " + text);
             }
         }
     }

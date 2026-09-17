@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **72<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 26<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **70<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -169,8 +169,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 0<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 26<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 72<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 70<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1499,7 +1499,30 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   (`grep RateLimit|rate.limit` → nothing) on `/db/query`, `/bi/query`, `/recon/*` or `/agent/*`; one
   authenticated client can saturate DuckDB or spend model tokens without bound. Fix: a per-subject
   token-bucket stage in the `ControlApi` dispatch chain scoped to those prefixes.
-- **P3** · **`ERRORCODE-DEFAULTED-1`** — `ApiException` carries an explicit `ErrorCodes` constant at 15 of 648
+- **P3** · 🔶 **`ERRORCODE-DEFAULTED-1` — the 403 SLICE IS DONE 2026-09-17; the file sweep remains, and
+  this row's OWN NUMBERS for it were WRONG.** Premise confirmed: `ErrorCodes.defaultFor(403)` is
+  `PATH_JAIL_VIOLATION`, so a share mismatch and a bad provider signature were both telling the client a
+  path escaped a jail. ⚠ **The row named two sites; there were TWELVE bare of twenty** — all now explicit,
+  and **zero bare 403 sites remain repo-wide**: `PERMISSION_DENIED` at `ShareRoutes:111`,
+  `DeliveryStatusRoutes:137`, `AgentRoutes:98/:125`, `ExchangeRoutes:293/:318`; and `PATH_JAIL_VIOLATION`
+  now STATED at the six that genuinely are jail refusals (`ConfigPreviewRoutes:74`,
+  `ConnectionRoutes:145/:161`, `DbBrowserRoutes:182`, `PipelineGraphRoutes:514`, `RunRoutes:208`,
+  `WriteGates:57`) — the default was right there, and saying so stops the next reader re-deriving it.
+  ✅ **No new constant, and no UI risk:** `PERMISSION_DENIED` already exists and is already in the SPA's
+  `V1ErrorCode` union; the SPA maps only `CONFLICT_STALE_VERSION` to behaviour, everything else renders
+  generically ⇒ no client degradation.
+  ⚠ **Structural change, deliberate:** `ErrorCodes` and its constants became **public** (`defaultFor` stays
+  package-private). It was package-private, so `ExchangeRoutes` — in another module — literally could not
+  name a code despite `ApiException`'s public 3-arg constructor. Not annotated `@PublicApi`, which in this
+  repo marks INTENT rather than exposure. `ApiContractTest` still pins the catalog, 5/5.
+  🔴 **The row's sweep figure is REFUTED and must not be used to plan the rest:** it says
+  *“`RunRoutes`, `ComponentRoutes`, `AgentRoutes` lead with 9 bare sites each”*. Re-derived:
+  `ComponentRoutes` **36** · `inspecto-ops/ObjectRoutes` **34** (a module the row missed ENTIRELY) ·
+  `PipelineGraphRoutes` 30 · `ExchangeRoutes` 30 · `ReconRoutes` 26 · `AgentRoutes` 22 · `RunRoutes` 21 —
+  wrong by ~3×. **620 of 648 sites remain bare, none of them 403.** ⛔ Re-derive the counts per file rather
+  than trusting this row.
+
+  - **P3** · **`ERRORCODE-DEFAULTED-1` (original row)** — `ApiException` carries an explicit `ErrorCodes` constant at 15 of 648
   throw sites; the rest take `ErrorCodes.defaultFor(status)` (`ErrorCodes.java:29-41`), whose `case 403`
   is `PATH_JAIL_VIOLATION` — so `ShareRoutes.java:111` (a dataset/share mismatch) and
   `DeliveryStatusRoutes.java:137` (a bad provider signature) tell the client a path escaped a jail. Fix: code
@@ -1659,7 +1682,27 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   the ~32 MB jar staged into EVERY edition, so a transitive logging binding can duplicate the core's on the
   assembled classpath. Fix: copy the agent's exclude block and assert one `SLF4JServiceProvider` on the
   bundle classpath in the packaging smoke.
-- **P3** · **`LEGACY-ASN-SRC-TREE-UNBUILT-1`** — `asn-parser/src/` holds 66 Java files that no pom compiles (`asn-parser/pom.xml` does not exist;
+- **P3** · 🔴 **`LEGACY-ASN-SRC-TREE-UNBUILT-1` — PREMISE REFUTED 2026-09-17, and its REMEDY WOULD HAVE
+  DELETED COMPILED SOURCE.** ⛔ **45 of the 66 files ARE compiled**, and not in theory: `legacy-code/pom.xml`
+  declares `<sourceDirectory>../../src/main/java</sourceDirectory>`, which resolves from
+  `asn-parser/asn-decoders/legacy-code/` to exactly **`asn-parser/src/main/java`**; `legacy-code` is an
+  UNCONDITIONAL `<module>` of `asn-parser/asn-decoders/pom.xml` (not profile-gated), and
+  `legacy-code/target/classes` holds **41 `.class` files** from a real build. ⇒ *“no pom compiles”* is false.
+  ⚠ **The row's own disclaimer is exactly backwards.** It says *“Not the same subject as the refuted
+  `BACKLOG-STALE-LEGACY-POM-1` (that was `legacy-code/pom.xml`)”* — but `legacy-code/pom.xml` is precisely
+  what compiles this tree, so it is the SAME subject, and this row repeats the very claim that was retracted.
+  🔴 **Two false zeros in one lineage now**: the first from `ls -d legacy-code` at the repo root (a nested
+  path), this one from *“`asn-parser/pom.xml` does not exist”* — true, and irrelevant, because the compiling
+  pom is one level down with a `..`-relative source root. ⛔ **A module's source root need not live under its
+  own directory**; grep `<sourceDirectory>` before concluding a tree is unbuilt.
+  ✅ **What survives, narrowed to what is true:** the **21 files under `asn-parser/src/test/`** are genuinely
+  unbuilt — `legacy-code/pom.xml` sets no `testSourceDirectory` and has no `target/test-classes`. And the
+  original irritant stands: the compiled `main` tree still shadows current types with superseded
+  `ByteSource`/`TxConfig`/`Tag` twins that greps and refactors keep hitting.
+  ⇒ **Re-scoped:** decide the 21 test files (wire them or delete them), and treat the shadowing twins as a
+  rename/deprecation question. ⛔ **Do NOT delete `asn-parser/src/main/java`** — 41 classes ship from it.
+
+  - **P3** · **`LEGACY-ASN-SRC-TREE-UNBUILT-1` (original row)** — `asn-parser/src/` holds 66 Java files that no pom compiles (`asn-parser/pom.xml` does not exist;
   the root aggregates `asn-parser/asn-decoders` only), shadowing current types
   with superseded `ByteSource`/`TxConfig`/`Tag` twins that greps and refactors keep hitting. ⚠ Not the same
   subject as the refuted `BACKLOG-STALE-LEGACY-POM-1` (that was `legacy-code/pom.xml`). Fix: delete the tree
@@ -1910,14 +1953,37 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   Measured 0 violations in `layout`, 0 in `core`, 0 overall — widening cost nothing, so nothing was narrowed.
   ⚠ `src/styles/splash-screen.css` (3 hex values) stays OUT deliberately: it paints the pre-boot splash, before
   any `--gamma-*` var exists to read. Original row follows.
-  - **P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`** — `inspecto-ui/tools/check-design-tokens.mjs` scans
+  - ~~**P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`**~~ ✅ **CLOSED 2026-09-17 — RANK DRIFT, already shipped.**
+  `check-design-tokens.mjs:31` already reads `ROOTS = ['src/app']`, widened in `edf6a8c0` earlier the same
+  day — **wider than this row asked**: scoping the parent covers `layout/**` AND `core/**`, and makes
+  in-scope the DEFAULT, so a new directory under `src/app` cannot be silently unguarded again. Zero edits.
+  ✅ **The green was not taken at face value** — because a guard's scope is a silent exemption, it was
+  mutation-probed: an injected `#abcdef` in `layout.component.scss` drives the guard to **exit 1** naming
+  the file, so it genuinely reaches the shell rather than merely reporting absence. Probe reverted.
+
+  - **P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1` (original row)** — `inspecto-ui/tools/check-design-tokens.mjs` scans
     `src/app/inspecto` and `src/app/modules/admin` only, so `src/app/layout/**` (the shell every user sees)
     may hardcode colours unguarded; zero violations today. Fix: add `src/app/layout` to `ROOTS`.
 - **P3** · **`API-DEAD-METHODS-1`** — five exported service methods have no caller in the SPA:
   `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, `config.service.ts:180,
   187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended
   feature that never got a pane. Fix: a product call — wire or delete; not a mechanical delete.
-- **P3** · **`SIGN-IN-NO-SPEC-1`** — `modules/admin/session/sign-in.component.ts` has an a11y spec only;
+- ~~**P3** · **`SIGN-IN-NO-SPEC-1`**~~ ✅ **CLOSED 2026-09-17 — and the row named the WRONG FILE.**
+  🔴 The **authorize** and **mock-code** branches are not in `sign-in.component.ts` at all: that component's
+  `signIn()` delegates unconditionally, and the branch is `SessionService.beginLogin`
+  (`session.service.ts:189`). Both were **untested ANYWHERE** — the only prior `beginLogin` reference in any
+  spec was a `vi.fn()` call-count assert. ⛔ Writing the spec where the row pointed would have tested a
+  delegation and left the branches uncovered.
+  ⚠ **The `mockAuthMode` dev switch named in an older javadoc DOES NOT EXIST** and was deliberately not
+  tested — `session.service.ts:64` documents its absence; `auth.mock` arrives on the `/bootstrap` payload.
+  ✅ Added `sign-in.component.spec.ts` (5 tests: the `ngOnInit` bounce, the one-shot `signInFailed` flag, the
+  busy latch) and 2 tests in `session.service.spec.ts` for the authorize URL (**`code_challenge_method=S256`
+  asserted**, challenge ≠ stored verifier, state matching storage) and the mock branch. **Both
+  mutation-tested** — disabling the `removeItem` and forcing `oidc?.mock` false each fail the right test.
+  ⚠ Unit specs only; the sign-in screen has still never been driven in a browser. UI 3012/0 (5 skipped),
+  eslint 0, typecheck clean.
+
+  - **P3** · **`SIGN-IN-NO-SPEC-1` (original row)** — `modules/admin/session/sign-in.component.ts` has an a11y spec only;
   no behaviour spec covers the authorize/mock-code branches. Fix: add one.
 - ~~**P3** · **`JOBRUN-STORE-SWALLOWED-WRITES-1`**~~ ✅ **CLOSED 2026-09-17 — and the row's COUNT was
   REFUTED.** It claimed eight swallowed audit writes in `DbJobRunStore` plus three in `JobRunLedger`. Verified
@@ -1949,7 +2015,19 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   `ReferenceCompactor.java:292`, `RunArtifactStore.java:60`, `RunLogStore.java:50` and `CommitLog.java:85`
   read whole journal files into memory on every read with no cap. Demand-gated: stream or tail once a
   file is measured to matter.
-- **P3** · **`AUDIT-AUTH-DUPLICATE-ROW-1`** — the generic `AuditTrail.record` interceptor also classifies
+- ~~**P3** · **`AUDIT-AUTH-DUPLICATE-ROW-1`**~~ ✅ **FIXED 2026-09-17.** Confirmed exactly as filed: the
+  generic interceptor (`ControlApi.routeDispatch:790` → `AuditTrail.record`) classified
+  `POST /auth/{exchange,refresh,logout}` as `auth.created` / `data_mutation` **beside** the typed
+  `authentication` row, so every successful sign-in, refresh and sign-out wrote **TWO auditor-facing rows**.
+  `AuditTrail.classify` now skips `/auth/`; the surviving row is the TYPED one (better classification, and
+  the one `compliance/evidence/audit-log-extraction.md:26-27` already describes).
+  ✅ **Checked before deleting, not after:** a repo-wide grep for `auth.created` found **zero** references in
+  code, tests, docs or compliance, and no report asserted the doubled number. ⚠ **Refusals were never
+  doubled** — a 401 throws before `record` is reached — so the over-count was exactly one extra row per
+  SUCCESSFUL session event. `AuditTrailTest` 4/4 + a no-`auth.created` assertion in
+  `ControlApiAuthSessionV1Test` 8/8. → `okf/capabilities/observability/observability.md` §Layer 3
+
+  - **P3** · **`AUDIT-AUTH-DUPLICATE-ROW-1` (original row)** — the generic `AuditTrail.record` interceptor also classifies
   the auth routes as `auth.created <route>` (`data_mutation`) beside the typed `auth.exchange`/`auth.refresh`/
   `auth.logout` rows added 2026-09-17, so every sign-in writes two rows. Fix: teach `AuditTrail.classify`
   to skip `/auth/*`.

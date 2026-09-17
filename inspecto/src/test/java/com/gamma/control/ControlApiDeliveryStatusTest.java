@@ -109,7 +109,10 @@ class ControlApiDeliveryStatusTest {
             seed(c.svc, "d1", "n1");
             String hardBounce = event("d1", DeliveryStatus.BOUNCED_HARD, 2000L);
 
-            assertEquals(403, callback(c.port, "test", hardBounce, "wrong").statusCode());
+            HttpResponse<String> wrongSig = callback(c.port, "test", hardBounce, "wrong");
+            assertEquals(403, wrongSig.statusCode());
+            // ERRORCODE-DEFAULTED-1: a rejected provider signature used to default to PATH_JAIL_VIOLATION.
+            assertEquals("PERMISSION_DENIED", json(wrongSig).at("/error/errorCode").asText(), wrongSig.body());
             assertEquals(403, callback(c.port, "test", hardBounce, null).statusCode(), "absent signature");
 
             DeliveryReceipt after = c.svc.deliveryReceipts().get("d1").orElseThrow();

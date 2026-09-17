@@ -511,7 +511,7 @@ final class PipelineGraphRoutes implements RouteModule {
                 if (!Files.isRegularFile(p)) throw new ApiException(404, "no such file: " + f);
                 picked.add(p);
             } catch (ConnectionWorkbench.PathEscape e) {
-                throw new ApiException(403, "file '" + f + "' escapes the pipeline's source root");
+                throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "file '" + f + "' escapes the pipeline's source root");
             }
         }
 

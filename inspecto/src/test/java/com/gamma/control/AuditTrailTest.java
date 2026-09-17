@@ -37,4 +37,14 @@ class AuditTrailTest {
         assertNull(AuditTrail.classify("POST", "/assist/chat"));
         assertNull(AuditTrail.classify("GET", "/runs"), "ordinary reads are not audited");
     }
+
+    /** AUDIT-AUTH-DUPLICATE-ROW-1: the /auth/* routes emit their own typed `authentication` rows through
+     *  AuditTrail.authentication; classifying them here too wrote a second, mis-categorised row
+     *  ("auth.created", data_mutation) for every sign-in, refresh and sign-out. */
+    @Test
+    void leavesTheAuthRoutesToTheirTypedEmitter() {
+        assertNull(AuditTrail.classify("POST", "/auth/exchange"));
+        assertNull(AuditTrail.classify("POST", "/auth/refresh"));
+        assertNull(AuditTrail.classify("POST", "/auth/logout"));
+    }
 }

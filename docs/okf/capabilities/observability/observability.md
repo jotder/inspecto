@@ -258,7 +258,10 @@ user agent as attributes. Actor comes from `ApiContext.actor`; on Personal (no a
 default `appUser`. **Scope boundary, stated, do not overclaim:** the credential check itself (MFA,
 password, lockout) belongs to the IdP and is **not** in it. ✅ Since 2026-09-17 the *session lifecycle* IS:
 `auth.exchange` / `auth.refresh` / `auth.logout` (`AuditTrail.authentication`, category `authentication`),
-granted as `AUDIT` and refused as `ACCESS_DENIED`, with no code or token on the row. *Authorization*
+granted as `AUDIT` and refused as `ACCESS_DENIED`, with no code or token on the row. The generic
+interceptor **skips `/auth/*`** so these rows are not doubled — until 2026-09-17 it also classified the
+same requests as `auth.created` (`data_mutation`), so every sign-in wrote two rows
+(`AUDIT-AUTH-DUPLICATE-ROW-1`; an over-count in auditor-facing data). *Authorization*
 decisions are in it too (`access.denied`/`access.granted`, ABAC A5). Secrets are scrubbed at `EventLog.emit`, not here.
 
 **Durability claims, exactly.** The trail is **append-only by construction** — one write seam, no update

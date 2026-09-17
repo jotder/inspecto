@@ -54,7 +54,7 @@ public final class WriteGates {
     public static Path jail(Path root, Path target, String what) {
         Path normalized = target.normalize();
         if (!PathJail.contains(root, normalized))
-            throw new ApiException(403, what + " escapes the write root");
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, what + " escapes the write root");
         return normalized;
     }
 

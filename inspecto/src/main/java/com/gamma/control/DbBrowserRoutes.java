@@ -179,7 +179,7 @@ final class DbBrowserRoutes implements RouteModule {
         if (dataRoot == null) throw new ApiException(404, "no data directory for this space");
         Path root = dataRoot.normalize();
         Path storeDir = root.resolve(storeName).normalize();
-        if (!storeDir.startsWith(root)) throw new ApiException(403, "store path escapes the data root");
+        if (!storeDir.startsWith(root)) throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "store path escapes the data root");
         Path browseDir = pipelineDatabaseDir(api, storeName).orElse(storeDir);
         if (!Files.isDirectory(browseDir)) throw new ApiException(404, "no store '" + storeName + "'");
 

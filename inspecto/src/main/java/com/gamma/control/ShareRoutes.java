@@ -108,7 +108,7 @@ final class ShareRoutes implements RouteModule {
             throw new ApiException(422, bad.getMessage());
         }
         if (!allowedDatasets(store, dashboard).contains(spec.dataset()))
-            throw new ApiException(403, "this share link does not cover dataset '" + spec.dataset() + "'");
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "this share link does not cover dataset '" + spec.dataset() + "'");
 
         List<Finding> findings = SqlGuard.check(sql);
         if (!findings.isEmpty()) throw new ApiException(422, "compiled query failed the SQL safety check");

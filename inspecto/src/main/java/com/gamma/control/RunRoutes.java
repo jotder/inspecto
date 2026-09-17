@@ -205,7 +205,7 @@ final class RunRoutes implements RouteModule {
         if (file == null || file.isBlank())
             throw new ApiException(400, "?file= is required (the input file's name)");
         if (file.contains("/") || file.contains("\\") || file.contains(".."))
-            throw new ApiException(403, "?file= must be a bare file name, not a path");
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "?file= must be a bare file name, not a path");
 
         String wanted = com.gamma.etl.CsvIngester.stripExtensions(file) + "_errors.csv";
         Path found = locateErrorsFile(cfg, wanted);

@@ -113,8 +113,14 @@ class ControlApiShareTest {
             assertEquals(200, ok.statusCode(), ok.body());
 
             // …but the token is NOT a general data API: an unreferenced dataset is refused.
-            assertEquals(403, post(c.port, "/public/dashboards/" + token + "/query",
-                    "{\"dataset\":\"secret_ds\",\"measures\":[{\"agg\":\"count\"}]}").statusCode());
+            HttpResponse<String> refused = post(c.port, "/public/dashboards/" + token + "/query",
+                    "{\"dataset\":\"secret_ds\",\"measures\":[{\"agg\":\"count\"}]}");
+            assertEquals(403, refused.statusCode());
+            // ERRORCODE-DEFAULTED-1: this 403 took ErrorCodes.defaultFor(403) = PATH_JAIL_VIOLATION, which
+            // told the client a path had escaped a jail. A share token not covering a dataset is a
+            // permission decision, and the code is part of the v1 contract the SPA reads.
+            assertEquals("PERMISSION_DENIED",
+                    V1Body.envelope(refused.body()).at("/error/errorCode").asText(), refused.body());
         }
     }
 

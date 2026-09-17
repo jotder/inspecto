@@ -71,7 +71,7 @@ final class ConfigPreviewRoutes implements RouteModule {
             throw new ApiException(400, "query parameter 'pipeline' is required");
         // A bare config key, never a path: refuse separators outright rather than jailing a path.
         if (pipeline.contains("/") || pipeline.contains("\\") || pipeline.contains(".."))
-            throw new ApiException(403, "'pipeline' must be a bare pipeline name, not a path");
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'pipeline' must be a bare pipeline name, not a path");
 
         PipelineConfig cfg = api.service().configFor(pipeline)
                 .orElseThrow(() -> new ApiException(404, "no pipeline named '" + pipeline + "'"));

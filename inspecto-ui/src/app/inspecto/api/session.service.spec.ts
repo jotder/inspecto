@@ -212,6 +212,48 @@ describe('SessionService (W6d edition switch)', () => {
         await done;
     }
 
+    // SIGN-IN-NO-SPEC-1: the two beginLogin branches. They were filed against SignInComponent, but the
+    // component only delegates — the authorize/mock-code split is decided here.
+    it('beginLogin builds an Auth-Code + PKCE authorize URL and leaves the SPA', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({ authorizeUrl: 'https://idp/authorize', clientId: 'spa-1', scopes: 'openid email' });
+
+        await svc.beginLogin();
+
+        const url = new URL(assign.mock.calls[0][0] as string);
+        expect(url.origin + url.pathname).toBe('https://idp/authorize');
+        expect(url.searchParams.get('response_type')).toBe('code');
+        expect(url.searchParams.get('client_id')).toBe('spa-1');
+        expect(url.searchParams.get('scope')).toBe('openid email');
+        expect(url.searchParams.get('redirect_uri')).toBe(`${window.location.origin}/auth/callback`);
+        // PKCE must be S256 — a `plain` challenge would defeat the interception defence entirely.
+        expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+        const challenge = url.searchParams.get('code_challenge') ?? '';
+        expect(challenge.length).toBeGreaterThan(0);
+        // The verifier is retained for the exchange, and is NOT the challenge sent over the wire.
+        const verifier = sessionStorage.getItem('inspecto.pkce.verifier');
+        expect(verifier).toBeTruthy();
+        expect(challenge).not.toBe(verifier);
+        // `state` is stored so completeLogin() can reject a mismatched round-trip.
+        expect(url.searchParams.get('state')).toBe(sessionStorage.getItem('inspecto.pkce.state'));
+        assign.mockRestore();
+    });
+
+    it('beginLogin in offline mock mode grants a fake code in-app and never leaves the SPA', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({ authorizeUrl: 'https://idp/authorize', clientId: 'spa-1', mock: true });
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+        await svc.beginLogin();
+
+        expect(assign).not.toHaveBeenCalled(); // there is no IAM to redirect to
+        expect(navigate).toHaveBeenCalledWith(['/auth/callback'], {
+            queryParams: { code: 'mock-code', state: sessionStorage.getItem('inspecto.pkce.state') },
+        });
+        navigate.mockRestore();
+        assign.mockRestore();
+    });
+
     // RP-Initiated Logout 1.0. Without this the Inspecto session ends but the IdP's SSO session does
     // not, so the next sign-in completes with no credential prompt (BACKLOG §5).
     it('logout redirects to the provider end_session_endpoint when one is configured', async () => {

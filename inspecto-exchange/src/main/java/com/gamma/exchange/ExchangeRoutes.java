@@ -2,6 +2,7 @@ package com.gamma.exchange;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 
 import com.gamma.event.Event;
@@ -290,7 +291,7 @@ public final class ExchangeRoutes implements RouteModule {
         String consumer = ApiContext.query(e, "consumer");
         if (consumer == null) throw new ApiException(400, "'consumer' query param is required");
         if (!ex.canRenderWidget(consumer, owner, item))
-            throw new ApiException(403, "no active grant to render widget " + owner + "/" + item);
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "no active grant to render widget " + owner + "/" + item);
         ComponentRegistry.Component c = ownerRegistry(api, owner).get("widget", item)
                 .orElseThrow(() -> new ApiException(404, "no widget '" + item + "' in space '" + owner + "'"));
         Map<String, Object> out = new LinkedHashMap<>();
@@ -315,7 +316,7 @@ public final class ExchangeRoutes implements RouteModule {
         String consumer = ApiContext.query(e, "consumer");
         if (consumer == null) throw new ApiException(400, "'consumer' query param is required");
         if (!ex.canRender(consumer, owner, Exchange.VIEW, item))
-            throw new ApiException(403, "no active grant to render view " + owner + "/" + item);
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "no active grant to render view " + owner + "/" + item);
         ComponentRegistry.Component c = ownerRegistry(api, owner).get(Exchange.VIEW, item)
                 .orElseThrow(() -> new ApiException(404, "no view '" + item + "' in space '" + owner + "'"));
         Map<String, Object> out = new LinkedHashMap<>();

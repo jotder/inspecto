@@ -183,8 +183,13 @@ final class AuditTrail {
         if (!"POST".equals(method) && !"PUT".equals(method) && !"DELETE".equals(method)) return null;
         // Non-mutating POSTs: diagnostics / previews / assist chat, and the user's own notification-feed
         // housekeeping (read/delete) — not part of the security audit trail.
+        // The /auth/* session routes emit their own typed rows through authentication() — category
+        // `authentication`, action auth.exchange/refresh/logout. Classifying them here as well wrote a
+        // SECOND row per sign-in ("auth.created", data_mutation), so the audit trail double-counted
+        // every session event and mis-categorised it (AUDIT-AUTH-DUPLICATE-ROW-1).
         if (path.endsWith("/test") || path.endsWith("/preview") || path.endsWith("/dry-run")
                 || path.equals("/validate") || path.startsWith("/assist")
+                || path.startsWith("/auth/")
                 || path.startsWith("/notifications")) return null;
 
         String last = lastSegment(path);
