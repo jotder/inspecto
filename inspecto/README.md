@@ -417,8 +417,10 @@ The agent is a separate module loaded in-process when present — it never bloat
 1. Build the whole reactor (`mvn clean package` at the repo root) so `inspecto-agent` is on
    the classpath.
 2. Provide a model: a local **Ollama** server (default; air-gapped-safe) or, in connected builds,
-   a hosted provider (Gemini/Claude/ChatGPT). Tiers auto-select per hardware profile
-   (dev-laptop / cpu-only / production).
+   a hosted provider (Gemini/Claude/ChatGPT). For Ollama you **declare** which built-in bundle to
+   use — `-Dagentkernel.profile=cpu-only|dev-laptop|production` (default `cpu-only`) — and that
+   bundle maps every model tier to a concrete model for you. Nothing probes the machine, so pick
+   the bundle that matches your hardware.
 3. Configure the `assist.read` / `assist.write` tokens.
 
 **Call a skill** (everything is confirm-first; state-changing skills return a *draft* `.toon`):
