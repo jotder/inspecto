@@ -219,6 +219,9 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     /** Per-instance {@code Idempotency-Key} replay cache for retryable writes (W5). */
     private final Idempotency.Store idempotency = new Idempotency.Store();
 
+    /** Per-subject token-bucket throttle for the expensive routes ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}). */
+    private final RateLimiter rateLimiter = new RateLimiter();
+
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
      * single-tenant entry point (and every test); behaviour is unchanged.
@@ -773,6 +776,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 AuditTrail.accessDenied(ex, method, path, ae.status);
                 throw ae;
             }
+            try {
+                rateLimit(ex, path);
+            } catch (ApiException ae) {
+                AuditTrail.accessDenied(ex, method, path, ae.status);
+                throw ae;
+            }
             authorize(ex, method, path);
             Object result;
             try {
@@ -870,6 +879,28 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         boolean granted = decision == AccessDecider.Decision.ALLOW;
         AuditTrail.policyDecision(ex, granted, action, path, null, null, policy);
         if (!granted) throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "denied by access policy");
+    }
+
+    /** Route prefixes throttled by {@link #rateLimit} ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}): each can
+     *  saturate DuckDB ({@code /db/query}, {@code /bi/query}, {@code /recon/*}) or spend model tokens
+     *  ({@code /agent/*}) without any other bound on request volume. */
+    private static boolean isRateLimited(String path) {
+        return path.equals("/db/query") || path.equals("/bi/query")
+                || path.startsWith("/recon/") || path.startsWith("/agent/");
+    }
+
+    /** Per-subject (falling back to the caller's IP when unauthenticated) token-bucket throttle for the
+     *  expensive routes above — a bound DuckDB/model-spend still has, since none of them has one of its
+     *  own. Runs after {@link #authenticate} so a {@link Subject}, when present, is the throttle key;
+     *  {@code 429 RATE_LIMITED} when the bucket is empty. */
+    private void rateLimit(HttpExchange ex, String path) {
+        if (!isRateLimited(path)) return;
+        String key = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> {
+            String ip = ApiContext.ip(ex);
+            return ip == null ? "unknown" : ip;
+        });
+        if (!rateLimiter.tryConsume(key))
+            throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + path + " — retry later");
     }
 
     /** The ABAC action verb for a request — the single source of truth shared by the {@link #authorize}

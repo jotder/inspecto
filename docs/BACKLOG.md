@@ -1504,10 +1504,15 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   (`CLIENT-HALVES-1`); two concurrent editors silently clobber each other — components are recoverable from
   the MET-5 `.history/`, pipelines and views are NOT. Fix: extend the `ETags`/`CONFLICT_STALE_VERSION`
   pattern to these write paths, or at minimum give `PipelineStore`/`ViewStore` the same history.
-- **P2** · **`NO-RATE-LIMIT-EXPENSIVE-ROUTES-1`** — no throttling exists anywhere in `com.gamma.control`
-  (`grep RateLimit|rate.limit` → nothing) on `/db/query`, `/bi/query`, `/recon/*` or `/agent/*`; one
-  authenticated client can saturate DuckDB or spend model tokens without bound. Fix: a per-subject
-  token-bucket stage in the `ControlApi` dispatch chain scoped to those prefixes.
+- ~~**P2** · **`NO-RATE-LIMIT-EXPENSIVE-ROUTES-1`**~~ ✅ **SHIPPED 2026-09-17.** Grounding confirmed: no
+  throttling existed anywhere in `com.gamma.control` on `/db/query`, `/bi/query`, `/recon/*` or `/agent/*`.
+  Added `RateLimiter`, a fixed-budget (burst 20, refill 1/3 req/s) in-memory token bucket keyed per
+  authenticated Subject (falling back to caller IP), wired into `ControlApi.routeDispatch` right after
+  the AuthN gate, scoped to exactly those four prefixes. An exhausted bucket answers `429 RATE_LIMITED`
+  in the existing error-body shape. `ControlApiRateLimitTest` + regression sweep
+  (`ControlApiDbBrowserTest`, `ControlApiBiQueryTest`, `ControlApiReconTest`, `CapabilityManifestTest`,
+  33 tests total) all pass, verified in a clean worktree at HEAD (the shared tree carries an uncommitted
+  `release=27` pom WIP that breaks local `-am` builds under this JDK 26 toolchain).
 - **P3** · 🔶 **`ERRORCODE-DEFAULTED-1` — the 403 SLICE IS DONE 2026-09-17; the file sweep remains, and
   this row's OWN NUMBERS for it were WRONG.** Premise confirmed: `ErrorCodes.defaultFor(403)` is
   `PATH_JAIL_VIOLATION`, so a share mismatch and a bad provider signature were both telling the client a

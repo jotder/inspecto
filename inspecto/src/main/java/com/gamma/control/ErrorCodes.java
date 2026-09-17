@@ -25,6 +25,8 @@ public final class ErrorCodes {
     public static final String UNAUTHENTICATED          = "UNAUTHENTICATED";
     /** 403 — an authenticated subject lacks the capability a route requires (Standard edition, W6). */
     public static final String PERMISSION_DENIED        = "PERMISSION_DENIED";
+    /** 429 — the per-subject token bucket for an expensive route is exhausted ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}). */
+    public static final String RATE_LIMITED             = "RATE_LIMITED";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     static String defaultFor(int status) {
