@@ -75,10 +75,10 @@ describe('column role contract', () => {
      * for a stored Dataset — it receives the coarse type — so what it pins here is that every published
      * mapping lands inside the vocabulary it can actually render.
      *
-     * ⚠ `query/query-columns.ts` `dbColumnType` is a SECOND client-side interpreter of raw SQL spellings,
-     * for the query builder rather than for a stored Dataset. It is deliberately NOT pinned to these cases
-     * yet: it disagrees on composites (`BIGINT[]`/`STRUCT`/`MAP` → `number`) and on `LOGICAL`, and
-     * reconciling it is a query-builder behaviour change outside this row.
+     * ⚠ `query/query-columns.ts` `dbColumnType` is the SECOND client-side interpreter of raw SQL spellings,
+     * for the query builder rather than for a stored Dataset. Since `COLUMN-TYPE-SECOND-INTERPRETER-1` it
+     * runs the same algorithm and is pinned to these same cases by `query/query-columns.spec.ts` — so all
+     * THREE readers move together, or one of the two specs goes red.
      */
     it('maps every published DuckDB type into the coarse vocabulary', () => {
         expect(COLUMN_ROLE_CONTRACT.duckdbTypeCases.length).toBeGreaterThanOrEqual(20);

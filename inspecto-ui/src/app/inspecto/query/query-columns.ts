@@ -55,14 +55,67 @@ export function columnType(columns: ColumnMeta[], field: string): ColumnType {
     return columns.find((c) => c.name === field)?.type ?? 'string';
 }
 
-/** Map a column type as the `/db` routes report it (already-normalized `number`/`string`, or raw
- *  DuckDB/Postgres spellings like `BIGINT`/`TIMESTAMP`) to a {@link ColumnType}. */
+/**
+ * Map a column type as the `/db` routes report it (already-normalized `number`/`string`/`date`/`boolean`,
+ * or raw DuckDB spellings like `BIGINT`/`TIMESTAMP`) to a {@link ColumnType}.
+ *
+ * This is the client mirror of the engine's `ResultSetDescriptor.columnType(String)` and is pinned against
+ * the SAME committed fixture the Java `ColumnRoleContractTest` reads —
+ * `app/inspecto/contracts/column-role.contract.json`'s `duckdbTypeCases`. Keep the two algorithms
+ * identical; the contract itself does not move.
+ *
+ * ⚠ It matches on the LEADING TOKEN, never on a substring of the whole spelling. The substring form this
+ * replaced read `INT` inside `INTERVAL` / `BIGINT[]` / `STRUCT(a INTEGER)` and `TIME` inside
+ * `MAP(VARCHAR, TIMESTAMP)`, so composites and durations were offered numeric operators and emitted as
+ * BARE SQL literals by `query-sql.ts`.
+ *
+ * ⛔ `INTERVAL` is a duration, not a date; ⛔ a composite (`LIST`/`STRUCT`/`MAP`/`UNION`) is `string` —
+ * the coarse vocabulary has no composite, and the query builder has no way to filter one.
+ */
 export function dbColumnType(dbType: string | undefined): ColumnType {
-    const t = (dbType ?? '').toUpperCase();
-    if (/NUMBER|INT|DOUBLE|FLOAT|DECIMAL|NUMERIC|REAL/.test(t)) return 'number';
-    if (/DATE|TIME/.test(t)) return 'date';
-    if (/BOOL/.test(t)) return 'boolean';
-    return 'string';
+    let t = (dbType ?? '').trim().toUpperCase();
+    const cut = t.indexOf('(');
+    if (cut > 0) t = t.slice(0, cut).trim(); // DECIMAL(18,2) -> DECIMAL
+    if (t.endsWith('[]')) return 'string'; // a LIST of anything is not that thing
+    switch (t) {
+        case 'TINYINT':
+        case 'SMALLINT':
+        case 'INTEGER':
+        case 'BIGINT':
+        case 'HUGEINT':
+        case 'UTINYINT':
+        case 'USMALLINT':
+        case 'UINTEGER':
+        case 'UBIGINT':
+        case 'UHUGEINT':
+        case 'DECIMAL':
+        case 'NUMERIC':
+        case 'REAL':
+        case 'FLOAT':
+        case 'DOUBLE':
+        case 'NUMBER': // the already-normalized coarse name the /db routes also send
+            return 'number';
+        case 'BOOLEAN':
+        case 'BOOL':
+        case 'LOGICAL':
+            return 'boolean';
+        case 'DATE':
+        case 'TIME':
+        case 'TIMETZ':
+        case 'TIMESTAMP':
+        case 'TIMESTAMPTZ':
+        case 'DATETIME':
+        case 'TIMESTAMP_S':
+        case 'TIMESTAMP_MS':
+        case 'TIMESTAMP_NS':
+            return 'date';
+        case 'STRING':
+            return 'string';
+        default:
+            // Spelled-out forms DuckDB also reports, e.g. "TIMESTAMP WITH TIME ZONE".
+            if (t.startsWith('TIMESTAMP') || t.startsWith('TIME ')) return 'date';
+            return 'string';
+    }
 }
 
 /** Guess column metadata from the keys + sample values of loose-map rows. */
