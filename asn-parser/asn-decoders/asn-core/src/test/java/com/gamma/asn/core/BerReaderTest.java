@@ -133,4 +133,32 @@ class BerReaderTest {
     void eocInsideDefiniteConstructedRejected() {
         assertThrows(BerParseException.class, () -> parse("30 04 00 00 00 00"));
     }
+
+    @Test
+    void primitiveLengthNearLongMaxRejectedInsteadOfWrappingPastTheGuard() {
+        // 0x88 = long-form length, 8 bytes; 7F FF.. = Long.MAX_VALUE. valueOffset + valueLength
+        // wraps negative, so an `end > limit` guard would let this through with a negative endOffset.
+        assertThrows(BerParseException.class, () -> parse("02 88 7F FF FF FF FF FF FF FF"));
+    }
+
+    @Test
+    void constructedLengthNearLongMaxRejectedInsteadOfWrappingPastTheGuard() {
+        assertThrows(BerParseException.class, () -> parse("22 88 7F FF FF FF FF FF FF FF"));
+    }
+
+    @Test
+    void anAcceptedNodeNeverReportsOffsetsOutsideTheInput() {
+        // the load-bearing shape assertion: whatever a length claims, a returned Tlv must describe a
+        // slice that really lies inside the input. A wrapped end is negative and would fail here.
+        byte[] bytes = HexFormat.of().parseHex("0288" + "7FFFFFFFFFFFFFFF");
+        try {
+            Tlv t = BerReader.read(ByteSource.of(bytes), 0, bytes.length, Strictness.BER);
+            assertTrue(t.endOffset() >= t.valueOffset() && t.endOffset() <= bytes.length,
+                    "endOffset " + t.endOffset() + " is outside the input");
+            assertTrue(t.valueLength() >= 0 && t.valueLength() <= bytes.length,
+                    "valueLength " + t.valueLength() + " is outside the input");
+        } catch (BerParseException expected) {
+            // rejecting it is the other allowed outcome
+        }
+    }
 }

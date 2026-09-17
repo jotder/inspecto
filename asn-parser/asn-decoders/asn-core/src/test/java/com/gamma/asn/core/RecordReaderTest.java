@@ -105,6 +105,64 @@ class RecordReaderTest {
     }
 
     @Test
+    void truncatedTrailingRecordHeaderIsReportedNotThrown() {
+        // a complete record followed by a single stray byte: the 2-byte length field of the last
+        // "record" runs off the end, and the framing used to read past the buffer before the
+        // recovery try was entered
+        byte[] data = hex("00 03 02 01 05 00");
+        Framing framing = Framing.of(new Framing.FramingSpec(0, 0, Set.of(),
+                new Framing.RecordHeaderSpec(2, 0, 2, true, false)));
+        List<ParseError> errors = new ArrayList<>();
+        RecordReader r = new RecordReader(ByteSource.of(data), framing, Strictness.BER,
+                RecoveryPolicy.SKIP_RECORD, errors::add);
+        List<Tlv> records = new ArrayList<>();
+        r.forEachRemaining(records::add);
+        // load-bearing: the good record before the truncation still reaches the caller, and the
+        // failure arrives as a ParseError rather than as an unchecked throw out of hasNext()
+        assertEquals(1, records.size());
+        assertEquals(1, r.recordsOk());
+        assertEquals(1, r.recordsFailed());
+        assertEquals(1, errors.size());
+        assertTrue(errors.getFirst().message().contains("truncated record header"),
+                "message was " + errors.getFirst().message());
+        // the boundary is unknown, so there is nothing to resync to: STOP_FILE, not SKIP_RECORD
+        assertEquals(RecoveryPolicy.STOP_FILE, errors.getFirst().action());
+    }
+
+    @Test
+    void skipRecoveryStillContinuesTheFileAndThenStopsOnATruncatedTail() {
+        // good | corrupt-but-bounded (skipped, file continues) | good | stray truncated header
+        byte[] data = hex("00 03 02 01 05 00 03 C9 FF FF 00 03 02 01 06 00");
+        Framing framing = Framing.of(new Framing.FramingSpec(0, 0, Set.of(),
+                new Framing.RecordHeaderSpec(2, 0, 2, true, false)));
+        List<ParseError> errors = new ArrayList<>();
+        RecordReader r = new RecordReader(ByteSource.of(data), framing, Strictness.BER,
+                RecoveryPolicy.SKIP_RECORD, errors::add);
+        List<Tlv> records = new ArrayList<>();
+        r.forEachRemaining(records::add);
+        assertEquals(2, records.size());
+        assertEquals(2, r.recordsFailed());
+        assertEquals(2, errors.size());
+        assertEquals(RecoveryPolicy.SKIP_RECORD, errors.getFirst().action());
+        assertEquals(RecoveryPolicy.STOP_FILE, errors.get(1).action());
+        assertEquals(6, records.get(1).value(ByteSource.of(data))[0]);
+    }
+
+    @Test
+    void lengthNearLongMaxIsAReportedParseErrorNotAnUncheckedThrow() {
+        // 22 = constructed, 0x88 = 8-byte length, 7F FF.. = Long.MAX_VALUE. The wrapped contentEnd
+        // used to yield a Tlv with a negative endOffset, which the reader then used as its cursor.
+        byte[] data = hex("22 88 7F FF FF FF FF FF FF FF");
+        List<ParseError> errors = new ArrayList<>();
+        RecordReader r = new RecordReader(ByteSource.of(data), Framing.none(), Strictness.BER,
+                RecoveryPolicy.SKIP_RECORD, errors::add);
+        assertFalse(r.hasNext());
+        assertEquals(1, errors.size());
+        assertEquals(0, r.recordsOk());
+        assertEquals(RecoveryPolicy.STOP_FILE, errors.getFirst().action());
+    }
+
+    @Test
     void headerDeclaringLengthPastEndFails() {
         byte[] data = hex("00 63 02 01 05");
         Framing framing = Framing.of(new Framing.FramingSpec(0, 0, Set.of(),

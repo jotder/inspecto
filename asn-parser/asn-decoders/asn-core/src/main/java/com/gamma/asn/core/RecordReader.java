@@ -86,9 +86,12 @@ public final class RecordReader implements Iterator<Tlv> {
         }
         long recordStart = pos;
         long recordIndex = recordsOk + recordsFailed;
-        long declared = framing.recordLength(src, recordStart);
-        long payloadStart = recordStart + framing.recordHeaderLength(src, recordStart);
+        // the framing reads header bytes, so it can fail on a truncated tail record — it belongs
+        // inside the recovery try, not in front of it
+        long declared = -1;
         try {
+            declared = framing.recordLength(src, recordStart);
+            long payloadStart = recordStart + framing.recordHeaderLength(src, recordStart);
             if (declared == 0) {
                 throw new BerParseException(recordStart, "record header declares zero length");
             }

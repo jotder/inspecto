@@ -106,6 +106,12 @@ public interface Framing {
             if (h == null || h.lengthSize() == 0) {
                 return -1;
             }
+            long contentEnd = src.size() - spec.trailerLength();
+            if (recordStart + h.lengthOffset() + h.lengthSize() > contentEnd) {
+                throw new BerParseException(recordStart,
+                        "truncated record header: " + h.lengthSize() + "-byte length field at +"
+                                + h.lengthOffset() + " runs past end of content " + contentEnd);
+            }
             long len = 0;
             for (int i = 0; i < h.lengthSize(); i++) {
                 int idx = h.bigEndian() ? i : h.lengthSize() - 1 - i;

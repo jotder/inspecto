@@ -182,7 +182,9 @@ class BerFuzzTest {
                 mutated[rnd.nextInt(mutated.length)] ^= (byte) (1 + rnd.nextInt(255));
                 try {
                     Tlv t = BerReader.read(ByteSource.of(mutated), 0, mutated.length, Strictness.BER);
-                    assertTrue(t.endOffset() <= mutated.length,
+                    // the lower bound matters as much as the upper one: an overflowed
+                    // valueOffset + valueLength wraps negative and satisfies `<= length`
+                    assertTrue(t.endOffset() >= 0 && t.endOffset() <= mutated.length,
                             "tree " + i + " mutation " + m + " read past the buffer");
                 } catch (BerParseException expected) {
                     // clean structured error is the other allowed outcome

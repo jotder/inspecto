@@ -99,11 +99,13 @@ public final class BerReader {
         }
 
         if (!constructed) {
-            long end = valueOffset + valueLength;
-            if (end > limit) {
+            // compared as a remaining-bytes budget, never as valueOffset + valueLength: a declared
+            // length near Long.MAX_VALUE makes that sum wrap negative and slip past the guard
+            if (valueLength > limit - valueOffset) {
                 throw new BerParseException(valueOffset,
                         "value of " + valueLength + " bytes runs past limit " + limit);
             }
+            long end = valueOffset + valueLength;
             return new Tlv(tagClass, tagNumber, false, false, offset, valueOffset, valueLength, end, List.of());
         }
 
@@ -125,11 +127,11 @@ public final class BerReader {
             }
         }
 
-        long contentEnd = valueOffset + valueLength;
-        if (contentEnd > limit) {
+        if (valueLength > limit - valueOffset) {
             throw new BerParseException(valueOffset,
                     "constructed value of " + valueLength + " bytes runs past limit " + limit);
         }
+        long contentEnd = valueOffset + valueLength;
         long cursor = valueOffset;
         while (cursor < contentEnd) {
             if (src.byteAt(cursor) == 0x00) {
