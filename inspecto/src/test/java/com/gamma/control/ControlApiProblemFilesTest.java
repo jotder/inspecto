@@ -45,6 +45,26 @@ class ControlApiProblemFilesTest {
             "start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,"
             + "duration_ms,error,consignment_id";
 
+    /**
+     * Boot one space over {@code pipelines}. ⚠ <b>Seed every ledger and quarantine-tree fixture
+     * BEFORE calling this</b>, never inside the try-block. The status read surface is a DB PROJECTION of
+     * the on-disk ledgers since the {@code db} default (2026-08-31), and it is only ever as fresh as its
+     * last {@code syncStatus()}. {@code CollectorService.start()} projects synchronously as its last boot
+     * step, so a ledger already on disk is queryable from the first GET — deterministically, on this
+     * thread, with nothing to wait for.
+     *
+     * <p>🔴 A ledger written AFTER boot is a race this test cannot win, and it is what made
+     * {@code limitBoundsTheListAndCountsStayPreLimit} intermittent in the full-module run (measured
+     * 2026-09-17: 1 of 3 runs red at the same tree, green alone 8/8). {@code start()} schedules the first
+     * poll cycle with initial delay 0, and that cycle's own {@code syncStatus()} runs concurrently with
+     * the test body: land it after the write and the rows appear, land it before and the route honestly
+     * returns 0 rows — after which the next sync is a full {@code service.poll.seconds} (60s) away.
+     * Polling for the rows therefore cannot fix it either; there is no second sync inside any sane
+     * deadline. Seeding first removes the window instead of widening it.
+     *
+     * <p>In production nothing but the engine writes these ledgers and the engine syncs after each run,
+     * so the ordering this helper now enforces is also the real one.
+     */
     private Ctx open(Path root, String... pipelines) throws Exception {
         for (String p : pipelines) seedPipeline(root, "s1", p);
         SpaceManager spaces = SpaceManager.discover(root);
@@ -102,24 +122,6 @@ class ControlApiProblemFilesTest {
         return V1Body.of(r.body());
     }
 
-    /**
-     * Read the problem-files route until it reports {@code expectedTotal} rows, bounded. ⚠ The status
-     * read surface is a DB PROJECTION of the on-disk ledgers since the {@code db} default (2026-08-31),
-     * refreshed after every run and on each poll tick — so a ledger this test hand-writes AFTER boot is
-     * visible only once the next tick has synced it. In production nothing but the engine writes the
-     * ledger, and the engine syncs after each run; the race is this test's, not the product's. Observed
-     * order-dependent in a full reactor run (2026-09-02: 2 of 8 cases read 0 rows), green in isolation.
-     */
-    private JsonNode awaitTotal(int port, String path, int expectedTotal) throws Exception {
-        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(10).toNanos();
-        JsonNode d = data(port, path);
-        while (d.get("total").asInt() != expectedTotal && System.nanoTime() < deadline) {
-            Thread.sleep(100);
-            d = data(port, path);
-        }
-        return d;
-    }
-
     private static List<String> names(JsonNode rows) {
         List<String> out = new ArrayList<>();
         for (JsonNode r : rows) out.add(r.get("filename").asText());
@@ -130,12 +132,11 @@ class ControlApiProblemFilesTest {
 
     @Test
     void splitsFullFromPartialAndOmitsCleanFiles(@TempDir Path root) throws Exception {
+        ledger(root, "alpha",
+                "clean.csv,SUCCESS,100,0,2026-08-20 01:00:00",
+                "partial.csv,SUCCESS,90,10,2026-08-20 02:00:00",
+                "bad.csv,QUARANTINED_UNREADABLE,0,0,2026-08-20 03:00:00");
         try (Ctx c = open(root, "alpha")) {
-            ledger(root, "alpha",
-                    "clean.csv,SUCCESS,100,0,2026-08-20 01:00:00",
-                    "partial.csv,SUCCESS,90,10,2026-08-20 02:00:00",
-                    "bad.csv,QUARANTINED_UNREADABLE,0,0,2026-08-20 03:00:00");
-
             JsonNode d = data(c.port, "/spaces/s1/status/problem-files");
             assertEquals(2, d.get("total").asInt(), "the clean file is not a problem: " + d);
             assertEquals(1, d.get("fullCount").asInt());
@@ -165,18 +166,17 @@ class ControlApiProblemFilesTest {
      */
     @Test
     void aProblemRowCarriesTheArchiveAndTheLogicalIdentity(@TempDir Path root) throws Exception {
+        // ⚠ "status_dir", matching the ledger() helper — a ledger under "status" is written
+        // where nothing reads it and the route then honestly returns [] (see open()'s note).
+        Path statusDir = root.resolve("s1").resolve("alpha").resolve("status_dir");
+        Files.createDirectories(statusDir);
+        Files.writeString(statusDir.resolve("alpha_status_20260820_010000.csv"),
+                FILES_HEADER + ",origin,logical_name\n"
+                        + "2026-08-20 03:00:00,2026-08-20 03:00:00,00001_a.csv,QUARANTINED_MISMATCH,"
+                        + "0,0,,,10,boom,c-1,bundle.zip,\"east/bundle\"\n",
+                StandardCharsets.UTF_8);
         try (Ctx c = open(root, "alpha")) {
-            // ⚠ "status_dir", matching the ledger() helper — a ledger under "status" is written
-            // where nothing reads it and the route then honestly returns [] (see open()'s note).
-            Path statusDir = root.resolve("s1").resolve("alpha").resolve("status_dir");
-            Files.createDirectories(statusDir);
-            Files.writeString(statusDir.resolve("alpha_status_20260820_010000.csv"),
-                    FILES_HEADER + ",origin,logical_name\n"
-                            + "2026-08-20 03:00:00,2026-08-20 03:00:00,00001_a.csv,QUARANTINED_MISMATCH,"
-                            + "0,0,,,10,boom,c-1,bundle.zip,\"east/bundle\"\n",
-                    StandardCharsets.UTF_8);
-
-            JsonNode row = awaitTotal(c.port, "/spaces/s1/status/problem-files", 1).get("rows").get(0);
+            JsonNode row = data(c.port, "/spaces/s1/status/problem-files").get("rows").get(0);
             assertEquals("bundle.zip", row.get("origin").asText(),
                     "the operator sees what they actually DROPPED");
             assertEquals("east/bundle", row.get("logicalName").asText(),
@@ -187,11 +187,10 @@ class ControlApiProblemFilesTest {
     /** 🔴 The whole point of the route: ONE call covers every pipeline. */
     @Test
     void aggregatesAcrossPipelines(@TempDir Path root) throws Exception {
+        ledger(root, "alpha", "a-bad.csv,QUARANTINED_EMPTY,0,0,2026-08-20 01:00:00");
+        ledger(root, "beta",  "b-partial.csv,SUCCESS,5,5,2026-08-20 09:00:00");
         try (Ctx c = open(root, "alpha", "beta")) {
-            ledger(root, "alpha", "a-bad.csv,QUARANTINED_EMPTY,0,0,2026-08-20 01:00:00");
-            ledger(root, "beta",  "b-partial.csv,SUCCESS,5,5,2026-08-20 09:00:00");
-
-            JsonNode d = awaitTotal(c.port, "/spaces/s1/status/problem-files", 2);
+            JsonNode d = data(c.port, "/spaces/s1/status/problem-files");
             assertEquals(2, d.get("total").asInt(), d.toString());
             assertEquals(2, d.get("pipelinesWithProblems").asInt());
             // Newest first puts beta's row on top, proving the sort spans pipelines rather than
@@ -207,12 +206,11 @@ class ControlApiProblemFilesTest {
     /** A diagnostic read must not become an export: bounded, with the TRUE total reported. */
     @Test
     void limitBoundsTheListAndCountsStayPreLimit(@TempDir Path root) throws Exception {
+        ledger(root, "alpha",
+                "f1.csv,SUCCESS,1,1,2026-08-20 01:00:00",
+                "f2.csv,SUCCESS,1,1,2026-08-20 02:00:00",
+                "f3.csv,QUARANTINED_UNREADABLE,0,0,2026-08-20 03:00:00");
         try (Ctx c = open(root, "alpha")) {
-            ledger(root, "alpha",
-                    "f1.csv,SUCCESS,1,1,2026-08-20 01:00:00",
-                    "f2.csv,SUCCESS,1,1,2026-08-20 02:00:00",
-                    "f3.csv,QUARANTINED_UNREADABLE,0,0,2026-08-20 03:00:00");
-
             JsonNode d = data(c.port, "/spaces/s1/status/problem-files?limit=1");
             assertEquals(1, d.get("rows").size(), "the page is cut");
             assertTrue(d.get("truncated").asBoolean());
@@ -226,11 +224,10 @@ class ControlApiProblemFilesTest {
 
     @Test
     void sinceFiltersByLedgerTime(@TempDir Path root) throws Exception {
+        ledger(root, "alpha",
+                "old.csv,SUCCESS,1,1,2026-08-19 23:00:00",
+                "new.csv,SUCCESS,1,1,2026-08-21 08:00:00");
         try (Ctx c = open(root, "alpha")) {
-            ledger(root, "alpha",
-                    "old.csv,SUCCESS,1,1,2026-08-19 23:00:00",
-                    "new.csv,SUCCESS,1,1,2026-08-21 08:00:00");
-
             JsonNode d = data(c.port, "/spaces/s1/status/problem-files?since=2026-08-20");
             assertEquals(List.of("new.csv"), names(d.get("rows")));
             assertEquals(1, d.get("total").asInt());
@@ -257,14 +254,13 @@ class ControlApiProblemFilesTest {
      */
     @Test
     void quarantineTreeOnlyFilesAreReportedOnce(@TempDir Path root) throws Exception {
+        ledger(root, "alpha", "known.csv,QUARANTINED_UNREADABLE,0,0,2026-08-20 03:00:00");
+        // Two files in the tree: one the ledger already knows, one it never saw.
+        Path q = root.resolve("s1").resolve("alpha").resolve("quarantine").resolve("corrupt_download");
+        Files.createDirectories(q);
+        Files.writeString(q.resolve("known.csv"), "x");
+        Files.writeString(q.resolve("orphan.csv"), "x");
         try (Ctx c = open(root, "alpha")) {
-            ledger(root, "alpha", "known.csv,QUARANTINED_UNREADABLE,0,0,2026-08-20 03:00:00");
-            // Two files in the tree: one the ledger already knows, one it never saw.
-            Path q = root.resolve("s1").resolve("alpha").resolve("quarantine").resolve("corrupt_download");
-            Files.createDirectories(q);
-            Files.writeString(q.resolve("known.csv"), "x");
-            Files.writeString(q.resolve("orphan.csv"), "x");
-
             JsonNode d = data(c.port, "/spaces/s1/status/problem-files");
             List<String> files = names(d.get("rows"));
             assertEquals(1, files.stream().filter("known.csv"::equals).count(),
