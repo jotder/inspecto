@@ -42,6 +42,10 @@ final class PartitionPruneTask {
         if (days < 1) throw new IllegalArgumentException("partition_prune retention_days must be >= 1");
         long t0 = System.nanoTime();
         LocalDate cutoff = LocalDate.now(ZoneOffset.UTC).minusDays(days);
+        // Absent = legitimate no-op; exists-but-not-a-directory = a broken config no run can ever satisfy
+        // (COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1).
+        if (Files.exists(dir) && !Files.isDirectory(dir))
+            throw new IllegalArgumentException("partition_prune: 'dir' " + dir + " exists but is not a directory");
         if (!Files.isDirectory(dir))
             return JobResult.ok("partition_prune: " + dir + " does not exist — nothing to prune",
                     (System.nanoTime() - t0) / 1_000_000L);

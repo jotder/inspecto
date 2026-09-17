@@ -46,6 +46,10 @@ final class StorageReportTask {
         long warnBytes = Long.parseLong(cfg.opt("warn_bytes", "0"));   // 0 = no threshold
         int top = Integer.parseInt(cfg.opt("top", "5"));
         long t0 = System.nanoTime();
+        // Absent = legitimate no-op; exists-but-not-a-directory = a broken config no run can ever satisfy
+        // (COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1).
+        if (Files.exists(dir) && !Files.isDirectory(dir))
+            throw new IllegalArgumentException("storage_report: 'dir' " + dir + " exists but is not a directory");
         if (!Files.isDirectory(dir)) {
             return JobResult.ok("storage_report: directory not present, nothing to report (" + dir + ")", 0L);
         }

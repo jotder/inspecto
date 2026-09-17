@@ -46,6 +46,10 @@ final class CleanupTask {
         Path archiveDir = archive
                 ? PathJail.requireJobPathUnderAny(jailRoots, SpaceConfigRoot.current(), cfg.require("archive_dir"), "archive_dir") : null;
         long t0 = System.nanoTime();
+        // Absent = legitimate no-op; exists-but-not-a-directory = a broken config no run can ever satisfy
+        // (COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1).
+        if (Files.exists(dir) && !Files.isDirectory(dir))
+            throw new IllegalArgumentException("cleanup: 'dir' " + dir + " exists but is not a directory");
         if (!Files.isDirectory(dir)) {
             return JobResult.ok("cleanup: directory not present, nothing to do (" + dir + ")", 0L);
         }

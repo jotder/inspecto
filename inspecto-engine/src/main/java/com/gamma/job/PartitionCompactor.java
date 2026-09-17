@@ -66,6 +66,12 @@ final class PartitionCompactor {
         int minFiles = Integer.parseInt(cfg.opt("min_files", "4"));
         if (minFiles < 2) throw new IllegalArgumentException("compact min_files must be >= 2");
         long t0 = System.nanoTime();
+        // An ABSENT dir is a legitimate no-op — a store nothing has written to yet has nothing to compact,
+        // and a path under the jail that does not exist is indistinguishable from one that will. A dir that
+        // EXISTS and is not a directory is not: no run can ever make it compactable, so reporting "nothing
+        // to do" there is a broken config reported as success (COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1).
+        if (Files.exists(root) && !Files.isDirectory(root))
+            throw new IllegalArgumentException("compact: 'dir' " + root + " exists but is not a directory");
         if (!Files.isDirectory(root))
             return JobResult.ok("compact: directory not present, nothing to do (" + root + ")", 0L);
 
