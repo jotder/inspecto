@@ -110,21 +110,30 @@ final class BiTemplates {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         store.get("dataset", dataset).orElseThrow(() -> new ApiException(404, "no dataset '" + dataset + "'"));
 
-        // Conflict check first — apply is all-or-nothing, never a partial board.
+        // Two resolve passes, then the writes — apply is all-or-nothing, never a partial board.
+        //
+        // BITEMPLATES-GATE-ORDER-1: the passes are SEPARATE so the gate order matches the `endpoint`
+        // skill's mandate — spec/422 for the WHOLE request before conflict/409 for the whole request.
+        // A single interleaved loop got that wrong twice over: component 1's conflict beat its own
+        // invalidity, and component 1's conflict also beat component 2's invalidity.
+        //
+        // Pass 1 — substitute + validate → 422.
+        // COMPONENT-BULK-WRITERS-UNGATED-1: run the SAME gate as POST|PUT /components/{kind}, in a
+        // RESOLVE pass so a refusal costs nothing. ⚠ Today this cannot fire: every template body is
+        // hardcoded, `substituteTree` substitutes VALUES only (so `dataset`/`prefix` can never
+        // introduce a key for the census to refuse). ⚠ ⛔ An earlier pass claimed `validateKind` does not
+        // constrain `widget`/`dashboard` at all — FALSE: its last line is
+        // `if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(...)`, and a bogus
+        // top-level key on a template widget was mutation-proven to return 422. The gate is dark because
+        // the BODIES are hardcoded and valid, not because the kinds are unguarded. It is here for the
+        // NEXT curated template, which is exactly the case
+        // `ControlApiBiTemplatesTest.everyTemplateWritesABodyTheAuthoringRouteAccepts` pins at build
+        // time — this makes the same property fail closed at run time too.
         List<Map<String, Object>> resolved = new ArrayList<>();
         for (Map<String, Object> c : t.components()) {
             String kind = (String) c.get("kind");
             String id = substitute((String) c.get("id"), dataset, prefix);
-            if (store.get(kind, id).isPresent())
-                throw new ApiException(409, kind + " '" + id + "' already exists — re-apply with a 'prefix'");
             Map<String, Object> content = substituteTree(asMap(c.get("content")), dataset, prefix);
-            // COMPONENT-BULK-WRITERS-UNGATED-1: run the SAME gate as POST|PUT /components/{kind}, in the
-            // RESOLVE loop so a refusal costs nothing — apply stays all-or-nothing and never plants a
-            // partial board. ⚠ Today this cannot fire: every template body is hardcoded, and
-            // `substituteTree` substitutes VALUES only, so `dataset`/`prefix` can never introduce a key
-            // for the census to refuse. It is here for the NEXT curated template, which is exactly the
-            // case `ControlApiBiTemplatesTest.everyTemplateWritesABodyTheAuthoringRouteAccepts` pins at
-            // build time — this makes the same property fail closed at run time too.
             try {
                 ComponentRoutes.validateKind(kind, id, content);
             } catch (IllegalArgumentException e) {
@@ -132,6 +141,13 @@ final class BiTemplates {
                         + kind + " '" + id + "': " + e.getMessage());
             }
             resolved.add(Map.of("kind", kind, "id", id, "content", content));
+        }
+        // Pass 2 — conflict → 409, still before any write.
+        for (Map<String, Object> c : resolved) {
+            String kind = (String) c.get("kind");
+            String id = (String) c.get("id");
+            if (store.get(kind, id).isPresent())
+                throw new ApiException(409, kind + " '" + id + "' already exists — re-apply with a 'prefix'");
         }
         List<Map<String, Object>> written = new ArrayList<>();
         for (Map<String, Object> c : resolved) {
