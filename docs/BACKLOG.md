@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **91<!--count:backlog-rows--> rows: 5<!--count:backlog-p1--> × P1 · 52<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **86<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 51<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 5<!--count:backlog-p1--> P1 + 52<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 34<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 91<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 51<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 31<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 86<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1586,17 +1586,66 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   the published bundle pairs a Linux JVM with Windows-only DuckDB extensions — the exact air-gap failure
   `-RequireExtensions` exists to prevent. Fix: derive the extension platform from the runtime actually
   embedded and emit one artifact per target platform; the file it changes is `inspecto/package.ps1`.
-- **P1** · **`BER-LENGTH-OVERFLOW-1`** — `long end = valueOffset + valueLength` with `valueLength` accepted
-  up to `Long.MAX_VALUE` overflows negative and passes the `end > limit` guard (`BerReader.java:102` and
-  `:128`); `RecordReader.java:249` catches only `BerParseException`, so `Tlv.java:33`'s
-  `Math.toIntExact` escapes as an unchecked `ArithmeticException` — or, just under 2 GB, allocates a
-  `byte[]` sized by the input. Fix: `Math.addExact` (or `valueLength > limit - valueOffset`) at both sites,
-  raising `BerParseException`; the file it changes is `BerReader.java`.
-- **P2** · **`BER-FRAMING-UNCHECKED-READ-1`** — `framing.recordLength(...)`/`recordHeaderLength(...)` are
-  called OUTSIDE the recovery `try` (`RecordReader.java:234-235` vs `:236`) and `Framing.java:375` reads
-  header bytes with no bound against `contentEnd`, so a truncated last record crashes the ingester with
-  `IndexOutOfBoundsException` instead of a skippable `ParseError`; `RecoveryPolicy.SKIP_RECORD` cannot save
-  the file. Fix: move both calls inside the `try` and bounds-check the header first.
+- ~~**P1** · **`BER-LENGTH-OVERFLOW-1`**~~ ✅ **SHIPPED 2026-09-17 — CONFIRMED by constructing the bytes, and
+  WORSE than the row stated.** `02 88 7F FF FF FF FF FF FF FF` (long-form 8-byte length = `Long.MAX_VALUE`)
+  wrapped `valueOffset + valueLength` negative, so `end > limit` passed and `BerReader` returned a Tlv with
+  **`endOffset = -9223372036854775799`**. `RecordReader` then counted it as `recordsOk++` and used the negative
+  value as its cursor — so the `ArithmeticException` escaped `hasNext()` ITSELF. **A malformed record was being
+  recorded as successfully parsed.**
+  ✅ Both sites now compare against a remaining-bytes budget (`valueLength > limit - valueOffset`), both
+  operands non-negative, subtraction cannot overflow. `BerParseException` chosen because `BerFuzzTest`'s own
+  javadoc states the contract: malformed input must never crash with anything else.
+  ⚠ One row detail imprecise: `RecordReader` never calls `Tlv.value()`, so the unchecked throw actually escapes
+  from `SchemaBinder` — outside the reader's recovery entirely.
+  🔴 **A blind spot in the existing fuzz guard closed on the way past:** it asserted `endOffset <= length`,
+  which a NEGATIVE endOffset satisfies, and which measured `true` on the overflowing input. ⚠ Stated honestly —
+  that test stayed GREEN under the mutant because its generator never emits an 8-byte length, so the added
+  lower bound is belt-and-braces, not the guard.
+  ⇒ Residual filed: `BER-VALID-BUT-HUGE-ALLOCATION-1`. Original row follows.
+  - **P1** · **`BER-LENGTH-OVERFLOW-1`** — `long end = valueOffset + valueLength` with `valueLength` accepted
+    up to `Long.MAX_VALUE` overflows negative and passes the `end > limit` guard (`BerReader.java:102` and
+    `:128`); `RecordReader.java:249` catches only `BerParseException`, so `Tlv.java:33`'s
+    `Math.toIntExact` escapes as an unchecked `ArithmeticException` — or, just under 2 GB, allocates a
+    `byte[]` sized by the input. Fix: `Math.addExact` (or `valueLength > limit - valueOffset`) at both sites,
+    raising `BerParseException`; the file it changes is `BerReader.java`.
+
+- **P3** · **`BER-VALID-BUT-HUGE-ALLOCATION-1` — a length that is VALID but enormous still allocates.**
+  Filed 2026-09-17 out of `BER-LENGTH-OVERFLOW-1`, and **measured rather than reasoned**: with a stub
+  `ByteSource` reporting 3 GB, `04 84 95 02 F9 00` (2,500,000,000 bytes) **parses cleanly** — `endOffset`
+  genuinely within the source — and `Tlv.value()` then throws `ArithmeticException` on `Math.toIntExact`. Just
+  under 2 GB it would instead SUCCEED and allocate a `byte[]` sized by attacker-controlled input.
+  ⛔ **No bounds check can reject this** — the length is legitimate. It needs a cap or a streaming accessor,
+  which is a design call on `Tlv.value()`'s `byte[]` return type. Reachable only via `ByteSource.map`
+  (`MappedSource` is explicitly >2 GB capable); `HeapSource` cannot exceed 2 GB.
+  → `okf/backend/engine/parser-plugins.md`
+
+- **P2** · 🔴 **`NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1` — identity verification does not help if TLS never
+  starts.** Filed 2026-09-17 out of `NOTIFY-SMTP-TLS-VERIFY-1`, which closed the hostname half.
+  `mail.smtp.starttls.enable` is **opportunistic**: a MITM who simply declines to advertise `STARTTLS` gets a
+  plaintext session, the identity check never runs because no TLS session is ever established, and the SMTP
+  AUTH credentials go over the wire in the clear anyway — so the threat model the parent row named is only
+  half closed.
+  ⛔ **The fix is `mail.smtp.starttls.required=true`, and it is a LARGER behaviour change than the parent:** it
+  breaks installs that set `starttls=true` against a relay which never offered it and have been silently
+  sending plaintext. ⛔ Operator call — it converts a silent weakness into a loud failure, which is right, but
+  not something to flip unannounced. The gap is documented in `SmtpEmailChannel`'s javadoc meanwhile.
+  → `okf/backend/control-plane/events-metrics.md`
+- ~~**P2** · **`BER-FRAMING-UNCHECKED-READ-1`**~~ ✅ **SHIPPED 2026-09-17 — held, with BOTH cited line numbers
+  drifted by ~145 lines** (the files are 118 and 117 lines long). `00 03 02 01 05 00` — one good record plus a
+  stray byte — threw `ArrayIndexOutOfBoundsException` AFTER a record had already been delivered.
+  ✅ `Framing.Fixed.recordLength` now bounds its header read against `size() - trailerLength`, and
+  `RecordReader` takes the framing calls inside the recovery `try` with `declared` pre-initialised to `-1` so
+  `canSkip` is false when the header itself failed. **Both halves are independently load-bearing** — reverting
+  either alone reds tests.
+  ⚠ **The row's wording is narrowed:** a truncated TAIL reports `ParseError(STOP_FILE)` even under
+  `RecoveryPolicy.SKIP_RECORD`, because a header that cannot be read yields no boundary to resync to. Records
+  already read are still delivered. SKIP_RECORD cannot "save" a truncated tail; it converts a crash into a
+  reported error with prior records intact. Original row follows.
+  - **P2** · **`BER-FRAMING-UNCHECKED-READ-1`** — `framing.recordLength(...)`/`recordHeaderLength(...)` are
+    called OUTSIDE the recovery `try` (`RecordReader.java:234-235` vs `:236`) and `Framing.java:375` reads
+    header bytes with no bound against `contentEnd`, so a truncated last record crashes the ingester with
+    `IndexOutOfBoundsException` instead of a skippable `ParseError`; `RecoveryPolicy.SKIP_RECORD` cannot save
+    the file. Fix: move both calls inside the `try` and bounds-check the header first.
 - **P2** · **`RELEASE-PIPELINE-NEVER-EXECUTED-1`** — every step of `release.yml` is unexecuted: the workflow
   landed 2026-09-02, the newest tag is `v3.9.0` (2026-06-01), the pom is `4.0.0-SNAPSHOT`, and `ci.yml`
   only PARSES `package.ps1` (`.github/workflows/ci.yml` launcher/SBOM/extension guards) — never runs it.
@@ -1609,10 +1658,26 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   (`inspecto/package.ps1:1736`) and the only `chmod +x` lives inside the emitted `install-service.sh`, so a
   customer who unzips gets a non-executable `serve.sh`/`run.sh`. Fix: zip the Linux leg with a mode-
   preserving tool (or `tar.gz`) and assert the bit in the release verify step.
-- **P2** · **`NOTIFY-SMTP-TLS-VERIFY-1`** — `SmtpEmailChannel.java:154` sets `mail.smtp.starttls.enable`
-  but never `mail.smtp.ssl.checkserveridentity`, which legacy `javax.mail` defaults to `false`: a STARTTLS
-  session accepts any certificate for `notify.smtp.host`, so SMTP AUTH credentials can be intercepted by
-  whoever answers that name. Fix: set `checkserveridentity=true` unconditionally.
+- ~~**P2** · **`NOTIFY-SMTP-TLS-VERIFY-1`**~~ ✅ **SHIPPED 2026-09-17 — held, and the row's IMPACT is corrected.**
+  Verified in the actual jar rather than from general knowledge: this module pins `com.sun.mail:javax.mail
+  1.6.2`, whose `SocketFetcher.java:632` reads `ssl.checkserveridentity` with a default of **false**.
+  🔴 **"Accepts any certificate" is WRONG.** `SocketFetcher` already uses `SSLSocketFactory.getDefault()`, so
+  the certificate CHAIN was always validated — only the HOSTNAME check was missing. It is "any **CA-valid**
+  certificate, for any name": still a credential-interception path, but a narrower blast radius AND a narrower
+  upgrade risk than filed.
+  ⛔ **No escape hatch, deliberately.** The `FtpConnector` `tls_trust: all` precedent would have permitted one
+  but does not apply — the chain was already validated, so a self-signed relay already FAILS today, and a hatch
+  buys nothing `-Djavax.net.ssl.trustStore` does not serve better with authentication left ON.
+  ✅ **The test pins BEHAVIOUR, not configuration:** a real STARTTLS server driven through the session the
+  channel builds, two cases differing in exactly one variable — the certificate's SAN. Mutation-proved.
+  ⚠ **Release-note-worthy:** verification is now always on and not configurable; a relay whose cert does not
+  name `notify.smtp.host` goes from silently trusted to failing to deliver, and **that will not be noticed** —
+  notification failures are logged and isolated, never surfaced.
+  ⇒ Residual filed: `NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1`. Original row follows.
+  - **P2** · **`NOTIFY-SMTP-TLS-VERIFY-1`** — `SmtpEmailChannel.java:154` sets `mail.smtp.starttls.enable`
+    but never `mail.smtp.ssl.checkserveridentity`, which legacy `javax.mail` defaults to `false`: a STARTTLS
+    session accepts any certificate for `notify.smtp.host`, so SMTP AUTH credentials can be intercepted by
+    whoever answers that name. Fix: set `checkserveridentity=true` unconditionally.
 - **P2** · **`PIPELINE-EDITOR-SILENT-ERRORS-1`** — twelve `.subscribe({ next })` calls in the core
   authoring journey carry no `error` handler (`pipeline-editor.component.ts:914, 934, 1450, 1452, 1637,
   1639, 1677, 1807, 1812, 1895, 2047, 3058, 3088`), so a failed save, load or validate fails with no user
@@ -1625,6 +1690,28 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   angular-eslint builder is registered in `inspecto-ui/angular.json` and `package.json` has no lint script
   beyond `lint:tokens`, so the `angular-ui` skill's "lint" leg of GAUNTLET has never run anything. Fix: add
   angular-eslint with the repo's rules and wire it into `ui.yml`.
+  ✅ **HALF SHIPPED 2026-09-17 — the target now EXISTS AND RUNS; it does not pass, and that is deliberate.**
+  `angular-eslint 22.5.0` / `typescript-eslint 8.70.0` (peer range admits our TS 6.0.3) / `eslint 10.10.0`,
+  with `@eslint/js` added explicitly since ESLint 10 no longer supplies it transitively. Wired into `ui.yml`
+  **reporting-only**, matching the precedent the coverage step already sets there.
+  ⛔ **A hard gate today would put a known-red step in front of the whole UI workflow** — the pattern that
+  suppressed the reactor for a day on 2026-09-16. ⛔ Flip it by draining the findings, never by muting rules.
+  🔴 **Measured BEFORE any source change: 177 problems (173 errors) across 80 of 972 files.** No source file
+  was touched and no rule disabled to improve that. Rules are the upstream `recommended` presets verbatim —
+  there were no house rules to port, and inventing a ruleset would have been the large unreviewed change this
+  row must not smuggle in. `templateAccessibility` was **added** (+32) rather than omitted, because the
+  `angular-ui` skill makes WCAG 2.2 AA non-negotiable and omitting it would be choosing a weaker ruleset to
+  look greener.
+  ⬜ **OWED: the drain, as THREE reviewable changes, not one sweep.** (1) ~76 mechanical — `no-unused-vars` 64,
+  `prefer-const` 3, `no-useless-escape` 3, 4 dead `eslint-disable` directives, `no-useless-assignment` 2;
+  largely `--fix`-able. (2) ~53 behavioural — `prefer-inject` 22, `prefer-on-push` 12 (exactly the v22
+  `ChangeDetectionStrategy.Eager` shims the skill calls legacy), `no-explicit-any` 15, `no-input-rename` 3,
+  `no-output-native` 4. (3) ~32 real WCAG findings — belongs with `docs/ui/accessibility-audit.md`.
+  ⚠ `template/eqeqeq` (8) is the only group that can change BEHAVIOUR and must not be bulk-applied.
+  🔴 **Evidence against a mechanical drain, found while measuring:** the source already carries four
+  `eslint-disable` directives naming rules in NO preset (a config existed upstream in the Fuse template and was
+  never tracked), and `job-parameter-specs.ts:61`'s `no-fallthrough` is an INTENTIONAL case group flagged only
+  because an explanatory comment sits between the labels.
 - **P2** · **`UI-CAPABILITY-AFFORDANCE-1`** — after 2026-09-17's gating (`ad29e683`) the Test/Probe buttons
   in `connections.service.ts:71,82` callers, the Evaluate actions in `expectations.service.ts:81,86` and
   `alerts.service.ts:75` callers, and Space import (`spaces.service.ts:184`) render for every user and
@@ -1642,15 +1729,35 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
 - **P3** · **`PKG-LINUX-RUNTIME-WARNS-1`** — a failed Linux runtime build is `Write-Warning`, not `throw`
   (`inspecto/package.ps1:1436`), so a release quietly loses a platform. Fix: throw unless an explicit
   `-AllowPartialRuntime` is passed.
-- **P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`** — `tools/bundle-modules.mjs:77` says "Personal 2, Standard
-  10, Enterprise 11" while its own table yields 2/11/12 (and `ci.yml` agrees with the table). Fix: correct
-  the comment or make `tools/check-sbom-modules.mjs` assert the stated counts.
+- ~~**P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`**~~ ✅ **SHIPPED 2026-09-17 — and BOTH options were taken.**
+  Real counts re-derived from the MODULES table rather than copied from the row: **Personal 2 / Standard 11 /
+  Enterprise 12**, cross-checked against `check-doc-counts`'s `enterprise-first-party-jars=12`. The drift dates
+  to PKG-5 adding `inspecto-agent`.
+  ⛔ **Correcting the comment alone would have moved the drift to a second place**, so `check-sbom-modules.mjs`
+  now PARSES that sentence out of `bundle-modules.mjs` and asserts it against the table — the prose itself is
+  the checked artifact. Falsified twice: a wrong count is named, and rewording the sentence away fails as an
+  unparseable claim rather than passing by absence.
+  ⚠ **The row's "`ci.yml` agrees with the table" is WRONG** — `ci.yml:184-185` quotes EDG-01-era jar counts as
+  dated history, correct for when written. Left alone. Original row follows.
+  - **P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`** — `tools/bundle-modules.mjs:77` says "Personal 2, Standard
+    10, Enterprise 11" while its own table yields 2/11/12 (and `ci.yml` agrees with the table). Fix: correct
+    the comment or make `tools/check-sbom-modules.mjs` assert the stated counts.
 - **P3** · **`SFTP-RESUME-CHECKSUM-1`** — a resumed fetch treats "local size == remote length" as complete
   (`SftpConnector.java:155-179`) with no checksum, so a truncated-then-replaced remote file of equal size
   is accepted. Fix: verify with the module's existing `Checksums` on resume.
-- **P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`** — `inspecto-ui/tools/check-design-tokens.mjs` scans
-  `src/app/inspecto` and `src/app/modules/admin` only, so `src/app/layout/**` (the shell every user sees)
-  may hardcode colours unguarded; zero violations today. Fix: add `src/app/layout` to `ROOTS`.
+- ~~**P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`**~~ ✅ **SHIPPED 2026-09-17 — and the blind spot was MEASURED, not
+  inferred.** With a hex colour planted in `layout.component.scss` and an `rgba()` in `navigation-data.ts`,
+  both TRACKED files, the OLD `ROOTS` reported **green, exit 0**. The new scope names both.
+  ✅ **Scope is `src/app`, not `src/app/layout`, and not a deny-list** — justified from the guard's own header,
+  which already defined its subject as "inspecto-authored source" and described its exclusions AS exclusions.
+  Every excluded tree sits OUTSIDE `src/app` (`src/@gamma/**` is a sibling; `src/app/modules/auth` no longer
+  exists), so the parent scope states the intent exactly and an empty deny-list would be speculative.
+  Measured 0 violations in `layout`, 0 in `core`, 0 overall — widening cost nothing, so nothing was narrowed.
+  ⚠ `src/styles/splash-screen.css` (3 hex values) stays OUT deliberately: it paints the pre-boot splash, before
+  any `--gamma-*` var exists to read. Original row follows.
+  - **P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`** — `inspecto-ui/tools/check-design-tokens.mjs` scans
+    `src/app/inspecto` and `src/app/modules/admin` only, so `src/app/layout/**` (the shell every user sees)
+    may hardcode colours unguarded; zero violations today. Fix: add `src/app/layout` to `ROOTS`.
 - **P3** · **`API-DEAD-METHODS-1`** — five exported service methods have no caller in the SPA:
   `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, `config.service.ts:180,
   187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended
@@ -1669,11 +1776,25 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   the auth routes as `auth.created <route>` (`data_mutation`) beside the typed `auth.exchange`/`auth.refresh`/
   `auth.logout` rows added 2026-09-17, so every sign-in writes two rows. Fix: teach `AuditTrail.classify`
   to skip `/auth/*`.
-- **P3** · **`MAIL-RELEASE-NOTES-STATUS-1`** — the pending-MAJOR release notes still describe `mail.send`
-  as returning SUCCESS with no channel; it returns `SKIPPED` since `ad29e683`. Fix: correct the note.
-- **P3** · **`NAV-MOCK-COMMENT-STALE-1`** — `core/navigation/navigation-data.ts:7,302` and
-  `navigation.service.ts:91` still describe a mock navigation API removed at the shell re-plumb. Fix:
-  delete the comments when the file is next touched.
+- ~~**P3** · **`MAIL-RELEASE-NOTES-STATUS-1`**~~ ✅ **SHIPPED 2026-09-17 — and the note was wrong a SECOND way
+  the row did not name.** It attributed the SUCCESS-with-nothing-sent behaviour to *no recipients*, which is a
+  different branch that returns **FAILED** and was untouched by `ad29e683`. Both halves corrected.
+  ⚠ `mail.send` has three outcomes: `ok` on delivery, **SKIPPED** with no channel configured (deliberately not
+  FAILED, so a transport-less deployment is inert rather than red on every fire), **FAILED** when `to` resolves
+  to no addresses. The pending-MAJOR release notes live in `okf/backend/control-plane/api-stability.md`; there
+  is no `RELEASE_NOTES`/`CHANGELOG` file in the repo. Original row follows.
+  - **P3** · **`MAIL-RELEASE-NOTES-STATUS-1`** — the pending-MAJOR release notes still describe `mail.send`
+    as returning SUCCESS with no channel; it returns `SKIPPED` since `ad29e683`. Fix: correct the note.
+- ~~**P3** · **`NAV-MOCK-COMMENT-STALE-1`**~~ ✅ **SHIPPED 2026-09-17 — held for TWO of its three sites and
+  REFUTED for the third.** The mock really is gone (no `navigation/api.ts`, no `MockApi` anywhere), and the two
+  stale attributions in `navigation-data.ts` are fixed.
+  🔴 **`navigation.service.ts:91` is NOT stale** — it already records the mock's removal and is the only place
+  explaining why the sidebar is built client-side. The row's instruction to delete it would have removed the
+  explanation. ⚠ Only the attribution was rewritten in the other two: both comments also carry still-true
+  reasons (why the divider exists; why each layout gets its own array). Original row follows.
+  - **P3** · **`NAV-MOCK-COMMENT-STALE-1`** — `core/navigation/navigation-data.ts:7,302` and
+    `navigation.service.ts:91` still describe a mock navigation API removed at the shell re-plumb. Fix:
+    delete the comments when the file is next touched.
 
 ### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
 

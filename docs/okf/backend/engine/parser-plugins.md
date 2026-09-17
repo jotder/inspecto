@@ -253,3 +253,22 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   without the data; the data alone no longer runs them without the property (2026-08-01).
 - **Drop-in `plugins/` jar directory** and the **segments editor** (unlock guided Save for
   ingestable custom parsers) — unchanged from before, apply to any custom parser, not ASN.1-specific.
+
+### BER hostile-input handling — fixed 2026-09-17, and one hazard left open
+
+✅ **`BER-LENGTH-OVERFLOW-1` (P1) is closed.** A long-form 8-byte length of `Long.MAX_VALUE` made
+`valueOffset + valueLength` wrap negative, so the `end > limit` guard passed and `BerReader` returned a Tlv
+with a **negative `endOffset`** that `RecordReader` counted as `recordsOk++` and used as its cursor — a
+malformed record recorded as successfully parsed. Both sites now compare against a remaining-bytes budget
+(`valueLength > limit - valueOffset`), where both operands are non-negative and the subtraction cannot
+overflow. ✅ **`BER-FRAMING-UNCHECKED-READ-1` too**: `Framing.Fixed.recordLength` bounds its header read, and
+`RecordReader` takes the framing calls inside the recovery `try`.
+
+⚠ **A truncated TAIL reports `ParseError(STOP_FILE)` even under `RecoveryPolicy.SKIP_RECORD`** — a header that
+cannot be read yields no boundary to resync to. Records already read are still delivered.
+
+⬜ **`BER-VALID-BUT-HUGE-ALLOCATION-1` remains open and is a different shape.** A length that is *valid* but
+enormous still allocates: measured with a 3 GB stub source, `04 84 95 02 F9 00` parses cleanly and just under
+2 GB would allocate a `byte[]` sized by attacker-controlled input. ⛔ No bounds check can reject it — the
+length is legitimate — so it needs a cap or a streaming accessor, a design call on `Tlv.value()`'s `byte[]`
+return type. Reachable only via `ByteSource.map`.

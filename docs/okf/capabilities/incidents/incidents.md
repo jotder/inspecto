@@ -67,7 +67,7 @@ out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but
 |---|---|---|---|---|
 | `INC-1` | **Alert Rules** watch Metrics (and, since 2026-09-06, Measures); fired **Alerts** with severity | Must | ✅ SHIPPED — ⚠ the authoring form cannot express a Measure rule (§5) | All (the *feed*); ALERT **objects** S/E |
 | `INC-2` | **Alert → Incident → Case** lifecycle, object-link graph, SLA, comments | Must | ✅ SHIPPED | **S/E** — was `All`; `inspecto-ops` since 2026-09-08 (CP-11) |
-| `INC-3` | **Notification** delivery channels (email / webhook) + per-user preferences | Must | 🟡 PARTIAL — feed + rules + receipts shipped; channels S/E; **preferences are one global set**; `mail.send` reports success when no channel exists (§5) | Feed All (CP-12) · channels **S/E** (CP-15) |
+| `INC-3` | **Notification** delivery channels (email / webhook) + per-user preferences | Must | 🟡 PARTIAL — feed + rules + receipts shipped; channels S/E; **preferences are one global set**; ~~`mail.send` reports success when no channel exists~~ ✅ returns **SKIPPED** since `ad29e683` (§5) | Feed All (CP-12) · channels **S/E** (CP-15) |
 | `INC-4` | Incident workflow depth: queues, escalation, watchers | ⛔ **WITHDRAWN** | ⛔ **RETIRED 2026-09-14 (`RETIRE-HALVES-1`)** — the queue family, the three watcher routes and the escalation engine are **deleted from the code**, not merely undocumented. Assignment is now person-only (`POST /objects/{id}/assign` takes `assignee`); the Incident object, the SLA breach sweep and triage stay. ⚠ `watchers` survives as an object **attribute** (the merge union feeds it) with no route. Re-file when a customer names on-call escalation | **n/a** — withdrawn, not gated |
 | `INC-5` | **Diagnosis**: AI-assisted RCA of a failing Run/Collector **producing an Incident** | Should | 🟡 **PARTIAL** — the RCA ships (`FailureReactor` → `DiagnosisStore`, `GET /assist/diagnoses`); **nothing creates an Incident from a Diagnosis** — the only bridge is a drafted Alert Rule (§3.9) | All |
 
@@ -480,7 +480,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | MNT-14 residuals — no UI, no shipped Job instance, retention derived not stamped, `INCIDENT` only | `BACKLOG.md` §6 *MNT-14* | Standing; the operator opts in |
 | Digest deliveries correlate to the digest, not per notification | `BACKLOG.md` §6 | `deliverWithReceipt` is the escape hatch |
 | D7 startup backfill is a full object scan | `BACKLOG.md` §6 | Deliberately unfixed: nothing measures startup |
-| `mail.send` succeeds with nothing sent | `BACKLOG.md` §6 (working-as-designed, disclosed) | Listed because `REQUIREMENTS.md` INC-3 calls it a defect — the two boards disagree on its *category*, not its existence |
+| ~~`mail.send` succeeds with nothing sent~~ ✅ **FIXED 2026-09-17 — see §above; it returns SKIPPED** | `BACKLOG.md` §6 (was: working-as-designed, disclosed) | ⚠ Kept for the trail: `REQUIREMENTS.md` INC-3 called it a defect while §6 called it by-design, and the disagreement was about its *category*. `ad29e683` settled it by changing the behaviour, so the row is spent, not adjudicated |
 
 ### `UNTRACKED` — surfaced by this spec, no board row
 
@@ -693,6 +693,6 @@ baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guard
 |---|---|
 | **No test exercises Diagnosis → Incident** | there is no such path to test (§3.9) |
 | **No test that a Personal bundle answers all 49 object paths `503`** | `AbsentObjectRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
-| **`mail.send` on a transport-less bundle has no failing test** | its success is the recorded behaviour |
+| ~~**`mail.send` on a transport-less bundle has no failing test**~~ ✅ **STALE 2026-09-17** | ~~its success is the recorded behaviour~~ — it returns **SKIPPED** since `ad29e683`, so the recorded behaviour changed and this line no longer describes the code |
 | **No end-to-end SMTP or webhook delivery against a real endpoint** | both transports are tested against in-process fakes; delivery-status webhooks against synthetic signatures |
 | **No committed Case Rule or Tag Rule** | `*_case_rule.toon` / `*_tag_rule.toon`: zero files (§8.5) |

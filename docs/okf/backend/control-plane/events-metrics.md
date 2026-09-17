@@ -302,3 +302,23 @@ cannot outrank a parameterised one registered earlier; the catch-all now carries
 SPA's `v1Interceptor` does). Reaching for `.get("data")` on top of it lands on `null` and surfaces as an
 NPE that reads exactly like a handler bug. Gate tests asserting only a status code pass either way, so
 this appears in the HAPPY PATH alone.
+
+### SMTP transport security — the hostname half is closed, the opportunistic half is not
+
+✅ **`NOTIFY-SMTP-TLS-VERIFY-1` closed 2026-09-17.** `SmtpEmailChannel` now sets
+`mail.smtp.ssl.checkserveridentity` unconditionally. ⚠ The defect was narrower than filed: `javax.mail 1.6.2`'s
+`SocketFetcher` already used `SSLSocketFactory.getDefault()`, so the certificate CHAIN was always validated —
+only the hostname check was missing, making it "any CA-valid certificate, for any name". No escape hatch was
+added: a self-signed relay already failed, and `-Djavax.net.ssl.trustStore` serves that case with
+authentication left ON.
+
+⚠ **Release-note-worthy:** verification is always on and not configurable. A relay whose certificate does not
+name `notify.smtp.host` goes from silently trusted to failing to deliver, and **this will not be noticed on its
+own** — notification failures are logged and isolated by `NotificationService`, never surfaced.
+
+⬜ **`NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1` remains open.** `mail.smtp.starttls.enable` is opportunistic: a
+MITM who simply declines to advertise `STARTTLS` gets a plaintext session, the identity check never runs
+because no TLS session exists, and the AUTH credentials go over the wire in the clear — so the parent row's
+threat model is only half closed. ⛔ `starttls.required=true` is the fix and is a LARGER behaviour change: it
+breaks installs pointed at a relay that never offered STARTTLS and have been silently sending plaintext.
+Operator call.
