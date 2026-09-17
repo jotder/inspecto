@@ -1266,6 +1266,20 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   before launching a gauntlet, confirm no other build is live, and never fire a targeted run "just
   quickly" while one is in flight. 🔴 The expensive part is not the lost build — it is that a clobbered run
   looks exactly like a real regression in code you never touched, and costs a diagnosis every time.
+- **🔴 A REAL flake did exist, and it was an ASYNC BOOT TASK racing the test body — diagnose by making
+  the race LOSE, not by re-running.** `ControlApiProblemFilesTest.limitBounds…` was intermittent on the
+  `inspecto` module's only gate (measured 2026-09-17: 1 of 3 full-module runs red at an **unchanged** tree,
+  green 8/8 alone). Cause: the status read surface is a DB **projection**, refreshed only at boot and at the
+  end of a poll cycle — and `CollectorService.start()` schedules the first cycle with **initial delay 0**, so
+  that cycle's sync ran concurrently with the test, which seeded its ledger *after* boot. Win the race, green;
+  lose it, the route honestly returns 0 rows. ⚠ **The `@TempDir`/shared-state/mtime hypotheses were all wrong**
+  — every test had its own temp root. ⇒ **The technique that settled it in one run: insert a `Thread.sleep`
+  to force the losing order**, which turned a 1-in-3 flake into a deterministic, byte-identical failure; the
+  same probe passing afterwards is then real proof the race is gone. ⚠ **A retry/poll helper was not a fix but
+  a FALSE one** — after the boot cycle there is no second sync inside any sane deadline, so `awaitTotal`'s
+  10s loop could never recover the miss; it only widened the window it was papering over. Fix + the
+  seed-before-boot rule: `e5e4ee8f`; mechanism in `okf/backend/build-run/operations-reference.md`
+  § "Status backend".
 - **⚠ A full reactor build can fail TRANSIENTLY in an untouched module on Windows — re-run before
   believing it.** *(Kept for the diagnosis technique; the CAUSE is the entry above, not staleness.)* Twice on 2026-09-12 `mvn -o clean test -Pedition-enterprise` died in the `asn-*` subtree
   on sources nobody had edited: once as `asn-golden` test-compile errors (*"package com.gamma.asn.schema

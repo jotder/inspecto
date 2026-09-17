@@ -701,6 +701,24 @@ staleness) and the API/observability transparently read from it — no endpoint 
 is a transactional DELETE-then-INSERT per pipeline, so it is idempotent and doubles as the
 migrate/backfill of existing file audit into the database.
 
+🔴 **Only a run or a boot makes a ledger observable — there are exactly TWO sync points, and
+nothing polls the filesystem.** `CollectorService.start()` projects synchronously as its last boot step,
+and a poll cycle projects when its last run finishes (`PipelineScheduler.runOne`, the `pending`
+decrement). So a status artifact that appears on disk **without a run** — restored from backup, copied in
+by an operator, or hand-written by a test — is invisible to every query surface until the next cycle,
+i.e. up to one full `service.poll.seconds` (**default 60**). The file audit is intact the whole time; only
+the projection is behind. `-Dstatus.backend=file` reads the artifacts directly and has no such window.
+
+⚠ **For tests this is a race, not merely a delay, because `start()` schedules the first cycle with
+initial delay 0** — that cycle's sync runs concurrently with the test body. Seed the ledger *after* boot
+and it is observable only if the sync happens to land after your write; lose that coin-flip and the route
+correctly returns 0 rows, with the next sync 60s away, so **retry-until-it-appears cannot recover it**.
+⇒ **A test must seed every ledger / quarantine fixture BEFORE booting the space**, making the boot sync the
+single deterministic projection point. Pinned by `ControlApiProblemFilesTest` (see its `open()` javadoc).
+*(Established 2026-09-17: this is what made that class's `limitBounds…` case intermittent — 1 of 3
+full-module runs red at an unchanged tree, green 8/8 alone. Reproduced deterministically by inserting a
+2s sleep after boot, which forces the race to lose.)*
+
 > **Future / distributed:** the same code path runs on **PostgreSQL** for a multi-writer or
 > multi-node deployment — point the URL at `jdbc:postgresql://host:5432/inspecto` (with
 > `-Dstatus.db.user`/`.password`) and put the PostgreSQL JDBC driver on the classpath. The
