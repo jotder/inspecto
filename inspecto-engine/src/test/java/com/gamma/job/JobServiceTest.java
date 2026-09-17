@@ -172,6 +172,31 @@ class JobServiceTest {
     }
 
     @Test
+    void undeclaredParameterWarnsOnTheRunLogAndTheRunStillSucceeds(@TempDir Path dir) throws Exception {
+        // JOB-PARAM-UNDECLARED-UNREPORTED-1: `retention_dayz` is a typo of a real maintenance parameter —
+        // authored, persisted, shown in the editor, and read by nothing. It now reaches the run log beside
+        // the three REJECTED diagnostics, ⛔ as a WARNING: the run must still SUCCEED, because a descriptor
+        // is the UI/API contract and not the read set (built-ins reach undeclared keys through
+        // JobConfig.opt directly), so fail-closed here would refuse configs that work today.
+        JobConfig typo = new JobConfig("typo_job", JobType.MAINTENANCE, null, null, true, false,
+                Map.of("task", "heartbeat", "retention_dayz", "30"));
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(typo), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            js.start();
+            String runId = js.triggerRun("typo_job", null).orElseThrow();
+            JobRun run = await(() -> js.lastRunOf("typo_job").orElse(null));
+
+            assertEquals("SUCCESS", run.status(), "⛔ never fail-closed: " + run.message());
+            List<String> logged = js.runLog(runId).stream().map(RunLogEntry::message).toList();
+            assertTrue(logged.stream().anyMatch(m -> m.contains("undeclared parameter(s)")
+                    && m.contains("retention_dayz")), logged.toString());
+            assertFalse(logged.stream().anyMatch(m -> m.contains("undeclared parameter(s)") && m.contains("task")),
+                    "a declared parameter is not reported: " + logged);
+        }
+    }
+
+    @Test
     void triggerArgsSatisfyARequiredParameterAndClearTheReject(@TempDir Path dir) throws Exception {
         // P3a-2 (§7.2 layer 1): the same enrich job that REJECTs with no 'config' passes the resolver gate
         // when the manual trigger supplies it as an explicit arg — proving trigger args reach the run path.

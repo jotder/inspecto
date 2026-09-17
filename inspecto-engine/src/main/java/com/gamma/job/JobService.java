@@ -1248,6 +1248,16 @@ public final class JobService implements AutoCloseable {
                     LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
             return;
         }
+        // JOB-PARAM-UNDECLARED-UNREPORTED-1: an authored params: key no descriptor declares is reported
+        // ⛔ WARNING-only, on the run log beside the three REJECTED diagnostics above — never fail-closed.
+        // A descriptor is the UI/API contract, not the read set (see ParameterResolver#undeclared), so a
+        // strict version would refuse configs that work today. This surfaces the dead-property risk: a
+        // typo'd or retired key that is authored, persisted, shown in the editor, and read by nothing.
+        if (!pr.undeclared().isEmpty())
+            ctx.log().warn("undeclared parameter(s) for job type '" + job.type() + "': "
+                    + String.join(", ", pr.undeclared())
+                    + " — no declaration covers them, so nothing validates or renders them; the Job may "
+                    + "still read them directly");
         ctx.params(pr.resolved());
         // DUCKLE-C4: the parameter RECEIPT — which layer each value came from and what it overrode. Built here
         // (the values are resolved), written AFTER the run body (below) so a run's OUTPUT artifacts keep their

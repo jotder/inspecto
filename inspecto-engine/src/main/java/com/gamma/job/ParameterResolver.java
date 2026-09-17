@@ -39,15 +39,32 @@ final class ParameterResolver {
 
     /** Outcome: the resolved values, any {@code required} names that stayed unresolved, any name whose
      *  resolved value didn't parse as its declared {@link ParamType}, and any name whose {@code $}-value
-     *  named a token no provider declares (all three ⇒ REJECTED). */
+     *  named a token no provider declares (those three ⇒ REJECTED) — plus {@code undeclared}, the
+     *  authored {@code params:} keys no declaration covers, which is a <b>WARNING only</b>. */
     record Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType,
-                      List<String> unknownExpression, Map<String, Provenance> provenance) {
+                      List<String> unknownExpression, List<String> undeclared,
+                      Map<String, Provenance> provenance) {
         /** The pre-provenance shape, for callers that only want the values. */
         Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType,
                    List<String> unknownExpression) {
-            this(resolved, missingRequired, invalidType, unknownExpression, Map.of());
+            this(resolved, missingRequired, invalidType, unknownExpression, List.of(), Map.of());
         }
     }
+
+    /**
+     * Authored {@code job:} keys that land in {@link JobConfig#params()} but are read by the
+     * <em>framework</em>, not by any Job Type — so no {@link JobTypeDescriptor} can ever declare them and
+     * reporting them as undeclared would be a false positive by construction. Kept deliberately tiny:
+     * a key earns a place here only by having a named read in framework code.
+     * <ul>
+     *   <li>{@code on_pipeline_gate} — {@code JobService.onCommit}'s {@code any}/{@code all} multi-upstream
+     *       semantics, documented on {@link JobConfig} itself and applicable to every type.</li>
+     * </ul>
+     * ⚠ {@code flow} is <b>not</b> here: it is the pre-rename alias of the {@code pipeline} parameter and is
+     * excused below only when a {@code pipeline} declaration exists — i.e. exactly when the ladder's
+     * {@code config:flow} rung actually reads it.
+     */
+    private static final java.util.Set<String> FRAMEWORK_KEYS = java.util.Set.of("on_pipeline_gate");
 
     /**
      * Where a resolved value came from, and what it overrode (`DUCKLE-C4-PARAM-PROVENANCE-1`, 2026-09-15).
@@ -109,7 +126,34 @@ final class ParameterResolver {
             provenance.put(d.name(), new Provenance(l.source(), l.overrode()));
         }
         return new Resolution(Map.copyOf(out), List.copyOf(missing), List.copyOf(invalidType),
-                List.copyOf(unknown), Map.copyOf(provenance));
+                List.copyOf(unknown), undeclared(decls, config), Map.copyOf(provenance));
+    }
+
+    /**
+     * The authored {@code params:} keys no {@link ParameterDecl} covers
+     * ({@code JOB-PARAM-UNDECLARED-UNREPORTED-1}). ⛔ <b>A WARNING, never a rejection.</b> A descriptor is
+     * the UI/API contract, not the read set: built-in Jobs legitimately reach keys their own descriptor
+     * never declares straight through {@link JobConfig#require}/{@link JobConfig#opt} — {@code data_dir}
+     * and {@code batch_id} ({@code PipelineJobRunner}), {@code sleep_ms} ({@code MaintenanceJob}),
+     * {@code top} ({@code StorageReportTask}/{@code StorageTrendTask}), {@code history_days}
+     * ({@code ReferenceCompactor}), {@code max_attempts}/{@code backoff_minutes}
+     * ({@code SoftBounceRetryTask}) — so a fail-closed version would refuse working configs on day one.
+     * What this catches is the dead-property class: a typo'd or retired key that is authored, persisted,
+     * shown in the editor, and read by nothing.
+     *
+     * <p>Only the {@code config} layer is checked. Trigger {@code args}/{@code bind} are per-firing and
+     * already reported through {@code unknownExpression}; an extra key there is not a config that rots.
+     */
+    private static List<String> undeclared(List<ParameterDecl> decls, Map<String, String> config) {
+        java.util.Set<String> declared = new java.util.HashSet<>();
+        for (ParameterDecl d : decls) declared.add(d.name());
+        List<String> extra = new ArrayList<>();
+        for (String key : config.keySet()) {
+            if (declared.contains(key) || FRAMEWORK_KEYS.contains(key)) continue;
+            if ("flow".equals(key) && declared.contains("pipeline")) continue;   // the config:flow rung read it
+            extra.add(key);
+        }
+        return List.copyOf(extra);
     }
 
     /** Check a resolved value against the declaration's full contract (§7.2, step 8) — type, then

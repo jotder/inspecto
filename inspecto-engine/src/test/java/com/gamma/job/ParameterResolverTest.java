@@ -354,6 +354,53 @@ class ParameterResolverTest {
                 "the fail-closed gate now covers the layer authors actually type into");
     }
 
+    // ── JOB-PARAM-UNDECLARED-UNREPORTED-1 (2026-09-17): an authored params: key no declaration covers
+    // ── is REPORTED as `undeclared` — and ⛔ WARNING-only: it never rejects and never drops a value ──
+
+    @Test
+    void undeclaredConfigKeyIsReportedButNeverRejects() {
+        List<ParameterDecl> decls = List.of(decl("dir", false, null, null));
+        var r = resolve(decls, Map.of("dir", "/data", "retention_dayz", "30"), ctx(Optional.empty()));
+
+        assertEquals(List.of("retention_dayz"), r.undeclared(), "the typo'd key is named, not swallowed");
+        assertTrue(r.missingRequired().isEmpty(), "an undeclared key is never a missing required one");
+        assertTrue(r.invalidType().isEmpty(), "⛔ WARNING only — nothing here may make a Run REJECTED");
+        assertTrue(r.unknownExpression().isEmpty());
+        assertEquals("/data", r.resolved().get("dir"), "the declared params still resolve normally");
+    }
+
+    @Test
+    void everyDeclaredKeyIsCovered() {
+        // Covered whether the value came from the config layer or not: declaring `absent` and not
+        // authoring it is the missing/default question, not an undeclared one.
+        List<ParameterDecl> decls = List.of(decl("dir", false, null, null), decl("absent", false, null, "d"));
+        assertEquals(List.of(), resolve(decls, Map.of("dir", "/data"), ctx(Optional.empty())).undeclared());
+    }
+
+    @Test
+    void frameworkKeysAndTheFlowAliasAreNotUndeclared() {
+        // on_pipeline_gate is read by JobService (multi-upstream any/all) for EVERY type, so no
+        // descriptor can declare it — reporting it would be a false positive by construction.
+        List<ParameterDecl> pipeline = List.of(decl("pipeline", false, null, null));
+        assertEquals(List.of(), resolve(pipeline, Map.of("on_pipeline_gate", "all"), ctx(Optional.empty())).undeclared());
+
+        // `flow` is the pre-rename alias the ladder's config:flow rung reads — excused only when a
+        // `pipeline` declaration exists, which is exactly when that rung fires.
+        assertEquals(List.of(), resolve(pipeline, Map.of("flow", "orders"), ctx(Optional.empty())).undeclared());
+        assertEquals(List.of("flow"),
+                resolve(List.of(decl("task", false, null, null)), Map.of("flow", "orders"), ctx(Optional.empty())).undeclared(),
+                "with no `pipeline` declaration nothing reads `flow`, so it IS an undeclared key");
+    }
+
+    @Test
+    void triggerArgsAndBindAreNotCheckedForUndeclaredKeys() {
+        // Only the authored config layer is a config that can rot; a per-firing extra arg is not.
+        List<ParameterDecl> decls = List.of(decl("dir", false, null, null));
+        var r = ParameterResolver.resolve(decls, Map.of("extra_arg", "x"), Map.of("extra_bind", "$signal.y"),
+                Map.of("dir", "/data"), EXPR, ctx(Optional.empty()));
+        assertEquals(List.of(), r.undeclared());
+    }
+
     @Test
     void missingRequiredParameterIsReported() {
         List<ParameterDecl> decls = List.of(
