@@ -65,11 +65,29 @@ import { join, dirname, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { checkoutIndex, trackedPaths as checkoutPaths } from './tracked-paths.mjs';
 
-/** Trees scanned. Root-level `*.md` (CLAUDE.md, README) is added separately. */
-const ROOTS = ['docs', 'compliance', '.claude'];
+/**
+ * Scope: the WHOLE repository, as a DENY-list (`SKIP_DIRS`), not an allow-list of trees.
+ *
+ * ⛔ Until 2026-09-17 this read `['docs', 'compliance', '.claude']` + root `*.md`, and that allow-list
+ * was itself the bug — the SEVENTH recorded instance of this shape in `tools/`, after
+ * `check-doc-links.mjs` (`README-LINKS-BROKEN-IN-REPO-1`), `check-doc-counts.mjs`
+ * (`DOC-COUNTS-GUARD-SCOPE-1`) and `check-vocabulary.mjs` (`README-VOCAB-SCOPE-1`). Every module README
+ * was unchecked for dead citations — including `inspecto/README.md`, which `package.ps1` step 7 copies
+ * to the BUNDLE ROOT as the customer's first page.
+ *
+ * An allow-list answers "did we remember to add this tree?"; a deny-list answers "is there a reason to
+ * skip this tree?" — and only the second fails loudly when someone adds a fourth doc-bearing directory.
+ */
+const ROOTS = ['.'];
 
 /** Never walked: build output and the git worktrees, which hold whole second copies of the repo. */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out']);
+// ⚠ `inspecto-deploy` is the packaged BUNDLE — gitignored build output carrying a stale COPY of the
+// whole docs tree. Its citations are the docs' own, one release behind, so scanning it reports findings
+// in generated files nobody edits. `check-doc-links.mjs` and `check-family-count.mjs` skip it for the
+// same reason. ⛔ It is absent from a fresh clone, so omitting it looks green to the author and goes red
+// the moment the guard meets a checkout that has ever built a bundle.
+const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out',
+                           'inspecto-deploy']);
 
 /** Exempt AS SOURCES only — see the header. Kept as prefixes so they read at the call site. */
 const EXEMPT_TIERS = ['docs/archived-documents/', 'docs/superpower/'];
@@ -144,7 +162,12 @@ const MIN_PATH_CITATIONS = 300;
 /** Check B is worthless if the map fails to parse, so a thin map FAILS rather than passing green. */
 const MIN_RENAME_ENTRIES = 20;
 
-const slash = (p) => p.split(sep).join('/');
+/**
+ * Repo-relative, forward-slashed. ⚠ The `./` strip is load-bearing now that ROOTS is `['.']`: the
+ * EXEMPT_TIERS test below is a plain `startsWith`, and a leading `./` would stop it matching — silently
+ * un-exempting the archive and the in-flight plans. `check-doc-links.mjs` records the same trap.
+ */
+const slash = (p) => p.split(sep).join('/').replace(/^\.\//, '');
 
 function fail(message) {
     console.error(`✗ Citation guard: ${message}`);
@@ -251,12 +274,11 @@ const anyOldName = new RegExp('\\b(' + oldNames.join('|') + ')\\b', 'g');
 
 const files = [];
 for (const root of ROOTS) if (existsSync(root)) collect(root, files);
-for (const name of readdirSync('.')) if (name.endsWith('.md')) files.push(name);
 
 if (files.length < MIN_FILES) {
     fail(
-        `only ${files.length} markdown file(s) found, below the floor of ${MIN_FILES}. Either the doc ` +
-            `trees moved (fix ROOTS) or this ran from the wrong directory — a citation check over ` +
+        `only ${files.length} markdown file(s) found, below the floor of ${MIN_FILES}. Either the repo ` +
+            `root moved (fix ROOTS) or this ran from the wrong directory — a citation check over ` +
             `nothing is the bug this floor exists for.`,
     );
 }
@@ -353,7 +375,8 @@ if (pathCitations < MIN_PATH_CITATIONS) {
 
 // The exemptions are stated on every run, pass or fail. An unprinted scope is an unaudited one.
 const scopeNote =
-    `scope: ${files.length} markdown file(s) under ${ROOTS.join(', ')} + root *.md, MINUS ` +
+    `scope: ${files.length} markdown file(s) — the WHOLE repo minus ` +
+    `${[...SKIP_DIRS].join('/')}, MINUS ` +
     `${EXEMPT_TIERS.join(' and ')} as sources (never-maintained / in-flight tiers — citations pointing ` +
     `INTO them are still checked); ${pathCitations} path citation(s), of which ${recordedAbsences} ` +
     `state the absence on the citing line and are ALLOWED as recorded history; ${renames.size} ` +

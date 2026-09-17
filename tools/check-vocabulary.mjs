@@ -6,8 +6,10 @@
 //      docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md). Cheapest, highest-value surface: a bad
 //      key caught here costs nothing, while the same key caught after operators author data costs a
 //      migration.
-//   3. KNOWLEDGE TREES — `docs/okf/**` + `docs/superpower/**`, same rules as pass 1 but allowlisted per
-//      `<path>::<ruleId>` (DOC_ALLOW). Added 2026-08-04; `docs/archived-documents/**` stays excluded.
+//   3. EVERY OTHER TRACKED MARKDOWN FILE — same rules as pass 1 but allowlisted per `<path>::<ruleId>`
+//      (DOC_ALLOW). Added 2026-08-04 as `docs/okf/**` + `docs/superpower/**`; reshaped 2026-09-17 from an
+//      allow-list of trees into a DENY-list (`DOC_SKIP`), so a new doc-bearing directory is IN SCOPE by
+//      default instead of silently unscanned. `docs/archived-documents/**` is the only exclusion.
 //   4. JAVA + TS SOURCE — two rules, added 2026-08-04 and 2026-08-26. `flow-identifier` bans `flow`
 //      only where it is WELDED to another word (`flowStore`, `FLOW_CONSERVATION`); `flow-message` bans
 //      the BARE word inside the text a user reads (string literals, template text), and spares a
@@ -65,6 +67,12 @@ if (!gitAccess.ok && !gitAccess.tarball) {
 // The curated set of user-facing docs whose canonical vocabulary must stay pristine.
 const USER_FACING = [
     'docs/USER_GUIDE.md',
+    // Added 2026-09-17 (README-VOCAB-SCOPE-1): `package.ps1` step 7 copies this file to the BUNDLE ROOT,
+    // so it is literally the customer's first page — the single most user-facing document the product
+    // ships. It meets this list's admission criterion (measured clean under every rule before being
+    // added), and it belongs under pass 1's no-allowlist discipline rather than pass 3's for the same
+    // reason USER_GUIDE.md does: there is no audience below it to whom a stale synonym is harmless.
+    'inspecto/README.md',
     // 🔴 EIGHT ENTRIES REMOVED 2026-09-08 — they had been dead paths for 54 days and pass 1 was scanning
     // NOTHING for any of them. `docs/operations.md`, `troubleshooting.md`, `configuration.md`,
     // `integrations.md`, `plugins.md`, `performance.md`, `parsing-options-reference.md` and
@@ -81,14 +89,13 @@ const USER_FACING = [
     // build on a dead entry, which is why this could sit unnoticed before and cannot now.
 ];
 
-// Pass 3 (§3.2, added 2026-08-04): the KNOWLEDGE trees — `docs/okf/**` (current knowledge) and
-// `docs/superpower/**` (active plans). Same rules as pass 1, but allowlisted per `<path>::<ruleId>` via
-// DOC_ALLOW, because these docs legitimately name things the rename program keeps on purpose.
+// Pass 3 (§3.2, added 2026-08-04): every current doc. Same rules as pass 1, but allowlisted per
+// `<path>::<ruleId>` via DOC_ALLOW, because these docs legitimately name things the rename program keeps
+// on purpose.
 //
-// `docs/archived-documents/**` is EXCLUDED PERMANENTLY, not pending: CLAUDE.md defines that tier as
-// "kept for provenance, never maintained, never linked as current", and it holds most of the repo's raw
-// `flow` hits. Linting a tree nobody may edit would be unfixable-by-design noise.
-// `compliance/**` (C2, added 2026-08-28) joins them: it is product documentation, tracked in git and
+// ── HOW THIS SCOPE GREW, one forgotten tree at a time (kept: it is the argument for the deny-list) ──
+// It began as `docs/okf/**` + `docs/superpower/**`, an ALLOW-LIST of trees.
+// `compliance/**` (C2, added 2026-08-28) joined them: it is product documentation, tracked in git and
 // SHIPPED IN THE DEPLOY BUNDLE'S DOCS (compliance plan §4), so it is exactly as user-facing as
 // `docs/okf` — and a control matrix that calls a Pipeline a "Flow" is one an auditor reads. It was
 // outside every pass on the day it was created, which is the silent-exemption shape this guard's own
@@ -108,43 +115,41 @@ const USER_FACING = [
 // job type: past a certain age a banned synonym stops being wrong vocabulary and becomes wrong
 // instructions. The lesson is now on its third repetition: audit a guard's SCOPE separately from its
 // RULES, because a clean run says nothing about what it declined to look at.
-const DOC_TREES = [
-    'docs/okf',
-    'docs/superpower',
-    'compliance',
-    'docs/stakeholders',
-    'docs/roadmap',
-    'docs/ops',
-    'docs/api',
-    'docs/ui',
-    'docs/wiki',
-];
-
-// The ROOT CANON (CLAUDE.md doc-lifecycle §1) — tier-1 current knowledge that is not under a tree, so
-// every pass missed it: `docs/` also holds `ops/`, `roadmap/`, `api/`, `ui/` and the permanently
-// unscanned `archived-documents/`, which is why this is a NAMED FILE LIST and not `docs/`.
+// ⛔ THE ALLOW-LIST OF TREES IS GONE (2026-09-17, README-VOCAB-SCOPE-1) — and the list above is its
+// obituary, not its design: every paragraph of it records the SAME failure, a doc-bearing directory that
+// was unscanned because nobody remembered to name it. Five times in six weeks (`compliance/`,
+// `docs/stakeholders/`, the root canon, the five trees of 2026-09-08, and finally the module READMEs).
+// An allow-list can only ever answer "did we remember to add this tree?"; a DENY-list answers "is there a
+// reason to skip this tree?", and only the second fails loudly when someone adds a sixth.
 //
-// Added 2026-08-29 after an audit asked what each guard's SCOPE quietly exempts. It found the same
-// silent-exemption shape `compliance/` had: GLOSSARY — the file that DEFINES the bans — plus INDEX,
-// BACKLOG, PROJECT_NOTES, ADVANCED_GUIDE and FEATURE_INVENTORY were outside every pass, and four of
-// them carried live `Flow` residue the rename program had already retired everywhere it looked.
-// `USER_GUIDE.md` is absent on purpose: it is already pass 1's, under the stricter no-allowlist rules.
-const ROOT_CANON = [
-    'docs/ADVANCED_GUIDE.md',
-    'docs/BACKLOG.md',
-    'docs/BRANCHING.md',
-    'docs/EDITIONS.md',
-    'docs/FEATURE_INVENTORY.md',
-    'docs/GLOSSARY.md',
-    'docs/INDEX.md',
-    'docs/PROJECT_NOTES.md',
-    'docs/REQUIREMENTS.md',
-];
+// What the sixth gap was hiding: `inspecto/README.md` — the file `package.ps1` step 7 copies to the
+// BUNDLE ROOT as the customer's first page — was outside every pass, so its wording had to be checked by
+// HAND against the bans. Its sibling `check-doc-links.mjs` had already taken this same reshape
+// (`ROOTS = ['.']` minus SKIP_DIRS) one day earlier, for the same file and the same reason.
+//
+// Scope is now EVERY TRACKED MARKDOWN FILE except the paths below. That is a smaller widening than it
+// sounds and it was measured before it was written: 529 tracked `*.md`, of which 228 were already
+// scanned and 240 are the archive, leaving 61 newly in scope and exactly THREE hits — all three the
+// data-origin sense, all three recorded in DOC_ALLOW below with a reason. Note the prose pass reads
+// markdown ONLY (`git ls-files '*.md'`); Java and TS are pass 4's, under rules written for code.
+//
+// `docs/archived-documents/**` is EXCLUDED PERMANENTLY, not pending: CLAUDE.md defines that tier as
+// "kept for provenance, never maintained, never linked as current", and it holds most of the repo's raw
+// `flow` hits. Linting a tree nobody may edit would be unfixable-by-design noise. It is the ONLY
+// exclusion, and `check-doc-links.mjs` records the identical one for the identical reason.
+const DOC_SKIP = ['docs/archived-documents/'];
 
-// The trees' own name for themselves. Derived, never restated — the summary line used to say
+// A named ROOT_CANON file list (GLOSSARY, INDEX, BACKLOG, PROJECT_NOTES, ADVANCED_GUIDE,
+// FEATURE_INVENTORY, REQUIREMENTS, BRANCHING, EDITIONS) lived here from 2026-08-29 to 2026-09-17. It was
+// a named list ONLY because `docs/` also held trees the allow-list had not taken; with the deny-list it
+// is redundant — those nine files are simply tracked markdown outside the archive. Nothing loses
+// coverage. `USER_GUIDE.md` and `inspecto/README.md` stay out of pass 3 because they are pass 1's, under
+// the stricter no-allowlist rules — the `USER_FACING.includes` filter below is what keeps them there.
+
+// The scope's own name for itself. Derived, never restated — the summary line used to say
 // "docs/{okf,superpower}" literally, so adding a third tree left the guard REPORTING A SCOPE IT NO
 // LONGER HAD. A guard that misstates what it scanned is the same failure as one that scans nothing.
-const DOC_TREES_LABEL = `{${[...DOC_TREES, 'root canon'].join(', ')}}`;
+const DOC_TREES_LABEL = `{all tracked *.md minus ${DOC_SKIP.join(', ')}}`;
 
 // Keyed `<path>::<ruleId>`, exactly like CONFIG_ALLOW, so exempting one known keep never blanket-exempts a
 // file from the other rules. Two legitimate shapes only:
@@ -187,6 +192,17 @@ const DOC_ALLOW = {
     // radius (517 Java files)", a figure the Tier-3 sweep had already taken to 166, inside a per-plan
     // narrative that moved to `archived-documents/index-snapshot-2026-09-07.md`. The rename map that owns
     // the claim is GLOSSARY §13, which has its own subject-matter exemption below.
+    // ── the deny-list scope (added with it, 2026-09-17) ──────────────────────────────────────────
+    // THREE entries, which is the whole cost of taking every tracked markdown file. All three are the
+    // *data-origin* sense the `source-acquisition-entity` rule already spares in prose ("Source path",
+    // "source of truth") but cannot spare as a BARE table-column header, where no trailing noun follows.
+    'CLAUDE.md::source-acquisition-entity':
+        'Subject matter, exactly as GLOSSARY below: the repo-root instructions DECLARE the bans, so the hard-bans bullet must be able to print "⛔ *Source* (acquisition entity) → **Collector**". The ⛔ line-skip does not reach it because the bullet wraps.',
+    'inspecto-agent/docs/AGENT_KERNEL_K0_K1_PLAN.md::source-acquisition-entity':
+        'Different concept: the §3.1 work-unit table\'s "Source" column says where each unit comes FROM (port from UCC vs. new) — provenance of code, not an acquisition entity.',
+    'inspecto-engine/src/test/resources/pipeline-document.golden.md::source-acquisition-entity':
+        'Different concept, and a GOLDEN FIXTURE: the Map table\'s "Source" column is the mapping\'s input expression (`CAST(AMOUNT AS DOUBLE)`), the data-origin sense. The text is EMITTED by the document generator and must stay byte-exact for its test — if that header is ever renamed, it is renamed in the generator and this file follows, never the reverse.',
+
     'docs/PROJECT_NOTES.md::bare-flow':
         'Subject matter: the one hit records that CONFIG_ALLOW doubles as the Flow→Pipeline Tier-3 ledger. The other four hits in this file were stale and were fixed 2026-08-29.',
 };
@@ -659,7 +675,7 @@ const usedDocAllow = new Set();
 const treeViolations = [];
 const treeMarkdown = trackedFiles('*.md');
 const treeDocs = (treeMarkdown ?? []).filter(
-    (p) => DOC_TREES.some((t) => p.startsWith(`${t}/`)) || ROOT_CANON.includes(p),
+    (p) => !DOC_SKIP.some((t) => p.startsWith(t)) && !USER_FACING.includes(p),
 );
 for (const rel of treeDocs) {
     for (const hit of scanProse(rel)) {

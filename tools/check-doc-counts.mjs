@@ -17,7 +17,9 @@
 // guard is mostly exemption — the shape this repo has recorded as a failure three times over. The
 // invariant the repository states about ITSELF is different and exact: a contract owns the number.
 //
-// Exemptions: NONE, by construction. A marker either resolves and matches, or the guard fails.
+// Exemptions: NONE, by construction — a marker either resolves and matches, or the guard fails. The ONE
+// thing not scanned is a fenced block, and that is not an exemption but a SCOPE call: text in a fence is a
+// marker being SHOWN, not one being asserted. See `DOC-COUNTS-FENCED-MARKER-1` at the scan loop below.
 //
 // Usage:  node tools/check-doc-counts.mjs
 // Marker: <!--count:ID--> placed directly after the number, e.g.  **119**<!--count:processors-->
@@ -369,14 +371,38 @@ for (const [id, spec] of Object.entries(MANIFEST)) {
 }
 
 // ── scan markers ────────────────────────────────────────────────────────────────────────────────
+// ⛔ Anything inside a fenced block (``` or ~~~) is QUOTED TEXT, not an assertion — `DOC-COUNTS-FENCED-MARKER-1`.
+// Found by HITTING it: the section recording `DOC-COUNTS-GUARD-SCOPE-1` could not show a marker by example, so
+// it had to write the id as `*` to dodge the scan. Widening the scope to the whole repo widened that trap to
+// every markdown file in it. `check-doc-links.mjs`, `check-doc-citations.mjs` and `check-bundle-doc-links.mjs`
+// all strip fences with exactly this idiom, for exactly this reason; this guard was the odd one out.
+// ⚠ INLINE `` `code` `` IS DELIBERATELY NOT STRIPPED, and that is a separate decision from the fence — they
+// merely arrived in one sentence of the row. `check-vocabulary.mjs` strips inline spans; `check-doc-citations.mjs`
+// requires them. Here the asymmetry is the FLOOR: floors now sit below the marked counts (68 markers, floors
+// summing to 55), so a live marker hidden by one stray backtick would NOT trip the ratchet — it would just stop
+// being policed, silently, which is the failure shape this file's own header records. Measured: ZERO of the 68
+// markers sit inside inline backticks today, so stripping them would buy nothing and risk exactly that. A doc
+// showing a marker by example puts it in a FENCE.
 const MARKER = /<!--\s*count:([a-z0-9-]+)\s*-->/g;
 const seen = Object.fromEntries(Object.keys(MANIFEST).map(k => [k, 0]));
 let markers = 0;
+let quoted = 0;   // markers skipped inside a fence — printed, because a silent exemption is not an exemption
 
 for (const f of files) {
     const lines = readFileSync(f, 'utf8').split('\n');
+    let inFence = false;
     lines.forEach((line, i) => {
         let m;
+        const trimmed = line.trimStart();
+        if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
+            inFence = !inFence;
+            return;
+        }
+        if (inFence) {
+            MARKER.lastIndex = 0;
+            while (MARKER.exec(line)) quoted++;
+            return;
+        }
         MARKER.lastIndex = 0;
         while ((m = MARKER.exec(line))) {
             markers++;
@@ -422,7 +448,8 @@ if (failures.length) {
     console.error(`\n  derived: ${tally}`);
     console.error(`  scope: ${files.length} current-tier markdown file(s) (${all.length} total — the `
         + `WHOLE repo minus ${[...SKIP_DIRS].join('/')}; ${EXEMPT.join(', ')} exempt as `
-        + `never-maintained), ${markers} marker(s), NO exemptions by design\n`);
+        + `never-maintained), ${markers} live marker(s) + ${quoted} quoted inside a fenced block (not `
+        + `asserted); inline \`code\` IS still scanned\n`);
     console.error('  Fix the DOC, or the contract — not this guard. A count in a doc must equal what');
     console.error('  its owning contract derives. If a line is deliberately recording an OLD figure,');
     console.error('  do not mark it: markers assert the current value.\n');
@@ -432,4 +459,5 @@ if (failures.length) {
 console.log(`✓ Doc-count guard: ${markers} marked count statement(s) all match what their owning `
     + `contract derives — ${tally}; scope: ${files.length} current-tier markdown file(s) `
     + `(${all.length} total — the WHOLE repo minus ${[...SKIP_DIRS].join('/')}; `
-    + `${EXEMPT.join(', ')} exempt as never-maintained); NO exemptions by design.`);
+    + `${EXEMPT.join(', ')} exempt as never-maintained); ${quoted} further marker(s) quoted inside a `
+    + `fenced block and NOT asserted; inline \`code\` IS still scanned.`);
