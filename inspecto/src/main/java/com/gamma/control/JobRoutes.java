@@ -54,7 +54,7 @@ final class JobRoutes implements RouteModule {
         // live JobService (JobService.upsertJob/removeJob) so it takes effect without a restart.
         api.post("/jobs", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createJob(api, api.body(e))));
         api.put("/jobs/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> updateJob(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> updateJob(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/jobs/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> deleteJob(api, ApiContext.name(m))));
         // Job Type registry (R3, job-framework P2a): list + per-type descriptor (params/emits/artifacts)
@@ -97,7 +97,7 @@ final class JobRoutes implements RouteModule {
                 (e, m) -> replayRun(api, e, ApiContext.name(m))));
         // Single-job detail (the Scheduler's detail page). Registered AFTER every fixed /jobs/<sub-path>
         // above, so "types"/"packs"/"metrics"/"runs"/"failures" resolve to their own routes first.
-        api.get("/jobs/([^/]+)", (e, m) -> jobDetail(api, ApiContext.name(m)));
+        api.get("/jobs/([^/]+)", (e, m) -> jobDetail(api, e, ApiContext.name(m)));
         api.get("/jobs/([^/]+)/runs", (e, m) -> jobs(api).runsFor(ApiContext.name(m)));
         // Structured Run Log for one run (R5, job-framework P0). More path segments than the history
         // route above and ends in /log, so the two never collide under full-match routing.
@@ -210,9 +210,14 @@ final class JobRoutes implements RouteModule {
      *  shape is {@code ConnectionProfile}: an inline literal secret becomes {@code ***}, while a
      *  {@code ${ENV:…}} reference stays visible, because the reference is not itself sensitive and hiding
      *  it would leave an operator unable to see how the secret is wired. */
-    private Object jobDetail(ApiContext api, String name) {
+    private Object jobDetail(ApiContext api, HttpExchange ex, String name) throws IOException {
         JobConfig cfg = existingJob(api, name);
-        return maskSecrets(cfg.toMap(), jobs(api).secretParams(cfg));
+        Map<String, Object> raw = cfg.toMap();
+        // IFMATCH-COVERAGE-GAP-1: a strong content ETag over the raw (unmasked) stored config — the
+        // same bytes PUT /jobs/{name} hashes for its If-Match check — so an editor that reads here and
+        // later saves through updateJob can detect a concurrent edit, mirroring PipelineGraphRoutes.
+        ETags.set(ex, ETags.of(ContentHash.of(raw)));
+        return maskSecrets(raw, jobs(api).secretParams(cfg));
     }
 
     /** Mask the {@code secret}-declared parameters of one {@code JobConfig.toMap()} view. That view is the
@@ -337,15 +342,21 @@ final class JobRoutes implements RouteModule {
         return c.toMap();
     }
 
-    /** {@code PUT /jobs/{name}} — replace a job's config; 404 if unknown, 400 on a body/path name mismatch. */
-    private Object updateJob(ApiContext api, String name, Map<String, Object> body) throws IOException {
+    /** {@code PUT /jobs/{name}} — replace a job's config; 404 if unknown, 400 on a body/path name
+     *  mismatch, 409 on a stale {@code If-Match} (IFMATCH-COVERAGE-GAP-1: this is a genuine
+     *  read-modify-write — the Scheduler's edit form reads {@code GET /jobs/{name}}, mutates fields
+     *  client-side and PUTs the full config back, so two concurrent editors can silently clobber one
+     *  another without a version check). */
+    private Object updateJob(ApiContext api, HttpExchange ex, String name, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         JobService svc = jobs(api);
-        if (svc.jobs().stream().noneMatch(v -> v.name().equals(name)))
-            throw new ApiException(404, "no job named '" + name + "'");
+        JobConfig existing = svc.jobConfig(name)
+                .orElseThrow(() -> new ApiException(404, "no job named '" + name + "'"));
+        ETags.requireMatch(ex, ETags.of(ContentHash.of(existing.toMap())));
         JobConfig c = parseJob(body);
         if (!name.equals(c.name())) throw new ApiException(400, "body 'name' must match the path id");
         persistJob(api, c);
+        ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
         return c.toMap();
     }
 

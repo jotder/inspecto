@@ -45,10 +45,10 @@ final class AccessRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/access/roles", (e, m) -> ETags.respond(e, roles(api)));
         api.put("/access/roles", ApiContext.withCapability("canConfigureAccess",
-                (e, m) -> saveRoles(api, api.body(e))));
+                (e, m) -> saveRoles(api, e, api.body(e))));
         api.get("/access/policies", (e, m) -> ETags.respond(e, policies(api)));
         api.put("/access/policies", ApiContext.withCapability("canConfigureAccess",
-                (e, m) -> savePolicies(api, api.body(e))));
+                (e, m) -> savePolicies(api, e, api.body(e))));
         // "Why denied?" dry-run for the caller's own session (BACKLOG §5). A GET (read action) on
         // purpose: it changes nothing, and a POST would be a 'write' the very policy under test could
         // deny at the route PEP — locking the denied subject out of the tool that explains their denial.
@@ -56,10 +56,10 @@ final class AccessRoutes implements RouteModule {
         api.get("/access/explain", (e, m) -> explain(e));
         api.get("/access/catalog", (e, m) -> ETags.respond(e, catalog(api)));
         api.put("/access/catalog", ApiContext.withCapability("canConfigureAccess",
-                (e, m) -> saveCatalog(api, api.body(e))));
+                (e, m) -> saveCatalog(api, e, api.body(e))));
         api.get("/access/profiles", (e, m) -> ETags.respond(e, profiles(api)));
         api.put("/access/profiles/([^/]+)", ApiContext.withCapability("canConfigureAccess",
-                (e, m) -> saveProfile(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> saveProfile(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/access/profiles/([^/]+)", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> deleteProfile(api, ApiContext.name(m))));
     }
@@ -89,12 +89,17 @@ final class AccessRoutes implements RouteModule {
      *  seed entry (an empty capability list revokes); seed roles not named keep their defaults. The
      *  optional {@code identity.attributeClaims} allowlist (ABAC A1) rides the same doc — omitting it
      *  clears it, like any full-replace field. */
-    private Object saveRoles(ApiContext api, Map<String, Object> body) throws IOException {
+    /** IFMATCH-COVERAGE-GAP-1: {@code Roles} is a full-replace settings doc read by
+     *  {@code GET /access/roles} (which already publishes a content ETag) and edited/PUT back by an
+     *  operator — a genuine read-modify-write with real double-write exposure between two admins, so
+     *  the write honours the same optional {@code If-Match} precondition the read publishes. */
+    private Object saveRoles(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "role settings write");
+        ETags.requireMatch(ex, ETags.of(ContentHash.of(roles(api))));
         Map<String, Roles.Def> authored = Roles.validate(body.get("roles"));
         List<String> attributeClaims = Roles.attributeClaims(body.get("identity"));
         Roles.write(root, authored, attributeClaims);
-        return roles(api);
+        return ETags.respond(ex, roles(api));
     }
 
     private static Map<String, Object> roleShape(String name, Roles.Def def, String source) {
@@ -186,11 +191,13 @@ final class AccessRoutes implements RouteModule {
 
     /** Full replace of the authored doc (settings-doc discipline). Conditions parse-gate here — a
      *  `when` the {@code Conditions} grammar rejects is a 422, never a stored time bomb. */
-    private Object savePolicies(ApiContext api, Map<String, Object> body) throws IOException {
+    /** IFMATCH-COVERAGE-GAP-1: same full-replace settings-doc exposure as {@link #saveRoles}. */
+    private Object savePolicies(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "access policy write");
+        ETags.requireMatch(ex, ETags.of(ContentHash.of(policies(api))));
         List<AccessPolicies.Policy> policies = AccessPolicies.validate(body.get("policies"));
         AccessPolicies.write(root, policies);
-        return policies(api);
+        return ETags.respond(ex, policies(api));
     }
 
     private static Map<String, Object> policyShape(AccessPolicies.Policy p, String source) {
@@ -222,13 +229,20 @@ final class AccessRoutes implements RouteModule {
         return empty;
     }
 
-    private Object saveCatalog(ApiContext api, Map<String, Object> body) throws IOException {
+    /** IFMATCH-COVERAGE-GAP-1: the catalog is a single ComponentStore-backed doc two operators can
+     *  both open and save — the same real double-write exposure {@code ComponentRoutes.updateComponent}
+     *  guards for, so the write honours an optional {@code If-Match} against the ETag its own GET
+     *  publishes. */
+    private Object saveCatalog(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         ComponentStore store = writeStore(api);
+        ETags.requireMatch(ex, ETags.of(ContentHash.of(catalog(api))));
         Map<String, Object> doc = new LinkedHashMap<>();
         Object version = body.get("version");
         doc.put("version", version instanceof Number n ? n.intValue() : 1);
         doc.put("nodes", validNodes(body.get("nodes"), new LinkedHashSet<>()));
-        return write(store, CATALOG_TYPE, CATALOG_ID, doc);
+        Object written = write(store, CATALOG_TYPE, CATALOG_ID, doc);
+        ETags.set(ex, ETags.of(ContentHash.of(written)));
+        return written;
     }
 
     /** Validate a node forest: id (safe, unique across the tree), label, kind, action ⇒ capability. */
@@ -278,9 +292,16 @@ final class AccessRoutes implements RouteModule {
                 .toList();
     }
 
-    private Object saveProfile(ApiContext api, String id, Map<String, Object> body) throws IOException {
+    /** IFMATCH-COVERAGE-GAP-1: a profile is a ComponentStore-backed doc an operator reads (via the
+     *  {@code GET /access/profiles} list, whose items carry the same content shape written here) and
+     *  edits back — real double-write exposure between two admins editing the same subject's profile,
+     *  so an optional {@code If-Match} against the existing doc's content hash is honoured (no-op,
+     *  same as a brand-new profile: nothing existing to be stale against). */
+    private Object saveProfile(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = writeStore(api);
         String safeId = WriteGates.safeName(id, "access profile id");
+        store.get(PROFILE_TYPE, safeId).ifPresent(current ->
+                ETags.requireMatch(ex, ETags.of(ContentHash.of(current.content()))));
         String subjectType = trimOrEmpty(body.get("subjectType"));
         if (!SUBJECT_TYPES.contains(subjectType))
             throw new ApiException(422, "access profile requires subjectType " + SUBJECT_TYPES);
@@ -294,7 +315,9 @@ final class AccessRoutes implements RouteModule {
         doc.put("subjectId", subjectId);
         doc.put("label", trimOrEmpty(body.get("label")).isBlank() ? subjectId : trimOrEmpty(body.get("label")).trim());
         doc.put("grants", validGrants(body.get("grants")));
-        return write(store, PROFILE_TYPE, safeId, doc);
+        Object written = write(store, PROFILE_TYPE, safeId, doc);
+        ETags.set(ex, ETags.of(ContentHash.of(written)));
+        return written;
     }
 
     private Object deleteProfile(ApiContext api, String id) throws IOException {
