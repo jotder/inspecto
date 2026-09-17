@@ -126,7 +126,7 @@ down. Four modules do that here (~800 lines, immaterial) — but it is why a cov
 measure of *"how much code has tests"*, only of *"how much measured code was executed"*.
 
 ✅ **A fourth instance, 2026-09-13 — the vocabulary guard could not reach the file it was supposed to
-police.** `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (`:343`, applied at `:665`) held exactly **two**
+police.** `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (`:359`, applied at `:724`) held exactly **two**
 rules, `flow-identifier` and `flow-message`, both Flow→Pipeline. <!-- vocab-allow: names the rename the two rule ids exist for --> **There was no Collector rule over source
 files at all** — the Source→Collector rule is a *prose* rule and never ran over `.java`. ⛔ So the
 offending author-facing message was never in the guard's reach, and no amount of tightening the existing

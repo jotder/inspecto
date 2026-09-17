@@ -630,3 +630,17 @@ despite distinct javadoc rationales, so declaring one rather than the other chan
 observe. Possibly intended — a 4GB GPU cannot hold a 7B either — possibly a copy-paste. Either way the
 operator-facing choice is a distinction without a difference today; one should become a documented alias of
 the other, or get its own map.
+
+### `MODELPROFILE-DUPLICATE-TIERS-1` — settled 2026-09-17 as an intended alias
+
+`git log --follow` on `ModelProfile.java` returns **exactly one commit**: the file was born with `CPU_ONLY` and
+`DEV_LAPTOP` carrying identical tier maps and has never been edited, so drift (two edits, one missed) is ruled
+out. The two javadocs were written independently, each concluding its hardware cannot host a 14B; and the
+design space is one axis wide — SMALL/MEDIUM are identical across all three bundles, only LARGE varies, so with
+three bundles over a binary axis two must coincide. Both constants now name the other, and `DEV_LAPTOP` is kept
+as a distinct declared name so the maps can diverge later without a config change.
+
+⛔ **No test was added, and that is the finding worth keeping.** The only assertable fact —
+`CPU_ONLY.models().equals(DEV_LAPTOP.models())` — is a guard that fires in the **wrong direction**: it would go
+red the day someone legitimately differentiates the maps, punishing the correct product call. `ModelSeamTest`
+already pins the real invariant (every tier mapped, all three profiles).

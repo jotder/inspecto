@@ -654,3 +654,32 @@ percentile per dialect — DuckDB `quantile_cont(col, p)` vs PostgreSQL `percent
 
 ---
 
+
+### `CONFIG-MIGRATOR-LOSES-MAPPINGS-1` — the migrator loses what its javadoc promises to refuse (open, P1)
+
+Found 2026-09-17 by **driving** `migrate-configs` on a copy of `spaces/demo`, not by reading it.
+
+🔴 **The schema split silently drops every `mapping:` block.** `ConfigMigrator.java:185` does
+`schema.remove("mapping")` unconditionally, then writes the Mapping CSV only when `mapping.rules[]` is a
+non-empty list. **All four committed demo schemas carry `mapping.fields[]`; none carries `rules`** —
+`MappingCsv.encode` reads `targetColumn`/`sourceExpression`/`transformType` while the corpus authors
+`name`/`from`/`fn`/`args`. On the drive, `registry/mappings/` was never created and `registry/schemas/orders.toon`
+lost all 8 field mappings, including two SQL expressions, while the original was archived away. Exit 0, no
+refusal. ⛔ The class javadoc says *"Refuses rather than loses."*
+
+⚠ **Why no test caught it:** `ConfigMigratorTest`'s `legacySpace()` fixture is the only corpus in the repo
+using `mapping.rules[]`. The unit test agrees with itself, not with the space — so any fix must be pinned
+against a **committed** schema, not a fixture.
+
+🔴 **The documented `--apply` form writes to a directory named `--apply`.** `MainApp.java:55-62` strips
+`--dry-run` only, so `--apply` falls into the positional list and becomes `outRoot`. The tool's own usage text
+prints this form; it still reports success and still archives the originals.
+
+✅ **The entry point, for the record:** there is no `inspecto` launcher — the fat jar's `Main-Class` is
+`CollectorProcessor`, so it is reached as
+`java -cp inspecto-processor-*.jar com.gamma.inspector.MainApp migrate-configs <config_root> [<registry_root>] [--apply]`.
+
+✅ Separately settled by the same drive (`MIGRATE-ENRICH-DRIVE-1`, closed): the post-`ea5a9225` enrich SKIP is
+real — 9 conversions / 0 refusals, the enrich config byte-identical and unarchived. ⚠ But `archived-config/`
+is a convention for humans, not a runtime quarantine: `ServiceBootstrap.resolveBySuffix` walks the tree with
+**no `archived-config/` exclusion**, so archiving would not have hidden the file from `EnrichJob` anyway.

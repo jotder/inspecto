@@ -15,7 +15,18 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **62<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 20<!--count:backlog-p3--> × P3** — ⬆ **UP again, 60 → 63, out of the four-lane
+> **59<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** — ⬇ **DOWN 62 → 59, the first net
+> decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
+> ⛔ **The growth 56→58→60→63 was real and the "honest result" framing had become a rationalisation.**
+> Three causes, named so they can be checked: most rows filed were about our OWN guards and docs, not the
+> product; the P1 tier had not moved in three shifts because all of it is operator-gated; and lanes were told
+> refutations are valuable without any cap, so every refutation produced a residual row.
+> ⇒ **Standing rules from 2026-09-17:** a lane files AT MOST ONE row — anything smaller is fixed in place or
+> dropped; a residual that belongs inside an open row stays there (see `EDITION-GATED-TESTS-IN-WRONG-HOME-1`,
+> which absorbed its own test-vehicle design instead of spawning a row); and work found-and-fixed the same day
+> is recorded STRUCK for provenance rather than filed open (see `CITATION-GUARD-SCOPE-1`).
+> ⚠ **Report P1+P2 as the owed number (43), not 59** — §0 defines P3 as demand-gated, i.e. things deliberately
+> NOT being built. — ⬆ **UP again, 60 → 63, out of the four-lane
 > parallel shift of 2026-09-17: three rows STRUCK as shipped, five FILED.** ⚠ **Three of the four lanes
 > refuted part of their own row's premise, and a FOURTH found its row had already SHIPPED** — the residuals
 > those refutations exposed are what grew the board. ⛔ **The lanes were handed a row's ORIGINAL prose that
@@ -155,9 +166,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 3<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 20<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 62<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 16<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 59<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -877,15 +888,71 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 
 - ~~**P3** · **`MIGRATE-ENRICH-1`**~~ ✅ **ANSWERED + CLOSED 2026-09-16 (operator): the 2026-08-06 reversal cancelled the FILE-FORMAT migration too, not only the vocabulary — `*_enrich.toon` stays a Job.** The amendment §6 step-1 clause is **STRUCK**; `GLOSSARY.md` §Enrichment corrected (it was carrying the pre-reversal position against §Job and the §13 row in the same file); `ConfigMigrator` now passes enrich configs over in silence and leaves them where `EnrichJob` expects them — **not** archived. ⇒ a space owning an enrich config migrates again, so **§6 step 1 is dischargeable**. Original row follows.
   - **P3** · **`MIGRATE-ENRICH-1` — `*_enrich.toon` has no conversion target, and the two the docs name CONTRADICT each other** (filed 2026-09-16 while building the §6 step-1 converter). `inspecto migrate-configs` REFUSES an enrichment config, and because a refusal fails the whole migration, **the demo space cannot be migrated today** (driven live: 9 conversions, 1 refusal, per demo space). 🔴 **The blocker is not missing code — it is that the target was REVERSED and `GLOSSARY.md` still carries both positions.** §*Enrichment* (`GLOSSARY.md:398`) says the file kind *"becomes a **table-entry Pipeline** (amendment Phases 3/6)"* and that existing enrich files *"keep running until migration"*; §*Job* (`:456`) and the §13 row (`:908`) say the Job retirement was **REVERSED by operator decision 2026-08-06** precisely because its replacement path *"hung on the amendment's Phase 3 S3 (table-entry `collect`), **deferred by its own design spike as genuine new design**"*, and that table-entry Pipelines are *"an **additive complement**, never the Job's replacement"*. ⇒ the conversion the amendment's §6 step 1 asks for is **blocked on a slice that was deliberately deferred**, and a periodic enrich is a **Job** under the reversal. ⛔ Do not build a table-entry conversion on the §6 wording alone; ⛔ do not "fix" the GLOSSARY by picking a side — the vocabulary is binding and this is an operator call, filed in §1. Two outcomes are possible and they differ in kind: **(a)** `*_enrich.toon` stays a Job ⇒ strike the clause from §6 step 1, and the converter should SKIP enrich files as out of scope (the demo space then migrates); **(b)** it really does become a table-entry Pipeline ⇒ this row waits on S3's design and the converter's refusal is correct as it stands. Files when (a): `ConfigMigrator.java` (the refusal becomes a skip) + `GLOSSARY.md` §Enrichment. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §6 step 1 · `okf/backend/control-plane/jobs.md`
-- **P3** · ⚠ **`MIGRATE-ENRICH-DRIVE-1` — the post-skip live drive is NOT evidenced.** Filed 2026-09-16.
-  `ea5a9225` turned the converter's enrich REFUSAL into a skip and its commit message asserts *“a space
-  owning one migrates again”*, but cites **no run** — and the live drive it points back to (9 conversions,
-  1 refusal) PREDATES the change, so it evidences the old behaviour. The unit test
-  `ConfigMigratorTest.anEnrichConfigIsPassedOverAndDoesNotBlockTheSpace` is real and passes, but
-  ⛔ **a unit test is not a drive**: this repo's standing lesson is that an example proves nothing until it
-  is DRIVEN. ⇒ One clean-checkout run of `inspecto migrate-configs` against a **COPY** of `spaces/demo`
-  (⛔ never the original) should show **9 conversions, 0 refusals, the enrich file untouched and
-  unarchived** so `EnrichJob` still finds it. Cheap, and it closes the last open thing in the §6 step-1 lane.
+- ~~**P3** · **`MIGRATE-ENRICH-DRIVE-1`**~~ ✅ **DRIVEN + CLOSED 2026-09-17 — all four assertions PASS, and
+  the drive found TWO defects that are not the enrich skip.**
+  Driven on a COPY of `spaces/demo` (never the original; `git status -- spaces/` empty afterwards). The
+  expected count was derived INDEPENDENTLY before reading any output — 5 `*_pipeline.toon` + 4 `*_schema.toon`
+  = 9 — so the tool's number was checked against a known answer, not accepted from it.
+  ✅ **9 conversions · 0 refusals · enrich file byte-identical (sha256 unchanged) · not archived.** The
+  post-`ea5a9225` skip is confirmed by a real run.
+  ⚠ **Assertion 4 is weaker than it reads, by the lane's own correction:** `ServiceBootstrap.resolveBySuffix`
+  walks the config tree with **no `archived-config/` exclusion** — only `ConfigMigrator.legacyFiles` has one —
+  so archiving would not have hidden the file from `EnrichJob` anyway. It is a claim about operator
+  expectations, not about reachability.
+  ⚠ The row's `inspecto migrate-configs` spelling is not a binary: the entry point is
+  `java -cp inspecto-processor-*.jar com.gamma.inspector.MainApp migrate-configs <config_root> [<registry_root>] [--apply]`.
+  ⇒ Both defects filed together as `CONFIG-MIGRATOR-LOSES-MAPPINGS-1` (P1). Original row follows.
+  - **P3** · ⚠ **`MIGRATE-ENRICH-DRIVE-1` — the post-skip live drive is NOT evidenced.** Filed 2026-09-16.
+    `ea5a9225` turned the converter's enrich REFUSAL into a skip and its commit message asserts *“a space
+    owning one migrates again”*, but cites **no run** — and the live drive it points back to (9 conversions,
+    1 refusal) PREDATES the change, so it evidences the old behaviour. The unit test
+    `ConfigMigratorTest.anEnrichConfigIsPassedOverAndDoesNotBlockTheSpace` is real and passes, but
+    ⛔ **a unit test is not a drive**: this repo's standing lesson is that an example proves nothing until it
+    is DRIVEN. ⇒ One clean-checkout run of `inspecto migrate-configs` against a **COPY** of `spaces/demo`
+    (⛔ never the original) should show **9 conversions, 0 refusals, the enrich file untouched and
+    unarchived** so `EnrichJob` still finds it. Cheap, and it closes the last open thing in the §6 step-1 lane.
+
+- **P1** · 🔴 **`CONFIG-MIGRATOR-LOSES-MAPPINGS-1` — the migration tool silently DROPS every schema's
+  mapping block, and its documented `--apply` form writes to a directory called `--apply`.** Filed 2026-09-17
+  from the `MIGRATE-ENRICH-DRIVE-1` drive — **found by DRIVING it, not by reading it.** Two halves, one commit's
+  worth of work, filed together because one run surfaced both.
+  🔴 **(a) Silent data loss.** `ConfigMigrator.java:185` does `schema.remove("mapping")` unconditionally, then
+  writes the Mapping CSV only when `mapping.rules[]` is a non-empty list. **All four committed demo schemas
+  carry `mapping.fields[]`, ZERO carry `rules`** (`MappingCsv.encode` reads `targetColumn`/`sourceExpression`/
+  `transformType`; the corpus authors `name`/`from`/`fn`/`args`). On the live drive `registry/mappings/` was
+  **never created** and `registry/schemas/orders.toon` lost all 8 field mappings — including two SQL
+  expressions — while the original was archived away. **Exit 0, no refusal, no warning.**
+  ⛔ The class javadoc at `:24` says *"**Refuses rather than loses.**"* Here it loses, on 4 of 4 real files.
+  ⚠ **Why no test caught it:** `ConfigMigratorTest.anApplyWritesTheComponentsAndArchivesTheOriginals` passes
+  because its `legacySpace()` fixture is **the only corpus in the repo using `mapping.rules[]`**. The standing
+  lesson, reproduced exactly — *the unit test agrees with itself, not with the space.* ⇒ any fix must be
+  pinned against a COMMITTED schema, not a fixture.
+  🔴 **(b) `--apply` is not stripped from the positional args.** `MainApp.java:55-62` strips `--dry-run`
+  only, so `--apply` falls into `subArgsList`, `subArgs.length > 1`, and `outRoot = Paths.get("--apply")` — a
+  relative directory in the process CWD. The tool's OWN usage text (`MainApp.java:298`) prints this form. It
+  still reports `9 file(s) converted` and exit 0, and it still archives the originals, so an operator loses the
+  legacy files and finds the registry nowhere near the Space.
+  ✅ Both verified on a copy of `spaces/demo` at `36f554ae`; `spaces/` never opened for writing.
+  → `okf/backend/config/configuration.md`
+
+- ~~**P3** · **`CITATION-GUARD-SCOPE-1`**~~ ✅ **FILED AND SHIPPED 2026-09-17 — recorded struck so the
+  provenance exists without adding an open row.** The **seventh** instance of the allow-list shape in
+  `tools/`: `check-doc-citations.mjs` carried `ROOTS = ['docs','compliance','.claude']` and now scopes the
+  whole repo minus a deny-list, like its three fixed siblings.
+  ✅ **Measured before fixing: 36 newly-scoped files, 8 dead citations in 4 files, ZERO in already-scoped
+  files.** Including 🔴 **two renamed event types in `inspecto/README.md`** (`BatchEvent`→`ConsignmentEvent`, `BatchEventBus`→`ConsignmentEventBus`),
+  dead since the 2026-08-31 Consignment rename, shipping on the page `package.ps1` copies to the bundle root
+  as the customer's first page — with the guard green throughout.
+  ✅ **The scope number reconciles exactly rather than approximately:** 276 current-tier + **13**
+  `docs/superpower/` = 289, matching the siblings. The difference is an exemption this guard has deliberately,
+  because an in-flight plan citing an unbuilt path *is the plan working*.
+  ⛔ **The `./`-strip in `slash()` is LOAD-BEARING** under `ROOTS = ['.']`: `EXEMPT_TIERS` is a plain
+  `startsWith`, so without it both never-maintained tiers silently re-enter scope — a widening that would have
+  quietly un-exempted the archive.
+  ⚠ Also fixed: a cross-repo `docs/ARCHITECTURE.md` in the agent-kernel plan (disambiguated, not deleted — it
+  names a repo that does not exist yet), and two demo Space configs the demo README has promised since
+  `ff0e8ccf` but which were **never authored** (`git log -S` puts both strings only in the README).
+  → `okf/backend/build-run/build-test.md`
 
 - ~~**P3** · **`MIGRATE-MATERIALIZE-1`**~~ ✅ **ANSWERED + CLOSED 2026-09-16 (operator), same call: the clause is STRUCK and `materialize` stays a Job task.** The row's grounding held — a Dataset-registering task is not a `transform.summarize` node, and there was no config file for the converter to walk. Original row follows.
   - **P3** · **`MIGRATE-MATERIALIZE-1` — "every `materialize` task → a `summarize` recipe" is not a conversion the code can express** (filed 2026-09-16, same build). §6 step 1's fourth clause has **no file for the converter to walk**: `materialize` is a *maintenance JOB task* (`MaintenanceJob.java:220` → `MaterializeTask`), declared in a Job, not in a config file a migration of `*_pipeline.toon` / `*_schema.toon` / `*_enrich.toon` ever sees. 🔴 **And the two are not the same operation, so the clause is wrong on grounding as well as on reach:** `MaterializeTask` compiles a **measure spec** (`measures`/`group_by`, BI-7 `MeasureCompiler`) over a source **Dataset**'s trusted relation, `COPY`s Parquet under the data root and **registers/refreshes a `dataset` component**; `transform.summarize` (`BuiltinNodeType.java:156`) is a TRANSFORM node over a DATA relation inside a Pipeline, declaring its own output columns and registering nothing. A recipe cannot carry "and then a Dataset exists". ⚠ The same 2026-08-06 reversal applies: dataset operations are explicitly named as Job work. ⇒ the honest options are **strike the clause** (materialize stays a Job task — the likely answer) or **design a Dataset-registering sink**, which is new design, not a migration. ⛔ Not startable as written. → `MaterializeTask.java` · `okf/backend/control-plane/jobs.md` · the §1 call below
@@ -2271,6 +2338,30 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   EDG-01 cell 7 and adds ~240 tests plus a Postgres dependency to every Personal build. Four of the six
   need a core test vehicle built first, so this is real work, not a move.
   → `okf/backend/build-run/build-test.md`
+  ✅ **THREE MORE CLOSED 2026-09-17 by SPLITTING, not moving — and the row's count was wrong.**
+  `ControlApiDecisionRulesTest` (5 core / 3 ops), `ControlApiDbBrowserTest` (7 / 1) and
+  `PostgresStateStoreTest` (11 / 5): the core half now lives in `inspecto` and runs in the DEFAULT reactor,
+  with `ControlApiDecisionRuleApplyTest`, `ControlApiDbBrowserOpsTablesTest` and `PostgresOpsStoreTest`
+  retained in ops. **32 tests before, 32 after**; packages unchanged in both homes; no new dependency
+  (`inspecto` already declared the Postgres driver at test scope). `comm -12` over both modules' report lists
+  returns ZERO — no class runs twice.
+  🔴 **The decisive finding: IMPORTS DO NOT ESTABLISH OPS-INDEPENDENCE.** `ControlApiDecisionRulesTest`
+  imports nothing from `com.gamma.ops`, yet three of its tests drive `GET /objects`. Measured in a default
+  build one of them FAILED and another **PASSED VACUOUSLY** (with ops absent, the `/objects` envelope happens
+  to satisfy its `== 1`). Moving the class whole — which the row's wording invites — would have landed a
+  vacuously-green test. The positive control caught it; the triage did not.
+  ⚠ **The row's "four of the six need a vehicle" should read THREE**, and three of the six were per-method
+  splits needing no vehicle at all.
+  ⬜ **THREE REMAIN** — `ControlApiScopedObjectsTest`, `ControlApiAccessDeciderTest`, `ControlApiReconPromoteTest`
+  — and all three block on ONE thing, kept here rather than filed as a separate row: a **core-test-scope fake
+  `ObjectEngineProvider`** in `inspecto/src/test/java/com/gamma/control/`, registered via `META-INF/services`,
+  satisfying the SPI `CollectorService.objects()` discovers, implementing `ObjectServiceAccess` so the existing
+  downcast works, and causing `/objects*` to register in a core `ControlApi` (unregistered, those routes answer
+  404 and the tests become meaningless rather than red).
+  ⛔ **Do not build it naively:** `ControlApiReconPromoteTest`'s dedup assertions depend on real
+  status-transition semantics (`ARCHIVED` vs `RESOLVED` suppression), so a map-backed fake would pass them
+  WITHOUT exercising the grain they exist to pin — turning the repo's only `ReconRoutes.promote` coverage into
+  a test of the fake.
 
 - ~~**P3** · **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's CENTRAL CLAIM
   was REFUTED, and the defect underneath it was real and FOUR times wider.**
@@ -2429,31 +2520,81 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
     `inspecto/README.md` or `asn-parser/docs/` would be. ⚠ The fifth guard-scope blind spot in three days.
     → `okf/backend/build-run/build-test.md`
 
-- **P3** · 🔴 **`DOC-COUNTS-FENCED-MARKER-1` — `check-doc-counts.mjs` scans fenced and quoted markers as
-  live.** Filed 2026-09-17, discovered by HITTING it: writing the doc section that records
-  `DOC-COUNTS-GUARD-SCOPE-1` turned the guard red, because a `<!--count:*-->` marker quoted literally in prose
-  — even inside backticks or a fenced block — is counted as an assertion. ⚠ Unlike `check-doc-links.mjs` and
-  `check-vocabulary.mjs`, this guard does **not strip fenced blocks**. The doc was fixed, never the guard.
-  ⛔ **Widening the scope to the whole repo widened this trap to every markdown file in it**, so documenting
-  markers by example is now impossible anywhere. → `okf/backend/build-run/build-test.md`
+- ~~**P3** · **`DOC-COUNTS-FENCED-MARKER-1`**~~ ✅ **SHIPPED 2026-09-17 — and it found WHY the row existed.**
+  `check-doc-counts.mjs` now carries the same `inFence` strip as `check-doc-links`, `check-doc-citations` and
+  `check-bundle-doc-links` (``` and `~~~`), so a marker inside a fence is text being SHOWN, not a count being
+  asserted. ⚠ **This guard was the odd one out of FIVE, not three** — the row undercounted its siblings.
+  🔴 **The row said "the doc was fixed, never the guard" — the fix was a MANGLED ID, not a rewording.**
+  `build-test.md` had to spell the marker with a `*` so it fell outside the `[a-z0-9-]+` id class. A doc was
+  carrying a deliberate typo as a workaround.
+  ⛔ **Inline backticks are deliberately STILL scanned** — a separate decision from fences despite arriving in
+  one sentence of the row. The reason is measured: **the floor ratchet has drifted from its stated design**
+  (68 markers against floors summing to 55), so a live marker hidden behind one stray backtick would not trip
+  the floor — it would just stop being policed. That is the exclusion-masquerading-as-a-fix shape this guard's
+  own header warns about. ⚠ There is also no "reuse the sibling" answer for inline: `check-vocabulary` strips
+  inline spans and `check-doc-citations` REQUIRES them.
+  ✅ **Measured before changing anything: 0 of 68 markers sit in a fence or backticks today**, so the change
+  adds and removes no findings — what changed is a doc's WRITABILITY, and the proof is old-red/new-green, not
+  red-then-green. A fourth check was added unasked: a wrong marker after the closing fence still fails, so the
+  fence state cannot swallow the rest of the file. Original row follows.
+  - **P3** · 🔴 **`DOC-COUNTS-FENCED-MARKER-1` — `check-doc-counts.mjs` scans fenced and quoted markers as
+    live.** Filed 2026-09-17, discovered by HITTING it: writing the doc section that records
+    `DOC-COUNTS-GUARD-SCOPE-1` turned the guard red, because a `<!--count:*-->` marker quoted literally in prose
+    — even inside backticks or a fenced block — is counted as an assertion. ⚠ Unlike `check-doc-links.mjs` and
+    `check-vocabulary.mjs`, this guard does **not strip fenced blocks**. The doc was fixed, never the guard.
+    ⛔ **Widening the scope to the whole repo widened this trap to every markdown file in it**, so documenting
+    markers by example is now impossible anywhere. → `okf/backend/build-run/build-test.md`
 
-- **P3** · 🔴 **`README-VOCAB-SCOPE-1` — the customer's first page is outside the vocabulary guard.**
-  Filed 2026-09-17 while correcting `inspecto/README.md`. `check-vocabulary.mjs`'s `USER_FACING` list
-  (`:66`) holds only `docs/USER_GUIDE.md`, and its tree scan covers `docs/**` plus the root canon — **not
-  module READMEs**. So the file `package.ps1` copies to the bundle root as the customer's first page is
-  unchecked for banned synonyms, and its wording had to be hand-checked against the bans.
-  ⚠ **The sixth guard-scope blind spot in three days**, and the same family as
-  `README-LINKS-BROKEN-IN-REPO-1` and `DOC-COUNTS-GUARD-SCOPE-1` — both of which were fixed at the SHAPE, which
-  is the precedent here. ⛔ Adding it to `USER_FACING` will likely surface pre-existing violations; that is the
-  work, not a reason to skip it. → `okf/backend/build-run/build-test.md`
+- ~~**P3** · **`README-VOCAB-SCOPE-1`**~~ ✅ **SHIPPED 2026-09-17 — fixed at the SHAPE.** Pass 3 no longer
+  carries `DOC_TREES` + a named `ROOT_CANON`; it carries `DOC_SKIP = ['docs/archived-documents/']`, so every
+  tracked markdown file is scanned unless there is a stated reason to skip it. `inspecto/README.md` is promoted
+  into `USER_FACING` — pass 1, the NO-ALLOWLIST set — because it measured pristine and there is no audience
+  below the bundle's first page; pass 3 excludes `USER_FACING` so the two cannot double-report.
+  🔴 **One row claim corrected: "its tree scan covers Java/TS too" is misleading.** It does, but through
+  **pass 4**, a different rule set reading identifiers and string literals. The PROSE pass reads markdown only
+  — which is exactly what made the whole-repo reshape cheap rather than risky.
+  ✅ **Measured before writing: 61 files newly in scope, exactly THREE violations**, all the data-origin sense
+  of that word as a bare table-column header where the rule's trailing-noun lookahead cannot reach. All three
+  recorded in `DOC_ALLOW` with reasons rather than "fixed" — none is a stale synonym.
+  ⛔ **One is a GOLDEN FIXTURE** (`pipeline-document.golden.md`) whose text is emitted by the document
+  generator and must stay byte-exact: renaming that header to satisfy a guard would have broken its test.
+  ⚠ `DOC_ALLOW` was chosen over the inline `vocab-allow` marker partly because an HTML comment after a table
+  row's final pipe risks breaking GFM rendering. All three are covered by the existing self-retirement check.
+  ✅ The resulting scope (287 + 2 = **289**) is byte-identical to `check-doc-counts.mjs`'s independently derived
+  "289 current-tier markdown files" — two guards now agree out loud on what the current doc tier is.
+  Original row follows.
+  - **P3** · 🔴 **`README-VOCAB-SCOPE-1` — the customer's first page is outside the vocabulary guard.**
+    Filed 2026-09-17 while correcting `inspecto/README.md`. `check-vocabulary.mjs`'s `USER_FACING` list
+    (`:68`) holds only `docs/USER_GUIDE.md`, and its tree scan covers `docs/**` plus the root canon — **not
+    module READMEs**. So the file `package.ps1` copies to the bundle root as the customer's first page is
+    unchecked for banned synonyms, and its wording had to be hand-checked against the bans.
+    ⚠ **The sixth guard-scope blind spot in three days**, and the same family as
+    `README-LINKS-BROKEN-IN-REPO-1` and `DOC-COUNTS-GUARD-SCOPE-1` — both of which were fixed at the SHAPE, which
+    is the precedent here. ⛔ Adding it to `USER_FACING` will likely surface pre-existing violations; that is the
+    work, not a reason to skip it. → `okf/backend/build-run/build-test.md`
 
-- **P3** · **`MODELPROFILE-DUPLICATE-TIERS-1` — two assist bundles are behaviourally identical.**
-  Filed 2026-09-17 out of `README-HARDWARE-PROFILE-CLAIM-1`. `ModelProfile.CPU_ONLY` and `DEV_LAPTOP`
-  (`:40-45`) carry the **same** tier map (`qwen2.5:3b/7b/7b`) despite distinct javadoc rationales, so declaring
-  one or the other changes nothing. Possibly intended (a 4GB GPU cannot hold a 7B either), possibly a
-  copy-paste. ⚠ Either way the operator-facing choice is currently a distinction without a difference, and one
-  of the two should be documented as an alias or given its own map.
-  → `okf/capabilities/assistant/assistant.md`
+- ~~**P3** · **`MODELPROFILE-DUPLICATE-TIERS-1`**~~ ✅ **SETTLED 2026-09-17 — intended ALIAS, not drift, and
+  the evidence decided it.** `git log --follow` on `ModelProfile.java` returns **exactly ONE commit**
+  (`2ecce6b6`): the file was born with identical maps and has never been edited. Drift requires two edits with
+  one missed. Corroborating: the two javadocs were **independently written** (a copy-paste would have
+  duplicated the prose, not written two different reasons for the same outcome), and the design space is one
+  axis wide — SMALL/MEDIUM are identical across all three bundles including `PRODUCTION`, only LARGE varies
+  (`7b`/`14b`), so with three bundles over a binary axis two MUST coincide.
+  ✅ Both constants now carry a javadoc sentence naming the other; `DEV_LAPTOP` is kept as a distinct declared
+  name so an operator's `-Dagentkernel.profile` records intended hardware and the maps can diverge later
+  without a config change. `inspecto/README.md` now says the two currently map to the same models.
+  ⛔ **No test, deliberately.** The only assertable fact — `CPU_ONLY.models().equals(DEV_LAPTOP.models())` —
+  is **a guard that fires in the WRONG DIRECTION**: it would go red the day someone legitimately differentiates
+  the maps, punishing the correct future product call. `ModelSeamTest` already pins the real invariant.
+  ⚠ Two row corrections: they are `static final` **record** constants, not enum constants; and the duplication
+  IS operator-visible, at `inspecto/README.md`. Original row follows.
+  - **P3** · **`MODELPROFILE-DUPLICATE-TIERS-1` — two assist bundles are behaviourally identical.**
+    Filed 2026-09-17 out of `README-HARDWARE-PROFILE-CLAIM-1`. `ModelProfile.CPU_ONLY` and `DEV_LAPTOP`
+    (`:40-45`) carry the **same** tier map (`qwen2.5:3b/7b/7b`) despite distinct javadoc rationales, so declaring
+    one or the other changes nothing. Possibly intended (a 4GB GPU cannot hold a 7B either), possibly a
+    copy-paste. ⚠ Either way the operator-facing choice is currently a distinction without a difference, and one
+    of the two should be documented as an alias or given its own map.
+    → `okf/capabilities/assistant/assistant.md`
 
 - ~~**P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1`**~~ ✅ **SHIPPED 2026-09-17 (`f30d39c5`).**
   `when` is declared `FieldType.MAP` — the `widget.controls` / `dashboard.filter` precedent, which

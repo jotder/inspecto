@@ -329,3 +329,43 @@ so documenting markers by example is now impossible anywhere.
 unchecked for banned synonyms. ⚠ The sixth guard-scope blind spot in three days, and the same family as
 `README-LINKS-BROKEN-IN-REPO-1` (fixed at the shape) and `DOC-COUNTS-GUARD-SCOPE-1` (fixed at the shape) —
 which is the precedent for fixing this one.
+
+### The guard-scope family, closed 2026-09-17 — and what the seventh instance cost to find
+
+Three more guards moved from an allow-list to a deny-list, joining `check-doc-links.mjs`:
+
+- **`check-vocabulary.mjs`** (`README-VOCAB-SCOPE-1`) — pass 3 now carries `DOC_SKIP =
+  ['docs/archived-documents/']`. ⚠ Its pass 4 reads Java/TS through a **different rule set**; the prose pass is
+  markdown-only, which is what made the reshape cheap. 61 files newly in scope, **three** violations, all the
+  data-origin sense of that word as a bare table-column header — recorded in `DOC_ALLOW` with reasons, since
+  none is a stale synonym. ⛔ One is a **golden fixture** whose text the document generator emits; renaming
+  that header to satisfy a guard would have broken its test. `inspecto/README.md` is promoted to `USER_FACING`,
+  the no-allowlist pass, because there is no audience below the bundle's first page.
+- **`check-doc-citations.mjs`** (`CITATION-GUARD-SCOPE-1`) — the **seventh** instance of the shape. 36 newly
+  scoped files carried 8 dead citations, including two type names renamed in 2026-08 still shipping on
+  `inspecto/README.md`. ⛔ The `./`-strip in `slash()` is **load-bearing** under `ROOTS = ['.']`: `EXEMPT_TIERS`
+  is a plain `startsWith`, so without it both never-maintained tiers silently re-enter scope.
+- **`check-doc-counts.mjs`** (`DOC-COUNTS-FENCED-MARKER-1`) — now strips fenced blocks like four siblings.
+  ⚠ **Inline backticks are deliberately still scanned:** the floor ratchet has drifted from its stated design
+  (68 markers, floors summing to 55), so a marker hidden behind one stray backtick would stop being policed
+  rather than trip the floor.
+
+✅ **Three guards now independently derive the same current-tier corpus** — 289 markdown files
+(`check-doc-citations` reaching it as 276 + the 13 `docs/superpower/` files it alone exempts, because an
+in-flight plan citing an unbuilt path is the plan working).
+
+⛔ **The proof that matters is old-green/new-red, not red-then-green.** Every one of these was falsified by
+running the *previous* guard against the same planted input: red-then-green only shows a guard can fail;
+old-green/new-red shows the widening does something. Two of the three were invisible on today's corpus
+otherwise.
+
+### `EDITION-GATED-TESTS-IN-WRONG-HOME-1` — three closed by SPLITTING, and the trap in the other three
+
+`ControlApiDecisionRulesTest` (5 core / 3 ops), `ControlApiDbBrowserTest` (7 / 1) and `PostgresStateStoreTest`
+(11 / 5) were **split, not moved**: the core half runs in the default reactor, an ops sibling keeps every case
+needing operational objects. 32 tests before, 32 after; no package churn; no new dependency.
+
+🔴 **Imports do not establish ops-independence.** `ControlApiDecisionRulesTest` imports nothing from
+`com.gamma.ops`, yet three of its tests drive `GET /objects`. In a default build one **failed** and another
+**passed vacuously** — with ops absent, the `/objects` envelope happens to satisfy its `== 1`. Moving the class
+whole would have landed a vacuously-green test. The positive control caught it; the triage did not.
