@@ -1879,14 +1879,22 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
     but never `mail.smtp.ssl.checkserveridentity`, which legacy `javax.mail` defaults to `false`: a STARTTLS
     session accepts any certificate for `notify.smtp.host`, so SMTP AUTH credentials can be intercepted by
     whoever answers that name. Fix: set `checkserveridentity=true` unconditionally.
-- **P2** · **`PIPELINE-EDITOR-SILENT-ERRORS-1`** — twelve `.subscribe({ next })` calls in the core
-  authoring journey carry no `error` handler (`pipeline-editor.component.ts:914, 934, 1450, 1452, 1637,
-  1639, 1677, 1807, 1812, 1895, 2047, 3058, 3088`), so a failed save, load or validate fails with no user
-  feedback; three more in `pipeline-parse-definition.component.ts`, and one each in `jobs.component.ts:348`,
-  `job-detail.component.ts:257`, `expectations.component.ts:188`, `decision-rules.component.ts:195`,
-  `connections.component.ts:176`. Fix: route them through the shared banner/toast pattern the same file
-  already uses elsewhere. ⚠ Counted by a script matching a 600-character observer window; plain grep on
-  adjacent lines mis-counts multi-line RxJS observers.
+- ~~**P2**~~ · **`PIPELINE-EDITOR-SILENT-ERRORS-1`** — ✅ **CLOSED 2026-09-17 (refuted on re-ground, no
+  code change): every cited `.subscribe({ next })` already carries an `error:` handler wired to the
+  shared toast pattern.** Re-checked all cited lines across all 7 files (all `.subscribe({...})` object
+  forms, brace-matched, not line-window matched): `pipeline-editor.component.ts` — all 13 cited call
+  sites (914, 934, 1450/1452, 1637/1639, 1677, 1807/1812, 1857/1859, 1888/1895, 2047, 3058, 3088) already
+  call `error:` → `this.toast.error(...)`/`onWriteError(...)`/`apiErrorMessage(...)`.
+  `pipeline-parse-definition.component.ts` — the one remaining bare `.subscribe({ next })` (line 1613) is
+  preceded by `.pipe(catchError(() => of(null)))`, i.e. deliberately pre-handled, not silent.
+  `jobs.component.ts:348`, `job-detail.component.ts:257`, `expectations.component.ts:188`,
+  `decision-rules.component.ts:195`, `connections.component.ts:176` are each either an HTTP call with an
+  `error:` handler already present, or a `dialog.open(...).afterClosed().subscribe(...)` — a dialog-close
+  observable that structurally never errors, so no handler is missing. `DatasetRegistrationService.ensure`
+  (used bare at `pipeline-editor.component.ts:3095`) is documented "never errors" and converts every
+  failure into a `{status:'failed'}` value the caller already branches on. The original row was generated
+  by a 600-character observer-window script that both went stale (the handlers were added in a later
+  shift) and, per its own caveat, mis-counts multi-line RxJS observers. No fix needed; no files changed.
 - ~~**P2**~~ · **`UI-LINT-NOT-CONFIGURED-1`** — ✅ **CLOSED 2026-09-17: the target exists, all 177 findings are
   DRAINED (zero), and `ui.yml` runs it as a HARD GATE.** Split into three reviewable commits by risk:
   (1) mechanical — unused imports/locals/directives, `prefer-const`, useless escapes, side-effect ternaries
