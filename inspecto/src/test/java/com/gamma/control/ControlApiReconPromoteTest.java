@@ -3,9 +3,6 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.objects.ObjectType;
-import com.gamma.ops.ObjectQuery;
-import com.gamma.ops.OperationalObject;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
@@ -25,16 +22,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@code BREAK-INCIDENT-1}: {@code POST /recon/promote} hands one reconciliation Break to Ops as an
- * {@link ObjectType#INCIDENT}, deduped on {@code (reconciliation, type, key, column)} — full parity with the
- * SPA's {@code breakId} since {@code BREAK-DEDUPE-GRAIN-1} (2026-09-15); it was {@code (reconciliation, key)}
+ * {@code INCIDENT}, deduped on {@code (reconciliation, type, key, column)} — full parity with the SPA's
+ * {@code breakId} since {@code BREAK-DEDUPE-GRAIN-1} (2026-09-15); it was {@code (reconciliation, key)}
  * before, so one key breaking on two columns collapsed into a single Incident.
  *
- * <p>⚠ <b>This class lives in {@code inspecto-ops}, not beside the other recon route tests.</b> The route
- * itself is in core, and core's gates for it ({@code 503} write root, {@code 422}, {@code 404}, and the
- * {@code 503} when no object engine is installed) are covered in {@code ControlApiReconTest} there. The
- * <em>happy</em> path cannot be: it needs a real Object Engine, and {@code inspecto-ops} is an optional
- * edition module that a default {@code mvn test} does not even build. Asserting the promotion where the
- * engine exists is the only way to assert it at all.
+ * <p>⚠ <b>Moved here from {@code inspecto-ops} 2026-09-17</b> ({@code EDITION-GATED-TESTS-IN-WRONG-HOME-1}).
+ * Grepping {@code ReconRoutes.promote}/{@code .promoted} found they touch exactly two SPI methods —
+ * {@code ObjectAccess.hasActiveMatching}/{@code .activeAttributeIndex} (via
+ * {@code com.gamma.objects.IncidentAccess}) and {@code .open} — none of it {@code com.gamma.ops} vocabulary.
+ * So the happy path is genuinely core, and runs here against {@link FakeObjectEngineProvider}, a minimal
+ * in-memory {@code ObjectAccess} registered for this module's tests only (see that class' own note). Fixture
+ * seeding/inspection goes through {@link TestFakeObjects}, this module's downcast onto the fake — the
+ * counterpart of {@code inspecto-ops}' {@code TestOpsEngine}.
+ *
+ * <p>⛔ <b>The route's other gates (503 write root, 422, 404, and the 503 when no engine is installed) stay
+ * in {@code ControlApiReconTest}</b>, which already covers them without any engine at all.
  *
  * <p>🔴 The dedupe is the point of the test, not a detail. Reconciliation is <b>stateless compute</b> —
  * nothing persists a Break — so the Incident's reference to one is reconstructed from the request on each
@@ -82,9 +84,8 @@ class ControlApiReconPromoteTest {
                 .GET().build(), BodyHandlers.ofString());
     }
 
-    private List<OperationalObject> incidents(Ctx c) {
-        return TestOpsEngine.of(c.svc).query(new ObjectQuery(
-                ObjectType.INCIDENT, null, null, null, null, null, null, 100, 0, 0L, false));
+    private List<FakeObjectEngineProvider.FakeObjects.Fake> incidents(Ctx c) {
+        return TestFakeObjects.of(c.svc).all();
     }
 
     @Test
@@ -98,11 +99,11 @@ class ControlApiReconPromoteTest {
             assertFalse(data.get("deduped").asBoolean(), "the first promotion is not a duplicate");
             assertFalse(data.get("incidentId").isNull(), "the first promotion must name the Incident it opened");
 
-            List<OperationalObject> opened = incidents(c);
+            List<FakeObjectEngineProvider.FakeObjects.Fake> opened = incidents(c);
             assertEquals(1, opened.size(), "exactly one Incident");
-            OperationalObject incident = opened.get(0);
+            var incident = opened.get(0);
             assertEquals(data.get("incidentId").asText(), incident.id());
-            assertEquals(RECON, incident.correlationId(), "the reconciliation is the Incident's scope");
+            assertEquals(RECON, incident.scope(), "the reconciliation is the Incident's scope");
 
             Map<String, String> attrs = incident.attributes();
             assertEquals(RECON, attrs.get("reconciliation"));
@@ -149,7 +150,7 @@ class ControlApiReconPromoteTest {
             assertEquals(200, promote(c.port,
                     "{\"reconciliation\":\"" + RECON + "\",\"key\":\"APAC|sms\"}").statusCode());
 
-            List<OperationalObject> opened = incidents(c);
+            List<FakeObjectEngineProvider.FakeObjects.Fake> opened = incidents(c);
             assertEquals(2, opened.size(), "two distinct Breaks are two distinct Incidents");
             assertEquals(java.util.Set.of("EU|voice", "APAC|sms"),
                     opened.stream().map(o -> o.attributes().get("breakKey")).collect(java.util.stream.Collectors.toSet()));
@@ -233,19 +234,15 @@ class ControlApiReconPromoteTest {
 
     /**
      * How long suppression lasts, which is <b>not</b> what it looks like. Dedupe is over <em>non-terminal</em>
-     * Incidents, and 🔴 for an Incident the only terminal state is {@code ARCHIVED} — {@code RESOLVED} is not
-     * one ({@code Workflow.defaultFor}: {@code IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED}, terminal set
-     * {@code {ARCHIVED}}). So an operator who resolves a promoted Break and sees it recur gets <b>no new
-     * Incident</b> until the old one is archived.
+     * Incidents, and the fake's only terminal state is {@code ARCHIVED} — mirroring the real engine, where
+     * {@code RESOLVED} is not terminal ({@code Workflow.defaultFor}: {@code IDENTIFIED → DIAGNOSING →
+     * RESOLVED → ARCHIVED}, terminal set {@code {ARCHIVED}}). So an operator who resolves a promoted Break
+     * and sees it recur gets <b>no new Incident</b> until the old one is archived.
      *
      * <p>⚠ That is the product's existing rule, not something this route chose, and it is asserted here
      * precisely because it is surprising: the obvious expectation ("resolved means a recurrence is new
-     * news") is wrong, and a future change to the Incident workflow's terminal set would silently change
-     * how recurring Breaks behave. This test is where that would be caught.
-     *
-     * <p>(The first half also documents why the test cannot simply call {@code resolve}: resolving an
-     * Incident is gated on a completion checklist — timeline, cause analysis, corrective actions, SLA —
-     * so {@code archive} is the reachable terminal move from a freshly opened Incident.)
+     * news") is wrong. This test drives the fake straight to {@code archive} — the reachable terminal move
+     * this fake exposes — rather than walking the real Incident workflow's completion checklist.
      */
     @Test
     void suppressionLastsUntilTheIncidentIsArchivedNotMerelyResolved(@TempDir Path cfg, @TempDir Path wr) throws Exception {
@@ -256,9 +253,8 @@ class ControlApiReconPromoteTest {
             assertTrue(V1Body.of(promote(c.port, body).body()).get("incidentId").isNull(),
                     "suppressed while the Incident is open");
 
-            // ARCHIVED is the terminal state; `archive` is legal straight from IDENTIFIED.
-            TestOpsEngine.of(c.svc).transition(opened, "archive", "alice");
-            assertEquals("ARCHIVED", TestOpsEngine.of(c.svc).get(opened).orElseThrow().status());
+            TestFakeObjects.of(c.svc).archive(opened);
+            assertEquals("ARCHIVED", TestFakeObjects.of(c.svc).get(opened).orElseThrow().status());
 
             JsonNode data = V1Body.of(promote(c.port, body).body());
             assertFalse(data.get("deduped").asBoolean(),
@@ -295,7 +291,7 @@ class ControlApiReconPromoteTest {
             assertFalse(data.get("truncated").asBoolean());
 
             // The ids are the real Incidents, not invented.
-            List<String> live = incidents(c).stream().map(OperationalObject::id).toList();
+            List<String> live = incidents(c).stream().map(FakeObjectEngineProvider.FakeObjects.Fake::id).toList();
             assertTrue(live.contains(map.get(EU_VOICE_ID).asText()), "the reported id is a real Incident");
         }
     }
@@ -325,7 +321,7 @@ class ControlApiReconPromoteTest {
             assertTrue(V1Body.of(promoted(c.port, RECON).body()).get("promoted").has(EU_VOICE_ID),
                     "promoted while the Incident is open");
 
-            TestOpsEngine.of(c.svc).transition(opened, "archive", "alice");
+            TestFakeObjects.of(c.svc).archive(opened);
 
             assertFalse(V1Body.of(promoted(c.port, RECON).body()).get("promoted").has(EU_VOICE_ID),
                     "⛔ an ARCHIVED Incident must NOT read as promoted — promote() would open a fresh one, so "
