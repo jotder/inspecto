@@ -176,6 +176,35 @@ class PackTestHarnessTest {
         assertTrue(run.message().contains("target"), run.message());
     }
 
+    /**
+     * PACKHARNESS-NO-UNDECLARED-1. {@code rejection()} excludes {@code undeclared} — correctly, it is not
+     * a rejection — and before this the harness dropped it entirely, so the one diagnostic aimed at a pack
+     * author was the one surface that never showed it.
+     *
+     * <p>⚠ The load-bearing assertion is {@code logged("thershold")}: it names the typo'd key, so it goes
+     * red the moment the warn is stubbed out. {@code assertEquals("SUCCESS", …)} pins the other half of
+     * the contract — reporting it must never turn it into a rejection — but on its own it would stay green
+     * against a harness that reports nothing at all, which is precisely the state being fixed.
+     */
+    @Test
+    void anUndeclaredParameterWarnsTheAuthorWithoutRejectingTheRun() {
+        PackTestHarness harness = PackTestHarness.create()
+                .load(provider("acme.typo", List.of(), (cfg, ctx) -> JobResult.ok("ran", 0L)));
+
+        // `subject` IS declared by the fixture; `thershold` is the dead-property class — authored,
+        // persisted, shown in the editor, read by nothing.
+        PackTestHarness.Outcome run = harness.run("acme.typo",
+                Map.of("subject", "hi", "thershold", "10"));
+
+        assertEquals("SUCCESS", run.status(), run.message());
+        assertTrue(run.logged("thershold"), run.log().toString());
+        assertTrue(run.logged("undeclared parameter(s) for job type 'acme.typo'"), run.log().toString());
+        assertTrue(run.log().stream().anyMatch(l -> l.startsWith("WARN")), run.log().toString());
+        // The declared key must not be swept in with it — a warning that names everything names nothing.
+        assertTrue(run.log().stream().noneMatch(l -> l.contains("undeclared") && l.contains("subject")),
+                run.log().toString());
+    }
+
     @Test
     void aThrownExceptionBecomesAFailedRun() {
         JobTypeProvider boom = provider("acme.boom", List.of(), (cfg, ctx) -> {

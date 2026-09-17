@@ -156,6 +156,19 @@ final class ParameterResolver {
         return List.copyOf(extra);
     }
 
+    /**
+     * The WARNING text for a non-empty {@link Resolution#undeclared()}. Shared by the two surfaces that
+     * report it — {@code JobService}'s run log and {@link PackTestHarness} — so a pack author reads the
+     * production wording rather than a lookalike that can drift away from it
+     * ({@code PACKHARNESS-NO-UNDECLARED-1}). ⛔ Still a warning at both call sites: this builds a string,
+     * never a rejection, and {@code rejection()}/{@code reasons} deliberately exclude {@code undeclared}.
+     */
+    static String undeclaredWarning(String typeId, List<String> undeclared) {
+        return "undeclared parameter(s) for job type '" + typeId + "': " + String.join(", ", undeclared)
+                + " — no declaration covers them, so nothing validates or renders them; the Job may "
+                + "still read them directly";
+    }
+
     /** Check a resolved value against the declaration's full contract (§7.2, step 8) — type, then
      *  {@code options}, {@code pattern} and {@code min}/{@code max}. Returns {@code null} when it holds, or
      *  the reason it doesn't.

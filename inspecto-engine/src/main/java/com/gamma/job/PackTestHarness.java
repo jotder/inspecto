@@ -168,6 +168,15 @@ public final class PackTestHarness {
         String rejection = rejection(pr);
         if (rejection != null) return outcome("REJECTED", rejection, ctx);
 
+        // PACKHARNESS-NO-UNDECLARED-1: the dead-property warning, on the Run Log where the engine writes
+        // it — the pack author is exactly the person authoring params: against a descriptor, so the one
+        // diagnostic aimed at them must not be the one the harness drops. Same words as production
+        // (shared builder) and the same position in the ladder: AFTER the rejection return, so a run that
+        // is REJECTED reports here what it reports there. ⛔ Never a rejection itself — rejection() above
+        // excludes undeclared deliberately and this does not touch status.
+        if (!pr.undeclared().isEmpty())
+            ctx.log().warn(ParameterResolver.undeclaredWarning(typeId, pr.undeclared()));
+
         ctx.params = pr.resolved();
         PlatformServices granted = platform.grant(Set.copyOf(
                 registry.descriptor(typeId).map(JobTypeDescriptor::requires).orElse(List.of())));

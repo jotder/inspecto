@@ -1254,10 +1254,7 @@ public final class JobService implements AutoCloseable {
         // strict version would refuse configs that work today. This surfaces the dead-property risk: a
         // typo'd or retired key that is authored, persisted, shown in the editor, and read by nothing.
         if (!pr.undeclared().isEmpty())
-            ctx.log().warn("undeclared parameter(s) for job type '" + job.type() + "': "
-                    + String.join(", ", pr.undeclared())
-                    + " — no declaration covers them, so nothing validates or renders them; the Job may "
-                    + "still read them directly");
+            ctx.log().warn(ParameterResolver.undeclaredWarning(job.type(), pr.undeclared()));
         ctx.params(pr.resolved());
         // DUCKLE-C4: the parameter RECEIPT — which layer each value came from and what it overrode. Built here
         // (the values are resolved), written AFTER the run body (below) so a run's OUTPUT artifacts keep their
