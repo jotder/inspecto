@@ -560,8 +560,10 @@ final class ComponentRoutes implements RouteModule {
      * malformed component to degrade at render/dispatch time. Kinds with no model stay unconstrained, so
      * this is a hook, not a schema registry.
      */
-    // Package-private, not private: `BundleRoutes.ComponentBundleSource.write` calls it so bundle
-    // import runs the SAME gate as the authoring route (COMPONENT-BULK-WRITERS-UNGATED-1). ⛔ Reuse it
+    // Package-private, not private: the two BULK writers call it so they run the SAME gate as the
+    // authoring route (COMPONENT-BULK-WRITERS-UNGATED-1) — `BundleRoutes.ComponentBundleSource.write`
+    // (per-item: a refusal fails THAT item) and `BiTemplates.apply` (all-or-nothing: a refusal 422s the
+    // whole apply, in its resolve loop before any write). ⛔ Reuse it
     // rather than growing a second accepted-set - two copies of an accepted-set is exactly how the
     // widget/dashboard census came to be needed in the first place.
     static void validateKind(String type, String id, Map<String, Object> content) {

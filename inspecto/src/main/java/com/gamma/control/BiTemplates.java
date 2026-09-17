@@ -118,6 +118,19 @@ final class BiTemplates {
             if (store.get(kind, id).isPresent())
                 throw new ApiException(409, kind + " '" + id + "' already exists — re-apply with a 'prefix'");
             Map<String, Object> content = substituteTree(asMap(c.get("content")), dataset, prefix);
+            // COMPONENT-BULK-WRITERS-UNGATED-1: run the SAME gate as POST|PUT /components/{kind}, in the
+            // RESOLVE loop so a refusal costs nothing — apply stays all-or-nothing and never plants a
+            // partial board. ⚠ Today this cannot fire: every template body is hardcoded, and
+            // `substituteTree` substitutes VALUES only, so `dataset`/`prefix` can never introduce a key
+            // for the census to refuse. It is here for the NEXT curated template, which is exactly the
+            // case `ControlApiBiTemplatesTest.everyTemplateWritesABodyTheAuthoringRouteAccepts` pins at
+            // build time — this makes the same property fail closed at run time too.
+            try {
+                ComponentRoutes.validateKind(kind, id, content);
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(422, "template '" + templateId + "' would write an invalid "
+                        + kind + " '" + id + "': " + e.getMessage());
+            }
             resolved.add(Map.of("kind", kind, "id", id, "content", content));
         }
         List<Map<String, Object>> written = new ArrayList<>();

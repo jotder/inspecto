@@ -92,10 +92,18 @@ class ControlApiBiTemplatesTest {
     /**
      * COMPONENT-BULK-WRITERS-UNGATED-1: {@code BiTemplates.apply} writes through {@code ComponentStore}
      * directly, so no {@code ComponentRoutes.validateKind} gate — and therefore no {@code widget}/
-     * {@code dashboard} top-level key census — ever runs over a curated template. The gate cannot be
-     * called from here ({@code validateKind} is private), and a runtime check over content that is
-     * entirely hardcoded would be the wrong shape anyway: the only operator input is the {@code dataset}
-     * and {@code prefix} VALUES, and the census refuses KEYS. So pin the property at build time instead —
+     * {@code dashboard} top-level key census — ever runs over a curated template.
+     *
+     * <p>⚠ CORRECTED 2026-09-17. This javadoc used to justify the build-time-only shape with "the gate
+     * cannot be called from here ({@code validateKind} is private)". That is FALSE and was already false
+     * when written: {@code validateKind} is package-private (widened for {@code BundleRoutes}), and
+     * {@code BiTemplates} is in this very package. {@code BiTemplates.apply} now calls it in its resolve
+     * loop, so the row is closed at run time too.
+     *
+     * <p>The javadoc's OTHER argument still holds and is why this test stays: the runtime gate cannot
+     * fire today, because template bodies are hardcoded and {@code substituteTree} substitutes VALUES
+     * only — the only operator input is the {@code dataset}/{@code prefix} values, and the census refuses
+     * KEYS. So this build-time pin is the guard that can actually go red for a badly authored template;
      * every component a template writes must be one the authoring route would accept, or the gallery
      * ships boards the Studio cannot re-save.
      */
