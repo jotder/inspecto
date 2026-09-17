@@ -3564,12 +3564,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ship — a customer reading *"see `ControlApi.java`"* loses nothing — and papering those over at package
   time would hide real rot from the repo's own guard. ⇒ The guard is **NOT wired into CI**: red on master
   by design until the source-path class is decided. Original row follows.
-  - **P2** · **`BUNDLE-DANGLING-LINKS-1` — the shipped INDEX points at documents the customer does not
-  have.** Residual of `BUNDLE-SHIPS-THE-ARCHIVE-1`, which now withholds two doc trees from the bundle.
-  Current-tier docs link INTO those trees **198 times** (187 `archived-documents`, 11 `superpower`),
-  `INDEX.md` — which lists both as sections — `GLOSSARY.md` and `ADVANCED_GUIDE.md` among them.
-  Withholding does not rewrite them. Three options: rewrite at package time · ship a marked stub per
-  withheld target · accept and say so in the bundle README. ⇒ Owed call.
+  - ~~**P2** · **`BUNDLE-DANGLING-LINKS-1` — the shipped INDEX points at documents the customer does not
+  have.**~~ ✅ **CLOSED 2026-09-17 — already resolved, this is stale duplicate text.** Re-measured with
+  `tools/check-bundle-doc-links.mjs` (simulated mode, no `pwsh` needed): the raw repo-level count into the
+  two withheld trees is now **194** (181 `archived-documents` + 13 `superpower`, `docs/INDEX.md` still the
+  worst offender at 97) — essentially the same ballpark as this row's original 198, not the 323 the sibling
+  entry above measured (that figure also folded in the 31 audience-file links and the 4 root-climbing ones,
+  which this row never counted). The owed call this row asked for was **already made and shipped**, one
+  entry up in this same file: option (a), rewrite at package time — `package.ps1` step 7 neutralises every
+  link into a withheld tree/file to `label (internal document - not shipped)`, fence-aware, driven against
+  the live tree with 224 neutralised. This simulator intentionally does not model that text-rewrite (it
+  only simulates the bundle's FILE SET, per its own header comment), so it still reports the pre-rewrite
+  count — that is the tool working as designed, not a regression. No further code change needed; this row
+  is a leftover unstruck copy of the "Original row follows" text the sibling entry already reproduced and
+  closed. Options (b) stays refused (would land stubs under the very trees the tier/audience guards forbid
+  staging) and a fresh (c)-style README caveat would only restate what (a) already fixed.
   → `okf/backend/build-run/build-test.md`
 
 - ~~**P3** · **`WORKTREE-PROVISIONING-1`**~~ ✅ **CLOSED 2026-09-16 — one half FIXED, the other half
