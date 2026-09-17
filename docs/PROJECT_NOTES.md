@@ -140,6 +140,53 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **FOUR NEW FALSE-GREEN MECHANISMS, all of which report SUCCESS** (2026-09-17). (1) `mvn … ; echo
+  "EXIT=$?"` records the **echo's** status, so a failed build reports exit 0 — capture Maven's status
+  directly. (2) `-DfailIfNoSpecifiedTests=false` is **silently ignored**; the working spelling is
+  `-Dsurefire.failIfNoSpecifiedTests=false`, and without it a filtered `-am` run dies at `asn-core` for the
+  wrong reason. (3) **`-Dtest=A+B+C` runs ZERO tests and reports BUILD SUCCESS** — `+` is Surefire's *method*
+  separator, so the whole thing is one literal pattern matching nothing. Commas are required. (4) A subagent
+  reporting **"Verdict: PASS" from the wrong tree and without `-Pedition-enterprise`** — 23 modules instead
+  of 32, so every edition-gated module was skipped, with the verdict read off the log rather than from
+  `check-reactor-verdict.mjs`. ⇒ **Re-derive every verdict with the tool, on the tree you are about to
+  commit.**
+  ⚠ And one **false RED**, which is rarer and makes people "fix" a non-problem: with `node_modules` absent in
+  a fresh worktree, `npx tsc` resolves to an unrelated npm package and fails with a message that reads exactly
+  like a type error.
+
+- 🔴 **A TEST CAN BE GREEN FOR A REASON THAT IS NOT THE CODE** (2026-09-17).
+  `ControlApiBundleNewKindsTest`'s bundle-escape guard passed or failed depending on three machine facts and
+  none of them the security property: the allowed roots are
+  `${session.executionRootDirectory};${java.io.tmpdir}` (`pom.xml:418`), the value resolved against the
+  **process working directory** because the test helper clears `assist.write.root` before the request, and six
+  `..` clamps at the drive root on Windows. `-Djava.io.tmpdir=C:\` flipped the verdict with **no code change**.
+  ⛔ It was announced as "master is RED on a security guard" before being grounded — and the gate was in fact
+  sound. ⇒ **Probe the gate DIRECTLY (call the validator by hand) before believing a test about it**, and pin
+  such a property against an absolute path constructed to be outside every root, never by counting `..`.
+
+- ⚠ **`git checkout -- <file>` reverts to HEAD, not to your pre-experiment state** (2026-09-17). Falsifying a
+  guard by planting a bad value and then "undoing" it that way **discarded a lane's real change** to the same
+  file. Copy the file aside first, or restore the intended hunk from the patch afterwards. Same family as the
+  standing "unstage, never delete" rule for a peer's work.
+
+- ⚠ **`docs/BACKLOG.md` keeps a CLOSED row's original prose as an indented child bullet** under its own
+  strikethrough header (the "Original row follows" convention). So **grepping a row ID lands on open-sounding
+  text first**, and two lanes were tasked from already-shipped rows in one shift. ⇒ Assign work only from a
+  **top-level, unstruck** bullet: `grep -nE '^- \*\*P[123]\*\*' docs/BACKLOG.md`.
+
+- ⚠ **A row's enumerated call-site list is a hypothesis, and it understates as often as it overstates**
+  (2026-09-17, four instances). `SQLIDENT-NINE-COPIES-1` named nine copies: there were **16** across five
+  modules, four of them *inline* with no helper method, and **two of the nine were the previous fix**, not the
+  defect. A job-param census globbed `*_job.toon` and structurally missed `*_job_template.toon`. One row named
+  one `!Files.isDirectory` site where four existed; another named four demo schemas where the whole
+  25-file corpus was affected. ⇒ **Grep the pattern, then re-derive the count.**
+
+- ⚠ **A row's prescribed FIX can be unbuildable, and the reason is usually the module graph** (2026-09-17).
+  `SQLIDENT`'s prescribed home (`inspecto-sql`) would have been a **cycle** — it depends on `inspecto-util`,
+  where two of the copies lived. `PACK-SPI`'s prescribed `OptionalSpi` reuse is unreachable from
+  `inspecto-engine`, because `inspecto-processor` depends on the engine, not the other way round. ⇒ Check the
+  dependency direction before adopting a row's remedy.
+
 - 🔴 **A GUARD FAILS IN THE DIRECTION OF PASSING — five instances in two days** (2026-09-16/17). Each was
   green while blind: a prose regex that required the number word to touch its noun, so a **bolded** count
   matched nothing; surefire reports surviving `mvn clean` (which only cleans modules the reactor REACHES),
