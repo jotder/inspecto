@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.config.safety.PathJail;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.service.CollectorService;
@@ -113,12 +114,35 @@ class ControlApiBundleNewKindsTest {
      * <p>Two halves, both load-bearing: the bad item is refused (a per-item {@code failed}, never a
      * write + never a hot-registration), and — because import is a BULK path — a good item in the SAME
      * bundle still lands. A refusal that aborted the batch would be the worse bug.
+     *
+     * <p>🔴 <b>The escaping value is an ABSOLUTE path outside a root this test pins itself, not a count
+     * of {@code ..} segments</b> ({@code BUNDLE-ESCAPE-TEST-IS-ENVIRONMENT-DEPENDENT-1}, 2026-09-17).
+     * The original spelling was {@code ../../../../../../evil_escape}, and a job's <em>relative</em>
+     * value resolves against the process working directory here ({@code SpaceConfigRoot.current()} is
+     * null — {@code open()} restores {@code assist.write.root} before the request), so where six
+     * {@code ..} lands depends on how deep the checkout sits. The roots it is measured against are
+     * environment-derived too: {@code pom.xml} feeds the gate
+     * {@code ${session.executionRootDirectory};${java.io.tmpdir}}. Measured 2026-09-17 — the identical
+     * commit PASSES 11/11 normally and FAILS with {@code failed: 0} under
+     * {@code -Djava.io.tmpdir=C:\}, because the escape then genuinely lands inside a declared allowed
+     * root. ⛔ That was the TEST being wrong about its own premise, never the gate letting an escape
+     * through. Pinning the root and using an absolute sibling of it makes the property hold on any
+     * machine at any depth.
      */
     @Test
     void jobImportRefusesAnEscapingPathValueWithoutAbortingTheBatch(@TempDir Path dir) throws Exception {
+        Path escape = dir.resolveSibling(dir.getFileName() + "_evil_escape");
+        String priorRoots = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", dir.toString());
         try (Ctx c = open(dir, dir.resolve("wr"))) {
+            // The premise, asserted rather than assumed: if a leaked root ever made this path legal the
+            // test must say so by name, not go quietly green on a security property.
+            assertTrue(PathJail.allowedRoots().stream().noneMatch(r -> PathJail.contains(r, escape)),
+                    "the escape target must be outside every allowed root: " + escape
+                            + " vs " + PathJail.allowedRoots());
+
             String bad = "{\"name\":\"escaper\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"cron\":\"0 3 * * *\","
-                    + "\"dir\":\"../../../../../../evil_escape\"}";
+                    + "\"dir\":\"" + escape.toString().replace("\\", "\\\\") + "\"}";
             String good = "{\"name\":\"wellbehaved\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"cron\":\"0 4 * * *\"}";
             String bundle = "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,"
                     + "\"exportedAt\":\"2026-09-16T00:00:00Z\",\"sourceSpace\":null,\"items\":["
@@ -138,6 +162,9 @@ class ControlApiBundleNewKindsTest {
                     "refused before the write AND before the hot-registration");
             assertEquals(200, send(c.port, "GET", "/jobs/wellbehaved", null).statusCode(),
                     "the batch did not abort");
+        } finally {
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
         }
     }
 
