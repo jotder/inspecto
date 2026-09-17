@@ -1256,6 +1256,34 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   the cross-space controller and connector-direct emission (S8) are what the trigger names; the
   **RFC 6902 JSON Patch state deltas for AG-UI still have no consumer** and should not ride along.
   ⛔ Scope to the consequence that was actually asked for.
+
+  🔴 **RE-GROUNDED 2026-09-17 — still open, needs a design pass, NOT a quick build.** Confirmed against
+  current code: cross-Space consequence is **structurally absent today, not merely unguarded**. Each
+  Space is fully isolated at the runtime-instance level, not by a checkable flag: `EventLog` holds one
+  ledger per Space in a `SPACES` map keyed by id (`inspecto-event/src/main/java/com/gamma/event/
+  EventLog.java:77`, routed by thread MDC, `:100-110`), and `SpaceContext` gives each Space its own
+  `CollectorService`/`JobService` instance (`inspecto/src/main/java/com/gamma/service/
+  SpaceContext.java:17-19`, "each fully isolated"). `Signal.space` (`inspecto-engine/src/main/java/
+  com/gamma/signal/Signal.java:27-29`, persisted via `ATTR_SPACE`) is descriptive metadata only — nothing
+  reads it to gate anything. `DecisionRoutes.apply`'s consequences (`emit-signal`, `start-job`,
+  `trigger-pipeline`, `create-incident`, `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:
+  36-41`) and `AlertEvaluateJob` ("runs **this space's** authored Alert Rules",
+  `inspecto-engine/src/main/java/com/gamma/job/AlertEvaluateJob.java:12`) always bind to the request's
+  own Space instance — there is **no target-space parameter anywhere in the apply path** (grepped
+  `DecisionRoutes.java`: no match on space-id params), so there is nothing to author a refusal for yet.
+  ⚠ **Correcting a stale premise:** Space/ABAC row-level enforcement (`PolicyEngine`/`AccessDecider`) IS
+  Enterprise-only (`inspecto-policy/src/main/java/com/gamma/policy/PolicyEngine.java:19`; with no
+  decider on the classpath, Personal/Standard show every row — `inspecto/src/main/java/com/gamma/
+  control/RowScope.java:9-14`) — but that ABAC layer is irrelevant to this row: the Space-instance
+  isolation above is structural plumbing, not the ABAC PDP, and it applies to every edition.
+  ⛔ **No small safe increment exists to ship here.** There is no missing validation/refusal to add
+  because no code path can currently even name a different Space to target — the gap is the absence of
+  the whole cross-space controller (S8), which is a genuine cross-boundary design (does a consequence
+  need its own authorization independent of the triggering Space's caller? does the target Space's
+  EventLog need to accept externally-originated Signals, and under what identity?). Left **open, P2,
+  ungated for build** pending that design pass — no code change made this session.
+  → `okf/backend/control-plane/signal-backbone.md` §"Open / deferred" · `okf/backend/control-plane/
+  decision-rules.md`
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (DuckDB `spatial` extension itself: zero demand re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (outbound mirror of the connector SPI reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
 - **P2** · ✅ **TRIGGER (operator, 2026-09-13):** the first install where hand-edited policy TOON goes wrong. ⚠ The
