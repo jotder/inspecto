@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  * <p>Each loader warns-and-skips a bad file so one malformed config never blocks the
  * others. Logs under {@link CollectorService}'s category so existing log output is unchanged.
  */
-final class ServiceBootstrap {
+public final class ServiceBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(CollectorService.class);
 
@@ -38,7 +38,7 @@ final class ServiceBootstrap {
      * {@code -Dservice.max.runs} (default = source count). Shared by the service and Control API entry points.
      * Exits the JVM with a message if no sources are found.
      */
-    static CollectorService build(String[] args) throws IOException {
+    public static CollectorService build(String[] args) throws IOException {
         return buildFrom(SpaceRoot.legacy(), args, true);
     }
 
@@ -49,7 +49,7 @@ final class ServiceBootstrap {
      * CLI), a config-less invocation exits the JVM; a space tolerates an empty {@code config/} (a freshly created
      * space has no sources yet), so {@code SpaceBootstrap} passes {@code false}.
      */
-    static CollectorService buildFrom(SpaceRoot root, String[] paths, boolean exitIfEmpty) throws IOException {
+    public static CollectorService buildFrom(SpaceRoot root, String[] paths, boolean exitIfEmpty) throws IOException {
         if (root.config() == null) registerLegacyAcquisitionLedger(root);
         List<Path> registry = MultiCollectorProcessor.resolveConfigs(paths);
         List<EnrichmentConfig> enrichJobs = loadEnrichJobs(resolveBySuffix(paths, "_enrich.toon"));

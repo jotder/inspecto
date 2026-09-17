@@ -1,9 +1,11 @@
-package com.gamma.service;
+package com.gamma.opsboot;
 
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.objects.ObjectType;
 import com.gamma.ops.workflow.Workflow;
+import com.gamma.service.CollectorService;
+import com.gamma.service.SpaceRoot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,14 +16,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@link ServiceBootstrap#loadWorkflows} scans {@code *_workflow.toon}, registering the valid ones and
- * warning + skipping any that fail to parse (the {@code loadRcaTemplates} robustness contract), and
- * {@link ServiceBootstrap#buildFrom} wires each override into {@link com.gamma.ops.ObjectService} so
- * {@code workflow(type)} (what {@code GET /workflows/{type}} serves) reflects it — the boot-scan seam that
- * was previously missing (the {@code workflows} map was frozen to {@link Workflow#defaultFor} at
- * construction).
+ * Validates that {@code *_workflow.toon} overrides are loaded, registering the valid ones and
+ * warning + skipping any that fail to parse, and that service bootstrap wires each override into
+ * {@link com.gamma.ops.ObjectService} so {@code workflow(type)} (what {@code GET /workflows/{type}}
+ * serves) reflects it instead of the built-in {@link Workflow#defaultFor} default.
  */
-class ServiceBootstrapWorkflowTest {
+class WorkflowConfigLoadTest {
 
     private static final String TASK_OVERRIDE = """
             workflow:
@@ -63,7 +63,7 @@ class ServiceBootstrapWorkflowTest {
         TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
         Files.writeString(dir.resolve("task_workflow.toon"), TASK_OVERRIDE);
 
-        try (var svc = ServiceBootstrap.buildFrom(SpaceRoot.legacy(), new String[]{dir.toString()}, false)) {
+        try (var svc = CollectorService.fromArgs(new String[]{dir.toString()})) {
             // ⚠ objects() is the narrow seam now — take it down to the engine, as the module's routes do.
             com.gamma.ops.ObjectService engine =
                     ((com.gamma.ops.ObjectServiceAccess) svc.objects().orElseThrow()).service();
