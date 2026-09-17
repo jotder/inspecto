@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.api.PublicApi;
+import com.gamma.config.safety.PathJail;
 import com.gamma.enrich.ReferenceReader;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.DuckLakeRegistrar;
@@ -16,6 +17,7 @@ import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineStores;
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.BranchCommitCoordinator;
@@ -239,15 +241,17 @@ public final class PipelineJobRunner implements Job {
         // enrich job's `config:`); the Stage-2 remainder is lifted at RUN time (PipelineLift.stageTwo),
         // so the flat file stays the single truth — no derived graph is persisted to the pipeline store.
         // Mutually exclusive with `pipeline:`/`flow:` — carrying both leaves the graph source undefined.
-        // 🔴 `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`, 2026-09-16: `pipeline_config` (below) and `data_dir` (the `cfg.opt("data_dir", dataDir)` read) are
-        // both in `ConfigSafetyValidator.JOB_PATH_KEYS`, so a job SAVED through a route resolves them with
-        // PathJail.resolveJobPath against the Space config root and jails them against the policy roots —
-        // while the two reads below still resolve CWD-relative and jail nothing at all. ⛔ The reader
-        // cannot be moved onto resolveJobPath yet: DRIVEN over the real rule, ALL 19 committed values
-        // behind these two keys break — 12 `pipeline_config` refuse in BOTH columns (the authored value is
-        // already space-root-prefixed, or names a file beside the job, so the old path always exists and
-        // the ambiguous-case branch always fires) and 7 `data_dir: out` refuse once served / re-point
-        // silently on a fresh tree. `JOB-PATH-DEMO-CONFIG-REPOINT-1` has to land first.
+        // `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` (operator 2026-09-17, option 1): `pipeline_config` and `data_dir`
+        // are both in `ConfigSafetyValidator.JOB_PATH_KEYS`, so a job SAVED through a route is jailed — but a job
+        // read from disk reached the filesystem here with no jail at all. Both reads now go through the one
+        // job-path rule against the Space's config READ root (`SpaceConfigRoot.currentConfigReadRoot()`), NOT
+        // `current()`: in the single-tenant layout the write root (`-Dassist.write.root`, `out/`+`registry/`) is
+        // a different directory from the one a job's relative path has always meant, and resolving against it
+        // would re-point all 19 committed values (12 `pipeline_config`, 7 `data_dir: out`). With the read root
+        // = the launch dir, a value that resolves resolves to the same file as before; only an escape from the
+        // policy roots is refused (PathJail.Escape, unmapped — the maintenance tasks' idiom).
+        List<Path> jailRoots = PathJail.allowedRoots();
+        Path readRoot = SpaceConfigRoot.currentConfigReadRoot();
         String flatPath = cfg.opt("pipeline_config", null);
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
         // read only, kept for existing *_job.toon files that were never resaved.
@@ -258,6 +262,7 @@ public final class PipelineJobRunner implements Job {
             if (pipelineIdOpt != null || cfg.opt("flow", null) != null)
                 throw new IllegalArgumentException("pipeline job '" + cfg.name()
                         + "' carries both pipeline_config: and pipeline:/flow: — pick one graph source");   // vocab-allow: names the two config KEYS, `pipeline:` and the legacy `flow:`
+            flatPath = PathJail.requireJobPathUnderAny(jailRoots, readRoot, flatPath, "job.pipeline_config").toString();
             g = com.gamma.pipeline.PipelineLift.stageTwo(com.gamma.etl.PipelineConfig.load(flatPath));
             pipelineId = g.name();
         } else {
@@ -273,6 +278,12 @@ public final class PipelineJobRunner implements Job {
         // route already refuses one with UNKNOWN_USE_REF).
         if (registry != null) g = registry.get().effectiveGraph(g);
         String dir = cfg.opt("data_dir", dataDir);
+        // Containment CHECK only: the authored string itself travels on unchanged, because it is baked into the
+        // durable view definitions (`registerViews` → `SqlViews.storeReadRoot`) and swapping in the absolute form
+        // would rewrite persisted SQL for every existing relative `data_dir`. The constructor default is the
+        // Space's own data root (JobService), not an authored path, and is not jailed.
+        if (cfg.opt("data_dir", null) != null)
+            PathJail.requireJobPathUnderAny(jailRoots, readRoot, dir, "job.data_dir");
         requireTopLevelSinks(g, dir);
         String batchId = cfg.opt("batch_id", cfg.name().toLowerCase().replace(' ', '_')
                 + "-" + System.currentTimeMillis());

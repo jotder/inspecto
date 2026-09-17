@@ -73,9 +73,14 @@ public final class SpaceManager implements AutoCloseable {
     /** Wrap a single already-built service as the {@code default} space (single-tenant / CLI / tests). */
     public static SpaceManager single(CollectorService service) {
         SpaceManager m = new SpaceManager();
-        SpaceContext ctx = new SpaceContext(DEFAULT, SpaceRoot.legacy(),
+        SpaceRoot legacy = SpaceRoot.legacy();
+        SpaceContext ctx = new SpaceContext(DEFAULT, legacy,
                 new SpaceContext.SpaceManifest(DEFAULT.value(), "", ""), service);
         m.spaces.put(DEFAULT, ctx);
+        // JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1 (option 1, 2026-09-17): a job's relative path has always meant the
+        // launch dir in this layout, NOT -Dassist.write.root — publish that explicitly so the engine holds no
+        // cwd assumption of its own (SpaceBootstrap.load's per-space register() covers the multi-space case).
+        com.gamma.pipeline.SpaceConfigRoot.registerConfigReadRoot(DEFAULT.value(), legacy.base());
         return m;
     }
 

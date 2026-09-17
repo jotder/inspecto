@@ -134,7 +134,8 @@ final class CapabilityManifest {
             // Operator decision: triage is daily work, but changing an Incident's disposition is
             // administrative — so the state-changing routes take `canAdminister`, and comment / attach /
             // link / RCA-seed stay open as collaboration (see EXEMPTIONS). Case-Rule evaluate opens a Case,
-            // which the audit had mis-bucketed as read-shaped. `POST /objects` (create) is PENDING.
+            // which the audit had mis-bucketed as read-shaped. `POST /objects` (create) took `canManageIncidents`
+            // on 2026-09-16 (it said PENDING here until 2026-09-17; PENDING_OPERATOR_CALLS has been empty since).
             new Entry("POST", "/objects/([^/]+)/ack", Roles.CAN_ADMINISTER),
             new Entry("POST", "/objects/([^/]+)/resolve", Roles.CAN_ADMINISTER),
             new Entry("POST", "/objects/([^/]+)/transition", Roles.CAN_ADMINISTER),

@@ -147,6 +147,67 @@ class SpaceConfigRootTest {
         assertEquals(demo, SpaceConfigRoot.forSpace("demo"));
     }
 
+    // ── the config READ root (JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1, option 1: additive) ──────
+
+    @Test
+    void theDefaultSpacesReadRootIsTheLaunchDirWhenNothingIsRegistered(@TempDir Path serverWide) {
+        System.setProperty("assist.write.root", serverWide.toString());
+        // The rule a job's relative path has ALWAYS been resolved by, computed independently: the launch dir —
+        // and NOT the write root, even though the write root is set. That non-fallback is the point.
+        assertEquals(Path.of("").toAbsolutePath(), SpaceConfigRoot.currentConfigReadRoot());
+        assertEquals(serverWide, SpaceConfigRoot.current(), "the WRITE root is untouched by the read-root accessor");
+    }
+
+    @Test
+    void aRegisteredReadRootWinsAndLeavesTheWriteRootAndRegistryUnchanged(@TempDir Path launch, @TempDir Path serverWide) {
+        System.setProperty("assist.write.root", serverWide.toString());
+        Path registryBefore = SpaceConfigRoot.currentRegistry();
+
+        SpaceConfigRoot.registerConfigReadRoot(EventLog.DEFAULT_SPACE_ID, launch);
+
+        assertEquals(launch, SpaceConfigRoot.currentConfigReadRoot());
+        // 🔴 The regression the row warns about: `out/`, `write/`, `registry/` are derived from current(), and a
+        // read-root registration must not move them by construction. Same answer before and after.
+        assertEquals(serverWide, SpaceConfigRoot.current());
+        assertEquals(registryBefore, SpaceConfigRoot.currentRegistry());
+        assertEquals(serverWide.resolve("registry"), SpaceConfigRoot.currentRegistry());
+    }
+
+    @Test
+    void aSelfContainedSpacesReadRootIsItsConfigRoot(@TempDir Path ucc, @TempDir Path launch) {
+        SpaceConfigRoot.register("ucc", ucc);
+        MDC.put(EventLog.SPACE_MDC_KEY, "ucc");
+        // One root serves both roles for a space SpaceBootstrap.load registered ...
+        assertEquals(ucc, SpaceConfigRoot.currentConfigReadRoot());
+        // ... until the control plane says otherwise explicitly.
+        SpaceConfigRoot.registerConfigReadRoot("ucc", launch);
+        assertEquals(launch, SpaceConfigRoot.currentConfigReadRoot());
+        assertEquals(ucc, SpaceConfigRoot.current());
+    }
+
+    @Test
+    void anUnregisteredNamedSpaceHasNoReadRoot(@TempDir Path serverWide) {
+        System.setProperty("assist.write.root", serverWide.toString());
+        MDC.put(EventLog.SPACE_MDC_KEY, "ucc");
+        // Mirrors forSpace: a named space never inherits the default space's answer, not even the launch dir.
+        assertNull(SpaceConfigRoot.currentConfigReadRoot());
+        assertNull(SpaceConfigRoot.forSpaceConfigReadRoot("ucc"));
+        assertEquals(Path.of("").toAbsolutePath(), SpaceConfigRoot.forSpaceConfigReadRoot(null),
+                "null id means the default space, as forSpace(null) does");
+    }
+
+    @Test
+    void forgetAndClearDropTheReadRootToo(@TempDir Path ucc, @TempDir Path launch) {
+        SpaceConfigRoot.register("ucc", ucc);
+        SpaceConfigRoot.registerConfigReadRoot("ucc", launch);
+        SpaceConfigRoot.forget("ucc");
+        assertNull(SpaceConfigRoot.forSpaceConfigReadRoot("ucc"), "a read root must not outlive its space");
+
+        SpaceConfigRoot.registerConfigReadRoot(EventLog.DEFAULT_SPACE_ID, launch);
+        SpaceConfigRoot.clear();
+        assertEquals(Path.of("").toAbsolutePath(), SpaceConfigRoot.currentConfigReadRoot());
+    }
+
     @Test
     void decisionRulesRegistersThroughTheSameMap(@TempDir Path cfg) {
         // DecisionRules takes a REGISTRY root and the shared map holds CONFIG roots; the forwarding must

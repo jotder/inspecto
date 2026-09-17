@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **83<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 48<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **76<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 30<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 48<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 31<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 83<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 30<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 76<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1674,7 +1674,7 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
 `spaces/demo/audit/jobs_runs.csv` to an ungated call, now refused by `SqlGuard.RELATION_REF`, 17/17), and
 `SessionService.onAuthLost` dropped state without navigating to sign-in (now navigates).
 
-- **P1** · **`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`** — on `ubuntu-latest` `$env:OS` is unset so the jlink
+- ~~**P1**~~ · **`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`** — ✅ **SHIPPED 2026-09-17** — `package.ps1` reads the platform off the EMBEDDED jlink image (`Get-RuntimePlatform`: `java.exe` vs an ELF `bin/java`, `e_machine 0x3E`) and names each zip `inspecto-deploy-<platform>.zip`; a Linux cross-build failure THROWS unless `-AllowPartialRuntime`; on a POSIX host the zip is written with Info-ZIP `zip -X` after `chmod +x *.sh` so the exec bit survives (Windows hosts cannot preserve modes — stated at the site); `release.yml` collects every `inspecto-deploy-*.zip` through `tools/release-collect.sh`, FAILS when the runner's own platform is missing, and verifies per zip that the runtime binary, the extension directory and (on Linux) `-rwx serve.sh` agree. Guard `tools/check-bundle-platform.mjs` (ci.yml, `guards` job) falsified three ways. Local Personal package produced both zips with matching entry tables. ⚠ NOT verifiable from Windows: the POSIX zip branch, the ELF read of a host-linked temurin image, and `release-collect.sh` end-to-end — the first tag is their first run (`RELEASE-PIPELINE-NEVER-EXECUTED-1` stays open for exactly that). *(Original:)* on `ubuntu-latest` `$env:OS` is unset so the jlink
   image is LINUX, yet the only zip a tag publishes is built by `Compress-BundleForPlatform -Platform
   'windows_amd64'` (`inspecto/package.ps1:1746`; collect steps at `.github/workflows/release.yml:168-210`):
   the published bundle pairs a Linux JVM with Windows-only DuckDB extensions — the exact air-gap failure
@@ -1744,11 +1744,11 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   landed 2026-09-02, the newest tag is `v3.9.0` (2026-06-01), the pom is `4.0.0-SNAPSHOT`, and `ci.yml`
   only PARSES `package.ps1` (`.github/workflows/ci.yml` launcher/SBOM/extension guards) — never runs it.
   Fix: a `workflow_dispatch` dry-run job that executes the Personal packaging path (no `-Sign`) on master.
-- **P2** · **`RELEASE-LINUX-ZIP-NEVER-PUBLISHED-1`** — `inspecto-deploy-linux.zip` is built only when a
+- ~~**P2**~~ · **`RELEASE-LINUX-ZIP-NEVER-PUBLISHED-1`** — ✅ **SHIPPED 2026-09-17 with `RELEASE-BUNDLE-PLATFORM-MISMATCH-1`** (`tools/release-collect.sh` collects every platform zip and fails short). *(Original:)* `inspecto-deploy-linux.zip` is built only when a
   Linux jmods cache is found (`inspecto/package.ps1:1421-1440`) and the three collect steps in
   `release.yml` name only the `inspecto-deploy.zip*` trio, so no Linux-labelled artifact has ever been
   released. Fix: name it in each collect step and fail the release when the per-platform set is short.
-- **P2** · **`RELEASE-LAUNCHERS-NOT-EXECUTABLE-1`** — `Compress-Archive` stores no POSIX mode bits
+- ~~**P2**~~ · **`RELEASE-LAUNCHERS-NOT-EXECUTABLE-1`** — ✅ **SHIPPED 2026-09-17 with `RELEASE-BUNDLE-PLATFORM-MISMATCH-1`** (POSIX host: `chmod +x` + Info-ZIP `zip -X`; release verify asserts `-rwx serve.sh`). ⚠ A Linux zip CROSS-BUILT on Windows still cannot carry modes — `install-service.sh` chmods `serve.sh`. *(Original:)* `Compress-Archive` stores no POSIX mode bits
   (`inspecto/package.ps1:1736`) and the only `chmod +x` lives inside the emitted `install-service.sh`, so a
   customer who unzips gets a non-executable `serve.sh`/`run.sh`. Fix: zip the Linux leg with a mode-
   preserving tool (or `tar.gz`) and assert the bit in the release verify step.
@@ -1834,7 +1834,7 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
 - **P2** · **`RUN-ROUTES-TEST-1`** — `RunRoutes.java` (register/trigger/pause/resume/status/report of
   pipelines) is referenced by no test file under `inspecto/src/test/java/com/gamma/control/`. Fix: a
   `ControlApiRunRoutesTest` over the write paths through the real gate chain.
-- **P3** · **`PKG-LINUX-RUNTIME-WARNS-1`** — a failed Linux runtime build is `Write-Warning`, not `throw`
+- ~~**P3**~~ · **`PKG-LINUX-RUNTIME-WARNS-1`** — ✅ **SHIPPED 2026-09-17** (throws unless `-AllowPartialRuntime`). *(Original:)* a failed Linux runtime build is `Write-Warning`, not `throw`
   (`inspecto/package.ps1:1436`), so a release quietly loses a platform. Fix: throw unless an explicit
   `-AllowPartialRuntime` is passed.
 - ~~**P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`**~~ ✅ **SHIPPED 2026-09-17 — and BOTH options were taken.**
@@ -2049,7 +2049,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   not only 28 lines below it.
 ## 5. Docs & hygiene
 
-- **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down.**
+- ~~**P1**~~ · **`ROUTE-UNGATED-DEFAULT-1`** — ✅ **CLOSED 2026-09-17 — grounded against the code, every remaining item was already decided and shipped.** The ratchet is the boot refusal (§0). Item (a)'s "product decision first" was taken 2026-09-15/16: Incident/Case DISPOSITION (`ack/resolve/transition/assign/merge/split/PATCH`, Case-Rule `evaluate`) is `canAdminister`; opening an Incident (`POST /objects`) is `canManageIncidents`; comments/attachments/links/RCA/tag assignments are recorded `collaboration` / `target-visibility-gated` exemptions; agent governance (`feedback`, `approvals/{id}/decision`, `PUT /agent/policy`, `kill-switch`) is `canAdminister` at `AgentRoutes.java:150,177,194,199`. `CapabilityManifest.PENDING_OPERATOR_CALLS` is EMPTY. The only residue was a stale comment in the manifest still calling `POST /objects` PENDING — corrected. 🔴 **Lesson: this row sat at P1 for two days after its own work finished**, because its head paragraph was never rewritten when the sub-items closed. *(Original head:)* 🔴 **an unlisted route is OPEN, not locked down.**
   ✅ **The blocking half is BUILT 2026-09-15.** `Roles.CAN_ADMINISTER` exists — **one** coarse capability per
   the operator's call, not three per-family ones — so duckle's "unlisted ⇒ admin" rule is **expressible for
   the first time**. `PUT /spaces/{id}` and `DELETE /spaces/{id}` are gated on it; `DELETE /spaces/{id}` was
@@ -2539,7 +2539,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   rather than a comment. The alternative is pushing the Space-root lookup DOWN into `inspecto-config`
   beside `PathJail`, the push-don't-pull shape `DiscoveredRoots` already uses.
 
-- **P1** · 🔴 **`JOB-PATH-COMPAT-SURVEY-1` — SURVEY DONE 2026-09-16 (`6c3dbd6e`), and it RE-RANKS this
+- ~~**P1**~~ · **`JOB-PATH-COMPAT-SURVEY-1`** — ✅ **CLOSED 2026-09-17 — re-DRIVEN over the real `PathJail.resolveJobPath` (positive control fired): the six demo backup/report/compact values RESOLVE, every one of the row's "four defects" is shipped, and `probes.txt`'s "two jobs broken right now" was FALSE for this tree (single-tenant never reached the Space-root rule).** 🔴 **What the re-drive found instead: SIX committed `pipeline_config` values the row never listed — `spaces/default/config/jobs/{dedup,filter,join,sql,summarize}_step_rollup_job.toon:4` and `spaces/demo/config/jobs/orders_rollup_job.toon:4` — were spelled repo-relative (`spaces/<x>/config/...`) and REFUSE under the Space-root rule (the path doubles).** Re-pointed to Space-relative (`dedup_step/dedup_step_pipeline.toon`, `orders/orders_pipeline.toon`) in the same commit that jails the runner's reads (`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`), because the runner read CWD-relative until then and the two changes only work together. `JOB_PATH_KEYS` is **nine** today (`ConfigSafetyValidator.java:135-137`), not six. *(Original head:)* SURVEY DONE 2026-09-16 (`6c3dbd6e`), and it RE-RANKS this
   row from P2 to P1: on a deployed tree the change refuses EVERY relative path in EVERY committed job
   config.** Full survey: [`superpower/job-path-compat-survey.md`](superpower/job-path-compat-survey.md).
   37 configs, 24 carrying 33 relative values, **zero absolute values anywhere**. Deployed: **28 NOW
@@ -2579,7 +2579,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `JOB-PATH-BACKUPTASK-SPLIT-1` — refused at save while still running CWD-relative. ⇒ do both rows in one
   change, and re-point the demo/example configs to space-relative values as part of it.
 
-- **P1** · 🔴 **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` — CONFIRMED, and the BLOCKER CHANGED TWICE. It is a
+- ~~**P1**~~ · **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`** — ✅ **SHIPPED 2026-09-17 under the operator's design call (Option 1, additive read root).** `SpaceConfigRoot` gains `registerConfigReadRoot` / `currentConfigReadRoot` / `forSpaceConfigReadRoot`: an explicit read root wins; a `SpaceBootstrap`-registered space's config root serves both roles; the DEFAULT space falls back to the launch dir (the twin of `LegacySpaceRoot.base()`, which the engine cannot import) — exactly today's resolution rule, so nothing re-points; `current()`/`currentRegistry()`/`forSpace()` are byte-identical and a test pins `currentRegistry()` unchanged after registering a different read root. `SpaceManager.single()` registers `legacy.base()` as the default read root. `PipelineJobRunner` now resolves `pipeline_config` through `PathJail.requireJobPathUnderAny(allowedRoots, readRoot, …)` and CHECKS `data_dir` the same way without rewriting it (the authored string is baked into durable view SQL). New `PipelineJobRunnerPathJailTest` (4) + 5 `SpaceConfigRootTest` cases; mutation: dropping the `pipeline_config` jail reddens 2 tests, dropping the `data_dir` jail exactly 1. **DRIVEN live**: `spaces/demo` `orders_rollup` and `spaces/default` `dedup_step_rollup`/`sql_step_rollup` triggered over HTTP against the re-pointed `pipeline_config` values (`JOB-PATH-COMPAT-SURVEY-1`) — SUCCESS, 21 rows → store. *(Original head:)* CONFIRMED, and the BLOCKER CHANGED TWICE. It is a
   two-root DESIGN call, not a policy one.** 🔴 **The recorded blocker was refuted 2026-09-16 (`da55eaca`):**
   it said single-tenant serve registers no allowed roots, so the jail would throw *"no allowed roots
   configured"* and the only workaround was fail-open, which `SafetyPolicy` forbids. **False.**

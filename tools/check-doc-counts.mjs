@@ -208,9 +208,12 @@ const MANIFEST = {
     // THE P3 PATTERN IS DELIBERATELY LOOSER than the other two: one row spells its rank
     // `- **P3 . RELEASE-GATED (next MAJOR), not demand-gated**`, and a strict `^- \*\*P3\*\*`
     // silently undercounts by one. Do not "tidy" it.
-    'backlog-p1': { floor: 2, what: 'P1 rows on the board (sections 3-5)', derive: () => backlogRanks().p1, source: BACKLOG },
-    'backlog-p2': { floor: 2, what: 'P2 rows on the board (sections 3-5)', derive: () => backlogRanks().p2, source: BACKLOG },
-    'backlog-p3': { floor: 2, what: 'P3 rows on the board (sections 3-5)', derive: () => backlogRanks().p3, source: BACKLOG },
+    // `zeroOk`: a RANK bucket may legitimately be empty — the board reached ZERO P1s on 2026-09-17 and this guard
+    // failed in the direction of FAILING ("derived a non-count: 0") on the best state it can report. The emptiness
+    // floor still holds where it belongs: `backlog-rows` (a scan matching nothing) keeps the `n <= 0` rule.
+    'backlog-p1': { floor: 2, zeroOk: true, what: 'P1 rows on the board (sections 3-5)', derive: () => backlogRanks().p1, source: BACKLOG },
+    'backlog-p2': { floor: 2, zeroOk: true, what: 'P2 rows on the board (sections 3-5)', derive: () => backlogRanks().p2, source: BACKLOG },
+    'backlog-p3': { floor: 2, zeroOk: true, what: 'P3 rows on the board (sections 3-5)', derive: () => backlogRanks().p3, source: BACKLOG },
     // Derived, never summed by hand -- and cross-checked inside backlogRanks() against a rank-agnostic
     // count, so a row spelled with an unrecognised rank FAILS rather than silently vanishing.
     'backlog-rows': { floor: 2, what: 'P-ranked rows on the board (sections 3-5)', derive: () => backlogRanks().total, source: BACKLOG },
@@ -363,7 +366,7 @@ const failures = [];
 for (const [id, spec] of Object.entries(MANIFEST)) {
     try {
         const n = spec.derive();
-        if (!Number.isInteger(n) || n <= 0) throw new Error(`derived a non-count: ${n}`);
+        if (!Number.isInteger(n) || n < 0 || (n === 0 && !spec.zeroOk)) throw new Error(`derived a non-count: ${n}`);
         derived[id] = n;
     } catch (e) {
         failures.push(`  cannot derive '${id}' from ${spec.source}\n      ${e.message}`);

@@ -38,6 +38,13 @@ public final class SpaceConfigRoot {
     /** {@code space id -> data root}; the sibling of {@link #ROOTS}, and never registered without it. */
     private static final Map<String, Path> DATA_ROOTS = new ConcurrentHashMap<>();
 
+    /**
+     * {@code space id -> config READ root} ({@code JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1}, operator 2026-09-17,
+     * option 1: ADDITIVE). Consulted only by {@link #currentConfigReadRoot()}; {@link #ROOTS} stays what
+     * {@link #current()} / {@link #currentRegistry()} / {@link #forSpace} resolve, untouched.
+     */
+    private static final Map<String, Path> READ_ROOTS = new ConcurrentHashMap<>();
+
     private SpaceConfigRoot() {
     }
 
@@ -63,6 +70,7 @@ public final class SpaceConfigRoot {
         if (spaceId != null) {
             ROOTS.remove(spaceId);
             DATA_ROOTS.remove(spaceId);
+            READ_ROOTS.remove(spaceId);
         }
     }
 
@@ -70,6 +78,24 @@ public final class SpaceConfigRoot {
     public static void clear() {
         ROOTS.clear();
         DATA_ROOTS.clear();
+        READ_ROOTS.clear();
+    }
+
+    /**
+     * Publish (or replace) the root a Space's <b>job-authored config paths</b> resolve against — the base a
+     * job's relative {@code pipeline_config:} / {@code data_dir:} means — separately from the write root
+     * {@link #register} publishes. {@code null}s are ignored.
+     *
+     * <p>Why a second root ({@code JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1}): in the single-tenant layout the
+     * write root ({@code -Dassist.write.root}, where {@code out/}, {@code registry/} live) and the root a
+     * job's relative path has always meant (the launch directory, {@code LegacySpaceRoot.base()}) are
+     * DIFFERENT directories. Resolving a job path against {@link #current()} there would silently re-point
+     * every committed relative value — the 19-value breakage the runner's own comment documents. So the
+     * control plane registers the read root explicitly ({@code SpaceManager.single()}), and
+     * {@link #current()} keeps meaning exactly what it means today.
+     */
+    public static void registerConfigReadRoot(String spaceId, Path readRoot) {
+        if (spaceId != null && readRoot != null) READ_ROOTS.put(spaceId, readRoot);
     }
 
     /**
@@ -109,6 +135,42 @@ public final class SpaceConfigRoot {
         if (spaceId != null && !EventLog.DEFAULT_SPACE_ID.equals(spaceId)) return null;
         String wr = System.getProperty("assist.write.root");
         return wr == null || wr.isBlank() ? null : Path.of(wr.trim());
+    }
+
+    /**
+     * The root this Space's <b>job-authored config paths</b> resolve against — the {@code base} for
+     * {@code PathJail.requireJobPathUnderAny} in a job runner. Never {@code null} for the default Space.
+     *
+     * <p>Resolution, most specific first:
+     * <ol>
+     *   <li>a root published by {@link #registerConfigReadRoot} — the control plane's explicit answer;</li>
+     *   <li>the Space's config root from {@link #register} — a self-contained Space ({@code SpaceBootstrap.load})
+     *       has ONE root that serves both roles, its {@code config/} directory;</li>
+     *   <li>for the <b>default</b> Space only, the process launch directory — {@code Path.of("").toAbsolutePath()},
+     *       the twin of {@code LegacySpaceRoot.base()}, which this module cannot import (it lives above the
+     *       engine). This is exactly the rule a job's relative path has always been resolved by, so a reader
+     *       that runs before {@code SpaceManager.single()} has registered anything — the engine CLI, and every
+     *       {@code PipelineJobRunner} test, which constructs the runner directly — is byte-identical to before.
+     *       ⛔ It deliberately does NOT fall back to {@code -Dassist.write.root} the way {@link #current()}
+     *       does: that root is where the engine WRITES, and treating it as the base for authored paths is
+     *       the re-point this accessor exists to avoid;</li>
+     *   <li>a named Space with nothing registered: {@code null} (the jail then applies its own no-Space rule),
+     *       mirroring {@link #forSpace}'s refusal to hand a named Space another Space's root.</li>
+     * </ol>
+     */
+    public static Path currentConfigReadRoot() {
+        return forSpaceConfigReadRoot(EventLog.currentSpaceId());
+    }
+
+    /** {@link #currentConfigReadRoot()} for a caller that already holds the Space id; {@code null} means the default Space. */
+    public static Path forSpaceConfigReadRoot(String spaceId) {
+        String id = spaceId == null ? EventLog.DEFAULT_SPACE_ID : spaceId;
+        Path read = READ_ROOTS.get(id);
+        if (read != null) return read;
+        Path cfg = ROOTS.get(id);
+        if (cfg != null) return cfg;
+        if (!EventLog.DEFAULT_SPACE_ID.equals(id)) return null;
+        return Path.of("").toAbsolutePath();
     }
 
     /** {@link #current()}{@code /registry} — the component registry — or {@code null} when there is none. */
