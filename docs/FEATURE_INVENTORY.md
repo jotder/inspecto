@@ -221,7 +221,7 @@ unsynthesized. The rest of `data/` is created on first run and gitignored.
 
 ## 3. Packaging (`inspecto/package.ps1`)
 
-Builds `inspecto-deploy.zip`. Bundle layout:
+Builds `inspecto-deploy-<platform>.zip` per embedded runtime (Since 2026-09-17 the zip is named after the EMBEDDED runtime's platform — `inspecto-deploy-<platform>.zip` (`windows_amd64`, `linux_amd64`), read off the jlink image, never the host OS (`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`).). Bundle layout:
 
 ```
 inspecto-deploy/

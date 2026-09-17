@@ -287,8 +287,10 @@ Enterprise is a **superset** of Standard, matching `-Pedition-enterprise` = `edi
 
 ### Two-target (Windows + Linux) embedded runtime — GraalVM cache location matters
 
-`package.ps1` always builds the Windows bundle; it **additionally** builds
-`inspecto-deploy-linux.zip` with a genuinely Linux-native embedded JVM (real `libjvm.so`/ELF
+`package.ps1` builds the bundle for the runtime it EMBEDS and names the zip after that platform
+(`inspecto-deploy-<platform>.zip`, read off the image by `Get-RuntimePlatform` — never the host OS; guarded by
+`tools/check-bundle-platform.mjs`). On a Windows host it **additionally** builds
+`inspecto-deploy-linux_amd64.zip` with a genuinely Linux-native embedded JVM (real `libjvm.so`/ELF
 `bin/java`, not a copy) whenever it can find a Linux GraalVM jmods directory — no separate flag,
 it just needs to locate the cache. **Fixed 2026-07-31:** the lookup used to be hardcoded to
 `<repo>/.graalvm-cache`, which never matches a cache kept as a **sibling of the repo**

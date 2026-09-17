@@ -165,14 +165,16 @@ jobs:
       # assuming the examples regressed.
       - name: Smoke - a job-bearing example runs its jobs against the packaged jar
         run: bash inspecto-deploy/examples/serve-example.sh 06-serve/maintenance-library --check-jobs --clean
+      # RELEASE-BUNDLE-PLATFORM-MISMATCH-1 / RELEASE-LINUX-ZIP-NEVER-PUBLISHED-1 (2026-09-17): package.ps1 now
+      # emits one `inspecto-deploy-<platform>.zip` per target platform, named for the runtime it embeds.
+      # These steps used to name only the `inspecto-deploy.zip*` trio — a HOST (Linux) image zipped with the
+      # windows_amd64 extension set — so no Linux-labelled artifact was ever published and the one that was
+      # could load none of its extensions. tools/release-collect.sh collects EVERY produced platform zip
+      # (+ .sha256 + .asc) and FAILS if the runner's own platform (linux_amd64 on ubuntu-latest) is missing.
       - name: Collect Personal artifacts
         run: |
           set -euo pipefail
-          mkdir -p release
-          for f in inspecto-deploy.zip inspecto-deploy.zip.sha256 inspecto-deploy.zip.asc; do
-            test -f "$f" || { echo "::error::$f missing — the bundle was not signed/checksummed"; exit 1; }
-            cp "$f" "release/inspecto-deploy-personal${f#inspecto-deploy}"
-          done
+          bash tools/release-collect.sh personal
           cp inspecto-deploy/sbom/inspecto-personal.cdx.json inspecto-deploy/sbom/inspecto-personal.spdx.json release/
       # STANDARD-BUNDLE-1 (2026-09-10): Standard is its OWN artifact. Until now the pipeline shipped Personal
       # and Enterprise only, labelling Enterprise "superset of Standard" — true of the module set, false of
@@ -187,15 +189,16 @@ jobs:
       - name: Collect Standard artifacts
         run: |
           set -euo pipefail
-          for f in inspecto-deploy.zip inspecto-deploy.zip.sha256 inspecto-deploy.zip.asc; do
-            test -f "$f" || { echo "::error::$f missing — the bundle was not signed/checksummed"; exit 1; }
-            cp "$f" "release/inspecto-deploy-standard${f#inspecto-deploy}"
-          done
+          bash tools/release-collect.sh standard
           cp inspecto-deploy/sbom/inspecto-standard.cdx.json inspecto-deploy/sbom/inspecto-standard.spdx.json release/
           # the commercial property this step exists for: no policy jar in what a Standard customer receives
-          if unzip -l inspecto-deploy.zip | grep -q 'inspecto-policy'; then
-            echo '::error::the Standard bundle carries inspecto-policy — it would self-identify as Enterprise'; exit 1
-          fi
+          # (checked on the collected copies — release-collect.sh removes the originals so one edition's zips
+          # can never be mistaken for the next's)
+          for z in release/inspecto-deploy-standard-*.zip; do
+            if unzip -l "$z" | grep -q 'inspecto-policy'; then
+              echo "::error::the Standard bundle $z carries inspecto-policy — it would self-identify as Enterprise"; exit 1
+            fi
+          done
       - name: Package + SBOM + sign — Enterprise
         env:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
@@ -203,10 +206,7 @@ jobs:
       - name: Collect Enterprise artifacts
         run: |
           set -euo pipefail
-          for f in inspecto-deploy.zip inspecto-deploy.zip.sha256 inspecto-deploy.zip.asc; do
-            test -f "$f" || { echo "::error::$f missing — the bundle was not signed/checksummed"; exit 1; }
-            cp "$f" "release/inspecto-deploy-enterprise${f#inspecto-deploy}"
-          done
+          bash tools/release-collect.sh enterprise
           cp inspecto-deploy/sbom/inspecto-enterprise.cdx.json inspecto-deploy/sbom/inspecto-enterprise.spdx.json release/
 
       # Verify what we are about to publish with the PUBLIC half only — the same check a customer runs.
@@ -217,6 +217,25 @@ jobs:
           for zip in *.zip; do
             (sha256sum -c "$zip.sha256" | grep -q ': OK') || { echo "::error::checksum mismatch for $zip"; exit 1; }
             gpg --batch --verify "$zip.asc" "$zip"
+            # The bundle's name, embedded JVM and DuckDB extension set must all agree — the mismatch that
+            # RELEASE-BUNDLE-PLATFORM-MISMATCH-1 shipped (Linux JVM + windows_amd64 extensions) was visible
+            # only in the zip's own entry table, never to the boot smoke, so it is asserted from the table.
+            plat=$(basename "$zip" .zip | sed -E 's/^inspecto-deploy-(personal|standard|enterprise)-//')
+            entries=$(unzip -Z1 "$zip")
+            case "$plat" in
+              linux_amd64)   grep -qx 'inspecto-deploy/runtime/bin/java'     <<<"$entries" || { echo "::error::$zip: no runtime/bin/java";     exit 1; } ;;
+              windows_amd64) grep -qx 'inspecto-deploy/runtime/bin/java.exe' <<<"$entries" || { echo "::error::$zip: no runtime/bin/java.exe"; exit 1; } ;;
+              *) echo "::error::$zip: unknown platform suffix '$plat'"; exit 1 ;;
+            esac
+            grep -q "^inspecto-deploy/duckdb-extensions/$plat/" <<<"$entries" || { echo "::error::$zip: no duckdb-extensions/$plat/"; exit 1; }
+            if grep '^inspecto-deploy/duckdb-extensions/' <<<"$entries" | grep -qv "^inspecto-deploy/duckdb-extensions/$plat/"; then
+              echo "::error::$zip carries another platform's DuckDB extensions"; exit 1
+            fi
+            # RELEASE-LAUNCHERS-NOT-EXECUTABLE-1: a Linux zip built on this POSIX runner goes through Info-ZIP,
+            # which records POSIX modes; a customer's unzip must yield an executable serve.sh.
+            if [ "$plat" = linux_amd64 ]; then
+              unzip -Z "$zip" inspecto-deploy/serve.sh | grep -q '^-rwx' || { echo "::error::$zip: serve.sh is not executable in the archive"; exit 1; }
+            fi
           done
           ls -la
 

@@ -51,7 +51,7 @@
 The core engine never contains `if (edition == …)` branches; it depends on SPIs (`Authenticator`,
 `SecretsProvider`, …) and the **build** decides which implementation ships. One SemVer version spans all
 editions. 🔴 **No classifier is emitted** (corrected 2026-09-09): all three flavours write the same
-`inspecto-deploy.zip` path and `release.yml` **renames** them afterwards to `-personal` / `-enterprise`.
+`inspecto-deploy-<platform>.zip` path (Since 2026-09-17 the zip is named after the EMBEDDED runtime's platform — `inspecto-deploy-<platform>.zip` (`windows_amd64`, `linux_amd64`), read off the jlink image, never the host OS (`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`).) and `release.yml` **collects** them via `tools/release-collect.sh` as `inspecto-deploy-<edition>-<platform>.zip`, failing when the runner's own platform is missing.
 There is no `-standard` artifact at all and no `-enterprise` classifier — the two names this line used
 are exactly the pair the pipeline does not produce.
 

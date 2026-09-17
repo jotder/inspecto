@@ -991,13 +991,13 @@ powershell -ExecutionPolicy Bypass -File inspecto\package.ps1
 powershell -ExecutionPolicy Bypass -File inspecto\package.ps1 -NoBuild
 ```
 
-This produces **`inspecto-deploy.zip`** in the sandbox root. The script:
+This produces **`inspecto-deploy-<platform>.zip`** in the sandbox root, one per embedded runtime (Since 2026-09-17 the zip is named after the EMBEDDED runtime's platform — `inspecto-deploy-<platform>.zip` (`windows_amd64`, `linux_amd64`), read off the jlink image, never the host OS (`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`).). The script:
 1. Runs `mvn clean package` to build a fresh fat JAR
 2. Builds the optional operator UI (`inspecto-ui/` via npm) and bundles its `dist/` as `ui/` — skip with `-NoUi`, or omitted automatically when `inspecto-ui/` is absent
 3. Assembles a self-contained bundle with the JAR, config files, and run/serve scripts
 4. Rewrites `schema_file` paths in the bundled configs so they are relative to the bundle root
 5. Creates all placeholder directories (inbox, database, backup, temp, errors, quarantine)
-6. Zips everything into `inspecto-deploy.zip`
+6. Zips everything into `inspecto-deploy-<platform>.zip` — on a POSIX host with Info-ZIP `zip -X` so `serve.sh`/`run.sh` keep their exec bit; on Windows with `Compress-Archive` (NTFS has no mode bits to preserve)
 
 ### Bundle contents
 
@@ -1034,7 +1034,7 @@ inspecto-deploy/
 
 ```bash
 # 1. Copy the zip to the server and extract
-unzip inspecto-deploy.zip
+unzip inspecto-deploy-windows_amd64.zip
 cd inspecto-deploy
 
 # 2. Stage files (optional — use pre-ETL utilities if source is on a network share or in tarballs)
@@ -1064,7 +1064,7 @@ own: every serve.sh env var passes straight through `docker run -e` (PORT / SPAC
 CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS …).
 
 ```bash
-unzip inspecto-deploy-linux.zip && cd inspecto-deploy
+unzip inspecto-deploy-linux_amd64.zip && cd inspecto-deploy
 docker build -t inspecto .
 docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```

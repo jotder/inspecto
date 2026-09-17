@@ -25,11 +25,16 @@
 # target JDK's jmods; -NoRuntime skips both. ⚠ The invoked tool is the HOST's (`jlink.exe` on Windows,
 # `jlink` elsewhere) — hardcoding the `.exe` is what kept CI from ever embedding a runtime (OPS-07).
 #
-# Output:
-#   inspecto-deploy.zip        (Windows target, embedded Windows JVM)
-#   inspecto-deploy-linux.zip  (Linux target, embedded Linux JVM — only when a Linux
-#                                      GraalVM jmods cache is present under .graalvm-cache)
-#   (both in the sandbox root, alongside inbox/ and database/)
+# Output (RELEASE-BUNDLE-PLATFORM-MISMATCH-1, 2026-09-17 — one zip PER TARGET PLATFORM, named for it):
+#   inspecto-deploy-<platform>.zip   where <platform> is read off the runtime ACTUALLY embedded
+#                                    (Get-RuntimePlatform: bin\java.exe → windows_amd64, ELF bin/java →
+#                                    linux_amd64), never assumed from the host or hard-coded.
+#     · the HOST's own platform is always produced (jlink links a host image with no jmods cache);
+#     · linux_amd64 is ADDITIONALLY cross-built on a Windows host when a Linux GraalVM jmods cache
+#       is present under .graalvm-cache. A failed cross-build THROWS unless -AllowPartialRuntime.
+#   🔴 Before this the host image (LINUX on ubuntu-latest) was always zipped as `inspecto-deploy.zip`
+#   with the windows_amd64 extension set — a Linux JVM that could load none of its DuckDB extensions.
+#   (all in the sandbox root, alongside inbox/ and database/)
 #
 # Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/{excel,ducklake,postgres_scanner}.duckdb_extension
 # when a local DuckDB extension cache is found — none is statically linked into duckdb_jdbc, so an
@@ -51,6 +56,10 @@ param(
     [switch]$NoBuild,   # skip mvn build; use existing JAR in target/
     [switch]$NoUi,      # skip the Angular UI build/bundle (inspecto-ui/ is optional)
     [switch]$NoRuntime, # skip embedding a trimmed Java runtime (target server must then provide Java 24+)
+    # PKG-LINUX-RUNTIME-WARNS-1: a failed linux_amd64 CROSS-build (Windows host + Linux jmods cache) is a
+    # THROW by default — a release must not quietly lose a platform. Pass this to downgrade it to a warning
+    # and ship only the host platform's zip.
+    [switch]$AllowPartialRuntime,
     # Boot smoke (SEC-SIDECAR-BOOT-1 follow-up, 2026-09-07). The staged-artifact checks below assert that
     # Nimbus and the SPI files are PRESENT; that is not the same as ControlApi actually starting. The bug
     # they were written for was a boot failure that every green test suite missed, so packaging now
@@ -131,8 +140,9 @@ $adjParserDir = if ((Split-Path -Leaf $scriptDir) -eq 'inspecto') { $scriptDir }
                else { Join-Path $scriptDir 'inspecto' }
 $sandboxRoot  = Split-Path -Parent $adjParserDir
 $targetDir    = Join-Path $adjParserDir 'target'
-$outZip       = Join-Path $sandboxRoot  'inspecto-deploy.zip'
-$outZipLinux  = Join-Path $sandboxRoot  'inspecto-deploy-linux.zip'
+# platform → zip path, filled in step 8 as inspecto-deploy-<platform>.zip. The key is what
+# Get-RuntimePlatform read off the embedded runtime, so name, JVM and extension set cannot disagree.
+$outZips      = [ordered]@{}
 
 # ── resolve the GraalVM cache dir (jlink.exe + per-target jmods/) ─────────────
 # Historically assumed nested at <repo>/.graalvm-cache; on this sandbox it is a SIBLING of the
@@ -1376,7 +1386,27 @@ function New-JlinkRuntime {
     Write-Host "Embedded runtime ready: $OutputDir (${rtSize} MB, $PlatformLabel)" -ForegroundColor Green
 }
 
+# The DuckDB-extension platform key (`duckdb-extensions/<key>/`) a runtime can actually load, read from
+# the image itself: bin\java.exe = windows_amd64; an ELF x86-64 bin/java = linux_amd64. Anything else is
+# a platform this script stages no extensions for, and is refused rather than guessed.
+# ⛔ This is the ONLY source of the platform label used to name a zip and pick its extension set —
+# never `$env:OS`, never a literal. `tools/check-bundle-platform.mjs` pins that.
+function Get-RuntimePlatform {
+    param([Parameter(Mandatory)] [string]$RuntimeDir)
+    $binDir = Join-Path $RuntimeDir 'bin'
+    if (Test-Path (Join-Path $binDir 'java.exe')) { return 'windows_amd64' }
+    $java = Join-Path $binDir 'java'
+    if (-not (Test-Path $java)) { throw "Get-RuntimePlatform: $RuntimeDir has neither bin/java.exe nor bin/java — not a jlink image" }
+    $fs = [System.IO.File]::OpenRead($java)
+    try { $hdr = [byte[]]::new(20); [void]$fs.Read($hdr, 0, 20) } finally { $fs.Dispose() }
+    # ELF magic 7F 45 4C 46; e_machine (offset 18, little-endian) 0x003E = x86-64
+    $isElf = ($hdr[0] -eq 0x7F -and $hdr[1] -eq 0x45 -and $hdr[2] -eq 0x4C -and $hdr[3] -eq 0x46)
+    if ($isElf -and $hdr[18] -eq 0x3E -and $hdr[19] -eq 0x00) { return 'linux_amd64' }
+    throw "Get-RuntimePlatform: $java is not an ELF x86-64 binary — this script stages DuckDB extensions for windows_amd64 and linux_amd64 only"
+}
+
 $builtLinuxRuntime = $false
+$hostPlatform      = $null   # set below from the embedded runtime (or the host OS under -NoRuntime)
 if (-not $NoRuntime) {
     # Module set = jdeps core for inspecto.jar (java.base, java.compiler, java.desktop,
     # java.naming, java.scripting, java.sql, jdk.httpserver) + runtime-only safety modules that
@@ -1417,10 +1447,14 @@ if (-not $NoRuntime) {
     # embedded JVM while Windows targets fall back to system java exactly as they do today.
     $runtimeOut = Join-Path $bundleDir 'runtime'
     New-JlinkRuntime -JlinkExe $jlink -Modules $runtimeModules -OutputDir $runtimeOut -PlatformLabel $hostLabel
+    $hostPlatform = Get-RuntimePlatform -RuntimeDir $runtimeOut
+    Write-Host "  embedded runtime platform: $hostPlatform (read from the image, not the host)" -ForegroundColor DarkGray
 
     # Linux jmods dir: glob for it (don't pin the version string) so a cache refresh doesn't break this.
+    # Skipped when the host image IS already linux_amd64 (ubuntu-latest): the cross-build would only
+    # duplicate it under the same zip name.
     $linuxJmods = $null
-    if ($graalvmCacheDir) {
+    if ($graalvmCacheDir -and $hostPlatform -ne 'linux_amd64') {
         $linuxJmods = Get-ChildItem -Path $graalvmCacheDir -Directory -Filter '*linux*' -ErrorAction SilentlyContinue |
                       ForEach-Object { Join-Path $_.FullName 'jmods' } |
                       Where-Object { Test-Path $_ } |
@@ -1432,13 +1466,18 @@ if (-not $NoRuntime) {
             New-JlinkRuntime -JlinkExe $jlink -Modules $runtimeModules -OutputDir $linuxRuntimeOut -ModulePath $linuxJmods -PlatformLabel 'Linux'
             $builtLinuxRuntime = $true
         } catch {
-            Write-Warning "Linux runtime build failed ($($_.Exception.Message)) — skipping $outZipLinux."
+            # PKG-LINUX-RUNTIME-WARNS-1: this used to be a Write-Warning, so a release quietly lost a platform.
+            if (-not $AllowPartialRuntime) { throw "Linux runtime cross-build failed ($($_.Exception.Message)). Pass -AllowPartialRuntime to ship only the $hostPlatform zip." }
+            Write-Warning "Linux runtime build failed ($($_.Exception.Message)) — -AllowPartialRuntime: skipping inspecto-deploy-linux_amd64.zip."
         }
-    } else {
-        Write-Host "  (no Linux jmods cache found under .graalvm-cache — skipping $outZipLinux)" -ForegroundColor Yellow
+    } elseif ($hostPlatform -ne 'linux_amd64') {
+        Write-Host "  (no Linux jmods cache found under .graalvm-cache — skipping inspecto-deploy-linux_amd64.zip)" -ForegroundColor Yellow
     }
 } else {
     Write-Host "  (-NoRuntime: skipping embedded JVM; target server must provide Java 24+)" -ForegroundColor Yellow
+    # No runtime to read a platform from: the zip is for the HOST platform's system java, so it keeps the
+    # host's extension set. This is the one place the host OS decides the label.
+    $hostPlatform = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'windows_amd64' } else { 'linux_amd64' }
 }
 
 # ── step 6d: bundle the DuckDB excel extension (multiformat X1), per platform ──
@@ -1701,7 +1740,7 @@ if (Test-Path $docsSrc) {
     Write-Host "  docs: staged $docsShipped files; withheld $docsSkipped (tiers: $($docsExcludedTrees -join ', '); audience: $($docsExcludedFiles -join ', '))" -ForegroundColor DarkGray
 }
 
-# ── step 8: zip (Windows bundle, then swap runtime/ and zip again for Linux) ───
+# ── step 8: zip the host-platform bundle, then swap runtime/ and zip again for a cross-built target ──
 # Each zip carries ONLY its own platform's DuckDB extensions. Both platforms are staged into the one
 # $bundleDir above (so a single assembly serves both targets), but a bundle can only ever LOAD the
 # directory its own launcher probes: run.sh reads duckdb-extensions/linux_amd64, serve.bat reads
@@ -1733,7 +1772,25 @@ function Compress-BundleForPlatform {
     }
     try {
         if (Test-Path $DestinationPath) { Remove-Item $DestinationPath -Force }
-        Compress-Archive -Path $bundleDir -DestinationPath $DestinationPath
+        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+            # RELEASE-LAUNCHERS-NOT-EXECUTABLE-1: Compress-Archive stores NO POSIX mode bits, and on a
+            # Windows host there are none to store — NTFS has no exec bit. A linux_amd64 zip cross-built here
+            # therefore unzips with 0644 launchers; install-service.sh chmods serve.sh itself (its own
+            # `[ -x serve.sh ] || chmod +x serve.sh`), run.sh/ura.sh need a by-hand `chmod +x` on that path.
+            Compress-Archive -Path $bundleDir -DestinationPath $DestinationPath
+        } else {
+            # On a POSIX host (ubuntu-latest) modes CAN be preserved: Info-ZIP `zip` records them in the
+            # Unix extra field and `unzip` restores them. The launchers were written with WriteAllText
+            # (0644), so set the bit first. release.yml asserts `-rwx` on serve.sh in the published zip.
+            $zipExe = (Get-Command zip -ErrorAction SilentlyContinue).Source
+            if (-not $zipExe) { throw "Compress-BundleForPlatform: 'zip' (Info-ZIP) not on PATH — it is required on a POSIX host so launcher exec bits survive into $DestinationPath" }
+            Get-ChildItem -Path $bundleDir -Recurse -File -Filter '*.sh' | ForEach-Object { & chmod +x $_.FullName }
+            Push-Location $sandboxRoot
+            try {
+                & $zipExe -r -q -X $DestinationPath (Split-Path -Leaf $bundleDir)
+                if ($LASTEXITCODE -ne 0) { throw "zip exited $LASTEXITCODE for $DestinationPath" }
+            } finally { Pop-Location }
+        }
     } finally {
         # Restored even when Compress-Archive throws — a half-stripped $bundleDir would otherwise
         # silently produce a SECOND zip missing extensions it was supposed to carry.
@@ -1741,25 +1798,33 @@ function Compress-BundleForPlatform {
     }
 }
 
-Compress-BundleForPlatform -Platform 'windows_amd64' -DestinationPath $outZip
+# ⛔ The platform passed here is what Get-RuntimePlatform read off the embedded image (or, under
+# -NoRuntime, the host OS) — never a literal. On ubuntu-latest this is linux_amd64; the old hard-coded
+# 'windows_amd64' paired a Linux JVM with Windows-only extensions in the only zip a tag published.
+$outZips[$hostPlatform] = Join-Path $sandboxRoot "inspecto-deploy-$hostPlatform.zip"
+Compress-BundleForPlatform -Platform $hostPlatform -DestinationPath $outZips[$hostPlatform]
 
 if ($builtLinuxRuntime) {
     # Common bundle content (jar, config, docs, UI, scripts) was already assembled once above;
     # only the runtime/ folder differs per target, so swap it in place and re-zip rather than
     # rebuilding the whole bundle a second time.
-    $windowsRuntimeOut = Join-Path $bundleDir 'runtime'
-    $windowsRuntimeTmp = Join-Path $sandboxRoot 'inspecto-deploy-windows-runtime'
-    if (Test-Path $windowsRuntimeTmp) { Remove-Item $windowsRuntimeTmp -Recurse -Force }
-    Move-Item $windowsRuntimeOut $windowsRuntimeTmp
-    Move-Item (Join-Path $sandboxRoot 'inspecto-deploy-linux-runtime') $windowsRuntimeOut
+    $crossRuntimeSrc = Join-Path $sandboxRoot 'inspecto-deploy-linux-runtime'
+    $crossPlatform   = Get-RuntimePlatform -RuntimeDir $crossRuntimeSrc
+    if ($crossPlatform -eq $hostPlatform) { throw "cross-built runtime is $crossPlatform, same as the host image — the two zips would collide" }
+    $hostRuntimeOut = Join-Path $bundleDir 'runtime'
+    $hostRuntimeTmp = Join-Path $sandboxRoot "inspecto-deploy-$hostPlatform-runtime"
+    if (Test-Path $hostRuntimeTmp) { Remove-Item $hostRuntimeTmp -Recurse -Force }
+    Move-Item $hostRuntimeOut $hostRuntimeTmp
+    Move-Item $crossRuntimeSrc $hostRuntimeOut
 
-    Compress-BundleForPlatform -Platform 'linux_amd64' -DestinationPath $outZipLinux
+    $outZips[$crossPlatform] = Join-Path $sandboxRoot "inspecto-deploy-$crossPlatform.zip"
+    Compress-BundleForPlatform -Platform $crossPlatform -DestinationPath $outZips[$crossPlatform]
 
-    # Restore the Windows runtime. ⚠ $bundleDir is now a SUPERSET of either zip — it holds both
+    # Restore the host runtime. ⚠ $bundleDir is now a SUPERSET of either zip — it holds both
     # platforms' extensions, while each zip holds only its own — so anything inspecting it must not
-    # treat it as a mirror of $outZip.
-    Remove-Item $windowsRuntimeOut -Recurse -Force
-    Move-Item $windowsRuntimeTmp $windowsRuntimeOut
+    # treat it as a mirror of any one zip.
+    Remove-Item $hostRuntimeOut -Recurse -Force
+    Move-Item $hostRuntimeTmp $hostRuntimeOut
 }
 
 # ── step 8b: release integrity — SHA-256 checksums (+ optional GPG signatures) [SOC 2 CC8-04] ──
@@ -1799,13 +1864,11 @@ function New-ReleaseIntegrity {
 
 $sigNote = if ($Sign) { ' + GPG signature' } else { '' }
 Write-Host "Generating release integrity artifacts (SHA-256$sigNote)..." -ForegroundColor Cyan
-New-ReleaseIntegrity -ArtifactPath $outZip
-if ($builtLinuxRuntime) { New-ReleaseIntegrity -ArtifactPath $outZipLinux }
+foreach ($zipPath in $outZips.Values) { New-ReleaseIntegrity -ArtifactPath $zipPath }
 
 Write-Host ""
-Write-Host "Deployment bundle ready:" -ForegroundColor Green
-Write-Host "  $outZip  (+ .sha256$sigNote)"
-if ($builtLinuxRuntime) { Write-Host "  $outZipLinux  (+ .sha256$sigNote)" }
+Write-Host "Deployment bundle(s) ready:" -ForegroundColor Green
+foreach ($plat in $outZips.Keys) { Write-Host "  $($outZips[$plat])  (+ .sha256$sigNote)  [$plat]" }
 # A bundle with no ui/ still starts and still serves /api/v1 — but every browser hit returns
 # ControlApi's `{"error":"not found — API routes are served under /api/v1"}` 404, which looks like a
 # broken deployment rather than a packaging choice. It shipped that way once (2026-07-31) precisely
@@ -1824,9 +1887,9 @@ if (-not (Test-Path (Join-Path $bundleDir 'ui\index.html'))) {
 
 Write-Host ""
 Write-Host "Deploy to remote server:" -ForegroundColor Cyan
-Write-Host "  1. Copy $outZip to the server"
-Write-Host "  2. Expand-Archive inspecto-deploy.zip   (PowerShell)"
-Write-Host "     or:  unzip inspecto-deploy.zip       (Linux)"
+Write-Host "  1. Copy the inspecto-deploy-<platform>.zip matching the server to it"
+Write-Host "  2. Expand-Archive inspecto-deploy-windows_amd64.zip   (PowerShell)"
+Write-Host "     or:  unzip inspecto-deploy-linux_amd64.zip         (Linux)"
 Write-Host "  3. cd inspecto-deploy"
 Write-Host "  4. ETL pipeline (one-shot):"
 Write-Host "       run.bat voucher         (Windows)"
@@ -1853,12 +1916,9 @@ Write-Host "       see examples/README.md for the full catalog"
 Write-Host ""
 if (-not $NoRuntime) {
     Write-Host "Embedded Java runtime included (bundle\runtime\) — no JVM needed on the target."
-    if ($builtLinuxRuntime) {
-        Write-Host "  $outZip        → Windows-native embedded JVM" -ForegroundColor Green
-        Write-Host "  $outZipLinux  → Linux-native embedded JVM" -ForegroundColor Green
-    } else {
-        Write-Host "  $outZip → Windows-native embedded JVM" -ForegroundColor Green
-        Write-Host "  (no Linux GraalVM jmods cache found — inspecto-deploy-linux.zip not built;" -ForegroundColor Yellow
+    foreach ($plat in $outZips.Keys) { Write-Host "  $($outZips[$plat])  → $plat-native embedded JVM + $plat DuckDB extensions" -ForegroundColor Green }
+    if (-not $outZips.Contains('linux_amd64')) {
+        Write-Host "  (no Linux GraalVM jmods cache found — inspecto-deploy-linux_amd64.zip not built;" -ForegroundColor Yellow
         Write-Host "   the bundled *.sh launchers fall back to system java on Linux instead.)" -ForegroundColor Yellow
     }
     Write-Host "The run/serve/ura launchers auto-prefer the embedded runtime when present."

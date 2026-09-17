@@ -224,6 +224,15 @@ jobs:
       - name: Guard — the emitted launchers hand the JVM their edition's flag set
         run: node tools/check-launchers.mjs
 
+      # Bundle-platform guard (RELEASE-BUNDLE-PLATFORM-MISMATCH-1, 2026-09-17). The one zip a tag published
+      # was compressed as 'windows_amd64' by a LITERAL at the call site while the jlink image on ubuntu-latest
+      # is Linux — a Linux JVM beside Windows-only DuckDB extensions. package.ps1 now reads the platform off the
+      # embedded image (Get-RuntimePlatform: java.exe vs an ELF `bin/java`); this parses package.ps1 and fails
+      # on any literal -Platform at a compress call, any platform variable not assigned from that function, or
+      # the function losing its image checks. Falsified three ways before wiring (see the file header).
+      - name: Guard — the bundle's platform is read from the embedded runtime, never hard-coded
+        run: node tools/check-bundle-platform.mjs
+
   test:
     runs-on: ubuntu-latest
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is
