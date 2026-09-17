@@ -1371,12 +1371,36 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
     exactly the tree the rows said it compiles. A row was FILED and COMMITTED on that zero, then retracted.
   - The mirror error: `grep poi` over the poms returns **nine hits, every one a substring of
     "point"/"policy"** — a false POSITIVE. Match `org.apache.poi` or `<artifactId>poi`.
-  ⇒ **Three rules.** (1) Run probes from the repo ROOT, and scope the probe to the claim — a claim about a
+  - **THIRD occurrence, 2026-09-17, same lineage:** a row claimed `asn-parser/src/` holds *“66 Java files that
+    no pom compiles (`asn-parser/pom.xml` does not exist)”* — true about that filename, and irrelevant.
+    `legacy-code/pom.xml`, one level down, sets `<sourceDirectory>../../src/main/java</sourceDirectory>`,
+    which resolves to exactly that tree; `legacy-code` is an unconditional `<module>`, and its
+    `target/classes` holds **41 `.class` files** from a real build. ⛔ **Its remedy was “delete the tree”.**
+    The row even carried a disclaimer saying it was *not* the same subject as the retracted one — exactly
+    backwards. (What survived: the **21 files under `src/test/`** genuinely are unbuilt — no
+    `testSourceDirectory`, no `target/test-classes`.)
+  ⇒ **Four rules.** (1) Run probes from the repo ROOT, and scope the probe to the claim — a claim about a
   nested path is not tested at the root. (2) Before believing a zero, **prove the probe can return a hit**
   (run it against something you know is there). (3) ⛔ **Agreement between agents is not corroboration when
   they share a probe.** Independent confirmation means a *different* method, not another caller.
+  (4) ⛔ **A Maven module's source root need not live under its own directory** — `grep -r "<sourceDirectory>"`
+  before concluding any tree is unbuilt, and check `target/classes` for the artefact rather than arguing
+  from poms.
   ⚠ Prior art, same class: the grep helper whose quoted-pathspec default produced literal-quote false zeros
   for a whole batch.
+
+- 🔴 **BESIDE AN ACTIVE PEER, `git commit -- <explicit paths>` IS THE ONLY SAFE COMMIT — `git add` by
+  path does NOT protect you.** This tree is shared, and a peer's files can already be **staged** before your
+  session starts. On 2026-09-17 `docs/INDEX.md` and a new plan sat in the index as someone else's work-in-
+  progress; `git add <my files>` left them staged, so a plain `git commit` would have shipped their work
+  under my message — the incident this repo has already recorded twice, from both directions.
+  ⇒ **Commit with a pathspec** (`git commit -F - -- pathA pathB …`): it commits the working-tree content of
+  exactly those paths and leaves every foreign index entry untouched. Verify afterwards with
+  `git status --short` that their entries are still `M `/`A ` (staged, uncommitted).
+  ⚠ **One trap in that workflow:** a **new UNTRACKED** file cannot be committed by pathspec —
+  `git commit -- <new file>` fails with *“did not match any file(s) known to git”*. `git add` that ONE file
+  first (safe — it is yours), then pathspec-commit. ⚠ The by-hunk rule still applies to a SHARED file both
+  sessions edit; the pathspec rule is for disjoint files with a dirty shared index.
 
 - 🔴 **A COMPILE IS NOT A VERIFICATION, and a reactor halt reads as a pass.**
   A lane reported "core shipped" on a clean `test-compile`; the first real run was **5 errors**. Separately,
