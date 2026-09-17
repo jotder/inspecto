@@ -77,7 +77,7 @@ if (!modulesAssign) {
 }
 const psModules = {
     Enterprise: modulesAssign[1].split(',').map((s) => s.trim()).filter(Boolean),
-    Standard: modulesAssign[2].split(',').map((s) => s.trim()).filter(Boolean),
+    Professional: modulesAssign[2].split(',').map((s) => s.trim()).filter(Boolean),
 };
 for (const [edition, list] of Object.entries(psModules)) {
     if (list.length < MIN_EDITION_MODULES) {
@@ -150,7 +150,7 @@ if (!maximalCheck.same) {
 }
 
 // Per-edition membership comes from $modules, which names reactor DIRECTORIES.
-for (const edition of ['Standard', 'Enterprise']) {
+for (const edition of ['Professional', 'Enterprise']) {
     const expected = set(editionOnlyModules(edition).map((m) => m.dir));
     const check = diff(set(psModules[edition]), expected);
     if (!check.same) {
@@ -199,17 +199,17 @@ for (const m of bundleModules('Enterprise')) {
 // That file's `bundleModules` doc comment names the counts a reader will trust without running
 // anything. It drifted the moment inspecto-agent arrived (PKG-5) and said 2/10/11 against a real
 // 2/11/12 for five days. Prose beside a list is not checked by the list, so check it here.
-const COUNTS = /Personal (\d+), Standard (\d+), Enterprise (\d+)/.exec(
+const COUNTS = /Personal (\d+), Professional (\d+), Enterprise (\d+)/.exec(
     readFileSync(join(repoRoot, 'tools/bundle-modules.mjs'), 'utf8'),
 );
 if (!COUNTS) {
     fail(
         `tools/bundle-modules.mjs no longer states its per-edition counts as ` +
-            `\`Personal N, Standard N, Enterprise N\`. Either the comment was reworded (fix this parser) ` +
+            `\`Personal N, Professional N, Enterprise N\`. Either the comment was reworded (fix this parser) ` +
             `or it was dropped — a count nobody asserts is how that comment went stale in the first place.`,
     );
 }
-const stated = { Personal: +COUNTS[1], Standard: +COUNTS[2], Enterprise: +COUNTS[3] };
+const stated = { Personal: +COUNTS[1], Professional: +COUNTS[2], Enterprise: +COUNTS[3] };
 for (const edition of EDITIONS) {
     const actual = bundleModules(edition).length;
     if (stated[edition] !== actual) {

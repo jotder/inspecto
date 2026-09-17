@@ -7,7 +7,7 @@
   },
   "servers" : [ {
     "url" : "/api/v1",
-    "description" : "Versioned surface (v1 envelope + structured errors). Personal edition: plain HTTP, localhost. Standard edition: HTTPS behind the WSO2 gateway with OIDC (Keycloak/IAM) — same contract."
+    "description" : "Versioned surface (v1 envelope + structured errors). Personal edition: plain HTTP, localhost. Professional edition: HTTPS behind the WSO2 gateway with OIDC (Keycloak/IAM) — same contract."
   } ],
   "tags" : [ {
     "name" : "Session & Identity",
@@ -53,7 +53,7 @@
     "description" : "Metadata Bundle v2 export / fit-check / import."
   }, {
     "name" : "Audit & Compliance",
-    "description" : "Actor-attributed audit trail (actor from JWT under Standard)."
+    "description" : "Actor-attributed audit trail (actor from JWT under Professional)."
   } ],
   "paths" : {
     "/health" : {
@@ -7128,7 +7128,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The authenticated subject's resolved capability grants (W6, guideline 13 — verbs, never roles). Present only when the security module attached a Subject (Standard edition, authenticated request); absent on Personal / anonymous requests."
+            "description" : "The authenticated subject's resolved capability grants (W6, guideline 13 — verbs, never roles). Present only when the security module attached a Subject (Professional edition, authenticated request); absent on Personal / anonymous requests."
           },
           "diagnostics" : {
             "$ref" : "#/components/schemas/Diagnostics"
@@ -7638,7 +7638,7 @@
         "properties" : {
           "edition" : {
             "type" : "string",
-            "enum" : [ "personal", "standard" ]
+            "enum" : [ "personal", "professional" ]
           },
           "version" : {
             "type" : "string",
@@ -7898,7 +7898,7 @@
         }
       },
       "PathJail" : {
-        "description" : "A resolved path escapes the write root (PATH_JAIL_VIOLATION). Under Standard, 403 also carries PERMISSION_DENIED for authorization denials.",
+        "description" : "A resolved path escapes the write root (PATH_JAIL_VIOLATION). Under Professional, 403 also carries PERMISSION_DENIED for authorization denials.",
         "content" : {
           "application/json" : {
             "schema" : {
@@ -7951,7 +7951,7 @@
         }
       },
       "Unauthenticated" : {
-        "description" : "Missing or invalid credentials (UNAUTHENTICATED) — Standard edition only; Personal never emits it.",
+        "description" : "Missing or invalid credentials (UNAUTHENTICATED) — Professional edition only; Personal never emits it.",
         "content" : {
           "application/json" : {
             "schema" : {
@@ -7961,7 +7961,7 @@
         }
       },
       "SessionUnavailable" : {
-        "description" : "No session broker on this edition (CAPABILITY_UNAVAILABLE) — the /auth/* routes are live only when the Standard security module is bundled.",
+        "description" : "No session broker on this edition (CAPABILITY_UNAVAILABLE) — the /auth/* routes are live only when the Professional security module is bundled.",
         "content" : {
           "application/json" : {
             "schema" : {
@@ -7976,7 +7976,7 @@
         "type" : "http",
         "scheme" : "bearer",
         "bearerFormat" : "JWT",
-        "description" : "Standard/Enterprise editions only (W6): IAM-issued JWT validated by the resource server (issuer/audience/expiry via JWKS); authorization derived from claims → Roles → Capabilities. The Personal edition serves the same contract auth-free on localhost. No operation declares a security requirement until W6 lands."
+        "description" : "Professional/Enterprise editions only (W6): IAM-issued JWT validated by the resource server (issuer/audience/expiry via JWKS); authorization derived from claims → Roles → Capabilities. The Personal edition serves the same contract auth-free on localhost. No operation declares a security requirement until W6 lands."
       }
     }
   }

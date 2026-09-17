@@ -13,7 +13,7 @@ in [`GLOSSARY.md`](GLOSSARY.md) — the canonical vocabulary — so if a word he
 > [Getting around](#1-getting-around) and the [Common workflows](#8-common-workflows) at the end;
 > then dip into individual screens as you need them.
 
-> **Editions & personas.** Inspecto ships in build *editions* (Personal / Standard / Enterprise),
+> **Editions & personas.** Inspecto ships in build *editions* (Personal / Professional / Enterprise),
 > and each user views it through a *Lens* (Business / Builder / Ops). An edition can add or remove
 > whole screens, so your app may show a subset of what's described here. A Lens never hides a
 > screen — it changes emphasis: where the app opens and which actions and toolbars are
@@ -153,7 +153,7 @@ current page stays highlighted.
 - **Search** — a global jump-to palette across *named artifacts* — Pipelines, Collectors, Datasets,
   Widgets, Dashboards, Queries. Use this to find *a thing*; use the sidebar menu-search to find *a
   screen*.
-- **User menu** — your profile, appearance/preferences, and (in the Standard edition) sign-out.
+- **User menu** — your profile, appearance/preferences, and (in the Professional edition) sign-out.
 
 ---
 
@@ -246,7 +246,7 @@ rule (metric, comparator, threshold, window, severity, optional Pipeline scope),
 it, and **Evaluate now** to sweep the armed rules on demand. Alerts are a common trigger for
 raising an **Incident**.
 
-**Incidents** — Tracked operational problems with a lifecycle: **Identified → Diagnosing → Resolved → Archived** (reopen returns a Resolved/Archived Incident to Diagnosing). Standard and Enterprise editions; a Personal build hides the Incidents and Case Manager screens.
+**Incidents** — Tracked operational problems with a lifecycle: **Identified → Diagnosing → Resolved → Archived** (reopen returns a Resolved/Archived Incident to Diagnosing). Professional and Enterprise editions; a Personal build hides the Incidents and Case Manager screens.
 An Incident can be raised automatically by an Alert or a Diagnosis, or created by hand. Open one to
 update its status, add notes, and record the resolution. Incidents are the unit of "something is
 wrong and we're on it."

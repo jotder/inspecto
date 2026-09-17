@@ -14,9 +14,9 @@
     <artifactId>inspecto-events</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Operational Event Viewer (Standard edition, optional)</name>
+    <name>Inspecto — Operational Event Viewer (Professional edition, optional)</name>
     <description>
-        OPTIONAL Standard-edition events feed (EDITIONS.md CP-13, second half): the whole /events* surface —
+        OPTIONAL Professional-edition events feed (EDITIONS.md CP-13, second half): the whole /events* surface —
         recent/live-tail, filtered search, by-id, CSV-or-JSON export incl. the audit-shaped CSV, and saved
         filter views — contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam.
 
@@ -37,7 +37,7 @@
         AuditTrailTest still proves that on Personal. What Personal loses is the ability to READ the feed
         back over HTTP.
 
-        Built only under the "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        Built only under the "edition-professional"/"edition-enterprise" profiles, so a routine "mvn -o clean
         test" (= Personal, the DEFAULT build) never compiles it.
     </description>
 

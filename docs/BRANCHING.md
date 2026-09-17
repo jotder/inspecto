@@ -45,9 +45,9 @@ section: nothing is in production after 3.x.)*
 | Axis | Mechanism | Example |
 |---|---|---|
 | **Versions / releases** | **git branches** | `master` (today the only one — §0-A) |
-| **Editions** (Personal / Standard / Enterprise) | **build flavors** — Maven profiles + `ServiceLoader` modules + `-D` flags | `mvn -Pedition-standard package` |
+| **Editions** (Personal / Professional / Enterprise) | **build flavors** — Maven profiles + `ServiceLoader` modules + `-D` flags | `mvn -Pedition-professional package` |
 
-**Editions are NEVER branches.** There is no `personal` or `standard` branch. An edition is *which
+**Editions are NEVER branches.** There is no `personal` or `professional` branch. An edition is *which
 modules get assembled* from the same commit. See the editions plan for the assembly detail.
 
 ---
@@ -75,7 +75,7 @@ modules get assembled* from the same commit. See the editions plan for the assem
 ## 2. Versioning — SemVer + Conventional Commits
 
 Releases are SemVer, tagged `vMAJOR.MINOR.PATCH` (e.g. `v4.0.0`). One version spans all editions;
-artifacts are differentiated by classifier (`-personal`, `-standard`, `-enterprise` — all three released since 2026-09-10), **not** by version.
+artifacts are differentiated by classifier (`-personal`, `-professional`, `-enterprise` — all three released since 2026-09-10), **not** by version.
 
 Commit messages use **Conventional Commits** (already the repo convention):
 
@@ -157,7 +157,7 @@ git checkout master && git merge --no-ff 4.x && git push origin master
 ```
 
 CI (`.github/workflows/ci.yml`) must build **every edition** and run tests on each PR, so a change that
-breaks the Personal build or the Standard auth path fails before merge.
+breaks the Personal build or the Professional auth path fails before merge.
 
 ---
 
@@ -180,19 +180,19 @@ git push origin <branch> --tags
 #                                      corrected 2026-09-07: `-Pedition-personal` does not exist, and
 #                                      Maven only warns on an unknown profile, so the old line here
 #                                      built the right jar while teaching the wrong mechanism)
-#   mvn -Pedition-standard package   → inspecto-processor-X.Y.Z-standard.jar
-#   mvn -Pedition-enterprise package → the Enterprise artifact (= standard + inspecto-policy)
+#   mvn -Pedition-professional package   → inspecto-processor-X.Y.Z-professional.jar
+#   mvn -Pedition-enterprise package → the Enterprise artifact (= professional + inspecto-policy)
 # Release integrity (SOC 2 CC8-04): publish a SHA-256 checksum + a GPG detached signature for EVERY
 # artifact so customers can verify integrity AND authenticity. package.ps1 emits .sha256/.asc for the
 # deploy zips; for the raw edition JARs, generate them here (INSPECTO_SIGNING_KEY = the release key id;
 # never commit the key). Customer verification steps: compliance/soc2/CC8-04-release-verification.md.
-for f in '<personal.jar>' '<standard.jar>'; do
+for f in '<personal.jar>' '<professional.jar>'; do
     sha256sum "$f" > "$f.sha256"
     gpg --local-user "$INSPECTO_SIGNING_KEY" --armor --detach-sign --output "$f.asc" "$f"
 done
 gh release create vX.Y.Z --target <branch> --notes-file <notes> \
     '<personal.jar>' '<personal.jar>.sha256' '<personal.jar>.asc' \
-    '<standard.jar>' '<standard.jar>.sha256' '<standard.jar>.asc'
+    '<professional.jar>' '<professional.jar>.sha256' '<professional.jar>.asc'
 
 # Bump the line back to the next -SNAPSHOT:
 mvn ...:set -DnewVersion=<next>-SNAPSHOT ... && git commit -am "chore: begin <next> development"

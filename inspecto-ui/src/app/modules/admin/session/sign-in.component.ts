@@ -8,7 +8,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { environment } from 'environments/environment';
 
 /**
- * Standard-edition sign-in screen (W6d). A single "Sign in with SSO" action that kicks off the
+ * Professional-edition sign-in screen (W6d). A single "Sign in with SSO" action that kicks off the
  * Authorization-Code + PKCE redirect to the IAM (Keycloak/WSO2) via {@link SessionService.beginLogin}.
  * Never reached on Personal / offline: {@link authGuard} only routes here when OIDC is on and there is
  * no live session, and this component itself bounces back to the app if a session already exists (e.g.

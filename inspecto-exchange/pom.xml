@@ -14,9 +14,9 @@
     <artifactId>inspecto-exchange</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — cross-space exchange / sharing (Standard edition, optional)</name>
+    <name>Inspecto — cross-space exchange / sharing (Professional edition, optional)</name>
     <description>
-        OPTIONAL Standard-edition cross-space Exchange (EDITIONS.md SEC-10, "Exchange / sharing grants between
+        OPTIONAL Professional-edition cross-space Exchange (EDITIONS.md SEC-10, "Exchange / sharing grants between
         spaces"): the com.gamma.exchange domain (offers, share grants, snapshots, ledger) plus ExchangeRoutes
         (11 routes under /exchange, six of them capability-gated) contributed through the core's public
         com.gamma.control.RouteModule ServiceLoader seam, and ExchangeRefResolver, which installs the core's
@@ -29,11 +29,11 @@
         features.exchange=false, and SharedRefResolver stays NONE so every shared ref fails closed.
 
         ⚠ The six /exchange capability entries stay in the core's CapabilityManifest by decision: deriving the
-        grantable vocabulary from registered routes would make a role file authored on Standard fail
+        grantable vocabulary from registered routes would make a role file authored on Professional fail
         validation on Personal. Dead vocabulary is not a hole — there is no route behind it.
 
         THIN, like inspecto-policy: nothing beyond what the core already supplies. Built only under the
-        "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean test" (= Personal, the
+        "edition-professional"/"edition-enterprise" profiles, so a routine "mvn -o clean test" (= Personal, the
         DEFAULT build) never compiles or tests it.
     </description>
 

@@ -19,7 +19,9 @@
 
 **Inspecto** (formerly *UCC File Processor*; repo `inspecto`, checked out here as
 `C:/sandbox/inspecto-clean`). Java (core bytecode
-`release=24`; agent modules need a **JDK 25+ runtime**; built & bundled on **JDK 26**) / Maven
+`release=27`, built & bundled on **JDK 27** — moved off `release=27`/JDK 26 on 2026-09-17; the old
+three-floor split, 24 product / 25 agent modules / 26 toolchain, collapses to a single floor of 27
+because 27 is above every one of them) / Maven
 multi-module · embedded **DuckDB** · **TOON** config · OpenCSV. Mainline = `master` — the ONLY
 line (`4.x` was deleted 2026-08-17; the next major's branch is cut when it ships, `BRANCHING.md` §0-A).
 Editions = build flavors (see below), **never branches**.
@@ -51,8 +53,8 @@ Authoritative shape, version management, and the module-extraction playbook:
 | `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
 | `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
 | `inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
-| `inspecto-security/` | Standard/Enterprise OIDC auth, `-Pedition-standard` only (not in default `<modules>`) | `inspecto-security` |
-| `inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= standard + this) | `inspecto-policy` |
+| `inspecto-security/` | Professional/Enterprise OIDC auth, `-Pedition-professional` only (not in default `<modules>`) | `inspecto-security` |
+| `inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= professional + this) | `inspecto-policy` |
 | `inspecto-ui/` | Angular SPA (gamma/Fuse template), serves from the engine | — (npm; dev :4204) |
 
 agent-kernel is GONE (discontinued upstream, replaced 2026-07-07): its reasoning layer is vendored at
@@ -78,7 +80,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 | Branch-aware ingest executor (armed `route:`, engagement) | [`branch-aware-ingest.md`](okf/backend/engine/branch-aware-ingest.md) |
 | Data acquisition framework (Phases A–F, connectors, dedup, watermarks) | [`data-acquisition-framework.md`](okf/backend/acquisition/data-acquisition-framework.md) |
 | All TOON config keys | [`configuration.md`](okf/backend/config/configuration.md) |
-| Editions (Personal/Standard/Enterprise = build flavors); feature × edition board; Step Processor catalog table | [`EDITIONS.md`](EDITIONS.md) |
+| Editions (Personal/Professional/Enterprise = build flavors); feature × edition board; Step Processor catalog table | [`EDITIONS.md`](EDITIONS.md) |
 | Branch & release policy (versions=branches; merge-forward; SemVer+CC) | [`BRANCHING.md`](BRANCHING.md) |
 | Parsing/grammar | [`parsing-options-reference.md`](okf/backend/config/parsing-options-reference.md), [`delimited-grammar-design.md`](archived-documents/plans-archive/delimited-grammar-design.md) |
 | Perf benchmarks & tuning | [`performance.md`](okf/backend/build-run/performance.md) |
@@ -92,13 +94,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 ## 3. Key decisions (the "why", not derivable from code)
 
 - **Editions are build flavors, never git branches.** One source tree (`master` = auth-free common core);
-  edition-only code in its own Maven module (`inspecto-security` for Standard/Enterprise), assembled via
+  edition-only code in its own Maven module (`inspecto-security` for Professional/Enterprise), assembled via
   `-Pedition-*` profiles + `ServiceLoader` + `-D` flags. A fix lands once in core; all editions inherit it
   at build. Rationale: branches would force perpetual cross-line cherry-picking. → [`EDITIONS.md`](EDITIONS.md).
 - **All auth removed from `master`/common core (2026-06-16).** Personal is genuinely auth-free (every
-  ControlApi route open; SPA boots to `/dashboard`; no token paste/guards). Standard re-adds auth out-of-band
+  ControlApi route open; SPA boots to `/dashboard`; no token paste/guards). Professional re-adds auth out-of-band
   via the **`inspecto-security` module (BUILT, W6 2026-07-06** — `OidcAuthenticator` Nimbus+JWKS, `RoleMapper`,
-  `OidcTokenRelay` (renamed from `KeycloakTokenRelay` 2026-07-25, D15); reactor-gated behind the `edition-standard` profile) behind the
+  `OidcTokenRelay` (renamed from `KeycloakTokenRelay` 2026-07-25, D15); reactor-gated behind the `edition-professional` profile) behind the
   `Authenticator`/`Subject`/`TokenRelay` SPIs (`com.gamma.control`), plus HTTPS (`HttpsServer`) and the BFF
   `/auth/exchange|refresh|logout` routes; Angular uses OIDC Auth-Code+PKCE driven by `bootstrap.features.authMode`
   (no-op on Personal). **The `-Dassist.write.root` 503 write-gate is SEPARATE from auth and stays.**
@@ -218,7 +220,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   edition-gated, so no lane's `mvn -o -pl inspecto -am test` compiles it — it failed a combined run every
   lane had passed. A cross-field rule change in `inspecto-config` went red three modules downstream in
   `inspecto-intelligence`. ⛔ `mvn -o -pl inspecto-ops -am` does not even RESOLVE without
-  `-Pedition-standard`, which is why the repo's only sweep over every committed Space config never ran in
+  `-Pedition-professional`, which is why the repo's only sweep over every committed Space config never ran in
   a default build. ⇒ Gate on `tools/check-reactor-verdict.mjs`, never on a sum of surefire reports.
 
 - 🔴 **WRITING A FILE THROUGH A PYTHON/HEREDOC LAYER CORRUPTED THREE FILES IN ONE SHIFT** (2026-09-16).
@@ -565,7 +567,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   whitepaper's one-to-many sentence was deleted by the v1.2 rewrite a day *before* an operator chose to
   "build rather than drop" it, and `auth-security.md`'s *"`SpiSlot.active()` has no try/catch"* was true
   when written and falsified by PKG-5 routing that call through `OptionalSpi` — which is what let a
-  misconfigured Standard build boot **wide open**. ✅ **When a stakeholder or concept doc is rewritten,
+  misconfigured Professional build boot **wide open**. ✅ **When a stakeholder or concept doc is rewritten,
   re-ground every row that cites it**; `git log -S "<exact phrase>" -- <doc>` settles it in one command.
 
 - 🔴 **A raw `jdbc:` value in a `*.backend` property is a URL, not a keyword — never lowercase it.**
@@ -591,7 +593,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   `set "X=%X% …"` lines in one `if ( … )` collapse to the LAST one executed.** Measured 2026-09-11:
   `set "OPTS=BASE"` then a block doing `-Dfirst` and `-Dsecond` yields `BASE -Dsecond`; `-Dfirst` is gone.
   This shipped in the generated `serve.bat` (`SERVEBAT-OPTS-1`): six such lines in the
-  `if exist inspecto-security.jar (…)` branch meant **every Windows Standard/Enterprise bundle booted
+  `if exist inspecto-security.jar (…)` branch meant **every Windows Professional/Enterprise bundle booted
   AUTH-FREE** — `-Dauth.mode=oidc` and three of the four OIDC flags dropped — while printing
   `edition: Enterprise`. ✅ Fix = **one statement per line**, chaining conditions
   (`if exist X if not "%Y%"=="" set …`), the form the adjacent Postgres lines already used AND documented.
@@ -881,7 +883,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 - **A profile-scoped module is invisible to the verify loop that everyone actually runs.**
   `inspecto-security` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
-  (`-Pedition-standard` / `-Pedition-enterprise`), not the default list — so `mvn -o clean test`
+  (`-Pedition-professional` / `-Pedition-enterprise`), not the default list — so `mvn -o clean test`
   reports **BUILD SUCCESS while both edition builds are broken**. The 2026-08-10 artifactId rename
   proved it: the two poms still declared `file-processor-parent`, which is a *non-resolvable parent*,
   and nothing caught it because the routine loop never loads them. **Any change to the parent pom, a

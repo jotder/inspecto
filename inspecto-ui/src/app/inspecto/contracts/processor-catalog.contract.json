@@ -864,7 +864,7 @@
     "emoji" : "🏷️",
     "icon" : "heroicons_outline:sparkles",
     "status" : "planned",
-    "note" : "still unbuilt; the assist agent now ships Standard+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist",
+    "note" : "still unbuilt; the assist agent now ships Professional+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist",
     "addable" : false
   }, {
     "id" : "ml.embedding.vector",
@@ -982,7 +982,7 @@
     "icon" : "heroicons_outline:server-stack",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
-    "note" : "`output.ducklake` — needs the postgresql sidecar (Standard+)",
+    "note" : "`output.ducklake` — needs the postgresql sidecar (Professional+)",
     "addable" : true
   }, {
     "id" : "sink.view",

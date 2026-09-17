@@ -333,14 +333,16 @@ Inspecto consumes a **narrow model-transport seam, not the full embed**. What ma
 | Pinned version | **`0.2.0-SNAPSHOT`** |
 | Upstream repository | **`jotder/inspect-agent`** (public), cloned by continuous integration |
 | Distribution | **none** — no package registry; the upstream is built from source into the runner's local repository on every run |
-| Java floor | the upstream targets **JDK 25**; this reactor targets **release 24** |
+| Java floor | the upstream targets **JDK 25**; this reactor targets **release 27** since 2026-09-17, so the upstream floor is no longer binding (it was `release 24`, which is what made it binding) |
 | The dry-run seam | `DryRunProvider` **is** present in the pinned artifact (verified in the local repository cache), which is what discharged the gate on 2026-09-08. 🔴 **But it is NOT reachable from the host** (re-verified 2026-09-16 with `javap` on the pinned `eoiagent-platform` jar): `PlatformBuilder` exposes `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`** — the only setter is on `CallbackApprovalGate.Builder`, which `PlatformBuilder` constructs internally. So "discharged" described the *type*, not the *seam*; consuming it needs an upstream `PlatformBuilder` change first (the ask is recorded on BACKLOG §2) |
 
 Two consequences worth stating plainly. First, **the build is not reproducible from published
 artifacts** — it is reproducible only from a branch head, so a change the pack needs must be pushed
 upstream before this repo can consume it. Second, **the Java floor conflict is the mechanism behind the
 packaging refusal** in §3.10: the board's own packaging row declines to add a bundling switch until the
-JDK 25 versus Java 24 question is resolved.
+JDK 25 versus Java 24 question is resolved. ✅ **That question is answered as of 2026-09-17** — the
+reactor's compile target moved to 27, which is above the upstream's 25, so the conflict no longer
+exists; the row's framing predates the move.
 
 ### 3.10 What a shipped bundle actually contains
 

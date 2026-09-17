@@ -22,7 +22,7 @@ package com.gamma.control;
 final class AbsentExchangeRoutes implements RouteModule {
 
     static final String MESSAGE = "Cross-space exchange and sharing are not installed in this bundle - they "
-            + "are provided by the optional inspecto-exchange module (Standard edition and above).";
+            + "are provided by the optional inspecto-exchange module (Professional edition and above).";
 
     private static final String[][] SURFACE = {
             {"GET",  "/exchange/offers"},

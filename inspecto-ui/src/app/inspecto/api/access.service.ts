@@ -89,7 +89,7 @@ export interface PolicyEvaluation {
 }
 
 /** `GET /access/explain` — a "why denied?" dry-run for the caller's own session. `enabled:false`
- *  when there is no policy engine (Personal/Standard) or no authenticated subject. */
+ *  when there is no policy engine (Personal/Professional) or no authenticated subject. */
 export interface ExplainResult {
     enabled: boolean;
     reason?: string;

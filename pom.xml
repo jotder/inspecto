@@ -34,7 +34,7 @@
     <modules>
         <!--
             asn-parser/asn-decoders is a SEPARATE reactor (its own parent com.gamma.asn:asn-decoders,
-            release 25) aggregated here ONLY so com.gamma.asn:asn-facade:0.1.0-SNAPSHOT — which
+            release 27) aggregated here ONLY so com.gamma.asn:asn-facade:0.1.0-SNAPSHOT — which
             inspecto-engine depends on — resolves from this build instead of a manual `mvn install`.
             Aggregation only: that tree inherits NOTHING from inspecto-parent (modules and inheritance
             are orthogonal). It must precede inspecto-engine so asn-facade is built first. Its
@@ -63,15 +63,15 @@
         backup/backup_verify/restore tasks) inspecto-geo-link (CP-09 — the geo map + link analysis
         routes), inspecto-exchange (SEC-10 — cross-space sharing), inspecto-metrics (CP-13 — the
         Prometheus exposition), inspecto-events (CP-13 — the /events* feed) and inspecto-ops (CP-11 —
-        operational objects) are Standard-edition-only.
+        operational objects) are Professional-edition-only.
         None is in the default <modules> above, so a routine
         "mvn -o clean test" (= PERSONAL, the default build; there is no -Pedition-personal) never
         compiles/tests them and never resolves Nimbus JOSE+JWT or javax.mail. Build them explicitly
-        with "mvn -o clean test -Pedition-standard".
+        with "mvn -o clean test -Pedition-professional".
     -->
     <profiles>
         <profile>
-            <id>edition-standard</id>
+            <id>edition-professional</id>
             <modules>
                 <module>inspecto-security</module>
                 <!-- EDG-01 cell 1 (2026-09-07): the external notification transports. CP-15 is "not for
@@ -111,7 +111,20 @@
                 <module>inspecto-ops</module>
             </modules>
         </profile>
-        <!-- Enterprise = Standard + the ABAC policy engine (rbac-abac-plan §5): the same one-version
+        <profile>
+            <id>edition-standard</id>
+            <modules>
+                <module>inspecto-security</module>
+                <module>inspecto-notify-channels</module>
+                <module>inspecto-backup</module>
+                <module>inspecto-geo-link</module>
+                <module>inspecto-exchange</module>
+                <module>inspecto-metrics</module>
+                <module>inspecto-events</module>
+                <module>inspecto-ops</module>
+            </modules>
+        </profile>
+        <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
              reactor gains inspecto-policy (com.gamma.control.AccessDecider via ServiceLoader).
              "mvn -o clean test -Pedition-enterprise" builds/tests all optional modules. -->
         <profile>
@@ -163,12 +176,12 @@
              than the target. NOTE: the lean ETL core (inspecto) runs on JDK 24 cleanly. The
              optional inspecto-agent module depends on eoiagent (agent-kernel's replacement,
              2026-07-07 — the kernel is discontinued and its reasoning layer is vendored in-tree at
-             release=24), whose bytecode is Java 25 (class-file v69) — those classes cannot LOAD on
+             release=27), whose bytecode is Java 27 (class-file v69) — those classes cannot LOAD on
              a JDK 24 runtime (UnsupportedClassVersionError). The agent modules therefore require a
              JDK 25+ runtime (the bundled GraalVM JDK 25 qualifies — this said "JDK 26" until 2026-09-09; the
              cache holds 25.0.3 Windows / 25.1.3 Linux and CI sets up JDK 25); see
              docs/superpower/agent-kernel-replacement-plan.md. -->
-        <maven.compiler.release>24</maven.compiler.release>
+        <maven.compiler.release>27</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
         <!-- Shared external versions hoisted here (M1) so the six poms cannot drift. Each was

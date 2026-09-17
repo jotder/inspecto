@@ -320,8 +320,8 @@ class ControlApiAuthV1Test {
     }
 
     @Test
-    void xActorHeaderIsRejectedOnStandard(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        // SEC-7(a): with an Authenticator active (Standard), a client-supplied X-Actor is a spoof → 403,
+    void xActorHeaderIsRejectedOnProfessional(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // SEC-7(a): with an Authenticator active (Professional), a client-supplied X-Actor is a spoof → 403,
         // even alongside valid credentials — the actor must come from the authenticated Subject.
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {

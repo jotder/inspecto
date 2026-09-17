@@ -48,7 +48,7 @@ AI-driven autonomy without redesign.
   Signals, Incidents). **Role** = assigned, server-enforced authorization (security module); Roles project
   onto Lenses through **Capabilities** — panes gate on a Capability, never on Lens identity.
 - **Editions are build flavors, never branches**: **Personal** (auth-free, local, free tier) ·
-  **Standard** (adds `inspecto-security`: HTTPS, OIDC via external IAM, RBAC/ABAC, attributed audit — the
+  **Professional** (adds `inspecto-security`: HTTPS, OIDC via external IAM, RBAC/ABAC, attributed audit — the
   free→paid line) · **Enterprise** (future: shared state, distributed scheduling, per-tenant ABAC;
   demand-gated).
 
@@ -64,7 +64,7 @@ AI-driven autonomy without redesign.
   2026-08-31; it was cited by no row.)*
   `IN-FLIGHT` (uncommitted work in
   progress) · `DESIGN` (design-of-record exists, no code) · `PLANNED` (agreed, not started).
-- **Edition** — `P` Personal · `S` Standard · `E` Enterprise · `All` edition-neutral.
+- **Edition** — `P` Personal · `PR` Professional · `E` Enterprise · `All` edition-neutral.
 - IDs are stable handles for traceability (`ACQ-3`, `NFR-2`, …); they do not imply sequence.
 - ⚠ **`EDITIONS.md`'s feature × edition matrix is AUTHORITATIVE for the Edition column**; §3 mirrors it.
   Several rows here predate the 2026-09-02 "not for Personal" gating decisions and the EDG-01 gating debt,
@@ -140,8 +140,8 @@ library. The split is fixed by `GLOSSARY.md` §14, not chosen here.
 | NFR-4 | **Air-gap operation** | Full function without egress; hosted-AI SDKs physically absent; offline basemap/geocoder | SHIPPED |
 | NFR-5 | **Accessibility** | WCAG 2.2 AA; axe-core CI gate | SHIPPED |
 | NFR-6 | **API compatibility** | SemVer; versioned `/api/v1` as the sole business surface (unversioned routes retired 2026-07-25, API-5); `@PublicApi` embedding policy | SHIPPED |
-| NFR-7 | **Compliance posture (Standard)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/capabilities/compliance/compliance.md`](okf/capabilities/compliance/compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
-| NFR-8 | **Scale ceiling** | Single-node by design; Enterprise distributed tier is the opt-in escape hatch | ACCEPTED CONSTRAINT — escape hatch **design SIGNED 2026-09-10** as T5 partitioned scale-out (Enterprise; its lease + shared state are also Standard's T4 DR) → `superpower/enterprise-scale-out-plan.md` |
+| NFR-7 | **Compliance posture (Professional)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/capabilities/compliance/compliance.md`](okf/capabilities/compliance/compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
+| NFR-8 | **Scale ceiling** | Single-node by design; Enterprise distributed tier is the opt-in escape hatch | ACCEPTED CONSTRAINT — escape hatch **design SIGNED 2026-09-10** as T5 partitioned scale-out (Enterprise; its lease + shared state are also Professional's T4 DR) → `superpower/enterprise-scale-out-plan.md` |
 | NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — ⚠ **understated and misstated (corrected 2026-09-09; owner [`okf/capabilities/tooling/tooling.md`](okf/capabilities/tooling/tooling.md) §2)**: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
 | NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED — **both halves of this cell were wrong (corrected 2026-09-09)**. (a) Not "enforced in review": it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/capabilities/tooling/tooling.md`](okf/capabilities/tooling/tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
 
@@ -249,7 +249,7 @@ template gallery + apply).*
 
 ## 6. Sequencing & dependencies
 
-1. **Security-first ordering holds**: SEC-7 + PKG-4 close out the Standard revenue gate that W6 opened.
+1. **Security-first ordering holds**: SEC-7 + PKG-4 close out the Professional revenue gate that W6 opened.
 2. **Connectors before streaming**: ACQ-4's object-storage half shipped 2026-07-08 (SDK-free s3);
    ACQ-5 (Kafka) shipped the same day on the same SPI once `kafka-clients` landed in the cache.
 3. **Parsing unification (ING-5) before Expectation engine (ING-6)** — Expectations bind to the unified
@@ -270,8 +270,8 @@ template gallery + apply).*
 |---|---|---|
 | R1 | ~~Authored-Pipeline go-live verified only against synthetic data~~ **RESOLVED 2026-07-07** — live seeded `type: pipeline` run verified (`examples/06-serve/pipeline-job`) | — |
 | R2 | ~~eoiagent SNAPSHOT churn (moving dependency)~~ **RESOLVED 2026-07-08** — v0.1.0 cut + pinned (EOI-7a); CI builds the tag | — |
-| R3 | ~~Standard jlink runtime unverified vs Nimbus~~ **RESOLVED 2026-07-07** — module set verified sufficient (PKG-4) | — |
-| R4 | ~~Per-resource permissions & X-Actor rejection incomplete on Standard~~ **RETIRED 2026-09-08** — both halves shipped 2026-07-07/08 (`X-Actor` rejected outright when an `Authenticator` is active; `permissions[]` emitted); see `okf/capabilities/security/security.md` §2 | — |
+| R3 | ~~Professional jlink runtime unverified vs Nimbus~~ **RESOLVED 2026-07-07** — module set verified sufficient (PKG-4) | — |
+| R4 | ~~Per-resource permissions & X-Actor rejection incomplete on Professional~~ **RETIRED 2026-09-08** — both halves shipped 2026-07-07/08 (`X-Actor` rejected outright when an `Authenticator` is active; `permissions[]` emitted); see `okf/capabilities/security/security.md` §2 | — |
 | R5 | Provenance conservation checks unproven on live data | OPS-5 live verification alongside R1's seeded run |
 | R6 | ~~Structured (non-SQL) Queries still client-compiled~~ **ACCEPTED AS DESIGN 2026-07-22** (product sign-off) — not a risk. The builder UI emits valid SQL that `QueryExecutor` runs; a server-side structured compiler would duplicate that for no functional gain. Server 422 on non-SQL bodies stays the explicit, deliberate contract. Revisit only if an external API consumer must submit structured bodies directly. | Closed — `okf/backend/control-plane/queries.md` |
 | R7 | Prompt injection / data egress once intelligence deepens | AGT-5 design: context-as-data, privacy classes P0–P3, approval gates, kill switch |

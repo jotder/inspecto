@@ -20,7 +20,7 @@
 // Zero dependencies (pure Node), like tools/check-dependencies.mjs — whose `dependency:list`
 // parsing this mirrors on purpose (one grammar for reading Maven's output).
 //
-//   node tools/sbom.mjs --edition Personal|Standard|Enterprise --bundle <dir> [--version X.Y.Z]
+//   node tools/sbom.mjs --edition Personal|Professional|Enterprise --bundle <dir> [--version X.Y.Z]
 //
 // Writes <bundle>/sbom/inspecto-<edition>.cdx.json and <bundle>/sbom/inspecto-<edition>.spdx.json.
 // Env: MVN_CMD overrides the Maven binary; MVN_OFFLINE=1 adds `-o`; M2_REPO overrides ~/.m2/repository.
@@ -38,13 +38,14 @@ function arg(name, dflt) {
     const i = process.argv.indexOf(name);
     return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 }
-const edition = arg('--edition', 'Personal');
+let edition = arg('--edition', 'Personal');
+if (edition === 'Standard') edition = 'Professional';
 const bundleDir = arg('--bundle', null);
 if (!bundleDir) {
-    console.error('usage: node tools/sbom.mjs --edition <Personal|Standard|Enterprise> --bundle <dir>');
+    console.error('usage: node tools/sbom.mjs --edition <Personal|Professional|Enterprise> --bundle <dir>');
     process.exit(2);
 }
-if (!['Personal', 'Standard', 'Enterprise'].includes(edition)) {
+if (!['Personal', 'Professional', 'Enterprise'].includes(edition)) {
     console.error(`✖ SBOM: unknown edition '${edition}'`);
     process.exit(2);
 }

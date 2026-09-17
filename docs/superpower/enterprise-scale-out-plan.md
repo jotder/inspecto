@@ -11,10 +11,10 @@
 > preconditions outright, and S4 changes how §7's test must be built.
 >
 > ✅ **Two directions taken by the operator on 2026-09-10, ahead of the full signature:** *fault-tolerant DR
-> is a **Standard** capability; the Kubernetes cluster is **Enterprise**.* Recorded in `editions.md` §4 and
-> applied to its §3.9 topology table (T4 → Standard; T5 added as Enterprise). 🔴 **This reshapes the
+> is a **Professional** capability; the Kubernetes cluster is **Enterprise**.* Recorded in `editions.md` §4 and
+> applied to its §3.9 topology table (T4 → Professional; T5 added as Enterprise). 🔴 **This reshapes the
 > sequencing more than it reshapes the design**: phases A and B are no longer "valuable on a single node" —
-> they ARE the Standard DR deliverable and must ship in the Standard bundle. D8 was decided first; D1′–D7
+> they ARE the Professional DR deliverable and must ship in the Professional bundle. D8 was decided first; D1′–D7
 > and D9–D13 were signed later the same day (§9).
 >
 > **What this plan does.** Turns the operator's 2026-09-10 direction — *"on Enterprise I plan K8s
@@ -76,14 +76,14 @@ follows from that.
 | Recording document | Today (verbatim) | Proposed on sign-off |
 |---|---|---|
 | `REQUIREMENTS.md` `NFR-8` | *"Single-node by design; Enterprise distributed tier is the opt-in escape hatch \| ACCEPTED CONSTRAINT"* | **Unchanged in substance** — the escape hatch is now being built. Status cell gains: *"escape hatch IN DESIGN 2026-09-10 → `superpower/enterprise-scale-out-plan.md`"* |
-| `editions.md` §4, 2026-09-06 row | *"a container image as a convenience with orchestration out of scope"* | Add a dated row: *"2026-09-10 — D1 REVISED by operator: the container image becomes the **Enterprise unit of deployment**; orchestration is IN SCOPE for Enterprise only (Personal/Standard stay single-artifact, no orchestrator). Design: `superpower/enterprise-scale-out-plan.md`."* |
-| `editions.md` §6 *Active/active deployment* | *"⛔ NOT OFFERED — both schedulers are in-process; the single-node ceiling is an accepted constraint (`NFR-8`). The escape hatch is a priced roadmap conversation, not a configuration"* | *"⚠ **SUPERSEDED 2026-09-10** for Enterprise: active/active becomes **partitioned scale-out** (shared-nothing by Space), not replicated active/active. Personal/Standard: still not offered. → plan §4"* |
-| `editions.md` §6 *Orchestration platform support* | *"⛔ OUT OF SCOPE per the signed container decision … not on the roadmap until that decision changes"* | *"⚠ **That decision changed 2026-09-10.** Kubernetes is the Enterprise orchestrator; Personal/Standard remain orchestrator-free. → plan §5.4"* |
+| `editions.md` §4, 2026-09-06 row | *"a container image as a convenience with orchestration out of scope"* | Add a dated row: *"2026-09-10 — D1 REVISED by operator: the container image becomes the **Enterprise unit of deployment**; orchestration is IN SCOPE for Enterprise only (Personal/Professional stay single-artifact, no orchestrator). Design: `superpower/enterprise-scale-out-plan.md`."* |
+| `editions.md` §6 *Active/active deployment* | *"⛔ NOT OFFERED — both schedulers are in-process; the single-node ceiling is an accepted constraint (`NFR-8`). The escape hatch is a priced roadmap conversation, not a configuration"* | *"⚠ **SUPERSEDED 2026-09-10** for Enterprise: active/active becomes **partitioned scale-out** (shared-nothing by Space), not replicated active/active. Personal/Professional: still not offered. → plan §4"* |
+| `editions.md` §6 *Orchestration platform support* | *"⛔ OUT OF SCOPE per the signed container decision … not on the roadmap until that decision changes"* | *"⚠ **That decision changed 2026-09-10.** Kubernetes is the Enterprise orchestrator; Personal/Professional remain orchestrator-free. → plan §5.4"* |
 | `ROADMAP.md` L1 | *"Enterprise distributed tier … \| XL \| A deployment whose scale or multi-tenancy actually exceeds the single-node design"* | Trigger cell: *"Operator direction 2026-09-10; sized as three M phases in the plan, each independently shippable"* |
-| `editions.md` §3.9 topology table | T1–T4, T4 = Enterprise | ✅ **APPLIED 2026-09-10 (operator direction, not a signature of this plan):** T4 → **Standard** (fault-tolerant DR); **T5 — partitioned scale-out on Kubernetes** added as **Enterprise**. The one row in this table already amended |
+| `editions.md` §3.9 topology table | T1–T4, T4 = Enterprise | ✅ **APPLIED 2026-09-10 (operator direction, not a signature of this plan):** T4 → **Professional** (fault-tolerant DR); **T5 — partitioned scale-out on Kubernetes** added as **Enterprise**. The one row in this table already amended |
 
 ⛔ None of these edits is made by this draft **except the last row**, which records a decision the operator
-took directly on 2026-09-10 ("fault-tolerant DR Standard, K8s cluster Enterprise") and is therefore already
+took directly on 2026-09-10 ("fault-tolerant DR Professional, K8s cluster Enterprise") and is therefore already
 applied. The other five are the operator's to sign.
 
 ---
@@ -474,7 +474,7 @@ Work:
 - An **edition-level profile** that sets every `*.backend` to Postgres and makes fallback a boot
   failure. Not a new flag per store — one switch, `-Dinspecto.topology=partitioned` (name SIGNED as D12,
   2026-09-10; values `single` | `partitioned`, and what `/bootstrap` reports),
-  that `ServiceStores` reads once. ⚠ Personal/Standard behaviour is unchanged.
+  that `ServiceStores` reads once. ⚠ Personal/Professional behaviour is unchanged.
 - ✅ **`events.backend=db` — SHIPPED.** `DbEventStore` (`inspecto-event`) is selected at
   `ServiceStores.java:275` behind the same `EventStore` interface `InMemoryEventStore` and
   `ParquetEventStore` implement, so the Signal ledger is visible from every pod. ⚠ Four javadoc sites
@@ -541,7 +541,7 @@ trigger, and a lease abandoned by a dead pod is reclaimable within a bounded tim
 Work:
 - ✅ **SHIPPED 2026-09-12 (slice B0).** `RunLease` extracted at the `PipelineRunGuard` seam (§3.2),
   with `PipelineRunGuard` itself as the heap implementation — the default, so **Personal and single-node
-  Standard are byte-identical** — and **`DbRunLease`** as the shared one: a row per pipeline with owner,
+  Professional are byte-identical** — and **`DbRunLease`** as the shared one: a row per pipeline with owner,
   epoch, acquired-at and expiry; `tryAcquire` is the conditional
   `UPDATE … WHERE owner IS NULL OR expires_at < now()`. ⛔ Advisory locks stay rejected (D5): they die
   with the connection and the §5.1 pool recycles connections — a lease must outlive its connection.
@@ -600,7 +600,7 @@ Work:
   baseline but N independent ones, so a pod that had never run the pipeline read "never" — which
   `dueThisTick` turns into "due now" — and re-ran a pipeline another pod had just run, however long the
   interval. `RunLease` gained `lastRunAt(pipeline)` / `recordRun(pipeline, epochMs)`; `PipelineRunGuard`
-  holds the identical map (⛔ **Personal and single-node Standard are unchanged**) and `DbRunLease` holds
+  holds the identical map (⛔ **Personal and single-node Professional are unchanged**) and `DbRunLease` holds
   a `last_run_at` column on the row it already had.
 
   🔴 **The scope question here is answered by the code, not by the operator — and it is NOT the B1
@@ -662,7 +662,7 @@ Work:
   "simplify" by moving `RunLease` down into the engine — it is bound to a `SpaceRoot` and opens
   operational-DB families, neither of which the engine knows about.
 
-  ⚠ **Heap-backed by default** like every other lease, so Personal and single-node Standard *do* get the
+  ⚠ **Heap-backed by default** like every other lease, so Personal and single-node Professional *do* get the
   authored-pipeline fix (two differently-named jobs on one pipeline stop overlapping) without a DB. The arming
   claim is a no-op on one node, where the `LockingRunner` already covers it.
 
@@ -709,7 +709,7 @@ Work:
   **phase C+1**, explicitly deferred — it needs the lease's heartbeat and a controller.
 
   ⛔ **Absent the file, nothing changes** — `hostsEverything()`, every discovered Space boots. That
-  default is load-bearing: Personal and single-node Standard must never need this file, and
+  default is load-bearing: Personal and single-node Professional must never need this file, and
   `withNoPartitionFileEverySpaceIsHosted` is what fails if it is ever lost.
 
   🔴 **This file deliberately does NOT follow the fail-soft idiom every other global TOON file uses.**
@@ -1099,7 +1099,7 @@ Work:
   from an old one gets a 404 — intermittently, because round-robin decides each asset independently. This
   appears the first time a multi-pod deployment is **rolled**, with or without partitioning. Moving the
   assets off the pods removes the skew *and* makes "which pod serves the UI" a non-question;
-  `-Dui.dir` stays exactly as-is for the single-node Personal/Standard deployment it was built for.
+  `-Dui.dir` stays exactly as-is for the single-node Personal/Professional deployment it was built for.
 - ⚠ **Verify `/auth/refresh` is stateless** before any multi-pod deployment. The BFF keeps the refresh
   token in an httpOnly cookie; if it is validated from a shared signing key, round-robin is fine, but any
   server-side session state breaks the moment a refresh lands on another pod. **Unverified** — §12.
@@ -1120,8 +1120,8 @@ the phases here are A/B/C while the units are `U1`–`U4` — they are different
 
 | Phase | Delivers | Value before any pod exists | Verify gate |
 |---|---|---|---|
-| ✅ **A — shared state** (§5.1) — **COMPLETE 2026-09-14** | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling. **Since 2026-09-10: the foundation of Standard's DR tier — ships in the Standard bundle** | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
-| ✅ **B — the lease** (§5.2) — **COMPLETE 2026-09-12** | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step. **Since 2026-09-10 this IS the Standard fault-tolerant-DR deliverable**, so `RunLease` and `PostgresRunLease` live in core or `inspecto-security`-tier modules, ⛔ never behind `inspecto-policy` | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Standard |
+| ✅ **A — shared state** (§5.1) — **COMPLETE 2026-09-14** | Postgres profile, `events.backend=db`, 12/12 stores tested, connection pool, fatal registrar | Durable restart; `VER-3` truthful; T2/T3 deployments get pooling. **Since 2026-09-10: the foundation of Professional's DR tier — ships in the Professional bundle** | `PostgresStateStoreTest` 12/12 · a boot with an unreachable backend in partitioned mode **fails** (falsified: reachable → boots) · pool saturation test |
+| ✅ **B — the lease** (§5.2) — **COMPLETE 2026-09-12** | `RunLease` seam, `PostgresRunLease`, shared `lastRunAtMs`, cron through the lease | **T4 active/passive standby becomes automatic** — the signed 30-min RTO with no runbook step. **Since 2026-09-10 this IS the Professional fault-tolerant-DR deliverable**, so `RunLease` and `PostgresRunLease` live in core or `inspecto-security`-tier modules, ⛔ never behind `inspecto-policy` | §7's test · a killed owner's lease is reclaimed within TTL · `HeapRunLease` behaviour byte-identical for Personal/Professional |
 | 🟡 **C — partition + lakehouse** (~~§5.3~~, ~~§5.4 less two bullets~~) — the last phase, and the only Enterprise one | ~~Space→pod map, inbox ownership~~ · ~~per-tenant ABAC~~ · ~~shared Postgres catalog, read-side attach, mandatory registration~~ · **remaining: object-store visibility (`CatalogCommit`) + `s3://` containment + the Helm chart** | Horizontal scale | 3 pods · 3 Spaces · one Postgres · one MinIO: every pipeline runs once per trigger, every pod reads every slice, killing a pod loses nothing committed. ✅ **The MinIO half of this gate is RUNNABLE as of 2026-09-14** — a `minio` container is up on 127.0.0.1:9000 with bucket `inspecto-lakehouse`, and DuckDB 1.5.2 was measured writing and reading Parquet through it; the Postgres half was met the same day. ⛔ What still blocks bullet 6 is PACKAGING, not infrastructure: no bundle stages `httpfs` or `aws` (`AIRGAP-S3-EXTENSIONS-1`) |
 
 ⚠ **This row's §5.3 half is DONE — struck above 2026-09-14.** §5.3 closed 2026-09-12 (C1 static Space→pod
@@ -1208,7 +1208,7 @@ paragraph above warns about. Nothing in the repo boots two control planes in one
 | **Wide single feeds** | Partitioning does not split one feed (§4) | Say it in sales; onboarding pattern: split by switch/region/hour at source |
 | **Connection storms** | One connection per store per pod (§3.4) × 12 stores × N pods | Phase A's pool, sized per scheme |
 | **Dynamic rebalancing creep** | "A pod died, move its Spaces" is a controller, not a config | Explicitly phase C+1; static assignment first |
-| **The 90 MB claim** | Enterprise now needs Postgres + object store | Keep the claim for Personal/Standard; Enterprise says "same artifact, plus your Postgres and S3" (D9) |
+| **The 90 MB claim** | Enterprise now needs Postgres + object store | Keep the claim for Personal/Professional; Enterprise says "same artifact, plus your Postgres and S3" (D9) |
 
 ---
 
@@ -1216,21 +1216,21 @@ paragraph above warns about. Nothing in the repo boots two control planes in one
 
 | # | Question | Recommendation |
 |---|---|---|
-| **D1′** | Revise the signed container decision so the image is the Enterprise unit of deployment and orchestration is in scope for Enterprise? | ✅ **SIGNED 2026-09-10 (operator)** — **Yes.** Personal/Standard stay orchestrator-free; §2 amendments APPLIED with this signature |
+| **D1′** | Revise the signed container decision so the image is the Enterprise unit of deployment and orchestration is in scope for Enterprise? | ✅ **SIGNED 2026-09-10 (operator)** — **Yes.** Personal/Professional stay orchestrator-free; §2 amendments APPLIED with this signature |
 | **D2** | Scaling model | ✅ **SIGNED 2026-09-10 (operator)** — **A — shared-nothing partitioning.** B refused, not deferred |
 | **D3** | Partition unit | ✅ **SIGNED 2026-09-10 (operator)** — **Space**, not pipeline — it is already the namespace for every store and directory (and, since `SPACES-GOVERNOR-1`, for admission state) |
 | **D4** | Shared lakehouse | ✅ **SIGNED 2026-09-10 (operator)** — **(ii) object store + DuckLake catalog on Postgres**, catalog commit as visibility; (i) shared POSIX volume kept as a documented fallback for sites without object storage |
-| **D5** | Lease mechanism | ✅ **SIGNED 2026-09-10 (operator)** — **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator). Per D8 this lease is also Standard's T4 standby |
+| **D5** | Lease mechanism | ✅ **SIGNED 2026-09-10 (operator)** — **A lease table with TTL heartbeat.** ⛔ Not advisory locks (die with pooled connections); ⛔ not the Kubernetes Lease API (couples the engine to the orchestrator). Per D8 this lease is also Professional's T4 standby |
 | **D6** | Events across pods | ✅ **SIGNED 2026-09-10 (operator)** — **Add `events.backend=db`** on the existing `EventStore` seam. ✅ **BUILT 2026-09-12 (phase A3)**: `DbEventStore` + `OperationalDb.Family.EVENTS` + the `db` branch in `ServiceStores.openEventStore`, covered by `DbEventStoreTest` (10, over DuckDB so it runs everywhere) and a Postgres round-trip in `PostgresStateStoreTest`. 🔴 **It closes the QUERY half only** — see §5.5's corrected note: `/signals/stream` and `EventObjectBridge` both read `EventLog`'s **in-heap** subscriber list and never consult a store, so a `SEQUENCE_GAP` on pod B still never becomes an ALERT if the bridge runs on pod A. ⛔ Do not record D6 as making the live tail cross-pod |
 | **D7** | Connection pool | ✅ **SIGNED 2026-09-10 (operator)** — **Un-park `postgres-multi-user-plan.md` P1 + P2** as phase A work (spike S3 first) |
-| **D8** | Tier naming | ✅ **DECIDED 2026-09-10 (operator):** **T5 — partitioned scale-out on Kubernetes** = **Enterprise**, added to §3.9; **T4 active/passive DR moves to Standard**. Applied |
-| **D9** | The "zero external runtime services" claim | ✅ **SIGNED 2026-09-10 (operator)** — refined by D8: **Personal — zero. Standard — zero unless DR (T4) is enabled, then Postgres. Enterprise — Postgres + S3-compatible object store.** The 90 MB artifact claim stays true: same artifact, plus YOUR services |
+| **D8** | Tier naming | ✅ **DECIDED 2026-09-10 (operator):** **T5 — partitioned scale-out on Kubernetes** = **Enterprise**, added to §3.9; **T4 active/passive DR moves to Professional**. Applied |
+| **D9** | The "zero external runtime services" claim | ✅ **SIGNED 2026-09-10 (operator)** — refined by D8: **Personal — zero. Professional — zero unless DR (T4) is enabled, then Postgres. Enterprise — Postgres + S3-compatible object store.** The 90 MB artifact claim stays true: same artifact, plus YOUR services |
 | **D10** | `DuckLakeRegistrar` failure in partitioned mode | ✅ **SIGNED 2026-09-10 (operator)** — **Fatal.** A pod that cannot reach the shared catalog must not write files nobody can see; single-node mode keeps today's opt-in, warn-only behaviour. ✅ **SHIPPED 2026-09-14** on the **commit-time** reading — 🔴 "fails boot" was not implementable (registration is per-batch, not boot-time); see §5.1 |
 | **D11** | Dynamic rebalancing | ✅ **SIGNED 2026-09-10 (operator)** — **Deferred to phase C+1**; static Space→pod assignment first |
-| **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Standard's two-pod T4 standby is partitioned without being a cluster |
+| **D12** | The partitioned-mode switch's name | ✅ **SIGNED 2026-09-10 (operator)** — **`-Dinspecto.topology=partitioned`** (values `single` \| `partitioned`; also what `/bootstrap` reports). Not `mode=cluster` — D2 refused the cluster engine, and Professional's two-pod T4 standby is partitioned without being a cluster |
 | **D13** | *(new, operator 2026-09-10)* An external SQL/BI query surface: Postgres views over the Hive-partitioned Parquet, executed by Postgres's DuckDB extension (pg_duckdb-style) | ✅ **SIGNED 2026-09-10 (operator)** — **Added as the external query surface; DuckLake catalog commit stays the write-visibility event.** A Hive glob sees a half-written file the moment it appears, so visibility must remain the commit, not file existence. Spike **S5** first: is `pg_duckdb` installable on the customer's Postgres (managed services such as RDS do not allow it)? → §5.4. 🔴 **S5 ANSWERED 2026-09-10 — SELF-MANAGED POSTGRES ONLY.** `pg_duckdb` is installed by **building from source** (`make install`), and it appears on **none** of the curated extension lists of Amazon RDS/Aurora, Google Cloud SQL or Azure Database for PostgreSQL Flexible Server — all three publish a fixed set, so a customer cannot add one that is not on it. ⚠ **Evidence strength, stated so it can be re-checked:** Azure's list was read in full from the primary source (Microsoft Learn, *List of Extensions and Modules by Name*, dated 2026-07-10) and contains **no** extension whose name contains "duck"; RDS/Aurora and Cloud SQL rest on their published lists as surfaced by search rather than a full read. ⇒ Treat Azure as settled and the other two as very likely; **the live half of S5 is what confirms all three.** It supports Postgres 14–18 and reads Parquet/CSV/JSON/Iceberg/Delta from S3, GCS, Azure and R2. ⇒ **The external query surface is NOT general.** It is available to a self-managed Postgres and unavailable to the managed services an Enterprise customer is most likely to already run — so D13 must be sold as an option with a deployment precondition, never as a default. 🔴 **And it needs one more thing to be correct at all:** DuckLake **inlines** small writes into the catalog (S1), so a view over the Hive Parquet prefix would silently omit them unless inlining is disabled — see §3.5. ⚠ The live half of S5 (install it, build the view, query it from `psql`) is still owed; this sandbox has no Postgres and no container daemon. |
 | **D14** | *(new, 2026-09-11 — operator challenge to D3)* **Relax D3**: is the indivisible unit the **inbox-sharing group** (connected components of "names the same `dirs.poll`") rather than the Space, with the Space kept as the default grouping? | ⬜ **UNSIGNED — asked.** Recommend **yes.** Under D3 as written a single-Space customer gets **nothing** from N pods, and that is the likely tier-1 telecom shape, not an edge case (§4.1). Two of D3's three justifications do not survive grounding: ledgers and dedup move to shared Postgres **in phase A itself**, and the shared inbox is a per-Pipeline *config fact*, decidable at boot — not a property of a Space. ⛔ Preconditions if signed: phase A (stores on Postgres) **and** D6 (`events.backend=db`), because splitting a Space without D6 splits that Space's Signal ledger across two pods' memory and a Space is precisely the unit Ops looks at. Plus a boot check that **refuses** a map splitting a shared-inbox group |
-| **D15** | *(new, 2026-09-11)* Split-brain posture: **idempotent writes + fencing tokens** over the existing Postgres claim surfaces — and **refuse ZooKeeper/etcd**? 🔴 **RE-POSED 2026-09-11 (same day) — its premise was measured and REFUTED; see §12.** The phrase "over the **existing** claim surfaces" is what failed: `DbFileStageStore` and `DbConsignmentOutputStore` have **no unique constraint and no CAS**, and the `batchId` every write keys on is **wall-clock derived at second granularity**, so two executors cannot agree on it. ⇒ **The question is no longer "which posture?" but "will you fund the precondition?":** a **deterministic, content-derived Consignment identity** plus **unique constraints on the registry and a CAS on the stage store**. Until those exist, neither idempotent writes nor fencing tokens are implementable — a fencing token is validated *at the resource*, and the resource key is the same unstable `batchId`. ⚠ **Standard is affected, not only Enterprise**: a T4 standby taking over from a *paused* owner double-executes. ⛔ Do not sign the recommendation below as written — it describes a destination reachable only after that precondition. | ⬜ **UNSIGNED — asked, and now re-posed (see the question cell).** The ZK half stands unchanged and can be signed on its own. The idempotency half is superseded by the precondition above. Original recommendation, kept for provenance: **yes, and refuse ZK.** ⚠ A TTL lease does not *prevent* split-brain, it makes it unlikely — and a ZK session expiring in a GC pause has the identical hole, so changing coordinator fixes nothing. Lead with **idempotent writes keyed on Consignment/file id** (`DbDedupLedger` + `FileStages` already exist) so double execution is *wasted effort, not corruption*; add **fencing tokens** validated at the resource for the paused-owner case. ZK refused: Postgres is already mandatory (D9) and already linearizable in the critical path; ZK is a **third** stateful system and **two coordinators is a new split-brain surface**; D5 already refused advisory locks and the Kubernetes Lease API, both lighter than ZK (§4.2) |
+| **D15** | *(new, 2026-09-11)* Split-brain posture: **idempotent writes + fencing tokens** over the existing Postgres claim surfaces — and **refuse ZooKeeper/etcd**? 🔴 **RE-POSED 2026-09-11 (same day) — its premise was measured and REFUTED; see §12.** The phrase "over the **existing** claim surfaces" is what failed: `DbFileStageStore` and `DbConsignmentOutputStore` have **no unique constraint and no CAS**, and the `batchId` every write keys on is **wall-clock derived at second granularity**, so two executors cannot agree on it. ⇒ **The question is no longer "which posture?" but "will you fund the precondition?":** a **deterministic, content-derived Consignment identity** plus **unique constraints on the registry and a CAS on the stage store**. Until those exist, neither idempotent writes nor fencing tokens are implementable — a fencing token is validated *at the resource*, and the resource key is the same unstable `batchId`. ⚠ **Professional is affected, not only Enterprise**: a T4 standby taking over from a *paused* owner double-executes. ⛔ Do not sign the recommendation below as written — it describes a destination reachable only after that precondition. | ⬜ **UNSIGNED — asked, and now re-posed (see the question cell).** The ZK half stands unchanged and can be signed on its own. The idempotency half is superseded by the precondition above. Original recommendation, kept for provenance: **yes, and refuse ZK.** ⚠ A TTL lease does not *prevent* split-brain, it makes it unlikely — and a ZK session expiring in a GC pause has the identical hole, so changing coordinator fixes nothing. Lead with **idempotent writes keyed on Consignment/file id** (`DbDedupLedger` + `FileStages` already exist) so double execution is *wasted effort, not corruption*; add **fencing tokens** validated at the resource for the paused-owner case. ZK refused: Postgres is already mandatory (D9) and already linearizable in the critical path; ZK is a **third** stateful system and **two coordinators is a new split-brain surface**; D5 already refused advisory locks and the Kubernetes Lease API, both lighter than ZK (§4.2) |
 | **D16** | *(new, 2026-09-11)* Request routing: **ingress path-routing on `/spaces/<id>/` with rules generated from the partition map**, `/spaces` answered **from the map**, and the **SPA served off the pods** (ingress/CDN)? | ⬜ **UNSIGNED — asked.** Recommend **yes, all three.** The routing key is already in the URL (`spaceScopedUrl`), so this needs **zero UI change**. ⛔ Generate the ingress rules from the map — hand-maintaining them makes the ingress a second copy that drifts. An in-app forward is the weaker option (new code, and it would have to proxy SSE); client-side routing is refused (leaks topology to the browser). Serving the SPA off the pods also removes the rolling-update chunk-skew defect (§12) and keeps `-Dui.dir` unchanged for single-node (§5.5) |
 
 ---
@@ -1295,17 +1295,17 @@ that, not on infrastructure.**
 A **three-message product** since the 2026-09-10 tier decision, and each message holds:
 
 - **Personal** — *the 90 MB artifact: zero external services, runs on a laptop or an air-gapped server.*
-  *(D9: **Standard** is zero too unless T4 DR is enabled, which needs a Postgres; **Enterprise** states Postgres +
+  *(D9: **Professional** is zero too unless T4 DR is enabled, which needs a Postgres; **Enterprise** states Postgres +
   an S3-compatible object store — the same artifact, plus your services.)*
   Unchanged.
-- **Standard** — *the same artifact, and if the node dies the standby takes over inside the signed RTO.*
-  **Fault-tolerant DR** (T4) is the Standard headline beside the Ops workflow and the audit pack. Its
-  honest dependency: Postgres — Standard DR is database-backed, not optionally so.
+- **Professional** — *the same artifact, and if the node dies the standby takes over inside the signed RTO.*
+  **Fault-tolerant DR** (T4) is the Professional headline beside the Ops workflow and the audit pack. Its
+  honest dependency: Postgres — Professional DR is database-backed, not optionally so.
 - **Enterprise** — *the same artifact as a pod, scaled by partition: one binary, one config, N pods,
   your Postgres, your S3.* The **cluster** (T5) and policy-level tenant isolation. A cleaner scale story
   than the closest competitor's Helm chart, because there is no second architecture to learn.
 
-⚠ The ladder now reads as *survive a node* (Standard) → *outgrow a node* (Enterprise), which is the
+⚠ The ladder now reads as *survive a node* (Professional) → *outgrow a node* (Enterprise), which is the
 distinction a buyer already understands.
 
 It does not break the air-gap wedge — regulated on-prem estates already run Kubernetes (OpenShift is
@@ -1360,7 +1360,7 @@ withdrawn.**)*
   unstable `batchId`. Resolving D15 therefore requires building **(1) a deterministic, content-derived
   Consignment identity** to replace the wall-clock `batchId`, and **(2) unique constraints on the output
   registry plus a CAS on the stage store**, before the question it poses can even be answered.
-  ⚠ **This bites Standard, not only Enterprise:** a T4 standby taking over from a *paused* — not dead —
+  ⚠ **This bites Professional, not only Enterprise:** a T4 standby taking over from a *paused* — not dead —
   owner double-executes, and the lease alone only narrows the window.
 
 - ⚠ **The only concurrency test that exists switches off the leg where the corruption lives.**

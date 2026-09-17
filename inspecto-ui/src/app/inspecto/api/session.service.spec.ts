@@ -71,7 +71,7 @@ describe('SessionService (W6d edition switch)', () => {
         const init = svc.init();
         httpMock
             .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'standard', features: { authMode: 'none', geoLink: true } });
+            .flush({ edition: 'professional', features: { authMode: 'none', geoLink: true } });
         await init;
         expect(svc.geoLinkEnabled()).toBe(true);
     });
@@ -87,7 +87,7 @@ describe('SessionService (W6d edition switch)', () => {
         const init = svc.init();
         httpMock
             .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'standard', features: { authMode: 'none', events: true } });
+            .flush({ edition: 'professional', features: { authMode: 'none', events: true } });
         await init;
         expect(svc.eventsEnabled()).toBe(true);
     });
@@ -103,7 +103,7 @@ describe('SessionService (W6d edition switch)', () => {
         const init = svc.init();
         httpMock
             .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'standard', features: { authMode: 'none', ops: true } });
+            .flush({ edition: 'professional', features: { authMode: 'none', ops: true } });
         await init;
         expect(svc.opsEnabled()).toBe(true);
     });
@@ -117,7 +117,7 @@ describe('SessionService (W6d edition switch)', () => {
 
     it('OIDC bootstrap + refresh 401 ⇒ authenticated false, loginRequired true', async () => {
         const done = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'professional', features: { authMode: 'oidc' } });
         await tick();
         httpMock
             .expectOne(`${base}/auth/refresh`)
@@ -130,7 +130,7 @@ describe('SessionService (W6d edition switch)', () => {
 
     it('OIDC bootstrap + refresh 200 ⇒ resumes the session (token + authenticated + effective grants)', async () => {
         const done = svc.init();
-        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'standard', features: { authMode: 'oidc' } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({ edition: 'professional', features: { authMode: 'oidc' } });
         await tick();
         httpMock.expectOne(`${base}/auth/refresh`).flush({ accessToken: 'at-resumed', expiresIn: 300 });
         await tick();

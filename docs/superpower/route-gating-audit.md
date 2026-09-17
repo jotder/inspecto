@@ -127,7 +127,7 @@ is the wrong diagnosis.
 
 🔴 **`DELETE /spaces/{id}` is the single worst case found.** `deleteSpace` (`SpaceRoutes.java:125-139`)
 checks only `requireMultiSpace`, id validity, and a 409 refusing to purge the *last* space on disk —
-**no capability check at all**. On Standard any authenticated caller can deregister a Space, and with
+**no capability check at all**. On Professional any authenticated caller can deregister a Space, and with
 `?purge=true` delete its tree outright (unless it is the last one). ⇒ Needs a capability of its own;
 `canConfigureAccess` is the closest existing fit but means something different.
 
@@ -251,7 +251,7 @@ every remaining entry as a hypothesis.
 | `POST /import` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | Parses a bundle, writes into the Space's `config/` and **hot-registers connections and pipelines live** (`DataSourceRoutes:246-312`). Both true siblings are gated — `/bundle/import` (`BundleRoutes:118`), `/pipelines/import` (`PipelineBundleRoutes:96`). No manifest entry, no defending comment, and **no test exercises it at all**. |
 | `POST /events/views` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | A saved view is **server-wide, not per-user**: `SavedView` is `(name, filters, createdAt)` with no subject field (`SavedView.java:9-20`) over one `SavedViewStore` per service (`CollectorService:116`). Any caller creates what every caller sees. |
 | `POST /events/views/{id}/delete` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | Same store, no ownership check — deletes another caller's view. ⚠ A POST-shaped DELETE does not change the authorization question. |
-| `POST /assist/settings` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | **Server-wide** provider config, one file (`AssistModelSettings.save`), reachable in Standard/Enterprise. 🔴 Its own javadoc names a `scope: assist.write` **that the route never enforces** — documented intent, unenforced. |
+| `POST /assist/settings` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | **Server-wide** provider config, one file (`AssistModelSettings.save`), reachable in Professional/Enterprise. 🔴 Its own javadoc names a `scope: assist.write` **that the route never enforces** — documented intent, unenforced. |
 | `POST /assist/settings/test` | ✅ **GATED 2026-09-15** `canAuthorWorkbench` | Performs a **real outbound call** (`p.generate(...)`) to whatever `baseUrl` was last saved. ⛔ **Gate it WITH the route above, never alone** — see the security note below. |
 | `POST /recon/run` | ⛔ **DELIBERATE EXEMPTION** | 🔴 The audit called it *"the same shape as every other trigger"*. **It triggers nothing** — stateless compute, nothing persisted, no job dispatched. Siblings `/recon/columns` and `/recon/breaks` are the same shape and were never proposed; `/bi/query` is ungated for this reason (`BiRoutes:44`). The class javadoc says these routes *"are stateless compute over ReconService"* with `/recon/promote` as *"the one exception… which writes"*. |
 | `POST /tags/assignments/{k}/{id}` | ⛔ **DELIBERATE EXEMPTION** | `TagRoutes.java:60-62` states it: gated **per target via `AnnotationTargets`, not by capability**, because *"a capability gate would make 'can tag' independent of 'can see' — which is exactly how a tag would turn into an access grant."* |
@@ -265,7 +265,7 @@ not have.** `POST /assist/settings` is ungated and writes a **server-wide** `bas
 `POST /assist/settings/test` then makes a **real outbound request to it**. ⇒ any authenticated caller can
 point the server at an arbitrary URL and make it call out. ⚠ Unlike §6(c) agent governance — whose gate is
 correct but **unreached**, because nothing stages `inspecto-intelligence` — **`inspecto-agent` IS staged**
-(`package.ps1:340-348`), so this pair is live in every Standard and Enterprise bundle. ⛔ **Gate both in
+(`package.ps1:340-348`), so this pair is live in every Professional and Enterprise bundle. ⛔ **Gate both in
 one commit**: gating only the test route leaves the write route as the injection point.
 
 ⚠ **`EventRoutes` and `AssistRoutes` are 100% ungated FILES**, not outliers among gated siblings — neither

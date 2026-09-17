@@ -120,10 +120,10 @@ const MANIFEST = {
     // ── SPEC-COUNTS-1's last hand-typed count, closed 2026-09-15: `tools/bundle-modules.mjs` is the one
     // module list sbom.mjs and check-sbom-modules.mjs both read (the dependency count was already derived —
     // `locked-dependencies` below). ⚠ Named for the SET: "staged jars" was stated eight ways because it
-    // silently meant different sets (first-party only vs + the PG sidecar; Standard vs Enterprise).
+    // silently meant different sets (first-party only vs + the PG sidecar; Professional vs Enterprise).
     'optional-modules': {
         floor: 2,
-        what: 'first-party modules an edition can add beyond Personal (Standard + Enterprise floors)',
+        what: 'first-party modules an edition can add beyond Personal (Professional + Enterprise floors)',
         derive: () => editionOnlyModules('Enterprise').length,
         source: 'tools/bundle-modules.mjs',
     },

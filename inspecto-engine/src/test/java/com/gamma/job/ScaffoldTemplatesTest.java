@@ -55,7 +55,7 @@ class ScaffoldTemplatesTest {
             Map.entry("engineArtifactId", "inspecto-engine"),
             Map.entry("engineVersion", "0-test"),
             Map.entry("junitVersion", "5.10.2"),
-            Map.entry("javaRelease", "24"),
+            Map.entry("javaRelease", "27"),
             Map.entry("compilerPluginVersion", "3.13.0"),
             Map.entry("surefirePluginVersion", "3.2.5"));
 

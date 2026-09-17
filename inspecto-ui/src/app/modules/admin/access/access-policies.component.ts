@@ -28,7 +28,7 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
  * </ul>
  *
  * Read-only by design: policy <em>authoring</em> stays TOON/API (the matrix editor is a separate, larger
- * follow-on). Enforcement is Enterprise-only — on Personal/Standard the explainer reports it's disabled.
+ * follow-on). Enforcement is Enterprise-only — on Personal/Professional the explainer reports it's disabled.
  */
 @Component({
     selector: 'app-access-policies',

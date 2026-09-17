@@ -7,12 +7,12 @@
 # `inspecto-deploy.zip*` trio, so a platform the script built but did not name there was never
 # published — and the one it did name was the HOST image under a Windows label.
 #
-# Usage: bash tools/release-collect.sh <personal|standard|enterprise> [required-platform ...]
+# Usage: bash tools/release-collect.sh <personal|professional|enterprise> [required-platform ...]
 #   Default required set: the runner's own platform (linux_amd64 on a Linux runner, windows_amd64 on
 #   Windows) — the one jlink can always produce with no jmods cache. Pass more names to demand a
 #   cross-built platform too.
 set -euo pipefail
-edition="${1:?edition (personal|standard|enterprise) required}"; shift || true
+edition="${1:?edition (personal|professional|enterprise) required}"; shift || true
 case "$(uname -s)" in
   Linux)                  host=linux_amd64 ;;
   MINGW*|MSYS*|CYGWIN*)   host=windows_amd64 ;;

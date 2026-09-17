@@ -17,7 +17,11 @@ mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar (fat J
 ```
 
 Always offline (`-o`). Tests spin up a real `CollectorService`/[`ControlApi`](../control-plane/control-api.md) on
-an ephemeral port. (Java **25** toolchain + Maven — ⚠ this said 26 until 2026-09-09; the GraalVM cache holds 25.0.3 (Windows) / 25.1.3 (Linux) and CI sets up JDK 25; see the `build-verify` skill for exact local paths.)
+an ephemeral port. (Java **27** toolchain + Maven, `release=27` — moved 2026-09-17. The local JDK is
+`C:\sandbox\.graalvm-cache\jdk-27-win` (Oracle 27+35-2325) and CI sets up **Oracle** JDK 27, not Temurin:
+Adoptium had published no 27 build as of 2026-09-17. ⚠ The GraalVM cache still holds 25.0.3 (Windows) /
+25.1.3 (Linux); the Linux entry is the jmods source for the cross-built runtime and is NOT the toolchain.
+See the `build-verify` skill for exact local paths.)
 
 ## Mandatory DuckDB native-access flag
 
@@ -190,12 +194,13 @@ launch classpath yourself — there is no `package.ps1` switch for it:
 mvn -o clean package -pl inspecto-agent -am -DskipTests
 ```
 
-🔴 **Check the runtime floor before you do.** The agent modules need a **JDK 25+ runtime** (their
-model-transport jars are class-file v69) per
-[api-stability.md](../control-plane/api-stability.md) §*Current Java floor*, while the `-NoRuntime`
-flavor documents a **Java 24+** target server. The bundled jlink runtime satisfies both; a
-`-NoRuntime` deployment on Java 24 does not. Adding a packaging switch is therefore a real decision,
-not a missing line — tracked as **PKG-5** in [BACKLOG](../../../BACKLOG.md) §6.
+✅ **The runtime-floor conflict is GONE as of 2026-09-17.** It was: the agent modules need a **JDK
+25+ runtime** (their model-transport jars are class-file v69) while the `-NoRuntime` flavor documented
+a **Java 24+** target server, so a `-NoRuntime` deployment on Java 24 could not load them. Moving the
+compile target to **`release=27`** puts the product's own floor *above* the agent modules' — one floor,
+27, for everything. A `-NoRuntime` target server must now provide **Java 27+**, and at that version the
+agent modules load by construction. ⚠ The historical reasoning is kept because **PKG-5** in
+[BACKLOG](../../../BACKLOG.md) §6 is written against the old two-floor framing.
 
 ⚠ The **jlink embedded-runtime step is unproven as of 2026-08-27**: a stale `java.exe` held
 `runtime/bin/server/jvm.dll` and step 6c failed with an access error that was a **file lock, not a

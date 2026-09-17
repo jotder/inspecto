@@ -1,26 +1,26 @@
 # package.ps1 — Build and bundle inspecto for remote server deployment.
 #
 # Usage (run from inside inspecto/ or from the sandbox root):
-#   pwsh -File inspecto\package.ps1 [-NoBuild] [-Edition Standard|Enterprise]
+#   pwsh -File inspecto\package.ps1 [-NoBuild] [-Edition Professional|Enterprise]
 #
 # Run under pwsh 7: this file is BOM-less UTF-8 and Windows PowerShell 5.1 garbles its non-ASCII
 # characters (see .claude/skills/build-verify/SKILL.md).
 #
-# -Edition Enterprise is Standard + inspecto-policy (the ABAC AccessDecider SPI implementation),
+# -Edition Enterprise is Professional + inspecto-policy (the ABAC AccessDecider SPI implementation),
 # bundled as inspecto-policy.jar. It needs NO extra flag: the module is discovered purely
 # through META-INF/services/com.gamma.control.AccessDecider, so being on the classpath is what
 # turns policy evaluation on. serve.sh/serve.bat auto-detect it the same way they do the security jar.
 #
-# -Edition Standard (default: Personal) additionally builds inspecto-security (W6, the OIDC
-# Authenticator SPI implementation) and bundles it as inspecto-security.jar; serve.sh/
-# serve.bat auto-detect its presence, add it to the classpath, and turn on -Dauth.mode=oidc.
-# Standard/Enterprise also bundle the PostgreSQL JDBC driver as postgresql.jar (PG-1) — same
-# auto-detect mechanism, inert until -Dinspecto.db=postgres; the fat JAR stays driver-free.
-# (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle). The embedded
-# jlink runtime's module set (below) is VERIFIED sufficient for inspecto-security too (PKG-4,
-# 2026-07-07): jdeps on inspecto-security.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
+# -Edition Professional (default: Personal; 'Standard' accepted as legacy alias) additionally builds
+# inspecto-security (W6, the OIDC Authenticator SPI implementation) and bundles it as
+# inspecto-security.jar; serve.sh/serve.bat auto-detect its presence, add it to the classpath, and
+# turn on -Dauth.mode=oidc. Professional/Enterprise also bundle the PostgreSQL JDBC driver as
+# postgresql.jar (PG-1) — same auto-detect mechanism, inert until -Dinspecto.db=postgres; the fat
+# JAR stays driver-free. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
+# The embedded jlink runtime's module set (below) is VERIFIED sufficient for inspecto-security too
+# (PKG-4, 2026-07-07): jdeps on inspecto-security.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
 # java.base/java.sql/java.net.http/jdk.httpserver, and RS256/ES256 resolve via SunRsaSign/SunEC
-# (jdk.crypto.ec) on a jlink image built from exactly this list — Standard bundles may embed the
+# (jdk.crypto.ec) on a jlink image built from exactly this list — Professional bundles may embed the
 # runtime. jlink can target either platform from a Windows host by pointing --module-path at the
 # target JDK's jmods; -NoRuntime skips both. ⚠ The invoked tool is the HOST's (`jlink.exe` on Windows,
 # `jlink` elsewhere) — hardcoding the `.exe` is what kept CI from ever embedding a runtime (OPS-07).
@@ -66,12 +66,12 @@ param(
     # launches the bundle it just built and waits for /health. -SkipBootCheck opts out for a fast local
     # package; CI and releases must never pass it.
     [switch]$SkipBootCheck,
-    # Editions are build flavors (docs/EDITIONS.md), never branches. 'Standard' additionally builds
+    # Editions are build flavors (docs/EDITIONS.md), never branches. 'Professional' additionally builds
     # and bundles inspecto-security (W6, the Authenticator SPI's OIDC implementation) alongside the
     # core jar; serve.sh/serve.bat auto-detect its presence and wire -Dauth.mode=oidc from env vars.
-    # 'Enterprise' is Standard PLUS inspecto-policy (the ABAC AccessDecider SPI impl) — the same
+    # 'Enterprise' is Professional PLUS inspecto-policy (the ABAC AccessDecider SPI impl) — the same
     # superset relation the -Pedition-enterprise Maven profile encodes, so it bundles BOTH extra jars.
-    [ValidateSet('Personal', 'Standard', 'Enterprise')]
+    [ValidateSet('Personal', 'Professional', 'Standard', 'Enterprise')]
     [string]$Edition = 'Personal',
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally
@@ -246,10 +246,10 @@ if (-not $connectorsJarSrc -or -not (Test-Path $connectorsJarSrc)) {
     throw "Connector sidecar not found matching $connectorsTargetDir\inspecto-connectors-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl inspecto-connectors -am -DskipTests"
 }
 
-# ── step 1c: Standard/Enterprise editions — build the optional edition modules ─────────────────
+# ── step 1c: Professional/Enterprise editions — build the optional edition modules ─────────────────
 # Separate optional modules (docs/EDITIONS.md), NOT in the default reactor <modules> — only built
 # when the profile is requested, from the repo root (they are siblings of inspecto/, not submodules).
-# Enterprise is a SUPERSET of Standard (the -Pedition-enterprise profile = edition-standard + policy),
+# Enterprise is a SUPERSET of Professional (the -Pedition-enterprise profile = edition-professional + policy),
 # so it bundles the security jar too — an Enterprise deployment authenticates AND authorizes.
 $securityJarSrc = $null
 $policyJarSrc   = $null
@@ -261,18 +261,19 @@ $metricsJarSrc  = $null
 $eventsJarSrc   = $null
 $opsJarSrc      = $null
 $agentJarSrc    = $null
+if ($Edition -eq 'Standard') { $Edition = 'Professional' }
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
-    $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
+    $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-professional' }
     # EDG-01 cell 1: inspecto-notify-channels rides with security in BOTH non-Personal editions — CP-15
-    # is "Standard and above", and Enterprise is a superset of Standard.
-    # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Standard and above.
-    # EDG-01 cell 3b: inspecto-geo-link (CP-09) rides alongside, Standard and above.
-    # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Standard and above.
-    # EDG-01 cell 5: inspecto-metrics (CP-13, the /metrics exposition), Standard and above.
-    # EDG-01 cell 6: inspecto-events (CP-13's other half, the /events* feed), Standard and above.
-    # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Standard and above.
-    # PKG-5 (operator decision 2026-09-12): the assistant is STANDARD AND ABOVE. Taken first as
+    # is "Professional and above", and Enterprise is a superset of Professional.
+    # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Professional and above.
+    # EDG-01 cell 3b: inspecto-geo-link (CP-09) rides alongside, Professional and above.
+    # EDG-01 cell 4: inspecto-exchange (SEC-10) rides alongside, Professional and above.
+    # EDG-01 cell 5: inspecto-metrics (CP-13, the /metrics exposition), Professional and above.
+    # EDG-01 cell 6: inspecto-events (CP-13's other half, the /events* feed), Professional and above.
+    # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Professional and above.
+    # PKG-5 (operator decision 2026-09-12): the assistant is PROFESSIONAL AND ABOVE. Taken first as
     # "all editions, optional" and narrowed the same day once the sidecar's weight was measured -
     # Personal already carries the ~32 MB connector sidecar. NB inspecto-agent is in the DEFAULT
     # reactor (not profile-scoped like the modules beside it); it is listed here only so this pass
@@ -287,7 +288,7 @@ if ($Edition -ne 'Personal') {
     }
     $securityTargetDir = Join-Path $sandboxRoot 'inspecto-security\target'
     # SEC-SIDECAR-BOOT-1 (2026-09-07): the SHADED jar, not the thin one. Until now this copied the plain
-    # 16 KB artifact, which carries no com/nimbusds classes at all - so every Standard/Enterprise bundle
+    # 16 KB artifact, which carries no com/nimbusds classes at all - so every Professional/Enterprise bundle
     # died at boot, because ControlApi resolves the Authenticator SPI during startup through an unguarded
     # ServiceLoader and OidcAuthenticator needs Nimbus. The glob is '-sidecar' on purpose: a bare
     # 'inspecto-security-*.jar' now matches BOTH artifacts and would pick one by luck.
@@ -388,7 +389,7 @@ if (Test-Path $bundleDir) {
 Copy-Item $jarSrc "$bundleDir\inspecto.jar"
 if ($securityJarSrc) {
     Copy-Item $securityJarSrc "$bundleDir\inspecto-security.jar"
-    Write-Host "Bundled Standard-edition security module → inspecto-security.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition security module → inspecto-security.jar" -ForegroundColor Green
 
     # Verify the STAGED artifact, the same way the connector sidecar is verified. This is the check that
     # would have caught SEC-SIDECAR-BOOT-1: the module's own tests pass with Nimbus on the compile
@@ -409,7 +410,7 @@ if ($securityJarSrc) {
 }
 if ($channelsJarSrc) {
     Copy-Item $channelsJarSrc "$bundleDir\inspecto-notify-channels.jar"
-    Write-Host "Bundled Standard-edition delivery channels -> inspecto-notify-channels.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition delivery channels -> inspecto-notify-channels.jar" -ForegroundColor Green
 
     # Verify the STAGED artifact, exactly as the security and connector sidecars are. Both halves matter:
     # javax.mail missing means SmtpEmailChannel throws NoClassDefFoundError the moment NotificationService
@@ -437,7 +438,7 @@ if ($channelsJarSrc) {
 }
 if ($backupJarSrc) {
     Copy-Item $backupJarSrc "$bundleDir\inspecto-backup.jar"
-    Write-Host "Bundled Standard-edition backup module -> inspecto-backup.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition backup module -> inspecto-backup.jar" -ForegroundColor Green
     # A thin jar cannot lose classes to a shade, so the only way it ships INERT is a missing
     # META-INF/services entry - and inert here looks exactly like Personal, i.e. the bug this fixes.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -457,7 +458,7 @@ if ($backupJarSrc) {
 }
 if ($geoLinkJarSrc) {
     Copy-Item $geoLinkJarSrc "$bundleDir\inspecto-geo-link.jar"
-    Write-Host "Bundled Standard-edition geo/link module -> inspecto-geo-link.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition geo/link module -> inspecto-geo-link.jar" -ForegroundColor Green
     # A thin jar cannot lose classes to a shade, so the only way it ships INERT is a missing or incomplete
     # META-INF/services entry - and inert here means the five paths 503 on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -475,7 +476,7 @@ if ($geoLinkJarSrc) {
 }
 if ($exchangeJarSrc) {
     Copy-Item $exchangeJarSrc "$bundleDir\inspecto-exchange.jar"
-    Write-Host "Bundled Standard-edition exchange module -> inspecto-exchange.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition exchange module -> inspecto-exchange.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $exZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-exchange.jar")
     try {
@@ -489,7 +490,7 @@ if ($exchangeJarSrc) {
 }
 if ($metricsJarSrc) {
     Copy-Item $metricsJarSrc "$bundleDir\inspecto-metrics.jar"
-    Write-Host "Bundled Standard-edition metrics module -> inspecto-metrics.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition metrics module -> inspecto-metrics.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $mtZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-metrics.jar")
     try {
@@ -500,7 +501,7 @@ if ($metricsJarSrc) {
 }
 if ($eventsJarSrc) {
     Copy-Item $eventsJarSrc "$bundleDir\inspecto-events.jar"
-    Write-Host "Bundled Standard-edition events feed module -> inspecto-events.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition events feed module -> inspecto-events.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $evZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-events.jar")
     try {
@@ -511,7 +512,7 @@ if ($eventsJarSrc) {
 }
 if ($opsJarSrc) {
     Copy-Item $opsJarSrc "$bundleDir\inspecto-ops.jar"
-    Write-Host "Bundled Standard-edition operational-objects module -> inspecto-ops.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition operational-objects module -> inspecto-ops.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $opZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-ops.jar")
     try {
@@ -527,7 +528,7 @@ if ($opsJarSrc) {
 }
 if ($agentJarSrc) {
     Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"
-    Write-Host "Bundled Standard-edition assist agent -> inspecto-agent.jar" -ForegroundColor Green
+    Write-Host "Bundled Professional-edition assist agent -> inspecto-agent.jar" -ForegroundColor Green
 
     # Verify the sidecar is USABLE, not merely present - the lesson CONNECTORS-BUNDLE-1 taught (a
     # module's own tests can never fail for a packaging gap). This runs on the STAGED ARTIFACT.
@@ -585,7 +586,7 @@ try {
     Write-Host "  verified: $factories connector factories + sshj present in the sidecar" -ForegroundColor DarkGray
 } finally { $connZip.Dispose() }
 
-# ── step 3a: Standard/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
+# ── step 3a: Professional/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
 # The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, inspecto-engine/pom.xml);
 # the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
 # inspecto-security.jar. Personal ships DuckDB only — OperationalDb.verifySelectable fails a
@@ -750,22 +751,22 @@ fi
 # classpath the same way now. Every entry is inert unless a config asks for it.
 CP="inspecto.jar"
 [ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
-# Delivery channels (EDG-01 cell 1): Standard/Enterprise bundles only, and honoured on ANY bundle so a
+# Delivery channels (EDG-01 cell 1): Professional/Enterprise bundles only, and honoured on ANY bundle so a
 # drop-in works. Personal never carries the jar, so it has no external transport at all -- in-app
 # delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
 # the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
 [ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
-# Backup / restore tasks (EDG-01 cell 2): Standard/Enterprise only; same contract as the line above.
+# Backup / restore tasks (EDG-01 cell 2): Professional/Enterprise only; same contract as the line above.
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
-# Geo map + link analysis routes (EDG-01 cell 3b): Standard/Enterprise only; same contract as above.
+# Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
-# Cross-space exchange (EDG-01 cell 4): Standard/Enterprise only; same contract as above.
+# Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
 [ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
-# Prometheus scrape endpoint (EDG-01 cell 5): Standard/Enterprise only.
+# Prometheus scrape endpoint (EDG-01 cell 5): Professional/Enterprise only.
 [ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
 [ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
-# PKG-5: the assistant, Standard and above. Absent in a Personal bundle, and absent-safe everywhere:
+# PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
 # OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
 # floor of 24), so an older host boots normally and the assist paths answer 503.
 [ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
@@ -837,15 +838,15 @@ rem RUNSH-CP-1 (2026-09-07): -cp, never -jar. See run.sh for why - `java -jar` i
 rem classpath, so every sidecar (connectors above all) was unreachable on this one-shot ETL path.
 set "CP=inspecto.jar"
 if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
-rem Delivery channels (EDG-01 cell 1) - Standard/Enterprise only; see serve.sh for the reasoning.
+rem Delivery channels (EDG-01 cell 1) - Professional/Enterprise only; see serve.sh for the reasoning.
 if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
-rem Backup / restore tasks (EDG-01 cell 2) - Standard/Enterprise only.
+rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
-rem Geo map + link analysis routes (EDG-01 cell 3b) - Standard/Enterprise only.
+rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
-rem Cross-space exchange (EDG-01 cell 4) - Standard/Enterprise only.
+rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
 if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
-rem Prometheus scrape endpoint (EDG-01 cell 5) - Standard/Enterprise only.
+rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
 if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
 if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
@@ -928,11 +929,11 @@ Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
 # have had ZERO Java readers since the token plane left the core on 2026-06-16 -- so the scripts
 # emitted them inertly while telling the operator CONTROL_TOKEN was "required to use the control
 # plane". Someone following that instruction would think they had secured an auth-free service.
-# Real authentication is the inspecto-security module (Standard+, OIDC); see docs/EDITIONS.md.
+# Real authentication is the inspecto-security module (Professional+, OIDC); see docs/EDITIONS.md.
 $serveShContent = @'
 #!/usr/bin/env bash
 # Usage: [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
-# The core is AUTH-FREE by design. Real authentication is the `inspecto-security` module (Standard+, OIDC) — see docs/EDITIONS.md.
+# The core is AUTH-FREE by design. Real authentication is the `inspecto-security` module (Professional+, OIDC) — see docs/EDITIONS.md.
 # Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" ./serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
 set -euo pipefail
@@ -948,19 +949,19 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 [ -n "${HTTPS_KEYSTORE:-}" ]          && JAVA_OPTS+=("-Dhttps.keystore=${HTTPS_KEYSTORE}")
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
 # Edition auto-detects from the bundle (W6, docs/EDITIONS.md): inspecto-security.jar present
-# ⇒ Standard — put it on the classpath and turn on OIDC (issuer/JWKS/audience from env, never baked
+# ⇒ Professional — put it on the classpath and turn on OIDC (issuer/JWKS/audience from env, never baked
 # into the bundle); + inspecto-policy.jar ⇒ Enterprise. Neither ⇒ Personal, byte-for-byte the
 # historic auth-free classpath/flags.
 CP="inspecto.jar"
 EDITION="Personal"
 if [ -f inspecto-security.jar ]; then
     CP="inspecto.jar:inspecto-security.jar"
-    EDITION="Standard"
+    EDITION="Professional"
     JAVA_OPTS+=("-Dauth.mode=oidc")
-    # EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts. The engine
+    # EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts. The engine
     # default is the bounded in-memory ring (ServiceStores.openEventStore), which forgets every audited
     # mutation on restart -- correct for Personal's zero-file promise, false for the tamper-evident,
-    # append-only audit story Standard+ sells. -Devents.dir is deliberately NOT set: it defaults to
+    # append-only audit story Professional+ sells. -Devents.dir is deliberately NOT set: it defaults to
     # SpaceRoot.eventsDir(), so discover mode keeps one trail per space instead of one shared pile.
     JAVA_OPTS+=("-Devents.backend=parquet")
     [ -n "${AUTH_OIDC_ISSUER:-}" ]    && JAVA_OPTS+=("-Dauth.oidc.issuer=${AUTH_OIDC_ISSUER}")
@@ -970,45 +971,45 @@ if [ -f inspecto-security.jar ]; then
     # Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value —
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
-    # inspecto-policy.jar present ⇒ Enterprise (Standard + ABAC). No flag: the module is found
+    # inspecto-policy.jar present ⇒ Enterprise (Professional + ABAC). No flag: the module is found
     # via META-INF/services/com.gamma.control.AccessDecider, so the classpath entry IS the switch.
     if [ -f inspecto-policy.jar ]; then
         CP="${CP}:inspecto-policy.jar"
         EDITION="Enterprise"
     fi
 fi
-# PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
+# PostgreSQL JDBC driver sidecar (PG-1): present in Professional/Enterprise bundles, and honored on ANY
 # bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
 # Remote connector sidecar (CONNECTORS-BUNDLE-1): present in every edition, and honoured on ANY
 # bundle so a drop-in works. Inert until a pipeline names a non-local `collector.connector` --
 # without it CollectorConnectors.forConfig throws, naming this jar as the thing that is missing.
 [ -f inspecto-connectors.jar ] && CP="${CP}:inspecto-connectors.jar"
-# Delivery channels (EDG-01 cell 1): Standard/Enterprise bundles only, and honoured on ANY bundle so a
+# Delivery channels (EDG-01 cell 1): Professional/Enterprise bundles only, and honoured on ANY bundle so a
 # drop-in works. Personal never carries the jar, so it has no external transport at all -- in-app
 # delivery is intrinsic to NotificationService and is not a channel. The classpath entry IS the switch:
 # the module is found via META-INF/services/com.gamma.notify.NotificationChannel.
 [ -f inspecto-notify-channels.jar ] && CP="${CP}:inspecto-notify-channels.jar"
-# Backup / restore tasks (EDG-01 cell 2): Standard/Enterprise only; same contract as the line above.
+# Backup / restore tasks (EDG-01 cell 2): Professional/Enterprise only; same contract as the line above.
 [ -f inspecto-backup.jar ] && CP="${CP}:inspecto-backup.jar"
-# Geo map + link analysis routes (EDG-01 cell 3b): Standard/Enterprise only; same contract as above.
+# Geo map + link analysis routes (EDG-01 cell 3b): Professional/Enterprise only; same contract as above.
 [ -f inspecto-geo-link.jar ] && CP="${CP}:inspecto-geo-link.jar"
-# Cross-space exchange (EDG-01 cell 4): Standard/Enterprise only; same contract as above.
+# Cross-space exchange (EDG-01 cell 4): Professional/Enterprise only; same contract as above.
 [ -f inspecto-exchange.jar ] && CP="${CP}:inspecto-exchange.jar"
-# Prometheus scrape endpoint (EDG-01 cell 5): Standard/Enterprise only.
+# Prometheus scrape endpoint (EDG-01 cell 5): Professional/Enterprise only.
 [ -f inspecto-metrics.jar ] && CP="${CP}:inspecto-metrics.jar"
 [ -f inspecto-events.jar ] && CP="${CP}:inspecto-events.jar"
 [ -f inspecto-ops.jar ] && CP="${CP}:inspecto-ops.jar"
-# PKG-5: the assistant, Standard and above. Absent in a Personal bundle, and absent-safe everywhere:
+# PKG-5: the assistant, Professional and above. Absent in a Personal bundle, and absent-safe everywhere:
 # OptionalSpi skips a provider that cannot LINK (its dependency needs a newer Java than the product
 # floor of 24), so an older host boots normally and the assist paths answer 503.
 [ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
-# and Standard/Enterprise move to PostgreSQL here — the edition seam, per the codebase's rule that
+# and Professional/Enterprise move to PostgreSQL here — the edition seam, per the codebase's rule that
 # editions differ by what the BUNDLE carries, never by a default baked into the engine.
 # ⚠ Driver PRESENCE alone must not select PostgreSQL: OperationalDb.verifySelectable() fails the boot
-# when postgres is chosen without a URL, so auto-enabling on the sidecar would break every Standard
+# when postgres is chosen without a URL, so auto-enabling on the sidecar would break every Professional
 # deployment that has not configured one yet. The URL is the signal.
 if [ -f postgresql.jar ] && [ -n "${INSPECTO_DB_URL:-}" ]; then
     JAVA_OPTS+=("-Dinspecto.db=postgres" "-Dinspecto.db.url=${INSPECTO_DB_URL}")
@@ -1035,7 +1036,7 @@ $serveBatContent = @'
 @echo off
 rem Usage: serve.bat
 rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
-rem The core is AUTH-FREE by design; real auth is the inspecto-security module (Standard+, OIDC).
+rem The core is AUTH-FREE by design; real auth is the inspecto-security module (Professional+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
 setlocal
@@ -1052,7 +1053,7 @@ if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
 if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%"
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
 rem Edition auto-detects from the bundle (W6, docs/EDITIONS.md): inspecto-security.jar present
-rem => Standard - put it on the classpath and turn on OIDC (issuer/JWKS/audience from env);
+rem => Professional - put it on the classpath and turn on OIDC (issuer/JWKS/audience from env);
 rem + inspecto-policy.jar => Enterprise. Neither => Personal, byte-for-byte the historic
 rem auth-free classpath/flags.
 set "CP=inspecto.jar"
@@ -1061,16 +1062,16 @@ rem 🔴 SERVEBAT-OPTS-1 (2026-09-11): these are single-line `if`s, NOT a parent
 rem is load-bearing. cmd.exe expands every %OPTS% in a parenthesized block ONCE, when the block is
 rem PARSED, so N `set "OPTS=%OPTS% ..."` statements inside one block all expand to the value OPTS had
 rem BEFORE the block and only the last one executed survives. This branch used to be such a block, so
-rem a Standard/Enterprise Windows bundle dropped -Dauth.mode=oidc (and every OIDC flag but the last)
-rem and booted AUTH-FREE while printing "edition: Standard" -- the BUNDLE-1 inert-flag trap again.
+rem a Professional/Enterprise Windows bundle dropped -Dauth.mode=oidc (and every OIDC flag but the last)
+rem and booted AUTH-FREE while printing "edition: Professional" -- the BUNDLE-1 inert-flag trap again.
 rem ⛔ Do NOT "tidy" these back into an if-block, and do NOT reach for `setlocal EnableDelayedExpansion`
 rem instead: these values carry operator secrets and keystore passwords, and delayed expansion eats `!`
 rem inside them. One statement per line is the only form that is correct for both. serve.sh has no
 rem such hazard -- bash expands at execution -- which is why only this half is written out flat.
 if exist inspecto-security.jar set "CP=inspecto.jar;inspecto-security.jar"
-if exist inspecto-security.jar set "EDITION=Standard"
+if exist inspecto-security.jar set "EDITION=Professional"
 if exist inspecto-security.jar set "OPTS=%OPTS% -Dauth.mode=oidc"
-rem EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts; see serve.sh.
+rem EVENTS-DURABLE-1 (2026-09-11): Professional+ keeps the API audit trail across restarts; see serve.sh.
 if exist inspecto-security.jar set "OPTS=%OPTS% -Devents.backend=parquet"
 if exist inspecto-security.jar if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
 if exist inspecto-security.jar if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
@@ -1078,23 +1079,23 @@ if exist inspecto-security.jar if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS
 if exist inspecto-security.jar if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
 rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
 if exist inspecto-security.jar if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
-rem inspecto-policy.jar present => Enterprise (Standard + ABAC). No flag needed: the module
+rem inspecto-policy.jar present => Enterprise (Professional + ABAC). No flag needed: the module
 rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
 if exist inspecto-security.jar if exist inspecto-policy.jar set "CP=inspecto.jar;inspecto-security.jar;inspecto-policy.jar"
 if exist inspecto-security.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
-rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
+rem PostgreSQL JDBC driver sidecar (PG-1): present in Professional/Enterprise bundles, and honored on ANY
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
 rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is unconditional.
 if exist inspecto-connectors.jar set "CP=%CP%;inspecto-connectors.jar"
-rem Delivery channels (EDG-01 cell 1) - Standard/Enterprise only; see serve.sh for the reasoning.
+rem Delivery channels (EDG-01 cell 1) - Professional/Enterprise only; see serve.sh for the reasoning.
 if exist inspecto-notify-channels.jar set "CP=%CP%;inspecto-notify-channels.jar"
-rem Backup / restore tasks (EDG-01 cell 2) - Standard/Enterprise only.
+rem Backup / restore tasks (EDG-01 cell 2) - Professional/Enterprise only.
 if exist inspecto-backup.jar set "CP=%CP%;inspecto-backup.jar"
-rem Geo map + link analysis routes (EDG-01 cell 3b) - Standard/Enterprise only.
+rem Geo map + link analysis routes (EDG-01 cell 3b) - Professional/Enterprise only.
 if exist inspecto-geo-link.jar set "CP=%CP%;inspecto-geo-link.jar"
-rem Cross-space exchange (EDG-01 cell 4) - Standard/Enterprise only.
+rem Cross-space exchange (EDG-01 cell 4) - Professional/Enterprise only.
 if exist inspecto-exchange.jar set "CP=%CP%;inspecto-exchange.jar"
-rem Prometheus scrape endpoint (EDG-01 cell 5) - Standard/Enterprise only.
+rem Prometheus scrape endpoint (EDG-01 cell 5) - Professional/Enterprise only.
 if exist inspecto-metrics.jar set "CP=%CP%;inspecto-metrics.jar"
 if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
@@ -1560,7 +1561,7 @@ if ($duckdbExtCacheDir) {
 # gap this closes. It runs LAST, after every stage step: an earlier placement failed on 'no spaces'
 # because the spaces tree is copied in step 4, and a boot check that dies for a reason unrelated to
 # what it tests is worse than none -- it trains you to read its failure as noise.
-# Standard/Enterprise matter most (they load inspecto-security), but Personal is
+# Professional/Enterprise matter most (they load inspecto-security), but Personal is
 # smoked too: a broken core is the same class of failure.
 if (-not $SkipBootCheck) {
     $java = if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" }
@@ -1594,7 +1595,7 @@ if (-not $SkipBootCheck) {
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
     $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
-    # A Standard/Enterprise bundle CANNOT CONSTRUCT ITS AUTHENTICATOR WITHOUT OIDC CONFIG -- the boot
+    # A Professional/Enterprise bundle CANNOT CONSTRUCT ITS AUTHENTICATOR WITHOUT OIDC CONFIG -- the boot
     # smoke discovered this, which is precisely what it is for. ControlApi calls Authenticators.active()
     # at startup and SpiSlot runs ServiceLoader regardless of -Dauth.mode, so the mere PRESENCE of
     # inspecto-security.jar makes OidcAuthenticator's constructor mandatory -- and it requires

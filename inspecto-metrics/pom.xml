@@ -14,9 +14,9 @@
     <artifactId>inspecto-metrics</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Prometheus scrape endpoint (Standard edition, optional)</name>
+    <name>Inspecto — Prometheus scrape endpoint (Professional edition, optional)</name>
     <description>
-        OPTIONAL Standard-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
+        OPTIONAL Professional-edition metrics EXPOSITION (EDITIONS.md CP-13): GET /metrics, the Prometheus text
         endpoint, contributed through the core's public com.gamma.control.RouteModule ServiceLoader seam.
 
         WHY ONLY THE EXPOSITION (EDG-01 cell 5, 2026-09-07). MetricRegistry is called by nine classes across
@@ -29,7 +29,7 @@
         no token) while Personal ships no authenticator and binds every interface by default, so a Personal
         install served its full operational telemetry to any host that could reach the port.
 
-        Built only under the "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        Built only under the "edition-professional"/"edition-enterprise" profiles, so a routine "mvn -o clean
         test" (= Personal, the DEFAULT build) never compiles it.
     </description>
 

@@ -20,10 +20,10 @@
         evaluates the space's authored Access Policies (access-policies.toon, the shared Conditions
         grammar) at the core's two PEPs -- the route-level authorize stage and the row-level RowScope
         filter. Discovered by the core's ServiceLoader seam (com.gamma.control.AccessDecider) --
-        dropping THIS jar on the classpath is what turns policy evaluation on; Personal and Standard
+        dropping THIS jar on the classpath is what turns policy evaluation on; Personal and Professional
         never bundle it and keep their existing behaviour byte-identically. Dependency-free beyond the
         core (the condition evaluator is hand-rolled in inspecto-util). Only built as part of the
-        reactor under the "edition-enterprise" profile (= edition-standard + this module).
+        reactor under the "edition-enterprise" profile (= edition-professional + this module).
     </description>
 
     <dependencies>

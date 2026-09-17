@@ -56,9 +56,9 @@ Behavior notes (accepted, small):
 ## Bytecode / runtime constraints (verified)
 
 - eoiagent jars are class-file **v69 (Java 25)** — same as agent-kernel 1.1.0 today. javac 26 with
-  `--release 24` compiles fine against them; they need a **JDK 25+ runtime**, which the agent module
+  `--release 27` compiles fine against them; they need a **JDK 25+ runtime**, which the agent module
   already requires (root-pom note) and the bundled JDK 26 satisfies. Vendoring the kernel at
-  `release=24` actually *shrinks* the v69 surface to the eoiagent jars only.
+  `release=27` actually *shrinks* the v69 surface to the eoiagent jars only.
 - eoiagent was `mvn clean install`'d to the local `.m2` from `C:/sandbox/agent-brainstorm`
   (all 19 artifacts, built on the same JDK 26).
 

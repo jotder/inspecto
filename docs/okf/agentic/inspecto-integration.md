@@ -34,8 +34,10 @@ a model transport, *not* the full eoiagent host embed:
   and in [`BACKLOG.md`](../../BACKLOG.md) §2.
 * **Air-gap invariant** — `langchain4j-open-ai` is excluded in `inspecto-agent`; the `EgressGuardTest`
   invariant holds; hosted model SDKs stay in `inspecto-agent-hosted`.
-* **Runtime floor** — eoiagent jars are class-file v69 ⇒ the agent modules need a **JDK 25+ runtime**
-  (bundled JDK 26 qualifies); a bare JDK 24 fails with `UnsupportedClassVersionError`.
+* **Runtime floor** — eoiagent jars are class-file v69 ⇒ the agent modules need a **JDK 25+ runtime**.
+  ✅ **No longer a constraint in practice since 2026-09-17**: the product compiles at `release=27`, so
+  every host that can run Inspecto at all clears 25 by construction. (Historically a bare JDK 24 host
+  failed with `UnsupportedClassVersionError` — the case `OptionalSpi` was built for.)
 * **Version pin** — eoiagent is pinned to the **released `0.1.0`** (EOI-7a, 2026-07-08: tag `v0.1.0`
   on eoiagent `main`; both agent poms pin `eoiagent.version 0.1.0`, no SNAPSHOT anywhere). Remaining
   EOI-7b: publish artifacts to a registry (infra/product call); until then CI reproduces the pin with

@@ -1,6 +1,6 @@
 # Architecture Map
 
-Inspecto (repo `inspecto`) — Java 26 build / Maven `release=24`, multi-module reactor
+Inspecto (repo `inspecto`) — Java 27 build / Maven `release=27`, multi-module reactor
 (`inspecto-parent`). DuckDB · TOON config (JToon) · OpenCSV · Commons Compress.
 
 ---
@@ -37,7 +37,7 @@ Inspecto (repo `inspecto`) — Java 26 build / Maven `release=24`, multi-module 
 - **Main entry**: `com.gamma.inspector.CollectorProcessor` (ETL) · `com.gamma.service.CollectorService` (always-on
   host: scans `*_pipeline.toon`/`*_enrich.toon`/`*_job.toon`, serves Control API + UI on `:8080`).
 - **Tests**: `<module>/src/test/java/...`. Authoritative verify = `mvn -o clean test` (full reactor). Toolchain:
-  JDK `C:\.jdks\openjdk-26.0.1`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd` (run offline `-o`).
+  JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd` (run offline `-o`).
 - **Docs**: `docs/okf/backend/config/configuration.md` (config ref) · `docs/okf/backend/build-run/operations.md` (runbook) · `docs/okf/backend/acquisition/connectors-runbook.md` (remote connectors) · `docs/okf/backend/integrations.md`
   (DuckLake, warehouse) · `docs/consolidated/` (stakeholder snapshot) ·
   `docs/superpowers/specs/` (as-built design specs).

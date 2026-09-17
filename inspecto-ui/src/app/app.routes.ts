@@ -44,7 +44,7 @@ export const appRoutes: Route[] = [
     // primary action — `lensHomeRedirect` stays exported because the Home card reproduces its Ops fallback.
     { path: '', pathMatch: 'full', redirectTo: 'home' },
 
-    // Standard-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
+    // Professional-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
     // session (authGuard bounces here). No app shell, no guard. On Personal/offline these are simply
     // never navigated to. sign-in kicks off Auth-Code+PKCE; auth/callback redeems the returned code.
     {
@@ -89,7 +89,7 @@ export const appRoutes: Route[] = [
     // },
 
     // Inspecto inspector routes. Personal/core edition is auth-free (authGuard is a pass-through there);
-    // the Standard edition (authMode==='oidc') gates entry on a live OIDC session, redirecting to
+    // the Professional edition (authMode==='oidc') gates entry on a live OIDC session, redirecting to
     // /sign-in when absent (W6d). Session state is resolved by SessionService.init before routing.
     {
         path: '',

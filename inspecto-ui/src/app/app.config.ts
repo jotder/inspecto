@@ -22,7 +22,7 @@ export const appConfig: ApplicationConfig = {
         // Re-attempt it only alongside that audit — see docs/BACKLOG.md.
         provideZoneChangeDetection({ eventCoalescing: true }),
 
-        // Main HttpClient. The Personal/core edition is auth-free; the Standard edition adds OIDC via
+        // Main HttpClient. The Personal/core edition is auth-free; the Professional edition adds OIDC via
         // the authInterceptor (W6d), which is a no-op unless SessionService.authMode === 'oidc'. Order:
         // v1 envelope unwrap (W7 — first) → space scope rewrite → auth bearer/refresh → error tracker.
         provideHttpClient(

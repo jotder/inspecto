@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Editions Model
-description: Personal/Standard/Enterprise are build flavors — Maven profiles + ServiceLoader modules + -D flags, never branches.
+description: Personal/Professional/Enterprise are build flavors — Maven profiles + ServiceLoader modules + -D flags, never branches.
 resource: docs/EDITIONS.md
 tags: [editions, build-flavors, maven, serviceloader]
 timestamp: 2026-07-07T00:00:00Z
@@ -15,7 +15,7 @@ every edition inherits it at build time — no cross-line cherry-picking. Author
 
 Assembly mechanisms:
 
-* **Maven profiles** — `-Pedition-standard` / `-Pedition-enterprise` are **`<modules>` lists and nothing
+* **Maven profiles** — `-Pedition-professional` (with `edition-standard` alias) / `-Pedition-enterprise` are **`<modules>` lists and nothing
   else**: no `<build>`, no `<properties>`, no `<dependencies>`, and no child POM declares a profile at
   all. 🔴 **They do NOT vary the fat-JAR's shaded content** (corrected 2026-09-09 — this said
   “which modules + shade includes enter the fat-JAR”): `inspecto/pom.xml` has ONE unconditional shade
@@ -28,13 +28,13 @@ Assembly mechanisms:
   `inspecto-security` (OIDC/Nimbus, role mapping, token relay — see [auth & security](auth-security.md)),
   `inspecto-policy` (Enterprise ABAC), and the **seven** EDG-01 modules (this said “five” before 2026-09-09 while listing seven) `inspecto-notify-channels`,
   `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-metrics`, `inspecto-events`, `inspecto-ops`.
-  Each joins the reactor only under `edition-standard`/`edition-enterprise`, so Personal never even
+  Each joins the reactor only under `edition-professional`/`edition-enterprise`, so Personal never even
   compiles it.
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
   optional [assist agent](../agent/assist-agent.md) and [connectors](../modules/connectors.md)).
-* **`-D` flags** — e.g. `-Dauth.mode=none` (Personal) vs `-Dauth.mode=oidc` (Standard).
-* **`package.ps1 -Edition …`** — emits per-edition bundles from one build (`Personal` | `Standard` |
-  `Enterprise`, the last a superset of Standard bundling the ABAC `policy` jar as well; see
+* **`-D` flags** — e.g. `-Dauth.mode=none` (Personal) vs `-Dauth.mode=oidc` (Professional).
+* **`package.ps1 -Edition …`** — emits per-edition bundles from one build (`Personal` | `Professional` |
+  `Enterprise`, the last a superset of Professional bundling the ABAC `policy` jar as well; see
   [build & run](../build-run/build-test.md)).
 
 One version spans all editions; artifacts differ by classifier. The matching branch policy is in
@@ -77,7 +77,7 @@ Seven cells were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91
 9. ⚠ **`package.ps1` emits four launchers** (`run.sh`/`run.bat`/`serve.sh`/`serve.bat`) — each classpath
    anchor appears twice — and `.gitignore` is per-module for `target/`.
 10. ⛔ **Grantable capability vocabulary stays static across editions.** Deriving it from registered routes
-    would make a role file authored on Standard fail validation on Personal. Dead vocabulary is not a hole;
+    would make a role file authored on Professional fail validation on Personal. Dead vocabulary is not a hole;
     there is no route behind it.
 
 11. 🔴 **Census the CONSUMERS of the surface, not just its providers — and count UI panes, not only Java
@@ -121,7 +121,7 @@ Seven cells were gated out of Personal this way (`9fdb99f8` · `c323f35c` · `91
     `testCompile` with a bare "cannot find symbol". Cells 4 and 6 both hit it; the established fix is a
     **small local `json()`/`envelope()` helper per module**, not a `test-jar` dependency. ⚠ Two ways this
     bites late: the DEFAULT build never compiles the module, so `mvn -o clean test` stays green while the
-    Standard/Enterprise build is broken — always run **both** profiles before calling a cell done; and if
+    Professional/Enterprise build is broken — always run **both** profiles before calling a cell done; and if
     the reactor dies in an earlier module, the new module is merely SKIPPED, which reads like success in a
     summary that only counts failures. Check the module actually **contributed tests**, not just that the
     build passed.
@@ -158,8 +158,8 @@ code dependants, several of which **built** the feature. What that changes:
     ⚠ And a named `switch` case always beats a contributed provider, so a task must be **removed** from the
     switch, not merely also provided.
 23. 🔴 **An optional module may only depend on one that ships in every edition where IT ships.**
-    `inspecto-ops` is Standard-and-above, `inspecto-policy` is Enterprise-only, so the test edge is legal
-    in exactly one direction. ⚠ `-Pedition-standard -DskipTests` **passed** with the wrong direction,
+    `inspecto-ops` is Professional-and-above, `inspecto-policy` is Enterprise-only, so the test edge is legal
+    in exactly one direction. ⚠ `-Pedition-professional -DskipTests` **passed** with the wrong direction,
     because this machine's `~/.m2` held a stale jar — a green local build is not evidence here, reactor
     membership per profile is.
 24. ⚠ **A three-way outcome must not be squeezed into two.** `DecisionRoutes` reported "Incident already
@@ -170,7 +170,7 @@ code dependants, several of which **built** the feature. What that changes:
     neighbour that reads the same field through a SUPPLIER produced 632 NPEs across 40 test classes: the
     field is assigned 40 lines later. When adding to a list of registrations, ask whether the line
     evaluates now or later — not whether it looks like its neighbours.
-26. ⚠ **Tests that needed a real engine were only ever testing the Standard shape.** Re-seating
+26. ⚠ **Tests that needed a real engine were only ever testing the Professional shape.** Re-seating
     `AlertServiceTest`/`ReconRunJobTest`/`DryRunServicesTest` onto a core `FakeObjectAccess` is a gain, not
     a compromise: they now assert what core is responsible for (dedupe-then-open, right kind/scope/attrs),
     which is identical on every edition. Move the ones that genuinely assert PERSISTENCE or the object

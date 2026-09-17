@@ -974,7 +974,7 @@ contract, its envelope and error-code catalog, the OpenAPI document, ETag concur
 the Java embedding API's stability policy (`@PublicApi`). *Control* distinguishes it from the data plane
 (§6-B) — it moves configuration and commands, never rows.
 
-**Edition** — A **build flavour** of one Inspecto version — **Personal** · **Standard** · **Enterprise** —
+**Edition** — A **build flavour** of one Inspecto version — **Personal** · **Professional** · **Enterprise** —
 assembled by `package.ps1` from Maven profiles and `ServiceLoader` modules. ⛔ Never a branch (versions are
 branches; see `BRANCHING.md`) and never a runtime flag: a feature an edition lacks is a module that edition
 does not bundle. The per-feature table is `EDITIONS.md`.

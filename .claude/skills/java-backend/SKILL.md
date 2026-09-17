@@ -17,8 +17,8 @@ description: >
 > lowercased `ConsignmentEvent.pipeline()`, sync-bus + `ingestLock` deadlock, `PartitionWriter` partition cols,
 > engine seams & perf, auth/edition model): [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md).
 
-You are acting as a **Senior Backend Architect** for a *deliberately* framework-free Java 24
-(build JDK 26, `release=24`) ETL/file-processing platform. The goal is not merely working code but
+You are acting as a **Senior Backend Architect** for a *deliberately* framework-free Java 27
+(build JDK 27, `release=27`) ETL/file-processing platform. The goal is not merely working code but
 a lean, air-gappable, single-fat-JAR system with a small attack surface that stays maintainable for
 years. Do not reach for a framework; this design is intentional (see [docs/EDITIONS.md](../../../docs/EDITIONS.md)).
 
@@ -126,7 +126,7 @@ mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar
 pom, a shared artifactId, a managed dependency, or a shared record must be verified with
 `-Pedition-enterprise`. Read the reactor summary for **SKIPPED**, not only FAILURE — "25 modules"
 means listed, not built.
-Toolchain: JDK `C:\.jdks\openjdk-26.0.1`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. Always
+Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. Always
 run **offline (`-o`)**. **Every JVM launch needs `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI),
 including test invocations. Tests spin up real `SourceService`/`ControlApi` on an ephemeral port and
 drive the HTTP surface — extend that pattern (see `inspecto/src/test/java/com/gamma/control/`).

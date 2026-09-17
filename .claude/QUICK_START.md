@@ -1,7 +1,7 @@
 # Quick Start Commands
 
-Inspecto (`inspecto`) — Java 26 / Maven reactor (`inspecto-parent`).
-Toolchain: JDK `C:\.jdks\openjdk-26.0.1`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`.
+Inspecto (`inspecto`) — Java 27 / Maven reactor (`inspecto-parent`).
+Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`.
 
 ---
 
@@ -19,7 +19,7 @@ mvn -o clean package -q          # → inspecto/target/inspecto-processor-*.jar
 pwsh -File inspecto\package.ps1                # full (embeds trimmed Windows JVM via jlink → bundle\runtime\)
 pwsh -File inspecto\package.ps1 -NoBuild       # reuse target/ JAR
 pwsh -File inspecto\package.ps1 -NoUi          # skip Angular UI
-pwsh -File inspecto\package.ps1 -NoRuntime     # skip embedded JVM (target server must provide Java 24+)
+pwsh -File inspecto\package.ps1 -NoRuntime     # skip embedded JVM (target server must provide Java 27+)
 ```
 
 JVM flag required at every launch: `--enable-native-access=ALL-UNNAMED` (DuckDB native access).

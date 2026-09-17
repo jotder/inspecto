@@ -16,7 +16,7 @@ partitioned columnar output — all backed by an embedded **DuckDB**. An operato
 
 ## Tech stack
 
-* **Java 26**, **Maven** multi-module reactor.
+* **Java 27** (`maven.compiler.release=27`), **Maven** multi-module reactor.
 * Embedded **DuckDB** (native, via the Appender API) for ingest/transform/output.
 * **TOON** configuration (`.toon` files via JToon) — see [TOON config](./config/toon-config.md).
 * Framework-free: the JDK's built-in `HttpServer`, manual dependency injection, `ServiceLoader` SPIs, and

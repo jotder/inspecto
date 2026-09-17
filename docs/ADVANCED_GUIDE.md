@@ -33,7 +33,7 @@ drift; treat them as hints, confirm against code. **Last verified against code: 
 
 ## 1. What Inspecto is (one paragraph)
 
-A framework-free Java 25 (build JDK 26) ETL / file-processing platform: it **acquires** files (local or remote),
+A framework-free Java 27 (`release=27`, build JDK 27) ETL / file-processing platform: it **acquires** files (local or remote),
 **parses + validates + transforms** them with DuckDB into Hive-partitioned Parquet/CSV, and exposes an
 **operational-intelligence** layer (events, metrics, alerts, managed cases/issues) over a small JDK-`HttpServer`
 Control API + Angular UI. No Spring/Quarkus; DI is manual constructors; optional capability is `ServiceLoader`
@@ -60,7 +60,7 @@ SPI; editions are build flavors, never branches (see [`EDITIONS.md`](EDITIONS.md
 
 ### Editions
 One SemVer version spans all editions; artifacts differ by classifier/build profile. The master/common core is
-**auth-free**; Standard/Enterprise add an `Authenticator` SPI etc. as build flavors. Do not branch on edition in code.
+**auth-free**; Professional/Enterprise add an `Authenticator` SPI etc. as build flavors. Do not branch on edition in code.
 
 ---
 

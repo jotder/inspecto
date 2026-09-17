@@ -12,7 +12,7 @@ export const environment = {
     // environment.ts is the one that actually ships.)
     apiBaseUrl: '/api',
     hmr: false,
-    // Real Standard-deployment OIDC config (public PKCE client — no secret). Left blank in dev. A real deployment sets the IAM's
+    // Real Professional-deployment OIDC config (public PKCE client — no secret). Left blank in dev. A real deployment sets the IAM's
     // authorize endpoint + the SPA's public client id here; the SessionService reads bootstrap.auth first
     // and falls back to this. `endSessionUrl` is the provider's `end_session_endpoint` (RP-initiated
     // logout) — declared, never derived from the issuer, same call D15 made for tokenEndpoint. Leave it

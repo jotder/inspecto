@@ -80,9 +80,9 @@ final class BootstrapRoutes implements RouteModule {
         return data;
     }
 
-    /** Auth-free core = Personal; the Standard build (security module + {@code -Dauth.mode=oidc}) reports itself. */
+    /** Auth-free core = Personal; the Professional build (security module + {@code -Dauth.mode=oidc}) reports itself. */
     private static String edition() {
-        return "none".equalsIgnoreCase(System.getProperty("auth.mode", "none")) ? "personal" : "standard";
+        return "none".equalsIgnoreCase(System.getProperty("auth.mode", "none")) ? "personal" : "professional";
     }
 
     private static Map<String, Object> features(ApiContext api) {

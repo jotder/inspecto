@@ -14,7 +14,7 @@
     <artifactId>inspecto-notify-channels</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — notification delivery channels (Standard edition, optional)</name>
+    <name>Inspecto — notification delivery channels (Professional edition, optional)</name>
     <description>
         OPTIONAL external notification transports (EDITIONS.md CP-15, "Delivery channels"): the webhook
         POST channel and the SMTP email channel, discovered through the core's
@@ -28,7 +28,7 @@
         so IN-APP delivery -- which is intrinsic to NotificationService and not a channel -- is the only
         delivery it has, exactly as NotificationChannel's own Javadoc has always claimed.
 
-        Built only under the "edition-standard"/"edition-enterprise" profiles (see the parent pom's
+        Built only under the "edition-professional"/"edition-enterprise" profiles (see the parent pom's
         profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
         there is no -Pedition-personal) never compiles it and never resolves javax.mail.
     </description>

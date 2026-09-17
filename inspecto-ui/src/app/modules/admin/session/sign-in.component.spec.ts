@@ -9,7 +9,7 @@ import { SignInComponent } from './sign-in.component';
 const FAILED_KEY = 'inspecto.signInFailed';
 
 /**
- * Behaviour spec for the Standard-edition sign-in screen (SIGN-IN-NO-SPEC-1). The sibling
+ * Behaviour spec for the Professional-edition sign-in screen (SIGN-IN-NO-SPEC-1). The sibling
  * `sign-in.a11y.spec.ts` covers rendering, branding and the version line; this one covers the two
  * things the component itself DECIDES: the `ngOnInit` bounce when no login is required, and the
  * one-shot "sign-in failed" flag round-trip.

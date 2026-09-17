@@ -20,8 +20,9 @@ runtime (test scope uses JUnit 5). Build: `mvn -o clean test` (offline works; su
 
 ## Deviations from the redesign doc (deliberate)
 
-- **Java 25 LTS, not 21**: the FFM API (`Arena`/`MemorySegment`) used for >2 GB mmap is
-  final only since Java 22.
+- **Java 27, not 21**: the FFM API (`Arena`/`MemorySegment`) used for >2 GB mmap is final only
+  since Java 22. This tree tracked `release=25` until 2026-09-17 and now follows the reactor at
+  `release=27`.
 - **Lenient mode** (`Asn1Parser.parseLenient`, `SchemaCompiler.compileLenient`): the
   grammars in `config/` are hand-doctored (lowercased keywords in `nrtrde_2.1.asn`, a
   botched `Currency`→`OCTET STRING` global replace in `tap 3.12.asn`). Lenient mode

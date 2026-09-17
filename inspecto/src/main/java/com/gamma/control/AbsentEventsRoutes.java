@@ -29,7 +29,7 @@ package com.gamma.control;
 final class AbsentEventsRoutes implements RouteModule {
 
     static final String MESSAGE = "The operational events feed is not installed in this bundle - it is "
-            + "provided by the optional inspecto-events module (Standard edition and above). Events are "
+            + "provided by the optional inspecto-events module (Professional edition and above). Events are "
             + "still RECORDED, including the audit trail; only reading the feed back over HTTP is "
             + "edition-gated.";
 

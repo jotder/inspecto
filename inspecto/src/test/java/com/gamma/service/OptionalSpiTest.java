@@ -24,12 +24,13 @@ import org.junit.jupiter.api.io.TempDir;
  * {@link OptionalSpi} — the optional-module absence contract must survive a jar that is <b>present but
  * unloadable</b>, not only a jar that is missing.
  *
- * <p>The live case this exists for: the assistant modules' upstream dependency is Java 25 bytecode while
- * the product's floor is Java 24, so on an older host the staged jar links with
- * {@code UnsupportedClassVersionError}. That is a {@link LinkageError} — {@code ServiceLoader} does
- * <b>not</b> wrap it into a {@link ServiceConfigurationError}, it propagates raw — so before this class
- * existed the error escaped {@code CollectorService.start()} and took the whole boot down because an
- * OPTIONAL component could not load.
+ * <p>The live case this exists for: an optional module staged as bytecode NEWER than the host JVM links
+ * with {@code UnsupportedClassVersionError}, and before this class existed that error escaped
+ * {@code CollectorService.start()} and took the whole boot down because an OPTIONAL component could not
+ * load. ⚠ The error TYPE that reaches the caller is JDK-dependent: through JDK 26 {@code ServiceLoader}
+ * propagates it raw as a {@link LinkageError}; on JDK 27 it arrives wrapped in a
+ * {@link ServiceConfigurationError}. {@code OptionalSpi} catches both, which is why the contract survived
+ * the toolchain move to 27 untouched — do not narrow either catch.
  *
  * <p>⚠ Every negative test here is paired with a CONTROL that would otherwise succeed: the same provider,
  * same class loader, same service declaration, differing only in the class-file version. Without the
@@ -69,10 +70,19 @@ class OptionalSpiTest {
     void aProviderCompiledForANewerJavaIsSkippedRatherThanThrown(@TempDir Path dir) throws Exception {
         stageProvider(dir, true);
         withContextClassLoader(dir, () -> {
-            // 🔴 This is what the raw ServiceLoader does, and why start() died: the LinkageError escapes.
-            assertThrows(LinkageError.class,
+            // 🔴 This is what the raw ServiceLoader does, and why start() died: the error escapes.
+            // ⚠ The TYPE is JDK-dependent and must not be pinned. Through JDK 26 the UnsupportedClass-
+            // VersionError propagates raw as a LinkageError; on JDK 27 ServiceLoader wraps it in a
+            // ServiceConfigurationError (measured 2026-09-17 on 27+35-2325). OptionalSpi catches BOTH, so
+            // the product contract is unaffected — what this assertion pins is only that the staged
+            // provider is genuinely UNLOADABLE, which is what makes the two negatives below mean anything.
+            Error raw = assertThrows(Error.class,
                     () -> ServiceLoader.load(Probe.class).findFirst(),
                     "if this stops throwing the mutation has changed, not the fix — re-check the probe");
+            assertTrue(raw instanceof LinkageError || raw instanceof ServiceConfigurationError,
+                    "unexpected raw-loader error type: " + raw);
+            assertTrue(causeChainHas(raw, UnsupportedClassVersionError.class),
+                    "the probe must fail on the CLASS-FILE VERSION, not on something else: " + raw);
 
             assertTrue(OptionalSpi.all(Probe.class).isEmpty(), "unloadable is an ABSENCE, not a failure");
             assertEquals(Optional.empty(), OptionalSpi.first(Probe.class));
@@ -128,6 +138,14 @@ class OptionalSpiTest {
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
         }
+    }
+
+    /** True when {@code t} or anything it wraps is an instance of {@code type}. */
+    private static boolean causeChainHas(Throwable t, Class<? extends Throwable> type) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            if (type.isInstance(c)) return true;
+        }
+        return false;
     }
 
     private interface ThrowingRunnable {

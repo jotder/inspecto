@@ -130,8 +130,8 @@ function observe(out) {
 // `expect` / `reject` match an argv entry exactly; a `reject` PREFIX is written with a trailing `=`
 // removed so `-Dauth.mode` catches any value at all, which is the assertion Personal needs.
 const PERSONAL = ['inspecto.jar'];
-const STANDARD = [...PERSONAL, 'inspecto-security.jar'];
-const ENTERPRISE = [...STANDARD, 'inspecto-policy.jar'];
+const PROFESSIONAL = [...PERSONAL, 'inspecto-security.jar'];
+const ENTERPRISE = [...PROFESSIONAL, 'inspecto-policy.jar'];
 const OIDC_ENV = {
   AUTH_OIDC_ISSUER: 'https://idp.example/realms/x',
   AUTH_OIDC_JWKS_URI: 'https://idp.example/realms/x/jwks',
@@ -154,8 +154,8 @@ const SCENARIOS = [
     jarsOnCp: ['inspecto.jar'],
   },
   {
-    name: 'Standard — security jar, no OIDC env',
-    jars: STANDARD, env: {}, edition: 'Standard',
+    name: 'Professional — security jar, no OIDC env',
+    jars: PROFESSIONAL, env: {}, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
     rejectPrefix: ['-Dauth.oidc.'],
     jarsOnCp: ['inspecto.jar', 'inspecto-security.jar'],
@@ -163,8 +163,8 @@ const SCENARIOS = [
   {
     // 🔴 THE REGRESSION TEST. SERVEBAT-OPTS-1 lost five of these six flags and kept the last. Any
     // future rewrite that reintroduces a parse-time-expanded block fails HERE, with the flag named.
-    name: 'Standard — security jar + every OIDC variable set',
-    jars: STANDARD, env: OIDC_ENV, edition: 'Standard',
+    name: 'Professional — security jar + every OIDC variable set',
+    jars: PROFESSIONAL, env: OIDC_ENV, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet',
       `-Dauth.oidc.issuer=${OIDC_ENV.AUTH_OIDC_ISSUER}`,
       `-Dauth.oidc.jwksUri=${OIDC_ENV.AUTH_OIDC_JWKS_URI}`,
@@ -184,8 +184,8 @@ const SCENARIOS = [
   },
   {
     // Operator flags are appended LAST on purpose, so they cannot clobber the required ones.
-    name: 'Standard — operator INSPECTO_JAVA_OPTS',
-    jars: STANDARD, env: { INSPECTO_JAVA_OPTS: '-Xmx4g -Dui.static.log=DEBUG' }, edition: 'Standard',
+    name: 'Professional — operator INSPECTO_JAVA_OPTS',
+    jars: PROFESSIONAL, env: { INSPECTO_JAVA_OPTS: '-Xmx4g -Dui.static.log=DEBUG' }, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Xmx4g', '-Dui.static.log=DEBUG'],
     lastAfter: { after: '-Dauth.mode=oidc', these: ['-Xmx4g', '-Dui.static.log=DEBUG'] },
     jarsOnCp: ['inspecto.jar', 'inspecto-security.jar'],

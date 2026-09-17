@@ -23,7 +23,7 @@ package com.gamma.control;
 final class AbsentGeoLinkRoutes implements RouteModule {
 
     static final String MESSAGE = "Geo map and link analysis are not installed in this bundle - they are "
-            + "provided by the optional inspecto-geo-link module (Standard edition and above).";
+            + "provided by the optional inspecto-geo-link module (Professional edition and above).";
 
     private static final String[][] SURFACE = {
             {"POST", "/geo/projection"},

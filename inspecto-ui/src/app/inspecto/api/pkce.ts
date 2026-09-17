@@ -1,5 +1,5 @@
 /**
- * PKCE (RFC 7636) helpers for the Standard-edition OIDC Authorization-Code flow (W6d). Pure Web-Crypto
+ * PKCE (RFC 7636) helpers for the Professional-edition OIDC Authorization-Code flow (W6d). Pure Web-Crypto
  * functions — no Angular, no state — so they unit-test with no backend. The SPA is a public client
  * (no secret): the code verifier proves the token exchange came from the same client that started the
  * redirect. Kept tiny and dependency-free (no `angular-oauth2-oidc`) — the backend BFF does the actual

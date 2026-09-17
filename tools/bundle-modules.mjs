@@ -25,7 +25,7 @@
 /** The third-party JDBC sidecar package.ps1 stages for Standard and Enterprise (PG-1). */
 export const PG_SIDECAR = 'postgresql.jar';
 
-export const EDITIONS = ['Personal', 'Standard', 'Enterprise'];
+export const EDITIONS = ['Personal', 'Professional', 'Enterprise'];
 
 /**
  * artifactId → { dir, bundleFile, from }.
@@ -34,8 +34,8 @@ export const EDITIONS = ['Personal', 'Standard', 'Enterprise'];
  * module whose directory (`inspecto/`) differs from its artifactId. `bundleFile` is the canonical name
  * the jar is staged under, which is what the bundle carries and what gets hashed.
  *
- * `from` is the edition floor: 'all' ships everywhere, 'standard' means Standard and above (Enterprise
- * is a superset of Standard, never a replacement for it), 'enterprise' means Enterprise only.
+ * `from` is the edition floor: 'all' ships everywhere, 'professional' means Professional and above (Enterprise
+ * is a superset of Professional, never a replacement for it), 'enterprise' means Enterprise only.
  */
 const MODULES = [
     // Every edition. The shaded fat jar is the product; the connector sidecar is NOT edition-gated
@@ -44,22 +44,22 @@ const MODULES = [
     { artifactId: 'inspecto-processor', dir: 'inspecto', bundleFile: 'inspecto.jar', from: 'all' },
     { artifactId: 'inspecto-connectors', dir: 'inspecto-connectors', bundleFile: 'inspecto-connectors.jar', from: 'all' },
 
-    // Standard and above. inspecto-security is the original non-Personal sidecar; the seven below are
+    // Professional and above. inspecto-security is the original non-Personal sidecar; the seven below are
     // EDG-01 cells 1–7, added 2026-09-07 and absent from the generator until this file existed.
-    { artifactId: 'inspecto-security', dir: 'inspecto-security', bundleFile: 'inspecto-security.jar', from: 'standard' },
+    { artifactId: 'inspecto-security', dir: 'inspecto-security', bundleFile: 'inspecto-security.jar', from: 'professional' },
     // EDG-01 cell 1 (CP-15). Brings javax.mail — SmtpEmailChannel needs it, and it came here FROM
     // inspecto-connectors, whose pom no longer declares it.
-    { artifactId: 'inspecto-notify-channels', dir: 'inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'standard' },
-    { artifactId: 'inspecto-backup', dir: 'inspecto-backup', bundleFile: 'inspecto-backup.jar', from: 'standard' },        // cell 2 (OPS-06)
-    { artifactId: 'inspecto-geo-link', dir: 'inspecto-geo-link', bundleFile: 'inspecto-geo-link.jar', from: 'standard' },  // cell 3b (CP-09)
-    { artifactId: 'inspecto-exchange', dir: 'inspecto-exchange', bundleFile: 'inspecto-exchange.jar', from: 'standard' },  // cell 4 (SEC-10)
-    { artifactId: 'inspecto-metrics', dir: 'inspecto-metrics', bundleFile: 'inspecto-metrics.jar', from: 'standard' },     // cell 5 (CP-13, /metrics)
-    { artifactId: 'inspecto-events', dir: 'inspecto-events', bundleFile: 'inspecto-events.jar', from: 'standard' },        // cell 6 (CP-13, /events*)
-    { artifactId: 'inspecto-ops', dir: 'inspecto-ops', bundleFile: 'inspecto-ops.jar', from: 'standard' },                 // cell 7 (CP-11)
-    // PKG-5 (2026-09-12): the assist agent ships Standard and above, as an OPTIONAL component. NB it is
+    { artifactId: 'inspecto-notify-channels', dir: 'inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'professional' },
+    { artifactId: 'inspecto-backup', dir: 'inspecto-backup', bundleFile: 'inspecto-backup.jar', from: 'professional' },        // cell 2 (OPS-06)
+    { artifactId: 'inspecto-geo-link', dir: 'inspecto-geo-link', bundleFile: 'inspecto-geo-link.jar', from: 'professional' },  // cell 3b (CP-09)
+    { artifactId: 'inspecto-exchange', dir: 'inspecto-exchange', bundleFile: 'inspecto-exchange.jar', from: 'professional' },  // cell 4 (SEC-10)
+    { artifactId: 'inspecto-metrics', dir: 'inspecto-metrics', bundleFile: 'inspecto-metrics.jar', from: 'professional' },     // cell 5 (CP-13, /metrics)
+    { artifactId: 'inspecto-events', dir: 'inspecto-events', bundleFile: 'inspecto-events.jar', from: 'professional' },        // cell 6 (CP-13, /events*)
+    { artifactId: 'inspecto-ops', dir: 'inspecto-ops', bundleFile: 'inspecto-ops.jar', from: 'professional' },                 // cell 7 (CP-11)
+    // PKG-5 (2026-09-12): the assist agent ships Professional and above, as an OPTIONAL component. NB it is
     // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
     // that pass builds its shaded `sidecar` artifact. The staged file is the sidecar, never the thin jar.
-    { artifactId: 'inspecto-agent', dir: 'inspecto-agent', bundleFile: 'inspecto-agent.jar', from: 'standard' },             // CP-14
+    { artifactId: 'inspecto-agent', dir: 'inspecto-agent', bundleFile: 'inspecto-agent.jar', from: 'professional' },             // CP-14
 
     // Enterprise only.
     { artifactId: 'inspecto-policy', dir: 'inspecto-policy', bundleFile: 'inspecto-policy.jar', from: 'enterprise' },
@@ -68,24 +68,25 @@ const MODULES = [
 /** The Maven profile that activates an edition's extra modules, or null for Personal. */
 export function editionProfile(edition) {
     if (edition === 'Enterprise') return 'edition-enterprise';
-    if (edition === 'Standard') return 'edition-standard';
+    if (edition === 'Professional' || edition === 'Standard') return 'edition-professional';
     return null;
 }
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Standard 11, Enterprise 12 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 11, Enterprise 12 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.
  */
 export function bundleModules(edition) {
-    if (!EDITIONS.includes(edition)) throw new Error(`unknown edition '${edition}'`);
+    const normalized = edition === 'Standard' ? 'Professional' : edition;
+    if (!EDITIONS.includes(normalized)) throw new Error(`unknown edition '${edition}'`);
     return MODULES.filter(
         (m) =>
             m.from === 'all' ||
-            (m.from === 'standard' && edition !== 'Personal') ||
-            (m.from === 'enterprise' && edition === 'Enterprise'),
+            ((m.from === 'professional' || m.from === 'standard') && normalized !== 'Personal') ||
+            (m.from === 'enterprise' && normalized === 'Enterprise'),
     );
 }
 

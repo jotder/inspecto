@@ -7,7 +7,7 @@
 ## Personas — one console, three Lenses
 
 Everyone uses the **same operator console**; a self-selected **Lens** filters it (a Lens is a view,
-never a permission — server-enforced **Roles** arrive with the Standard edition and map onto Lenses):
+never a permission — server-enforced **Roles** arrive with the Professional edition and map onto Lenses):
 
 - **Business** — consume Dashboards/KPIs, investigate provenance & lineage, raise **Requirements**
   (KPI / Report / Reconciliation / Rule requests with a triage lifecycle).
@@ -38,7 +38,7 @@ item, not a shipped artifact (corrected 2026-09-08).
 | **Govern metadata** | Everything is a **Component**; Catalog + reuse/lineage graphs; **Metadata Bundle** export/import with drift detection | ✅ Shipped (bundle backend endpoints pending) |
 | **Multi-tenant** | Isolated **Spaces** with CRUD, export/import, templates | ✅ Shipped |
 | **Integrate** | Versioned **`/api/v1`** REST contract (OpenAPI-enforced), gateway/IAM-ready | ✅ Shipped |
-| **Secure** | Auth-free Personal; Standard: OIDC SSO, HTTPS, RBAC seams, attributed audit | ✅ Module shipped; hardening = MUST remainder |
+| **Secure** | Auth-free Personal; Professional: OIDC SSO, HTTPS, RBAC seams, attributed audit | ✅ Module shipped; hardening = MUST remainder |
 | **AI assist** | 7 draft-only assistant skills (diagnose, explain, KPI→SQL, NL→schedule, …), fully offline-capable | ✅ Shipped |
 | **AI next** | Embedded intelligence: governed autonomy ladder (explain → draft → act-with-approval) | ✅ **P0–P5 complete 2026-07-21**; inline authoring A1–A5 shipped 2026-07-26/28. Open: AGT-6b (model-composed graphs), gated upstream |
 
@@ -53,7 +53,7 @@ Clients buy the rung they trust, and can prove what happened at every rung:
 | Tier | Rungs | Edition | Pitch |
 |---|---|---|---|
 | **A — Explain & Investigate** | L0 QA + L1 investigation (Cases, RCA, ranked root cause + fix draft) | **All**, incl. air-gapped | "Ask your platform why a batch failed; get a ranked root cause and a fix draft. Fully offline, local models, nothing leaves the box." |
-| **B — Author & Act with approval** | L1 authoring + L2 gated action | **Standard+**, opt-in (`-Dintelligence.act.enabled`) | "The agent drafts; your operator approves in an inbox with a full diff. Every action rides the same audited route a human uses." |
+| **B — Author & Act with approval** | L1 authoring + L2 gated action | **Professional+**, opt-in (`-Dintelligence.act.enabled`) | "The agent drafts; your operator approves in an inbox with a full diff. Every action rides the same audited route a human uses." |
 | **C — Bounded autonomy** | L3 (`ops_monitor`, policy + budgets) | **Enterprise**, demand-gated | "Hands-off remediation inside limits you set — with a kill switch, per-class budgets, and a SHADOW mode to watch what it *would* do first." |
 
 **Tier A is the wedge** — highest value, lowest risk, and it works in the deployments these buyers
@@ -78,6 +78,6 @@ no auth code in the free core.
 ## The remaining MUST list (release-gating)
 
 Object-storage connectors (S3/GCS/Azure) · JSON + text/regex parsing · Expectation engine ·
-notification delivery · Standard security hardening + packaging verification · one live end-to-end
+notification delivery · Professional security hardening + packaging verification · one live end-to-end
 pipeline verification · pin the agent framework to a released version.
 (Detail and sequencing: [`../REQUIREMENTS.md`](../REQUIREMENTS.md) §5–6.)

@@ -15,7 +15,7 @@ relies on you so it never has to read a full build log.
 
 ## Commands (offline; Windows toolchain)
 
-- **Authoritative verify:** `mvn -o clean test` (full reactor). JDK `C:\.jdks\openjdk-26.0.1`,
+- **Authoritative verify:** `mvn -o clean test` (full reactor). JDK `C:\sandbox\.graalvm-cache\jdk-27-win`,
   Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Every JVM launch needs
   `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI).
   🔴 **Capture the log with `-B`, never `-q`, and get the verdict from the guard — not by reading:**

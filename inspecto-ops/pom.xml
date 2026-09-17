@@ -14,9 +14,9 @@
     <artifactId>inspecto-ops</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — Operational objects (Standard edition, optional)</name>
+    <name>Inspecto — Operational objects (Professional edition, optional)</name>
     <description>
-        OPTIONAL Standard-edition operational objects (EDITIONS.md CP-11): Alerts -> Incidents -> Cases ->
+        OPTIONAL Professional-edition operational objects (EDITIONS.md CP-11): Alerts -> Incidents -> Cases ->
         Tasks, their notes, links, tags, RCA templates, findings and workflow — the com.gamma.ops
         domain, its four DuckDB-backed stores, the /objects, /notes and /tags route families, the
         object-analytics and case-rule Job Types, and the incident_purge maintenance task.
@@ -39,7 +39,7 @@
         RULES — a different domain from an OperationalObject whose objectType is ALERT. AlertService stays
         in core and reaches this module through the seam.
 
-        Built only under the "edition-standard"/"edition-enterprise" profiles, so a routine "mvn -o clean
+        Built only under the "edition-professional"/"edition-enterprise" profiles, so a routine "mvn -o clean
         test" (= Personal, the DEFAULT build) never compiles it.
     </description>
 

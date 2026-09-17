@@ -6,7 +6,7 @@
 
 **Inspecto** is a lean, configuration-driven **data acquisition + management + BI + investigation
 platform**: one ~90 MB self-contained artifact that runs on a laptop, an air-gapped server, or a
-container — with **zero external runtime services** in Personal (Standard adds a Postgres only for fault-tolerant DR; the Enterprise cluster adds Postgres and object storage). One declarative config file onboards a data feed;
+container — with **zero external runtime services** in Personal (Professional adds a Postgres only for fault-tolerant DR; the Enterprise cluster adds Postgres and object storage). One declarative config file onboards a data feed;
 no pipeline project, no cluster, no glue scripts.
 
 **It replaces four tool categories at once:** a NiFi-style collection/pipeline layer, a
@@ -26,7 +26,7 @@ built for regulated, air-gapped, and resource-constrained buyers where heavyweig
 **Editions are build flavors of one codebase** — no forks, one fix lands everywhere:
 
 - **Personal** (free) — full platform, auth-free, local. The zero-friction adoption tier.
-- **Standard** (paid — **the revenue gate**) — enterprise security: HTTPS, single-sign-on via the
+- **Professional** (paid — **the revenue gate**) — enterprise security: HTTPS, single-sign-on via the
   customer's identity provider (Keycloak/Okta/Entra), role-based access, attributed tamper-evident
   audit. **The security module shipped 2026-07-06**; hardening items remain before first customer.
 - **Enterprise** (future, demand-gated) — clustering/shared state for horizontal scale.
@@ -36,7 +36,7 @@ built for regulated, air-gapped, and resource-constrained buyers where heavyweig
 - **Delivered:** the full data plane (acquisition → parsing → pipelines → lakehouse), BI Studio with
   real persistence + live queries, investigation studios (Geo Map shipped; Link Analysis UI-complete),
   operations suite (signals, alerts → incidents → cases, audit), multi-tenant Spaces, a versioned
-  public API (`/api/v1`), the Standard security module, and an embedded AI assistant that runs fully
+  public API (`/api/v1`), the Professional security module, and an embedded AI assistant that runs fully
   offline.
 - **Release-gating remainder (the MUST list):** cloud object-storage connectors, JSON/regex parsing
   frontends, the data-quality Expectation engine, notification delivery, security hardening, and one
@@ -46,7 +46,7 @@ built for regulated, air-gapped, and resource-constrained buyers where heavyweig
 
 ## Decisions we need
 
-1. **Standard-edition go-to-market timing** — engineering gate is small and known (security hardening
+1. **Professional-edition go-to-market timing** — engineering gate is small and known (security hardening
    + packaging verification).
 2. **Embedded-intelligence P0 sign-off** — the design is ready; it is the next differentiating bet.
 3. **Legacy API sunset policy** — usage is now measured; sunset is a policy call, not engineering.

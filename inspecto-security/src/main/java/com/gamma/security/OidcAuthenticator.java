@@ -198,7 +198,7 @@ public final class OidcAuthenticator implements Authenticator {
     private static String requireValue(String value, String key) {
         if (value == null || value.isBlank())
             throw new IllegalStateException("inspecto-security requires -D" + key
-                    + " (Standard edition, docs/EDITIONS.md \"Security direction\")");
+                    + " (Professional edition, docs/EDITIONS.md \"Security direction\")");
         return value;
     }
 

@@ -1071,9 +1071,14 @@ docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
 As-built decisions:
-- **Base `eclipse-temurin:24-jre` supplies the JVM**; `.dockerignore` excludes `runtime/` so
-  serve.sh's `[ -x runtime/bin/java ]` preference misses and it falls back to the image `java`
-  (an embedded per-platform runtime is dead weight in a container, and the Windows one cannot run).
+- **The bundle's own jlink `runtime/` supplies the JVM** (changed 2026-09-17); the base is
+  `debian:stable-slim` and provides only glibc + bash. It was `eclipse-temurin:24-jre` with
+  `.dockerignore` excluding `runtime/`, so serve.sh's `[ -x runtime/bin/java ]` preference missed on
+  purpose. At `release=27` that image cannot run the JAR, and **Adoptium has published no
+  `eclipse-temurin:27-*`** (their release API topped out at 26 on 2026-09-17) — there is no vendor JRE
+  image to point at, so the bundle carries its own. ⚠ The Dockerfile is therefore valid **only in the
+  `linux_amd64` bundle**; it asserts this with a `runtime/bin/java -version` at build time rather than
+  failing at container start.
 - **HEALTHCHECK probes `/health` via a bash `/dev/tcp` HTTP GET, not curl** — the temurin JRE image
   ships **no curl or wget** (verified 2026-08-28; the original plan's curl one-liner would have
   reported unhealthy forever). `/health` is tokenless via `PUBLIC_PATHS`, correct for a healthcheck.
@@ -1129,7 +1134,7 @@ java --enable-native-access=ALL-UNNAMED \
      config/<data_source>/<data_source>_pipeline.toon
 ```
 
-**Java requirement:** **Java 24** or later (`pom.xml` `maven.compiler.release` = 24; the shipped container is `temurin:24-jre`). No other runtime dependencies. ⚠ Three distinct floors exist — 24 for the product, 25+ for the agent modules, 26 for the build toolchain.
+**Java requirement:** **Java 27** or later (`pom.xml` `maven.compiler.release` = 27; the shipped container carries the bundle's own jlink 27 runtime on a `debian:stable-slim` base). No other runtime dependencies. ✅ **One floor, not three** — as of 2026-09-17 the old split (24 product / 25+ agent modules / 26 toolchain) collapses, because 27 is above all of them.
 
 ### Performance reference (single-node, HDD, 4 threads)
 
@@ -1144,7 +1149,7 @@ Note: the 20200117 <data_source> file is ~4.3 GB uncompressed (~2.97 M rows) due
 
 - [ ] Delete `inbox/<data_source>/20200101/vou_DATE_20200101.csv/` — this is an 8 GB uncompressed directory (duplicate of the `.gz`); the glob pattern would pick up the file inside it and double-process the day
 - [ ] Run from the bundle root (or sandbox root locally) so relative paths resolve correctly
-- [ ] Verify Java 24+ is on `PATH`: `java -version`
+- [ ] Verify Java 27+ is on `PATH`: `java -version` — not needed for a bundle that kept its embedded `runtime/`
 
 ---
 

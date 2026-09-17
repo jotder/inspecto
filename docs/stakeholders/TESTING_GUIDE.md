@@ -56,7 +56,7 @@ Recipe (agents: `SMOKE` invokes `.claude/skills/smoke/`):
 - **Config-driven behavior** — most features are authored as TOON under `spaces/<id>/config/`;
   malformed or edge-case configs are the richest bug surface (`ConfigSafetyValidator` should 422,
   never crash the engine).
-- **Edition differences** — Personal (HTTP, auth-free) vs Standard (HTTPS, OIDC) are build flavors
+- **Edition differences** — Personal (HTTP, auth-free) vs Professional (HTTPS, OIDC) are build flavors
   of one codebase; test gates, not forks ([`EDITIONS.md`](../EDITIONS.md)).
 - **Multi-space isolation** — anything under `/spaces/{id}/…` must never leak data across spaces.
 - **Write gates** — control-plane writes fail closed (503 no write-root → 422 invalid spec →

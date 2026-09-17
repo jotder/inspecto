@@ -11,8 +11,8 @@ description: >
 
 # Build / Test / Package / Run
 
-Inspecto — Java 26 build (`release=24`), Maven reactor `inspecto-parent`. UI is Angular
-(`inspecto-ui/`, **not** in the Maven reactor). Toolchain: JDK `C:\.jdks\openjdk-26.0.1`, Maven
+Inspecto — Java 27 build (`release=27`), Maven reactor `inspecto-parent`. UI is Angular
+(`inspecto-ui/`, **not** in the Maven reactor). Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven
 `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Always build offline (`-o`).**
 
 > Durable project knowledge (module map, gotchas, engine seams & perf, decisions):
@@ -271,7 +271,7 @@ usually fine, but know it before drawing conclusions.)
 pwsh -File inspecto\package.ps1                 # full: JAR + UI + configs + scripts + jlinked Windows JVM
 pwsh -File inspecto\package.ps1 -NoBuild        # reuse target/ JAR
 pwsh -File inspecto\package.ps1 -NoUi           # skip Angular UI
-pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must provide Java 24+)
+pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must provide Java 27+)
 ```
 Editions are build flavors (Personal HTTP/no-auth · Standard HTTPS/OIDC · Enterprise = Standard + ABAC
 policy) — see [docs/EDITIONS.md](../../../docs/EDITIONS.md). All three flavors exist today:

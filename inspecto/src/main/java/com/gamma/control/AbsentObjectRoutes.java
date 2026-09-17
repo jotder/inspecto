@@ -24,8 +24,8 @@ package com.gamma.control;
 final class AbsentObjectRoutes implements RouteModule {
 
     static final String MESSAGE = "Operational objects are not installed in this bundle - Alerts, "
-            + "Incidents, Cases, Tasks and their notes, links, tags and queues are provided by the "
-            + "optional inspecto-ops module (Standard edition and above).";
+            + "Incidents, Cases, Tasks and their notes, links and tags are provided by the "
+            + "optional inspecto-ops module (Professional edition and above).";
 
     /** Mirrors the four moved route families, in their registration order. ⚠ Catch-alls stay last. */
     private static final String[][] SURFACE = {

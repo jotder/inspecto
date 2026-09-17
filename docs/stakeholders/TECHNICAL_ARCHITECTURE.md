@@ -14,13 +14,13 @@ Three cooperating applications, one product:
 │  One operator console · Lens-filtered nav · needs a live control plane  │
 │  → talks /api/v1 (envelope-unwrapping interceptor chain)                │
 └──────────────────────────────┬───────────────────────────────────────────┘
-                               │ HTTPS (Standard) / HTTP (Personal)
+                               │ HTTPS (Professional) / HTTP (Personal)
 ┌─ Java backend (single JVM) ──▼───────────────────────────────────────────┐
 │  ControlApi (JDK HttpServer) → /api/v1 versioned contract               │
 │  CollectorService: acquisition → Stage-1 M..N ingest → Parquet lakehouse   │
 │  Stage-2 enrichment · authored Pipelines (DAG) · Jobs/Scheduler         │
 │  Component store + metadata graphs · Signal ledger · embedded DuckDB    │
-│  Modules: core │ connectors │ agent │ agent-hosted │ security(Standard) │
+│  Modules: core │ connectors │ agent │ agent-hosted │ security(Professional) │
 └──────────────────────────────┬───────────────────────────────────────────┘
                                │ LlmGateway bridge (offline-capable)
 ┌─ eoiagent (separate repo) ───▼───────────────────────────────────────────┐
@@ -50,7 +50,7 @@ threads), embedded DuckDB, TOON config files, one fat JAR + jlink runtime. Small
 
 ## Security & editions
 
-Editions are **build flavors** (never branches): the common core has **no auth code**. Standard adds
+Editions are **build flavors** (never branches): the common core has **no auth code**. Professional adds
 the `inspecto-security` module behind three core SPIs (`Authenticator`/`Subject`/`TokenRelay`): OIDC
 resource server (Nimbus/JWKS) against the customer's IAM (Keycloak/WSO2/Okta/Entra), `RoleMapper`,
 HTTPS (pure-JDK `HttpsServer`), and a BFF session (`/auth/exchange|refresh|logout`; refresh token never
@@ -79,10 +79,10 @@ read-only/draft-only today; the embedded-intelligence design adds a governed aut
 ## Integration checklist (for a deployment)
 
 1. **API**: consume `/api/v1` only (envelope + error codes; OpenAPI file is the contract).
-2. **Identity (Standard)**: point OIDC at your IAM; roles map via `RoleMapper`; gateway (WSO2-style)
+2. **Identity (Professional)**: point OIDC at your IAM; roles map via `RoleMapper`; gateway (WSO2-style)
    can front the API unchanged.
 3. **Data**: land files via Connections/Collectors (SFTP/FTP/FTPS/DB today; object storage on the MUST
    list); query the lakehouse via the warehouse layer (pg_duckdb) — [`../okf/backend/integrations.md`](../okf/backend/integrations.md).
 4. **Observability**: scrape Prometheus metrics; consume the Signal ledger; ship the audit trail.
-5. **Packaging**: `package.ps1 -Edition <personal|standard|…>` → fat JAR + jlink bundle; air-gap
+5. **Packaging**: `package.ps1 -Edition <personal|professional|…>` → fat JAR + jlink bundle; air-gap
    flavors omit hosted-AI SDKs. [build & run](../okf/backend/build-run/index.md).

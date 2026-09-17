@@ -126,7 +126,7 @@ function safeParse(json: string): unknown {
  *
  * The non-streaming calls ride HttpClient (v1 envelope unwrapped, auth/space interceptors apply).
  * {@link askStream} POSTs with a raw `fetch` (SSE over POST — EventSource can't POST), so the
- * interceptor work is replicated by hand: the Standard-edition bearer (authInterceptor) and the
+ * interceptor work is replicated by hand: the Professional-edition bearer (authInterceptor) and the
  * `/spaces/<id>` path scoping (spaceInterceptor). SSE frames are written raw to the response body
  * (never enveloped), so no unwrap applies there.
  */
@@ -195,7 +195,7 @@ export class AgentService {
         signal?: AbortSignal,
     ): Promise<void> {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        // authInterceptor equivalent: bearer only in Standard-edition OIDC mode, never on Personal.
+        // authInterceptor equivalent: bearer only in Professional-edition OIDC mode, never on Personal.
         if (this.session.authMode() === 'oidc') {
             const token = this.session.token();
             if (token) headers['Authorization'] = `Bearer ${token}`;

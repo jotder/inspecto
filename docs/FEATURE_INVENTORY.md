@@ -15,7 +15,7 @@
 > **Shipped after this snapshot (2026-07-07 addendum)** — not yet folded into the tables below: the
 > versioned **`/api/v1`** contract (envelope, error-code catalog, ETag/`contentHash`, `GET /bootstrap`,
 > query catalog `POST /queries/{id}/run` + Result Set, async job/pipeline runs `202`+`runId`,
-> `Idempotency-Key`); the **`inspecto-security`** module (Standard-edition OIDC/HTTPS/BFF); the
+> `Idempotency-Key`); the **`inspecto-security`** module (Professional-edition OIDC/HTTPS/BFF); the
 > **agent-kernel → eoiagent** replacement (vendored kernel layer + `com.eoiagent` model transport);
 > component-model persistence (writable `dataset`/`widget`/`dashboard`/`query` kinds); **Studio**
 > (Query Library / Viz Library / Dashboard Builder), **Link Analysis** and **Geo Map Analysis**

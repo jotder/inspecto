@@ -10,7 +10,7 @@
 
 | # | Theme | Why it matters | Primary horizon |
 |---|---|---|---|
-| T1 | **Commercial readiness** | Standard-edition security is the gate to selling into regulated buyers. | Next |
+| T1 | **Commercial readiness** | Professional-edition security is the gate to selling into regulated buyers. | Next |
 | T2 | **Breadth of ingestion** | Object storage and more native formats widen the addressable feed set. | Next |
 | T3 | **Self-service authoring** | Visual Pipelines + AI assist move authoring from expert-only to operator-owned. | Now → Next |
 | T4 | **Trust & transparency** | Provenance/lineage + conservation checks as a default operational guarantee. | Now |
@@ -27,7 +27,7 @@ These are built and integrated on the development line; the work remaining is ve
 | N1 | **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental Pipelines, materialized views, visual editor | L | Built & tested | A representative `type: pipeline` job runs end-to-end against seeded data; visual editor verified live; design doc §14 closed |
 | N2 | **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, Sankey overlay | M | Built & tested (off by default) | Provenance verified against a real Pipeline-job run (not just synthetic injection); overlay confirmed against recorded data |
 | N3 | **`sink.view` consumer** — REST query of a Pipeline's logical views | S | Shipped in mainline | Done — `/views`, `/views/{name}`, `/views/{name}/data` live with tests |
-| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-standard` / `edition-enterprise` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
+| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-professional` / `edition-enterprise` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
 
 **Now-horizon focus:** finish live end-to-end verification of N1/N2 with real job configs (current verification used synthetic data on a config-less dev backend), then make the release call on N4.
 
@@ -41,11 +41,11 @@ now headed by what was actually delivered. **§3.4–§3.5 were re-derived from 
 the board, and one was never filed anywhere — each is marked below. ⛔ The board (`../BACKLOG.md` §0) owns the
 queue order; this page records direction.
 
-### 3.1 `inspecto-security` module — Standard edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**
+### 3.1 `inspecto-security` module — Professional edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**
 
 > **Delivered.** `inspecto-security/` implements the core `Authenticator` / `Subject` / `TokenRelay` SPIs —
 > `OidcAuthenticator` (Nimbus JOSE+JWT, JWKS-validated), `RoleMapper`, `OidcTokenRelay` (renamed 2026-07-25, D15: no vendor of record) — joining the
-> reactor only under the `edition-standard` Maven profile. The browser never holds tokens (BFF exchange +
+> reactor only under the `edition-professional` Maven profile (with `edition-standard` retained as an alias). The browser never holds tokens (BFF exchange +
 > httpOnly `inspecto_rt` cookie with an `Origin` CSRF check); HTTPS is served by the pure-JDK `HttpsServer`.
 > **RBAC/ABAC completed 2026-07-24:** data-driven roles + a capability manifest, Access-Profile enforcement,
 > component sharing, WSO2 gateway trust, and the Enterprise **`inspecto-policy`** module
@@ -59,9 +59,9 @@ The single most important item for commercialization.
 - **Scope (in):** an `Authenticator` SPI seam in the core; an OIDC/OAuth2 **resource-server** implementation (validate IAM-issued JWTs — issuer/audience/expiry via JWKS); **RBAC + ABAC** enforcement from token claims/groups; HTTPS (keystore; FIPS-provider option for Gov); actor-attributed, tamper-evident audit; the Angular UI as an OIDC Authorization-Code-+-PKCE public client.
 - **Scope (out, by design):** user management, AD/LDAP federation, SAML brokering — these are the **external IAM's** job (Keycloak / WSO2 / Okta / Entra). No identity store in the Java core.
 - **Approach:** incremental hardening on the framework-free core — **explicitly not** a Spring/Quarkus migration. At target user counts a framework buys nothing the IAM + small libraries don't, and a lean dependency tree is a compliance asset.
-- **Packaging:** delivered as the `inspecto-security` Maven module, assembled into the Standard build via a profile; Personal simply doesn't bundle it.
+- **Packaging:** delivered as the `inspecto-security` Maven module, assembled into the Professional build via a profile; Personal simply doesn't bundle it.
 - **Dependency:** unblocks revenue. Should precede anything that needs per-tenant or per-role gating.
-- **Exit criteria:** a Standard build authenticates against a reference IAM, enforces a role matrix, serves over HTTPS, and produces an actor-attributed audit log — with the Personal build unchanged and still auth-free.
+- **Exit criteria:** a Professional build authenticates against a reference IAM, enforces a role matrix, serves over HTTPS, and produces an actor-attributed audit log — with the Personal build unchanged and still auth-free.
 
 ### 3.2 Object-storage & network-share connectors (T2) · Effort: **M–L** · ✅ **SHIPPED (object storage) 2026-07-22**
 
@@ -157,7 +157,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 
 | Theme | Measure |
 |---|---|
-| Commercial readiness | A Standard build deployable against a reference IAM with a working role matrix and HTTPS; Personal build unchanged. |
+| Commercial readiness | A Professional build deployable against a reference IAM with a working role matrix and HTTPS; Personal build unchanged. |
 | Breadth of ingestion | Number of source backends and parsing frontends onboarding with zero core change. |
 | Self-service | Share of feeds authored/operated entirely from the console vs. hand-edited config. |
 | Trust & transparency | Provenance enabled on production Pipelines; conservation alerts surfaced and triaged as managed objects. |
@@ -185,7 +185,7 @@ restated, because each needs a status call rather than a doc edit:
   N1's live end-to-end verification is recorded as **RESOLVED 2026-07-07** in
   [`../REQUIREMENTS.md`](../REQUIREMENTS.md) §R1 (seeded `type: pipeline` run,
   `examples/06-serve/pipeline-job`), and N4's edition model shipped as real Maven build flavors
-  (`-Pedition-standard` / `-Pedition-enterprise`). N2 provenance is genuinely still open — it needs a live
+  (`-Pedition-professional` / `-Pedition-enterprise`). N2 provenance is genuinely still open — it needs a live
   feed (**OPS-5** in [`../BACKLOG.md`](../BACKLOG.md) §2).
 - **Residual banned vocabulary** — *(re-grounded 2026-09-08, when `docs/roadmap/` finally entered the
   vocabulary guard's scope — it had been outside every pass since the guard was written.)* Both halves of

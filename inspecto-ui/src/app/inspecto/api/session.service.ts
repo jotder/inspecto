@@ -6,7 +6,7 @@ import { environment } from '../../../environments/environment';
 import { apiUrl } from './api-base';
 
 /**
- * OIDC endpoint configuration for the Standard-edition login redirect. Comes from `bootstrap.auth`
+ * OIDC endpoint configuration for the Professional-edition login redirect. Comes from `bootstrap.auth`
  * when the backend supplies it (the mock does, with `mock:true`); otherwise falls back to
  * `environment.oidc` (a real deployment bakes its non-secret authorize URL + public client id there,
  * the conventional SPA pattern). Never carries a client secret — the SPA is a public PKCE client.
@@ -60,7 +60,7 @@ const STATE_KEY = 'inspecto.pkce.state';
  * <p><b>Offline / Personal is byte-for-byte unchanged.</b> When `authMode !== 'oidc'` (Personal, or the
  * mock backend answering offline) this service does nothing beyond the one bootstrap read: no login, no
  * token, no redirect — {@link loginRequired} is always false and {@link authGuard} is a pass-through.
- * The Standard flow (redirect → callback → {@link completeLogin}) engages only when the backend reports
+ * The Professional flow (redirect → callback → {@link completeLogin}) engages only when the backend reports
  * OIDC on `GET /bootstrap`. ⚠ There is NO client-side dev switch (a `mockAuthMode: 'oidc'` one was named
  * here for weeks and never existed — SIGNIN-PREVIEW-1). To preview the guest routes locally, run the core
  * with `tools/run-backend.ps1 -AuthMode oidc`: the core echoes `auth.mode` on `/bootstrap` without
@@ -72,7 +72,7 @@ export class SessionService {
     private http = inject(HttpClient);
     private router = inject(Router);
 
-    /** 'none' (Personal / offline) or 'oidc' (Standard). Drives {@link loginRequired} + {@link authGuard}. */
+    /** 'none' (Personal / offline) or 'oidc' (Professional). Drives {@link loginRequired} + {@link authGuard}. */
     readonly authMode = signal<'none' | 'oidc'>('none');
     readonly edition = signal<string>('personal');
     /** The running product's version as `GET /bootstrap` reported it; null until the bootstrap read lands. */
@@ -98,14 +98,14 @@ export class SessionService {
     readonly exchangeEnabled = signal(false);
     /**
      * `bootstrap.features.geoLink` — the geo map + link analysis routes are REGISTERED in this bundle
-     * (EDITIONS CP-09: an optional module Standard and Enterprise carry and Personal does not). The
+     * (EDITIONS CP-09: an optional module Professional and Enterprise carry and Personal does not). The
      * backend derives it from what actually registered, so this is never a guess about the edition.
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
     readonly geoLinkEnabled = signal(false);
     /**
      * `bootstrap.features.events` — the operational events FEED is registered in this bundle (EDITIONS
-     * CP-13: the optional `inspecto-events` module, Standard and above; EDG-01 cell 6).
+     * CP-13: the optional `inspecto-events` module, Professional and above; EDG-01 cell 6).
      *
      * ⛔ This is NOT "auditing is off". The audit trail is still RECORDED in every edition and still
      * READABLE through the core `/audit/*` routes, which is why the Audit log screen does not gate on this

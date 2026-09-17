@@ -16,7 +16,7 @@ package com.gamma.control;
 final class AbsentMetricsRoutes implements RouteModule {
 
     static final String MESSAGE = "The Prometheus metrics endpoint is not installed in this bundle - it is "
-            + "provided by the optional inspecto-metrics module (Standard edition and above). Instrumentation "
+            + "provided by the optional inspecto-metrics module (Professional edition and above). Instrumentation "
             + "still runs; only the HTTP exposition is edition-gated.";
 
     @Override

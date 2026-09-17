@@ -31,9 +31,9 @@ param(
     [string]$WriteRoot,
     [string]$UiDir,
     # SIGNIN-PREVIEW-1 (2026-09-15): -AuthMode oidc makes the CORE report authMode:'oidc' on /bootstrap, so
-    # the SPA renders its Standard-edition guest routes (/sign-in, /session/callback) against an auth-free
+    # the SPA renders its Professional-edition guest routes (/sign-in, /session/callback) against an auth-free
     # backend. It is a PREVIEW switch: nothing authenticates — the core has no Authenticator, and the
-    # sign-in button's redirect will not complete. For a real OIDC session run the Standard bundle.
+    # sign-in button's redirect will not complete. For a real OIDC session run the Professional bundle.
     [string]$AuthMode,
     [switch]$Rebuild   # compile the reactor first (-pl inspecto -am) before launching
 )
@@ -97,7 +97,7 @@ Write-Host "Classpath: $($moduleDirs.Count) module classes dirs + $($entries.Cou
 # ⛔ -Dcontrol.token=dev and -Dassist.read.token=dev were passed here and were REMOVED 2026-09-14
 # (DOC-DEADTOKEN-1): both have ZERO Java readers, so they authenticated nothing while reading exactly
 # as though they did. The core is auth-free by design; Authorization is enforced by the
-# Standard/Enterprise security module via AUTH_OIDC_*. ⛔ Do not re-add them.
+# Professional/Enterprise security module via AUTH_OIDC_*. ⛔ Do not re-add them.
 # ⚠ Keep this note ABOVE the call: a `#` line between backtick continuations breaks the parse —
 # the first attempt at this comment did exactly that, and `Parser::ParseFile` caught it.
 $authArgs = @()

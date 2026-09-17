@@ -14,9 +14,9 @@
     <artifactId>inspecto-geo-link</artifactId>
     <packaging>jar</packaging>
 
-    <name>Inspecto — geo map + link analysis routes (Standard edition, optional)</name>
+    <name>Inspecto — geo map + link analysis routes (Professional edition, optional)</name>
     <description>
-        OPTIONAL Standard-edition control-plane route groups (EDITIONS.md CP-09, "Geo map + link analysis"):
+        OPTIONAL Professional-edition control-plane route groups (EDITIONS.md CP-09, "Geo map + link analysis"):
         GeoRoutes (/geo/projection, /geo/routes) and InvRoutes (/inv/projection, /inv/projection/neighbors,
         /inv/schema/relationships), contributed through the core's public com.gamma.control.RouteModule
         ServiceLoader seam (EDG-01 cell 3a) and registered AFTER the core's built-in route list.
@@ -30,7 +30,7 @@
         THIN, like inspecto-policy: nothing beyond what the core already supplies (the query engine, the
         component/view stores, Jackson), so there is no shade and no sidecar classifier.
 
-        Built only under the "edition-standard"/"edition-enterprise" profiles (see the parent pom's
+        Built only under the "edition-professional"/"edition-enterprise" profiles (see the parent pom's
         profile-scoped &lt;modules&gt;), so a routine "mvn -o clean test" (= Personal, the DEFAULT build --
         there is no -Pedition-personal) never compiles or tests it.
     </description>

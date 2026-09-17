@@ -36,7 +36,7 @@ buyers where heavyweight stacks cannot go**.
 The staging table of record is `tools/bundle-modules.mjs`; the per-capability matrix is
 [`../EDITIONS.md`](../EDITIONS.md). Editions are build flavours of one codebase, never branches.
 
-| | **Personal** (free) | **Standard** (the revenue gate) | **Enterprise** |
+| | **Personal** (free) | **Professional** (the revenue gate) | **Enterprise** |
 |---|---|---|---|
 | **Buyer situation** | one engineer, one ugly feed, no budget | a regulated team putting it in front of other people | multi-tenant, or one node is not enough |
 | **The sentence** | *the whole data plane, free, on your laptop* | *operate it, prove it, survive a node* | *outgrow a node: same artifact, N pods* |
@@ -45,8 +45,8 @@ The staging table of record is `tools/bundle-modules.mjs`; the per-capability ma
 | **Conversion trigger** | the laptop becomes a shared server; or a Break needs an owner | a second tenant that must not see the first; or one node cannot keep up | — |
 
 ⚠ **The ladder's story is already true of the build, not invented for sales:** *Personal finds the
-problem; Standard owns it; Enterprise scales it.* Reconciliation and quality signals are core; the moment a
-Break needs an Incident, an audit export or a second team, the buyer is in Standard — because that is
+problem; Professional owns it; Enterprise scales it.* Reconciliation and quality signals are core; the moment a
+Break needs an Incident, an audit export or a second team, the buyer is in Professional — because that is
 where the modules live.
 
 ⛔ **The assistant and the autonomy ladder ship in NO edition.** `CP-14` on the board reads *"never bundled by
@@ -213,23 +213,23 @@ at once. This is structural, not a failing — Palantir loses it too.
 
 | Claim | Evidence |
 |---|---|
-| One ~90 MB artifact, zero external runtime services (Personal; Standard without DR) | `NFR-2`; signed D9 |
+| One ~90 MB artifact, zero external runtime services (Personal; Professional without DR) | `NFR-2`; signed D9 |
 | One config file onboards a feed | the `.toon` model; `PRODUCT_CAPABILITIES.md` |
 | Native ingest ~500K rows/s at 12 columns; transforms >1M rows/s | `performance.md`, measured |
 | ~2.5 / ~5 / ~10 billion 100-column rows/day per 8- / 16- / 32-core Linux node, sized to peak | §1.3: measured end to end on six cores (8.1M cells/s) × a stated server-core factor; conditions stated (concurrent batches, NVMe, console headroom, native lane). Operator decision 2026-09-14: publish without hardware specifics |
 | "~1.35M cells/s per physical core end to end, measured; ~1.8–2.8M on a current Linux server core" | §1.3 — say "measured" only of the first half |
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
-| Fault-tolerant DR at Standard; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |
+| Fault-tolerant DR at Professional; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |
 | **19**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
-| A distinct Standard bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
+| A distinct Professional bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
 
 ### 4.2 We MUST NOT claim yet — and what unlocks each
 
 | Claim | Why not | Unlocks when |
 |---|---|---|
 | Anything about the AI assistant or autonomy | ships in **no** bundle (`CP-14`, `PKG-5`) | `PKG-5` resolves and the assistant is in a downloadable artifact — **filed as a §1 decision needing an owner, 2026-09-11** |
-| "1 trillion rows/day" for Standard | off by 10–250× on one node (§1.3) | never for Standard; an Enterprise cluster-design conversation |
+| "1 trillion rows/day" for Professional | off by 10–250× on one node (§1.3) | never for Professional; an Enterprise cluster-design conversation |
 | "119 processors" | 67 are planned, inactive tiles | say **36**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above; one dead SPI | phrase as categories covered + named seams (§1.4) |
 | A production-grade Expectation engine | routes, no UI (`ING-6`) | the UI ships, or GX suites import |
@@ -242,7 +242,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 
 > *Inspecto is the end-to-end data operations platform for regulated environments where data can't leave:
 > acquire the hard formats, reconcile, investigate, and prove it to an auditor — from one 90 MB artifact,
-> with no cluster to run. Standard handles billions of records a day on a single node with fault-tolerant
+> with no cluster to run. Professional handles billions of records a day on a single node with fault-tolerant
 > DR; Enterprise partitions the same artifact across Kubernetes when you outgrow one. Every category is
 > covered in the product, every point your estate differs has a named extension seam, and what falls outside
 > both we build for you. One vendor, one config, one bill.*
@@ -265,7 +265,7 @@ counts; SSO as a feature (table stakes).
 | **A1** | Which segment first? | telecom gives the cheapest first three customers (ASN.1) | RA is niche; broaden via the buyer-situation horizontal + three blueprints | `AGT-SEGMENT-1` deferred with caveat kept (2026-09-10). Blueprints are roadmap items, not shipped templates |
 | **A2** | May we quote a capacity number? | only §1.3's derivation, with its caveats | a number is needed on the first slide | **Blocked on A3** |
 | **A3** | Sustained benchmark + CI floor | ~a day's work; `PipelineBenchmark -Dbench.cols=100` replaces the extrapolation | this is the evidence behind every capacity claim | **Open — highest-value unbuilt evidence** |
-| **A4** | Publish pricing? | editions exist; Standard bundle exists | Definite shows $250/mo; a buyer who cannot self-serve a price assumes enterprise sales | Open |
+| **A4** | Publish pricing? | editions exist; Professional bundle exists | Definite shows $250/mo; a buyer who cannot self-serve a price assumes enterprise sales | Open |
 | **A5** | The plugin/services line | 19 SPIs; one dead seam to fix or remove | "we build the rest for you" is a revenue line — price it | Open |
 | **A6** | The Expectation engine | routes exist, no UI; absorb GX suites rather than rival them | DQ buyers test this first | Open — product decision |
 | **A7** | Retire the stale stakeholder docs | brief + capabilities dated 2026-07-07 under- and over-sell | a sponsor reading them today gets the wrong product | Open — refresh from `EDITIONS.md` |

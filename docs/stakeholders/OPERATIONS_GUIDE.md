@@ -11,8 +11,8 @@
   hosts API + UI on `:8080` (SPA served by the engine). [`../okf/backend/build-run/operations-reference.md`](../okf/backend/build-run/operations-reference.md).
 - **Mandatory JVM flag** — DuckDB needs the native-access flag; the bundle scripts set it. Details:
   [build & run](../okf/backend/build-run/operations.md).
-- **Editions** — Personal boots open (no login); Standard needs the IAM/OIDC settings and HTTPS
-  keystore. Run the Standard bundle with `-NoRuntime` until the jlink/Nimbus verification closes.
+- **Editions** — Personal boots open (no login); Professional needs the IAM/OIDC settings and HTTPS
+  keystore. Run the Professional bundle with `-NoRuntime` until the jlink/Nimbus verification closes.
 - **API prefix** — every business route is served only under `/api/v1/…`; only the probes
   (`/health`, `/ready`, `/metrics`, `/metrics/acquisition`) are unversioned. Responses are
   envelope-wrapped (`{data, metadata, links, permissions, diagnostics}`), errors are

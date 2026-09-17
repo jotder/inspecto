@@ -32,7 +32,7 @@ property an auditor can test by trying to add one. That is what is enforced here
 an undeclared route before it can refuse a boot in a customer's bundle; the boot check is what makes the
 guarantee true of the deployed artifact rather than of the repository.
 
-**Scope.** Standard and Enterprise. ⚠ Personal is auth-free by design and enforces no capability at all —
+**Scope.** Professional and Enterprise. ⚠ Personal is auth-free by design and enforces no capability at all —
 access-control claims do not apply to it, and this document does not make any.
 
 ## Reads are open, by policy

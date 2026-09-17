@@ -9,7 +9,7 @@ import { SessionService } from './session.service';
 const SESSION_PATHS = ['/auth/exchange', '/auth/refresh', '/auth/logout'];
 
 /**
- * Standard-edition bearer attachment + silent refresh (W6d). Attaches `Authorization: Bearer <token>`
+ * Professional-edition bearer attachment + silent refresh (W6d). Attaches `Authorization: Bearer <token>`
  * to control-plane calls when a session is live, and on a 401 tries one silent refresh (from the
  * httpOnly cookie) then retries the original request; a failed refresh drops the session and routes to
  * sign-in.

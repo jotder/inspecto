@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  * <h3>Authentication (W6)</h3>
  * The core (Personal edition) is <b>auth-free</b> — every route is open, exactly as before. Authentication
  * and authorization are an <em>edition</em> concern: {@link #dispatch} looks up an {@link Authenticator}
- * via {@link Authenticators} (a {@code ServiceLoader} seam); when the Standard edition's
+ * via {@link Authenticators} (a {@code ServiceLoader} seam); when the Professional edition's
  * {@code inspecto-security} module is absent, the lookup is empty and nothing is enforced. When it is
  * present, every route outside the health/bootstrap probe surface requires a valid credential
  * ({@code 401 UNAUTHENTICATED} on failure); write routes additionally declare a required capability via
@@ -188,7 +188,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      */
     private static final Pattern SPACE_PREFIX = Pattern.compile("^/spaces/([a-z0-9][a-z0-9-]{0,62})(/.*)$");
 
-    /** Routes that stay open even when the Standard edition's security module is active (W6): liveness/
+    /** Routes that stay open even when the Professional edition's security module is active (W6): liveness/
      *  readiness/metrics probes carry no credentials; {@code /bootstrap} is how the SPA discovers it
      *  needs to start the OIDC redirect in the first place (its own {@code session.authenticated} reports
      *  {@code false} rather than 401); and the {@code /auth/*} session routes (W6d) run <em>before</em> a
@@ -302,7 +302,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     /**
      * Plain HTTP by default (Personal edition, unchanged). Set {@code -Dhttps.keystore=<PKCS12 path>}
-     * (+ {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead (Standard edition,
+     * (+ {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead (Professional edition,
      * docs/EDITIONS.md); pure JDK ({@link HttpsServer} + {@code javax.net.ssl}), no new dependency.
      *
      * <p>Both transports bind through {@link #bindAddress(int)} — a TLS listener that ignored
@@ -352,11 +352,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         http.start();
         System.setProperty(LOCAL_BASE_URL_PROP, "http://127.0.0.1:" + port());
         if (Authenticators.active().isPresent())
-            log.info("ControlApi started on port {} (Standard edition — authentication enforced via {})",
+            log.info("ControlApi started on port {} (Professional edition — authentication enforced via {})",
                     port(), Authenticators.active().get().getClass().getName());
         else
             log.info("ControlApi started on port {} (no authentication — Personal/core edition). "
-                    + "Authorization is added by the Standard/Enterprise security module.", port());
+                    + "Authorization is added by the Professional/Enterprise security module.", port());
     }
 
     private static boolean blank(String s) { return s == null || s.isBlank(); }
@@ -810,7 +810,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     /** AuthN gate (W6): a no-op when no {@link Authenticator} is on the classpath (Personal edition —
      *  {@link Authenticators#active()} is empty), so Personal behaviour is byte-for-byte unchanged. When
-     *  the Standard edition's security module is present, a {@link #PUBLIC_PATHS} route (bootstrap/health)
+     *  the Professional edition's security module is present, a {@link #PUBLIC_PATHS} route (bootstrap/health)
      *  authenticates <em>optionally</em> — a Subject is attached when credentials resolve one (so
      *  {@code /bootstrap} reports the real session for an already-logged-in caller), but missing/invalid
      *  credentials there is not an error. Every other route requires a valid credential; a miss is

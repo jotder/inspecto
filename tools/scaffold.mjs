@@ -111,7 +111,7 @@ function engineCoordinates() {
         engineArtifactId: artifactId,
         engineVersion: version,
         junitVersion: tag(rootPom, 'junit.version') ?? '5.10.2',
-        javaRelease: tag(rootPom, 'maven.compiler.release') ?? '24',
+        javaRelease: tag(rootPom, 'maven.compiler.release') ?? '27',
         compilerPluginVersion: pluginVersion(rootPom, 'maven-compiler-plugin') ?? '3.13.0',
         surefirePluginVersion: pluginVersion(rootPom, 'maven-surefire-plugin') ?? '3.2.5',
     };
