@@ -1485,11 +1485,20 @@ findings were FIXED in this pass rather than filed: `PipelineWatermarkStore.put`
 in place (torn watermark ⇒ silent full re-read), and `GET /signals` was the one list route with no ceiling
 on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before filing: "the acquisition ledger has no prune caller" — `LedgerPruneTask.java:17-24` calls `AcquisitionLedgers.shared().prune(cutoff, source)`. Grep the caller, not the callee.
 
-- **P2** · **`DB-BACKUP-POSTGRES-1`** — `BackupTask` knows DuckDB and files only: its one DB reference opens an
-  in-memory DuckDB scratch (`inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java:358`), so a
+- ~~**P2** · **`DB-BACKUP-POSTGRES-1`**~~ ✅ **CLOSED 2026-09-17 — documentation-only fix, `docs/EDITIONS.md`
+  OPS-06.** Grounded: `BackupTask`'s one DB reference (`catalogRow`, line 358 confirmed unchanged) opens a
+  throwaway in-memory DuckDB scratch just to write its own catalog Parquet row — it never touches the
+  operational stores, so the premise held. Took the documentation leg, not the `pg_dump`/COPY leg: a real
+  fix would need a JDBC `COPY`/dump per `OperationalDb.Family` (`inspecto/src/main/java/com/gamma/service/
+  OperationalDb.java`), each with its own URL and credential grain by design (see that class's roster
+  Javadoc) — infrastructure-plumbing scope disproportionate to one maintenance task, and this codebase has
+  no `pg_dump`-shelling precedent to reuse (the runtime is deliberately JDBC-driver-free, OPS-02). `docs/
+  EDITIONS.md`'s OPS-06 row now states plainly that `backup` covers files only and a Postgres operational
+  database needs an external DBA backup path. Original row: `BackupTask` knows DuckDB and files only — its
+  one DB reference opens an in-memory DuckDB scratch (`inspecto-backup/.../BackupTask.java:358`), so a
   Standard/Enterprise deployment on Postgres has NO backup path for job runs, the dedup and acquisition
-  ledgers, status, or the run lease. Fix: a `pg_dump`/COPY leg when `OperationalDb.postgres()` is true, or
-  document that Standard requires an external DBA backup and say so in `EDITIONS.md`.
+  ledgers, status, or the run lease. Fix offered: a `pg_dump`/COPY leg when `OperationalDb.postgres()` is
+  true, or document the gap in `EDITIONS.md`.
 - **P2** · **`STORE-CONFLICT-DETECTION-1`** — `ComponentStore.java:164-175`, `PipelineStore.java:80-84` and
   `ViewStore.java:88-91` overwrite blindly with no `If-Match`/version, unlike `ConfigWriteRoutes`
   (`CLIENT-HALVES-1`); two concurrent editors silently clobber each other — components are recoverable from
