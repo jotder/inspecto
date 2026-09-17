@@ -132,7 +132,7 @@ Release flow: merge to `main` → `0.x-SNAPSHOT` available (optional snapshot de
 - [ ] `./mvnw -B verify` is green on a clean checkout with **no app present**.
 - [ ] Three modules build; `agent-kernel-core` has **zero** compile/runtime dependencies (guard passes).
 - [ ] Tag → publish path works (a `0.1.0` artifact lands in the registry).
-- [ ] `docs/ARCHITECTURE.md` present; ADR folder exists.
+- [ ] `agent-kernel/docs/ARCHITECTURE.md` present; ADR folder exists.
 - [ ] Package skeleton (§3) compiles (interfaces may be empty/stubbed).
 
 ---

@@ -35,11 +35,20 @@ public record ModelProfile(String name, String baseUrl, boolean enabled, Map<Mod
         return models.get(tier);
     }
 
-    /** CPU-only (testing/dev): LARGE collapses to 7B since 14B is impractical on CPU. */
+    /**
+     * CPU-only (testing/dev): LARGE collapses to 7B since 14B is impractical on CPU.
+     * Deliberately carries the same tier map as {@link #DEV_LAPTOP} — the two differ only in the
+     * hardware they describe, and neither can hold a 14B — so declaring either behaves identically.
+     */
     public static final ModelProfile CPU_ONLY = new ModelProfile(
             "cpu-only", DEFAULT_BASE_URL, false, tiers("qwen2.5:3b", "qwen2.5:7b", "qwen2.5:7b"));
 
-    /** Dev laptop (~4GB GPU): 2-3B on GPU, 7B CPU-spilled, no 14B. */
+    /**
+     * Dev laptop (~4GB GPU): 2-3B on GPU, 7B CPU-spilled, no 14B.
+     * Deliberately carries the same tier map as {@link #CPU_ONLY} — see there. Kept as a separate
+     * declared name so an operator's {@code -Dagentkernel.profile} records the intended hardware,
+     * and so the maps can diverge later without a config change.
+     */
     public static final ModelProfile DEV_LAPTOP = new ModelProfile(
             "dev-laptop", DEFAULT_BASE_URL, false, tiers("qwen2.5:3b", "qwen2.5:7b", "qwen2.5:7b"));
 

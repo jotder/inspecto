@@ -68,14 +68,14 @@ The kernel must **not** force one orchestration model or any infrastructure.
 | Host framework | ServiceLoader (no DI) | Spring Boot + Quarkus agents | Spring Boot + Spring Modulith |
 | Persistence | none (reads DuckDB catalog) | Postgres + RLS, object store | Postgres + pgvector, object store |
 | Multi-tenancy | none | hard tenant isolation, quotas | single/multi-tenant TBD |
-| Eventing | in-process `BatchEvent` | message queue + signed webhooks | chat request / SSE |
+| Eventing | in-process `ConsignmentEvent` | message queue + signed webhooks | chat request / SSE |
 | Compliance | none | SOC2/HIPAA/GDPR, field-level PII enc | data-residency for LLM calls |
 
 **Consequence — the strongest argument for a Spring-free core:** because CVVE and CxO are Spring apps and UCC is not, the kernel can depend on **none** of them. Plain Java + `langchain4j-core` drops into a `@Component`/`@Tool` Spring bean *or* a ServiceLoader provider with equal ease. "No Spring in the core" is what *enables* reuse, not a limitation.
 
 ### 3.3 App-specific domain machinery (built on kernel primitives, lives in the app)
 
-- UCC: the 7 skills, `SqlOracle`, `FailureReactor` (`BatchEvent`), `OperationalTables`.
+- UCC: the 7 skills, `SqlOracle`, `FailureReactor` (`ConsignmentEvent`), `OperationalTables`.
 - CVVE: schema registry + meta-schema validation, OCR/fuzzy-match/malware processing agents, HITL review queue + `/override`, state machine, tenant isolation.
 - CxO: reconciliation engine (normalize → anchor-by-credibility → spread), gap-fill/what-if scenarios, analytics tools (amenity premium, floor-rise, BHK gap), RERA `DataSource` SPI.
 
@@ -89,7 +89,7 @@ Two-module reactor, `com.gamma.inspector:file-processor-parent` `3.12.0-SNAPSHOT
 
 | Generic runtime (belongs in kernel) | UCC binding (stays in app) |
 |---|---|
-| `Skill`/`SkillRegistry`, `ModelProvider/Router/Tier/Request`, `RepairLoop`, `DocRetriever`, `AuditEvent`, `AssistProfile` | 7 skills; `AssistContext`→`MetadataGraphService`/`ReportService`/`StatusStore`/`ConfigSource`; `FailureReactor`→`BatchEvent`; `SqlOracle`, `OperationalTables`, `NarrativeGuard`, `AiDescriptionProvider`; `UccAssistAgent` |
+| `Skill`/`SkillRegistry`, `ModelProvider/Router/Tier/Request`, `RepairLoop`, `DocRetriever`, `AuditEvent`, `AssistProfile` | 7 skills; `AssistContext`→`MetadataGraphService`/`ReportService`/`StatusStore`/`ConfigSource`; `FailureReactor`→`ConsignmentEvent`; `SqlOracle`, `OperationalTables`, `NarrativeGuard`, `AiDescriptionProvider`; `UccAssistAgent` |
 
 The core assist SPI (`com.gamma.assist`: `AssistAgent`, `AssistRequest`, `AssistResult`, `Diagnosis`) lives in the **ETL core**. Because the agent is **pre-production**, UCC 4.x is free to **reshape** this contract to match the kernel (e.g. `AssistResult.confidence` `String`→`double`) rather than freeze it behind a compatibility adapter. The kernel keeps its own neutral `AgentRequest/AgentResult`; the binding does a thin **reshape** at the HTTP boundary. The ETL core must still **not** depend on `agent-kernel` (no langchain4j in the lean ETL core) — only `file-processor-agent` does.
 

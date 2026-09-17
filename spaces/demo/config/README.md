@@ -64,8 +64,8 @@ seed script copies it into the consumed inbox). Everything under `../data/` exce
 | Job: sql.template | `jobs/orders_summary_sql_job.toon` (`$status` param, Run Artifact + `job.dataset.produced` signal) | `*_job.toon` | Workbench → Jobs |
 | Job: on-signal | `jobs/orders_summary_followup_job.toon` (`on_signal` + `when` guard; `args`/`bind` shapes above) | `*_job.toon` | Workbench → Jobs |
 | Job: at-rest Pipeline chain | `jobs/orders_rollup_job.toon` runs `orders/orders_pipeline.toon`'s Stage-2 `steps:` chain over the landed `orders` store on each commit, writing `output_store: rollup` | `*_job.toon` (`pipeline_config:`) + `*_pipeline.toon` | Pipelines |
-| Incident queue | `ops/demo_ops_queue.toon` | `*_queue.toon` | Incidents |
-| SLA escalation | `ops/sla_escalation.toon` | `*_escalation.toon` | Incidents |
+| Incident queue | *no example in this space yet* — the kind loads, but the demo queue config was never authored | `*_queue.toon` | Incidents |
+| SLA escalation | *no example in this space yet* — the kind loads, but the demo escalation config was never authored | `*_escalation.toon` | Incidents |
 | RCA template | `ops/orders_rca.toon` | `*_rca.toon` | Incidents |
 | Dataset | `registry/datasets/orders_dataset.toon`, `…/orders_enriched_dataset.toon` (DAT-5 calculated columns) | `registry/datasets/` | Studio → Datasets |
 | Query | `registry/queries/orders_by_region.toon` (SQL + `$minAmount` parameter) | `registry/queries/` | Studio → Query Library |
