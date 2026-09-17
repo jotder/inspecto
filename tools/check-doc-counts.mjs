@@ -296,28 +296,63 @@ function read(rel) {
 }
 function json(rel) { return JSON.parse(read(rel)); }
 
-// ── scope: the current tier. `docs/archived-documents/` is never maintained, so a marker there
-// would be a standing failure by policy; everything else that is maintained is in scope. ─────────
-const TREES = ['docs', 'compliance', '.claude'];
+// ── scope: the WHOLE repository, as a DENY-list (`SKIP_DIRS`), not an allow-list of trees. ───────
+//
+// ⛔ Until 2026-09-17 this read `['docs', 'compliance', '.claude']` + a root `*.md` pass — the SAME
+// allow-list whose twin in `check-doc-links.mjs` was the bug behind `README-LINKS-BROKEN-IN-REPO-1`
+// (`inspecto/README.md`, the customer's first page in the bundle, carried 29 dead links while the
+// guard stayed green because `inspecto/` was in none of its three roots). That guard was fixed at
+// the SHAPE on 2026-09-16; this one kept the pre-fix scope for a day. `DOC-COUNTS-GUARD-SCOPE-1`.
+//
+// An allow-list answers "did we remember to add this tree?"; a deny-list answers "is there a reason
+// to skip this tree?" — and only the second fails loudly when someone adds a fourth doc-bearing
+// directory. Widening cost NO findings and no noise: it took the walk from 493 markdown files to
+// 529, and the 36 it gained (`asn-parser/docs/` ×10, `inspecto-agent/docs/` ×14, `inspecto/README.md`,
+// `inspecto-ui/README.md`, `tools/templates/*/README.md`, …) carry ZERO `<!--count:*-->` markers
+// today — measured, not assumed. The point is that a marker placed in one of them is now POLICED
+// instead of silently unguarded.
+const ROOTS = ['.'];
+
+/**
+ * Never walked: build output and the git worktrees, which contain whole second copies of the repo.
+ * Copied from `check-doc-links.mjs`, and every entry was re-checked against THIS guard rather than
+ * assumed to transfer — two of them carry real markers:
+ *   - `graphify-out` holds dated GRAPH_REPORT snapshots with **8** `<!--count:parser-node-types-->`
+ *     markers frozen at whatever the contract derived on the day each snapshot was taken;
+ *   - `inspecto-deploy` is the packaged BUNDLE — gitignored build output carrying a stale COPY of the
+ *     whole docs tree: 485 markdown files and **59** markers in this checkout.
+ * Both are generated artifacts nobody edits, so policing them would fail the build over a stale copy
+ * and teach the next shift to ignore this guard. `dist`/`target` hold no markdown at all today and are
+ * kept for parity with the sibling.
+ * ⛔ Neither is present in a FRESH CLONE (or a fresh worktree), so a widening verified only there looks
+ * green and goes red the moment it meets a checkout that has ever built a bundle or run `graphify`.
+ * That is exactly how the sibling's own widening was nearly shipped blind — verify against a built tree.
+ */
+const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target', 'graphify-out',
+                           'inspecto-deploy']);
+
+// The archive is exempt ENTIRELY here, unlike in `check-doc-links.mjs` where it is exempt only as a
+// link SOURCE: that tier is never maintained (CLAUDE.md doc-lifecycle §3), so a marker inside it would
+// be a standing failure by policy rather than a drift anyone is expected to fix.
 const EXEMPT = ['docs/archived-documents'];
 
 function walk(dir, out = []) {
     let entries;
-    try { entries = readdirSync(dir); } catch { return out; }
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
     for (const e of entries) {
-        if (e === 'node_modules' || e === '.git' || e === 'worktrees') continue;
-        const p = join(dir, e);
+        if (e.isDirectory() && SKIP_DIRS.has(e.name)) continue;
+        const p = join(dir, e.name);
         let st; try { st = statSync(p); } catch { continue; }
         if (st.isDirectory()) walk(p, out);
-        else if (e.endsWith('.md')) out.push(p);
+        else if (e.name.endsWith('.md')) out.push(p);
     }
     return out;
 }
 
 const rel = f => relative(ROOT, f).split(sep).join('/');
+// The `.` walk subsumes what used to be a separate root-level `*.md` pass.
 const all = [];
-for (const t of TREES) all.push(...walk(join(ROOT, t)));
-for (const e of readdirSync(ROOT)) if (e.endsWith('.md')) all.push(join(ROOT, e));
+for (const t of ROOTS) all.push(...walk(join(ROOT, t)));
 const files = all.filter(f => !EXEMPT.some(x => rel(f).startsWith(x + '/')));
 
 // ── derive first, so a broken parse fails loudly rather than comparing against NaN ──────────────
@@ -385,8 +420,9 @@ if (failures.length) {
     console.error(`✗ Doc-count guard: ${failures.length} problem(s)\n`);
     console.error(failures.join('\n'));
     console.error(`\n  derived: ${tally}`);
-    console.error(`  scope: ${files.length} current-tier markdown file(s) (${all.length} total; `
-        + `${EXEMPT.join(', ')} exempt as never-maintained), ${markers} marker(s), NO exemptions by design\n`);
+    console.error(`  scope: ${files.length} current-tier markdown file(s) (${all.length} total — the `
+        + `WHOLE repo minus ${[...SKIP_DIRS].join('/')}; ${EXEMPT.join(', ')} exempt as `
+        + `never-maintained), ${markers} marker(s), NO exemptions by design\n`);
     console.error('  Fix the DOC, or the contract — not this guard. A count in a doc must equal what');
     console.error('  its owning contract derives. If a line is deliberately recording an OLD figure,');
     console.error('  do not mark it: markers assert the current value.\n');
@@ -395,4 +431,5 @@ if (failures.length) {
 
 console.log(`✓ Doc-count guard: ${markers} marked count statement(s) all match what their owning `
     + `contract derives — ${tally}; scope: ${files.length} current-tier markdown file(s) `
-    + `(${all.length} total; ${EXEMPT.join(', ')} exempt as never-maintained); NO exemptions by design.`);
+    + `(${all.length} total — the WHOLE repo minus ${[...SKIP_DIRS].join('/')}; `
+    + `${EXEMPT.join(', ')} exempt as never-maintained); NO exemptions by design.`);
