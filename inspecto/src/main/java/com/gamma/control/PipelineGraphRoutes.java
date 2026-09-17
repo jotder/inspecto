@@ -76,7 +76,7 @@ final class PipelineGraphRoutes implements RouteModule {
         // business verification and sign-off. A read, not an authoring action — no capability gate.
         api.get("/pipelines/([^/]+)/document", (e, m) -> document(api, e, ApiContext.name(m)));
         // W5 (plan U-A): the editable round-trip over the canonical *_pipeline.toon.
-        api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, ApiContext.name(m)));
+        api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, e, ApiContext.name(m)));
         api.put("/pipelines/([^/]+)/graph", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> saveGraph(api, e, ApiContext.name(m), api.body(e))));
     }
@@ -223,13 +223,19 @@ final class PipelineGraphRoutes implements RouteModule {
      * plus a synthesized node per registered {@code *_enrich.toon} companion whose
      * {@code triggers.on_pipeline} names this pipeline (W4b — the node carries only
      * {@code use: enrichment/<name>}, never a config mirror). 404 if no such registered pipeline.
+     *
+     * <p><b>STORE-CONFLICT-DETECTION-1:</b> carries a strong {@code ETag} over the on-disk config
+     * ({@code raw}) — the same bytes {@link #saveGraph} hashes for its {@code If-Match} check — so an
+     * editor that reads here and later saves through {@code PUT .../graph} can detect a concurrent
+     * edit exactly like {@code ComponentRoutes}' component CRUD (W3 optimistic locking).
      */
-    private Object editableGraph(ApiContext api, String name) throws IOException {
+    private Object editableGraph(ApiContext api, HttpExchange ex, String name) throws IOException {
         PipelineConfig cfg = api.service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
         Path file = api.service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, "no config file for pipeline '" + name + "'"));
         Map<String, Object> raw = ConfigLoader.filesystem().decode(file.toString());
+        ETags.set(ex, ETags.of(ContentHash.of(raw)));
         Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
         attachCompanionEnrichments(api, cfg.identity().pipelineName(), editable);
         return editable;
@@ -257,6 +263,12 @@ final class PipelineGraphRoutes implements RouteModule {
      * content is decided by whether {@code target} already exists on disk, not by registration —
      * a pipeline's first save (nothing registered yet) still overlays its own just-written file on
      * every save after the first.
+     *
+     * <p><b>STORE-CONFLICT-DETECTION-1:</b> honours an optional {@code If-Match} precondition against
+     * the existing file's content hash — the same {@code ETags} pattern {@code ComponentRoutes} uses
+     * for the component registry — so two editors racing to save the same pipeline get a {@code 409
+     * CONFLICT_STALE_VERSION} instead of a silent last-write-wins clobber. A brand-new pipeline (no
+     * existing file) has nothing to be stale against, so the precondition is only checked on an update.
      */
     private Object saveGraph(ApiContext api, HttpExchange e, String name, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
@@ -269,8 +281,10 @@ final class PipelineGraphRoutes implements RouteModule {
         Path target = WriteGates.jail(writeRoot,
                 registered.orElseGet(() -> writeRoot.resolve(WriteGates.safeName(name, "pipeline name") + "_pipeline.toon")),
                 "resolved path");
-        Map<String, Object> existing = Files.exists(target)
+        boolean existsOnDisk = Files.exists(target);
+        Map<String, Object> existing = existsOnDisk
                 ? ConfigLoader.filesystem().decode(target.toString()) : new LinkedHashMap<>();
+        if (existsOnDisk) ETags.requireMatch(e, ETags.of(ContentHash.of(existing)));
 
         Map<String, Object> lowered;
         try {
@@ -318,6 +332,8 @@ final class PipelineGraphRoutes implements RouteModule {
         byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
         log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, target.getFileName(), bytes.length);
+        // The etag a next save (or a re-read) must accept — the same bytes just written, not the pre-save hash.
+        ETags.set(e, ETags.of(ContentHash.of(lowered)));
 
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("written", true);

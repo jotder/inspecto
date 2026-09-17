@@ -1540,11 +1540,25 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   Standard/Enterprise deployment on Postgres has NO backup path for job runs, the dedup and acquisition
   ledgers, status, or the run lease. Fix offered: a `pg_dump`/COPY leg when `OperationalDb.postgres()` is
   true, or document the gap in `EDITIONS.md`.
-- **P2** · **`STORE-CONFLICT-DETECTION-1`** — `ComponentStore.java:164-175`, `PipelineStore.java:80-84` and
-  `ViewStore.java:88-91` overwrite blindly with no `If-Match`/version, unlike `ConfigWriteRoutes`
-  (`CLIENT-HALVES-1`); two concurrent editors silently clobber each other — components are recoverable from
-  the MET-5 `.history/`, pipelines and views are NOT. Fix: extend the `ETags`/`CONFLICT_STALE_VERSION`
-  pattern to these write paths, or at minimum give `PipelineStore`/`ViewStore` the same history.
+- ~~**P2** · **`STORE-CONFLICT-DETECTION-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's cited store lines were
+  stale; the real gap was one route hop over.** *(Original: `ComponentStore.java:164-175`,
+  `PipelineStore.java:80-84` and `ViewStore.java:88-91` overwrite blindly with no `If-Match`/version.)*
+  Grounded: `ComponentStore.write` (still no version check inside the store itself) IS already protected —
+  `ComponentRoutes.updateComponent` (`inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:265`)
+  calls `ETags.requireMatch` before calling `store.write`, exactly like `ConfigWriteRoutes`; the row's own
+  cited fix (extend `ETags`/`CONFLICT_STALE_VERSION`) was already true for components at the route layer.
+  `PipelineStore.write` is **not** the live pipeline-editor write path any more (W5): the graph editor's
+  `PUT /pipelines/{name}/graph` (`PipelineGraphRoutes.saveGraph`) writes the canonical `*_pipeline.toon`
+  directly via `AtomicFiles`, bypassing `PipelineStore` entirely — `PipelineStore.write` only backs the
+  grandfathered `*_flow.toon` bundle-import path (`BundleRoutes.PipelineBundleSource`), whose per-item
+  `actions` map (skip/overwrite/unchanged-by-hash) is a deliberate, different conflict contract for a batch
+  import, not a live two-editor race. `ViewStore.write` is written only by `MaterializeTask` after a
+  pipeline run — one writer, no HTTP `PUT` route exists for a view at all, so there is no concurrent-editor
+  scenario to protect. **Fix applied where the real race lives**: `PUT /pipelines/{name}/graph` now honours
+  an optional `If-Match` against the existing `*_pipeline.toon`'s content hash (409
+  `CONFLICT_STALE_VERSION` on a stale save), and `GET /pipelines/{name}/graph/raw` now publishes the
+  matching `ETag` — the same `ETags` pattern `ComponentRoutes` uses, applied to the route that was actually
+  missing it. See `ControlApiPipelineGraphIfMatchTest`.
 - ~~**P2** · **`NO-RATE-LIMIT-EXPENSIVE-ROUTES-1`**~~ ✅ **SHIPPED 2026-09-17.** Grounding confirmed: no
   throttling existed anywhere in `com.gamma.control` on `/db/query`, `/bi/query`, `/recon/*` or `/agent/*`.
   Added `RateLimiter`, a fixed-budget (burst 20, refill 1/3 req/s) in-memory token bucket keyed per
