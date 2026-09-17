@@ -1,6 +1,7 @@
 package com.gamma.acquire.connectors;
 
 import com.gamma.acquire.AcquisitionException;
+import com.gamma.acquire.Checksums;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionWorkbench;
 import com.gamma.acquire.DiscoveryContext;
@@ -163,8 +164,14 @@ public final class SftpConnector implements CollectorConnector {
                 boolean append = false;
                 if (Files.exists(dest)) {
                     long have = Files.size(dest);
-                    if (have == remoteLen && remoteLen > 0) return dest;     // already complete
-                    if (have > 0 && have < remoteLen) { offset = have; append = true; }   // resume (RESUMABLE)
+                    if (have == remoteLen && remoteLen > 0) {
+                        // Equal size alone doesn't prove the remote wasn't truncated-then-replaced since our
+                        // last attempt: verify content via checksum before trusting the local copy as complete.
+                        if (verifyComplete(client, file, dest, remoteLen)) return dest;
+                        offset = 0; append = false;   // mismatch: re-fetch the whole file from scratch
+                    } else if (have > 0 && have < remoteLen) {
+                        offset = have; append = true;   // resume (RESUMABLE)
+                    }
                 }
                 try (InputStream in = handle.new RemoteFileInputStream(offset);
                      OutputStream out = append
@@ -176,6 +183,29 @@ public final class SftpConnector implements CollectorConnector {
             return dest;
         } catch (IOException e) {
             throw new AcquisitionException("SFTP fetch failed for " + file.relativePath() + " → " + dest, e);
+        }
+    }
+
+    /**
+     * A local file whose size matches {@code remoteLen} could still be a truncated-then-replaced remote copy
+     * of the same length as our earlier, genuinely-complete download. Re-fetch the remote content into a
+     * sibling temp file and compare checksums with {@link Checksums} (no new hashing implementation) rather
+     * than trusting the size match. Returns true only when the two contents are identical.
+     */
+    private boolean verifyComplete(SFTPClient client, RemoteFile file, Path dest, long remoteLen) throws IOException {
+        Path tmp = dest.resolveSibling(dest.getFileName() + ".resume-verify");
+        try {
+            try (net.schmizz.sshj.sftp.RemoteFile handle = client.open(remotePath(file));
+                 InputStream in = handle.new RemoteFileInputStream();
+                 OutputStream out = Files.newOutputStream(tmp,
+                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                in.transferTo(out);
+            }
+            String localSum = Checksums.of(dest, null);
+            String freshSum = Checksums.of(tmp, null);
+            return localSum.equals(freshSum);
+        } finally {
+            Files.deleteIfExists(tmp);
         }
     }
 

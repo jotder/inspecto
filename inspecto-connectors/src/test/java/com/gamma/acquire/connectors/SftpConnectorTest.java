@@ -205,6 +205,26 @@ class SftpConnectorTest {
     }
 
     @Test
+    void fetchToRefusesAnEqualSizeButTruncatedThenReplacedRemote(@TempDir Path local) throws Exception {
+        // Local copy from an earlier, genuinely-complete fetch of the ORIGINAL remote content.
+        String original = "0123456789ABCDEF".repeat(64);   // 1024 bytes
+        Path dest = local.resolve("big.bin");
+        Files.writeString(dest, original);
+
+        // The remote file was since truncated and replaced with different content of the SAME length —
+        // size-only comparison would wrongly call this "already complete".
+        String replaced = "FEDCBA9876543210".repeat(64);   // same 1024 bytes, different content
+        Files.writeString(serverRoot.resolve("big.bin"), replaced);
+
+        try (CollectorConnector c = connector()) {
+            RemoteFile rf = c.discover(new DiscoveryContext(List.of("*.bin"), List.of(), DiscoveryContext.UNBOUNDED)).get(0);
+            Path got = c.fetchTo(rf, dest);
+            assertEquals(replaced, Files.readString(got, StandardCharsets.UTF_8),
+                    "equal size alone must not be accepted as complete — content mismatch triggers a full re-fetch");
+        }
+    }
+
+    @Test
     void endToEndSftpSourceIsIngestedAndDedupedOnReRun(@TempDir Path dir) throws Exception {
         // Two CSVs on the SFTP server; a pipeline with source.connector=sftp pulls them into the local
         // staging tree (poll) and the normal batch path ingests them. A second run re-lists but, finding the
