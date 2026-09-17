@@ -20,6 +20,11 @@ Inspecto — Java 26 build (`release=24`), Maven reactor `inspecto-parent`. UI i
 
 ## Verify (authoritative — the source of truth)
 
+> ⛔ **Cadence (operator, 2026-09-17): do NOT run the full reactor gate for each change.** Per change,
+> run the affected test classes (`mvn -o -B test -pl <module> -Dtest=A,B` — commas, never `+`; confirm
+> the surefire reports are fresh) and go forward. The full gate below is for: the operator asking
+> (GAUNTLET), the push that closes a batch touching shared seams, or handoff.
+
 ```powershell
 mvn -o clean test                # full reactor, offline. This is what "verified" means.
 mvn -o clean package -q          # → inspecto/target/inspecto-processor-*.jar  (skip tests)
