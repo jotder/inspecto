@@ -822,7 +822,9 @@ dirs, so without the mkdir every DB-backed store silently degraded to in-memory 
 The layer was **designed** for this: stores are JDBC-pluggable by URL scheme, the DDL is deliberately
 portable (`VARCHAR`/`BIGINT`, composite PKs, no auto-increment, no upserts — explicit DELETE-then-INSERT),
 and there is a **real embedded-Postgres round-trip test**
-([`PostgresStateStoreTest`](../../../../inspecto-ops/src/test/java/com/gamma/service/PostgresStateStoreTest.java))
+([`PostgresStateStoreTest`](../../../../inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java),
+moved to `inspecto` 2026-09-17 so it runs in the DEFAULT reactor — the four `com.gamma.ops` store cases stayed
+behind as [`PostgresOpsStoreTest`](../../../../inspecto-ops/src/test/java/com/gamma/service/PostgresOpsStoreTest.java))
 covering **9 of the 12 families** (note, tag assignment, job run, file stage, consignment output, status, provenance,
 object, link) — **the dedup ledger, the acquisition ledger and delivery receipts are the three it does not cover**
 (measured 2026-09-08; this sentence said "6 of the 9" and named two covered stores as uncovered). Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
