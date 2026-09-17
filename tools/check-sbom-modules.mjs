@@ -195,6 +195,31 @@ for (const m of bundleModules('Enterprise')) {
     }
 }
 
+// ── the per-edition counts bundle-modules.mjs states in prose ───────────────────────────────────
+// That file's `bundleModules` doc comment names the counts a reader will trust without running
+// anything. It drifted the moment inspecto-agent arrived (PKG-5) and said 2/10/11 against a real
+// 2/11/12 for five days. Prose beside a list is not checked by the list, so check it here.
+const COUNTS = /Personal (\d+), Standard (\d+), Enterprise (\d+)/.exec(
+    readFileSync(join(repoRoot, 'tools/bundle-modules.mjs'), 'utf8'),
+);
+if (!COUNTS) {
+    fail(
+        `tools/bundle-modules.mjs no longer states its per-edition counts as ` +
+            `\`Personal N, Standard N, Enterprise N\`. Either the comment was reworded (fix this parser) ` +
+            `or it was dropped — a count nobody asserts is how that comment went stale in the first place.`,
+    );
+}
+const stated = { Personal: +COUNTS[1], Standard: +COUNTS[2], Enterprise: +COUNTS[3] };
+for (const edition of EDITIONS) {
+    const actual = bundleModules(edition).length;
+    if (stated[edition] !== actual) {
+        problems.push(
+            `tools/bundle-modules.mjs says ${edition} ships ${stated[edition]} first-party module(s), but ` +
+                `its own MODULES table yields ${actual}. Correct the comment.`,
+        );
+    }
+}
+
 if (problems.length) {
     fail(
         `the shipped bill of materials and the bundle disagree:\n  - ${problems.join('\n  - ')}\n` +

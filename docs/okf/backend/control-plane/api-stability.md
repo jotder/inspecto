@@ -152,7 +152,10 @@ above the generated commit list.
 - Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
   catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured.
 - Run artifacts carry `event_time_min` / `event_time_max` instead of `timeRange`.
-- `mail.send` with no recipients logs "SUCCESS, nothing sent" rather than failing the job.
+- `mail.send` on a deployment with **no email channel configured** answers **`SKIPPED`**, not SUCCESS — it is
+  inert, not green. With **no recipients** (a `to` that resolves entirely blank) it answers **FAILED**.
+  *(This line said "no recipients logs 'SUCCESS, nothing sent'" until 2026-09-17, conflating the two cases and
+  naming the status the `ad29e683` reversal removed; `MailSendJob.java` — `JobResult.skipped` / `JobResult.failed`.)*
 - The token picker's preview is the server's evaluation, not a client-side guess.
 - New default-on cap: `-Djobs.maxConcurrentRuns=4` (D11), editable under Settings ▸ Scheduler ▸ Resource caps, where
   DuckDB `memory_limit` is also served (`2GB` is the measured recommendation, **not a shipped default** — GAP-4;

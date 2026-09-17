@@ -4,8 +4,8 @@ import { cloneDeep } from 'lodash-es';
 
 export const defaultNavigation: GammaNavigationItem[] = [
     // Separator above the platform groups. User-defined custom / business menus (Menu Builder) are
-    // prepended above this divider in the navigation mock (see navigation/api.ts), so this line marks
-    // the boundary between custom menus (top) and the built-in platform groups (below).
+    // prepended above this divider by NavigationService._build(), so this line marks the boundary
+    // between custom menus (top) and the built-in platform groups (below).
     {
         id: 'custom-menus-divider',
         type: 'divider',
@@ -309,8 +309,10 @@ export const defaultNavigation: GammaNavigationItem[] = [
         ],
     },
 ];
-// The alternate layouts reuse the same Inspecto navigation, but each gets its OWN array so the mock's
-// in-place child-fill (api.ts) can't mutate a shared reference and produce duplicate items (NG0955).
+// The alternate layouts reuse the same Inspecto navigation, but each gets its OWN array so no consumer
+// that mutates one in place can produce duplicate items in another (NG0955). The original in-place
+// mutator — the Fuse mock's child-fill in navigation/api.ts — went with the M4 shell re-plumb, and
+// NavigationService._build() now clones before it edits; these copies are belt-and-braces.
 export const compactNavigation: GammaNavigationItem[] = cloneDeep(defaultNavigation);
 export const futuristicNavigation: GammaNavigationItem[] = cloneDeep(defaultNavigation);
 export const horizontalNavigation: GammaNavigationItem[] = cloneDeep(defaultNavigation);
