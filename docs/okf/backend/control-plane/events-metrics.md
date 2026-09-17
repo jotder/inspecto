@@ -303,7 +303,7 @@ SPA's `v1Interceptor` does). Reaching for `.get("data")` on top of it lands on `
 NPE that reads exactly like a handler bug. Gate tests asserting only a status code pass either way, so
 this appears in the HAPPY PATH alone.
 
-### SMTP transport security — the hostname half is closed, the opportunistic half is not
+### SMTP transport security — both halves are now closed
 
 ✅ **`NOTIFY-SMTP-TLS-VERIFY-1` closed 2026-09-17.** `SmtpEmailChannel` now sets
 `mail.smtp.ssl.checkserveridentity` unconditionally. ⚠ The defect was narrower than filed: `javax.mail 1.6.2`'s
@@ -316,9 +316,21 @@ authentication left ON.
 name `notify.smtp.host` goes from silently trusted to failing to deliver, and **this will not be noticed on its
 own** — notification failures are logged and isolated by `NotificationService`, never surfaced.
 
-⬜ **`NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1` remains open.** `mail.smtp.starttls.enable` is opportunistic: a
-MITM who simply declines to advertise `STARTTLS` gets a plaintext session, the identity check never runs
-because no TLS session exists, and the AUTH credentials go over the wire in the clear — so the parent row's
-threat model is only half closed. ⛔ `starttls.required=true` is the fix and is a LARGER behaviour change: it
-breaks installs pointed at a relay that never offered STARTTLS and have been silently sending plaintext.
-Operator call.
+✅ **`NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1` closed 2026-09-17 — same call, same direction.** `SmtpEmailChannel`
+now sets `mail.smtp.starttls.required=true` alongside `.enable` whenever `notify.smtp.starttls` is on (the
+same existing config flag — no new knob was added). `mail.smtp.starttls.enable` alone is opportunistic: a
+relay that simply declines to advertise `STARTTLS` still got a plaintext session, the hostname-identity check
+above never ran because no TLS session existed, and SMTP AUTH credentials went out in the clear regardless of
+the fix above — so the parent row's threat model was only half closed until now.
+
+⚠ **Release-note-worthy, and a LARGER behaviour change than the hostname fix:** an install that set
+`notify.smtp.starttls=true` against a relay that never actually offered `STARTTLS` — and so has been silently
+sending plaintext mail and cleartext credentials — now fails to deliver instead of falling back silently.
+That is the intended outcome: a loud failure converts a silent weakness, which is exactly the call this
+session has made elsewhere for a genuine silent security gap (`NO-RATE-LIMIT-EXPENSIVE-ROUTES-1`,
+`UI-CAPABILITY-AFFORDANCE-1`). ⛔ No escape hatch to restore the opportunistic behaviour — the operator's
+options are to point at a relay that offers `STARTTLS`, or to stop setting `notify.smtp.starttls`. As with the
+hostname fix, notification failures are logged and isolated by `NotificationService`, never surfaced, so an
+affected install may not notice the switch to "loud failure" is happening beyond emails simply stopping.
+Documented in `SmtpEmailChannel`'s javadoc; proved by `SmtpEmailChannelStarttlsRequiredTest` (a fake relay that
+never advertises `STARTTLS` is refused, and no `AUTH` line ever reaches it).

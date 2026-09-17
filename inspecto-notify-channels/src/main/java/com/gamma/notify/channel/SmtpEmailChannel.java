@@ -43,10 +43,16 @@ import static com.gamma.util.Values.trimToNull;
  * fix is to configure {@code notify.smtp.host} as the name on the certificate, or to trust the issuing
  * CA via {@code -Djavax.net.ssl.trustStore}; there is deliberately no switch that turns verification off.
  *
- * <p>⚠ Known gap, deliberately not closed here: {@code starttls} is <em>opportunistic</em>
- * ({@code starttls.enable}, not {@code starttls.required}), so a relay that simply declines to advertise
- * {@code STARTTLS} still gets a cleartext session — identity verification never runs because no TLS
- * session is ever established.
+ * <p><b>{@code starttls} is required, not opportunistic, once enabled.</b> Setting {@code notify.smtp.starttls}
+ * also sets {@code mail.smtp.starttls.required=true} (not merely {@code .enable}), so a relay that simply
+ * declines to advertise {@code STARTTLS} fails the send loudly instead of silently falling back to a
+ * cleartext session in which the identity check above never runs and SMTP AUTH credentials go out in the
+ * clear. ⚠ <b>Behaviour change (closes {@code NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1}):</b> an install that set
+ * {@code notify.smtp.starttls=true} against a relay which never actually offered {@code STARTTLS} — and so
+ * has been silently sending plaintext mail and cleartext credentials — now fails to deliver instead. That is
+ * the intended outcome: a loud failure beats a silent weakness. There is no escape hatch to restore the
+ * opportunistic behaviour; the fix on the operator's side is to point at a relay that offers {@code STARTTLS},
+ * or to stop setting {@code notify.smtp.starttls}.
  *
  * <p>{@link #deliver(Notification, String)} sends to an explicit {@code target} address (a persisted
  * {@link com.gamma.notify.ChannelConfig} destination), falling back to {@code notify.smtp.to} when
@@ -178,7 +184,13 @@ public final class SmtpEmailChannel implements NotificationChannel {
         // escape hatch: an internal-CA deployment is served by the JVM trust store
         // (-Djavax.net.ssl.trustStore), which keeps authentication ON instead of turning it off.
         props.put("mail.smtp.ssl.checkserveridentity", "true");
-        if (starttls) props.put("mail.smtp.starttls.enable", "true");
+        if (starttls) {
+            props.put("mail.smtp.starttls.enable", "true");
+            // NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1: .enable alone is opportunistic — a relay that declines
+            // to advertise STARTTLS still gets a plaintext session, so the identity check above never runs
+            // and SMTP AUTH credentials go out in the clear. .required makes the send fail instead.
+            props.put("mail.smtp.starttls.required", "true");
+        }
         Session session;
         if (user != null && pass != null) {
             props.put("mail.smtp.auth", "true");

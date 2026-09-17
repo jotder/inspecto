@@ -1820,16 +1820,27 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   (`MappedSource` is explicitly >2 GB capable); `HeapSource` cannot exceed 2 GB.
   → `okf/backend/engine/parser-plugins.md`
 
-- **P2** · 🔴 **`NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1` — identity verification does not help if TLS never
-  starts.** Filed 2026-09-17 out of `NOTIFY-SMTP-TLS-VERIFY-1`, which closed the hostname half.
-  `mail.smtp.starttls.enable` is **opportunistic**: a MITM who simply declines to advertise `STARTTLS` gets a
-  plaintext session, the identity check never runs because no TLS session is ever established, and the SMTP
-  AUTH credentials go over the wire in the clear anyway — so the threat model the parent row named is only
-  half closed.
-  ⛔ **The fix is `mail.smtp.starttls.required=true`, and it is a LARGER behaviour change than the parent:** it
-  breaks installs that set `starttls=true` against a relay which never offered it and have been silently
-  sending plaintext. ⛔ Operator call — it converts a silent weakness into a loud failure, which is right, but
-  not something to flip unannounced. The gap is documented in `SmtpEmailChannel`'s javadoc meanwhile.
+- ~~**P2** · 🔴 **`NOTIFY-SMTP-STARTTLS-OPPORTUNISTIC-1`**~~ ✅ **CLOSED 2026-09-17 — same call made as the
+  parent row, in the same direction.** `SmtpEmailChannel.buildMessage` now sets
+  `mail.smtp.starttls.required=true` alongside the existing `.enable`, gated on the SAME `notify.smtp.starttls`
+  flag the parent row's fix already used — no new config surface was added. *(Original:)* identity
+  verification does not help if TLS never starts: `mail.smtp.starttls.enable` is opportunistic, so a MITM who
+  simply declines to advertise `STARTTLS` got a plaintext session, the hostname check never ran, and SMTP AUTH
+  credentials went out in the clear regardless of `NOTIFY-SMTP-TLS-VERIFY-1`'s fix.
+  ⚠ **Operator call made explicitly:** this converts the silent weakness into a loud failure — an install that
+  set `starttls=true` against a relay which never actually offered `STARTTLS` (and so has been silently
+  sending plaintext) now fails to deliver instead. That is the intended outcome, consistent with the house
+  style of `NO-RATE-LIMIT-EXPENSIVE-ROUTES-1` and `UI-CAPABILITY-AFFORDANCE-1`: a security feature that
+  silently no-ops under MITM is worse than a loud, noticeable failure. No escape hatch was added.
+  ⚠ **Release-note-worthy**, documented in `SmtpEmailChannel`'s javadoc (replacing the "known gap" comment)
+  and in `okf/backend/control-plane/events-metrics.md` (replacing the "remains open" note) — not in
+  `docs/EDITIONS.md`, which carries no per-fix release-note section for this module.
+  ✅ Proved by new `SmtpEmailChannelStarttlsRequiredTest`: a fake relay that never advertises `STARTTLS` is
+  refused (no plaintext fallback, no `AUTH` line ever reaches it); a relay with `starttls=false` (unaffected
+  control) carries no `required` property at all. Existing `SmtpEmailChannelTlsIdentityTest` (STARTTLS relay
+  that DOES support it, valid cert) still passes unmodified, confirming supported relays are unaffected.
+  Verified: `mvn -o -Pedition-standard -pl inspecto-notify-channels
+  -Dtest=SmtpEmailChannelStarttlsRequiredTest,SmtpEmailChannelTlsIdentityTest,SmtpEmailChannelTest test` — 11/0/0.
   → `okf/backend/control-plane/events-metrics.md`
 - ~~**P2** · **`BER-FRAMING-UNCHECKED-READ-1`**~~ ✅ **SHIPPED 2026-09-17 — held, with BOTH cited line numbers
   drifted by ~145 lines** (the files are 118 and 117 lines long). `00 03 02 01 05 00` — one good record plus a
