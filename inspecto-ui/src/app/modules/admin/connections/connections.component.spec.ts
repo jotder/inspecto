@@ -49,7 +49,7 @@ describe('ConnectionsComponent', () => {
         expect(c.visibleConnections()).toEqual([]);
     });
 
-    it('shows New/Edit/Delete in the default (Builder) lens', () => {
+    it('shows New/Edit/Delete/Test in the default (Builder) lens', () => {
         const fixture = create();
         const el = fixture.nativeElement as HTMLElement;
         expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('New connection'))).toBe(
@@ -57,9 +57,10 @@ describe('ConnectionsComponent', () => {
         );
         expect(el.querySelector('[aria-label="Edit"]')).not.toBeNull();
         expect(el.querySelector('[aria-label="Delete"]')).not.toBeNull();
+        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Test')).toBe(true);
     });
 
-    it('hides New/Edit/Delete in the Business (read-only) lens', () => {
+    it('hides New/Edit/Delete/Test in the Business (read-only) lens (UI-CAPABILITY-AFFORDANCE-1: Test requires canOnboardConnections)', () => {
         const fixture = create();
         TestBed.inject(LensService).selectLens('business');
         fixture.detectChanges();
@@ -69,6 +70,7 @@ describe('ConnectionsComponent', () => {
         );
         expect(el.querySelector('[aria-label="Edit"]')).toBeNull();
         expect(el.querySelector('[aria-label="Delete"]')).toBeNull();
+        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Test')).toBe(false);
     });
 
     it('renders with no a11y violations', async () => {

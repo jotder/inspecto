@@ -21,10 +21,12 @@
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
-            <button mat-stroked-button (click)="evaluateAll()" [disabled]="sweeping() || !rows().length">
-                <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
-                <span class="ml-2">Run all checks</span>
-            </button>
+            @if (lens.canOperateRuns()) {
+                <button mat-stroked-button (click)="evaluateAll()" [disabled]="sweeping() || !rows().length">
+                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                    <span class="ml-2">Run all checks</span>
+                </button>
+            }
             @if (lens.canAuthorWorkbench()) {
                 <button mat-flat-button color="primary" (click)="newExpectation()">
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>

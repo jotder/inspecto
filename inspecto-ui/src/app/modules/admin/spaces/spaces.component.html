@@ -17,14 +17,16 @@
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
             @if (spaces.multiSpace()) {
-                <button
-                    mat-icon-button
-                    (click)="createFromBundle()"
-                    matTooltip="Create from bundle"
-                    aria-label="Create from bundle"
-                >
-                    <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                </button>
+                @if (lens.canAdminister()) {
+                    <button
+                        mat-icon-button
+                        (click)="createFromBundle()"
+                        matTooltip="Create from bundle"
+                        aria-label="Create from bundle"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                    </button>
+                }
                 <button mat-stroked-button (click)="newFromTemplate()">
                     <mat-icon svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                     <span class="ml-2">New from template</span>

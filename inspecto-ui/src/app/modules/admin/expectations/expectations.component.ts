@@ -28,8 +28,8 @@ const KIND_LABELS: Record<string, string> = {
  * Expectations (C2) — data-quality checks (non-null / range / regex / referential) attached to
  * Pipelines/Jobs. "Run check" evaluates one now; "Run all checks" sweeps every enabled one. A FAILED
  * check raises an Incident (correlated `expectation:<name>`) and fans out a notification — follow it
- * on the Incidents pane. Authoring is Builder-lens (canAuthorWorkbench); evaluation is operational
- * and available in every lens.
+ * on the Incidents pane. Authoring is Builder-lens (canAuthorWorkbench); evaluation requires
+ * canOperateRuns, matching the backend's gate on `POST /expectations/evaluate` and `/{id}/evaluate`.
  */
 @Component({
     selector: 'app-expectations',
@@ -104,15 +104,17 @@ export class ExpectationsComponent implements OnInit {
         },
     ];
 
-    /** Run-check is operational (every lens); edit/delete author config (Builder lens only). */
+    /** Run-check needs canOperateRuns (backend-enforced); edit/delete author config (Builder lens only). */
     get rowActions(): InspectoRowAction<Expectation>[] {
-        const ops: InspectoRowAction<Expectation>[] = [
-            {
-                icon: 'heroicons_outline:play',
-                hint: 'Run check now',
-                onClick: (e) => this.evaluate(e),
-            },
-        ];
+        const ops: InspectoRowAction<Expectation>[] = this.lens.canOperateRuns()
+            ? [
+                  {
+                      icon: 'heroicons_outline:play',
+                      hint: 'Run check now',
+                      onClick: (e) => this.evaluate(e),
+                  },
+              ]
+            : [];
         if (!this.lens.canAuthorWorkbench()) return ops;
         return [
             ...ops,

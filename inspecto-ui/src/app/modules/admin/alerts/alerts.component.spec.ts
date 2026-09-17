@@ -35,7 +35,7 @@ const RULE: AlertRule = {
 
 async function create(
     overrides: Partial<Record<keyof AlertsService, unknown>> = {},
-    { canAuthor = true, confirmed = true } = {},
+    { canAuthor = true, confirmed = true, canOperateRuns = true } = {},
 ) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
@@ -52,7 +52,10 @@ async function create(
             { provide: AlertsService, useValue: api },
             { provide: ToastrService, useValue: toastr },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(async () => confirmed) } },
-            { provide: LensService, useValue: { canAuthorAlertRules: () => canAuthor } },
+            {
+                provide: LensService,
+                useValue: { canAuthorAlertRules: () => canAuthor, canOperateRuns: () => canOperateRuns },
+            },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
@@ -102,6 +105,16 @@ describe('AlertsComponent', () => {
         const c = fixture.componentInstance;
         expect(c.ruleActions).toEqual([]);
         expect(fixture.nativeElement.textContent).not.toContain('New rule');
+    });
+
+    it('Evaluate now is hidden without canOperateRuns (UI-CAPABILITY-AFFORDANCE-1)', async () => {
+        const { fixture } = await create({}, { canOperateRuns: false });
+        expect(fixture.nativeElement.textContent).not.toContain('Evaluate now');
+    });
+
+    it('Evaluate now is shown with canOperateRuns', async () => {
+        const { fixture } = await create({}, { canOperateRuns: true });
+        expect(fixture.nativeElement.textContent).toContain('Evaluate now');
     });
 
     it('New rule opens the form dialog and a save reloads + toasts', async () => {

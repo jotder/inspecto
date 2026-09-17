@@ -1927,11 +1927,15 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   `eslint-disable` directives naming rules in NO preset (a config existed upstream in the Fuse template and was
   never tracked), and `job-parameter-specs.ts:61`'s `no-fallthrough` is an INTENTIONAL case group flagged only
   because an explanatory comment sits between the labels.
-- **P2** · **`UI-CAPABILITY-AFFORDANCE-1`** — after 2026-09-17's gating (`ad29e683`) the Test/Probe buttons
-  in `connections.service.ts:71,82` callers, the Evaluate actions in `expectations.service.ts:81,86` and
-  `alerts.service.ts:75` callers, and Space import (`spaces.service.ts:184`) render for every user and
-  answer 403 for one without `canOnboardConnections`/`canOperateRuns`/`canAdminister`. Fix: gate the
-  affordances on the v1 envelope's `permissions` the way the CRUD buttons already are.
+- ~~**P2** · **`UI-CAPABILITY-AFFORDANCE-1`**~~ ✅ **CLOSED 2026-09-17.** Grounded against the actual backend
+  gates (line citations had drifted, capabilities re-verified): connections' Test/Probe → `canOnboardConnections`
+  (`ConnectionRoutes.java:44,49,57`); expectations'/alerts' Evaluate → `canOperateRuns`
+  (`ExpectationRoutes.java:53-55`, `AlertRoutes.java:42`) — a stale code comment claiming evaluation was
+  unconditional is now corrected; Space import → `canAdminister` (`SpaceRoutes.java:74,160-162`, gated only
+  once ≥1 Space exists — the recovery-route exemption). Each affordance now hides behind the matching
+  `LensService` signal, matching the CRUD-button pattern. vitest coverage added/extended across all four
+  components: 26/26 passing. ⚠ Noted but out of scope: the rest of the Spaces page (New space, per-space
+  Edit/Delete/Import) still has no capability gating at all.
 - **P2** · **`CONTROL-AUTHGATE-TESTCOVERAGE-1`** — only 8 of 136 files under
   `inspecto/src/test/java/com/gamma/control/` call `Authenticators.forTest`; every other route test runs
   Personal, where `ApiContext.requireCapability` is a no-op, so a gate added or removed on ~94% of routes

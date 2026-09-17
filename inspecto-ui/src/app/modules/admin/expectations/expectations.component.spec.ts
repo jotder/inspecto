@@ -32,7 +32,12 @@ const ROW: Expectation = {
 };
 
 async function create(
-    opts: { rows?: Expectation[]; canAuthor?: boolean; api?: Partial<Record<keyof ExpectationsService, unknown>> } = {},
+    opts: {
+        rows?: Expectation[];
+        canAuthor?: boolean;
+        canOperateRuns?: boolean;
+        api?: Partial<Record<keyof ExpectationsService, unknown>>;
+    } = {},
 ) {
     const toastr = { error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
@@ -50,7 +55,13 @@ async function create(
             { provide: MatDialog, useValue: { open: vi.fn() } },
             { provide: ToastrService, useValue: toastr },
             { provide: InspectoConfirmService, useValue: {} },
-            { provide: LensService, useValue: { canAuthorWorkbench: signal(opts.canAuthor !== false) } },
+            {
+                provide: LensService,
+                useValue: {
+                    canAuthorWorkbench: signal(opts.canAuthor !== false),
+                    canOperateRuns: signal(opts.canOperateRuns !== false),
+                },
+            },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
@@ -79,6 +90,20 @@ describe('ExpectationsComponent', () => {
         const hints = fixture.componentInstance.rowActions.map((a) => a.hint);
         expect(hints).toEqual(['Run check now']);
         expect(fixture.nativeElement.textContent).not.toContain('New expectation');
+    });
+
+    it('hides Run check now / Run all checks without canOperateRuns (UI-CAPABILITY-AFFORDANCE-1)', async () => {
+        const { fixture } = await create({ canOperateRuns: false });
+        const hints = fixture.componentInstance.rowActions.map((a) => a.hint);
+        expect(hints).not.toContain('Run check now');
+        expect(fixture.nativeElement.textContent).not.toContain('Run all checks');
+    });
+
+    it('shows Run check now / Run all checks with canOperateRuns', async () => {
+        const { fixture } = await create({ canOperateRuns: true });
+        const hints = fixture.componentInstance.rowActions.map((a) => a.hint);
+        expect(hints).toContain('Run check now');
+        expect(fixture.nativeElement.textContent).toContain('Run all checks');
     });
 
     it('a failed evaluation warns that an Incident was raised and patches the row', async () => {

@@ -13,7 +13,9 @@
             @if (loading() || evaluating()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button mat-stroked-button (click)="evaluate()" [disabled]="evaluating()">Evaluate now</button>
+            @if (lens.canOperateRuns()) {
+                <button mat-stroked-button (click)="evaluate()" [disabled]="evaluating()">Evaluate now</button>
+            }
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>

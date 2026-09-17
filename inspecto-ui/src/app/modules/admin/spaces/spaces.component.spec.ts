@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it } from 'vitest';
-import { Space, SpacesService } from 'app/inspecto/api';
+import { LensService, Space, SpacesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { SpacesComponent } from './spaces.component';
@@ -15,7 +15,7 @@ const SPACES: Space[] = [
     { id: 'beta', displayName: '', description: '', createdAt: '' },
 ];
 
-function create(multi: boolean, list: Space[]) {
+function create(multi: boolean, list: Space[], canAdminister = true) {
     const stub = {
         multiSpace: signal(multi),
         availableSpaces: signal(list),
@@ -32,6 +32,7 @@ function create(multi: boolean, list: Space[]) {
             { provide: MatDialog, useValue: {} },
             { provide: ToastrService, useValue: {} },
             { provide: InspectoConfirmService, useValue: {} },
+            { provide: LensService, useValue: { canAdminister: signal(canAdminister) } },
         ],
     });
     const fixture = TestBed.createComponent(SpacesComponent);
@@ -49,5 +50,17 @@ describe('SpacesComponent', () => {
     it('shows single-tenant guidance with no a11y violations', async () => {
         const fixture = create(false, []);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('hides "Create from bundle" without canAdminister (UI-CAPABILITY-AFFORDANCE-1)', () => {
+        const fixture = create(true, SPACES, false);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[aria-label="Create from bundle"]')).toBeNull();
+    });
+
+    it('shows "Create from bundle" with canAdminister', () => {
+        const fixture = create(true, SPACES, true);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[aria-label="Create from bundle"]')).not.toBeNull();
     });
 });

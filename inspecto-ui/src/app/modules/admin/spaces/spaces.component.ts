@@ -6,7 +6,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, Space, SpacesService } from 'app/inspecto/api';
+import { apiErrorMessage, LensService, Space, SpacesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -38,6 +38,7 @@ import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
 })
 export class SpacesComponent implements OnInit {
     readonly spaces = inject(SpacesService);
+    protected lens = inject(LensService);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);

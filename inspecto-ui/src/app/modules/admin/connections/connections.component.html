@@ -81,12 +81,19 @@
                         }
                     </div>
                     <div class="flex flex-wrap items-center gap-1">
-                        <button mat-flat-button color="primary" (click)="test(c.id)" [disabled]="testing()[c.id]">
-                            @if (testing()[c.id]) {
-                                <mat-spinner diameter="16" class="mr-2"></mat-spinner>
-                            }
-                            Test
-                        </button>
+                        @if (lens.canOnboardConnections()) {
+                            <button
+                                mat-flat-button
+                                color="primary"
+                                (click)="test(c.id)"
+                                [disabled]="testing()[c.id]"
+                            >
+                                @if (testing()[c.id]) {
+                                    <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                                }
+                                Test
+                            </button>
+                        }
                         <button
                             mat-icon-button
                             [routerLink]="[c.id]"
