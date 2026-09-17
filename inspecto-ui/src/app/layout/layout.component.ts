@@ -193,9 +193,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
     private _updateScheme(): void {
         // Remove class names for all schemes
         this._document.body.classList.remove('light', 'dark');
+        this._document.documentElement.classList.remove('light', 'dark');
 
-        // Add class name for the currently selected scheme
+        // Add class name and colorScheme for the currently selected scheme
         this._document.body.classList.add(this.scheme);
+        this._document.documentElement.classList.add(this.scheme);
+        this._document.documentElement.style.colorScheme = this.scheme;
     }
 
     /**

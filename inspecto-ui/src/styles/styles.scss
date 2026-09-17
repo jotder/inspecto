@@ -3,15 +3,122 @@
 /*  @ Styles from this file will override 'vendors.scss' and Gamma's base styles.
 /* ----------------------------------------------------------------------------------------------------- */
 
-/* Material overlay panels (mat-select / mat-menu / mat-autocomplete) render with a transparent surface in
- * this theme, so open dropdowns showed the content behind them. Give every overlay surface the solid card
- * background + the shared border token so they read as proper popovers. (Uses --gamma-* vars, scheme-aware.) */
+/* Material overlay panels (mat-select / mat-menu / mat-autocomplete / mat-datepicker) render with a solid card
+ * background + the shared border token so they read as proper popovers in both light and dark modes. */
 .mat-mdc-select-panel,
 .mat-mdc-menu-panel,
 .mat-mdc-autocomplete-panel {
     // !important: MDC's `.mdc-menu-surface { background-color }` has equal specificity and loads later.
     background-color: var(--gamma-bg-card) !important;
     border: 1px solid var(--gamma-border);
+    color: var(--gamma-text-default);
+}
+
+/* Material options inside select & autocomplete panels */
+.mat-mdc-option {
+    color: var(--gamma-text-default) !important;
+
+    .mdc-list-item__primary-text {
+        color: var(--gamma-text-default) !important;
+    }
+
+    &:hover:not(.mdc-list-item--disabled),
+    &.mat-mdc-option-active,
+    &.cdk-keyboard-focused {
+        background-color: var(--gamma-bg-hover) !important;
+    }
+
+    &.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+        background-color: rgba(var(--gamma-primary-rgb), 0.12) !important;
+        .mdc-list-item__primary-text {
+            color: var(--gamma-primary) !important;
+        }
+    }
+
+    &.mdc-list-item--disabled {
+        opacity: 0.38;
+        .mdc-list-item__primary-text {
+            color: var(--gamma-text-secondary) !important;
+        }
+    }
+}
+
+.mat-mdc-optgroup-label {
+    color: var(--gamma-text-secondary) !important;
+    font-weight: 600;
+}
+
+/* Material menu items */
+.mat-mdc-menu-panel .mat-mdc-menu-item {
+    color: var(--gamma-text-default) !important;
+
+    .mat-icon {
+        color: var(--gamma-text-secondary) !important;
+    }
+
+    &:hover:not([disabled]),
+    &.cdk-keyboard-focused:not([disabled]) {
+        background-color: var(--gamma-bg-hover) !important;
+    }
+
+    &[disabled] {
+        opacity: 0.38;
+        color: var(--gamma-text-secondary) !important;
+    }
+}
+
+/* Material Datepicker overlay panel & calendar */
+.mat-datepicker-content {
+    background-color: var(--gamma-bg-card) !important;
+    color: var(--gamma-text-default) !important;
+    border: 1px solid var(--gamma-border);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+
+    .mat-calendar {
+        background-color: var(--gamma-bg-card) !important;
+        color: var(--gamma-text-default) !important;
+    }
+
+    .mat-calendar-header,
+    .mat-calendar-period-button,
+    .mat-calendar-arrow {
+        color: var(--gamma-text-default) !important;
+        fill: currentColor !important;
+    }
+
+    .mat-calendar-previous-button,
+    .mat-calendar-next-button {
+        color: var(--gamma-text-secondary) !important;
+        &:hover {
+            color: var(--gamma-text-default) !important;
+        }
+    }
+
+    .mat-calendar-table-header th {
+        color: var(--gamma-text-secondary) !important;
+    }
+
+    .mat-calendar-body-label {
+        color: var(--gamma-text-secondary) !important;
+    }
+
+    .mat-calendar-body-cell-content {
+        color: var(--gamma-text-default) !important;
+        border-color: transparent !important;
+
+        &.mat-calendar-body-selected {
+            background-color: var(--gamma-primary) !important;
+            color: #ffffff !important;
+        }
+
+        &.mat-calendar-body-today:not(.mat-calendar-body-selected) {
+            border-color: var(--gamma-primary) !important;
+        }
+    }
+
+    .mat-calendar-body-cell:hover:not(.mat-calendar-body-disabled) .mat-calendar-body-cell-content:not(.mat-calendar-body-selected) {
+        background-color: var(--gamma-bg-hover) !important;
+    }
 }
 
 /* The global `*:focus-visible` ring (2px primary, 2px offset — @gamma/styles/tailwind.scss) is right for
@@ -33,6 +140,21 @@
  * dialog / filled-form-field / select MDC tokens at the --gamma-* vars (present in the overlay) so every
  * modal — confirm, connection form, … — is legible in dark mode. Light mode is already consistent. */
 body.dark {
+    --mat-select-enabled-trigger-text-color: var(--gamma-text-default);
+    --mat-select-placeholder-text-color: var(--gamma-text-secondary);
+    --mat-select-enabled-arrow-color: var(--gamma-text-secondary);
+    --mat-select-panel-background-color: var(--gamma-bg-card);
+    --mat-option-label-text-color: var(--gamma-text-default);
+    --mat-option-hover-state-layer-color: var(--gamma-bg-hover);
+    --mat-option-focus-state-layer-color: var(--gamma-bg-hover);
+    --mat-option-selected-state-label-text-color: var(--gamma-primary);
+    --mat-option-selected-state-layer-color: rgba(var(--gamma-primary-rgb), 0.12);
+    --mat-menu-container-color: var(--gamma-bg-card);
+    --mat-menu-item-label-text-color: var(--gamma-text-default);
+    --mat-menu-item-icon-color: var(--gamma-text-secondary);
+    --mat-menu-item-hover-state-layer-color: var(--gamma-bg-hover);
+    --mat-autocomplete-background-color: var(--gamma-bg-card);
+
     .mat-mdc-dialog-container {
         --mdc-dialog-container-color: var(--gamma-bg-card);
         --mdc-dialog-subhead-color: var(--gamma-text-default);
@@ -226,12 +348,61 @@ body.dark {
 }
 
 /* Native form controls (<select> option lists, scrollbars, date pickers) are painted by the BROWSER from its
- * own palette, and that palette is light unless the page declares `color-scheme`. Nothing here did, so an open
- * native <select> in the transform grid rendered a white list with the OS blue highlight against the dark
- * pane. Follow the scheme class the layout component sets on <body>. */
-body.light {
+ * own palette, and that palette is light unless the page declares `color-scheme`. Follow the scheme class
+ * that the layout component sets on <html> and <body>. Also ensure CDK overlays and native selects/options
+ * adhere to the active color-scheme and dark theme surfaces. */
+:root, html {
     color-scheme: light;
 }
-body.dark {
+:root.dark, html.dark, body.dark {
     color-scheme: dark;
 }
+:root.light, html.light, body.light {
+    color-scheme: light;
+}
+
+body.dark .cdk-overlay-container,
+.dark .cdk-overlay-container,
+.dark.cdk-overlay-container {
+    color-scheme: dark;
+}
+body.light .cdk-overlay-container,
+.light .cdk-overlay-container,
+.light.cdk-overlay-container {
+    color-scheme: light;
+}
+
+select {
+    color-scheme: inherit;
+    color: var(--gamma-text-default);
+}
+body.dark select,
+html.dark select,
+.dark select {
+    color-scheme: dark;
+    color: var(--gamma-text-default);
+}
+select option,
+select optgroup {
+    background-color: var(--gamma-bg-card);
+    color: var(--gamma-text-default);
+}
+body.dark select option,
+body.dark select optgroup,
+html.dark select option,
+html.dark select optgroup,
+.dark select option,
+.dark select optgroup {
+    background-color: var(--gamma-bg-card) !important;
+    color: var(--gamma-text-default) !important;
+}
+optgroup {
+    color: var(--gamma-text-secondary) !important;
+    font-weight: 600;
+}
+select.bg-transparent option,
+select.bg-transparent optgroup {
+    background-color: var(--gamma-bg-card) !important;
+    color: var(--gamma-text-default) !important;
+}
+

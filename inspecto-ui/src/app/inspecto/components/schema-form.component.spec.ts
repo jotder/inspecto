@@ -638,6 +638,55 @@ describe('InspectoSchemaFormComponent', () => {
         });
     });
 
+    describe('edit box sample value fill on Right Arrow key', () => {
+        it('fills the sample value into an empty input when pressing ArrowRight', () => {
+            const specs: AttributeSpec[] = [
+                {
+                    key: 'channel',
+                    label: 'Channel',
+                    type: 'identifier',
+                    tier: 'required',
+                    placeholder: 'e.g. ops_email',
+                },
+            ];
+            const fixture = create(specs);
+            const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+            expect(input).toBeTruthy();
+            expect(input.value).toBe('');
+
+            input.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                    key: 'ArrowRight',
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            fixture.detectChanges();
+
+            expect(input.value).toBe('ops_email');
+            expect(fixture.componentInstance.value()['channel']).toBe('ops_email');
+        });
+
+        it('fills the sample value in a list draft field when pressing ArrowRight', () => {
+            const fixture = create(LIST_SPECS);
+            const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+            expect(input).toBeTruthy();
+            expect(input.value).toBe('');
+
+            input.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                    key: 'ArrowRight',
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+            fixture.detectChanges();
+
+            expect(input.value).toBe('^CALL');
+            expect(fixture.componentInstance.listDraft('patterns')).toBe('^CALL');
+        });
+    });
+
     /**
      * `flat` renders a compact PROPERTY LIST (operator ask 2026-09-04): one ~32px row per spec — label ·
      * current value · pencil — with the real control inline only while that row is edited, help as an

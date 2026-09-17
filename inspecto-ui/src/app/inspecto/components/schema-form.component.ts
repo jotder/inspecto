@@ -35,6 +35,7 @@ import {
 } from '../component-model';
 import { ChipComponent } from './chip.component';
 import { InspectoOptionPickerComponent } from './option-picker.component';
+import { InspectoSampleValueDirective } from './sample-value.directive';
 import { InspectoTokenPickerComponent } from './token-picker.component';
 
 /**
@@ -60,6 +61,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
         ReactiveFormsModule,
         ChipComponent,
         InspectoOptionPickerComponent,
+        InspectoSampleValueDirective,
         InspectoTokenPickerComponent,
         MatAutocompleteModule,
         MatButtonModule,
@@ -1187,3 +1189,5 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         }
     }
 }
+
+export { InspectoSampleValueDirective, extractSampleValue } from './sample-value.directive';

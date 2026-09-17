@@ -29,7 +29,6 @@ import {
 import { ReconcileResult, reconcileSql } from './pipeline-transform-sql-reconcile';
 import { SqlFunction, quoteIdentifier, sqlFunctionsByCategory, usesSource } from './sql-functions';
 import { InputRelation } from './step-workbench-inputs';
-import { StepWorkbenchComponent } from './step-workbench.component';
 
 /** How many rows an inline "Try it on the sample" test posts (mirrors the config pane's cap). */
 const MAX_TEST_ROWS = 50;
@@ -94,7 +93,6 @@ export interface FieldRow extends CompiledField {
         StepPreviewResultComponent,
         InspectoAlertComponent,
         SqlCodemirrorComponent,
-        StepWorkbenchComponent,
     ],
     templateUrl: './pipeline-transform-sql-definition.component.html',
 })
@@ -176,7 +174,7 @@ export class PipelineTransformSqlDefinitionComponent {
      * with three overrides is genuinely the simpler surface. Anything that forces the grid to
      * enumerate every field is pushing it back toward the shape that does not scale.
      */
-    readonly filter = signal<FieldFilter>('changed');
+    readonly filter = signal<FieldFilter>('all');
     readonly pageSize = signal<number>(PAGE_SIZES[0]);
     readonly page = signal(0);
     readonly pageSizes = PAGE_SIZES;
@@ -398,6 +396,9 @@ export class PipelineTransformSqlDefinitionComponent {
             this.view.set('fields');
             this.sqlText.set('');
             this.fields.set(storedFields);
+            const used = new Set(storedFields.map((f) => f.from).filter(Boolean));
+            const missing = this.upstreamColumns().filter((c) => !used.has(c));
+            this.leftOut.set(missing);
         } else if (storedSql.trim()) {
             // Hand-written SQL opens as what the author wrote. Fields is one click away when it is a
             // projection; the reconciler, not a guess, decides that.
@@ -409,11 +410,7 @@ export class PipelineTransformSqlDefinitionComponent {
             this.sqlText.set('');
             this.fields.set(seedFields(this.upstreamColumns()));
         }
-        // D10: land on Changed when there IS something changed — on a wide feed that is a few rows to
-        // read instead of hundreds. ⛔ Never on a Step that changes nothing: "show me what I changed"
-        // over an all-passthrough Step is an empty table, which is a worse first screen than the
-        // fields themselves. The note under the toolbar carries the count either way.
-        this.filter.set(this.allRows().some((r) => r.changed) ? 'changed' : 'all');
+        this.filter.set('all');
         this.loaded = this.snapshot();
     }
 
@@ -560,6 +557,23 @@ export class PipelineTransformSqlDefinitionComponent {
         rows[idx + 1] = temp;
         this.fields.set(rows);
         this.touched();
+    }
+
+    /** Returns the declared type, inferred sample type, or 'VARCHAR' for an upstream column. */
+    columnType(col: string): string {
+        const declared = this.upstreamColumnTypes();
+        if (declared && declared[col]) return declared[col];
+        const sample = this.sampleRows()?.[0] ?? {};
+        if (typeof sample[col] === 'number') return 'DOUBLE';
+        if (typeof sample[col] === 'boolean') return 'BOOLEAN';
+        return 'VARCHAR';
+    }
+
+    /** Formats the column and its type as `<COL_NAME> ( <TYPE> )`, e.g. `ORDER_DATE ( VARCHAR )`. */
+    columnOptionLabel(col: string): string {
+        if (!col) return '';
+        const t = this.columnType(col);
+        return t ? `${col} ( ${t} )` : col;
     }
 
     // ── view controls ───────────────────────────────────────────────────────────────────────────────

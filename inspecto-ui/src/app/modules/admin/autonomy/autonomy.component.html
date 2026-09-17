@@ -92,7 +92,7 @@
                             <td class="py-2 pr-4 font-mono">{{ row.name }}</td>
                             <td class="py-2 pr-4">
                                 <select
-                                    class="rounded border border-gray-300 bg-transparent px-2 py-1 dark:border-gray-600"
+                                    class="rounded border border-gray-300 bg-transparent px-2 py-1 text-default dark:border-gray-600"
                                     [(ngModel)]="row.mode"
                                     [disabled]="!canOperate || unavailable()"
                                     [attr.aria-label]="'Mode for ' + row.name"

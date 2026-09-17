@@ -48,7 +48,7 @@ import { MeasureRow, formatMeasures, measureRowError, needsField, parseMeasures 
             }
             @if (availableColumns().length) {
                 <select
-                    class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
+                    class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs text-default dark:border-gray-600"
                     aria-label="Add a grouping column"
                     [ngModel]="''"
                     (ngModelChange)="addGroup($event)"
@@ -91,7 +91,7 @@ import { MeasureRow, formatMeasures, measureRowError, needsField, parseMeasures 
                                 <span class="text-secondary text-xs italic">as written</span>
                             } @else {
                                 <select
-                                    class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-1 text-sm dark:border-gray-600"
+                                    class="h-8 w-full rounded-md border border-gray-300 bg-transparent px-1 text-sm text-default dark:border-gray-600"
                                     [attr.aria-label]="'Aggregate, measure ' + ($index + 1)"
                                     [ngModel]="row.agg"
                                     (ngModelChange)="setAgg($index, $event)"

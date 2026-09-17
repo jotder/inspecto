@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
+import { InspectoSampleValueDirective } from 'app/inspecto/components/sample-value.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
@@ -41,6 +42,7 @@ export interface PipelineChangeIdResultData {
         MatInputModule,
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
+        InspectoSampleValueDirective,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `

@@ -12,6 +12,7 @@ const SHORTCUTS: Shortcut[] = [
     { keys: ['Ctrl', 'K'], description: 'Open the command palette (jump to a page or run an action)' },
     { keys: ['?'], description: 'Show this keyboard-shortcuts help' },
     { keys: ['Esc'], description: 'Close the palette, a dialog, or this help' },
+    { keys: ['→'], description: 'Fill sample value into an empty edit box' },
     { keys: ['↑', '↓'], description: 'Move between palette results' },
     { keys: ['Enter'], description: 'Open the selected result, or submit the focused form' },
     { keys: ['/'], description: "Search the page's table (opens and focuses its quick filter)" },
