@@ -51,11 +51,12 @@
         </dependency>
 
         <!-- OpenCSV — the CSV reader/writer helpers. Single-owner (only this module uses it since
-             the WS-D split), so it stays pinned here (M1: no drift to prevent). -->
+             the WS-D split), but the version is parent-managed anyway: the parent's
+             ${commons-lang3.version} comment reasons from opencsv's transitive commons-lang3 3.13.0,
+             so the number had a second home here and could go stale silently. -->
         <dependency>
             <groupId>com.opencsv</groupId>
             <artifactId>opencsv</artifactId>
-            <version>5.9</version>
         </dependency>
 
         <!-- Univocity CSV parser — used by the CSV helpers (version managed by the parent —

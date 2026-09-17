@@ -97,9 +97,14 @@
                      loses the Events SCREEN; recording (EventStore/EventLog) stays core and ungated. -->
                 <module>inspecto-events</module>
                 <!-- EDG-01 cell 7 (2026-09-08): CP-11 operational objects — the com.gamma.ops domain, its
-                     four stores, the /objects|/notes|/queues|/tags routes, two Job Types and the
+                     four stores, the /objects|/notes|/tags routes, two Job Types and the
                      incident_purge task. The largest cell: 31 domain files, 23 code dependants, several of
                      which CONSTRUCTED it — core now reaches it via com.gamma.objects.ObjectAccess.
+                     ⛔ /queues was in this cell when it was written (2026-09-08) and is NOT any more:
+                     RETIRE-HALVES-1 deleted QueueRoutes/QueueRouter/QueueStore and the *_queue.toon
+                     config kind outright on 2026-09-14 (commit 519673a7 — whose message describes only
+                     a whitepaper change; see okf/backend/control-plane/api-stability.md). The module's
+                     RouteModule service file lists ObjectRoutes, NoteRoutes and TagRoutes only.
                      ⚠ Amends OPS-01 (drops `objects` from Personal's stores) and SP-CTL-02 (a gap raises
                      the EVENT on Personal but no ALERT object). ⛔ NOT /alerts* — that is AlertsService
                      over config alert RULES, a different domain, and it stays in core. -->
@@ -196,6 +201,18 @@
              transitive 3.13.0 that would otherwise win Maven's same-depth resolution and break the
              tar path (NoClassDefFoundError: ArrayFill). -->
         <commons-lang3.version>3.18.0</commons-lang3.version>
+        <!-- logback binding: declared compile-scope by inspecto-event (EventStoreAppender extends
+             logback's AppenderBase, and this module ships logback.xml) and test-scope by inspecto-etl.
+             Two modules pinned the SAME 1.5.18 literal independently, which is exactly the drift M1
+             hoists against. Keep in step with ${slf4j.version} — slf4j is pinned to what logback 1.5.x
+             compiles against, so bumping one without the other splits the facade from its binding. -->
+        <logback.version>1.5.18</logback.version>
+        <!-- opencsv: single-owner (inspecto-util's CSV reader/writer helpers) and pinned literally there
+             until ROOT-POM row PARENT-UNMANAGED-CHILD-VERSIONS-1. Hoisted despite the single owner
+             because the ${commons-lang3.version} comment above REASONS FROM this number — opencsv drags a
+             transitive commons-lang3 3.13.0 — so the value already had two homes and a bump in one would
+             silently stale the other. -->
+        <opencsv.version>5.9</opencsv.version>
         <!-- Default empty so surefire's @{argLine} resolves cleanly when JaCoCo is inactive
              (normal 'mvn test'). The core module's 'coverage' profile's prepare-agent goal
              overrides this. Both modules inherit it. -->
@@ -309,6 +326,19 @@
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
+            <!-- logback binding (inspecto-event compile, inspecto-etl test). Scope stays with the
+                 declaring module; only the version resolves here. -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <!-- OpenCSV — inspecto-util's CSV reader/writer helpers. -->
+            <dependency>
+                <groupId>com.opencsv</groupId>
+                <artifactId>opencsv</artifactId>
+                <version>${opencsv.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter</artifactId>
@@ -382,8 +412,9 @@
 
     <!-- Shared plugin versions + config for both modules. Children activate plugins by
          reference (surefire/compiler run in the default lifecycle); the managed version and
-         configuration below apply without each child re-declaring them. Module-specific
-         plugins (the core's shade + jacoco) stay in the child POM. -->
+         configuration below apply without each child re-declaring them. Module-specific plugin
+         CONFIGURATION (shade's per-module relocations/excludes, and jacoco) stays in the child POM —
+         only the shade VERSION is managed here. -->
     <build>
         <pluginManagement>
             <plugins>
@@ -391,6 +422,19 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.13.0</version>
+                </plugin>
+                <!-- maven-shade-plugin: the fat-jar/sidecar builder. FIVE modules run it — inspecto
+                     (the core fat jar) plus the inspecto-agent, inspecto-connectors,
+                     inspecto-notify-channels and inspecto-security sidecars — and each pinned 3.5.2
+                     with its own copy of the "Pinned: the offline reactor resolves no plugin version
+                     from a repository" comment, so a bump half-landed. The version now lives once; the
+                     five children declare the plugin version-free and keep their own <configuration>.
+                     ⚠ Still an explicit pin, for that same offline reason — pluginManagement supplies
+                     it from the local repo exactly as it already does for compiler and surefire. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>3.5.2</version>
                 </plugin>
                 <!-- Native-access flag silences DuckDB JNI warnings on Java 24. @{argLine} is the
                      late-bound property JaCoCo's prepare-agent sets; keeping it here lets the

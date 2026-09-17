@@ -17,9 +17,10 @@
     <name>Inspecto — Operational objects (Standard edition, optional)</name>
     <description>
         OPTIONAL Standard-edition operational objects (EDITIONS.md CP-11): Alerts -> Incidents -> Cases ->
-        Tasks, their notes, links, tags, queues, RCA templates, findings and workflow — the com.gamma.ops
-        domain, its four DuckDB-backed stores, the /objects, /notes, /queues and /tags route families, the
+        Tasks, their notes, links, tags, RCA templates, findings and workflow — the com.gamma.ops
+        domain, its four DuckDB-backed stores, the /objects, /notes and /tags route families, the
         object-analytics and case-rule Job Types, and the incident_purge maintenance task.
+        (⛔ work QUEUES were in this list until RETIRE-HALVES-1 deleted the capability on 2026-09-14.)
 
         WHY THIS IS THE LARGEST EDG-01 CELL. Unlike the other six, this feature was never a leaf: 31 domain
         files with 23 code dependants across the mandatory inspecto-engine and inspecto modules, several of

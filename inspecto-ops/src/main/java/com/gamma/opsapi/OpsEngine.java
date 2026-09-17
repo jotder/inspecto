@@ -9,10 +9,10 @@ import com.gamma.ops.ObjectServiceAccess;
  * How this module's routes reach the concrete {@link ObjectService} (EDG-01 cell 7, 2026-09-08).
  *
  * <p>Core exposes only the {@code com.gamma.objects.ObjectAccess} seam — nine narrow methods in core
- * types — because {@code com.gamma.ops} is an optional edition module. The {@code /objects}, {@code /notes},
- * {@code /queues} and {@code /tags} routes need far more than that (workflow transitions, case rules,
- * queues, merge/split, RCA application), so they take the seam back down to the implementation this module
- * itself installed.
+ * types — because {@code com.gamma.ops} is an optional edition module. The {@code /objects}, {@code /notes}
+ * and {@code /tags} routes need far more than that (workflow transitions, case rules, merge/split, RCA
+ * application), so they take the seam back down to the implementation this module itself installed.
+ * (⛔ {@code /queues} was named here until RETIRE-HALVES-1 deleted the work-queue family on 2026-09-14.)
  *
  * <p>⚠ Deliberately NOT a static holder. Resolving through {@code api.service()} keeps the lookup
  * per-Space — a multi-Space runtime has one engine per Space — and a global would have quietly served one

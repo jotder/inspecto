@@ -106,9 +106,8 @@
         <plugins>
             <plugin>
                 <artifactId>maven-shade-plugin</artifactId>
-                <!-- Pinned: the offline reactor resolves no plugin version from a repository, and this
-                     is the version the core fat jar and the connector sidecar already use. -->
-                <version>3.5.2</version>
+                <!-- Version parent-managed (pluginManagement): still an explicit pin for the offline
+                     reactor, but declared once for all five shading modules. -->
                 <executions>
                     <execution>
                         <phase>package</phase>
