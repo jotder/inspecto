@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1}: the four maintenance tasks that walk an operator-authored
- * {@code dir} all guarded it with a bare {@code !Files.isDirectory(dir)} and reported SUCCESS on every
- * failing answer — so a {@code dir} that names an existing FILE was reported as "directory not present,
- * nothing to do".
+ * {@code COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1} (four tasks) and {@code REFERENCE-COMPACTOR-SAME-SHAPE-1}
+ * (the fifth): the maintenance tasks that walk an operator-authored {@code dir} all guarded it with a bare
+ * {@code !Files.isDirectory(dir)} and reported SUCCESS on every failing answer — so a {@code dir} that
+ * names an existing FILE was reported as "directory not present, nothing to do".
  *
  * <p><b>What this test does NOT claim.</b> A {@code dir} that is merely absent stays a successful no-op,
  * deliberately: a path under the jail that nothing has written yet is indistinguishable from a typo'd one,
@@ -65,6 +65,22 @@ class MaintenanceDirNotADirectoryTest {
                         "dir", fileNamedAsADir(root, "sink")))).run());
     }
 
+    /**
+     * The fifth site (REFERENCE-COMPACTOR-SAME-SHAPE-1), which the fix above deliberately left alone: its
+     * {@code !Files.isDirectory} guard lives in {@code ReferenceCompactor.compact(Path,long)}, an overload
+     * {@code CollectorService} also calls with a pipeline's DERIVED {@code dirs.database}. The refusal
+     * therefore belongs on the config adapter {@code run(JobConfig)} — beside the path jail, which is on
+     * that seam for exactly the same reason — so only the operator-authored {@code dir} is judged.
+     */
+    @Test
+    void referenceCompactRefusesADirThatNamesAFile(@TempDir Path root) throws Exception {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new MaintenanceJob(job(Map.of("task", "reference_compact",
+                        "dir", fileNamedAsADir(root, "reference")))).run());
+        assertTrue(e.getMessage().contains("not a directory"),
+                () -> "the message must say why the config is broken: " + e.getMessage());
+    }
+
     // ── the two cases that must STAY a successful no-op ──────────────────────────
 
     @Test
@@ -79,5 +95,20 @@ class MaintenanceDirNotADirectoryTest {
         Path empty = Files.createDirectories(root.resolve("empty"));
         JobResult r = new MaintenanceJob(job(Map.of("task", "compact", "dir", empty.toString()))).run();
         assertTrue(r.success(), () -> "an empty dir has nothing to compact, which is success: " + r.message());
+    }
+
+    @Test
+    void referenceCompactStillSucceedsWhenTheDirIsMerelyAbsent(@TempDir Path root) throws Exception {
+        JobResult r = new MaintenanceJob(job(Map.of("task", "reference_compact",
+                "dir", root.resolve("never-refreshed").toString()))).run();
+        assertTrue(r.success(), () -> "an absent reference store is a legitimate no-op: " + r.message());
+    }
+
+    @Test
+    void referenceCompactStillSucceedsWhenTheDirExistsAndIsEmpty(@TempDir Path root) throws Exception {
+        Path empty = Files.createDirectories(root.resolve("empty-reference"));
+        JobResult r = new MaintenanceJob(job(Map.of("task", "reference_compact",
+                "dir", empty.toString()))).run();
+        assertTrue(r.success(), () -> "an empty reference store has nothing to compact: " + r.message());
     }
 }

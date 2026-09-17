@@ -95,6 +95,11 @@ public final class ReferenceCompactor {
         // not an operator-authored value and is resolved by the pipeline lane.
         Path root = PathJail.requireJobPathUnderAny(
                 PathJail.allowedRoots(), SpaceConfigRoot.current(), cfg.require("dir"), "dir");
+        // Absent = legitimate no-op; exists-but-not-a-directory = a broken config no run can ever satisfy
+        // (REFERENCE-COMPACTOR-SAME-SHAPE-1). It sits HERE and not in compact(Path,..) for the same reason
+        // the jail does: that overload's root is CollectorService's derived dirs.database, not authored.
+        if (Files.exists(root) && !Files.isDirectory(root))
+            throw new IllegalArgumentException("reference_compact: 'dir' " + root + " exists but is not a directory");
         long historyDays = Long.parseLong(cfg.opt("history_days", "0"));
         long t0 = System.nanoTime();
         Result r = compact(root, historyDays);
