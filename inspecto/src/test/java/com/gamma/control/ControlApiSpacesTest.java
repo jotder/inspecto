@@ -138,19 +138,27 @@ class ControlApiSpacesTest {
             // the gate still authenticates — a missing credential is a clean 401, never a 500
             assertEquals(401, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
 
-            // ⛔ The RECOVERY guarantee is that POST /spaces needs NO capability: gating it would
-            // brick a server hosting zero Spaces exactly as the writeRoot() resolution once did.
-            // (ROUTE-UNGATED-DEFAULT-1, 2026-09-15 - gating it here turned this test red, which is
-            // how the constraint was rediscovered.) DELETE is the opposite: it is the worst single
-            // case the route audit found, so it IS gated, and this subject carries canAdminister.
-            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"delta\"}", "Bearer plain").statusCode(),
-                    "creating a Space needs no capability - it is the recovery route");
+            // ⛔ The RECOVERY guarantee is that POST /spaces needs NO capability WHILE ZERO Spaces are
+            // hosted: gating it there would brick a server exactly as the writeRoot() resolution once did.
+            // (ROUTE-UNGATED-DEFAULT-1, 2026-09-15 - gating it unconditionally turned this test red, which
+            // is how the constraint was rediscovered.) 2026-09-17: the exemption was UNCONDITIONAL, so on a
+            // populated server any authenticated caller could create Spaces while DELETE needed
+            // canAdminister. Now: a Space exists, so a capability-less subject is refused...
+            assertEquals(403, send(c.port, "POST", "/spaces", "{\"id\":\"delta\"}", "Bearer plain").statusCode(),
+                    "with a Space hosted, creating another is administration");
+            assertEquals(403, send(c.port, "POST", "/spaces/import?id=delta", "", "Bearer plain").statusCode(),
+                    "import is the same posture as create");
+            // ...and canAdminister still creates, as it deletes
+            assertEquals(200, authed(c.port, "POST", "/spaces", "{\"id\":\"delta\"}").statusCode());
             assertEquals(200, authed(c.port, "DELETE", "/spaces/delta", null).statusCode());
 
-            // and deregistering back down to zero leaves the server recoverable rather than bricked
+            // and deregistering back down to zero leaves the server recoverable rather than bricked -
+            // by ANY authenticated caller, capability or not: that is the recovery route
             assertEquals(200, authed(c.port, "DELETE", "/spaces/acme", null).statusCode());
             assertEquals(0, c.spaces.size());
-            assertEquals(200, authed(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}").statusCode());
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}", "Bearer plain").statusCode(),
+                    "on an empty container creation needs no capability - it is the recovery route");
+
         } finally {
             Authenticators.forTest(null);
         }

@@ -37,10 +37,12 @@ final class AlertRoutes implements RouteModule {
         api.get("/alerts/rules", (e, m) -> api.service().alertService()
                 .map(a -> (Object) a.rules())
                 .orElse(java.util.List.of()));
-        api.post("/alerts/evaluate", (e, m) -> api.service().alertService()
+        // Gated 2026-09-17: a fired rule emits ALERT_FIRED, which the default NotificationRules dispatch to
+        // email/webhook — this route can page people, so it is an operate action, not a read.
+        api.post("/alerts/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> api.service().alertService()
                 .map(a -> (Object) a.evaluateAll())
                 .orElseThrow(() -> new ApiException(503,
-                        "alert engine not armed (no alert-rule components loaded)")));
+                        "alert engine not armed (no alert-rule components loaded)"))));
         api.post("/alerts/rules", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> single(e, create(api, api.body(e)))));
         api.put("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",

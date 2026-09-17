@@ -138,8 +138,52 @@ class ControlApiAuthSessionV1Test {
         }
     }
 
+    /**
+     * 2026-09-17: sign-in, refresh and sign-out reach the audit trail, refusals included. BACKLOG §6 had
+     * carried "sign-in/sign-out are not audited" as working-as-designed; an auditor's first question of an
+     * audit log is "show me the sign-ins", and a disclosure is not a control. No token or code is recorded.
+     */
+    @Test
+    void sessionLifecycleIsAuditedRefusalsIncluded(@TempDir Path cfg) throws Exception {
+        TokenRelays.forTest(FAKE);
+        try (Ctx c = open(cfg)) {
+            assertEquals(200, post(c.port, "/auth/exchange",
+                    "{\"code\":\"good-code\",\"codeVerifier\":\"v\",\"redirectUri\":\"http://x/cb\"}").statusCode());
+            assertEquals(401, post(c.port, "/auth/exchange",
+                    "{\"code\":\"bad-code\",\"codeVerifier\":\"v\",\"redirectUri\":\"http://x/cb\"}").statusCode());
+            assertEquals(200, post(c.port, "/auth/refresh", null, "Cookie", AuthRoutes.COOKIE + "=rt-1").statusCode());
+            assertEquals(401, post(c.port, "/auth/refresh", null, "Cookie", AuthRoutes.COOKIE + "=dead").statusCode());
+            assertEquals(200, post(c.port, "/auth/logout", null, "Cookie", AuthRoutes.COOKIE + "=rt-1").statusCode());
+
+            // Read the store in process: /events is itself behind the gate under test.
+            List<java.util.Map<String, Object>> events = c.svc.events().page(200, null, null).stream()
+                    .map(com.gamma.event.Event::toMap).toList();
+            assertTrue(authEvent(events, "auth.exchange", "AUDIT", 200), "a granted exchange is an AUDIT row");
+            assertTrue(authEvent(events, "auth.exchange", "ACCESS_DENIED", 401), "a refused exchange is an ACCESS_DENIED row");
+            assertTrue(authEvent(events, "auth.refresh", "AUDIT", 200), "a granted refresh is audited");
+            assertTrue(authEvent(events, "auth.refresh", "ACCESS_DENIED", 401), "a refused refresh is audited");
+            assertTrue(authEvent(events, "auth.logout", "AUDIT", 200), "a logout is audited");
+            for (var e : events) {
+                String text = String.valueOf(e);
+                assertFalse(text.contains("good-code") || text.contains("rt-1") || text.contains("rt-2"),
+                        () -> "no code or token may reach the audit log: " + text);
+            }
+        }
+    }
+
+    private static boolean authEvent(List<java.util.Map<String, Object>> events, String action, String type, int status) {
+        for (var e : events) {
+            if (!type.equals(e.get("type"))) continue;
+            if (!(e.get("attributes") instanceof java.util.Map<?, ?> a)) continue;
+            if (action.equals(a.get("action")) && "authentication".equals(a.get("action_category"))
+                    && String.valueOf(status).equals(String.valueOf(a.get("http_status")))) return true;   // Integer or Long once stored
+        }
+        return false;
+    }
+
     @Test
     void logoutClearsTheCookie(@TempDir Path cfg) throws Exception {
+
         TokenRelays.forTest(FAKE);
         try (Ctx c = open(cfg)) {
             HttpResponse<String> r = post(c.port, "/auth/logout", null,

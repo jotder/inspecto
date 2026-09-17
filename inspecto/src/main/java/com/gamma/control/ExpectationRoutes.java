@@ -48,8 +48,12 @@ final class ExpectationRoutes implements RouteModule {
         // HOME-TILES-1 (2026-09-16): the landing page's "Expectations breached" tile — a server-side count over
         // the registry's persisted lastResult, so the page never fetches every Expectation to count failures.
         api.get("/expectations/breached-count", (e, m) -> breachedCount(api));
-        api.post("/expectations/evaluate", (e, m) -> evaluateAll(api));
-        api.post("/expectations/([^/]+)/evaluate", (e, m) -> single(e, evaluateOne(api, ApiContext.name(m))));
+        // Gated 2026-09-17: evaluation persists lastResult, opens Incidents and emits EXPECTATION_FAILED into
+        // the default notification dispatch — an operate action, never the read the old exemption called it.
+        api.post("/expectations/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> evaluateAll(api)));
+        api.post("/expectations/([^/]+)/evaluate", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> single(e, evaluateOne(api, ApiContext.name(m)))));
+
         api.post("/expectations", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> single(e, create(api, api.body(e)))));
         api.put("/expectations/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",

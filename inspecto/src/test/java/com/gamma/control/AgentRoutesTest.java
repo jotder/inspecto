@@ -56,8 +56,22 @@ class AgentRoutesTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
+    /**
+     * 2026-09-17: the session role used to be whatever the body said. With an authenticated Subject it is
+     * derived from the granted capabilities and the body's claim is ignored — a caller cannot type "admin".
+     */
+    @Test
+    void sessionRoleIsDerivedFromTheSubjectsCapabilitiesNotTheBody() {
+        assertEquals("admin", AgentRoutes.roleFor(java.util.Set.of(Roles.CAN_ADMINISTER, Roles.CAN_OPERATE_RUNS)));
+        assertEquals("analyst", AgentRoutes.roleFor(java.util.Set.of(Roles.CAN_AUTHOR_WORKBENCH)));
+        assertEquals("analyst", AgentRoutes.roleFor(java.util.Set.of(Roles.CAN_OPERATE_RUNS)));
+        assertEquals("support", AgentRoutes.roleFor(java.util.Set.of(Roles.CAN_MANAGE_INCIDENTS)));
+        assertEquals("user", AgentRoutes.roleFor(java.util.Set.of()), "no grants → least privileged, whatever the body claims");
+    }
+
     @Test
     void agentRoutesReturn503WhenNoIntelligenceModuleIsPresent(@TempDir Path dir) throws Exception {
+
         try (Ctx ctx = open(dir, null)) {
             HttpResponse<String> r = send(ctx.port(), "POST", "/agent/sessions", "{}");
             assertEquals(503, r.statusCode());

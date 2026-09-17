@@ -69,7 +69,7 @@ final class SpaceRoutes implements RouteModule {
         // failing, including the one that would recover it. Pinned by
         // ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet, whose subject
         // holds NO capabilities. Creating a Space is additive; PUT and DELETE below are not.
-        api.post("/spaces", (e, m) -> createSpace(api, api.body(e)));
+        api.post("/spaces", (e, m) -> createSpace(api, e, api.body(e)));
 
         api.post("/spaces/import", (e, m) -> importSpace(api, e));
 
@@ -83,6 +83,7 @@ final class SpaceRoutes implements RouteModule {
     /** Create + boot a new space seeded from an uploaded bundle zip; the new id comes from {@code ?id=}. */
     private Object importSpace(ApiContext api, HttpExchange e) throws IOException {
         requireMultiSpace(api);
+        requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.query(e, "id");
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, "query param 'id' is required and must be a valid space id ([a-z0-9-], 1-63 chars)");
@@ -97,8 +98,9 @@ final class SpaceRoutes implements RouteModule {
 
     /** Create + boot a space from {@code {id, display_name?, description?, template?}} — a {@code template}
      *  seeds the new space from {@code spaces/_templates/<template>/} (400 when no such template ships). */
-    private Object createSpace(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object createSpace(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         requireMultiSpace(api);
+        requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.str(body, "id");
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, "body must include a valid 'id' ([a-z0-9-], 1-63 chars, not starting with '-')");
@@ -146,7 +148,21 @@ final class SpaceRoutes implements RouteModule {
         return Map.of("id", id, "deleted", true, "purged", purge);
     }
 
+    /**
+     * The recovery posture, made CONDITIONAL (2026-09-17). {@code POST /spaces} and {@code /spaces/import}
+     * were exempt from any capability so that a server hosting ZERO Spaces can still be recovered — but the
+     * exemption was unconditional, so on a populated server any authenticated caller could create or import
+     * Spaces while {@code PUT}/{@code DELETE /spaces/{id}} demanded {@code canAdminister}. The recovery case
+     * is exactly "nothing is hosted": there, no capability is asked (nobody could have been granted one on a
+     * container with no Spaces); everywhere else creation is administration like the rest of the family.
+     * Recorded in {@code CapabilityManifest.EXEMPTIONS} as {@code recovery-route} with this condition named.
+     */
+    private static void requireAdministerUnlessRecovering(ApiContext api, HttpExchange e) {
+        if (api.spaces().size() > 0) ApiContext.requireCapability(e, Roles.CAN_ADMINISTER);
+    }
+
     private static void requireMultiSpace(ApiContext api) {
+
         if (!api.spaces().supportsCrud())
             throw new ApiException(409, "this server hosts a single space; launch with -Dspaces.root to manage many");
     }

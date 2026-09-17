@@ -128,9 +128,9 @@ final class GcpServiceAccountToken {
         }
     }
 
-    /** Parse a PKCS#8 PEM private key ({@code -----BEGIN PRIVATE KEY-----}) — the format in a GCS SA key file. */
+    /** Parse a PKCS#8 PEM private key ({@code -----BEGIN PRIVATE KEY-----}) — the format in a GCS SA key file. */ // secret-allow: names the header the parser strips
     private static PrivateKey parsePkcs8Pem(String pem) {
-        String base64 = pem.replace("-----BEGIN PRIVATE KEY-----", "")
+        String base64 = pem.replace("-----BEGIN PRIVATE KEY-----", "")   // secret-allow: the header being stripped, not a key
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
         if (base64.isEmpty())

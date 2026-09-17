@@ -215,7 +215,7 @@ body. Agents must not set this flag on their own — they must ask.
 
 | Layer | What | Scope | Bypass |
 |---|---|---|---|
-| **1. Claude Code hook** | `.claude/hooks/pre-tool-git-release-guard.sh` — injects the commit/push checklist and blocks commit/push/tag on retired lines | Claude Code agents on this machine (`.claude/` is gitignored — local only) | `UCC_RELEASE_GUARD_DISABLE=1` |
+| **1. Claude Code hook** | `.claude/hooks/pre-tool-git-release-guard.sh` — injects the commit/push checklist and blocks commit/push/tag on retired lines | Claude Code agents in this checkout (`.claude/` is TRACKED — the shared shift environment, CLAUDE.md; corrected 2026-09-17, it had said gitignored) | `UCC_RELEASE_GUARD_DISABLE=1` |
 | **2. git `pre-push` hook** | `.githooks/pre-push` — blocks pushes whose target ref is a retired line; **also runs the committed-secret guard** (`tools/check-secrets.mjs`) and the **canonical-vocabulary guard** (`tools/check-vocabulary.mjs`), blocking on either | Any human/agent using plain git, once `core.hooksPath` is set | `--no-verify` or `UCC_RELEASE_GUARD_DISABLE=1` — but the **secret** check runs BEFORE that override and is not switched off by it (see below) |
 | **3. CI** | `.github/workflows/branch-policy.yml` — rejects retired branches; lints Conventional Commits on PRs | Everyone; runs server-side | none (this is the backstop) |
 

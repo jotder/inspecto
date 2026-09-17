@@ -1242,9 +1242,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      * sees every module's source); this check sees what is actually DEPLOYED, which the test cannot — the
      * test classpath does not carry the optional modules. The two are complementary, not redundant.
      *
-     * <p>⛔ Reads are not covered, and that is a decision, not an omission: reads are open on every edition
-     * because confidentiality sits at the Space/ABAC layer (operator, 2026-09-15, re-affirmed for compliance
-     * 2026-09-16). Absent-module stubs go through {@link #stub}, never here, so they are exempt by
+     * <p>⛔ Reads are not covered, and that is a decision, not an omission: reads are not capability-gated on
+     * any edition (operator, 2026-09-15, re-affirmed for compliance 2026-09-16). ⚠ Say the rest precisely
+     * (2026-09-17): the "Space/ABAC layer" that confidentiality rests on is the ENTERPRISE-only
+     * {@code inspecto-policy} engine, and {@link AccessDeciders} reads its absence as ALLOW — so on Standard
+     * an authenticated subject reads every hosted Space. {@code compliance/controls-matrix.md} CC6 says so. Absent-module stubs go through {@link #stub}, never here, so they are exempt by
      * construction.
      */
     private static void requireDeclaredPosture(String method, String pattern, Handler h) {

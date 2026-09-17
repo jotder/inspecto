@@ -33,6 +33,7 @@ final class CapabilityManifest {
             // AcquisitionRoutes
             new Entry("POST", "/collectors/([^/]+)/notify", Roles.CAN_OPERATE_RUNS),
             // AlertRoutes
+            new Entry("POST", "/alerts/evaluate", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/alerts/rules", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("PUT", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("DELETE", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
@@ -57,6 +58,9 @@ final class CapabilityManifest {
             new Entry("DELETE", "/config/([^/]+)/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // ConnectionRoutes
             new Entry("POST", "/connections", Roles.CAN_ONBOARD_CONNECTIONS),
+            new Entry("POST", "/connections/([^/]+)/test", Roles.CAN_ONBOARD_CONNECTIONS),
+            new Entry("POST", "/connections/([^/]+)/probe", Roles.CAN_ONBOARD_CONNECTIONS),
+            new Entry("POST", "/connections/test", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("PUT", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("DELETE", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
             // DataSourceRoutes — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). Import writes config
@@ -94,6 +98,9 @@ final class CapabilityManifest {
             new Entry("POST", "/exchange/grants/([^/]+)/expiry", Roles.CAN_APPROVE_SHARES),
             // ExpectationRoutes
             new Entry("POST", "/expectations", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/expectations/evaluate", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/expectations/([^/]+)/evaluate", Roles.CAN_OPERATE_RUNS),
+
             new Entry("PUT", "/expectations/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/expectations/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // JobRoutes
@@ -176,7 +183,9 @@ final class CapabilityManifest {
             // ⛔ These were reachable by ANY authenticated caller: `DELETE /spaces/{id}` checked only that
             // more than one Space existed. They were not merely un-gated but INEXPRESSIBLE — no capability
             // meant "administrator" until `canAdminister`.
-            // ⚠ `POST /spaces` is deliberately NOT gated — it is the recovery route; see SpaceRoutes.
+            // ⚠ `POST /spaces` / `/spaces/import` carry NO withCapability wrapper: the gate is IN the handler,
+            // conditional on the container hosting at least one Space (SpaceRoutes.requireAdministerUnlessRecovering).
+            // They stay in EXEMPTIONS as `recovery-route` because the manifest can express only all-or-nothing.
             new Entry("PUT", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             new Entry("DELETE", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             // RunRoutes
@@ -261,9 +270,10 @@ final class CapabilityManifest {
             new Exemption("POST", "/config/preview/parsing", "read-shaped", "previews parsing of a draft"),
             new Exemption("POST", "/config/preview/schema", "read-shaped", "previews a derived schema"),
             new Exemption("POST", "/config/suggest/schema", "read-shaped", "suggests a schema from a sample"),
-            new Exemption("POST", "/connections/([^/]+)/test", "read-shaped", "opens and closes a connection; persists nothing"),
-            new Exemption("POST", "/connections/([^/]+)/probe", "read-shaped", "lists what a saved connection can see"),
-            new Exemption("POST", "/connections/test", "read-shaped", "tests an unsaved connection draft"),
+            // 2026-09-17: the three connection test/probe routes LEFT this list. "Persists nothing" was true and
+            // beside the point — /connections/test dials any host:port in the body from the server's network
+            // position, and /{id}/probe reads through a SAVED credential the caller was never granted. They now
+            // demand canOnboardConnections, the capability that already guards the same credential's CRUD.
             new Exemption("POST", "/db/query", "read-shaped", "read-only SQL behind SqlGuard"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
             new Exemption("POST", "/enrichment/preview", "read-shaped", "previews an enrichment over sample rows"),
@@ -279,14 +289,16 @@ final class CapabilityManifest {
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),
             new Exemption("POST", "/spaces/import", "recovery-route",
-                    "operator 2026-09-16: the POST /spaces additive/recovery posture extends to importing a config tree"),
+                    "gated IN the handler: canAdminister whenever at least one Space is hosted; open only on an empty container, where recovery needs it (SpaceRoutes.requireAdministerUnlessRecovering, 2026-09-17)"),
             new Exemption("POST", "/tags/rules/([^/]+)/apply", "collaboration",
                     "operator 2026-09-16: applying a tag rule is a collaboration act like assignments, not run operation"),
             new Exemption("POST", "/queries/([^/]+)/run", "read-shaped", "runs a saved read query"),
             new Exemption("POST", "/pipelines/authored/([^/]+)/dry-run", "read-shaped", "a dry run writes nothing (PIPELINE-DRYRUN-1)"),
-            new Exemption("POST", "/expectations/evaluate", "read-shaped", "evaluates and reports; a breach may open an Incident — canManageIncidents now exists (2026-09-16), but evaluating is not opening and gating it would stop Operations checking data quality: a separate call, deliberately not folded into that one"),
-            new Exemption("POST", "/expectations/([^/]+)/evaluate", "read-shaped", "evaluates one Expectation; same caveat as /expectations/evaluate"),
-            new Exemption("POST", "/alerts/evaluate", "read-shaped", "evaluates Alert Rules now; the same evaluation the scheduler runs unattended"),
+            // 2026-09-17: the three evaluate routes LEFT this list. They were never read-shaped: an Expectation
+            // evaluation persists lastResult, opens Incidents and emits EXPECTATION_FAILED; an Alert evaluation
+            // emits ALERT_FIRED — and both events match the DEFAULT NotificationRules, so an ungated caller could
+            // page or email through them. They now demand canOperateRuns: the Operations tier keeps checking
+            // data quality (the "ops" seed grants it), and nobody below it triggers dispatch.
             // §7 self-limiting — the agent surface gates itself per tool (the assistant refuses mutating
             // tools it was not granted), and the governance routes that decide what it MAY do are gated.
             new Exemption("POST", "/agent/sessions", "self-limiting", "opens a conversation; no tool runs without its own gate"),
@@ -296,7 +308,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments; runs nothing"),
             new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),
             // grounded one at a time 2026-09-15 (audit §5 GROUNDED)
-            new Exemption("POST", "/spaces", "recovery-route", "a server hosting zero Spaces must still answer it; a gate here bricks recovery — pinned by ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet"),
+            new Exemption("POST", "/spaces", "recovery-route", "gated IN the handler: canAdminister whenever at least one Space is hosted; a server hosting zero Spaces must still answer it without one or recovery is bricked — pinned by ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet (2026-09-17: the unconditional form let any authenticated caller create Spaces on a populated server)"),
             new Exemption("POST", "/recon/run", "stateless-compute", "triggers nothing: computes and returns, persists nothing, dispatches no job"),
             new Exemption("POST", "/tags/assignments/([^/]+)/([^/]+)", "target-visibility-gated", "gated per TARGET via AnnotationTargets: 'can tag' must not become independent of 'can see' (TagRoutes)"),
             new Exemption("DELETE", "/tags/assignments/([^/]+)/([^/]+)/([^/]+)", "target-visibility-gated", "same comment as the assignment POST"),

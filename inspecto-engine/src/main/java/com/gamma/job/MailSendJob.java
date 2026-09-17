@@ -76,9 +76,12 @@ final class MailSendJob implements Job {
         long ms = (System.nanoTime() - t0) / 1_000_000L;
         return sent
                 ? JobResult.ok("sent to " + (to.size() + cc.size()) + " recipient(s)", ms)
-                // Not a failure: a deployment without SMTP makes this Job inert rather than red on every
-                // fire, matching how NotificationService skips an unconfigured channel.
-                : JobResult.ok("no email channel configured — nothing sent", ms);
+                // Neither SUCCESS nor FAILED. Until 2026-09-17 this returned ok(...) so a deployment without
+                // SMTP would not be red on every fire — but a scheduled mail job then read GREEN forever while
+                // delivering nothing, which is the false-green shape this repo records as its commonest
+                // defect. SKIPPED is the honest third status: not red on every fire, and not a success either.
+                : JobResult.skipped("no email channel configured — nothing sent");
+
     }
 
     /** A declared `multi` parameter arrives as CSV (§7.5); blanks dropped. */

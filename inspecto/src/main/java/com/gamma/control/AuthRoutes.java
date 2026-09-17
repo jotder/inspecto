@@ -48,8 +48,11 @@ final class AuthRoutes implements RouteModule {
         String redirectUri = ApiContext.str(body, "redirectUri");
         if (code == null || verifier == null || redirectUri == null)
             throw new ApiException(400, "body must include 'code', 'codeVerifier' and 'redirectUri'");
-        TokenRelay.Tokens t = relay.exchangeCode(code, verifier, redirectUri)
-                .orElseThrow(() -> new ApiException(401, ErrorCodes.UNAUTHENTICATED, "code exchange failed"));
+        TokenRelay.Tokens t = relay.exchangeCode(code, verifier, redirectUri).orElseThrow(() -> {
+            AuditTrail.authentication(ex, "auth.exchange", false, 401);
+            return new ApiException(401, ErrorCodes.UNAUTHENTICATED, "code exchange failed");
+        });
+        AuditTrail.authentication(ex, "auth.exchange", true, 200);
         return respondWithSession(ex, t);
     }
 
@@ -60,8 +63,10 @@ final class AuthRoutes implements RouteModule {
         if (rt == null) throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "no session");
         TokenRelay.Tokens t = relay.refresh(rt).orElseThrow(() -> {
             clearCookie(ex);   // a dead refresh token is gone for good — don't leave the stale cookie behind
+            AuditTrail.authentication(ex, "auth.refresh", false, 401);
             return new ApiException(401, ErrorCodes.UNAUTHENTICATED, "session expired");
         });
+        AuditTrail.authentication(ex, "auth.refresh", true, 200);
         return respondWithSession(ex, t);
     }
 
@@ -71,7 +76,9 @@ final class AuthRoutes implements RouteModule {
         String rt = cookie(ex);
         if (rt != null) relay.revoke(rt);
         clearCookie(ex);
+        AuditTrail.authentication(ex, "auth.logout", true, 200);
         return Map.of("loggedOut", true);
+
     }
 
     /** Rotate the cookie to the (possibly new) refresh token and return only the access-token body —

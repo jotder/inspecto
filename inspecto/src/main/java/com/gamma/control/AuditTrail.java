@@ -72,7 +72,39 @@ final class AuditTrail {
         }
     }
 
+    /**
+     * Record an AUTHENTICATION event (2026-09-17): a session opened by code exchange, refreshed, or ended,
+     * and the refused forms of the first two. Until this existed the trail held authorization decisions
+     * and mutations only, and BACKLOG §6 carried "sign-in/sign-out are not audited" as working-as-designed
+     * with a disclosure — but a disclosure is not a control, and "show me the sign-ins" is the first
+     * question a CC6 auditor asks of an audit log. The IdP still owns the credential check (MFA, password,
+     * lockout); what is recorded here is what THIS server did with the result: minted, rotated or ended a
+     * session, or refused to. No token or code ever reaches the row — only the outcome, IP and user agent.
+     *
+     * @param action  {@code auth.exchange} / {@code auth.refresh} / {@code auth.logout}
+     * @param ok      whether the server granted it; a refusal is an {@link EventType#ACCESS_DENIED} row
+     * @param status  the HTTP status the caller received
+     */
+    static void authentication(HttpExchange ex, String action, boolean ok, int status) {
+        try {
+            String actor = ApiContext.actor(ex);
+            String path = ex.getRequestURI().getPath();
+            EventLog.current().emit(Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED)
+                    .source("audit")
+                    .message(actor + " " + action + (ok ? "" : " (refused, HTTP " + status + ")"))
+                    .actor(actor).actorType(ApiContext.actorType(ex))
+                    .action(action).actionCategory("authentication")
+                    .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
+                    .attr(AuditAttrs.HTTP_METHOD, "POST")
+                    .attr(AuditAttrs.HTTP_PATH, path)
+                    .attr(AuditAttrs.HTTP_STATUS, status));
+        } catch (RuntimeException ignore) {
+            // best effort — the audit trail must never break the request
+        }
+    }
+
     /** Record a refused attempt. Two callers, with deliberately different scopes: an unknown or
+
      *  method-mismatched route (404/405) is recorded for <em>non-GET</em> only, because a bare GET there is
      *  usually an SPA deep link rather than an API attempt; an authentication or authorization refusal
      *  (401/403) on a route that <em>did</em> match is recorded for <em>every</em> method, GET included —

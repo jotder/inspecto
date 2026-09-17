@@ -22,9 +22,10 @@ Captured:
 
 ⚠ **Deliberately NOT captured, and you must say so rather than let an auditor assume otherwise:**
 
-- **Authentication events — login, MFA, password, true 401/403 — are out of scope** of this trail.
-  They arrive with the security module. An auditor asking "show me failed logins" must be pointed
-  at the **IdP**, which owns authentication; Inspecto sees an already-authenticated subject.
+- **The credential check — MFA, password, lockout — is out of scope** of this trail: the **IdP** owns it.
+  ✅ What this server did with the result IS in scope since 2026-09-17: `auth.exchange` (session minted or
+  refused), `auth.refresh` (rotated or refused) and `auth.logout`, category `authentication`, refusals as
+  `ACCESS_DENIED` rows. "Show me the sign-ins" is answered here; "why did the IdP refuse" is answered there.
 - Diagnostic `POST`s are skipped as non-mutating: `/test`, `/preview`, `/dry-run`, `/validate`,
   `/assist/*`. They change nothing, so they are noise in an audit trail — but if an auditor asks
   for "all POSTs", this is the reason the counts differ.

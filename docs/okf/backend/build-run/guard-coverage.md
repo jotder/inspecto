@@ -340,6 +340,8 @@ produce. A stale generated table, which nobody would rank above P3, suppressed t
 
 ⛔ **Do not read "CI is red" as "CI has one problem."** The only honest reading of a red gate is *"the
 first failing step failed, and everything after it is UNKNOWN"* — and "unknown" gets wider the earlier
-the step sits. ⚠ Recorded rather than fixed: making the doc guards non-aborting (collect all, fail at
+the step sits. ✅ **FIXED 2026-09-17: the fifteen pure-Node guards now run as their own `guards` job in
+`ci.yml`, a sibling of `test`, so a red guard and the reactor report on the same push.** The note that
+follows is kept as the record of why it was owed a decision. ⚠ Was recorded rather than fixed: making the doc guards non-aborting (collect all, fail at
 the end) or moving them *after* the test step would have surfaced all three in one run instead of three.
 That is a real change to `ci.yml` job structure and is owed a decision, not a drive-by edit.

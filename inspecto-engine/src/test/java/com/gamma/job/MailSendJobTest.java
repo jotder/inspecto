@@ -127,13 +127,16 @@ class MailSendJobTest {
     }
 
     @Test
-    void anUnconfiguredEmailChannelIsInertRatherThanARedRunEveryFire() throws Exception {
+    void anUnconfiguredEmailChannelIsSkippedNeitherGreenNorRedEveryFire() throws Exception {
         FakeMail mail = new FakeMail();
         mail.configured = false;
         JobResult r = run(Map.of("to", "a@x.io", "subject", "s", "body", "b"), mail);
 
-        assertEquals("SUCCESS", r.status(), "a deployment without SMTP must not fail this Job on every fire");
+        // 2026-09-17: was SUCCESS — a scheduled mail job read green forever while delivering nothing.
+        assertEquals("SKIPPED", r.status(), "a deployment without SMTP is neither a success nor a red run every fire");
+        assertFalse(r.success(), "nothing was sent, so this must not read as success");
         assertTrue(r.message().contains("nothing sent"), () -> "unexpected message: " + r.message());
+
     }
 
     @Test

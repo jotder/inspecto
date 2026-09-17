@@ -360,10 +360,11 @@ Shipped 2026-06-29 as an **in-process MVP**, deliberately without a broker: `Not
   store** — an evicting cache answering "never bounced" for evidence it forgot must not collapse into
   "deliver". Unsuppress is an **override row** (`DELETE /notifications/suppressions?target=`) forgiving
   history up to its timestamp; a later bounce re-suppresses.
-- 🔴 **`mail.send` succeeds with nothing sent.** `MailSendJob` returns
-  `JobResult.ok("no email channel configured — nothing sent")` (`MailSendJob.java:81`) — a scheduled mail
-  job reports green forever on a bundle with no transport. `BACKLOG.md` §6 records it as working-as-designed
-  with a disclosure; it is listed in §5 because the register's `INC-3` cell names it as a defect.
+- ✅ **`mail.send` no longer succeeds with nothing sent** (fixed 2026-09-17). `MailSendJob` returns
+  `JobResult.skipped("no email channel configured — nothing sent")` — `SKIPPED`, neither green nor a red run
+  on every fire. It had returned `ok(...)` and `BACKLOG.md` §6 carried that as working-as-designed with a
+  disclosure, which the register's `INC-3` cell rightly called a defect: a scheduled mail job read green
+  forever on a bundle with no transport.
 
 ### 3.9 Diagnosis
 

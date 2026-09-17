@@ -17,27 +17,19 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # ── Repo guards: their OWN job (2026-09-17) ──────────────────────────────────────────────────────
+  # These fifteen pure-Node checks used to be the first steps of `test`, cheapest-first, ahead of the
+  # reactor. A job stops at its first failing step, so a stale generated table — a P3 at most — silenced
+  # the ENTIRE test suite for a day on 2026-09-16 (three stacked failures surfaced one per run; see
+  # okf/backend/build-run/guard-coverage.md "three unrelated defects behind ONE red gate"). Running them
+  # as a sibling job keeps every guard AND the tests reporting on the same push: a red guard no longer
+  # buys silence for the expensive signal behind it. Nothing here needs the JDK, Postgres or the
+  # eoiagent checkout, which is why it can run without them.
+  guards:
     runs-on: ubuntu-latest
-    # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is
-    # installed separately or pointed at — which left `PostgresStateStoreTest` reporting 11 SKIPPED and the
-    # only proof that the JDBC stores run on real Postgres (chiefly `percentile_cont`, the one piece of
-    # non-portable SQL) executing NOWHERE. A service container IS "an existing server", so this restores the
-    # coverage without reversing the decision: no embedded engine, no per-platform binaries, just a URL.
-    # ⚠ The test creates and drops its own schema per run, so a shared container is safe.
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
+
 
       # Canonical-vocabulary guard, two passes (docs/GLOSSARY.md). (1) User-facing docs must not use ⛔
       # banned synonyms (Flow, Data Store, Collector-as-noun) or the Measure/Metric confusion. (2) The
@@ -231,6 +223,28 @@ jobs:
       # checks serve.bat statically; the `launchers-windows` job below executes serve.bat for real.
       - name: Guard — the emitted launchers hand the JVM their edition's flag set
         run: node tools/check-launchers.mjs
+
+  test:
+    runs-on: ubuntu-latest
+    # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is
+    # installed separately or pointed at — which left `PostgresStateStoreTest` reporting 11 SKIPPED and the
+    # only proof that the JDBC stores run on real Postgres (chiefly `percentile_cont`, the one piece of
+    # non-portable SQL) executing NOWHERE. A service container IS "an existing server", so this restores the
+    # coverage without reversing the decision: no embedded engine, no per-platform binaries, just a URL.
+    # ⚠ The test creates and drops its own schema per run, so a shared container is safe.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 25
         uses: actions/setup-java@v4

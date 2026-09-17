@@ -255,9 +255,11 @@ is **one central interceptor called from `ControlApi.dispatch`** — not per han
 successful state-changing request (`POST`/`PUT`/`DELETE`), export `GET`s, and non-GET attempts on
 forbidden routes, classified fail-closed to `AUDIT` / `ACCESS_DENIED`, with actor, action, target, IP and
 user agent as attributes. Actor comes from `ApiContext.actor`; on Personal (no authenticator) it is the
-default `appUser`. **Scope boundary, stated, do not overclaim:** authentication events (sign-in/out,
-MFA, true 401/403 at the authenticator) are **not** in it; *authorization* decisions are
-(`access.denied`/`access.granted`, ABAC A5). Secrets are scrubbed at `EventLog.emit`, not here.
+default `appUser`. **Scope boundary, stated, do not overclaim:** the credential check itself (MFA,
+password, lockout) belongs to the IdP and is **not** in it. ✅ Since 2026-09-17 the *session lifecycle* IS:
+`auth.exchange` / `auth.refresh` / `auth.logout` (`AuditTrail.authentication`, category `authentication`),
+granted as `AUDIT` and refused as `ACCESS_DENIED`, with no code or token on the row. *Authorization*
+decisions are in it too (`access.denied`/`access.granted`, ABAC A5). Secrets are scrubbed at `EventLog.emit`, not here.
 
 **Durability claims, exactly.** The trail is **append-only by construction** — one write seam, no update
 or delete route, 405 inherent to dispatch — and that is the whole claim. It is **not tamper-evident** (no

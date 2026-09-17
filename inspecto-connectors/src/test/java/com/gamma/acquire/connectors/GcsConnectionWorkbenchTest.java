@@ -56,7 +56,7 @@ class GcsConnectionWorkbenchTest {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
         kpg.initialize(2048);
         PrivateKey key = kpg.generateKeyPair().getPrivate();
-        String pem = "-----BEGIN PRIVATE KEY-----\n"
+        String pem = "-----BEGIN PRIVATE KEY-----\n"   // secret-allow: wraps a key generated in this test
                 + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.UTF_8)).encodeToString(key.getEncoded())
                 + "\n-----END PRIVATE KEY-----\n";
         String pemJson = pem.replace("\n", "\\n");

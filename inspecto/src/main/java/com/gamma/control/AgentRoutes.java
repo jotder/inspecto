@@ -31,7 +31,7 @@ final class AgentRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.post("/agent/sessions", (e, m) -> {
             Map<String, Object> body = api.body(e);
-            String role = ApiContext.str(body, "role");
+            String role = sessionRole(e, ApiContext.str(body, "role"));
             Object page = body.get("page");
             String goalKind = ApiContext.str(body, "goalKind");
             try {
@@ -217,7 +217,29 @@ final class AgentRoutes implements RouteModule {
     }
 
     /** The request's audited actor (agent/human) as the policy's {@code updatedBy}, defaulting to "operator". */
+    /**
+     * The host role handed to the assistant's policy profile. Until 2026-09-17 this was the request body's
+     * {@code role} verbatim — so an authenticated caller could open a session as {@code "admin"} by typing
+     * the word, and the deliberative loop would plan with ADMIN grants (the mutating gate is separate and
+     * held, but the role also shapes what the model is told it may reason about). When a {@link Subject} is
+     * attached, the role is now DERIVED from the capabilities the IdP actually granted, and the body's
+     * value is ignored; with no Subject (Personal edition, nothing authenticates) the body still decides,
+     * because there is no identity to derive from.
+     */
+    static String sessionRole(HttpExchange e, String requestedRole) {
+        return ApiContext.subject(e).map(s -> roleFor(s.capabilities())).orElse(requestedRole);
+    }
+
+    /** Capability set → assistant host role, most privileged tier first. Package-private for the test. */
+    static String roleFor(java.util.Set<String> capabilities) {
+        if (capabilities.contains(Roles.CAN_ADMINISTER)) return "admin";
+        if (capabilities.contains(Roles.CAN_AUTHOR_WORKBENCH) || capabilities.contains(Roles.CAN_OPERATE_RUNS)) return "analyst";
+        if (capabilities.contains(Roles.CAN_MANAGE_INCIDENTS)) return "support";
+        return "user";
+    }
+
     private static String actorOrOperator(HttpExchange e) {
+
         String actor = ApiContext.actor(e);
         return actor == null || actor.isBlank() ? "operator" : actor;
     }

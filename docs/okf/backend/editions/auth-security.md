@@ -304,7 +304,9 @@ refuse a boot in a customer's bundle; the boot check is what makes the guarantee
 artifact rather than of the repository.
 
 **Reads are open BY POLICY**, and that is a stated position rather than an omission: confidentiality sits at
-the Space/ABAC layer, where a caller's data scopes decide what a read can see. Affirmed as the **compliance**
+the Space/ABAC layer, where a caller's data scopes decide what a read can see — ⚠ **which exists on Enterprise
+only** (`inspecto-policy`, seed `space-isolation`, active only with an IdP `space` claim; `AccessDeciders` reads
+absence as ALLOW), so on Standard an authenticated subject reads every hosted Space (stated 2026-09-17). Affirmed as the **compliance**
 position 2026-09-16 knowing it becomes an auditor-facing claim (`controls-matrix.md` CC6). ⚠ If reads are
 ever gated, that matrix line moves with the code.
 

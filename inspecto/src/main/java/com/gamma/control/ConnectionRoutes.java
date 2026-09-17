@@ -38,18 +38,25 @@ final class ConnectionRoutes implements RouteModule {
         // surface, so onboarding them is distinct from authoring pipelines/components. A no-op on
         // Personal — no Subject is ever attached there.
         api.post("/connections", ApiContext.withCapability("canOnboardConnections", (e, m) -> createConnection(api, api.body(e))));
-        api.post("/connections/([^/]+)/test", (e, m) -> testConnection(api, ApiContext.name(m)));
+        // Gated 2026-09-17 (test/probe, saved and unsaved): a test dials the profile's host:port from the
+        // server's network position and a probe reads through the SAVED credential — the same credential
+        // whose CRUD already needs canOnboardConnections. "Persists nothing" never made these reads.
+        api.post("/connections/([^/]+)/test", ApiContext.withCapability("canOnboardConnections",
+                (e, m) -> testConnection(api, ApiContext.name(m))));
         // The connection-workbench verbs (graded probe · explore · sample) — read-only network probes with
         // no persistence, so no capability gate, same as /test. Backed by ConnectionWorkbench implementations;
         // connectors without one probe as "skipped" and 501 on explore/sample (fail honest, not fabricated).
-        api.post("/connections/([^/]+)/probe", (e, m) -> probeConnection(api, ApiContext.name(m), api.body(e)));
+        api.post("/connections/([^/]+)/probe", ApiContext.withCapability("canOnboardConnections",
+                (e, m) -> probeConnection(api, ApiContext.name(m), api.body(e))));
         api.get("/connections/([^/]+)/explore", (e, m) -> exploreConnection(api, ApiContext.name(m), ApiContext.query(e, "path")));
         api.get("/connections/([^/]+)/sample", (e, m) -> sampleConnection(api, ApiContext.name(m),
                 ApiContext.query(e, "path"), ApiContext.query(e, "limit")));
         // Test an UNSAVED profile straight from the create/edit form — no persistence, no capability gate
         // (a read-only network probe, same as the saved-profile test above). ?target= connection|tunnel|proxy
         // selects which hop to probe.
-        api.post("/connections/test", (e, m) -> testUnsavedProfile(api.body(e), ApiContext.query(e, "target")));
+        api.post("/connections/test", ApiContext.withCapability("canOnboardConnections",
+                (e, m) -> testUnsavedProfile(api.body(e), ApiContext.query(e, "target"))));
+
         api.put("/connections/([^/]+)", ApiContext.withCapability("canOnboardConnections", (e, m) -> updateConnection(api, ApiContext.name(m), api.body(e))));
         api.delete("/connections/([^/]+)", ApiContext.withCapability("canOnboardConnections", (e, m) -> deleteConnection(api, ApiContext.name(m))));
         api.get("/connections/([^/]+)", (e, m) -> connectionById(api, ApiContext.name(m)));

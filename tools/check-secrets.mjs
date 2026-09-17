@@ -21,6 +21,14 @@
 //   - `token`-suffixed keys. `tokenEndpoint`/`tokenUrl` are URLs, and after D15 they are REQUIRED
 //     config — flagging them would fire on correct deployments.
 //
+// WHAT IT ALSO FLAGS SINCE 2026-09-17 — the STRUCTURAL shapes, with no key at all: a PEM private-key
+// header, an AWS access key id, a JWT, a GitHub/Slack/Google token literal (STRUCTURAL below). The
+// assignment shape above was the incident's shape; it was also the ONLY shape, and a probe showed a
+// committed `-----BEGIN RSA PRIVATE KEY-----` block and an `AKIA…` id passing green while a
+// `db_password = "…"` control was caught. A guard that is the last preventive layer before a public
+// remote cannot be blind to the two commonest ways a credential is pasted. Placeholders still apply
+// (`EXAMPLE` in an AWS id is Amazon's own documentation convention) and `secret-allow` still exempts.
+//
 // TWO MODES, and the second exists because the first hands out a FALSE GREEN:
 //   - default — tracked files as they stand. Catches the incident's shape: a secret living in HEAD.
 //   - `--range <git-log-args…>` — the ADDED lines of every commit in a push range. A credential
@@ -119,6 +127,20 @@ const PLACEHOLDER = [
 // Real credentials are long. Below this, the false-positive rate dwarfs the signal.
 const MIN_SECRET_LEN = 16;
 
+// Structural shapes — recognisable WITHOUT a key name. Each has a label (reported instead of a key) and
+// a pattern whose first capture group is the value the placeholder rules are applied to.
+const STRUCTURAL = [
+    // A PEM private-key header. Matched on the header alone: the body spans lines, and the header is
+    // never legitimately in a tracked file except as a parser's string constant or a throwaway test key —
+    // both of which say so with `secret-allow` on the line.
+    { label: 'PEM private key', re: /(-----BEGIN(?: [A-Z]+)* PRIVATE KEY-----)/ },
+    { label: 'AWS access key id', re: /\b(AKIA[0-9A-Z]{16})\b/ },
+    { label: 'JWT', re: /\b(eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/ },
+    { label: 'GitHub token', re: /\b(gh[pousr]_[A-Za-z0-9]{36,})\b/ },
+    { label: 'Slack token', re: /\b(xox[abprs]-[A-Za-z0-9-]{10,})\b/ },
+    { label: 'Google API key', re: /\b(AIza[0-9A-Za-z_-]{35})\b/ },
+];
+
 /** Floor for the tree scan - see scanWorkingTree. MEASURED 2026-09-07: 3366 files scanned of 3804
  *  tracked. 1000 leaves room for a legitimate narrowing (a new SKIP_DIR could halve it and still pass)
  *  while catching a scan that COLLAPSED - the failure this exists for is reading ~nothing, not reading
@@ -186,8 +208,16 @@ function scanLine(text) {
         if (isPlaceholder(value) || value.length < MIN_SECRET_LEN) continue;
         return { key, len: value.length };
     }
+    for (const { label, re } of STRUCTURAL) {
+        const m = text.match(re);
+        if (!m) continue;
+        const value = m[1];
+        if (isPlaceholder(value)) continue;
+        return { key: label, len: value.length };
+    }
     return null;
 }
+
 
 // A path worth opening at all: right extension, not under a skipped directory, not this file.
 function scannablePath(rel) {
