@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { EventFilter, EventRow, EventsService, SavedEventView, SessionService } from 'app/inspecto/api';
+import { EventRow, EventsService, SavedEventView, SessionService } from 'app/inspecto/api';
 import { AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
@@ -36,7 +36,7 @@ async function create(
     dialog: unknown = {},
     eventsEnabled = true,
 ) {
-    const search = vi.fn((_f: EventFilter) => of([EVENT]));
+    const search = vi.fn(() => of([EVENT]));
     const api = {
         search,
         views: () => of([VIEW]),

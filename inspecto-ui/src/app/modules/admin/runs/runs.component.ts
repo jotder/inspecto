@@ -164,7 +164,8 @@ export class RunsComponent implements OnInit {
                 const total = Object.values(res).reduce((s, r) => s + (r.total || 0), 0);
                 const failed = Object.values(res).reduce((s, r) => s + (r.failed || 0), 0);
                 const msg = `Run all: ${total} processed across ${Object.keys(res).length} runs, ${failed} failed`;
-                failed ? this.toastr.warning(msg) : this.toastr.success(msg);
+                if (failed) this.toastr.warning(msg);
+                else this.toastr.success(msg);
                 this.load();
             },
             error: (e) => {

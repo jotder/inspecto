@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { FormControl } from '@angular/forms';
 
 import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';

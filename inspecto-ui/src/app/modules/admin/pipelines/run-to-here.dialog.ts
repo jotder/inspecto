@@ -7,7 +7,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import {
     AuthoredNode,
     ConnectionProbeService,
-    PipelineRunRelation,
     PipelineRunResult,
     PipelinesService,
     ResourceNode,
@@ -100,7 +99,7 @@ export interface RunToHereData {
                             [loadingPaths]="loadingPaths()"
                             [selectedPath]="null"
                             (expand)="onExpand($event)"
-                            (select)="onSelect($event)"
+                            (nodeSelect)="onSelect($event)"
                         />
                     </div>
                 } @else if (exploreFailed()) {
@@ -292,7 +291,8 @@ export class RunToHereDialog implements OnInit {
             return;
         }
         const sel = new Set(this.selectedFiles());
-        sel.has(node.path) ? sel.delete(node.path) : sel.add(node.path);
+        if (sel.has(node.path)) sel.delete(node.path);
+        else sel.add(node.path);
         this.selectedFiles.set([...sel]);
     }
 

@@ -58,6 +58,7 @@ function widgetFor(decl: JobParameterDecl): AttributeType {
         // so a textarea is the honest control and no new AttributeType is needed. What a bare textarea
         // cannot give is a refusal, which is why every JSON parameter also gets `jsonParameterValidator`
         // (see `paramExtraValidators`) instead of failing at fire time.
+        // falls through
         case 'JSON':
             return 'multiline';
         case 'INTEGER':

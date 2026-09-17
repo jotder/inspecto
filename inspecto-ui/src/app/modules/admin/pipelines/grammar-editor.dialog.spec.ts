@@ -56,8 +56,8 @@ async function create(
     const close = vi.fn();
     const components = {
         list: () => of(opts.grammars ?? []),
-        create: vi.fn((_t: string, _c: Record<string, unknown>) => of(saved('x'))),
-        update: vi.fn((_t: string, id: string, _c: Record<string, unknown>) => of(saved(id))),
+        create: vi.fn(() => of(saved('x'))),
+        update: vi.fn((_t: string, id: string) => of(saved(id))),
     };
     const parsers = { list: vi.fn(() => of(CATALOG)), preview: vi.fn(() => of(TABLE_PREVIEW)) };
     const data: GrammarEditorDialogData = {

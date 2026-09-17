@@ -3,7 +3,7 @@ import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DashboardShareLink, DashboardsService } from './dashboards.service';
 import { ShareDashboardDialog } from './share-dashboard.dialog';

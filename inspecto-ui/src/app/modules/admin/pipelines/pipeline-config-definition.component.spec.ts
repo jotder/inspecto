@@ -855,7 +855,7 @@ describe('PipelineConfigDefinitionComponent', () => {
         });
 
         it('Save partitioning writes partitions[] back, carrying every other key verbatim', async () => {
-            const writeSpy = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            const writeSpy = vi.fn((type: string, _cfg: Record<string, unknown>) =>
                 of({
                     type,
                     written: true,

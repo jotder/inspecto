@@ -997,7 +997,7 @@ export class PipelineParseDefinitionComponent {
         // this runs once per instance — but an input swap without recreation re-seeds correctly too
         // (the [initial] binding re-seeds the editor, which is what marks it pristine again).
         effect(() => {
-            const n = this.node();
+            this.node();
             // ⚠ untracked: an effect tracks every signal read synchronously in its body, INCLUDING through
             // the methods it calls — and `loadSavedSchema()` reaches `plugin()` via
             // authorsSchema→authorsSegments. So the seed re-ran when the served parser catalog landed (or
@@ -1005,12 +1005,12 @@ export class PipelineParseDefinitionComponent {
             // the chosen Grammar template, clearing derived schema rows and segment drafts, and then
             // calling markAsPristine + emitDirty — Apply greyed out over work just done. The node input is
             // the ONLY thing that should re-seed this pane.
-            untracked(() => this.seedFromNode(n));
+            untracked(() => this.seedFromNode());
         });
     }
 
     /** The one-shot seed body — see the effect above for why it must not be tracked. */
-    private seedFromNode(n: AuthoredNode): void {
+    private seedFromNode(): void {
         {
             // A different node (or a Discard-driven re-seed) makes any imported seed stale — the
             // seed must fall back to the node's own block, or the previous node's copy lingers.

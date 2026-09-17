@@ -10,7 +10,6 @@ import {
     OnChanges,
     OnDestroy,
     Output,
-    signal,
     ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';

@@ -357,7 +357,7 @@ export class ComponentFormDialog {
         try {
             rows = JSON.parse(this.sampleRows);
             if (!Array.isArray(rows)) throw new Error('expected an array of rows');
-        } catch (e) {
+        } catch {
             this.testing.set(false);
             this.testError.set('Sample rows must be a JSON array of objects.');
             return;

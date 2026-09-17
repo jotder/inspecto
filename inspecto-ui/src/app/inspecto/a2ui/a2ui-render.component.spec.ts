@@ -203,7 +203,7 @@ describe('A2uiRenderComponent', () => {
 
             expect(c.invokeState('high_cost').phase).toBe('idle');
 
-            let btn = (fixture.nativeElement as HTMLElement).querySelector('button') as HTMLButtonElement;
+            const btn = (fixture.nativeElement as HTMLElement).querySelector('button') as HTMLButtonElement;
             expect(btn.textContent).toContain('dry-run');
             btn.click();
             fixture.detectChanges();

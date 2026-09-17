@@ -203,7 +203,9 @@ export class DesignSystemComponent {
             label: 'As of date',
             type: 'string',
             tier: 'required',
-            pattern: '\d{4}-\d{2}-\d{2}',
+            // 2026-09-17: was '\d{4}-…' in a plain string, where `\d` is just `d` — the showcase pattern rejected
+            // its own placeholder. Found by no-useless-escape; the schema-form applies `pattern` as a RegExp source.
+            pattern: '\\d{4}-\\d{2}-\\d{2}',
             placeholder: '2026-08-10',
             help: 'Has a token picker — a token replaces the whole value.',
         },
@@ -297,7 +299,8 @@ export class DesignSystemComponent {
     toggleFav(id: string): void {
         this.favIds.update((s) => {
             const next = new Set(s);
-            next.has(id) ? next.delete(id) : next.add(id);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
             return next;
         });
     }

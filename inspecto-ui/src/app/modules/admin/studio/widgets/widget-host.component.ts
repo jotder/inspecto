@@ -17,7 +17,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { StaleMark } from 'app/inspecto/signal/stale-tiles';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
-import { VizPlugin, VizProps, bucketSpecRows, getViz } from 'app/inspecto/viz';
+import { VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';

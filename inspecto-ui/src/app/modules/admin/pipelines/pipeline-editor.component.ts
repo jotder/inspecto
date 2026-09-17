@@ -1101,7 +1101,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private restoreOpenTabs(known: ReadonlySet<string>): void {
         if (this.tabsRestored) return;
         this.tabsRestored = true;
-        let stored: { open?: unknown; selected?: unknown } | null = null;
+        let stored: { open?: unknown; selected?: unknown } | null;
         try {
             const raw = localStorage.getItem(PipelineEditorComponent.OPEN_TABS_KEY);
             stored = raw ? (JSON.parse(raw) as { open?: unknown; selected?: unknown }) : null;

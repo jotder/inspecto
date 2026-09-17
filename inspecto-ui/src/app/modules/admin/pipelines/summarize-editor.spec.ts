@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MEASURE_AGGS } from './measure-grammar';
-import { formatMeasure, formatMeasures, measureRowError, needsField, parseMeasures } from './summarize-editor';
+import { formatMeasures, measureRowError, needsField, parseMeasures } from './summarize-editor';
 
 describe('parseMeasures / formatMeasures', () => {
     it('round-trips every shape the grammar accepts, byte for byte', () => {

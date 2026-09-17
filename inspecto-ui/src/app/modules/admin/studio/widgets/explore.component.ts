@@ -16,7 +16,6 @@ import {
     VizProps,
     allViz,
     autoAssignChannels,
-    bucketSpecRows,
     getViz,
     recommend,
 } from 'app/inspecto/viz';

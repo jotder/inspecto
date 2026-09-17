@@ -37,8 +37,6 @@ export function lensHome(lens: Lens, eventsEnabled: boolean): string {
 }
 
 // @formatter:off
-/* eslint-disable max-len */
-/* eslint-disable @typescript-eslint/explicit-function-return-type */
 export const appRoutes: Route[] = [
     // Default landing route — Home (landing-page plan D1, 2026-09-15). Root used to redirect straight to
     // `lensHomeRedirect`, which dropped the three Lenses onto three unrelated screens and gave a fresh

@@ -252,7 +252,7 @@ describe('MappingEditorDialog', () => {
         });
 
         it('previews through a throwaway candidate graph, never a stored pipeline', async () => {
-            const { c, pipelines } = await withSample();
+            const { pipelines } = await withSample();
             expect(pipelines.dryRunAuthored).toHaveBeenCalledTimes(2);
             const [, sample, candidate] = pipelines.dryRunAuthored.mock.calls[1];
             expect(sample).toEqual([{ amt: '150', ts: '2026-06-24' }]);

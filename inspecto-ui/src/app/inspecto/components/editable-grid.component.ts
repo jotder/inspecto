@@ -3,14 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AgGridAngular } from 'ag-grid-angular';
-import {
-    CellClassParams,
-    CellValueChangedEvent,
-    ColDef,
-    GridApi,
-    GridReadyEvent,
-    ITooltipParams,
-} from 'ag-grid-community';
+import { CellClassParams, ColDef, GridApi, GridReadyEvent, ITooltipParams } from 'ag-grid-community';
 import { parseCsv } from 'app/inspecto/data-table/core/csv';
 import { INSPECTO_DEFAULT_COL_DEF, InspectoGridThemeService, noRowsOverlay } from 'app/inspecto/grid';
 
@@ -96,7 +89,7 @@ export interface CsvImport {
             [rowSelection]="editable ? { mode: 'multiRow' } : undefined"
             [overlayNoRowsTemplate]="emptyOverlay"
             (gridReady)="onGridReady($event)"
-            (cellValueChanged)="onCellEdited($event)"
+            (cellValueChanged)="onCellEdited()"
         ></ag-grid-angular>
     `,
 })
@@ -156,7 +149,7 @@ export class EditableGridComponent {
         this.api = e.api;
     }
 
-    onCellEdited(_e: CellValueChangedEvent): void {
+    onCellEdited(): void {
         this.emitRows();
     }
 
