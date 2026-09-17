@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **77<!--count:backlog-rows--> rows: 6<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **76<!--count:backlog-rows--> rows: 5<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 6<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 5<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 25<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 77<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 76<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -956,25 +956,47 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
     ✅ Both verified on a copy of `spaces/demo` at `36f554ae`; `spaces/` never opened for writing.
     → `okf/backend/config/configuration.md`
 
-- **P1** · 🔴 **`BUNDLE-ESCAPE-TEST-IS-ENVIRONMENT-DEPENDENT-1` — master's only guard against a bundle
-  planting an escaping job path passes or fails depending on WHERE the test's temp directory sits.** Filed
-  2026-09-17. `ControlApiBundleNewKindsTest.jobImportRefusesAnEscapingPathValueWithoutAbortingTheBatch` asserts
-  a job whose `dir` is `../../../../../../evil_escape` is refused per-item.
-  ✅ **Measured, three ways:** it **FAILS** in a clean detached worktree at `c62b46a4` AND at `218d0cff`
-  (`failed: 0`, the escaper reported `imported`), and **PASSES** 11/11 in the main checkout at the same
-  commits. ⛔ The difference is not a peer's uncommitted work — that hypothesis was formed and then REFUTED:
-  the peer commit in between (`ad29e683`) touches no bundle, `PathJail` or `ConfigSafetyValidator` code.
-  🔴 **The likely mechanism is the escape DEPTH.** The test uses `@TempDir` and climbs exactly six `..`, so
-  whether the resolved path lands outside an allowed root depends on how deep the temp directory is — which
-  differs between checkouts. ⇒ **a security property is being pinned by a test whose verdict depends on the
-  filesystem layout of the machine running it.**
-  ⚠ **Two possibilities and they need separating, in this order:** (1) the GATE genuinely does not refuse the
-  escape, and the main checkout only appears green by accident — in which case `JOB-CONFIG-THIRD-PRODUCER-1`'s
-  fix is incomplete and a bundle can plant an escaping job path today; or (2) the gate holds and only the TEST
-  is fragile. ⛔ Do not "fix" the test to make it green until that is settled — that is how a real gate gets
-  papered over.
-  ⚠ **This also means CI's verdict and a local verdict can disagree on a security control**, and a fresh clone
-  is the CI case. → `okf/backend/config/config-safety.md`
+- ~~**P1** · **`BUNDLE-ESCAPE-TEST-IS-ENVIRONMENT-DEPENDENT-1`**~~ ✅ **SETTLED 2026-09-17 — verdict: the GATE
+  HOLDS, the TEST was fragile. There is no security hole.** The row demanded those two be separated before
+  anything was touched, and they were.
+  ✅ **The gate was probed DIRECTLY, with no HTTP and no test harness** — `PathJail.resolveJobPath` +
+  `ConfigSafetyValidator.check("job", …)` called by hand. It REFUSES a relative value resolving outside the
+  allowed roots, REFUSES an absolute value outside them, and correctly ACCEPTS one landing inside a declared
+  root. Its answer is a pure function of (resolved path, allowed roots) and is right in every case.
+  🔴 **The test's verdict depended on THREE machine facts, none of them the security property:** the roots are
+  `${session.executionRootDirectory};${java.io.tmpdir}` (`pom.xml:418`); the value resolved against the
+  **process working directory**, because the test helper clears `assist.write.root` before the request so
+  `SpaceConfigRoot.current()` is null; and six `..` clamps at the drive root on Windows.
+  ✅ **Reproduced, not argued:** at the same commit with NO code change, `-Djava.io.tmpdir=C:\` produces exactly
+  the reported symptom (`failed: 0`, escaper `imported`) — because the escape is then genuinely inside a
+  declared root, so importing it is the CORRECT answer.
+  ✅ The test now pins `assist.safety.roots` to its own `@TempDir` and escapes to an absolute SIBLING of it, and
+  **asserts that precondition** so root leakage fails loudly instead of going green on a security property.
+  Mutation-proved against the **gate**, not the test; green under `-Djava.io.tmpdir=C:\` and a deep tmpdir,
+  both of which flipped the old one.
+  ⚠ **Recorded because it is a real coverage gap, not a defect:** `SpaceConfigRoot.current()` is null
+  throughout this test, so the gate's **Space-config-root resolution branch is not exercised by it at all**.
+  ⛔ **My earlier "master is RED on a security guard" framing was WRONG and is retracted here** — master was
+  red on a test whose premise did not hold on a fresh checkout. Original row follows.
+  - **P1** · 🔴 **`BUNDLE-ESCAPE-TEST-IS-ENVIRONMENT-DEPENDENT-1` — master's only guard against a bundle
+    planting an escaping job path passes or fails depending on WHERE the test's temp directory sits.** Filed
+    2026-09-17. `ControlApiBundleNewKindsTest.jobImportRefusesAnEscapingPathValueWithoutAbortingTheBatch` asserts
+    a job whose `dir` is `../../../../../../evil_escape` is refused per-item.
+    ✅ **Measured, three ways:** it **FAILS** in a clean detached worktree at `c62b46a4` AND at `218d0cff`
+    (`failed: 0`, the escaper reported `imported`), and **PASSES** 11/11 in the main checkout at the same
+    commits. ⛔ The difference is not a peer's uncommitted work — that hypothesis was formed and then REFUTED:
+    the peer commit in between (`ad29e683`) touches no bundle, `PathJail` or `ConfigSafetyValidator` code.
+    🔴 **The likely mechanism is the escape DEPTH.** The test uses `@TempDir` and climbs exactly six `..`, so
+    whether the resolved path lands outside an allowed root depends on how deep the temp directory is — which
+    differs between checkouts. ⇒ **a security property is being pinned by a test whose verdict depends on the
+    filesystem layout of the machine running it.**
+    ⚠ **Two possibilities and they need separating, in this order:** (1) the GATE genuinely does not refuse the
+    escape, and the main checkout only appears green by accident — in which case `JOB-CONFIG-THIRD-PRODUCER-1`'s
+    fix is incomplete and a bundle can plant an escaping job path today; or (2) the gate holds and only the TEST
+    is fragile. ⛔ Do not "fix" the test to make it green until that is settled — that is how a real gate gets
+    papered over.
+    ⚠ **This also means CI's verdict and a local verdict can disagree on a security control**, and a fresh clone
+    is the CI case. → `okf/backend/config/config-safety.md`
 
 - ~~**P3** · **`CITATION-GUARD-SCOPE-1`**~~ ✅ **FILED AND SHIPPED 2026-09-17 — recorded struck so the
   provenance exists without adding an open row.** The **seventh** instance of the allow-list shape in
