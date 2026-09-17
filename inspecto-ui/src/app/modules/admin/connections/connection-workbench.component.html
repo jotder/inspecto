@@ -121,7 +121,7 @@
                         [selectedPath]="selected()?.path ?? null"
                         [filter]="treeFilter()"
                         (expand)="onExpand($event)"
-                        (select)="onSelect($event)"
+                        (nodeSelect)="onSelect($event)"
                     />
                 } @else {
                     <inspecto-empty-state

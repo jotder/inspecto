@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { Platform } from '@angular/cdk/platform';
 import { NavigationExtras, Router, RouterModule, UrlTree } from '@angular/router';
@@ -43,7 +43,7 @@ export class AppComponent implements OnInit {
     patchRouterNavigate(): void {
         const originalNavigate = this.router.navigate.bind(this.router);
 
-        this.router.navigate = (commands: any[], extras?: NavigationExtras): Promise<boolean> => {
+        this.router.navigate = (commands: readonly unknown[], extras?: NavigationExtras): Promise<boolean> => {
             const tree: UrlTree = this.router.createUrlTree(commands, extras);
             const url = this.router.serializeUrl(tree);
             const basePath = environment.basePath;

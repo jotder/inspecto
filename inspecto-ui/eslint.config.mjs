@@ -40,9 +40,36 @@ export default tseslint.config(
             ...angular.configs.tsRecommended,
         ],
         processor: angular.processInlineTemplates,
+        rules: {
+            // REVIEWED DECISION (operator, 2026-09-17, lint drain): after the mechanical sweep, every remaining
+            // `no-unused-vars` finding (25) was an `_`-prefixed INTENT marker: a rest-sibling omission
+            // (`const { key: _dropped, ...rest } = obj` - the binding IS the behaviour), a typed mock parameter a
+            // spec reads back through `mock.calls[i][k]`, or a non-trailing parameter a caller's arity pins.
+            // Deleting them changes behaviour or breaks the type-check (TS2554 surfaced twice trying). The
+            // `_` prefix is the conventional way to say "unused on purpose", so the rule is told to honour it.
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
+        },
     },
     {
+        // REVIEWED DECISION (operator, 2026-09-17, lint drain): every `prefer-on-push` finding in the tree
+        // was a test-HOST stub component inside a spec. A test host's change-detection strategy is not
+        // production behaviour, and forcing OnPush onto hosts that mutate plain fields would make specs
+        // pass or fail for reasons unrelated to the component under test. Production components stay
+        // under the rule.
+        files: ['**/*.spec.ts'],
+        rules: { '@angular-eslint/prefer-on-push-component-change-detection': 'off' },
+    },
+    {
+        // Inline templates reach this block too: `processInlineTemplates` above lifts them out of the .ts
+        // file as virtual .html documents.
         files: ['**/*.html'],
         extends: [...angular.configs.templateRecommended, ...angular.configs.templateAccessibility],
+        rules: {
+            // REVIEWED DECISION (operator, 2026-09-17, lint drain): all eight `template/eqeqeq` findings were
+            // `x != null`, the idiom that also catches `undefined` (`latencyMs != null` on an optional field).
+            // Rewriting them to `!== null` would have silently broken undefined handling. Strict equality is
+            // still required everywhere except the null/undefined check itself.
+            '@angular-eslint/template/eqeqeq': ['error', { allowNullOrUndefined: true }],
+        },
     },
 );

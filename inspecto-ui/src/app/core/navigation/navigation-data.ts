@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { GammaNavigationItem } from '@gamma/components/navigation';
 import { cloneDeep } from 'lodash-es';
 

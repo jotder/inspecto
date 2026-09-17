@@ -73,7 +73,7 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
                                     [siblings]="nodes()"
                                     [selectedId]="selectedId()"
                                     [canCurate]="canCurate()"
-                                    (select)="selectedId.set($event)"
+                                    (nodeSelect)="selectedId.set($event)"
                                     (changed)="onChanged()"
                                 />
                             }

@@ -37,7 +37,7 @@ describe('GeoAnalysisToolboxComponent', () => {
     it('co-location folds timed points and a result click emits a focus request', () => {
         const { c } = make(TIMED);
         let focused: GeoAnalysisFocus | undefined;
-        c.focus.subscribe((f) => (focused = f));
+        c.focusChange.subscribe((f) => (focused = f));
 
         c.analysisTool.set('coloc');
         c.runAnalysis();

@@ -2,11 +2,10 @@ import { DOCUMENT } from '@angular/common';
 import {
     ChangeDetectionStrategy,
     Component,
-    Inject,
+    inject,
     OnDestroy,
     OnInit,
     Renderer2,
-    signal,
     ViewEncapsulation,
 } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
@@ -40,20 +39,15 @@ export class LayoutComponent implements OnInit, OnDestroy {
     layout: string;
     scheme: 'dark' | 'light';
     theme: string;
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+    private _unsubscribeAll: Subject<null> = new Subject<null>();
 
-    /**
-     * Constructor
-     */
-    constructor(
-        private _activatedRoute: ActivatedRoute,
-        @Inject(DOCUMENT) private _document: any,
-        private _renderer2: Renderer2,
-        private _router: Router,
-        private _gammaConfigService: GammaConfigService,
-        private _gammaMediaWatcherService: GammaMediaWatcherService,
-        private _gammaPlatformService: GammaPlatformService,
-    ) {}
+    private readonly _activatedRoute = inject(ActivatedRoute);
+    private readonly _document = inject(DOCUMENT);
+    private readonly _renderer2 = inject(Renderer2);
+    private readonly _router = inject(Router);
+    private readonly _gammaConfigService = inject(GammaConfigService);
+    private readonly _gammaMediaWatcherService = inject(GammaMediaWatcherService);
+    private readonly _gammaPlatformService = inject(GammaPlatformService);
 
     // -----------------------------------------------------------------------------------------------------
     // @ Lifecycle hooks

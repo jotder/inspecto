@@ -114,10 +114,8 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
     private _matAutocomplete: MatAutocomplete;
     private _unsubscribeAll: Subject<void> = new Subject<void>();
 
-    constructor(
-        private _elementRef: ElementRef,
-        private _renderer2: Renderer2,
-    ) {}
+    private readonly _elementRef = inject(ElementRef);
+    private readonly _renderer2 = inject(Renderer2);
 
     @HostBinding('class') get classList(): Record<string, boolean> {
         return {
@@ -173,7 +171,7 @@ export class SearchComponent implements OnChanges, OnInit, OnDestroy {
 
     /** Resolve the persisted recent links back to live destinations (stale links dropped). */
     private recentDestinations(): SearchDestination[] {
-        let links: string[] = [];
+        let links: string[];
         try {
             links = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]');
         } catch {

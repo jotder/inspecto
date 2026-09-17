@@ -34,7 +34,7 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
             <button
                 type="button"
                 class="flex min-w-0 flex-auto items-center gap-2 text-left"
-                (click)="select.emit(node().id)"
+                (click)="nodeSelect.emit(node().id)"
             >
                 <mat-icon class="icon-size-5 text-secondary shrink-0" [svgIcon]="icon()"></mat-icon>
                 <span class="truncate text-sm" [class.font-semibold]="!isLeaf()">{{ node().title }}</span>
@@ -105,7 +105,7 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
                         [depth]="depth() + 1"
                         [selectedId]="selectedId()"
                         [canCurate]="canCurate()"
-                        (select)="select.emit($event)"
+                        (nodeSelect)="nodeSelect.emit($event)"
                         (changed)="changed.emit()"
                     />
                 }
@@ -131,7 +131,8 @@ export class MenuTreeNodeComponent {
      */
     readonly canCurate = input(false);
 
-    readonly select = output<string>();
+    /** Renamed from `select` 2026-09-17: an output named after a native DOM event is ambiguous on the host element. */
+    readonly nodeSelect = output<string>();
     readonly changed = output<void>();
 
     readonly isLeaf = computed(() => this.node().binding != null);

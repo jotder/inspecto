@@ -45,18 +45,13 @@ export class DenseLayoutComponent implements OnInit, OnDestroy {
     readonly navigationAppearance = signal<'default' | 'dense'>('dense');
     /** Active-space branding — the dense header shows the logo only. */
     protected readonly branding = inject(BrandingService);
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+    private _unsubscribeAll: Subject<null> = new Subject<null>();
 
-    /**
-     * Constructor
-     */
-    constructor(
-        private _activatedRoute: ActivatedRoute,
-        private _router: Router,
-        private _navigationService: NavigationService,
-        private _gammaMediaWatcherService: GammaMediaWatcherService,
-        private _gammaNavigationService: GammaNavigationService,
-    ) {}
+    private readonly _activatedRoute = inject(ActivatedRoute);
+    private readonly _router = inject(Router);
+    private readonly _navigationService = inject(NavigationService);
+    private readonly _gammaMediaWatcherService = inject(GammaMediaWatcherService);
+    private readonly _gammaNavigationService = inject(GammaNavigationService);
 
     // -----------------------------------------------------------------------------------------------------
     // @ Accessors

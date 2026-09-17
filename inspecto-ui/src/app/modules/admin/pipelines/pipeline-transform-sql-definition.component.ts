@@ -105,6 +105,7 @@ export class PipelineTransformSqlDefinitionComponent {
     /** The rows the tab's sample thread parsed — seeds a NEW step and feeds "Try it on the sample". */
     readonly sampleRows = input<Record<string, unknown>[] | undefined>(undefined);
     /** Upstream column names from the upstream schema or step, allowing authoring without parsed sample rows. */
+    // eslint-disable-next-line @angular-eslint/no-input-rename -- `upstreamColumns` is the public attribute; the field is suffixed so it cannot shadow the computed `upstreamColumns` below
     readonly upstreamColumnsInput = input<string[] | undefined>(undefined, { alias: 'upstreamColumns' });
     /**
      * The DECLARED type per upstream column, keyed by name. ⚠ Load-bearing for the zero-row `DESCRIBE`:

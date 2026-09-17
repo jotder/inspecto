@@ -47,7 +47,8 @@ export class GeoAnalysisToolboxComponent {
     readonly points = input<readonly GeoPoint[]>([]);
 
     /** Result click → the host flies the map and highlights the folded points. */
-    readonly focus = output<GeoAnalysisFocus>();
+    /** Renamed from `focus` 2026-09-17: an output named after a native DOM event is ambiguous on the host element. */
+    readonly focusChange = output<GeoAnalysisFocus>();
 
     readonly analysisTool = signal<'stay' | 'frequent' | 'coloc'>('coloc');
     /** Tool parameters (meters / minutes — converted to ms at run time). */
@@ -81,7 +82,7 @@ export class GeoAnalysisToolboxComponent {
 
     /** Result click: ask the host to highlight the folded points and fly to the spot. */
     pick(pointIds: string[], lat: number, lon: number): void {
-        this.focus.emit({ pointIds, lat, lon });
+        this.focusChange.emit({ pointIds, lat, lon });
     }
 
     /** Open the co-location pairs as an Entity/Link graph (the Link Analysis bridge). */

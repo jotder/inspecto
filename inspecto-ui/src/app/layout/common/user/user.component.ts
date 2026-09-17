@@ -29,9 +29,7 @@ import { Subject, takeUntil } from 'rxjs';
     imports: [MatButtonModule, MatMenuModule, MatIconModule, MatDividerModule],
 })
 export class UserComponent implements OnInit, OnDestroy {
-    /* eslint-disable @typescript-eslint/naming-convention */
     static ngAcceptInputType_showAvatar: BooleanInput;
-    /* eslint-enable @typescript-eslint/naming-convention */
     private session = inject(SessionService);
 
     /** Personal/offline is auth-free — the whole menu is hidden rather than offer a no-op Sign out. */
@@ -42,16 +40,11 @@ export class UserComponent implements OnInit, OnDestroy {
 
     @Input() showAvatar: boolean = true;
     user: User;
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+    private _unsubscribeAll: Subject<null> = new Subject<null>();
 
-    /**
-     * Constructor
-     */
-    constructor(
-        private _changeDetectorRef: ChangeDetectorRef,
-        private _router: Router,
-        private _userService: UserService,
-    ) {}
+    private readonly _changeDetectorRef = inject(ChangeDetectorRef);
+    private readonly _router = inject(Router);
+    private readonly _userService = inject(UserService);
 
     // -----------------------------------------------------------------------------------------------------
     // @ Lifecycle hooks
@@ -117,13 +110,13 @@ export class UserComponent implements OnInit, OnDestroy {
         this.session.logout();
     }
 
-    onMyProfileClick(): any {
-        let url = environment.gatewayUrl + '/apps/profile';
+    onMyProfileClick(): void {
+        const url = environment.gatewayUrl + '/apps/profile';
         window.open(url, '_blank');
     }
 
-    onMyNotificationClick(): any {
-        let url = environment.gatewayUrl + '/apps/manageNotification/userNotifications';
+    onMyNotificationClick(): void {
+        const url = environment.gatewayUrl + '/apps/manageNotification/userNotifications';
         window.open(url, '_blank');
     }
 }

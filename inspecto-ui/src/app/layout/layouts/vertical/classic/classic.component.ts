@@ -71,7 +71,12 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
     readonly displayedNavigation = signal<GammaNavigationItem[]>([]);
     /** Sidebar menu search query (client-side filter of the nav tree). */
     navSearchQuery = '';
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+    private _unsubscribeAll: Subject<null> = new Subject<null>();
+    private readonly _activatedRoute = inject(ActivatedRoute);
+    private readonly _router = inject(Router);
+    private readonly _navigationService = inject(NavigationService);
+    private readonly _gammaMediaWatcherService = inject(GammaMediaWatcherService);
+    private readonly _gammaNavigationService = inject(GammaNavigationService);
     /** Active-space branding (logo / caption / footer), falling back to the shipped defaults. */
     protected readonly branding = inject(BrandingService);
     /** Lens Access Profiles — filters the sidebar per lens (identity when none saved). */
@@ -103,13 +108,7 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
     /**
      * Constructor
      */
-    constructor(
-        private _activatedRoute: ActivatedRoute,
-        private _router: Router,
-        private _navigationService: NavigationService,
-        private _gammaMediaWatcherService: GammaMediaWatcherService,
-        private _gammaNavigationService: GammaNavigationService,
-    ) {
+    constructor() {
         // Re-filter the sidebar when the lens or the saved Access Profiles change (both signals
         // are read inside _applyNavSearch via AccessStateService.filterNav).
         effect(() => this._applyNavSearch());

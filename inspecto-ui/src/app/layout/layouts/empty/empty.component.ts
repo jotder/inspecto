@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, ViewEncapsulation } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { GammaLoadingBarComponent } from '@gamma/components/loading-bar';
 import { Subject } from 'rxjs';
@@ -11,7 +11,7 @@ import { Subject } from 'rxjs';
     imports: [GammaLoadingBarComponent, RouterOutlet],
 })
 export class EmptyLayoutComponent implements OnDestroy {
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+    private _unsubscribeAll: Subject<null> = new Subject<null>();
 
     /**
      * Constructor

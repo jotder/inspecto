@@ -53,7 +53,7 @@ import { fmtBytes } from 'app/inspecto/format';
                                 class="tree-row flex min-w-0 flex-auto items-center gap-2 px-1 py-1 text-left text-sm"
                                 [class.font-semibold]="selectedPath === n.path"
                                 [attr.aria-current]="selectedPath === n.path ? 'true' : null"
-                                (click)="select.emit(n)"
+                                (click)="nodeSelect.emit(n)"
                                 (keydown)="onKey(n, $event)"
                             >
                                 <mat-icon class="icon-size-4 shrink-0" [svgIcon]="icon(n)"></mat-icon>
@@ -73,7 +73,7 @@ import { fmtBytes } from 'app/inspecto/format';
                                 [selectedPath]="selectedPath"
                                 [filter]="filter"
                                 (expand)="expand.emit($event)"
-                                (select)="select.emit($event)"
+                                (nodeSelect)="nodeSelect.emit($event)"
                             />
                         }
                     </li>
@@ -91,7 +91,8 @@ export class ConnectionTreeComponent {
     /** Case-insensitive name filter; a node stays visible if its name (or a loaded descendant) matches. */
     @Input() filter = '';
     @Output() expand = new EventEmitter<ResourceNode>();
-    @Output() select = new EventEmitter<ResourceNode>();
+    /** Renamed from `select` 2026-09-17: an output named after a native DOM event is ambiguous on the host element. */
+    @Output() nodeSelect = new EventEmitter<ResourceNode>();
 
     /** Whether to render this node under the active filter (self-match, loaded-descendant match, or not-yet-loaded). */
     visible(n: ResourceNode): boolean {

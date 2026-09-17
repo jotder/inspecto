@@ -10,7 +10,7 @@ import { DrillEvent } from '../widgets/widget-host.component';
 /**
  * Viewer-facing dashboard **filter bar** — quick filters over the dashboard's cross-filter without opening the
  * editor's condition builder. For each *exposed* field it offers the distinct sample values as a picker; every
- * active `field = value` equality condition renders as a removable chip. Both paths emit `(toggle)` with the
+ * active `field = value` equality condition renders as a removable chip. Both paths emit `(drillToggle)` with the
  * same `{field, value}` shape the tiles' drill-down uses, so the host applies one toggle rule everywhere.
  * Presentational — the host owns the ConditionGroup.
  */
@@ -42,7 +42,7 @@ import { DrillEvent } from '../widgets/widget-host.component';
                         mat-stroked-button
                         type="button"
                         class="rounded-full"
-                        (click)="toggle.emit({ field: c.field, value: c.value ?? '' })"
+                        (click)="drillToggle.emit({ field: c.field, value: c.value ?? '' })"
                         [attr.aria-label]="'Remove filter ' + c.field + ' = ' + c.value"
                     >
                         <span class="font-medium">{{ c.field }}</span>
@@ -63,7 +63,8 @@ export class DashboardFilterBarComponent {
     /** The dashboard's live cross-filter — equality conditions on exposed fields render as chips. */
     readonly filter = input.required<ConditionGroup>();
     /** Toggle `field = value` in the cross-filter (add when absent, remove when present). */
-    readonly toggle = output<DrillEvent>();
+    /** Renamed from `toggle` 2026-09-17: an output named after a native DOM event is ambiguous on the host element. */
+    readonly drillToggle = output<DrillEvent>();
 
     /** Top-level `field = value` conditions on exposed fields — the removable chips. */
     readonly activeConditions = computed<Condition[]>(() => {
@@ -78,6 +79,6 @@ export class DashboardFilterBarComponent {
     }
 
     onPick(field: string, value: string | null): void {
-        if (value != null && value !== '') this.toggle.emit({ field, value });
+        if (value != null && value !== '') this.drillToggle.emit({ field, value });
     }
 }

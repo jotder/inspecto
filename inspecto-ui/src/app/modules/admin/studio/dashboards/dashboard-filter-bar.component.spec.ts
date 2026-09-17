@@ -39,7 +39,7 @@ describe('DashboardFilterBarComponent', () => {
     it('clicking a chip emits a toggle for that field/value', () => {
         const fixture = create();
         const spy = vi.fn();
-        fixture.componentInstance.toggle.subscribe(spy);
+        fixture.componentInstance.drillToggle.subscribe(spy);
         const chip = fixture.nativeElement.querySelector(
             'button[aria-label="Remove filter tariff = premium"]',
         ) as HTMLButtonElement;
@@ -50,7 +50,7 @@ describe('DashboardFilterBarComponent', () => {
     it('picking a value emits a toggle; empty pick is ignored', () => {
         const fixture = create();
         const spy = vi.fn();
-        fixture.componentInstance.toggle.subscribe(spy);
+        fixture.componentInstance.drillToggle.subscribe(spy);
         fixture.componentInstance.onPick('tariff', 'standard');
         fixture.componentInstance.onPick('tariff', null);
         expect(spy).toHaveBeenCalledTimes(1);

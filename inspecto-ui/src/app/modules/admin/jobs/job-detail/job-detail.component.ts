@@ -75,6 +75,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     private toastr = inject(ToastrService);
 
     /** Job name when embedded as a side panel; the route-snapshot param is the full-page fallback. */
+    // eslint-disable-next-line @angular-eslint/no-input-rename -- `name` is the public attribute; the field is suffixed so it cannot shadow the `name` member below
     readonly nameInput = input<string | undefined>(undefined, { alias: 'name' });
     /** Embedded (side-panel) mode — compact header with a close button instead of breadcrumb chrome. */
     readonly embedded = input(false);
