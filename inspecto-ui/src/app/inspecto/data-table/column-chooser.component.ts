@@ -26,6 +26,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:view-columns"></mat-icon>
         </button>
         <mat-menu #menu="matMenu">
+            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
             <div class="min-w-56 px-2 py-1" (click)="$event.stopPropagation()">
                 <div class="mb-1 flex items-center gap-1 border-b pb-1" style="border-color: var(--gamma-border)">
                     <button mat-button type="button" (click)="selectedChange.emit(columns())">All</button>

@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **84<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 49<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **83<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 48<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 49<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 48<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 31<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 84<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 83<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1780,7 +1780,21 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   `connections.component.ts:176`. Fix: route them through the shared banner/toast pattern the same file
   already uses elsewhere. ⚠ Counted by a script matching a 600-character observer window; plain grep on
   adjacent lines mis-counts multi-line RxJS observers.
-- **P2** · **`UI-LINT-NOT-CONFIGURED-1`** — `npx ng lint` fails with "Cannot find 'lint' target": no
+- ~~**P2**~~ · **`UI-LINT-NOT-CONFIGURED-1`** — ✅ **CLOSED 2026-09-17: the target exists, all 177 findings are
+  DRAINED (zero), and `ui.yml` runs it as a HARD GATE.** Split into three reviewable commits by risk:
+  (1) mechanical — unused imports/locals/directives, `prefer-const`, useless escapes, side-effect ternaries
+  rewritten as if/else; (2) structural — constructor→`inject()` in the layout shell (22 params, same tokens),
+  `any`→typed (14), four outputs named after DOM events renamed with every caller (`select`→`nodeSelect` ×2,
+  `toggle`→`drillToggle`, `focus`→`focusChange`); (3) accessibility — 32 template fixes under the WCAG 2.2 AA
+  preset (keyboard handlers + `tabindex` on interactive elements, label/control associations, tree-item ARIA),
+  16 `stopPropagation`-only menu guards exempted per line with a reason. Three rule customisations, each a
+  REVIEWED DECISION with the operator's answer recorded in `eslint.config.mjs`: `_`-prefixed intent markers
+  (25 rest-sibling omissions / arity-pinned mock params), `prefer-on-push` off in spec files (all 12 hits were
+  test hosts), `template/eqeqeq` with `allowNullOrUndefined` (all 8 hits were `!= null`; `!== null` would have
+  broken `undefined` handling). 🔴 One real bug surfaced: the design-system showcase's date `pattern` was
+  `'\d{4}-…'` in a plain string — `\d` is just `d`, so it rejected its own placeholder. ⚠ Lesson for lane
+  work: never junction `node_modules` into a worktree you will `git worktree remove` — it deleted half the
+  shared tree's `node_modules` mid-shift (repaired with `npm install`). *(Original row:)* `npx ng lint` fails with "Cannot find 'lint' target": no
   angular-eslint builder is registered in `inspecto-ui/angular.json` and `package.json` has no lint script
   beyond `lint:tokens`, so the `angular-ui` skill's "lint" leg of GAUNTLET has never run anything. Fix: add
   angular-eslint with the repo's rules and wire it into `ui.yml`.

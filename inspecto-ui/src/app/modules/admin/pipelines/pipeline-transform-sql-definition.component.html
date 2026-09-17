@@ -205,10 +205,14 @@
                                     @if (row.definition?.params?.length) {
                                         <div class="mt-1 flex flex-wrap gap-1">
                                             @for (param of row.definition!.params!; track param.name) {
-                                                <label class="flex items-center gap-1 text-xs">
+                                                <label
+                                                    class="flex items-center gap-1 text-xs"
+                                                    [for]="row.field.id + '-arg-' + param.name"
+                                                >
                                                     <span class="text-secondary">{{ param.label }}</span>
                                                     @if (param.type === 'enum') {
                                                         <select
+                                                            [id]="row.field.id + '-arg-' + param.name"
                                                             class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
                                                             [value]="row.field.args[param.name] ?? param.default ?? ''"
                                                             (change)="
@@ -233,6 +237,7 @@
                                                         </select>
                                                     } @else if (param.type === 'column') {
                                                         <select
+                                                            [id]="row.field.id + '-arg-' + param.name"
                                                             class="h-7 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
                                                             [value]="row.field.args[param.name] ?? ''"
                                                             (change)="
@@ -255,6 +260,7 @@
                                                         </select>
                                                     } @else {
                                                         <input
+                                                            [id]="row.field.id + '-arg-' + param.name"
                                                             [type]="param.type === 'number' ? 'number' : 'text'"
                                                             class="h-7 w-28 rounded-md border border-gray-300 bg-transparent px-1 text-xs dark:border-gray-600"
                                                             [class.w-56]="param.type === 'sql'"

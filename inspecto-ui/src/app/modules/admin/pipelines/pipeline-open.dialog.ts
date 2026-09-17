@@ -63,10 +63,14 @@ export interface PipelineOpenData {
             <!-- ONE row template for every section — the sections may never drift from the full list. -->
             <ng-template #row let-p>
                 <div class="flex items-center gap-1 rounded px-1 hover:bg-black/5 dark:hover:bg-white/10">
-                    <label class="flex min-w-0 flex-auto cursor-pointer items-center gap-2 py-1 text-sm">
+                    <label
+                        class="flex min-w-0 flex-auto cursor-pointer items-center gap-2 py-1 text-sm"
+                        [for]="cb.inputId"
+                    >
                         <!-- MDC's own inner (empty) label wins the association, so the row text
                              never names the input — give it an explicit accessible name. -->
                         <mat-checkbox
+                            #cb
                             [checked]="picked().has(p.name)"
                             (change)="toggle(p.name)"
                             [aria-label]="'Open ' + (p.displayName || p.name)"

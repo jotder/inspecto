@@ -18,7 +18,12 @@ import { ParserTreeNode } from 'app/inspecto/api';
     template: `
         <ul [attr.role]="root ? 'tree' : 'group'" class="m-0 list-none p-0" [class.pl-4]="!root">
             @for (n of nodes; track $index) {
-                <li role="treeitem" [attr.aria-expanded]="hasChildren(n) ? isOpen($index) : null" class="py-0.5">
+                <li
+                    role="treeitem"
+                    aria-selected="false"
+                    [attr.aria-expanded]="hasChildren(n) ? isOpen($index) : null"
+                    class="py-0.5"
+                >
                     <div class="flex items-start gap-1">
                         @if (hasChildren(n)) {
                             <button
@@ -79,7 +84,8 @@ export class ParserTreeComponent {
 
     toggle(i: number): void {
         const next = new Set(this.collapsed());
-        next.has(i) ? next.delete(i) : next.add(i);
+        if (next.has(i)) next.delete(i);
+        else next.add(i);
         this.collapsed.set(next);
     }
 }

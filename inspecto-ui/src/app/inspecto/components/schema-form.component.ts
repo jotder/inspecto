@@ -414,6 +414,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                  the error is the explicit role="alert" line below, like a list field's). -->
             <ng-template #row let-spec="spec">
                 @if (isVisible(spec)) {
+                    <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- focusin/focusout/escape delegate from the row's own controls; the row itself is not focusable by design -->
                     <div
                         class="sf-row flex min-h-8 min-w-0 items-center gap-2"
                         [attr.data-key]="spec.key"

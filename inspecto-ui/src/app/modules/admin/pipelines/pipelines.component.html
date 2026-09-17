@@ -92,6 +92,7 @@
                             </span>
                         </button>
                         <mat-menu #paletteMenu="matMenu">
+                            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                             <div class="max-w-xs p-3" (click)="$event.stopPropagation()">
                                 @for (g of nodeTypeGroups(); track g.category) {
                                     <div class="mb-3 last:mb-0">

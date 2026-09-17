@@ -38,6 +38,7 @@
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                 </button>
                 <mat-menu #searchMenu="matMenu">
+                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div class="p-3" (click)="$event.stopPropagation()">
                         <mat-form-field subscriptSizing="dynamic" class="w-64">
                             <mat-label>Search points</mat-label>
@@ -57,6 +58,7 @@
                     <mat-icon svgIcon="heroicons_outline:map-pin"></mat-icon>
                 </button>
                 <mat-menu #placeMenu="matMenu">
+                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div
                         class="flex w-72 flex-col gap-1 p-3"
                         (click)="$event.stopPropagation()"
@@ -103,6 +105,7 @@
                     <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
                 </button>
                 <mat-menu #kindMenu="matMenu">
+                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div
                         class="flex flex-col gap-1 px-4 py-2"
                         (click)="$event.stopPropagation()"
@@ -175,6 +178,7 @@
                     <mat-icon svgIcon="heroicons_outline:wrench-screwdriver"></mat-icon>
                 </button>
                 <mat-menu #toolsMenu="matMenu">
+                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div
                         class="flex w-80 flex-col gap-2 p-3"
                         (click)="$event.stopPropagation()"
@@ -275,6 +279,7 @@
                     <mat-icon svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                 </button>
                 <mat-menu #layersMenu="matMenu">
+                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div class="flex w-64 flex-col gap-1 p-3" (click)="$event.stopPropagation()" aria-label="Layers">
                         <mat-checkbox
                             [checked]="layerToggles().placeLabels !== false"
@@ -404,6 +409,7 @@
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
             </button>
             <mat-menu #saveMenu="matMenu">
+                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events -- (click) only stops propagation so the mat-menu stays open; the form is not a control -->
                 <form
                     [formGroup]="saveForm"
                     (ngSubmit)="saveView()"
@@ -658,7 +664,7 @@
             <inspecto-geo-analysis-toolbox
                 [hidden]="!analysisOpen()"
                 [points]="displayed()?.points ?? []"
-                (focus)="focusResult($event)"
+                (focusChange)="focusResult($event)"
             />
         }
 

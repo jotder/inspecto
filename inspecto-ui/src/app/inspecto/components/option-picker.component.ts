@@ -46,7 +46,7 @@ const SEARCH_THRESHOLD = 8;
                     placeholder="Filter…"
                 />
             }
-            <div role="listbox" [attr.aria-label]="data.title" (keydown)="onKeydown($event)">
+            <div role="listbox" tabindex="-1" [attr.aria-label]="data.title" (keydown)="onKeydown($event)">
                 @for (opt of shown(); track opt.value) {
                     <button
                         type="button"

@@ -101,9 +101,11 @@ src/app/
 - **No business logic in a component.** A `.component.ts` is template + signals + calls into `inspecto/`;
   validation, data shaping and business rules live in a shared library. This is the W3 rule from the
   2026-07-02 frontend review, landed here 2026-09-10 (Sprint 7.2) because the review plan was its only home.
-  ⚠ **It is enforced in review only — the boundary lint was never built.** There is no ESLint config tracked
-  in this repo and no `lint` script; `lint:tokens` is the design-token guard, not a linter. So do not cite a
-  boundary check as a gate. And the libraries are **not** uniformly framework-free: `component-model/` and
+  ⚠ **It is enforced in review only — the boundary lint was never built.** ESLint IS tracked since 2026-09-17
+  (`eslint.config.mjs`: upstream recommended presets + WCAG template preset, `npm run lint`, a hard gate in
+  `ui.yml`, zero findings) — but it carries no import-boundary rule, so do not cite a boundary check as a gate.
+  Three rule customisations exist, each a REVIEWED DECISION documented in the config; add a fourth only the
+  same way. A per-line `eslint-disable-next-line <rule> -- <reason>` is the house form for a deliberate exception. And the libraries are **not** uniformly framework-free: `component-model/` and
   `graph/` are, while `query/`, `viz/`, `rule/` and `format/` all import `@angular/*` — treat purity as the
   target for new code, not as a property you can assume.
 - ⛔ **The R1–R8 per-pane review protocol is RETIRED** ("no pane is shipped again without a sheet"). Its 37

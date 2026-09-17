@@ -76,6 +76,7 @@ interface ExtraEntry {
              editor (a toggle), so it has no pencil — exactly as a schema-form boolean. -->
         <div class="flex flex-col gap-0.5">
             @for (e of rows(); track e.key) {
+                <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- focusin/focusout/escape delegate from the row's own controls; the row itself is not focusable by design -->
                 <div
                     class="sf-row flex min-h-8 min-w-0 items-center gap-2"
                     [attr.data-key]="e.key"

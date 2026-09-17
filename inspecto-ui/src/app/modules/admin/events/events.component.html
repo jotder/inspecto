@@ -154,6 +154,7 @@
                 } @empty {
                     <div class="text-secondary px-4 py-2 text-sm">No saved views yet.</div>
                 }
+                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                 <div class="mt-1 flex items-center gap-2 border-t px-3 pt-2" (click)="$event.stopPropagation()">
                     <mat-form-field class="gamma-mat-dense flex-auto" subscriptSizing="dynamic">
                         <mat-label>Save current as…</mat-label>
