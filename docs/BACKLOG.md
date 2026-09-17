@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **54<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 36<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **77<!--count:backlog-rows--> rows: 6<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 36<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 14<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 6<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 25<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 77<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1443,6 +1443,122 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   — the guard's stale-allowlist rule fails the build until you do, which is the rename announcing itself.
   → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
 
+
+### Module audit 2026-09-17 — frontend first, then the end-user request path down to acquisition and packaging
+
+**Where we stand (grounded in code and a LIVE server, not board text).** The UI↔API contract is intact: every
+one of the SPA's 252 `apiUrl(...)` paths matches a registered route once the `/spaces/{id}` prefix and the
+infra probes are accounted for — zero dead calls. The UI suite is 3005/0 (5 skipped) with a production
+build at 1.01 MB raw, well under budget, and the design-token guard is green; 143 of 158 components have a
+spec. The control plane's write-gate chain is centralised in `WriteGates.java`; the optional modules
+(security, policy, ops, backup, agent) are fail-closed where the classic defects live — RS256 pinned,
+`at+jwt` allow-list, prepared statements throughout `inspecto-ops`, zip-slip pinned, mutating tools refused
+before any model call. The acquisition stack is protocol-tested for SFTP/FTP (real in-process servers) and
+stub-tested only for S3/GCS/Azure/Kafka, by disclosed design. `asn-parser` IS consumed (two engine
+ingesters), depth-bounded, and free of infinite loops. **What is still problematic clusters in four places:**
+(1) the release path has NEVER executed and its one published zip pairs a Linux runtime with Windows-only
+DuckDB extensions; (2) the ASN.1 length arithmetic trusts attacker-declared sizes; (3) silent failure in the
+core authoring journey and on session loss; (4) test posture where it matters — 94% of route tests never
+arm an Authenticator, `RunRoutes` has none, and `ng lint` is not configured at all. Two live P1s found by
+this audit were FIXED in the same shift rather than filed: `SqlGuard` let a bare path literal in `FROM`
+position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — returned rows of
+`spaces/demo/audit/jobs_runs.csv` to an ungated call, now refused by `SqlGuard.RELATION_REF`, 17/17), and
+`SessionService.onAuthLost` dropped state without navigating to sign-in (now navigates).
+
+- **P1** · **`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`** — on `ubuntu-latest` `$env:OS` is unset so the jlink
+  image is LINUX, yet the only zip a tag publishes is built by `Compress-BundleForPlatform -Platform
+  'windows_amd64'` (`inspecto/package.ps1:1746`; collect steps at `.github/workflows/release.yml:168-210`):
+  the published bundle pairs a Linux JVM with Windows-only DuckDB extensions — the exact air-gap failure
+  `-RequireExtensions` exists to prevent. Fix: derive the extension platform from the runtime actually
+  embedded and emit one artifact per target platform; the file it changes is `inspecto/package.ps1`.
+- **P1** · **`BER-LENGTH-OVERFLOW-1`** — `long end = valueOffset + valueLength` with `valueLength` accepted
+  up to `Long.MAX_VALUE` overflows negative and passes the `end > limit` guard (`BerReader.java:102` and
+  `:128`); `RecordReader.java:249` catches only `BerParseException`, so `Tlv.java:33`'s
+  `Math.toIntExact` escapes as an unchecked `ArithmeticException` — or, just under 2 GB, allocates a
+  `byte[]` sized by the input. Fix: `Math.addExact` (or `valueLength > limit - valueOffset`) at both sites,
+  raising `BerParseException`; the file it changes is `BerReader.java`.
+- **P2** · **`BER-FRAMING-UNCHECKED-READ-1`** — `framing.recordLength(...)`/`recordHeaderLength(...)` are
+  called OUTSIDE the recovery `try` (`RecordReader.java:234-235` vs `:236`) and `Framing.java:375` reads
+  header bytes with no bound against `contentEnd`, so a truncated last record crashes the ingester with
+  `IndexOutOfBoundsException` instead of a skippable `ParseError`; `RecoveryPolicy.SKIP_RECORD` cannot save
+  the file. Fix: move both calls inside the `try` and bounds-check the header first.
+- **P2** · **`RELEASE-PIPELINE-NEVER-EXECUTED-1`** — every step of `release.yml` is unexecuted: the workflow
+  landed 2026-09-02, the newest tag is `v3.9.0` (2026-06-01), the pom is `4.0.0-SNAPSHOT`, and `ci.yml`
+  only PARSES `package.ps1` (`.github/workflows/ci.yml` launcher/SBOM/extension guards) — never runs it.
+  Fix: a `workflow_dispatch` dry-run job that executes the Personal packaging path (no `-Sign`) on master.
+- **P2** · **`RELEASE-LINUX-ZIP-NEVER-PUBLISHED-1`** — `inspecto-deploy-linux.zip` is built only when a
+  Linux jmods cache is found (`inspecto/package.ps1:1421-1440`) and the three collect steps in
+  `release.yml` name only the `inspecto-deploy.zip*` trio, so no Linux-labelled artifact has ever been
+  released. Fix: name it in each collect step and fail the release when the per-platform set is short.
+- **P2** · **`RELEASE-LAUNCHERS-NOT-EXECUTABLE-1`** — `Compress-Archive` stores no POSIX mode bits
+  (`inspecto/package.ps1:1736`) and the only `chmod +x` lives inside the emitted `install-service.sh`, so a
+  customer who unzips gets a non-executable `serve.sh`/`run.sh`. Fix: zip the Linux leg with a mode-
+  preserving tool (or `tar.gz`) and assert the bit in the release verify step.
+- **P2** · **`NOTIFY-SMTP-TLS-VERIFY-1`** — `SmtpEmailChannel.java:154` sets `mail.smtp.starttls.enable`
+  but never `mail.smtp.ssl.checkserveridentity`, which legacy `javax.mail` defaults to `false`: a STARTTLS
+  session accepts any certificate for `notify.smtp.host`, so SMTP AUTH credentials can be intercepted by
+  whoever answers that name. Fix: set `checkserveridentity=true` unconditionally.
+- **P2** · **`PIPELINE-EDITOR-SILENT-ERRORS-1`** — twelve `.subscribe({ next })` calls in the core
+  authoring journey carry no `error` handler (`pipeline-editor.component.ts:914, 934, 1450, 1452, 1637,
+  1639, 1677, 1807, 1812, 1895, 2047, 3058, 3088`), so a failed save, load or validate fails with no user
+  feedback; three more in `pipeline-parse-definition.component.ts`, and one each in `jobs.component.ts:348`,
+  `job-detail.component.ts:257`, `expectations.component.ts:188`, `decision-rules.component.ts:195`,
+  `connections.component.ts:176`. Fix: route them through the shared banner/toast pattern the same file
+  already uses elsewhere. ⚠ Counted by a script matching a 600-character observer window; plain grep on
+  adjacent lines mis-counts multi-line RxJS observers.
+- **P2** · **`UI-LINT-NOT-CONFIGURED-1`** — `npx ng lint` fails with "Cannot find 'lint' target": no
+  angular-eslint builder is registered in `inspecto-ui/angular.json` and `package.json` has no lint script
+  beyond `lint:tokens`, so the `angular-ui` skill's "lint" leg of GAUNTLET has never run anything. Fix: add
+  angular-eslint with the repo's rules and wire it into `ui.yml`.
+- **P2** · **`UI-CAPABILITY-AFFORDANCE-1`** — after 2026-09-17's gating (`ad29e683`) the Test/Probe buttons
+  in `connections.service.ts:71,82` callers, the Evaluate actions in `expectations.service.ts:81,86` and
+  `alerts.service.ts:75` callers, and Space import (`spaces.service.ts:184`) render for every user and
+  answer 403 for one without `canOnboardConnections`/`canOperateRuns`/`canAdminister`. Fix: gate the
+  affordances on the v1 envelope's `permissions` the way the CRUD buttons already are.
+- **P2** · **`CONTROL-AUTHGATE-TESTCOVERAGE-1`** — only 8 of 136 files under
+  `inspecto/src/test/java/com/gamma/control/` call `Authenticators.forTest`; every other route test runs
+  Personal, where `ApiContext.requireCapability` is a no-op, so a gate added or removed on ~94% of routes
+  changes no test's outcome (this shift added six gates and every pre-existing test stayed green). Fix: an
+  armed-Authenticator variant per write route family, or a guard that flags a `withCapability` route with
+  no authenticated test.
+- **P2** · **`RUN-ROUTES-TEST-1`** — `RunRoutes.java` (register/trigger/pause/resume/status/report of
+  pipelines) is referenced by no test file under `inspecto/src/test/java/com/gamma/control/`. Fix: a
+  `ControlApiRunRoutesTest` over the write paths through the real gate chain.
+- **P3** · **`PKG-LINUX-RUNTIME-WARNS-1`** — a failed Linux runtime build is `Write-Warning`, not `throw`
+  (`inspecto/package.ps1:1436`), so a release quietly loses a platform. Fix: throw unless an explicit
+  `-AllowPartialRuntime` is passed.
+- **P3** · **`BUNDLE-MODULE-COUNT-COMMENT-1`** — `tools/bundle-modules.mjs:77` says "Personal 2, Standard
+  10, Enterprise 11" while its own table yields 2/11/12 (and `ci.yml` agrees with the table). Fix: correct
+  the comment or make `tools/check-sbom-modules.mjs` assert the stated counts.
+- **P3** · **`SFTP-RESUME-CHECKSUM-1`** — a resumed fetch treats "local size == remote length" as complete
+  (`SftpConnector.java:155-179`) with no checksum, so a truncated-then-replaced remote file of equal size
+  is accepted. Fix: verify with the module's existing `Checksums` on resume.
+- **P3** · **`DESIGN-TOKEN-SCOPE-LAYOUT-1`** — `inspecto-ui/tools/check-design-tokens.mjs` scans
+  `src/app/inspecto` and `src/app/modules/admin` only, so `src/app/layout/**` (the shell every user sees)
+  may hardcode colours unguarded; zero violations today. Fix: add `src/app/layout` to `ROOTS`.
+- **P3** · **`API-DEAD-METHODS-1`** — five exported service methods have no caller in the SPA:
+  `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, `config.service.ts:180,
+  187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended
+  feature that never got a pane. Fix: a product call — wire or delete; not a mechanical delete.
+- **P3** · **`SIGN-IN-NO-SPEC-1`** — `modules/admin/session/sign-in.component.ts` has an a11y spec only;
+  no behaviour spec covers the authorize/mock-code branches. Fix: add one.
+- **P3** · **`JOBRUN-STORE-SWALLOWED-WRITES-1`** — `DbJobRunStore.java:126-309` (eight sites) and
+  `JobRunLedger.java:71,107,133` log-and-swallow `SQLException` on audit writes with no signal, so an
+  audit gap is invisible. Fix: emit a metric/signal on write failure, or record a design decision that
+  best-effort is acceptable and close.
+- **P3** · **`AUDIT-LOG-UNBOUNDED-READ-1`** — `JobRunLedger.java:98,124,149`, `PartitionCompactor.java:163`,
+  `ReferenceCompactor.java:292`, `RunArtifactStore.java:60`, `RunLogStore.java:50` and `CommitLog.java:85`
+  read whole journal files into memory on every read with no cap. Demand-gated: stream or tail once a
+  file is measured to matter.
+- **P3** · **`AUDIT-AUTH-DUPLICATE-ROW-1`** — the generic `AuditTrail.record` interceptor also classifies
+  the auth routes as `auth.created <route>` (`data_mutation`) beside the typed `auth.exchange`/`auth.refresh`/
+  `auth.logout` rows added 2026-09-17, so every sign-in writes two rows. Fix: teach `AuditTrail.classify`
+  to skip `/auth/*`.
+- **P3** · **`MAIL-RELEASE-NOTES-STATUS-1`** — the pending-MAJOR release notes still describe `mail.send`
+  as returning SUCCESS with no channel; it returns `SKIPPED` since `ad29e683`. Fix: correct the note.
+- **P3** · **`NAV-MOCK-COMMENT-STALE-1`** — `core/navigation/navigation-data.ts:7,302` and
+  `navigation.service.ts:91` still describe a mock navigation API removed at the shell re-plumb. Fix:
+  delete the comments when the file is next touched.
 
 ### Filed from the 17-spec consolidation, 2026-09-09 (Sprint 2)
 

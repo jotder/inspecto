@@ -1,7 +1,7 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../environments/environment';
 import { SessionService } from './session.service';
@@ -58,8 +58,13 @@ describe('SessionService (W6d edition switch)', () => {
             .flush({ session: { authenticated: true, actor: 'priya.n', capabilities: ['canOperateRuns'] } });
         await init;
         expect(svc.actor()).toBe('priya.n');
+        const router = TestBed.inject(Router);
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
         svc.onAuthLost();
         expect(svc.actor()).toBeNull();
+        // 2026-09-17: the doc comment always promised the bounce; the body never did it, so a user whose
+        // refresh failed sat on a dead pane. Losing the session must land on sign-in.
+        expect(navigate).toHaveBeenCalledWith(['/sign-in']);
     });
 
     it('reads features.geoLink, and treats an absent flag as NOT enabled (Personal ships no geo/link module)', async () => {

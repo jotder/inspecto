@@ -284,19 +284,29 @@ export const defaultNavigation: GammaNavigationItem[] = [
         icon: 'heroicons_outline:cog-8-tooth',
         link: '/settings',
     },
+    // One top-level entry for the assistant family (operator, 2026-09-17): "Assistant" folds the skill
+    // panel and the agent chat under a single menu item instead of two siblings at the root.
     {
         id: 'assist',
         title: 'Assistant',
-        type: 'basic',
+        type: 'collapsable',
         icon: 'heroicons_outline:sparkles',
-        link: '/assist',
-    },
-    {
-        id: 'agent-chat',
-        title: 'Agent Chat',
-        type: 'basic',
-        icon: 'heroicons_outline:chat-bubble-left-right',
-        link: '/agent-chat',
+        children: [
+            {
+                id: 'assist-skills',
+                title: 'Assistant',
+                type: 'basic',
+                icon: 'heroicons_outline:sparkles',
+                link: '/assist',
+            },
+            {
+                id: 'agent-chat',
+                title: 'Agent Chat',
+                type: 'basic',
+                icon: 'heroicons_outline:chat-bubble-left-right',
+                link: '/agent-chat',
+            },
+        ],
     },
 ];
 // The alternate layouts reuse the same Inspecto navigation, but each gets its OWN array so the mock's

@@ -62,6 +62,34 @@ class SqlGuardTest {
         assertTrue(rejects("SELECT * FROM parquet_scan('/data/x.parquet')"));
     }
 
+    /**
+     * 🔴 Found LIVE 2026-09-17: {@code POST /db/query} returned the rows of a CSV outside every store through
+     * a bare path literal — DuckDB's replacement scan reads a file named in relation position with no
+     * {@code read_csv(} token for the function block-list to see. The relation position is the seam.
+     */
+    @Test
+    void aPathLiteralInRelationPositionIsRejected() {
+        assertTrue(rejects("SELECT * FROM 'C:/sandbox/spaces/demo/audit/jobs_runs.csv'"), "string literal as a table");
+        assertTrue(rejects("SELECT * FROM '/etc/passwd'"));
+        assertTrue(rejects("SELECT * FROM 'http://127.0.0.1:8080/api/v1/health'"), "URL literal");
+        assertTrue(rejects("SELECT a.x FROM t a JOIN 'other.parquet' b ON a.id = b.id"), "JOIN position too");
+        assertTrue(rejects("SELECT * FROM \"data/secret.csv\""), "a quoted identifier that is a path");
+        assertTrue(rejects("SELECT * FROM data.csv"), "a bare identifier with a data-file suffix");
+        assertTrue(rejects("SELECT * FROM s3://bucket/key.parquet"), "a scheme");
+        assertTrue(rejects("SELECT * FROM '*.csv'"), "a glob");
+        assertTrue(firstMessage("SELECT * FROM 'x.csv'").contains("replacement scan"));
+    }
+
+    @Test
+    void ordinaryRelationsStillPass() {
+        assertFalse(rejects("SELECT * FROM demo_orders o JOIN demo_sales s ON o.id = s.id"));
+        assertFalse(rejects("SELECT * FROM main.orders"), "schema-qualified table");
+        assertFalse(rejects("SELECT * FROM (SELECT 1 AS x) sub"), "a subquery in relation position");
+        assertFalse(rejects("WITH t AS (SELECT 1) SELECT * FROM t"));
+        assertFalse(rejects("SELECT * FROM \"Quoted Table\""), "a quoted identifier that is not a path");
+        assertFalse(rejects("SELECT 'a.csv' AS label FROM t"), "a path-like literal NOT in relation position");
+    }
+
     @Test
     void copyToIsRejected() {
         assertTrue(rejects("COPY (SELECT * FROM input) TO '/tmp/exfil.csv'"),

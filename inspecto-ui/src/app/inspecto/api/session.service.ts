@@ -283,12 +283,19 @@ export class SessionService {
             });
     }
 
-    /** Interceptor hook: a refresh failed / the session is gone — drop local state and bounce to sign-in. */
+    /**
+     * Interceptor hook: a refresh failed / the session is gone — drop local state and bounce to sign-in.
+     * 🔴 Until 2026-09-17 this did only the first half: the doc comment promised the bounce, the body never
+     * navigated, so a user on an already-loaded pane whose refresh failed sat on a dead page while every
+     * further call 401'd, re-tried the refresh and failed again. The `authGuard` only runs on the NEXT route
+     * activation, so nothing else could catch it.
+     */
     onAuthLost(): void {
         this.accessToken.set(null);
         this.authenticated.set(false);
         this.actor.set(null);
         this.capabilities.set([]);
+        if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
 
     private redirectUri(): string {

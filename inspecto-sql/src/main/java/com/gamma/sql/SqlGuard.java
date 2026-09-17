@@ -53,6 +53,23 @@ public final class SqlGuard {
                     + "|vacuum|analyze|prepare|execute)\\b",
             Pattern.CASE_INSENSITIVE);
 
+    /**
+     * A relation reference — the token after {@code FROM} or {@code JOIN}. DuckDB's REPLACEMENT SCAN turns a
+     * string literal, or an identifier that looks like a path, into an implicit file read:
+     * {@code SELECT * FROM 'C:/any/file.csv'} reads the file with no {@code read_csv(} token anywhere in the
+     * text, so {@link #BLOCKED_FUNCTIONS} never sees it. 🔴 Found live 2026-09-17: {@code POST /db/query}
+     * returned the rows of {@code spaces/demo/audit/jobs_runs.csv} — a file outside every store — to a
+     * caller with no capability. The relation position is the only place a path can do harm, so it is
+     * the only place this looks.
+     */
+    private static final Pattern RELATION_REF = Pattern.compile(
+            "\\b(from|join)\\s+('[^']*'|\"[^\"]*\"|[^\\s(),;]+)", Pattern.CASE_INSENSITIVE);
+
+    /** An identifier that is really a path or URL: separators, a scheme, a glob, or a data-file suffix. */
+    private static final Pattern PATH_LIKE = Pattern.compile(
+            "[\\\\/]|://|[*?\\[]|\\.(csv|tsv|txt|parquet|pq|json\\w*|ndjson|xlsx?|gz|zst|bz2|db|duckdb|arrow|ipc|feather|sqlite)$",
+            Pattern.CASE_INSENSITIVE);
+
     /** A cleaned candidate must start here: optional leading {@code (}, then SELECT or WITH. */
     private static final Pattern STARTS_READONLY = Pattern.compile(
             "^\\(*\\s*(select|with)\\b", Pattern.CASE_INSENSITIVE);
@@ -106,7 +123,21 @@ public final class SqlGuard {
                     + "' is not allowed — only a read-only SELECT over the catalog views is permitted"));
         }
 
+        var rm = RELATION_REF.matcher(noTrailing);
+        while (rm.find()) {
+            String ref = rm.group(2);
+            boolean literal = ref.startsWith("'");
+            String bare = (literal || ref.startsWith("\"")) ? ref.substring(1, ref.length() - 1) : ref;
+            if (literal || PATH_LIKE.matcher(bare).find()) {
+                out.add(Finding.error("sql", "'" + bare + "' after " + rm.group(1).toUpperCase()
+                        + " names a file or URL, not a table — DuckDB would read it directly (replacement scan); "
+                        + "only catalog tables and views may be queried"));
+                break;
+            }
+        }
+
         return out;
+
     }
 
     /** True iff {@code sql} passes the allow-list with no findings. */
