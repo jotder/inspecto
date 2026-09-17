@@ -245,3 +245,13 @@ code still references it, so it would raise warnings against a repo that keeps i
 `NodeAttributes` comment "read-compat only, never authored" — which describes the **authoring** surface
 and says nothing about lift, lower or the compiler. Read a type's **consumers**, not the comment nearest
 to it.
+
+### `NODETYPE-SCAFFOLD-EMITS-A-COPY-1` (open, filed 2026-09-17)
+
+`tools/templates/nodetype/.../__className__Executor.java:111` emits its own private SQL identifier-quoting
+copy into every generated Executor, so `SQLIDENT-NINE-COPIES-1` regrows from the scaffold however many call
+sites are consolidated. ⚠ It was left out of that consolidation because the generated module's pom is not
+visible from the template — it cannot be confirmed that a scaffolded module has `inspecto-util` on its
+classpath — and the template's javadoc points at "the contract note above", which is **not in the file**;
+that note appears lost to an earlier edit. Fixing it properly means settling the scaffold's dependency
+contract first.

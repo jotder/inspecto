@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **86<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 51<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **84<!--count:backlog-rows--> rows: 4<!--count:backlog-p1--> × P1 · 49<!--count:backlog-p2--> × P2 · 31<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 51<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 4<!--count:backlog-p1--> P1 + 49<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 31<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 86<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 84<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1525,20 +1525,87 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   (`BackupTask.java:117-148`) but its sidecar manifest at `:148` is a direct `Files.writeString`; a crash
   between the two leaves a zip with a missing or stale manifest. Fix: `AtomicFiles.write`.
 
-- **P2** · **`SQLIDENT-NINE-COPIES-1`** — SQL identifier quoting (`"\"" + ident.replace("\"", "\"\"") + "\""`) is
-  re-implemented byte-identically in nine classes across four modules while the canonical `SqlIdent.q`
-  (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/SqlIdent.java:19`) is package-private:
-  `DbBrowserRoutes.java:331`, `GeoRoutes.java:268`, `InvRoutes.java:267`, `MaterializeTask.java:185`,
-  `QueryExecutor.java:260`, `MeasureCompiler.java:258`, `ReconService.java:753`, `RowShaper.java:848`,
-  `ScratchTables.java:107`. `SqlIdent`'s own javadoc calls drift here "an injection or a mangled identifier";
-  a hardening change can only ever reach one copy. Fix: promote `SqlIdent` to `inspecto-sql` and delegate all
-  nine, as `JAVA-5` did inside `pipeline.exec`.
-- **P2** · **`PACK-SPI-LOAD-NOT-FAULT-TOLERANT-1`** — four `ServiceLoader` loops over an OPERATOR-SUPPLIED job-pack
-  class loader iterate raw (`JobPackManager.java:203,209,216,219`), so one broken class in one third-party
-  pack throws `ServiceConfigurationError` out of `hasNext()` and kills discovery of every other pack; the
-  tolerant loader already exists (`OptionalSpi.java:73-91`). ~20 further raw loops sit in core code over the
-  app class loader (lower risk; the entries ship with the build). Fix: an `OptionalSpi.all(spi, loader)`
-  overload for pack discovery, warn-and-skip per element.
+- ~~**P2** · **`SQLIDENT-NINE-COPIES-1`**~~ ✅ **SHIPPED 2026-09-17 — the row was wrong in BOTH directions and
+  its prescribed home was a MODULE CYCLE.**
+  🔴 **16 copies across FIVE modules, not nine across four** — four of them **inline**, with no helper method,
+  which is why a grep for a signature missed them. And **two of the nine were never copies**: `RowShaper:848`
+  and `ScratchTables:107` are the delegating helpers JAVA-5 left behind, so the row filed the line numbers of
+  the FIX as the defect.
+  🔴 **The premise failed too:** `com.gamma.util.SqlBuilder.quoteIdent` was **already public** and already
+  imported by three modules — there were TWO rival canonicals, not one package-private one.
+  ⛔ **`inspecto-sql` cannot be the home: it DEPENDS ON `inspecto-util`**, where two copies live, so the
+  prescribed move was a cycle and could not have consolidated the two copies the row did not know about. The
+  canonical is now `inspecto-util`, reachable by all five holding modules — confirmed by a green 32-module
+  `test-compile`, not by reading poms.
+  ✅ **Nine sites deliberately NOT consolidated, each a BEHAVIOUR difference:** `RecordTransform.quoteIdentifier`
+  returns a plain identifier **unquoted** and mirrors the SPA's `sql-functions.ts` in two languages;
+  `DuckDbCsvIngester.escapeIdent` returns the escape **without** surrounding quotes, so delegating would
+  double-quote; `DbConnectionWorkbench.quoteIdent` uses the **JDBC driver's** own quote string; and six are
+  RFC-4180 **CSV field** escapes — same bytes, different concept. ⚠ `ReportJob` contains BOTH kinds, so a
+  file-level sweep would have corrupted it.
+  ✅ **The mutation proof crosses a module boundary** — dropping the escape in `inspecto-util` reds
+  `ConditionSqlTest` in `inspecto-engine`, which is what proves real delegation. ⚠ The nine pre-existing
+  `ConditionSqlTest` cases did not notice the mutant at all.
+  ⚠ **Stated plainly: the other TEN delegating callers are NOT individually mutation-proven** — all private
+  static with no test reaching the quoted output, and five validate against `SAFE_IDENT` first so a quote can
+  never arrive in a test. Their delegation rests on a read diff; those are the ones that could regrow a copy.
+  ⇒ Residual filed: `NODETYPE-SCAFFOLD-EMITS-A-COPY-1`. Original row follows.
+  - **P2** · **`SQLIDENT-NINE-COPIES-1`** — SQL identifier quoting (`"\"" + ident.replace("\"", "\"\"") + "\""`) is
+    re-implemented byte-identically in nine classes across four modules while the canonical `SqlIdent.q`
+    (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/SqlIdent.java:19`) is package-private:
+    `DbBrowserRoutes.java:331`, `GeoRoutes.java:268`, `InvRoutes.java:267`, `MaterializeTask.java:185`,
+    `QueryExecutor.java:260`, `MeasureCompiler.java:258`, `ReconService.java:753`, `RowShaper.java:848`,
+    `ScratchTables.java:107`. `SqlIdent`'s own javadoc calls drift here "an injection or a mangled identifier";
+    a hardening change can only ever reach one copy. Fix: promote `SqlIdent` to `inspecto-sql` and delegate all
+    nine, as `JAVA-5` did inside `pipeline.exec`.
+
+- **P3** · 🔴 **`NODETYPE-SCAFFOLD-EMITS-A-COPY-1` — the node-type scaffold plants the next SQL-quoting
+  copy into every generated Executor.** Filed 2026-09-17 while consolidating `SQLIDENT-NINE-COPIES-1`.
+  `tools/templates/nodetype/src/main/java/__packageDir__/__className__Executor.java:111` emits its own private
+  `"\"" + ident.replace("\"", "\"\"") + "\""`, so **that row regrows from the template** however many call
+  sites are consolidated.
+  ⚠ Not fixed with the rest because the generated module's pom is not visible from the template — it cannot be
+  confirmed that a scaffolded module would have `inspecto-util` on its classpath — and the template's javadoc
+  points at "the contract note above", **which is not in the file**; that note appears to have been lost in an
+  earlier edit. ⇒ Fixing this properly means settling the scaffold's dependency contract first.
+  → `okf/backend/engine/node-types.md`
+
+- **P3** · **`QUEUES-USER-FACING-COPY-1` — three shipped strings still promise a capability deleted in
+  2026-09.** Filed 2026-09-17 out of `ROOT-POM-QUEUES-ROUTE-CLAIM-1`, which corrected the comments.
+  ⚠ **These are product copy, not comments, and none is test-asserted:**
+  `AbsentObjectRoutes.java:27` — the Personal-edition **503 body** — plus
+  `inspecto-ui/…/admin/objects/object-mail.component.html:4` and `…/admin/tags/tags.component.html:4`, all
+  reading "notes, links, tags **and queues** are provided by the…". ⇒ **A 503 telling an operator that a
+  deleted feature is available in Standard is a small but real defect.**
+  ⚠ Left out of the pom row deliberately: changing shipped copy and two Angular templates is a different
+  change class and needs the `angular-ui` skill. → `okf/capabilities/editions/editions.md`
+- ~~**P2** · **`PACK-SPI-LOAD-NOT-FAULT-TOLERANT-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's MECHANISM is
+  refuted and the real hole is worse.**
+  🔴 **`ServiceConfigurationError` was already contained** — `load()` catches it per jar, so a provider that is
+  missing or throws in its constructor rejects only its own pack. **`LinkageError` is what escaped**:
+  `ServiceLoader` wraps a class it cannot FIND in an SCE, but a class it finds and cannot DEFINE throws
+  `LinkageError` straight out of `hasNext()`. Neither an `Exception` nor an SCE — so it left `load()`, left
+  `rescan()`'s per-pack loop, killed discovery of **every other pack**, and at `scanAtStartup()` killed the
+  boot. A pack compiled for a newer Java is the everyday case.
+  ⛔ **The prescribed fix is not implementable:** `OptionalSpi` lives in `inspecto-processor`, which **depends
+  on** `inspecto-engine`, so `JobPackManager` cannot reference it. Adopting it means relocating a class used by
+  five call sites — a separate row, not a detail of this one.
+  ⛔ **Warn-and-skip per element was also REJECTED** — a pack is all-or-nothing by a decision stated three
+  times in that code, and `OptionalSpi`'s own javadoc says swallowing a per-provider failure "would turn a bug
+  into a silent absence". Skipping one broken provider would half-load a third-party pack.
+  ✅ The fix is ONE catch clause: `Exception | ServiceConfigurationError | LinkageError` — not bare `Error`,
+  so `OutOfMemoryError`/`StackOverflowError` still propagate.
+  ✅ **The ~20 core loops were CHECKED, not assumed**: all use single-arg `load()`, and `setContextClassLoader`
+  appears nowhere in `inspecto*/src/main/java`, so none runs over an operator-supplied loader. Scope held.
+  ✅ The test pins the **blast radius** — two jars, one with an 8-byte class file, asserting the OTHER still
+  registers. Mutation-proved: it reds as an **ERROR, not an assertion**, and the stack trace is the finding.
+  Original row follows.
+  - **P2** · **`PACK-SPI-LOAD-NOT-FAULT-TOLERANT-1`** — four `ServiceLoader` loops over an OPERATOR-SUPPLIED job-pack
+    class loader iterate raw (`JobPackManager.java:203,209,216,219`), so one broken class in one third-party
+    pack throws `ServiceConfigurationError` out of `hasNext()` and kills discovery of every other pack; the
+    tolerant loader already exists (`OptionalSpi.java:73-91`). ~20 further raw loops sit in core code over the
+    app class loader (lower risk; the entries ship with the build). Fix: an `OptionalSpi.all(spi, loader)`
+    overload for pack discovery, warn-and-skip per element.
 - **P2** · **`CONNECTOR-SIDECAR-SHADES-LOGGING-1`** — the connectors, notify-channels and security sidecars shade
   without excluding `ch/qos/logback/**`, `org/slf4j/impl/**` and the `SLF4JServiceProvider` service entry
   (`inspecto-connectors/pom.xml:175-180` vs the correct set in `inspecto-agent/pom.xml`), and connectors is
@@ -1550,14 +1617,41 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
   with superseded `ByteSource`/`TxConfig`/`Tag` twins that greps and refactors keep hitting. ⚠ Not the same
   subject as the refuted `BACKLOG-STALE-LEGACY-POM-1` (that was `legacy-code/pom.xml`). Fix: delete the tree
   (history keeps it) and say so beside the root `<modules>`.
-- **P3** · **`PARENT-UNMANAGED-CHILD-VERSIONS-1`** — `inspecto-util/pom.xml:58` (opencsv 5.9), `inspecto-etl/pom.xml:96`
-  and `inspecto-event/pom.xml:68` (the same logback 1.5.18 literal twice) bypass the parent's
-  `dependencyManagement`, and the shade plugin version is child-local in five poms — a bump half-lands. Fix:
-  move them to parent properties / `pluginManagement`.
-- **P3** · **`ROOT-POM-QUEUES-ROUTE-CLAIM-1`** — the root pom's EDG-01 cell-7 comment says the `/queues` routes moved
-  to `inspecto-ops`, but no `QueueRoutes` class exists anywhere and the module's `RouteModule` service file
-  lists `ObjectRoutes, NoteRoutes, TagRoutes` only. Fix: correct the comment, or file the missing surface if it
-  was meant to ship.
+- ~~**P3** · **`PARENT-UNMANAGED-CHILD-VERSIONS-1`**~~ ✅ **SHIPPED 2026-09-17 — the fix direction is right and
+  the row's DIAGNOSIS is wrong.** These did not "bypass the parent's `dependencyManagement`": the parent
+  managed **none** of the three. Nothing was being overridden — they were simply never hoisted.
+  ⚠ **The row missed a site:** `inspecto-engine/pom.xml:74` pins `com.gamma.asn:asn-facade`. ⛔ Deliberately
+  NOT moved — `asn-decoders` is a standalone reactor aggregated for build ordering only, documented as outside
+  the root parent's version management; hoisting it would contradict a recorded boundary.
+  ✅ **No artifact was pinned at CONFLICTING versions** — both logback literals 1.5.18, all five shade pins
+  3.5.2, so nothing had to be chosen between.
+  ⚠ **opencsv was moved AGAINST its own recorded comment** ("single-owner … so it stays pinned here"). That
+  premise had already become false: root `pom.xml:195` **reasons from the number** — `commons-lang3` is pinned
+  to 3.18.0 precisely because opencsv 5.9 drags an older transitive — so the value had two homes and a bump
+  would silently stale the parent's rationale. The comment now says so rather than being deleted.
+  ✅ **Inertness PROVEN, not asserted:** a reactor-wide `dependency:tree` before/after is **byte-identical**,
+  1083 lines across all 32 enterprise modules; `effective-pom` and a real `package` run confirm shade still
+  resolves 3.5.2 into all five shaded jars. ⇒ that diff is the cheap, strong proof for any future relocation.
+  Original row follows.
+  - **P3** · **`PARENT-UNMANAGED-CHILD-VERSIONS-1`** — `inspecto-util/pom.xml:58` (opencsv 5.9), `inspecto-etl/pom.xml:96`
+    and `inspecto-event/pom.xml:68` (the same logback 1.5.18 literal twice) bypass the parent's
+    `dependencyManagement`, and the shade plugin version is child-local in five poms — a bump half-lands. Fix:
+    move them to parent properties / `pluginManagement`.
+- ~~**P3** · **`ROOT-POM-QUEUES-ROUTE-CLAIM-1`**~~ ✅ **SHIPPED 2026-09-17 — `/queues` DID exist and was
+  deliberately RETIRED, so correcting the comment deletes no commitment.** Full lifecycle from `git log -S`:
+  created in `a5b89a89`, **moved to `inspecto-ops` in `e8d98918`** (so the root-pom comment was TRUE when
+  written), deleted in `519673a7` by RETIRE-HALVES-1. The retirement is already recorded in `EDITIONS.md:328`,
+  `api-stability.md:128` and `incidents.md:86`. ⇒ EDG-01 cell 7 is **three** route families, not four.
+  ⚠ **Provenance trap:** `git log --grep="RETIRE-HALVES"` does **NOT** find the commit that removed the routes
+  — it landed under a whitepaper message when a concurrent session committed the staged tree. Search the
+  symbol, or `--diff-filter=D`.
+  ⚠ Corrected at every site carrying the claim, not just the named one: the root pom, `inspecto-ops`'s
+  `<description>`, and two **comment-only** javadoc/line comments in `ControlApi` and `OpsEngine`.
+  ⇒ Residual filed: `QUEUES-USER-FACING-COPY-1`. Original row follows.
+  - **P3** · **`ROOT-POM-QUEUES-ROUTE-CLAIM-1`** — the root pom's EDG-01 cell-7 comment says the `/queues` routes moved
+    to `inspecto-ops`, but no `QueueRoutes` class exists anywhere and the module's `RouteModule` service file
+    lists `ObjectRoutes, NoteRoutes, TagRoutes` only. Fix: correct the comment, or file the missing surface if it
+    was meant to ship.
 
 ### Module audit 2026-09-17 — frontend first, then the end-user request path down to acquisition and packaging
 

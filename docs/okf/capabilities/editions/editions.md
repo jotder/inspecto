@@ -965,3 +965,19 @@ class names against `git ls-files` and the module tree.
 #### Service wrappers — acceptance still owed
 
 `package.ps1` stages `inspecto.service` + `install-service.sh` (systemd) and `install-service.ps1` (a Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). ⛔ The `sc.exe` route was REFUSED on grounding: a Windows service binary must reach the service control dispatcher shortly after start and `java.exe` never does, so an `sc.exe` service fails every start with error 1053 — that installer would have looked installed and restarted nothing. WinSW is the documented alternative. ⚠ **The unit renders and both installers parse, but the acceptance test — `kill -9` → back on `/health`, plus the reboot leg — is UNRUN**, because it needs a systemd host and an elevated Windows box. Tracked as `DEPLOY-SERVICE-WRAPPER-1` in `BACKLOG.md`; it is evidence-blocked, not code-blocked, and ⛔ SCR-3's acceptance must not be marked met until someone runs both legs.
+
+### `QUEUES-USER-FACING-COPY-1` (open, filed 2026-09-17)
+
+The work-queue family was retired on 2026-09-14 (created `a5b89a89`, moved to `inspecto-ops` `e8d98918`,
+deleted `519673a7`), and EDG-01 cell 7 is now **three** route families, not four. Three shipped strings still
+promise it, and none is test-asserted: `AbsentObjectRoutes.java:27` — the Personal-edition **503 body** — plus
+`inspecto-ui/.../admin/objects/object-mail.component.html:4` and `.../admin/tags/tags.component.html:4`, each
+reading "notes, links, tags **and queues** are provided by the…".
+
+⚠ A 503 telling an operator that a deleted feature is available in Standard is a small but real defect. It was
+kept out of the comment-correcting change deliberately: shipped copy plus two Angular templates is a different
+change class and needs the `angular-ui` skill.
+
+⚠ Provenance trap: `git log --grep="RETIRE-HALVES"` does **not** find the commit that removed the routes — it
+landed under a whitepaper message when a concurrent session committed the staged tree. Search the symbol, or
+`--diff-filter=D`.
