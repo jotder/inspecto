@@ -536,6 +536,31 @@ class EnrichmentEngineTest {
         assertEquals(2, Files.readAllLines(commits).size(), "commit-log header + one SUCCESS line");
     }
 
+    /**
+     * ENRICH-SILENT-FULL-RECOMPUTE-1 (CLI half): {@code --partitions} was given but the spec parses to
+     * zero usable partition maps (no {@code col=val} pairs) — the run silently WIDENS from the caller's
+     * requested incremental recompute to a full one. The audit row's note column must say so; a normal
+     * run (no {@code --partitions}, or one that parses fine) must leave the note column empty.
+     */
+    @Test
+    void cliMalformedPartitionsSpecNotesTheSilentFallbackToFull(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        Path toon = dir.resolve("enrich.toon");
+        Files.writeString(toon, configToon(in, out, DAILY_COUNT, ""));
+
+        // "no-equals-sign" spec parses to zero maps → incrementalRequested but full == true
+        EnrichmentProcessor.main(new String[]{ toon.toString(), "--partitions", "not-a-valid-spec" });
+
+        Path auditDir = Path.of(out + "_audit");
+        Path runs = auditDir.resolve("events_daily_kpi_enrich_runs.csv");
+        List<String> runLines = Files.readAllLines(runs);
+        assertEquals(2, runLines.size(), "header + one run row");
+        assertTrue(runLines.get(1).contains("full"), "silently widened to a full recompute");
+        assertTrue(runLines.get(1).toLowerCase().contains("falling back to a full recompute"),
+                "the widen-to-full must be noted on the audit row, not silent");
+    }
+
     @Test
     void cliPartitionParsing() {
         List<Map<String, String>> parsed = EnrichmentProcessor.parsePartitions(

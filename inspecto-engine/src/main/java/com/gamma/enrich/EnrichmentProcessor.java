@@ -38,11 +38,25 @@ public final class EnrichmentProcessor {
         EnrichmentConfig cfg = EnrichmentConfig.load(args[0]);
 
         List<Map<String, String>> filter = null;
+        boolean incrementalRequested = false;
         for (int i = 1; i < args.length - 1; i++) {
-            if ("--partitions".equals(args[i])) filter = parsePartitions(args[i + 1]);
+            if ("--partitions".equals(args[i])) {
+                incrementalRequested = true;
+                filter = parsePartitions(args[i + 1]);
+            }
         }
 
         boolean full = (filter == null || filter.isEmpty());
+        // ENRICH-SILENT-FULL-RECOMPUTE-1 (CLI half): --partitions was given but parsed to zero usable
+        // partition maps (e.g. a spec with no "col=val" pairs) — that would silently widen the caller's
+        // requested INCREMENTAL run into a FULL one. Make it loud instead of a quiet scope=full row.
+        String fallbackNote = "";
+        if (incrementalRequested && full) {
+            fallbackNote = "requested incremental recompute via --partitions but the spec parsed to no "
+                    + "usable partition(s); falling back to a FULL recompute instead of silently";
+            log.warn("[ENRICH] {} requested incremental (--partitions) but spec parsed to 0 partitions "
+                    + "— falling back to FULL recompute", cfg.name());
+        }
         int inputParts = full ? 0 : filter.size();
         String scope = full ? "full" : inputParts + " input partition(s)";
         String runId = cfg.name().toLowerCase().replace(' ', '_') + "-cli-" + EnrichmentAuditWriter.runStamp();
@@ -62,7 +76,8 @@ public final class EnrichmentProcessor {
             audit.record(new EnrichmentAuditWriter.RunRow(
                     runId, cfg.name(), "cli", "cli", scope, inputParts,
                     startTime, EnrichmentAuditWriter.now(), "SUCCESS",
-                    (int) partitions, outputs.size(), res.totalRows(), bytes, durationMs, ""), outputs);
+                    (int) partitions, outputs.size(), res.totalRows(), bytes, durationMs,
+                    fallbackNote), outputs);
             log.info("[ENRICH] {} complete: {} partition file(s), {} row(s) under {}",
                     cfg.name(), outputs.size(), res.totalRows(), cfg.output().database());
             for (PartitionOutput o : outputs) log.info("  {} ({} bytes)", o.partition(), o.bytes());
