@@ -14,8 +14,10 @@ import java.util.stream.Stream;
  *
  * <p>Projects a space's legacy per-file configuration into the component-registry shape the recipe path
  * reads: every {@code *_pipeline.toon} becomes a {@code pipelines/<name>.toon} recipe, and every
- * {@code *_schema.toon} splits into a {@code schemas/<name>.toon} structure plus a
- * {@code mappings/<name>.csv} Mapping component. Originals are left untouched, and moved aside to
+ * {@code *_schema.toon} becomes a {@code schemas/<name>.toon} structure — plus a
+ * {@code mappings/<name>.csv} Mapping component when, and only when, it carries a LEGACY
+ * {@code mapping.rules[]} block, the one shape that CSV can express (see {@link #writeSchema}).
+ * Originals are left untouched, and moved aside to
  * {@code archived-config/} only on {@code --apply}.
  *
  * <p><b>Deterministic and dry-run-first.</b> Files are visited in sorted path order, so two runs over the
@@ -173,19 +175,45 @@ public final class ConfigMigrator {
     }
 
     /**
-     * Split a legacy schema: the Mapping rules become the {@code mappings/<name>.csv} component and the rest
-     * of the file stays the {@code schemas/<name>.toon} structure. A schema with no {@code mapping.rules[]}
-     * writes no CSV rather than an empty one — an empty Mapping component and an absent one mean different
-     * things to the registry.
+     * Split a legacy schema: a legacy {@code mapping.rules[]} block becomes the {@code mappings/<name>.csv}
+     * Mapping component, and the rest of the file stays the {@code schemas/<name>.toon} structure. A schema
+     * with no {@code mapping.rules[]} writes no CSV rather than an empty one — an empty Mapping component
+     * and an absent one mean different things to the registry.
+     *
+     * <p>🔴 <b>Only what the CSV actually carries is removed from the schema</b> (fixed 2026-09-17,
+     * {@code CONFIG-MIGRATOR-LOSES-MAPPINGS-1}). This used to {@code remove("mapping")} unconditionally and
+     * then write the CSV only for {@code rules[]} — so every schema on the CURRENT spelling
+     * ({@code mapping.fields[]}, which is what {@link com.gamma.etl.MappingMigrator} migrated the whole
+     * corpus to, and what <b>all 25 committed schemas</b> carry) had its whole mapping DELETED, exit 0, no
+     * refusal, with the original already archived away. It also dropped {@code canonicalName}/{@code rawName}
+     * in the {@code rules[]} case, which the CSV has no column for.
+     *
+     * <p><b>Why carry {@code mapping.fields[]} through rather than translate it.</b> The Mapping CSV is the
+     * LEGACY triple {@code targetColumn,sourceExpression,transformType} ({@link MappingCsv#encode}); of the
+     * 23 Record Transformer catalog functions only four ({@code keep}, {@code custom},
+     * {@code date.concat_parts}, {@code date.from_filename}) have any {@code transformType} at all — the
+     * inverse of {@link com.gamma.etl.RecordTransform#fromMappingRules} — and even those lose their
+     * {@code args} (the concat {@code format}, the filename {@code pattern}). The translation is not total,
+     * and a lossy translation that looks complete is the worse failure. Refusing the file was the other
+     * candidate, but there is nothing here to lose: a schema component is loaded whole by
+     * {@code ComponentRegistry}, and {@code RowShaper.mappingSchemaOf} reads {@code schema.mapping.fields}
+     * directly — so the carried-through block is the usable, current-spelling artifact, and refusing would
+     * reject every schema in the repo for a case that is not lossy.
      */
     @SuppressWarnings("unchecked")
     private static void writeSchema(Conversion c) throws IOException {
         Map<String, Object> schema =
                 new LinkedHashMap<>(ConfigCodec.toMap(Files.readString(c.from(), StandardCharsets.UTF_8)));
-        Object mapping = schema.remove("mapping");
-        List<Map<String, Object>> rules = mapping instanceof Map<?, ?> m
-                && ((Map<String, Object>) m).get("rules") instanceof List<?> l
+        Map<String, Object> mapping = schema.get("mapping") instanceof Map<?, ?> m
+                ? new LinkedHashMap<>((Map<String, Object>) m) : null;
+        List<Map<String, Object>> rules = mapping != null && mapping.get("rules") instanceof List<?> l
                 ? (List<Map<String, Object>>) l : List.of();
+
+        if (!rules.isEmpty()) {
+            mapping.remove("rules");                       // and ONLY rules - the CSV carries nothing else
+            if (mapping.isEmpty()) schema.remove("mapping");
+            else schema.put("mapping", mapping);           // same key, so LinkedHashMap keeps its position
+        }
 
         write(c.to().get(0), ConfigCodec.toToon(schema));
         if (!rules.isEmpty()) write(c.to().get(1), MappingCsv.encode(rules));

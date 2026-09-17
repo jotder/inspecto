@@ -55,6 +55,14 @@ public class MainApp {
         for (String a : args) {
             if (a.equalsIgnoreCase("--dry-run")) {
                 dryRun = true;
+            } else if (a.equalsIgnoreCase("--apply")) {
+                // Recognised here ONLY so it is stripped from the positional list; `migrate-configs`
+                // reads it off the raw args below. Before this (fixed 2026-09-17,
+                // CONFIG-MIGRATOR-LOSES-MAPPINGS-1 (b)) the documented form printed by printUsage() -
+                // `migrate-configs <config_root> --apply` - fell through to subArgs, so subArgs.length
+                // was 2 and the registry was written to a DIRECTORY LITERALLY NAMED `--apply`, while the
+                // command still reported success and still archived the originals.
+                continue;
             } else if (command == null) {
                 command = a.toLowerCase();
             } else {
