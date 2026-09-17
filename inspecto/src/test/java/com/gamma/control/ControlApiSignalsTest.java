@@ -47,6 +47,16 @@ class ControlApiSignalsTest {
     }
 
     /** HOME-TILES-1: a count over the ledger, windowed, with the type required and the cap stated. */
+    /** 2026-09-17 (SIGNALS-LIST-UNCAPPED-1): the caller's limit was passed straight through; now it is clamped. */
+    @Test
+    void theListLimitIsClampedLikeEveryOtherListRoute() {
+        assertEquals(200, SignalRoutes.clampLimit(null), "absent -> default");
+        assertEquals(200, SignalRoutes.clampLimit("garbage"), "non-number -> default, not 400 (unchanged behaviour)");
+        assertEquals(200, SignalRoutes.clampLimit("0"), "non-positive -> default");
+        assertEquals(50, SignalRoutes.clampLimit("50"));
+        assertEquals(5000, SignalRoutes.clampLimit("99999999"), "ceiling");
+    }
+
     @Test
     void countsSignalsOfATypeInAWindow(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

@@ -79,7 +79,7 @@ final class SignalRoutes implements RouteModule {
 
     /** {@code GET /signals?type=&since=&until=&severity=&source=&correlationId=&limit=} — the correlation-chain-filterable ledger view. */
     private Object signals(ApiContext api, HttpExchange e) {
-        int limit = ApiContext.parseIntOr(ApiContext.query(e, "limit"), 200);
+        int limit = clampLimit(ApiContext.query(e, "limit"));
         Long since = parseEpochMs(ApiContext.query(e, "since"), "since");
         Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
         Severity minSeverity = parseSeverity(ApiContext.query(e, "severity"));
@@ -104,7 +104,7 @@ final class SignalRoutes implements RouteModule {
         String correlationId = ApiContext.query(e, "correlationId");
         if (correlationId == null || correlationId.isBlank())
             throw new ApiException(400, "'correlationId' is required for /signals/tree (a tree is scoped to one correlation chain)");
-        int limit = ApiContext.parseIntOr(ApiContext.query(e, "limit"), 200);
+        int limit = clampLimit(ApiContext.query(e, "limit"));
         List<Signal> found = Signals.query(api.service().events(),
                 null, null, null, null, correlationId, limit);
         return Signals.assembleTree(found).stream().map(SignalRoutes::toNode).toList();
@@ -188,5 +188,20 @@ final class SignalRoutes implements RouteModule {
     private static void writeFrame(OutputStream os, String frame) throws IOException {
         os.write(frame.getBytes(StandardCharsets.UTF_8));
         os.flush();
+    }
+    /** Default page and ceiling for {@code GET /signals} and {@code /signals/tree}. */
+    private static final int DEFAULT_LIMIT = 200;
+    private static final int MAX_LIMIT = 5000;
+
+    /**
+     * 2026-09-17 (SIGNALS-LIST-UNCAPPED-1): the caller's {@code limit} was passed straight to the query, so
+     * {@code ?limit=100000000} asked the event store for everything — the one list route in the package with
+     * no ceiling. Same idiom as {@code RunRoutes.clampLimit}; a non-number or a non-positive value gets the
+     * default rather than a 400, matching what the routes did before.
+     */
+    static int clampLimit(String raw) {   // package-private for the test
+        int v = ApiContext.parseIntOr(raw, DEFAULT_LIMIT);
+        if (v <= 0) v = DEFAULT_LIMIT;
+        return Math.min(v, MAX_LIMIT);
     }
 }

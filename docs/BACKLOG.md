@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **76<!--count:backlog-rows--> rows: 5<!--count:backlog-p1--> × P1 · 46<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **91<!--count:backlog-rows--> rows: 5<!--count:backlog-p1--> × P1 · 52<!--count:backlog-p2--> × P2 · 34<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 5<!--count:backlog-p1--> P1 + 46<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 25<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 76<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 5<!--count:backlog-p1--> P1 + 52<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 34<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 91<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1465,6 +1465,99 @@ a test that post-dates it. What was left was one release-gated wire change; `SBO
   — the guard's stale-allowlist rule fails the build until you do, which is the rename announcing itself.
   → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
 
+
+### Module audit 2026-09-17, layer 2 — API contract, Java module structure, database, files
+
+**Where we stand.** The API layer is centrally enveloped: every handler's return value passes through one
+dispatch chain, no route can answer 200 with an `error` key, `Idempotency-Key` covers retryable
+POST/PUT/DELETE, CORS is off unless `-Dcontrol.cors` is set, and `/openapi.json` is byte-equal to the
+committed spec by build guard. Its weak spots are UNDER-specification, not structure: error codes are
+defaulted from the HTTP status at ~96% of throw sites (633 bare vs 15 coded `ApiException`s), so a bare 403
+is always labelled `PATH_JAIL_VIOLATION` whatever caused it; `If-Match` protects config and components only;
+nothing throttles the expensive routes. The DB layer is mature for its age — one 14-family roster, HikariCP
+for Postgres and a single locked connection for DuckDB, insert-wins-on-PK instead of read-modify-write,
+a fenced `RunLease`, seven prune tasks that are opt-in by stated policy — but it has no schema-version stamp
+(migration is a per-store `ALTER … ADD COLUMN IF NOT EXISTS` discipline verified in 2 of ~10 stores), no
+`space_id` on any operational table (isolation is per-space DuckDB FILE, which a shared Postgres URL
+defeats), and no backup path for Postgres at all. The file layer's crash-safety core, `AtomicFiles.write`
+(temp + `ATOMIC_MOVE`), is used by ~25 writers; `PathJail` is the single containment authority. Two live
+findings were FIXED in this pass rather than filed: `PipelineWatermarkStore.put` was the one store writing
+in place (torn watermark ⇒ silent full re-read), and `GET /signals` was the one list route with no ceiling
+on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before filing: "the acquisition ledger has no prune caller" — `LedgerPruneTask.java:17-24` calls `AcquisitionLedgers.shared().prune(cutoff, source)`. Grep the caller, not the callee.
+
+- **P2** · **`DB-BACKUP-POSTGRES-1`** — `BackupTask` knows DuckDB and files only: its one DB reference opens an
+  in-memory DuckDB scratch (`inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java:358`), so a
+  Standard/Enterprise deployment on Postgres has NO backup path for job runs, the dedup and acquisition
+  ledgers, status, or the run lease. Fix: a `pg_dump`/COPY leg when `OperationalDb.postgres()` is true, or
+  document that Standard requires an external DBA backup and say so in `EDITIONS.md`.
+- **P2** · **`STORE-CONFLICT-DETECTION-1`** — `ComponentStore.java:164-175`, `PipelineStore.java:80-84` and
+  `ViewStore.java:88-91` overwrite blindly with no `If-Match`/version, unlike `ConfigWriteRoutes`
+  (`CLIENT-HALVES-1`); two concurrent editors silently clobber each other — components are recoverable from
+  the MET-5 `.history/`, pipelines and views are NOT. Fix: extend the `ETags`/`CONFLICT_STALE_VERSION`
+  pattern to these write paths, or at minimum give `PipelineStore`/`ViewStore` the same history.
+- **P2** · **`NO-RATE-LIMIT-EXPENSIVE-ROUTES-1`** — no throttling exists anywhere in `com.gamma.control`
+  (`grep RateLimit|rate.limit` → nothing) on `/db/query`, `/bi/query`, `/recon/*` or `/agent/*`; one
+  authenticated client can saturate DuckDB or spend model tokens without bound. Fix: a per-subject
+  token-bucket stage in the `ControlApi` dispatch chain scoped to those prefixes.
+- **P3** · **`ERRORCODE-DEFAULTED-1`** — `ApiException` carries an explicit `ErrorCodes` constant at 15 of 648
+  throw sites; the rest take `ErrorCodes.defaultFor(status)` (`ErrorCodes.java:29-41`), whose `case 403`
+  is `PATH_JAIL_VIOLATION` — so `ShareRoutes.java:111` (a dataset/share mismatch) and
+  `DeliveryStatusRoutes.java:137` (a bad provider signature) tell the client a path escaped a jail. Fix: code
+  the 403 sites first (`PERMISSION_DENIED` or a new constant), then sweep by file (`RunRoutes`,
+  `ComponentRoutes`, `AgentRoutes` lead with 9 bare sites each).
+- **P3** · **`IFMATCH-COVERAGE-GAP-1`** — only 7 of 95 files in `com.gamma.control` reference `If-Match`;
+  Run, Job, Alert, Access and Share writes are read-modify-write with no version check. Fix: audit each for
+  real double-write exposure and extend `ETags` where one exists (append-only routes need none).
+- **P3** · **`DB-SCHEMA-VERSION-1`** — no `schema_version` table or stamp exists (repo-wide grep: none);
+  correctness on upgrade rests on every store pairing a new column with a guarded `ALTER`, a discipline
+  `DbRunLease` itself records failing once (`last_run_at`). Verified present in `DbAcquisitionLedger.java:364`
+  and `DbRunLease`; unverified in the other ~8 `Db*Store` classes. Fix: audit those, then a per-table version
+  row so a breaking change fails loudly.
+- **P3** · **`DB-STATUS-INDEX-1`** — `DbStatusStore.java` creates no index beyond the primary keys while its
+  batches/lineage/quarantine tables serve the list endpoints; `DbJobRunStore.java:98` and
+  `DbEventStore.java:222` index their hot columns. Fix: check the list predicates and index them.
+- **P3** · **`STATUS-CSV-RETENTION-1`** — every run creates `<pipeline>_status_<ts>.csv` plus `_batches_`/
+  `_lineage_` siblings (`PipelineConfigParser.java:170-176`) and nothing prunes them (`LedgerPruneTask`
+  prunes the DB ledger only); 28 exist under `spaces/*/data/*/status/` today. `BACKLOG` line ~706 mentions
+  this as an aside inside the Completeness-KPI row, never as work. Fix: a maintenance task that ages them out
+  by `retention_days`.
+- **P3** · **`BACKUP-MANIFEST-ATOMIC-1`** — the backup zip is staged and `ATOMIC_MOVE`d
+  (`BackupTask.java:117-148`) but its sidecar manifest at `:148` is a direct `Files.writeString`; a crash
+  between the two leaves a zip with a missing or stale manifest. Fix: `AtomicFiles.write`.
+
+- **P2** · **`SQLIDENT-NINE-COPIES-1`** — SQL identifier quoting (`"\"" + ident.replace("\"", "\"\"") + "\""`) is
+  re-implemented byte-identically in nine classes across four modules while the canonical `SqlIdent.q`
+  (`inspecto-engine/src/main/java/com/gamma/pipeline/exec/SqlIdent.java:19`) is package-private:
+  `DbBrowserRoutes.java:331`, `GeoRoutes.java:268`, `InvRoutes.java:267`, `MaterializeTask.java:185`,
+  `QueryExecutor.java:260`, `MeasureCompiler.java:258`, `ReconService.java:753`, `RowShaper.java:848`,
+  `ScratchTables.java:107`. `SqlIdent`'s own javadoc calls drift here "an injection or a mangled identifier";
+  a hardening change can only ever reach one copy. Fix: promote `SqlIdent` to `inspecto-sql` and delegate all
+  nine, as `JAVA-5` did inside `pipeline.exec`.
+- **P2** · **`PACK-SPI-LOAD-NOT-FAULT-TOLERANT-1`** — four `ServiceLoader` loops over an OPERATOR-SUPPLIED job-pack
+  class loader iterate raw (`JobPackManager.java:203,209,216,219`), so one broken class in one third-party
+  pack throws `ServiceConfigurationError` out of `hasNext()` and kills discovery of every other pack; the
+  tolerant loader already exists (`OptionalSpi.java:73-91`). ~20 further raw loops sit in core code over the
+  app class loader (lower risk; the entries ship with the build). Fix: an `OptionalSpi.all(spi, loader)`
+  overload for pack discovery, warn-and-skip per element.
+- **P2** · **`CONNECTOR-SIDECAR-SHADES-LOGGING-1`** — the connectors, notify-channels and security sidecars shade
+  without excluding `ch/qos/logback/**`, `org/slf4j/impl/**` and the `SLF4JServiceProvider` service entry
+  (`inspecto-connectors/pom.xml:175-180` vs the correct set in `inspecto-agent/pom.xml`), and connectors is
+  the ~32 MB jar staged into EVERY edition, so a transitive logging binding can duplicate the core's on the
+  assembled classpath. Fix: copy the agent's exclude block and assert one `SLF4JServiceProvider` on the
+  bundle classpath in the packaging smoke.
+- **P3** · **`LEGACY-ASN-SRC-TREE-UNBUILT-1`** — `asn-parser/src/` holds 66 Java files that no pom compiles (`asn-parser/pom.xml` does not exist;
+  the root aggregates `asn-parser/asn-decoders` only), shadowing current types
+  with superseded `ByteSource`/`TxConfig`/`Tag` twins that greps and refactors keep hitting. ⚠ Not the same
+  subject as the refuted `BACKLOG-STALE-LEGACY-POM-1` (that was `legacy-code/pom.xml`). Fix: delete the tree
+  (history keeps it) and say so beside the root `<modules>`.
+- **P3** · **`PARENT-UNMANAGED-CHILD-VERSIONS-1`** — `inspecto-util/pom.xml:58` (opencsv 5.9), `inspecto-etl/pom.xml:96`
+  and `inspecto-event/pom.xml:68` (the same logback 1.5.18 literal twice) bypass the parent's
+  `dependencyManagement`, and the shade plugin version is child-local in five poms — a bump half-lands. Fix:
+  move them to parent properties / `pluginManagement`.
+- **P3** · **`ROOT-POM-QUEUES-ROUTE-CLAIM-1`** — the root pom's EDG-01 cell-7 comment says the `/queues` routes moved
+  to `inspecto-ops`, but no `QueueRoutes` class exists anywhere and the module's `RouteModule` service file
+  lists `ObjectRoutes, NoteRoutes, TagRoutes` only. Fix: correct the comment, or file the missing surface if it
+  was meant to ship.
 
 ### Module audit 2026-09-17 — frontend first, then the end-user request path down to acquisition and packaging
 

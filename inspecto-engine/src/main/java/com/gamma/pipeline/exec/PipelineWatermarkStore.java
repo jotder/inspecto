@@ -1,6 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.util.AtomicFiles;
 import com.gamma.util.Values;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,10 @@ public final class PipelineWatermarkStore {
     public void put(String pipeline, String store, String watermark) throws IOException {
         Path f = fileFor(pipeline, store);
         Files.createDirectories(f.getParent());
-        Files.writeString(f, watermark, StandardCharsets.UTF_8);
+        // 2026-09-17 (WATERMARK-ATOMIC-1): this was the ONE store writing in place. A crash mid-write left a
+        // torn watermark that the next incremental read parsed as garbage or empty — a silent full re-read.
+        // Every other store already goes through the temp-file + ATOMIC_MOVE writer; now this one does too.
+        AtomicFiles.write(f, watermark.getBytes(StandardCharsets.UTF_8), ".wm-");
     }
 
     private Path fileFor(String pipeline, String store) {
