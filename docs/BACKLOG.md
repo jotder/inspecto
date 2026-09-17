@@ -1936,12 +1936,25 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   `LensService` signal, matching the CRUD-button pattern. vitest coverage added/extended across all four
   components: 26/26 passing. ⚠ Noted but out of scope: the rest of the Spaces page (New space, per-space
   Edit/Delete/Import) still has no capability gating at all.
-- **P2** · **`CONTROL-AUTHGATE-TESTCOVERAGE-1`** — only 8 of 136 files under
-  `inspecto/src/test/java/com/gamma/control/` call `Authenticators.forTest`; every other route test runs
-  Personal, where `ApiContext.requireCapability` is a no-op, so a gate added or removed on ~94% of routes
-  changes no test's outcome (this shift added six gates and every pre-existing test stayed green). Fix: an
-  armed-Authenticator variant per write route family, or a guard that flags a `withCapability` route with
-  no authenticated test.
+- ~~**P2** · **`CONTROL-AUTHGATE-TESTCOVERAGE-1`**~~ ✅ **GUARD SHIPPED 2026-09-17** (guard only — the
+  underlying gap is NOT backfilled; see follow-up row below). Re-grounded before building: 9 of 138
+  files under `inspecto/src/test/java/com/gamma/control/` called `Authenticators.forTest` (drifted up
+  from 8/136 as other shifts landed `ControlApiRunRoutesTest` etc. in parallel this session). Building
+  an armed-Authenticator variant for every one of the ~94 gated routes was out of proportion for one
+  change, so this shipped the row's SECOND option: `tools/check-authgate-coverage.mjs`, wired into
+  `.github/workflows/ci.yml`'s `guards` job, following the same mechanical-scan convention as
+  `tools/route-gating-report.mjs`. It scans every `*Routes.java` for `withCapability("cap", …)`
+  registrations, scans every `*Test.java` under `com/gamma/control` for a file that calls
+  `Authenticators.forTest(`, and matches each gated route's pattern against the armed files' quoted
+  path literals (simple path-match, not method+capability — same simplification tradeoff
+  `route-gating-report.mjs` makes with its own regex scan). Grounded run found 94 gated routes, 15
+  covered, **79 uncovered** — proven live by injecting a throwaway ungated-test route, which raised
+  the guard's own count to 80 and failed it, then reverting. It is a RATCHET
+  (`BASELINE_UNCOVERED = 79`), not a hard zero: CI stays green today and only goes red if a NEW gated
+  route ships with no armed test, i.e. it catches future regressions of this exact class, it does not
+  raise today's 15/94 coverage. **Follow-up:** the 79-route backfill itself is real, uncompleted work —
+  if it's wanted, file it as its own row (e.g. `CONTROL-AUTHGATE-BACKFILL-1`) rather than reopening this
+  one, since the guard and the backfill are separable deliverables.
 - ~~**P2** · **`RUN-ROUTES-TEST-1`**~~ ✅ **SHIPPED 2026-09-17.** Grounding confirmed: `RunRoutes.java`
   (register/trigger/pause/resume/status/report of pipelines) had no referencing test file under
   `inspecto/src/test/java/com/gamma/control/`. Added `ControlApiRunRoutesTest` mirroring

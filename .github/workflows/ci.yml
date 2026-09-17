@@ -56,6 +56,15 @@ jobs:
       - name: Guard — space-less launchers declare their path-jail root
         run: node tools/check-safety-roots-declared.mjs
 
+      # Auth-gate test-coverage ratchet (CONTROL-AUTHGATE-TESTCOVERAGE-1, docs/BACKLOG.md). Most
+      # ControlApi route tests run Personal-shaped (no Authenticator armed), where
+      # ApiContext.requireCapability is a no-op — a withCapability gate can be added or removed there
+      # without any test noticing. This doesn't backfill the existing gap (out of scope for one
+      # change); it stops a NEWLY gated route from shipping with no armed-Authenticator test at all.
+      # Pure Node, <1s.
+      - name: Guard — new gated routes need an armed-Authenticator test
+        run: node tools/check-authgate-coverage.mjs
+
       # Step Processors board guard (CONNECTORS-BUNDLE-1 follow-up, 2026-09-07). docs/EDITIONS.md's
       # `| SP-*` rows are GENERATED from inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json
       # (itself written by ProcessorCatalogContractTest), plus the per-edition decisions the renderer holds
@@ -255,11 +264,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 25
+      - name: Set up JDK 27
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '25'
+          distribution: oracle
+          java-version: '27'
           cache: maven
 
       # The optional inspecto-agent module now depends on eoiagent (com.eoiagent:*:0.2.0-SNAPSHOT —
