@@ -33,6 +33,21 @@ import static com.gamma.util.Values.trimToNull;
  *   <li>{@code notify.smtp.starttls} — {@code true} to negotiate STARTTLS (default {@code false}).</li>
  * </ul>
  *
+ * <p><b>TLS server-identity verification is always on and is not configurable.</b> Whenever the
+ * connection becomes a TLS session, {@code mail.smtp.ssl.checkserveridentity} is set, so the certificate
+ * the server presents must actually name {@code notify.smtp.host}. javax.mail 1.6.2 defaults that to
+ * {@code false}, which left a chain-valid certificate for <em>any other</em> name good enough to
+ * intercept the SMTP AUTH credentials. ⚠ This is a behaviour change: an install whose relay presents a
+ * certificate that does not match the configured host name — typically one reached by IP, or by a CNAME
+ * the certificate does not carry — starts failing to deliver mail instead of silently trusting it. The
+ * fix is to configure {@code notify.smtp.host} as the name on the certificate, or to trust the issuing
+ * CA via {@code -Djavax.net.ssl.trustStore}; there is deliberately no switch that turns verification off.
+ *
+ * <p>⚠ Known gap, deliberately not closed here: {@code starttls} is <em>opportunistic</em>
+ * ({@code starttls.enable}, not {@code starttls.required}), so a relay that simply declines to advertise
+ * {@code STARTTLS} still gets a cleartext session — identity verification never runs because no TLS
+ * session is ever established.
+ *
  * <p>{@link #deliver(Notification, String)} sends to an explicit {@code target} address (a persisted
  * {@link com.gamma.notify.ChannelConfig} destination), falling back to {@code notify.smtp.to} when
  * blank; {@link #deliver(Notification)} always uses the fixed {@code notify.smtp.to}.
@@ -151,6 +166,18 @@ public final class SmtpEmailChannel implements NotificationChannel {
         Properties props = new Properties();
         props.put("mail.smtp.host", host);
         props.put("mail.smtp.port", String.valueOf(port));
+        // ⚠ UNCONDITIONAL, and it is the AUTH credentials that depend on it (NOTIFY-SMTP-TLS-VERIFY-1).
+        // com.sun.mail:javax.mail 1.6.2 defaults this to false — SocketFetcher.configureSSLSocket() reads
+        // `PropUtil.getBooleanProperty(props, prefix + ".ssl.checkserveridentity", false)` — so the stock
+        // SSLSocketFactory validates the certificate CHAIN but nobody ever checks that the name on it is
+        // the host we asked for. Any party who can answer for `notify.smtp.host` while holding a
+        // CA-valid certificate for a name they legitimately own terminates our STARTTLS session and reads
+        // the SMTP AUTH user/pass in the clear. Set here rather than under `if (starttls)` so it is not a
+        // knob that has to be remembered again the day an implicit-SSL mode is added; javax.mail ignores
+        // it when the socket never becomes an SSLSocket. ⛔ Deliberately no trust-all / skip-verify
+        // escape hatch: an internal-CA deployment is served by the JVM trust store
+        // (-Djavax.net.ssl.trustStore), which keeps authentication ON instead of turning it off.
+        props.put("mail.smtp.ssl.checkserveridentity", "true");
         if (starttls) props.put("mail.smtp.starttls.enable", "true");
         Session session;
         if (user != null && pass != null) {
