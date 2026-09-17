@@ -13,18 +13,6 @@ import com.gamma.etl.StatusStore;
 import com.gamma.etl.TestConfigs;
 import com.gamma.job.DbJobRunStore;
 import com.gamma.job.JobRun;
-import com.gamma.ops.DbObjectStore;
-import com.gamma.ops.ObjectQuery;
-import com.gamma.objects.ObjectType;
-import com.gamma.ops.OperationalObject;
-import com.gamma.objects.AnnotationKinds;
-import com.gamma.ops.link.DbLinkStore;
-import com.gamma.ops.link.ObjectLink;
-import com.gamma.ops.tag.DbTagAssignmentStore;
-import com.gamma.objects.TagAssignment;
-import com.gamma.ops.note.DbNoteStore;
-import com.gamma.ops.note.ObjectNote;
-import com.gamma.ops.note.NoteKind;
 import com.gamma.pipeline.exec.DbProvenanceStore;
 import com.gamma.pipeline.exec.ProvenanceRow;
 import org.junit.jupiter.api.AfterAll;
@@ -59,9 +47,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * DAT-6 — proves the ten JDBC-backed stores actually run on <b>real PostgreSQL</b>, not just the
+ * DAT-6 — proves the JDBC-backed stores actually run on <b>real PostgreSQL</b>, not just the
  * bundled DuckDB. Every store opens against one database, runs {@code initSchema}, and does a
  * write→read round-trip. The stores use distinct table names, so they coexist without collision.
+ *
+ * <p>⚠ This class covers the stores that live in the <b>default reactor</b>. The four
+ * {@code com.gamma.ops} stores of the same family (object / link / note / tag-assignment) keep identical
+ * Postgres coverage in {@code PostgresOpsStoreTest} over in {@code inspecto-ops}, which only a
+ * {@code -Pedition-standard} build compiles. The split is EDITION-GATED-TESTS-IN-WRONG-HOME-1: the core
+ * dialect coverage was unreachable from a default {@code mvn -o clean test}, and nothing is retracted.
  *
  * <p>The critical case is {@link DbJobRunStore#metrics} (p50/p95): those percentiles are the one piece of
  * non-portable SQL — DuckDB's {@code quantile_cont} vs Postgres's {@code percentile_cont(..) WITHIN GROUP}
@@ -197,84 +191,6 @@ class PostgresStateStoreTest {
     }
 
     @Test
-    void objectStore_createUpdateQueryRoundTrip() throws Exception {
-        try (DbObjectStore store = DbObjectStore.open(url, null, null)) {
-            OperationalObject obj = OperationalObject.builder(ObjectType.ALERT)
-                    .id("PG-ALERT-1").title("disk full").status("OPEN").severity("HIGH")
-                    .owner("ops").attr("rule", "disk>90").build();
-            store.create(obj);
-
-            Optional<OperationalObject> got = store.get("PG-ALERT-1");
-            assertTrue(got.isPresent(), "object read back from Postgres");
-            assertEquals("disk full", got.get().title());
-            assertEquals("disk>90", got.get().attributes().get("rule"), "JSON attributes survived");
-
-            store.update(got.get().withStatus("RESOLVED", System.currentTimeMillis(), true));
-            assertEquals("RESOLVED", store.get("PG-ALERT-1").orElseThrow().status());
-
-            List<OperationalObject> hits = store.query(
-                    new ObjectQuery(ObjectType.ALERT, "RESOLVED", null, null, null, null, null, 10, 0));
-            assertTrue(hits.stream().anyMatch(o -> o.id().equals("PG-ALERT-1")), "query filter matched");
-        }
-    }
-
-    @Test
-    void linkStore_appendAndReadRoundTrip() throws Exception {
-        try (DbLinkStore store = DbLinkStore.open(url, null, null)) {
-            store.add(ObjectLink.of("CASE-1", ObjectType.CASE, "INC-1", ObjectType.INCIDENT, "CONTAINS"));
-            store.add(ObjectLink.of("INC-1", ObjectType.INCIDENT, "ALERT-1", ObjectType.ALERT, "ESCALATED_FROM"));
-
-            List<ObjectLink> incident = store.incident("INC-1");
-            assertEquals(2, incident.size(), "both edges touching INC-1 read back from Postgres");
-            assertTrue(store.all(10).size() >= 2);
-        }
-    }
-
-    @Test
-    void noteStore_appendAndReadRoundTrip() throws Exception {
-        try (DbNoteStore store = DbNoteStore.open(url, null, null)) {
-            store.add(ObjectNote.comment("PG-ALERT-1", "alice", "looking into it"));
-            store.add(ObjectNote.attachment("PG-ALERT-1", "bob", "log.txt", "text/plain", "s3://x", "the log"));
-
-            List<ObjectNote> all = store.forObject("PG-ALERT-1", null);
-            assertEquals(2, all.size(), "both notes read back from Postgres");
-            List<ObjectNote> comments = store.forObject("PG-ALERT-1", NoteKind.COMMENT);
-            assertEquals(1, comments.size(), "kind filter worked");
-            assertEquals("the log", store.forObject("PG-ALERT-1", NoteKind.ATTACHMENT).get(0).body());
-        }
-    }
-
-    /**
-     * D10 on Postgres: the {@code target_kind} column + backfill land through the same
-     * {@code ADD COLUMN IF NOT EXISTS} migration, a legacy row reads back as {@code object}, and two
-     * families sharing an id stay separated.
-     */
-    @Test
-    void noteStore_mixedTargetKindsAndLegacyRowMigration() throws Exception {
-        String legacyTable = "inspecto_ops_notes";
-        try (java.sql.Connection conn = com.gamma.util.JdbcDrivers.connect(url, null, null);
-             java.sql.Statement st = conn.createStatement()) {
-            st.execute("DROP TABLE IF EXISTS " + legacyTable);
-            st.execute("CREATE TABLE " + legacyTable + " (id VARCHAR PRIMARY KEY, object_id VARCHAR, "
-                    + "kind VARCHAR, author VARCHAR, body VARCHAR, attributes VARCHAR, created_at BIGINT)");
-            st.execute("INSERT INTO " + legacyTable
-                    + " VALUES ('PG-OLD','PG-VIEW-1','COMMENT','alice','legacy note','',50)");
-        }
-
-        try (DbNoteStore store = DbNoteStore.open(url, null, null)) {          // ← runs the migration
-            List<ObjectNote> migrated = store.forObject("PG-VIEW-1", null);
-            assertEquals(1, migrated.size(), "legacy row survives the migration");
-            assertEquals("object", migrated.get(0).targetKind(), "and is backfilled to 'object'");
-
-            store.add(ObjectNote.comment("link-analysis-view", "PG-VIEW-1", "bob", "odd cluster"));
-            assertEquals(1, store.forObject("PG-VIEW-1", null).size(), "same id, other family — no bleed");
-            List<ObjectNote> onView = store.forTarget("link-analysis-view", "PG-VIEW-1", null);
-            assertEquals(1, onView.size());
-            assertEquals("odd cluster", onView.get(0).body());
-        }
-    }
-
-    @Test
     void provenanceStore_recordAndQueryRoundTrip() throws Exception {
         try (DbProvenanceStore store = DbProvenanceStore.open(url)) {
             store.record(List.of(
@@ -341,9 +257,10 @@ class PostgresStateStoreTest {
     }
 
     /**
-     * ⚠ The three tests below close a coverage gap the postgres-multi-user plan recorded as "8/8, only
+     * ⚠ The two tests below, with {@code tagAssignmentStore_addIsIdempotentAndReadsBack} in the ops sibling
+     * {@code PostgresOpsStoreTest}, close a coverage gap the postgres-multi-user plan recorded as "8/8, only
      * `DbTagAssignmentStore` missing". That was mis-sized: the family is <b>ten</b> stores and <b>three</b>
-     * were uncovered here.
+     * were uncovered.
      *
      * <p>⚠ Two of the three ({@link DbConsignmentOutputStore#record}, {@link DbFileStageStore#record}) are
      * documented <b>best-effort: a write failure is logged, never thrown</b>, because they index data that
@@ -351,28 +268,6 @@ class PostgresStateStoreTest {
      * would vanish into a WARN and the batch would report success. So these must assert the READ BACK, never
      * merely that {@code record} returned.
      */
-    @Test
-    void tagAssignmentStore_addIsIdempotentAndReadsBack() throws Exception {
-        try (DbTagAssignmentStore store = DbTagAssignmentStore.open(url, null, null)) {
-            TagAssignment first = store.add(
-                    new TagAssignment("urgent", AnnotationKinds.OBJECT, "obj-1", "alice", 1_000L));
-            assertEquals("alice", first.actor(), "the stored edge round-tripped from Postgres");
-
-            // Re-tagging returns the ALREADY-STORED edge — the checked-then-inserted path, not a rewrite.
-            TagAssignment again = store.add(
-                    new TagAssignment("urgent", AnnotationKinds.OBJECT, "obj-1", "bob", 9_000L));
-            assertEquals("alice", again.actor(), "re-tagging must not rewrite who applied it");
-            assertEquals(1_000L, again.createdAt(), "nor when");
-
-            assertEquals(List.of("urgent"), store.tagsOf(AnnotationKinds.OBJECT, "obj-1"),
-                    "SELECT DISTINCT … ORDER BY tag works on Postgres");
-            assertEquals(1, store.forTag("urgent").size(), "forTag read back through Postgres");
-
-            assertTrue(store.remove("urgent", AnnotationKinds.OBJECT, "obj-1"), "delete reports a hit");
-            assertTrue(store.tagsOf(AnnotationKinds.OBJECT, "obj-1").isEmpty(), "and the edge is gone");
-        }
-    }
-
     @Test
     void consignmentOutputStore_recordAndQueryRoundTrip() throws Exception {
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open(url)) {

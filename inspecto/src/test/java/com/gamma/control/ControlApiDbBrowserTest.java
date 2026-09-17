@@ -4,11 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
-import com.gamma.objects.ObjectType;
-import com.gamma.ops.OperationalObject;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
-import com.gamma.service.SpaceId;
 import com.gamma.service.SpaceManager;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.Test;
@@ -37,6 +34,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@link com.gamma.sql.SqlGuard} + sandboxed {@link com.gamma.query.QueryExecutor} path. Uses the multi-space
  * ({@code DirSpaceRoot}) seam so {@code dataRoot()} is a real per-space temp directory. Fails closed:
  * 503 (write root disabled), 404 (unknown store / group), 422 (SqlGuard violation).
+ *
+ * <p>⚠ The one case that needs a live {@code DbObjectStore} behind {@code -Dobjects.backend=db} stayed in
+ * {@code inspecto-ops} as {@code ControlApiDbBrowserOpsTablesTest} — nothing is retracted by this class
+ * living where the default reactor can build it (EDITION-GATED-TESTS-IN-WRONG-HOME-1).
  */
 class ControlApiDbBrowserTest {
 
@@ -244,56 +245,6 @@ class ControlApiDbBrowserTest {
         } finally {
             svc.close();
             if (prior != null) System.setProperty("assist.write.root", prior);
-        }
-    }
-
-    /** Phase 2: with objects on the DB backend, the operational tables browse through the live connection. */
-    @Test
-    void operationalTablesBrowsableWhenDbBacked(@TempDir Path root) throws Exception {
-        String prior = System.getProperty("objects.backend");
-        System.setProperty("objects.backend", "db");   // makes DbObjectStore live (a BrowsableStore)
-        try (Ctx c = open(root)) {
-            // a link target in the same space to satisfy the mandatory ≥1-link create contract
-            OperationalObject target = TestOpsEngine
-                    .of(c.spaces.space(SpaceId.of("s1")).orElseThrow().service())
-                    .open(ObjectType.INCIDENT, "link target", "d", "HIGH", "corr", java.util.Map.of());
-
-            // seed one row via the API (POST /objects defaults to an INCIDENT)
-            HttpResponse<String> created = postJson(c.port, "/spaces/s1/objects",
-                    "{\"title\":\"DB browser probe\",\"type\":\"INCIDENT\",\"links\":[{\"to\":\"" + target.id() + "\"}]}");
-            assertTrue(created.statusCode() < 300, created.body());
-
-            // catalog now carries the operational objects group alongside the parquet stores
-            JsonNode groups = JSON.readTree(get(c.port, "/spaces/s1/db/catalog").body()).get("data").get("groups");
-            JsonNode ops = null;
-            for (JsonNode g : groups) if ("ops:objects".equals(g.get("id").asText())) ops = g;
-            assertNotNull(ops, "operational objects group present: " + groups);
-            assertEquals("operational", ops.get("kind").asText());
-            boolean hasTable = false;
-            for (JsonNode t : ops.get("tables")) if ("inspecto_ops_objects".equals(t.get("name").asText())) hasTable = true;
-            assertTrue(hasTable, "inspecto_ops_objects listed: " + ops.get("tables"));
-
-            // browse the table through the live connection (the probe + its mandatory link target = 2 rows)
-            JsonNode data = JSON.readTree(get(c.port,
-                    "/spaces/s1/db/table?group=ops:objects&name=inspecto_ops_objects").body()).get("data");
-            assertEquals(2, data.get("rows").size());
-            List<String> titles = new java.util.ArrayList<>();
-            for (JsonNode row : data.get("rows")) titles.add(row.get("title").asText());
-            assertTrue(titles.contains("DB browser probe"), titles.toString());
-
-            // ad-hoc read-only SQL over the live connection
-            JsonNode q = JSON.readTree(postJson(c.port, "/spaces/s1/db/query",
-                    "{\"group\":\"ops:objects\",\"sql\":\"SELECT title FROM inspecto_ops_objects WHERE title = 'DB browser probe'\"}").body()).get("data");
-            assertEquals("DB browser probe", q.get("rows").get(0).get("title").asText());
-
-            // unknown table for the group → 404; a mutating statement → 422
-            assertEquals(404, get(c.port,
-                    "/spaces/s1/db/table?group=ops:objects&name=inspecto_bogus").statusCode());
-            assertEquals(422, postJson(c.port, "/spaces/s1/db/query",
-                    "{\"group\":\"ops:objects\",\"sql\":\"DELETE FROM inspecto_ops_objects\"}").statusCode());
-        } finally {
-            if (prior != null) System.setProperty("objects.backend", prior);
-            else System.clearProperty("objects.backend");
         }
     }
 }
