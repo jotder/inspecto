@@ -132,12 +132,14 @@ final class ParameterResolver {
     /**
      * The authored {@code params:} keys no {@link ParameterDecl} covers
      * ({@code JOB-PARAM-UNDECLARED-UNREPORTED-1}). ⛔ <b>A WARNING, never a rejection.</b> A descriptor is
-     * the UI/API contract, not the read set: built-in Jobs legitimately reach keys their own descriptor
-     * never declares straight through {@link JobConfig#require}/{@link JobConfig#opt} — {@code data_dir}
-     * and {@code batch_id} ({@code PipelineJobRunner}), {@code sleep_ms} ({@code MaintenanceJob}),
-     * {@code top} ({@code StorageReportTask}/{@code StorageTrendTask}), {@code history_days}
-     * ({@code ReferenceCompactor}), {@code max_attempts}/{@code backoff_minutes}
-     * ({@code SoftBounceRetryTask}) — so a fail-closed version would refuse working configs on day one.
+     * the UI/API contract, not the read set: a Job may legitimately reach a key its own descriptor never
+     * declares straight through {@link JobConfig#require}/{@link JobConfig#opt}, so a fail-closed version
+     * would refuse working configs. ⚠ The seven built-in keys this paragraph used to list as the standing
+     * example — {@code data_dir}/{@code batch_id} ({@code PipelineJobRunner}), {@code sleep_ms}
+     * ({@code MaintenanceJob}), {@code top} ({@code StorageReportTask}/{@code StorageTrendTask}),
+     * {@code history_days} ({@code ReferenceCompactor}), {@code max_attempts}/{@code backoff_minutes}
+     * ({@code SoftBounceRetryTask}) — are now DECLARED on their descriptors
+     * ({@code JOB-DESCRIPTORS-LIE-TO-THE-FORM-1}); the warning class outlives them.
      * What this catches is the dead-property class: a typo'd or retired key that is authored, persisted,
      * shown in the editor, and read by nothing.
      *

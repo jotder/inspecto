@@ -451,7 +451,28 @@ public final class JobService implements AutoCloseable {
                         ParameterDecl.optional("target", ParamType.STRING, null, "materialize: output Dataset id and directory (required; must differ from dataset)"),
                         ParameterDecl.optional("measures", ParamType.STRING, null, "materialize: comma-separated measure shorthand (field,agg); empty = a raw SELECT * snapshot"),
                         ParameterDecl.optional("group_by", ParamType.STRING, null, "materialize: comma-separated dimensions to group by"),
-                        ParameterDecl.optional("limit", ParamType.INTEGER, "1000000", "materialize: row cap on the snapshot")),
+                        ParameterDecl.optional("limit", ParamType.INTEGER, "1000000", "materialize: row cap on the snapshot"),
+                        // JOB-DESCRIPTORS-LIE-TO-THE-FORM-1: five keys the maintenance tasks have always
+                        // read straight through JobConfig.opt but the descriptor never declared — so the
+                        // generated form could not offer them and the resolver could not type-check them.
+                        // ⚠ Each defaultValue is the literal the reading code already passes to opt(), and a
+                        // bound appears ONLY where that code already refuses the value: declaring a NEW
+                        // refusal here would reject configs that run today. `top` is therefore UNBOUNDED —
+                        // StorageReportTask:47 / StorageTrendTask:49 parse it and accept anything.
+                        ParameterDecl.of("sleep_ms", ParamType.INTEGER).min(0).defaultValue("0")
+                                .description("heartbeat: hold the run RUNNING for this many milliseconds (liveness probe)")
+                                .build(),
+                        ParameterDecl.optional("top", ParamType.INTEGER, "5",
+                                "storage_report / storage_trend: how many largest files or fastest-growing axes to list"),
+                        ParameterDecl.of("history_days", ParamType.INTEGER).min(0).defaultValue("0")
+                                .description("reference_compact: keep superseded versions younger than N days (0 = winning versions only)")
+                                .build(),
+                        ParameterDecl.of("max_attempts", ParamType.INTEGER).min(1).defaultValue("3")
+                                .description("soft_bounce_retry: give up on a delivery after this many attempts")
+                                .build(),
+                        ParameterDecl.of("backoff_minutes", ParamType.INTEGER).min(0).defaultValue("60")
+                                .description("soft_bounce_retry: wait this long after the last attempt before retrying")
+                                .build()),
                 List.of("maintenance.storage.threshold", "maintenance.storage.trend",
                         "maintenance.scheduler.findings", "maintenance.backup.completed",
                         "maintenance.backup.verify_failed", "maintenance.restore.completed",
@@ -474,7 +495,16 @@ public final class JobService implements AutoCloseable {
                                         + "file stays the single truth. This is how a pipeline's transform half "
                                         + "executes — pair it with on_pipeline: <that pipeline> to run after each "
                                         + "commit. Mutually exclusive with pipeline."),
-                        ParameterDecl.optional("incremental_column", ParamType.STRING, null, "Watermark column for incremental runs")),
+                        ParameterDecl.optional("incremental_column", ParamType.STRING, null, "Watermark column for incremental runs"),
+                        // JOB-DESCRIPTORS-LIE-TO-THE-FORM-1: both read by PipelineJobRunner:275/277 and
+                        // undeclared until now. ⚠ Neither carries a defaultValue, and deliberately so:
+                        // their real fallbacks are COMPUTED, not authorable literals — data_dir falls back
+                        // to the JobService-injected space dataDir, batch_id to <job name>-<epoch millis>.
+                        // Putting either in defaultValue would publish a constant the code never uses.
+                        ParameterDecl.optional("data_dir", ParamType.STRING, null,
+                                "Data root this run reads and writes under. Default: the Space's own data directory."),
+                        ParameterDecl.optional("batch_id", ParamType.STRING, null,
+                                "Batch id to commit under. Default: derived per run from the job name and the fire time.")),
                 List.of("pipeline.commit"), List.of()),
                 this::buildPipelineJob));
         // sql.template (P3b, §15.1): the first Run Artifact producer. Config-aware parameters — the

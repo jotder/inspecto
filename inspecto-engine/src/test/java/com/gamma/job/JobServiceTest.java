@@ -93,6 +93,114 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * `JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`: the five maintenance keys the tasks have always read
+     * straight through {@code JobConfig.opt} must be DECLARED, optional, INTEGER, and carry exactly the
+     * default literal the reading code passes to {@code opt()} — a descriptor that omits them is a form
+     * that cannot author a working config, and a descriptor whose default differs from the code's is a
+     * form that lies about what happens when the field is left blank.
+     *
+     * <p>⛔ The `top` assertions are the load-bearing half of the DECISION, not of the shape: neither
+     * {@code StorageReportTask:47} nor {@code StorageTrendTask:49} refuses any value of `top`, so a bound
+     * here would be a genuinely NEW refusal introduced by a declaration. {@code min()}/{@code max()} must
+     * stay null. The bounds on the other four mirror refusals the code already makes
+     * ({@code SoftBounceRetryTask:50,52}).
+     */
+    @Test
+    void theMaintenanceTypeDeclaresTheFiveTaskKeysItAlreadyRead(@TempDir Path dir) throws Exception {
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            JobTypeDescriptor maintenance = js.jobTypes().stream().filter(d -> "maintenance".equals(d.id()))
+                    .findFirst().orElseThrow(() -> new AssertionError("the maintenance job type is not registered"));
+            var byName = maintenance.parameters().stream()
+                    .collect(java.util.stream.Collectors.toMap(ParameterDecl::name, d -> d));
+
+            for (String key : List.of("sleep_ms", "top", "history_days", "max_attempts", "backoff_minutes")) {
+                ParameterDecl d = byName.get(key);
+                assertNotNull(d, "maintenance must declare '" + key + "' — the task reads it, so an "
+                        + "undeclared key cannot be authored through the generated form");
+                assertFalse(d.required(), "'" + key + "' must stay OPTIONAL: requiredness on this type is "
+                        + "per-TASK and the task owns the refusal");
+                assertEquals(ParamType.INTEGER, d.type(), "'" + key + "' is parsed as a number by its task");
+            }
+
+            assertEquals("0", byName.get("sleep_ms").defaultValue(), "MaintenanceJob:224 reads opt(sleep_ms, \"0\")");
+            assertEquals("5", byName.get("top").defaultValue(), "StorageReportTask:47 reads opt(top, \"5\")");
+            assertEquals("0", byName.get("history_days").defaultValue(), "ReferenceCompactor:103 reads opt(history_days, \"0\")");
+            assertEquals("3", byName.get("max_attempts").defaultValue(), "SoftBounceRetryTask DEFAULT_MAX_ATTEMPTS = 3");
+            assertEquals("60", byName.get("backoff_minutes").defaultValue(), "SoftBounceRetryTask DEFAULT_BACKOFF_MINUTES = 60");
+
+            // Bounds ONLY where the code already throws.
+            assertNotNull(byName.get("max_attempts").min(), "SoftBounceRetryTask:50 throws below 1");
+            assertEquals(1.0, byName.get("max_attempts").min().doubleValue(), "SoftBounceRetryTask:50 throws below 1");
+            assertNotNull(byName.get("backoff_minutes").min(), "SoftBounceRetryTask:52 throws below 0");
+            assertEquals(0.0, byName.get("backoff_minutes").min().doubleValue(), "SoftBounceRetryTask:52 throws below 0");
+            assertNotNull(byName.get("sleep_ms").min(), "a negative sleep is not a duration");
+            assertEquals(0.0, byName.get("sleep_ms").min().doubleValue(), "a negative sleep is not a duration");
+            assertNotNull(byName.get("history_days").min(), "a negative history window is not a window");
+            assertEquals(0.0, byName.get("history_days").min().doubleValue(), "a negative history window is not a window");
+
+            // ⛔ The decision. Do not "tidy" this into a .min(1).
+            assertNull(byName.get("top").min(), "'top' must stay UNBOUNDED — no reader refuses any value, "
+                    + "so a bound here would REJECT configs (top: 0) that run today");
+            assertNull(byName.get("top").max(), "'top' must stay UNBOUNDED — see above");
+        }
+    }
+
+    /**
+     * `JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`, pipeline half: `data_dir` and `batch_id` are read by
+     * {@code PipelineJobRunner:275/277} and must be declared — but with **no {@code defaultValue}**.
+     * Their real fallbacks are computed, not authorable literals (the JobService-injected space
+     * {@code dataDir}; {@code <job name>-<epoch millis>}), so any literal here would publish a constant
+     * the code never uses. The fallback is stated in the description instead.
+     */
+    @Test
+    void thePipelineTypeDeclaresDataDirAndBatchIdWithNoLiteralDefault(@TempDir Path dir) throws Exception {
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            JobTypeDescriptor pipeline = js.jobTypes().stream().filter(d -> "pipeline".equals(d.id()))
+                    .findFirst().orElseThrow(() -> new AssertionError("the pipeline job type is not registered"));
+            var byName = pipeline.parameters().stream()
+                    .collect(java.util.stream.Collectors.toMap(ParameterDecl::name, d -> d));
+
+            for (String key : List.of("data_dir", "batch_id")) {
+                ParameterDecl d = byName.get(key);
+                assertNotNull(d, "pipeline must declare '" + key + "' — PipelineJobRunner reads it");
+                assertFalse(d.required(), "'" + key + "' must stay OPTIONAL: it has a computed fallback");
+                assertEquals(ParamType.STRING, d.type(), "'" + key + "' is a free string, never parsed as a number");
+                assertNull(d.defaultValue(), "'" + key + "' must carry NO defaultValue — its real fallback is "
+                        + "computed at run time, so a literal here would publish a constant the code never uses");
+                assertNotNull(d.description(), "the computed fallback must be stated somewhere an author reads");
+                assertTrue(d.description().toLowerCase().contains("default"),
+                        "'" + key + "' has no defaultValue, so its description must name what happens when it is blank");
+            }
+        }
+    }
+
+    /**
+     * ⛔ The two keys that must NEVER be declared. `on_pipeline_gate` is read by the FRAMEWORK for every
+     * type ({@code ParameterResolver.FRAMEWORK_KEYS}), so a per-type declaration would be a duplicate
+     * contract; `flow` is the pre-rename alias of `pipeline`, already excused by the resolver's
+     * {@code config:flow} rung, and declaring it would publish a GLOSSARY-banned word in the API contract.
+     */
+    @Test
+    void neitherFrameworkGateNorTheLegacyFlowAliasIsEverDeclared(@TempDir Path dir) throws Exception {
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            for (JobTypeDescriptor d : js.jobTypes()) {
+                for (ParameterDecl p : d.parameters()) {
+                    assertNotEquals("on_pipeline_gate", p.name(), "job type '" + d.id()
+                            + "': on_pipeline_gate is a FRAMEWORK key read for every type — never declare it");
+                    assertNotEquals("flow", p.name(), "job type '" + d.id()
+                            + "': 'flow' is the banned pre-rename alias of 'pipeline' — never declare it");
+                }
+            }
+        }
+    }
+
     @Test
     void manualTriggerRunsRecordsAndAudits(@TempDir Path dir) throws Exception {
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));
