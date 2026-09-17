@@ -3019,6 +3019,21 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   the package-time neutralisation — hiding repo rot behind a bundle rewrite is how it survives.
   → `okf/backend/build-run/build-test.md`
 
+- ~~**P2** · **`FENCE-STORE-SILENTLY-INERT-1`**~~ ✅ **CLOSED 2026-09-17 — check-time, no new wiring, as the
+  row called it.** `CollectorService.checkDeletion` (the existing `STORE_DELETE_CONFLICT` log/event path,
+  `:1122-1132`) now looks up `DeletionFence.coverage(...)` for every target store and labels the reason:
+  a conflict's event/log line carries `reason=FENCED` (the only value it can ever carry, since `check()`
+  only conflicts a resting producer); a target store that is NOT in conflict but is also not `FENCED` gets
+  a new WARN log line plus a new `STORE_DELETE_UNFENCED` event (`store`, `reason` attrs) naming
+  `VIEW_ONLY` / `CONSUMED_ONLY` / `UNMATCHED` — so the typo class the row filed against is no longer silent.
+  `check()`'s conflict/no-conflict outcome, and the delete-proceeds-regardless behaviour, are unchanged —
+  observability only. Registration-time was NOT chosen, per the row's own reasoning (new wiring,
+  false-positives on a not-yet-authored pipeline).
+  ✅ `DeletionFenceReasonTest` (`inspecto/src/test/java/com/gamma/service/`) pins both ends: a simulated
+  active producer (via the same `running` set a live run populates) yields a `STORE_DELETE_CONFLICT` with
+  `reason=FENCED`; an unmatched store yields `STORE_DELETE_UNFENCED` with `reason=UNMATCHED`. 2/2 green
+  (`mvn -o -pl inspecto-event,inspecto-engine,inspecto -am test -Dtest=DeletionFenceReasonTest`).
+  → `okf/backend/control-plane/jobs.md` · superseded analysis below, kept for provenance.
 - **P2** · **`FENCE-STORE-SILENTLY-INERT-1` — DETECTION SHIPPED 2026-09-17 (`29065137`); the PLACEMENT of
   a warning is an owed call.** `DeletionFence.coverage(...)` now separates the three reasons a store is
   skipped — `FENCED` / `VIEW_ONLY` / `CONSUMED_ONLY` / `UNMATCHED` — sharing one private `Topology` record

@@ -1119,15 +1119,37 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             }
         }
         List<DeletionFence.Conflict> conflicts = DeletionFence.check(targetStores, flows, active);
+        // FENCE-STORE-SILENTLY-INERT-1: coverage() shares check()'s Topology, so this is check-time only —
+        // no new wiring. It labels each conflict with the reason (always FENCED, since check() only ever
+        // conflicts a resting producer) and, for the remaining target stores, tells an operator WHY the fence
+        // was inert for that store (VIEW_ONLY/CONSUMED_ONLY = attested, by design; UNMATCHED = the typo class).
+        Map<String, DeletionFence.Coverage> coverage = DeletionFence.coverage(targetStores, flows);
         for (DeletionFence.Conflict c : conflicts) {
-            log.warn("Deletion fence: store '{}' has an active reader/writer — producers={}, consumers={}",
-                    c.store(), c.activeProducers(), c.activeConsumers());
+            DeletionFence.Coverage reason = coverage.getOrDefault(c.store(), DeletionFence.Coverage.FENCED);
+            log.warn("Deletion fence: store '{}' has an active reader/writer — producers={}, consumers={}, reason={}",
+                    c.store(), c.activeProducers(), c.activeConsumers(), reason);
             this.eventLog.emit(Event.builder(EventType.STORE_DELETE_CONFLICT)
                     .source(CollectorService.class.getName())
                     .message("Delete of store '" + c.store() + "' races an active pipeline")
                     .attr("store", c.store())
+                    .attr("reason", reason.name())
                     .attr("activeProducers", String.join(",", c.activeProducers()))
                     .attr("activeConsumers", String.join(",", c.activeConsumers())));
+        }
+        Set<String> conflicted = conflicts.stream().map(DeletionFence.Conflict::store)
+                .collect(java.util.stream.Collectors.toSet());
+        for (String store : targetStores) {
+            if (conflicted.contains(store)) continue;
+            DeletionFence.Coverage cov = coverage.get(store);
+            if (cov != null && cov != DeletionFence.Coverage.FENCED) {
+                log.warn("Deletion fence: store '{}' has no fence coverage (reason={}) — delete proceeds unchecked",
+                        store, cov);
+                this.eventLog.emit(Event.builder(EventType.STORE_DELETE_UNFENCED)
+                        .source(CollectorService.class.getName())
+                        .message("Delete of store '" + store + "' has no fence coverage: " + cov)
+                        .attr("store", store)
+                        .attr("reason", cov.name()));
+            }
         }
         return conflicts;
     }

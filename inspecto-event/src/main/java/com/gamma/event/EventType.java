@@ -101,6 +101,13 @@ public final class EventType {
      *  cross-driver hazard the deletion fence guards (§3.8 rule 4, T25). The {@code store},
      *  {@code activeProducers} and {@code activeConsumers} attributes name the racing flows. */
     public static final String STORE_DELETE_CONFLICT = "STORE_DELETE_CONFLICT";
+    /** A delete/maintenance job targets a store the deletion fence can never cover
+     *  ({@code FENCE-STORE-SILENTLY-INERT-1}) — {@code DeletionFence.Coverage.VIEW_ONLY},
+     *  {@code CONSUMED_ONLY} or {@code UNMATCHED}. The first two are attested by design (nothing rests, or
+     *  the producer is elsewhere); {@code UNMATCHED} is the typo class — no configured pipeline names this
+     *  store at all. The {@code store} and {@code reason} attributes name which. Advisory only: the delete
+     *  proceeds regardless either way. */
+    public static final String STORE_DELETE_UNFENCED = "STORE_DELETE_UNFENCED";
     /** A pipeline run's data-plane provenance failed the conservation invariant at a non-amplifying node —
      *  records entered that did not leave (silent data loss) or were unexpectedly amplified (§11.4, T22). The
      *  {@code node}, {@code recordsIn}, {@code recordsOut} and {@code kind} (LOSS/AMPLIFICATION) attributes
