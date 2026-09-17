@@ -272,3 +272,23 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   `ControlApiDecisionRulesTest`, `ControlApiScopedObjectsTest`, `ControlApiAccessDeciderTest`,
   `ControlApiReconPromoteTest`, `PostgresStateStoreTest`. ⛔ Not fixable by adding the module to the
   default `<modules>` — that reverses signed decision EDG-01 cell 7.
+
+### `DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused the README row survives in its sibling
+
+`README-LINKS-BROKEN-IN-REPO-1` was fixed at the **shape**: `check-doc-links.mjs` went from
+`ROOTS = ['docs','compliance','.claude']` to the whole repo minus a deny-list (`ROOTS = ['.']`), which is what
+made the customer-facing `inspecto/README.md` visible at all. Re-verified 2026-09-17 by falsifying it BOTH
+ways — four dead links planted in **tracked** files across four previously-invisible trees fail it by name
+(including `inspecto/README.md → ../docs/architecture.md`, the exact link the row was filed about), and the
+clean tree passes at 1802 links over 529 files.
+
+🔴 **`tools/check-doc-counts.mjs:301` still carries the PRE-FIX allow-list** — `const TREES = ['docs',
+'compliance', '.claude']` plus a root `*.md` pass. Its scope line prints **493** files where the doc-link
+guard now sees **529**. ✅ **Latent, not live** — a sweep for `<!--count:*-->` markers outside those three
+trees returns ZERO, so nothing is currently unpoliced; a marked count placed in `inspecto/README.md` or
+`asn-parser/docs/` would be. ⚠ The fifth guard-scope blind spot in three days, after the bolded-count regex,
+surefire freshness, edition-gated modules and the deny-list validated on a tree lacking what it should deny.
+
+⚠ **A trap that cost two lanes a build each:** `-DfailIfNoSpecifiedTests=false` is **silently ignored** by
+this Surefire (3.5.3). The working spelling is `-Dsurefire.failIfNoSpecifiedTests=false`; without it a
+filtered `-am` run dies at `asn-core` — red for the wrong reason.

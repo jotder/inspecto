@@ -373,3 +373,29 @@ Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`
   `condition` kind, so fixing only `when` and the enum would have left condition expectations refused
   anyway. It moved to a `column-needed-unless-condition` cross-field rule, since `FieldSpec` has no
   conditional-required. No new refusals: a widened enum and an optional field cannot refuse more.
+
+### Both bulk writers now run `validateKind` — `COMPONENT-BULK-WRITERS-UNGATED-1` CLOSED 2026-09-17
+
+`ComponentBundleSource.write` took the gate on 2026-09-16; `BiTemplates.apply` took it on 2026-09-17, in its
+**resolve** loop — before any write, so apply stays all-or-nothing and never plants a partial board — mapping
+`IllegalArgumentException` to 422 the way `writeComponent` does. ⚠ A bare IAE would have been a **500**: only
+`ApiException` maps to a status in `ControlApi`. The two postures differ deliberately: bundle import fails
+**per item**, templates fail **whole**.
+
+🔴 **What held the second half open was a false claim recorded in a test javadoc** —
+`ControlApiBiTemplatesTest` justified its build-time-only shape with *"the gate cannot be called from here
+(`validateKind` is private)"*. It is **package-private** (widened for `BundleRoutes`) and `BiTemplates` is in
+that very package. The claim was already false when written; the javadoc now retracts it in place.
+⇒ **A stated blocker is a hypothesis too — re-check it before treating it as the reason something is open.**
+
+⚠ **Severity is defence-in-depth, established BY CONSTRUCTION rather than by reading the accepted-set:**
+`substituteTree` copies keys verbatim and `substituteAny` rewrites only String *values*, and every key
+originates in a hardcoded `Map.of(...)` — so `dataset`/`prefix` cannot introduce a top-level key and a KEY
+census cannot fire on today's templates. ⛔ **No new test was added, deliberately:** with no reachable input
+able to trip the gate, a new test would be one that CANNOT FAIL. The gate was mutation-proven instead (bogus
+key ⇒ 422, nothing written; gate removed ⇒ 200 and all four components planted), and the build-time
+`everyTemplateWritesABodyTheAuthoringRouteAccepts` remains the guard that can actually go red.
+
+⇒ Open row: **`BITEMPLATES-GATE-ORDER-1`** — `apply` checks the 409 conflict BEFORE the 422 spec gate,
+inverting the `endpoint` skill's order. Observable only when a template is both conflicting and invalid,
+which no curated template can be today.

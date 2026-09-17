@@ -15,7 +15,13 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **60<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** — ⬆ **the board GREW by six on the way out of the
+> **63<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** — ⬆ **UP again, 60 → 63, out of the four-lane
+> parallel shift of 2026-09-17: three rows STRUCK as shipped, five FILED.** ⚠ **Three of the four lanes
+> refuted part of their own row's premise, and a FOURTH found its row had already SHIPPED** — the residuals
+> those refutations exposed are what grew the board. ⛔ **The lanes were handed a row's ORIGINAL prose that
+> this file preserves as an INDENTED CHILD under its own strikethrough closure** — grepping a row ID lands on
+> the open-sounding text first, and two of four lanes were mis-tasked that way. Read the PARENT bullet.
+> — ⬆ **the board GREW by six on the way out of the
 > five-lane parallel shift (2026-09-16 evening): eight rows FILED, two STRUCK as shipped, and one
 > re-ranked P2 → P1.** ⚠ **That is the honest result of five lanes that were told to ground before
 > building**: three of the five refuted part of their own row's premise, and the refutations produced
@@ -150,8 +156,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 3<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 18<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 60<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 21<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 63<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -2043,7 +2049,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   can land a job config whose paths point anywhere the file jail does not cover. **A third producer of job
   config files that was on no row.** → `okf/backend/control-plane/jobs.md`
 
-- ~~**P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1`**~~ ✅ **HALF SHIPPED 2026-09-16; the other half's
+- ~~**P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1`**~~ ✅ **FULLY CLOSED 2026-09-17. The bundle half shipped 2026-09-16; the other half's
   refutation does NOT hold.** `ComponentBundleSource.write` — the only `BundleSource` whose write
   validated nothing — now calls `ComponentRoutes.validateKind`, made **package-private** for exactly this
   (one modifier, no logic change). ⛔ **Reuse over a second accepted-set: two copies of an accepted-set is
@@ -2055,7 +2061,25 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   no-op. True of its tree; false here — `afaa4005` added the census at `ComponentRoutes:640`.
   🔴 **The lane was not careless: its worktree branched from `a6c30568` and genuinely lacked that commit.**
   Its second argument (hardcoded template content, only `dataset`/`prefix` substituted) still holds and
-  keeps severity low. ⇒ the `BiTemplates` half stays OPEN. Original row follows.
+  keeps severity low.
+  ✅ **THE `BiTemplates` HALF SHIPPED 2026-09-17 — and what held it open was a FALSE CLAIM RECORDED IN THE
+  CODE.** `BiTemplates.apply` now calls `ComponentRoutes.validateKind` in its **resolve** loop — before any
+  write, so apply stays all-or-nothing and never plants a partial board — mapping `IllegalArgumentException`
+  to 422 as `writeComponent` does (a bare IAE would have been a 500: only `ApiException` maps to a status in
+  `ControlApi`).
+  🔴 **`ControlApiBiTemplatesTest`'s javadoc justified its build-time-only shape with *“the gate cannot be
+  called from here (`validateKind` is private)”* — FALSE, and already false when written.** It is
+  package-private (widened for `BundleRoutes`) and `BiTemplates` sits in that very package. A stale blocker
+  nobody re-checked WAS the remaining work; the javadoc now retracts it in place.
+  ⚠ **Severity stays defence-in-depth, and was proven BY CONSTRUCTION rather than by reading the
+  accepted-set:** `substituteTree` copies keys verbatim and `substituteAny` rewrites only String *values*, and
+  every key originates in a hardcoded `Map.of(...)` — so `dataset`/`prefix` can never introduce a top-level
+  key and a KEY census cannot fire on today's templates. The gate is for the NEXT curated template.
+  ⛔ **No new test, deliberately.** No reachable input can trip the gate, so a new test would be one that
+  CANNOT FAIL — this repo's most-repeated failure mode. The gate was mutation-proven instead (bogus key ⇒ 422
+  and nothing written; gate removed ⇒ 200 and all four components planted), and the build-time
+  `everyTemplateWritesABodyTheAuthoringRouteAccepts` stays the guard that can actually go red.
+  ⇒ Residual filed: `BITEMPLATES-GATE-ORDER-1`. Original row follows.
   - **P2** · **`COMPONENT-BULK-WRITERS-UNGATED-1` — two bulk writers bypass every `validateKind` gate.**
   Filed 2026-09-16 from the `widget`/`dashboard` census. `BiTemplates.apply` (`BiTemplates.java:125`) and
   bundle import (`BundleRoutes.java:425`) call `store.write` directly, so no component gate runs — not the
@@ -2213,26 +2237,114 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   need a core test vehicle built first, so this is real work, not a move.
   → `okf/backend/build-run/build-test.md`
 
-- **P3** · **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1` — a broken compactor config reports SUCCESS.**
-  Filed 2026-09-17 while building the job smoke. `PartitionCompactor:69` returns
-  `JobResult.ok("directory not present, nothing to do")` when `dir` is absent. ⚠ Today's regression threw
-  only because `serve-example.sh:52` **pre-creates** `out/database`, which made `resolveJobPath` refuse —
-  **on a tree where the directory does not exist, the same broken config returns SUCCESS.** ⇒ The third
-  "silently inert" case in this subsystem in one day, after `DeletionFence` and the non-failing `probe()`.
-  ⛔ The fix is not obviously "throw": a compactor with nothing to compact is a legitimate no-op. The
-  question is whether an UNRESOLVABLE dir is distinguishable from an EMPTY one — it is, and only the
-  first should be an error. → `okf/backend/control-plane/jobs.md`
+- ~~**P3** · **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`**~~ ✅ **SHIPPED 2026-09-17 — the row's CENTRAL CLAIM
+  was REFUTED, and the defect underneath it was real and FOUR times wider.**
+  🔴 **“An UNRESOLVABLE dir is distinguishable from an EMPTY one” does NOT hold.** Every case the row calls
+  unresolvable — blank, URI (`s3://…`), UNC, unparseable, outside the jail — ALREADY throws `PathJail.Escape`
+  from `requireJobPathUnderAny` and never reaches the check. The row's own scenario (a stale-but-contained
+  relative path) is **byte-for-byte indistinguishable** from a store nothing has written to yet, and erroring
+  there would refuse every legitimate FIRST RUN. ⇒ the fix the row asked for is not implementable and was
+  not built.
+  ✅ **What IS distinguishable, and was genuinely broken: `dir` EXISTS but is a regular file.**
+  `!Files.isDirectory(dir)` is true, so the task reported *“directory not present, nothing to do”* — a config
+  no run can ever satisfy, reported as SUCCESS. `Files.exists(dir) && !Files.isDirectory(dir)` decides it
+  exactly; ABSENT and EMPTY both stay a successful no-op.
+  ⚠ **The row named ONE file; the shape was in FOUR** — `PartitionCompactor`, `CleanupTask`,
+  `StorageReportTask`, `PartitionPruneTask`, **two of which DELETE**. (Again: grep the SYMBOL, not the row's
+  file list.)
+  ✅ **Mutation-proven by the cleanest control available — the unmodified tree.** `MaintenanceDirNotADirectoryTest`
+  (6 tests) run against `928fd2ab` with the fix absent is **4 failures**, one per task; with the fix, 0. Its two
+  positive controls (absent dir, empty dir) pass in BOTH runs — which is what shows the refusal was not bought
+  by turning the legitimate no-op into an error.
+  ⇒ Residual filed: `REFERENCE-COMPACTOR-SAME-SHAPE-1`. Original row follows.
+  - **P3** · **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1` — a broken compactor config reports SUCCESS.**
+    Filed 2026-09-17 while building the job smoke. `PartitionCompactor:69` returns
+    `JobResult.ok("directory not present, nothing to do")` when `dir` is absent. ⚠ Today's regression threw
+    only because `serve-example.sh:52` **pre-creates** `out/database`, which made `resolveJobPath` refuse —
+    **on a tree where the directory does not exist, the same broken config returns SUCCESS.** ⇒ The third
+    "silently inert" case in this subsystem in one day, after `DeletionFence` and the non-failing `probe()`.
+    ⛔ The fix is not obviously "throw": a compactor with nothing to compact is a legitimate no-op. The
+    question is whether an UNRESOLVABLE dir is distinguishable from an EMPTY one — it is, and only the
+    first should be an error. → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`JOB-PARAM-UNDECLARED-UNREPORTED-1` — nothing reports a job param no descriptor declares.**
-  Filed 2026-09-17 from the `job` census ruling. `ParameterResolver` reports `missingRequired`,
-  `invalidType` and `unknownExpression` — but an **undeclared** param is silently accepted, which is the
-  dead-property risk the census would have covered and cannot. The registry-aware place for it is
-  `JobService`/`ParameterResolver`, where the type's `JobTypeDescriptor.parameters()` is actually known.
-  ⛔ **It must be WARNING, never fail-closed:** built-in jobs read params their own descriptors never
-  declare — `pipeline_config`, `data_dir`, `on_pipeline_gate`, `template`, `store` all go through
-  `config.require()`/`opt()` directly — so a strict version refuses working configs on day one.
-  ⚠ That asymmetry is itself worth recording: a descriptor is a UI/API contract, not the read set.
+- ~~**P2** · **`JOB-PARAM-UNDECLARED-UNREPORTED-1`**~~ ✅ **SHIPPED 2026-09-17 — WARNING-only, and THREE of
+  the row's five named examples were REFUTED.**
+  `ParameterResolver.Resolution` gained `undeclared`, derived by diffing the authored `config` layer against
+  the decl names; `JobService` warns on the run log beside the three REJECTED diagnostics. `JobRun.status`
+  and `reason` are untouched — it never fails closed.
+  🔴 **Refuted:** `pipeline_config` **IS** declared (`JobService.java:472`, on the `pipeline` descriptor)
+  · `store` **IS** declared (on `maintenance`) · `template` never reaches `JobConfig.params()` at all —
+  `JobTemplate.instantiate:102` strips `template`/`params` as resolution machinery before `fromMap` ever sees
+  them, so it is **not a param**. Only `data_dir` and `on_pipeline_gate` survived.
+  ✅ **And the asymmetry is WIDER than the row said.** Diffing every `cfg.require()`/`opt()` key against every
+  `ParameterDecl` across `inspecto-engine` + `inspecto-ops` found **NINE** undeclared-but-read keys, not five:
+  `data_dir`, `batch_id`, `flow` (`PipelineJobRunner`), `on_pipeline_gate` (`JobService:769`), `sleep_ms`
+  (`MaintenanceJob:224`), `top` (`StorageReportTask`/`StorageTrendTask`), `history_days`
+  (`ReferenceCompactor:98`), `max_attempts`/`backoff_minutes` (`SoftBounceRetryTask`). Fail-closed would
+  indeed have refused working configs on day one.
+  ✅ **Blast radius MEASURED, not argued: ZERO configs and ZERO keys warn.** All **21** committed `*_job.toon`
+  under `spaces/` were expanded (both `job_template` instances resolved, and `SqlParamScanner`'s `$`-tokens
+  counted for the two `sql.template` jobs) and diffed against their type's declarations. The diagnostic is
+  quiet **by construction, not by suppression** — which is why the exclusion list stayed at ONE entry
+  (`on_pipeline_gate`, read by the framework for every type), plus `flow` excused only when a `pipeline` decl
+  exists, i.e. exactly when the resolver's own `config:flow` rung reads it. The other seven were deliberately
+  NOT excluded: they are genuine type params a descriptor COULD declare and doesn't.
+  ⚠ **The mutation proof is honest about its own limit:** stubbing `undeclared()` to `List.of()` reds 3 of the
+  5 new tests; the other two assert empty lists, so they pin the EXCLUSIONS, not the detection.
+  ⇒ Residuals filed: `JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`, `PACKHARNESS-NO-UNDECLARED-1`. Original row follows.
+  - **P2** · **`JOB-PARAM-UNDECLARED-UNREPORTED-1` — nothing reports a job param no descriptor declares.**
+    Filed 2026-09-17 from the `job` census ruling. `ParameterResolver` reports `missingRequired`,
+    `invalidType` and `unknownExpression` — but an **undeclared** param is silently accepted, which is the
+    dead-property risk the census would have covered and cannot. The registry-aware place for it is
+    `JobService`/`ParameterResolver`, where the type's `JobTypeDescriptor.parameters()` is actually known.
+    ⛔ **It must be WARNING, never fail-closed:** built-in jobs read params their own descriptors never
+    declare — `pipeline_config`, `data_dir`, `on_pipeline_gate`, `template`, `store` all go through
+    `config.require()`/`opt()` directly — so a strict version refuses working configs on day one.
+    ⚠ That asymmetry is itself worth recording: a descriptor is a UI/API contract, not the read set.
+    → `okf/backend/control-plane/jobs.md`
+
+- **P2** · **`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1` — nine job params are read but declared by nobody.**
+  Filed 2026-09-17 out of `JOB-PARAM-UNDECLARED-UNREPORTED-1`, which MEASURED them rather than inferring them:
+  `data_dir`, `batch_id`, `flow` (`PipelineJobRunner`), `on_pipeline_gate` (`JobService:769`), `sleep_ms`
+  (`MaintenanceJob:224`), `top` (`StorageReportTask`/`StorageTrendTask`), `history_days`
+  (`ReferenceCompactor:98`), `max_attempts`/`backoff_minutes` (`SoftBounceRetryTask`). Each is a descriptor
+  that **lies to the authoring form**: `MaintenanceJob`'s `sleep_ms` and `StorageReportTask`'s `top` cannot be
+  offered, typed or bounded by any UI because no `ParameterDecl` names them. Same defect class the `min_files`
+  and `materialize` comments in `JobService.java` record as already fixed — these are the survivors.
+  ⛔ **Not a drive-by:** declaring them changes the published `GET /jobs/types/{id}` contract, so it needs its
+  own call. → `okf/backend/control-plane/jobs.md`
+
+- **P3** · **`PACKHARNESS-NO-UNDECLARED-1` — a Job Pack author never sees the undeclared-param warning.**
+  Filed 2026-09-17. `PackTestHarness.rejection()` correctly EXCLUDES `undeclared` (it is not a rejection), but
+  nothing surfaces it in the harness `Outcome` either — so the diagnostic shipped on 2026-09-17 reaches the
+  run log and not the pack author, who is exactly the person authoring params against a descriptor.
   → `okf/backend/control-plane/jobs.md`
+
+- **P3** · **`REFERENCE-COMPACTOR-SAME-SHAPE-1` — the fifth `!Files.isDirectory` site, with a different
+  blast radius.** Filed 2026-09-17 alongside `COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`, which fixed FOUR sites and
+  deliberately left this one. `ReferenceCompactor.java:115` returns `Result.NOTHING` on a non-directory, so an
+  operator-authored `reference_compact` `dir` that names a FILE reports success.
+  ⛔ **The one-line fix does not transfer:** the guard sits in `public static compact(root, historyDays)`,
+  shared with a NON-operator caller (`CollectorService.java:1276`, the pipeline lane, where the root is
+  DERIVED, not authored). Fixing it means lifting the check into `ReferenceCompactor.run(cfg)` — a different
+  shape. → `okf/backend/control-plane/jobs.md`
+
+- **P3** · **`BITEMPLATES-GATE-ORDER-1` — `BiTemplates.apply` runs 409 before 422.**
+  Filed 2026-09-17 when the `validateKind` gate landed there. The `endpoint` skill mandates spec/422 BEFORE
+  conflict/409; `apply` checks the existing-id conflict first, so validation was placed after it to keep that
+  change surgical. ⚠ **Observable only when a template is BOTH conflicting and invalid**, which no curated
+  template can be today — severity is ordering-consistency, not behaviour.
+  → `okf/backend/config/config-safety.md`
+
+- **P3** · 🔴 **`DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused `README-LINKS-BROKEN-IN-REPO-1`
+  still lives in its SIBLING guard.** Filed 2026-09-17 while re-verifying that row. `check-doc-links.mjs` was
+  fixed at the SHAPE (allow-list → whole repo minus a deny-list, `ROOTS = ['.']`); `tools/check-doc-counts.mjs`
+  still carries the pre-fix `const TREES = ['docs', 'compliance', '.claude']` plus a root `*.md` pass. Its own
+  scope line prints **493** files where the doc-link guard now sees **529** — precisely the old blind count.
+  ✅ **Latent, NOT live, and that was checked rather than assumed:** a sweep for `<!--count:*-->` markers
+  outside those three trees returns ZERO, so nothing is currently unpoliced. A marked count placed in
+  `inspecto/README.md` or `asn-parser/docs/` would be. ⚠ The fifth guard-scope blind spot in three days.
+  → `okf/backend/build-run/build-test.md`
 
 - ~~**P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1`**~~ ✅ **SHIPPED 2026-09-17 (`f30d39c5`).**
   `when` is declared `FieldType.MAP` — the `widget.controls` / `dashboard.filter` precedent, which

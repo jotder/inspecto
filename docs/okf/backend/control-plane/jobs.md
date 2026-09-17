@@ -733,3 +733,41 @@ from the deployed column alone called `maintenance_report_job.toon` a refusal, a
   `serve-example.sh:52` pre-creates the directory. ⛔ The fix is not simply "throw" — a compactor with
   nothing to compact is a legitimate no-op; the question is whether an UNRESOLVABLE dir is distinguishable
   from an EMPTY one, and it is.
+
+### Closed 2026-09-17 — `COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`, and the distinction it asked for does not exist
+
+✅ **SHIPPED**, but **not the fix the row named.** The row asked to separate an UNRESOLVABLE `dir` from an
+EMPTY one. 🔴 **They are not separable at that point.** Every genuinely unresolvable case — blank, URI
+(`s3://…`), UNC, unparseable, outside the jail — already throws `PathJail.Escape` from
+`requireJobPathUnderAny` and never reaches the `isDirectory` check. What remains, a stale-but-jail-contained
+relative path, is byte-for-byte identical to a store nothing has written to yet; erroring there refuses every
+legitimate FIRST RUN.
+
+✅ **The real, decidable case is `dir` EXISTS but is a regular file.** `!Files.isDirectory(dir)` is true, so
+the task reported *"directory not present, nothing to do"* — a config no run can ever satisfy, reported as
+SUCCESS. `Files.exists(dir) && !Files.isDirectory(dir)` decides it exactly; absent and empty stay a no-op.
+
+⚠ **The row named ONE file; the shape was in FOUR** — `PartitionCompactor`, `CleanupTask`,
+`StorageReportTask`, `PartitionPruneTask`, **two of which delete**. Pinned by
+`MaintenanceDirNotADirectoryTest`, whose mutation control is the unmodified tree: 4 failures without the fix,
+and its two positive controls (absent, empty) green in BOTH runs — the proof the no-op was not sacrificed.
+
+### Closed 2026-09-17 — `JOB-PARAM-UNDECLARED-UNREPORTED-1`: a descriptor is a CONTRACT, not the read set
+
+`ParameterResolver.Resolution` carries `undeclared` (the authored `config` layer minus the decl names) and
+`JobService` warns on the run log beside the three REJECTED diagnostics. ⛔ **WARNING only, never
+fail-closed** — and the reason is measured: **NINE** keys are read straight through `config.require()`/`opt()`
+that no `JobTypeDescriptor` declares (`data_dir`, `batch_id`, `flow`, `on_pipeline_gate`, `sleep_ms`, `top`,
+`history_days`, `max_attempts`, `backoff_minutes`). A strict version refuses working configs on day one.
+
+✅ **Blast radius: ZERO of 21 committed `*_job.toon` warn** (both `job_template` instances expanded,
+`sql.template`'s `$`-tokens counted). Quiet **by construction, not by suppression** — hence one framework
+exclusion (`on_pipeline_gate`) plus `flow` excused only when a `pipeline` decl exists.
+
+⇒ Open rows this leaves: **`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`** (those nine keys cannot be offered, typed or
+bounded by any UI; declaring them changes the published `GET /jobs/types/{id}` contract, so it needs its own
+call) · **`PACKHARNESS-NO-UNDECLARED-1`** (`PackTestHarness.rejection()` rightly excludes `undeclared`, but
+nothing surfaces it in the harness `Outcome`, so the pack author never sees it) ·
+**`REFERENCE-COMPACTOR-SAME-SHAPE-1`** (`ReferenceCompactor.java:115` is the fifth `!Files.isDirectory` site;
+⛔ the one-line fix does not transfer — its guard sits in a `public static compact(root, historyDays)` shared
+with a NON-operator caller, `CollectorService.java:1276`, where the root is derived, not authored).
