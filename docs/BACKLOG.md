@@ -1933,9 +1933,14 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   changes no test's outcome (this shift added six gates and every pre-existing test stayed green). Fix: an
   armed-Authenticator variant per write route family, or a guard that flags a `withCapability` route with
   no authenticated test.
-- **P2** · **`RUN-ROUTES-TEST-1`** — `RunRoutes.java` (register/trigger/pause/resume/status/report of
-  pipelines) is referenced by no test file under `inspecto/src/test/java/com/gamma/control/`. Fix: a
-  `ControlApiRunRoutesTest` over the write paths through the real gate chain.
+- ~~**P2** · **`RUN-ROUTES-TEST-1`**~~ ✅ **SHIPPED 2026-09-17.** Grounding confirmed: `RunRoutes.java`
+  (register/trigger/pause/resume/status/report of pipelines) had no referencing test file under
+  `inspecto/src/test/java/com/gamma/control/`. Added `ControlApiRunRoutesTest` mirroring
+  `ControlApiRequirementTest`'s `Authenticators.forTest` idiom through the real gate chain: register
+  (`canAuthorWorkbench`) and trigger/pause/resume (`canOperateRuns`) each proven 401 → 403 (wrong/other
+  capability) → success; status/report confirmed 401 unauthenticated but ungated by capability. 4/4
+  passing (`ControlApiRunRoutesTest`, verified in a clean worktree at HEAD since the shared tree carries
+  an uncommitted `release=27` pom WIP that breaks local `mvn -am` builds under this JDK 26 toolchain).
 - ~~**P3**~~ · **`PKG-LINUX-RUNTIME-WARNS-1`** — ✅ **SHIPPED 2026-09-17** (throws unless `-AllowPartialRuntime`). *(Original:)* a failed Linux runtime build is `Write-Warning`, not `throw`
   (`inspecto/package.ps1:1436`), so a release quietly loses a platform. Fix: throw unless an explicit
   `-AllowPartialRuntime` is passed.
