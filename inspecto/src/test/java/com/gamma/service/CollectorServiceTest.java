@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -36,12 +35,32 @@ class CollectorServiceTest {
         return toon;
     }
 
+    /**
+     * Counts the REVEALED output CSVs. ⚠ The poll thread is still writing while this walks: {@code PartitionWriter}
+     * stages under {@code .staging/<id>/} and then atomically moves the partition out, so a plain
+     * {@code Files.walk} that descends into a staging dir can meet {@code NoSuchFileException} mid-stream — it did,
+     * once, in the full reactor on 2026-09-17 (a flake, not a defect: the same class passed 3/3 alone). Staged
+     * files are not outputs, so the walk skips {@code .staging} entirely and tolerates a directory vanishing
+     * under it.
+     */
     private static long outputCsvCount(Path root) throws Exception {
         Path db = root.resolve("db");
         if (!Files.exists(db)) return 0;
-        try (Stream<Path> s = Files.walk(db)) {
-            return s.filter(Files::isRegularFile).filter(p -> p.toString().endsWith(".csv")).count();
-        }
+        final long[] n = {0};
+        Files.walkFileTree(db, new java.nio.file.SimpleFileVisitor<>() {
+            @Override public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes a) {
+                return dir.getFileName() != null && dir.getFileName().toString().equals(".staging")
+                        ? java.nio.file.FileVisitResult.SKIP_SUBTREE : java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override public java.nio.file.FileVisitResult visitFile(Path f, java.nio.file.attribute.BasicFileAttributes a) {
+                if (a.isRegularFile() && f.toString().endsWith(".csv")) n[0]++;
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override public java.nio.file.FileVisitResult visitFileFailed(Path f, java.io.IOException e) {
+                return java.nio.file.FileVisitResult.CONTINUE;   // a partition revealed/removed mid-walk
+            }
+        });
+        return n[0];
     }
 
     @Test
