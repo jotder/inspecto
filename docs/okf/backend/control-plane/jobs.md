@@ -752,6 +752,16 @@ SUCCESS. `Files.exists(dir) && !Files.isDirectory(dir)` decides it exactly; abse
 `MaintenanceDirNotADirectoryTest`, whose mutation control is the unmodified tree: 4 failures without the fix,
 and its two positive controls (absent, empty) green in BOTH runs — the proof the no-op was not sacrificed.
 
+✅ **Closed 2026-09-17 — the FIFTH site, `REFERENCE-COMPACTOR-SAME-SHAPE-1`.** `ReferenceCompactor` was
+deliberately left out above because its guard sits in `compact(Path root, long historyDays)`, a **public
+overload `CollectorService.compactReferenceStore` also calls** with a pipeline's `dirs.database` — a DERIVED
+root, not an authored one. ⛔ **The one-line fix does not belong on the shared overload.** It goes on the
+config adapter `run(JobConfig)`, immediately after `PathJail.requireJobPathUnderAny` — **the same seam the
+jail already sits on, and for the identical reason**, which the method's own comment had stated since it was
+written. The `compact(…)` guard is untouched, so the timer-driven pipeline lane keeps its silent no-op.
+Same three tests in the same class (refusal + absent/empty positive controls); mutation control is again the
+unmodified tree, 1 failure without the fix with both controls green in BOTH runs.
+
 ### Closed 2026-09-17 — `JOB-PARAM-UNDECLARED-UNREPORTED-1`: a descriptor is a CONTRACT, not the read set
 
 `ParameterResolver.Resolution` carries `undeclared` (the authored `config` layer minus the decl names) and
@@ -764,10 +774,34 @@ that no `JobTypeDescriptor` declares (`data_dir`, `batch_id`, `flow`, `on_pipeli
 `sql.template`'s `$`-tokens counted). Quiet **by construction, not by suppression** — hence one framework
 exclusion (`on_pipeline_gate`) plus `flow` excused only when a `pipeline` decl exists.
 
-⇒ Open rows this leaves: **`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`** (those nine keys cannot be offered, typed or
-bounded by any UI; declaring them changes the published `GET /jobs/types/{id}` contract, so it needs its own
-call) · **`PACKHARNESS-NO-UNDECLARED-1`** (`PackTestHarness.rejection()` rightly excludes `undeclared`, but
-nothing surfaces it in the harness `Outcome`, so the pack author never sees it) ·
-**`REFERENCE-COMPACTOR-SAME-SHAPE-1`** (`ReferenceCompactor.java:115` is the fifth `!Files.isDirectory` site;
-⛔ the one-line fix does not transfer — its guard sits in a `public static compact(root, historyDays)` shared
-with a NON-operator caller, `CollectorService.java:1276`, where the root is derived, not authored).
+⇒ **One open row this leaves: `JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`** — those nine keys cannot be offered,
+typed or bounded by any UI; declaring them changes the published `GET /jobs/types/{id}` contract, so it needs
+its own call. ⚠ It became MORE visible on 2026-09-17, not less: a built-in job would now warn if those
+descriptors were ever tightened.
+✅ The other two residuals of this row — `PACKHARNESS-NO-UNDECLARED-1` and `REFERENCE-COMPACTOR-SAME-SHAPE-1`
+— were **both CLOSED the same day**; see their sections below.
+
+### Closed 2026-09-17 — `PACKHARNESS-NO-UNDECLARED-1`: the warning reaches the pack author
+
+The row's premise held on inspection: `PackTestHarness.fire` holds a real `ParameterResolver.Resolution`,
+`rejection()` correctly omits `undeclared`, and nothing else looked at it — so the one diagnostic aimed at a
+pack author was the one surface that dropped it.
+
+**Surfaced on the Run Log, not as a new `Outcome` field.** `Outcome.log()` + `logged(fragment)` is already the
+harness's diagnostic channel (it is how dry-run substitution and every `ctx.log()` line are asserted), and the
+harness's whole claim is to be a proxy for a real Run — so the author should read *the* production line, in
+the production position, rather than a parallel structured channel the engine has no counterpart for.
+
+⚠ **The message is built once**, by `ParameterResolver.undeclaredWarning(typeId, undeclared)`, called from both
+`JobService` and the harness. Two hand-written copies of the same warning is the mirror-drift shape this repo
+has paid for repeatedly; there is no second spelling to drift.
+
+⚠ **Deliberate fidelity choice:** the warn sits **after** the `rejection()` early return, exactly as in
+`JobService`. A run that is REJECTED therefore shows no undeclared warning *in either place* — the harness
+would be lying if it reported something production does not.
+
+Pinned by `PackTestHarnessTest.anUndeclaredParameterWarnsTheAuthorWithoutRejectingTheRun`. The load-bearing
+assertion is `logged("thershold")` — the typo'd key by name. Mutation-proved by stubbing the warn
+(`if (false && …)`): that one assertion goes red on an **empty** run log, 11/12 of the class still green. Its
+neighbour `assertEquals("SUCCESS", …)` — which pins "reporting it never becomes a rejection" — **passed under
+the mutant**, and is recorded here as the half of the test that cannot detect the regression.

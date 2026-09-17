@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **63<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** — ⬆ **UP again, 60 → 63, out of the four-lane
+> **62<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 39<!--count:backlog-p2--> × P2 · 20<!--count:backlog-p3--> × P3** — ⬆ **UP again, 60 → 63, out of the four-lane
 > parallel shift of 2026-09-17: three rows STRUCK as shipped, five FILED.** ⚠ **Three of the four lanes
 > refuted part of their own row's premise, and a FOURTH found its row had already SHIPPED** — the residuals
 > those refutations exposed are what grew the board. ⛔ **The lanes were handed a row's ORIGINAL prose that
@@ -156,8 +156,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 3<!--count:backlog-p1--> P1 + 39<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 21<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 63<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 20<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 62<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1357,8 +1357,12 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   the plugin really is *deliberately operator-side*, which is the case the row said to stop for.
   It is documented as **the canonical worked example** of the plugin SPI in `asn-parser/docs/PLUGIN_GUIDE.md`
   (also `asn-decoders/README.md`, `CONFIG_REFERENCE.md`), and `.github/workflows/ci.yml` names
-  `asn-plugin-vendors` in its test coverage. Deleting it breaks `RTDMS_ASN_Test` and the asn-golden parity
-  run. ⇒ It is not operator-side and not dead — it is **in-repo load-bearing**.
+  `asn-plugin-vendors` in its test coverage. ~~Deleting it breaks `RTDMS_ASN_Test` and the asn-golden parity
+  run.~~ ⛔ **RETRACTED — see the correction below and on `RTDMS-ASN-HARNESS-1`: `RTDMS_ASN_Test` is compiled
+  by NO module** (`asn-parser/` has no `pom.xml`; no `testSourceDirectory` exists anywhere in the repo), so
+  deleting anything cannot "break" it. The real automated link is `asn-golden`'s runtime-scope dependency plus
+  `LegacyVendorFunctionsTest`'s own `@Test`s. ⇒ It is not operator-side and not dead — it is **in-repo
+  load-bearing**, on that evidence rather than this sentence's.
   ⛔ **`ExpressionProvider` — deleting the interface deletes the expression engine.** `BuiltinExpressions`
   implements it, `ExpressionRegistry.withBuiltins()` registers it, and `ParameterResolver`/`JobService`/
   `JobPackManager` consume it (the last via `ServiceLoader` for Job Packs). ⚠ What is actually unused is
@@ -1424,6 +1428,37 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   build a `Transformer(txConf)` over the **untracked** `asn-parser/config/rtdms/mtna` tx configs
   (`.gitignore:12`), so it may be a deliberate operator-side harness, which is precisely the case that
   refuted three of four deletions last time. ⛔ Do not sweep it in with a tidy-up.
+  ✅ **GROUNDED 2026-09-17 (no files changed — the verdict is still owed). The row UNDERSTATES it: the file is
+  not "a dead harness on the test-compile path", it is on NO path.**
+  🔴 **`asn-parser/` has no `pom.xml`** (deleted 2026-07-31 — `asn-decoders/README.md:198-200`). `legacy-code/pom.xml:58`
+  rescues the main half via `<sourceDirectory>../../src/main/java</sourceDirectory>`, and **no `testSourceDirectory`
+  exists anywhere in the repo**. ⇒ **all 21 tracked files under `asn-parser/src/test/java` are compiled by
+  nothing.** Proven empirically, not from poms: `legacy-code` logs *"No sources to compile"* / *"No tests to
+  run"*, has no `target/test-classes`, is the only asn module with **no `surefire-reports` directory at all**,
+  and `RTDMS_ASN_Test*.class` exists nowhere in the repo. It also has **no `org.junit` import at all**.
+  ⛔ **This refutes the "it keeps the module green" premise** — it cannot go red, so deleting it changes no
+  build outcome. The `SPEC-DEADSEAM-1` reachability trap does NOT apply: the six `TestASNFiles` methods only it
+  calls are in the same uncompiled tree.
+  🔴 **The real dependency is DOCUMENTARY, and it is in compiled, shipping code.**
+  `asn-golden/…/GoldenCapture.java:55-57` declares itself the durable home for tuples that *"live nowhere in
+  config — only in the legacy test drivers"*, then cites `RTDMS_ASN_Test.<method>` as provenance for **7 of its
+  9 golden cases**, plus `TestASNFiles.parseGMSC`. Deleting or renaming dangles **8 citations**.
+  ✅ **Not a live operator aid:** `asn-parser/config/` is gitignored AND absent, `git log --follow` returns ONE
+  commit (a 2026-07-30 vendored import by Gamma Dev, never touched since), and the `/home/gamma/…` paths appear
+  in no other file. `pgwParse():118` even points at `asn-parser-v2`, the artifactId deleted 2026-07-31.
+  ⚠ **Two row citations are off by a line or a kind:** `main` is at `:17` (`:15` is a static field), and
+  `:117` is `pgwParse`'s DEFINITION — the active CALL is `:32`.
+  ⬜ **RECOMMENDED: (c), widened — keep verbatim and document the TREE, not the file.** Keeping costs nothing
+  (it compiles nowhere); deleting is the only irreversible option and the only one that loses information; and
+  the defect is the doc gap, not the file — `asn-decoders/README.md:190-193` rescues `src/main/java` by name and
+  is SILENT on `src/test/java`, which is why the filename was the only evidence available. **Five more names in
+  that tree claim coverage they do not have** (`Test.java`, `ASNFileReaderTest`, `BERDecoderTest`,
+  `SbinHuaMscAsnTest`, `FixedLengthFileReaderTest`), so deleting one leaves five.
+  ⚠ **(b) is defensible** if a lying name outweighs resolvable provenance — but rename all five AND update
+  `GoldenCapture`'s 8 comments in the same commit. **(a) delete** only with those comments rewritten to stand
+  alone. ⛔ **Operator's call — do not act on this unasked.**
+  ✅ The false citation this row was filed over is now **retracted at its source** (§4's `SPEC-DEADSEAM-1` row),
+  not only 28 lines below it.
 ## 5. Docs & hygiene
 
 - **P1** · 🔴 **`ROUTE-UNGATED-DEFAULT-1` — an unlisted route is OPEN, not locked down.**
@@ -2314,20 +2349,53 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⛔ **Not a drive-by:** declaring them changes the published `GET /jobs/types/{id}` contract, so it needs its
   own call. → `okf/backend/control-plane/jobs.md`
 
-- **P3** · **`PACKHARNESS-NO-UNDECLARED-1` — a Job Pack author never sees the undeclared-param warning.**
-  Filed 2026-09-17. `PackTestHarness.rejection()` correctly EXCLUDES `undeclared` (it is not a rejection), but
-  nothing surfaces it in the harness `Outcome` either — so the diagnostic shipped on 2026-09-17 reaches the
-  run log and not the pack author, who is exactly the person authoring params against a descriptor.
-  → `okf/backend/control-plane/jobs.md`
+- ~~**P3** · **`PACKHARNESS-NO-UNDECLARED-1`**~~ ✅ **SHIPPED 2026-09-17 — and the row held IN FULL, which is
+  not this board's usual outcome.** `PackTestHarness.fire` already held a real `ParameterResolver.Resolution`
+  and simply discarded `pr.undeclared()`, so the fix was the shape the row assumed. The warning now goes to the
+  harness **Run Log** — `Outcome.log()`/`logged(fragment)` is the harness's existing diagnostic channel — not a
+  new structured `Outcome` field, because the harness's claim is to be a faithful proxy for a real Run.
+  ✅ **ONE message, TWO callers.** `ParameterResolver.undeclaredWarning(typeId, undeclared)` is now the single
+  source of the text, called by `JobService` and the harness. ⛔ Two hand-written copies of one warning is the
+  mirror-drift shape this repo has paid for repeatedly. The run-log warning shipped in `48784b88` is NOT moved,
+  weakened or removed — same channel, same words, same ladder position.
+  ✅ **Deliberate fidelity:** the warn sits AFTER the `rejection()` early return, exactly as in `JobService`, so
+  a REJECTED run reports no undeclared warning in EITHER place. `rejection()` still excludes `undeclared`.
+  ⚠ **The mutation proof names which half of the test is load-bearing and which is not.** Stubbing the warn
+  reds exactly one assertion — `logged("thershold")`, the typo'd key by name — on an empty run log, 11/12 of the
+  class still green. Its neighbour `assertEquals("SUCCESS", …)`, which pins "never becomes a rejection",
+  **PASSED under the mutant** and cannot detect the regression; that is recorded in the test javadoc so nobody
+  later mistakes it for a guard. Original row follows.
+  - **P3** · **`PACKHARNESS-NO-UNDECLARED-1` — a Job Pack author never sees the undeclared-param warning.**
+    Filed 2026-09-17. `PackTestHarness.rejection()` correctly EXCLUDES `undeclared` (it is not a rejection), but
+    nothing surfaces it in the harness `Outcome` either — so the diagnostic shipped on 2026-09-17 reaches the
+    run log and not the pack author, who is exactly the person authoring params against a descriptor.
+    → `okf/backend/control-plane/jobs.md`
 
-- **P3** · **`REFERENCE-COMPACTOR-SAME-SHAPE-1` — the fifth `!Files.isDirectory` site, with a different
-  blast radius.** Filed 2026-09-17 alongside `COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`, which fixed FOUR sites and
-  deliberately left this one. `ReferenceCompactor.java:115` returns `Result.NOTHING` on a non-directory, so an
-  operator-authored `reference_compact` `dir` that names a FILE reports success.
-  ⛔ **The one-line fix does not transfer:** the guard sits in `public static compact(root, historyDays)`,
-  shared with a NON-operator caller (`CollectorService.java:1276`, the pipeline lane, where the root is
-  DERIVED, not authored). Fixing it means lifting the check into `ReferenceCompactor.run(cfg)` — a different
-  shape. → `okf/backend/control-plane/jobs.md`
+- ~~**P3** · **`REFERENCE-COMPACTOR-SAME-SHAPE-1`**~~ ✅ **SHIPPED 2026-09-17 — the row was right about the
+  site and WRONG about the difficulty.**
+  🔴 **"A different shape" is overstated.** It is the SAME shape as the four-site precedent: in all four,
+  the check sits in the method that reads `cfg`, immediately after `PathJail.requireJobPathUnderAny`.
+  `run(JobConfig)` IS that method here — a genuine one-liner, not a restructure. The only unusual thing is that
+  `ReferenceCompactor` splits adapter from algorithm.
+  ✅ **The file had already argued the case.** `run(cfg)`'s own PRE-EXISTING comment says the jail belongs on
+  the config adapter and not on `compact(Path,..)`, because that overload is also called by
+  `CollectorService.compactReferenceStore` with a pipeline's derived `dirs.database`. The refusal belongs
+  there for the identical reason. The `compact(…)` guard is untouched, so the timer-driven lane keeps its
+  silent no-op.
+  ✅ Mutation control is again the unmodified tree: exactly ONE failure (the refusal test), with both positive
+  controls green in BOTH runs.
+  ⚠ **Not widened, deliberately:** the derived caller can also be handed a non-directory, but
+  `CollectorService.compactReferenceStore` wraps the call in `catch → log.warn` and its javadoc says it must
+  never throw (it would kill the timer) — so promoting it there buys only a warn line. That is a
+  pipeline-config validation question at a different seam. Original row follows.
+  - **P3** · **`REFERENCE-COMPACTOR-SAME-SHAPE-1` — the fifth `!Files.isDirectory` site, with a different
+    blast radius.** Filed 2026-09-17 alongside `COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`, which fixed FOUR sites and
+    deliberately left this one. `ReferenceCompactor.java:115` returns `Result.NOTHING` on a non-directory, so an
+    operator-authored `reference_compact` `dir` that names a FILE reports success.
+    ⛔ **The one-line fix does not transfer:** the guard sits in `public static compact(root, historyDays)`,
+    shared with a NON-operator caller (`CollectorService.java:1276`, the pipeline lane, where the root is
+    DERIVED, not authored). Fixing it means lifting the check into `ReferenceCompactor.run(cfg)` — a different
+    shape. → `okf/backend/control-plane/jobs.md`
 
 - **P3** · **`BITEMPLATES-GATE-ORDER-1` — `BiTemplates.apply` runs 409 before 422.**
   Filed 2026-09-17 when the `validateKind` gate landed there. The `endpoint` skill mandates spec/422 BEFORE
@@ -2336,15 +2404,56 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   template can be today — severity is ordering-consistency, not behaviour.
   → `okf/backend/config/config-safety.md`
 
-- **P3** · 🔴 **`DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused `README-LINKS-BROKEN-IN-REPO-1`
-  still lives in its SIBLING guard.** Filed 2026-09-17 while re-verifying that row. `check-doc-links.mjs` was
-  fixed at the SHAPE (allow-list → whole repo minus a deny-list, `ROOTS = ['.']`); `tools/check-doc-counts.mjs`
-  still carries the pre-fix `const TREES = ['docs', 'compliance', '.claude']` plus a root `*.md` pass. Its own
-  scope line prints **493** files where the doc-link guard now sees **529** — precisely the old blind count.
-  ✅ **Latent, NOT live, and that was checked rather than assumed:** a sweep for `<!--count:*-->` markers
-  outside those three trees returns ZERO, so nothing is currently unpoliced. A marked count placed in
-  `inspecto/README.md` or `asn-parser/docs/` would be. ⚠ The fifth guard-scope blind spot in three days.
-  → `okf/backend/build-run/build-test.md`
+- ~~**P3** · **`DOC-COUNTS-GUARD-SCOPE-1`**~~ ✅ **SHIPPED 2026-09-17 — fixed at the SHAPE, and falsified
+  THREE ways, not two.** `check-doc-counts.mjs` now walks `ROOTS = ['.']` minus the sibling's `SKIP_DIRS`,
+  matching `check-doc-links.mjs`; the root `*.md` special case is subsumed and both scope lines print the
+  deny-list.
+  ✅ **The third run is the one that matters:** the SAME planted marker against the OLD guard exits **0**.
+  Red-then-green only proves a guard can fail; old-green/new-red proves the widening is LOAD-BEARING.
+  ✅ **The deny-list was measured, not copied.** Two entries are load-bearing on a BUILT checkout:
+  `graphify-out` holds 8 real `parser-node-types` markers in dated snapshots, `inspecto-deploy` 59 in a stale
+  bundle copy. ⚠ **Neither directory exists in a fresh worktree**, so a lane's own tree looks green either way
+  — re-verified against the built main checkout: 68 markers in scope, **ZERO leaked** from the 67 in build
+  output. Independently re-falsified there too (planted marker in `inspecto-agent/docs/adr/`, red by name,
+  reverted clean).
+  ⚠ **Honest correction to this row's own numbers:** 493→529 is files WALKED; in scope it is 253→289. The row
+  stated only the first pair. 36 files became visible across nine trees.
+  ⇒ Residual filed: `DOC-COUNTS-FENCED-MARKER-1`. Original row follows.
+  - **P3** · 🔴 **`DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused `README-LINKS-BROKEN-IN-REPO-1`
+    still lives in its SIBLING guard.** Filed 2026-09-17 while re-verifying that row. `check-doc-links.mjs` was
+    fixed at the SHAPE (allow-list → whole repo minus a deny-list, `ROOTS = ['.']`); `tools/check-doc-counts.mjs`
+    still carries the pre-fix `const TREES = ['docs', 'compliance', '.claude']` plus a root `*.md` pass. Its own
+    scope line prints **493** files where the doc-link guard now sees **529** — precisely the old blind count.
+    ✅ **Latent, NOT live, and that was checked rather than assumed:** a sweep for `<!--count:*-->` markers
+    outside those three trees returns ZERO, so nothing is currently unpoliced. A marked count placed in
+    `inspecto/README.md` or `asn-parser/docs/` would be. ⚠ The fifth guard-scope blind spot in three days.
+    → `okf/backend/build-run/build-test.md`
+
+- **P3** · 🔴 **`DOC-COUNTS-FENCED-MARKER-1` — `check-doc-counts.mjs` scans fenced and quoted markers as
+  live.** Filed 2026-09-17, discovered by HITTING it: writing the doc section that records
+  `DOC-COUNTS-GUARD-SCOPE-1` turned the guard red, because a `<!--count:*-->` marker quoted literally in prose
+  — even inside backticks or a fenced block — is counted as an assertion. ⚠ Unlike `check-doc-links.mjs` and
+  `check-vocabulary.mjs`, this guard does **not strip fenced blocks**. The doc was fixed, never the guard.
+  ⛔ **Widening the scope to the whole repo widened this trap to every markdown file in it**, so documenting
+  markers by example is now impossible anywhere. → `okf/backend/build-run/build-test.md`
+
+- **P3** · 🔴 **`README-VOCAB-SCOPE-1` — the customer's first page is outside the vocabulary guard.**
+  Filed 2026-09-17 while correcting `inspecto/README.md`. `check-vocabulary.mjs`'s `USER_FACING` list
+  (`:66`) holds only `docs/USER_GUIDE.md`, and its tree scan covers `docs/**` plus the root canon — **not
+  module READMEs**. So the file `package.ps1` copies to the bundle root as the customer's first page is
+  unchecked for banned synonyms, and its wording had to be hand-checked against the bans.
+  ⚠ **The sixth guard-scope blind spot in three days**, and the same family as
+  `README-LINKS-BROKEN-IN-REPO-1` and `DOC-COUNTS-GUARD-SCOPE-1` — both of which were fixed at the SHAPE, which
+  is the precedent here. ⛔ Adding it to `USER_FACING` will likely surface pre-existing violations; that is the
+  work, not a reason to skip it. → `okf/backend/build-run/build-test.md`
+
+- **P3** · **`MODELPROFILE-DUPLICATE-TIERS-1` — two assist bundles are behaviourally identical.**
+  Filed 2026-09-17 out of `README-HARDWARE-PROFILE-CLAIM-1`. `ModelProfile.CPU_ONLY` and `DEV_LAPTOP`
+  (`:40-45`) carry the **same** tier map (`qwen2.5:3b/7b/7b`) despite distinct javadoc rationales, so declaring
+  one or the other changes nothing. Possibly intended (a 4GB GPU cannot hold a 7B either), possibly a
+  copy-paste. ⚠ Either way the operator-facing choice is currently a distinction without a difference, and one
+  of the two should be documented as an alias or given its own map.
+  → `okf/capabilities/assistant/assistant.md`
 
 - ~~**P2** · **`EXPECTATION-SPEC-STALE-VS-CONDITION-1`**~~ ✅ **SHIPPED 2026-09-17 (`f30d39c5`).**
   `when` is declared `FieldType.MAP` — the `widget.controls` / `dashboard.filter` precedent, which
@@ -2374,13 +2483,31 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⛔ Do not "fix" it by declaring `when` as a scalar: it is a TREE, and a spec that misdescribes its shape
   is a new lie for an old one. → `okf/backend/config/config-safety.md`
 
-- **P3** · **`README-HARDWARE-PROFILE-CLAIM-1` — the README claims a behaviour no current doc supports.**
-  Filed 2026-09-16 while repairing the bundle's front page. `inspecto/README.md` states assist model tiers
-  "auto-select per hardware profile (dev-laptop / cpu-only / production)". **No current-tier doc mentions
-  any of those three profiles**; the only source was the archived `v3-agent-mvp.md`. The citation was
-  removed rather than pointed at a doc that does not say it. ⇒ Either the behaviour exists and is
-  undocumented, or the claim is stale — one grep of the assist tier selection settles it.
-  → `okf/capabilities/assistant/assistant.md`
+- ~~**P3** · **`README-HARDWARE-PROFILE-CLAIM-1`**~~ ✅ **ANSWERED + SHIPPED 2026-09-17 — and the answer is a
+  THIRD outcome the row did not offer.** The row framed it as "the behaviour exists" OR "the claim is stale".
+  🔴 **The profiles are REAL and the word "auto" is the lie.** `ModelProfile.java:39-48` defines `CPU_ONLY`,
+  `DEV_LAPTOP`, `PRODUCTION` with exactly those names — but `fromEnvironment()` (`:68-74`) reads
+  `-Dagentkernel.profile` (env fallback `AGENTKERNEL_PROFILE`, default `cpu-only`) and hands it to a
+  case-insensitive `switch`. **The operator DECLARES the profile; nothing probes the machine.** No
+  `availableProcessors`, `maxMemory`, `os.arch` or GPU probe anywhere on the chain — the repo's
+  `availableProcessors` call sites all size ETL thread pools and are unreachable from model selection.
+  ⚠ **The trap that makes this easy to re-derive:** `ModelProfile`'s javadoc quotes hardware sizes
+  ("~4GB GPU", "16GB+ GPU") as guidance for PICKING a bundle, which reads like detection.
+  ⚠ **It was a transcription error, not a removed feature.** The archived `v3-agent-mvp.md:362` said the agent
+  "auto-selects **tiers per profile**" — accurate. The README compressed it to "Tiers auto-select per hardware
+  profile". `ModelProfile.java` has ONE commit and never contained detection code. ⇒ the row's "the only
+  source was the archive" is wrong: the primary home is live code.
+  ✅ Also found: `ModelProfile` is now the **legacy fallback** — `ModelProviderFactory.fromPersisted():30-34`
+  prefers persisted `AssistModelSettings` and only falls back to `fromEnvironment()`. Both paths documented in
+  `assistant.md` §3.4a, in precedence order.
+  ⇒ Residuals filed: `README-VOCAB-SCOPE-1`, `MODELPROFILE-DUPLICATE-TIERS-1`. Original row follows.
+  - **P3** · **`README-HARDWARE-PROFILE-CLAIM-1` — the README claims a behaviour no current doc supports.**
+    Filed 2026-09-16 while repairing the bundle's front page. `inspecto/README.md` states assist model tiers
+    "auto-select per hardware profile (dev-laptop / cpu-only / production)". **No current-tier doc mentions
+    any of those three profiles**; the only source was the archived `v3-agent-mvp.md`. The citation was
+    removed rather than pointed at a doc that does not say it. ⇒ Either the behaviour exists and is
+    undocumented, or the claim is stale — one grep of the assist tier selection settles it.
+    → `okf/capabilities/assistant/assistant.md`
 
 - **P2** · **`JOB-PATH-DEMO-CONFIG-REPOINT-1` — 24 left, and the remainder is BLOCKED ON SEQUENCING, not
   effort.** ✅ **Five re-pointed 2026-09-16**: the three `retention-sweep` instances, plus the **two

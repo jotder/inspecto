@@ -273,7 +273,7 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   `ControlApiReconPromoteTest`, `PostgresStateStoreTest`. ⛔ Not fixable by adding the module to the
   default `<modules>` — that reverses signed decision EDG-01 cell 7.
 
-### `DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused the README row survives in its sibling
+### `DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused the README row, removed from its sibling too
 
 `README-LINKS-BROKEN-IN-REPO-1` was fixed at the **shape**: `check-doc-links.mjs` went from
 `ROOTS = ['docs','compliance','.claude']` to the whole repo minus a deny-list (`ROOTS = ['.']`), which is what
@@ -282,13 +282,50 @@ ways — four dead links planted in **tracked** files across four previously-inv
 (including `inspecto/README.md → ../docs/architecture.md`, the exact link the row was filed about), and the
 clean tree passes at 1802 links over 529 files.
 
-🔴 **`tools/check-doc-counts.mjs:301` still carries the PRE-FIX allow-list** — `const TREES = ['docs',
-'compliance', '.claude']` plus a root `*.md` pass. Its scope line prints **493** files where the doc-link
-guard now sees **529**. ✅ **Latent, not live** — a sweep for `<!--count:*-->` markers outside those three
-trees returns ZERO, so nothing is currently unpoliced; a marked count placed in `inspecto/README.md` or
-`asn-parser/docs/` would be. ⚠ The fifth guard-scope blind spot in three days, after the bolded-count regex,
-surefire freshness, edition-gated modules and the deny-list validated on a tree lacking what it should deny.
+✅ **CLOSED 2026-09-17 — `tools/check-doc-counts.mjs` now has the same shape as its sibling:** `ROOTS = ['.']`
+minus the identical `SKIP_DIRS` deny-list. The walk went from **493** markdown files to **529** (in-scope, after
+the `docs/archived-documents` exemption: **253 → 289**), gaining 36 files in nine previously-invisible trees —
+`inspecto-agent/docs/` ×14, `asn-parser/docs/` ×10, `tools/templates/*/README.md` ×3, plus `inspecto/README.md`,
+`inspecto-ui/README.md`, `dev-infra/`, `spaces/`, `inspecto-engine/`, `inspecto-intelligence/`. The widening cost
+**no findings and no noise**: those 36 carry ZERO `<!--count:*-->` markers, so the row's "latent, not live"
+assessment held exactly. The 68 marked statements and their derived values are unchanged.
+
+⚠ **The deny-list was re-checked against THIS guard rather than assumed to transfer, and two entries turned out
+to be load-bearing for counts specifically:** `graphify-out` holds dated `GRAPH_REPORT.md` snapshots carrying **8**
+`count:parser-node-types` markers frozen at the value each snapshot day derived, and `inspecto-deploy` — the
+packaged bundle — carries a stale COPY of the whole docs tree, **485** markdown files with **59** markers. Widening
+without the deny-list would fail the build on generated copies nobody edits. ⛔ **Neither exists in a fresh clone or
+a fresh worktree**, which is the trap the sibling's own header records: the change was therefore verified a second
+time against the built main checkout (535 walked, 295 in scope, 68 markers, zero leaked from build output), not
+only against the clean worktree where it trivially looks green.
+
+Falsified BOTH ways, and the negative direction is the one that proves the fix load-bearing: a deliberately wrong
+`999` carrying the `count:parser-node-types` marker, appended to **tracked** `inspecto/README.md`, fails it by name
+(`inspecto/README.md:491 states 999, but … derives 7`, exit 1) while the **pre-fix** guard exits **0** on the very
+same marker. ⚠ Plant into a file that already exists and is tracked — `git status` must read `M`, not `??`; an
+earlier lane's `>>` created the file it meant to test and proved only that untracked files are scanned.
+
+⚠ **Writing THIS section turned the guard red, which is worth keeping:** unlike `check-doc-links.mjs` and
+`check-vocabulary.mjs`, `check-doc-counts.mjs` does **not** strip fenced blocks, so a marker quoted literally in
+prose — even inside backticks or a code fence — is scanned as a live marker. Documenting one by example is a
+standing failure; name the id (`count:<id>`) without the comment delimiters instead. Widening the scope widened
+this hazard to every markdown file in the repo.
 
 ⚠ **A trap that cost two lanes a build each:** `-DfailIfNoSpecifiedTests=false` is **silently ignored** by
 this Surefire (3.5.3). The working spelling is `-Dsurefire.failIfNoSpecifiedTests=false`; without it a
 filtered `-am` run dies at `asn-core` — red for the wrong reason.
+
+### Two guard-scope rows this concept still owns (filed 2026-09-17)
+
+**`DOC-COUNTS-FENCED-MARKER-1`** — `check-doc-counts.mjs` does **not strip fenced blocks**, unlike
+`check-doc-links.mjs` and `check-vocabulary.mjs`. A count marker quoted literally in prose, in backticks, or
+inside a fence is scanned as a live assertion. Found by hitting it while writing the section above; the DOC was
+fixed, never the guard. ⛔ Widening the scope to the whole repo widened this trap to every markdown file in it,
+so documenting markers by example is now impossible anywhere.
+
+**`README-VOCAB-SCOPE-1`** — `check-vocabulary.mjs`'s `USER_FACING` list (`:66`) holds only
+`docs/USER_GUIDE.md`, and its tree scan covers `docs/**` plus the root canon, **not module READMEs**. So
+`inspecto/README.md` — the file `package.ps1` copies to the bundle root as the customer's FIRST page — is
+unchecked for banned synonyms. ⚠ The sixth guard-scope blind spot in three days, and the same family as
+`README-LINKS-BROKEN-IN-REPO-1` (fixed at the shape) and `DOC-COUNTS-GUARD-SCOPE-1` (fixed at the shape) —
+which is the precedent for fixing this one.

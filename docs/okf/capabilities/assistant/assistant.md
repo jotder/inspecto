@@ -165,6 +165,32 @@ guarantee.
 `POST /assist/settings/test` probes each tier so the pane can show per-tier connectivity rather than one
 aggregate "AI is up". ⚠ In a stock bundle the pane's own routes are part of the 503 surface (§3.10).
 
+#### 3.4a How a tier resolves to a concrete model — and why it is NOT hardware-detected
+
+Two paths, in precedence order, both in `ModelProviderFactory.fromPersisted()`
+(`inspecto-agent/.../model/ModelProviderFactory.java:30-34`):
+
+1. **Persisted settings win.** `AssistModelSettings.load()` reads `config/assist-settings.properties`
+   (core-side twin: `inspecto/.../model/ModelSettingsStore.java:28-74`) — an operator-entered provider
+   id, base URL and per-tier model names. This is the production path.
+2. **Legacy environment fallback**, only when no settings file exists: `OllamaModelProvider.fromEnvironment()`
+   (`OllamaModelProvider.java:55-56`) → `ModelProfile.fromEnvironment()`
+   (`ModelProfile.java:68-74`).
+
+The fallback resolves one of **three built-in bundles** — `CPU_ONLY`, `DEV_LAPTOP`, `PRODUCTION`
+(`ModelProfile.java:39-48`), each a fixed `ModelTier → Ollama model name` map. Which bundle applies is a
+**plain case-insensitive string match** on `-Dagentkernel.profile` (env fallback `AGENTKERNEL_PROFILE`),
+defaulting to `cpu-only`, in `ModelProfile.byName()` (`ModelProfile.java:58-66`). The tier itself is
+chosen by capability code, not by the machine (e.g. `ModelDiagnoser.TIER = ModelTier.MEDIUM`).
+
+⚠ **Checked 2026-09-17 and found ABSENT: no hardware signal participates anywhere on this chain.**
+No `availableProcessors`, `maxMemory`, `os.arch`, GPU/CUDA probe or equivalent is read by `ModelProfile`,
+`OllamaModelProvider`, `ModelRouter`, `ModelProviderFactory` or `ModelSettingsStore`. The repo's
+`availableProcessors`/`maxMemory` call sites all size ETL thread pools and partition workers; none is
+reachable from model selection. The hardware sizes in `ModelProfile`'s javadoc ("~4GB GPU", "16GB+ GPU",
+`ModelProfile.java:38-48`) are **guidance to the operator for picking a bundle**, not detection.
+**Do not re-derive an auto-detection behaviour from those comments or from the bundle names.**
+
 ### 3.5 Embedded intelligence (AGT-5)
 
 Phases P0–P5 are complete (2026-07-21, plus polish), and the layer is organised as tiers:
@@ -589,8 +615,18 @@ One archived plan also cites a reflex-layer history file that **does not exist**
 
 ## Open row this concept owns
 
-- **`README-HARDWARE-PROFILE-CLAIM-1`** — `inspecto/README.md` claims assist model tiers "auto-select per
-  hardware profile (dev-laptop / cpu-only / production)". No current-tier doc mentions those profiles; the
-  only source was the archived `v3-agent-mvp.md`, and the citation was removed 2026-09-16 rather than
-  pointed at a doc that does not support it. ⇒ Either the behaviour exists and is undocumented, or the
-  claim is stale.
+- **`README-HARDWARE-PROFILE-CLAIM-1`** — ✅ **ANSWERED 2026-09-17 from the code** (`58739575`). The row
+  offered two outcomes; the truth was a third. The three profiles are **not stale** — `cpu-only`,
+  `dev-laptop` and `production` are live code with exactly those names (`ModelProfile.java:39-48`), so the
+  archived `v3-agent-mvp.md` was never their only home. What was wrong is the **one word "auto"**: the
+  bundle is declared by the operator via `-Dagentkernel.profile`, and **no hardware signal participates**
+  (evidence in §3.4a). The README was corrected to say "declare", and §3.4a records the absence so nobody
+  re-derives it.
+
+### `MODELPROFILE-DUPLICATE-TIERS-1` (open, filed 2026-09-17)
+
+`ModelProfile.CPU_ONLY` and `DEV_LAPTOP` (`:40-45`) carry the **same** tier map (`qwen2.5:3b` / `7b` / `7b`)
+despite distinct javadoc rationales, so declaring one rather than the other changes nothing an operator can
+observe. Possibly intended — a 4GB GPU cannot hold a 7B either — possibly a copy-paste. Either way the
+operator-facing choice is a distinction without a difference today; one should become a documented alias of
+the other, or get its own map.
