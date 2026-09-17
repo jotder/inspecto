@@ -254,7 +254,15 @@ final class JobPackManager implements AutoCloseable {
             log.info("[PACKS] loaded {} v{} ({}): {}", pack.id(), pack.version(), name, ids);
             signals.emit("job.pack.loaded", Severity.INFO, packPayload(pack));
             return true;
-        } catch (Exception | ServiceConfigurationError ex) {   // Error: a provider that fails to instantiate
+            // 🔴 LinkageError is NOT optional here. The four ServiceLoader loops above run over an
+            // OPERATOR-SUPPLIED pack loader, and a pack that is present but UNLOADABLE — a class compiled
+            // for a newer Java, a truncated/corrupt class, a missing shaded dependency — raises a
+            // LinkageError that ServiceLoader does NOT wrap in ServiceConfigurationError: it comes straight
+            // out of hasNext(). Catching only Exception|ServiceConfigurationError let that Error escape
+            // load(), escape rescan()'s per-pack loop, and so kill discovery of EVERY OTHER pack — and at
+            // startup the whole boot. Catching it here restores the blast radius the design intends: one
+            // bad jar rejects itself. ⛔ Not a bare Error: OutOfMemoryError/StackOverflowError must escape.
+        } catch (Exception | ServiceConfigurationError | LinkageError ex) {
             registry.deregister(name);                                  // roll back any partial registration
             expressions.deregister(name);                               // all four registries, or the pack
             PipelineNodeTypes.deregister(name);                         // half-loads — a refused node type

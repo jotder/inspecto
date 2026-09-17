@@ -138,6 +138,49 @@ class JobPackManagerTest {
         }
     }
 
+    /**
+     * 🔴 Blast radius: an UNLOADABLE pack must reject <b>itself</b> and nothing else.
+     *
+     * <p>The four {@code ServiceLoader} loops in {@code load()} run over an operator-supplied pack
+     * classloader. A pack whose provider class cannot be <i>defined</i> — compiled for a newer Java,
+     * truncated, corrupt — raises a {@link LinkageError} from {@code Class.forName}, and
+     * {@code ServiceLoader} does <b>not</b> wrap that in {@code ServiceConfigurationError}: it comes
+     * straight out of {@code hasNext()}. {@code load()} caught only
+     * {@code Exception | ServiceConfigurationError}, so the Error escaped {@code load()} AND
+     * {@code rescan()}'s per-pack loop — every other operator's pack silently never loaded, and at
+     * startup the boot died.
+     *
+     * <p>⚠ The property pinned here is that the <b>good</b> pack is still discovered. The broken jar
+     * sorts first in the packs dir precisely so that a regression cannot pass by loading the good pack
+     * before the Error is thrown. (Under the old catch the test reds either way: bad-first loses the
+     * good pack, good-first throws out of {@code scanAtStartup}.)
+     */
+    @Test
+    void anUnloadablePackRejectsItselfAndTheOtherPacksStillLoad(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null);
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildUnlinkablePackJar(work, packsDir.resolve("aaa-broken-1.jar"), "acme-broken");
+        buildPackJar(work, packsDir.resolve("zzz-greet-1.jar"), "acme.greet", "acme.greet",
+                "GreetType", "acme-greet", "1.0.0");
+
+        JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
+        Sink sink = new Sink();
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
+            mgr.scanAtStartup();
+
+            assertTrue(registry.has("acme.greet"),
+                    "a DIFFERENT operator's pack must still load — one unloadable jar is not a discovery-wide kill");
+            assertEquals("SUCCESS", registry.create("acme.greet", jobConfig("g1", "acme.greet")).run().status());
+            assertTrue(sink.types.contains("job.pack.loaded"));
+            assertTrue(sink.types.contains("job.pack.rejected"), "the broken jar is rejected, explicitly");
+
+            List<Map<String, Object>> inv = mgr.inventory();
+            assertEquals(1, inv.size(), "only the good pack is in the inventory");
+            assertEquals("acme-greet", inv.get(0).get("id"));
+        }
+    }
+
     @Test
     void metaMismatchRejectsThePack(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null);
@@ -474,6 +517,24 @@ class JobPackManagerTest {
 
     /** Compile one source file against the real {@code com.gamma.job} code-source location (robust under
      *  Maven surefire, where {@code java.class.path} is just the booter jar); returns the classes dir. */
+    /**
+     * A pack jar whose declared provider class is present but CANNOT BE DEFINED. The bytes carry the
+     * class-file magic and nothing else, so the pack's own {@link java.net.URLClassLoader} finds the
+     * resource (the parent has no such class) and {@code defineClass} raises {@code ClassFormatError} —
+     * a {@link LinkageError}, thrown out of {@code ServiceLoader.hasNext()} rather than wrapped in a
+     * {@code ServiceConfigurationError}. That is the same shape as the real-world case (a jar compiled
+     * for a newer Java throws {@code UnsupportedClassVersionError}), without needing a second JDK.
+     */
+    private static Path buildUnlinkablePackJar(Path work, Path jar, String packId) throws Exception {
+        Path classes = Files.createDirectories(
+                Files.createTempDirectory(work, "broken-").resolve("classes"));
+        Path cls = classes.resolve("com/acme/broken/BrokenProvider.class");
+        Files.createDirectories(cls.getParent());
+        Files.write(cls, new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE, 0, 0, 0, 0});
+        writeJar(jar, classes, packId, Map.of("com.gamma.job.JobTypeProvider", "com.acme.broken.BrokenProvider"));
+        return jar;
+    }
+
     private static Path compile(Path work, String relPath, String src) throws Exception {
         Path stage = Files.createTempDirectory(work, "stage-");
         Path srcFile = stage.resolve(relPath);
