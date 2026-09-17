@@ -1685,12 +1685,15 @@ on `limit`. Both are pinned by tests. ⚠ One agent finding was REFUTED before f
     tolerant loader already exists (`OptionalSpi.java:73-91`). ~20 further raw loops sit in core code over the
     app class loader (lower risk; the entries ship with the build). Fix: an `OptionalSpi.all(spi, loader)`
     overload for pack discovery, warn-and-skip per element.
-- **P2** · **`CONNECTOR-SIDECAR-SHADES-LOGGING-1`** — the connectors, notify-channels and security sidecars shade
-  without excluding `ch/qos/logback/**`, `org/slf4j/impl/**` and the `SLF4JServiceProvider` service entry
-  (`inspecto-connectors/pom.xml:175-180` vs the correct set in `inspecto-agent/pom.xml`), and connectors is
-  the ~32 MB jar staged into EVERY edition, so a transitive logging binding can duplicate the core's on the
-  assembled classpath. Fix: copy the agent's exclude block and assert one `SLF4JServiceProvider` on the
-  bundle classpath in the packaging smoke.
+- ~~**P2** · **`CONNECTOR-SIDECAR-SHADES-LOGGING-1`**~~ ✅ **CLOSED 2026-09-17.** Grounding confirmed the gap:
+  `inspecto-connectors/pom.xml` (then lines 174-180) and `inspecto-notify-channels/pom.xml` and
+  `inspecto-security/pom.xml` each excluded `logback.xml` but not `META-INF/services/org.slf4j.spi.SLF4JServiceProvider`,
+  `org/slf4j/impl/**` or `ch/qos/logback/**`, unlike `inspecto-agent/pom.xml:145-147`. As-built: copied
+  `inspecto-agent`'s three-line exclude block into all three sidecar poms' shade filters; built each under
+  `-Pedition-standard` and confirmed by `unzip -l` on the shaded `*-sidecar.jar` that none carries those
+  paths. Added the packaging smoke assertion in `inspecto/package.ps1` step 6e (before the boot-smoke
+  classpath is built): scans every staged jar for `META-INF/services/org.slf4j.spi.SLF4JServiceProvider`
+  and throws if more than one jar registers it.
 - **P3** · 🔴 **`LEGACY-ASN-SRC-TREE-UNBUILT-1` — PREMISE REFUTED 2026-09-17, and its REMEDY WOULD HAVE
   DELETED COMPILED SOURCE.** ⛔ **45 of the 66 files ARE compiled**, and not in theory: `legacy-code/pom.xml`
   declares `<sourceDirectory>../../src/main/java</sourceDirectory>`, which resolves from

@@ -1570,6 +1570,27 @@ if (-not $SkipBootCheck) {
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
     $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
+    # CONNECTOR-SIDECAR-SHADES-LOGGING-1: assert exactly ONE SLF4J binding registration across the
+    # assembled classpath. The core owns the logging binding; every sidecar's shade config excludes
+    # META-INF/services/org.slf4j.spi.SLF4JServiceProvider, org/slf4j/impl/** and ch/qos/logback/** so a
+    # sidecar cannot carry a second one. A duplicate here means a sidecar's shade excludes are missing
+    # or were dropped, which SLF4J resolves non-deterministically and silently -- exactly the failure
+    # mode the excludes exist to prevent.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $providerHits = @()
+    foreach ($jarName in $cp) {
+        $jarPath = Join-Path $bundleDir $jarName
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($jarPath)
+        try {
+            if ($zip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/org.slf4j.spi.SLF4JServiceProvider' }) {
+                $providerHits += $jarName
+            }
+        } finally { $zip.Dispose() }
+    }
+    if ($providerHits.Count -gt 1) {
+        throw "PACKAGING SMOKE FAILED: $($providerHits.Count) jars on the bundle classpath carry META-INF/services/org.slf4j.spi.SLF4JServiceProvider ($($providerHits -join ', ')) -- exactly one SLF4J binding may exist on the assembled classpath. Check the shade excludes in the listed sidecars' pom.xml (see inspecto-agent/pom.xml for the reference exclude block)."
+    }
+    Write-Host "  verified: $($providerHits.Count) SLF4JServiceProvider registration(s) on the bundle classpath" -ForegroundColor DarkGray
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
     $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
