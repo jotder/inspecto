@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -9,7 +10,7 @@ import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
 import { ReconRowsResult } from 'app/inspecto/api/recon.service';
-import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
+import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -54,6 +55,8 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
         TreeTableComponent,
         InspectoEmptyStateComponent,
         InspectoAlertComponent,
+        StatusBadgeComponent,
+        DatePipe,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './reconciliation-detail.component.html',
@@ -70,6 +73,7 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly recon = signal<Reconciliation | null>(null);
     readonly loading = signal(true);
     readonly computing = signal(false);
+    readonly lastEvaluated = signal<Date | null>(new Date());
     /** Live breaks (all `open` from the engine) — persisted statuses overlay by identity below. */
     private readonly liveBreaks = signal<ReconBreak[] | null>(null);
 
@@ -426,6 +430,7 @@ export class ReconciliationDetailComponent implements OnInit {
         this.computing.set(true);
         try {
             this.liveBreaks.set(breaksFromSets(r, await this.exec.breaks(r, this.path(), null, this.side())));
+            this.lastEvaluated.set(new Date());
         } catch (e) {
             this.liveBreaks.set(null);
             this.toastr.error(apiErrorMessage(e, 'Could not compute the break sets'));

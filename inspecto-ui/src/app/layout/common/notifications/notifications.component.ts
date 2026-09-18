@@ -14,6 +14,7 @@ import { ConnectedPosition, OverlayModule } from '@angular/cdk/overlay';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Subscription } from 'rxjs';
 import {
@@ -45,6 +46,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
         MatBadgeModule,
         MatButtonModule,
         MatIconModule,
+        MatMenuModule,
         MatTooltipModule,
         StatusBadgeComponent,
         InspectoEmptyStateComponent,
@@ -54,9 +56,9 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
         <button
             mat-icon-button
             type="button"
-            cdkOverlayOrigin
-            #trigger="cdkOverlayOrigin"
-            (click)="toggle()"
+            [matMenuTriggerFor]="notificationsMenu"
+            (menuOpened)="onMenuOpened()"
+            (menuClosed)="onMenuClosed()"
             [attr.aria-label]="ariaLabel()"
             [attr.aria-expanded]="open()"
             matTooltip="Notifications"
@@ -70,17 +72,10 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
             ></mat-icon>
         </button>
 
-        <ng-template
-            cdkConnectedOverlay
-            [cdkConnectedOverlayOrigin]="trigger"
-            [cdkConnectedOverlayOpen]="open()"
-            [cdkConnectedOverlayPositions]="positions"
-            [cdkConnectedOverlayHasBackdrop]="true"
-            cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
-            (backdropClick)="close()"
-            (detach)="close()"
-        >
+        <mat-menu #notificationsMenu="matMenu" xPosition="before" class="!max-h-none !p-0">
             <div
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
                 role="dialog"
                 aria-label="Notifications"
                 class="bg-card flex max-h-[28rem] w-[22rem] flex-col overflow-hidden rounded-lg border shadow-lg"
@@ -155,7 +150,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                     }
                 </div>
             </div>
-        </ng-template>
+        </mat-menu>
     `,
 })
 export class NotificationBellComponent implements OnInit, OnDestroy {
@@ -189,6 +184,15 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
 
     ngOnDestroy(): void {
         this.source?.close();
+    }
+
+    onMenuOpened(): void {
+        this.open.set(true);
+        this.svc.refresh();
+    }
+
+    onMenuClosed(): void {
+        this.open.set(false);
     }
 
     toggle(): void {

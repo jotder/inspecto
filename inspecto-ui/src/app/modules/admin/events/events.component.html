@@ -54,125 +54,16 @@
                     }
                 }
             }
-            <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
-                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-            </button>
+            @if (eventsEnabled()) {
+                <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
+                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                </button>
+            }
         </div>
     </div>
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        <!-- Filter toolbar -->
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-            <mat-form-field class="gamma-mat-dense w-32" subscriptSizing="dynamic">
-                <mat-label>Min level</mat-label>
-                <mat-select [(ngModel)]="fLevel">
-                    <mat-option value="">All</mat-option>
-                    @for (l of levels; track l) {
-                        <mat-option [value]="l">{{ l }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
-
-            <mat-form-field class="gamma-mat-dense w-52" subscriptSizing="dynamic">
-                <mat-label>Type</mat-label>
-                <mat-select [(ngModel)]="fType">
-                    <mat-option value="">All types</mat-option>
-                    @for (t of types; track t) {
-                        <mat-option [value]="t">{{ t }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
-
-            <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
-                <mat-label>Pipeline</mat-label>
-                <input matInput [(ngModel)]="fPipeline" placeholder="exact name" (keyup.enter)="load()" />
-            </mat-form-field>
-
-            <mat-form-field class="gamma-mat-dense w-64" subscriptSizing="dynamic">
-                <mat-label>Search</mat-label>
-                <input matInput [(ngModel)]="fq" placeholder="message or source contains…" (keyup.enter)="load()" />
-            </mat-form-field>
-
-            <mat-form-field class="gamma-mat-dense w-28" subscriptSizing="dynamic">
-                <mat-label>Limit</mat-label>
-                <mat-select [(ngModel)]="fLimit">
-                    @for (n of limitOptions; track n) {
-                        <mat-option [value]="n">{{ n }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
-
-            <button mat-flat-button color="primary" (click)="load()">
-                <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
-                <span class="ml-2">Search</span>
-            </button>
-            <button mat-button (click)="resetFilters()">Reset</button>
-
-            <span class="flex-auto"></span>
-
-            <button mat-stroked-button [matMenuTriggerFor]="viewsMenu" matTooltip="Saved views">
-                <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                <span class="ml-2">Views</span>
-            </button>
-            <button mat-stroked-button (click)="exportCsv()" matTooltip="Download matching events as CSV">
-                <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-                <span class="ml-2">Export CSV</span>
-            </button>
-
-            @if (fCorrelation()) {
-                <inspecto-chip
-                    variant="soft"
-                    tone="primary"
-                    removable
-                    removeLabel="Clear correlation filter"
-                    (removed)="clearCorrelation()"
-                >
-                    correlation: <span class="font-mono">{{ fCorrelation() }}</span>
-                </inspecto-chip>
-            }
-        </div>
-
-        <!-- Saved-views menu (collapses the former second toolbar row) -->
-        <mat-menu #viewsMenu="matMenu">
-            <div class="min-w-72">
-                @for (v of views(); track v.name) {
-                    <div class="flex items-center">
-                        <button mat-menu-item class="flex-auto" (click)="applyView(v.name)">
-                            <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                            <span>{{ v.name }}</span>
-                        </button>
-                        <button
-                            mat-icon-button
-                            class="mr-1"
-                            (click)="$event.stopPropagation(); selectedView.set(v.name); deleteView()"
-                            [attr.aria-label]="'Delete view ' + v.name"
-                        >
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
-                        </button>
-                    </div>
-                } @empty {
-                    <div class="text-secondary px-4 py-2 text-sm">No saved views yet.</div>
-                }
-                <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
-                <div class="mt-1 flex items-center gap-2 border-t px-3 pt-2" (click)="$event.stopPropagation()">
-                    <mat-form-field class="gamma-mat-dense flex-auto" subscriptSizing="dynamic">
-                        <mat-label>Save current as…</mat-label>
-                        <input
-                            matInput
-                            [(ngModel)]="saveName"
-                            placeholder="view name"
-                            (keydown)="$event.stopPropagation()"
-                            (keyup.enter)="saveView()"
-                        />
-                    </mat-form-field>
-                    <button mat-icon-button (click)="saveView()" aria-label="Save current view">
-                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                    </button>
-                </div>
-            </div>
-        </mat-menu>
-
         @if (!eventsEnabled()) {
             <!-- EDG-01 cell 6: this screen's whole data source is the optional inspecto-events module.
                  The nav entry is hidden when it is absent, but a bookmark still lands here — so explain,
@@ -182,30 +73,149 @@
                 The operational events feed is provided by the optional events module (Professional edition and above), so
                 there is nothing to browse in this bundle. Events are still recorded — the audit trail remains available
                 on the Audit log screen.
+                <div class="mt-3">
+                    <a mat-stroked-button href="/audit">
+                        <mat-icon svgIcon="heroicons_outline:shield-check"></mat-icon>
+                        <span class="ml-2">Open Audit Log</span>
+                    </a>
+                </div>
             </inspecto-alert>
-        } @else if (!loading() && events().length === 0) {
-            <inspecto-empty-state
-                icon="heroicons_outline:queue-list"
-                message="No events match the current filters."
-            ></inspecto-empty-state>
         } @else {
-            <inspecto-data-table
-                tier="pro"
-                sourceName="events"
-                exportName="events"
-                stateKey="events"
-                [rows]="events()"
-                [columns]="columnDefs"
-                [rowActions]="actions"
-                [pinActions]="true"
-                [loading]="loading()"
-                [searchable]="false"
-                [exportable]="false"
-                [pageSize]="50"
-                [serverPage]="true"
-                [hasMore]="hasMore()"
-                (loadMore)="loadMore()"
-            />
+            <!-- Filter toolbar -->
+            <div class="mb-4 flex flex-wrap items-center gap-3">
+                <mat-form-field class="gamma-mat-dense w-32" subscriptSizing="dynamic">
+                    <mat-label>Min level</mat-label>
+                    <mat-select [(ngModel)]="fLevel">
+                        <mat-option value="">All</mat-option>
+                        @for (l of levels; track l) {
+                            <mat-option [value]="l">{{ l }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
+
+                <mat-form-field class="gamma-mat-dense w-52" subscriptSizing="dynamic">
+                    <mat-label>Type</mat-label>
+                    <mat-select [(ngModel)]="fType">
+                        <mat-option value="">All types</mat-option>
+                        @for (t of types; track t) {
+                            <mat-option [value]="t">{{ t }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
+
+                <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
+                    <mat-label>Pipeline</mat-label>
+                    <input matInput [(ngModel)]="fPipeline" placeholder="exact name" (keyup.enter)="load()" />
+                </mat-form-field>
+
+                <mat-form-field class="gamma-mat-dense w-64" subscriptSizing="dynamic">
+                    <mat-label>Search</mat-label>
+                    <input matInput [(ngModel)]="fq" placeholder="message or source contains…" (keyup.enter)="load()" />
+                </mat-form-field>
+
+                <mat-form-field class="gamma-mat-dense w-28" subscriptSizing="dynamic">
+                    <mat-label>Limit</mat-label>
+                    <mat-select [(ngModel)]="fLimit">
+                        @for (n of limitOptions; track n) {
+                            <mat-option [value]="n">{{ n }}</mat-option>
+                        }
+                    </mat-select>
+                </mat-form-field>
+
+                <button mat-flat-button color="primary" (click)="load()">
+                    <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+                    <span class="ml-2">Search</span>
+                </button>
+                <button mat-button (click)="resetFilters()">Reset</button>
+
+                <span class="flex-auto"></span>
+
+                <button mat-stroked-button [matMenuTriggerFor]="viewsMenu" matTooltip="Saved views">
+                    <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
+                    <span class="ml-2">Views</span>
+                </button>
+                <button mat-stroked-button (click)="exportCsv()" matTooltip="Download matching events as CSV">
+                    <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    <span class="ml-2">Export CSV</span>
+                </button>
+
+                @if (fCorrelation()) {
+                    <inspecto-chip
+                        variant="soft"
+                        tone="primary"
+                        removable
+                        removeLabel="Clear correlation filter"
+                        (removed)="clearCorrelation()"
+                    >
+                        correlation: <span class="font-mono">{{ fCorrelation() }}</span>
+                    </inspecto-chip>
+                }
+            </div>
+
+            <!-- Saved-views menu (collapses the former second toolbar row) -->
+            <mat-menu #viewsMenu="matMenu">
+                <div class="min-w-72">
+                    @for (v of views(); track v.name) {
+                        <div class="flex items-center">
+                            <button mat-menu-item class="flex-auto" (click)="applyView(v.name)">
+                                <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
+                                <span>{{ v.name }}</span>
+                            </button>
+                            <button
+                                mat-icon-button
+                                class="mr-1"
+                                (click)="$event.stopPropagation(); selectedView.set(v.name); deleteView()"
+                                [attr.aria-label]="'Delete view ' + v.name"
+                            >
+                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
+                            </button>
+                        </div>
+                    } @empty {
+                        <div class="text-secondary px-4 py-2 text-sm">No saved views yet.</div>
+                    }
+                    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
+                    <div class="mt-1 flex items-center gap-2 border-t px-3 pt-2" (click)="$event.stopPropagation()">
+                        <mat-form-field class="gamma-mat-dense flex-auto" subscriptSizing="dynamic">
+                            <mat-label>Save current as…</mat-label>
+                            <input
+                                matInput
+                                [(ngModel)]="saveName"
+                                placeholder="view name"
+                                (keydown)="$event.stopPropagation()"
+                                (keyup.enter)="saveView()"
+                            />
+                        </mat-form-field>
+                        <button mat-icon-button (click)="saveView()" aria-label="Save current view">
+                            <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                        </button>
+                    </div>
+                </div>
+            </mat-menu>
+
+            @if (!loading() && events().length === 0) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:queue-list"
+                    message="No events match the current filters."
+                ></inspecto-empty-state>
+            } @else {
+                <inspecto-data-table
+                    tier="pro"
+                    sourceName="events"
+                    exportName="events"
+                    stateKey="events"
+                    [rows]="events()"
+                    [columns]="columnDefs"
+                    [rowActions]="actions"
+                    [pinActions]="true"
+                    [loading]="loading()"
+                    [searchable]="false"
+                    [exportable]="false"
+                    [pageSize]="50"
+                    [serverPage]="true"
+                    [hasMore]="hasMore()"
+                    (loadMore)="loadMore()"
+                />
+            }
         }
     </div>
 </div>

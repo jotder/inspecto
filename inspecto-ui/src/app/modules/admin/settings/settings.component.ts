@@ -76,7 +76,7 @@ export class SettingsComponent {
             id: 'scheduler',
             title: 'Scheduler',
             icon: 'heroicons_outline:queue-list',
-            description: 'Live Consignment concurrency caps — server-wide and per space.',
+            description: 'Execution concurrency caps — server-wide and per-space pipeline limits.',
             component: SchedulerSettingsComponent,
         },
         {

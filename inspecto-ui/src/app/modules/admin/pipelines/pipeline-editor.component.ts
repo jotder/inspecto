@@ -70,8 +70,6 @@ import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component
 import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component';
 import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
-import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.component';
-import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
 import {
     PARSE_NODE_FRONTENDS,
@@ -106,21 +104,10 @@ import {
     categoryVisualKind,
     computeNodeStatus,
     decodeEdgeId,
-    detectStepChain,
     encodeEdgeId,
     findingIcon,
     findingTint,
-    flattenStepChain,
     groupByCategory,
-    RECIPE_VERBS,
-    addRouteBranch,
-    insertRouteAfter,
-    insertStepAfter,
-    moveStepInChain,
-    removeRouteBranch,
-    removeStepFromChain,
-    setRouteBranchWhere,
-    setRouteDefault,
     nodeConfigEntries,
     nodeLastRunTotal,
     provenanceCounts,
@@ -133,9 +120,6 @@ import {
     typeLabelMap,
     uniqueNodeId,
     validatePipeline,
-    BRANCH_STEP_TYPES,
-    branchStepTypesLabel,
-    insertBranchHead,
     groupByFamily,
     ProcessorGroup,
 } from './pipeline-graph';
@@ -225,8 +209,6 @@ const UNDO_CAP = 50;
         PipelineChecklistComponent,
         PipelineInspectorComponent,
         PipelinePaletteComponent,
-        PipelineGuaranteesPanelComponent,
-        PipelineStepCardsComponent,
         InspectoEmptyStateComponent,
         InspectoSplitDirective,
         TransferMenuComponent,
@@ -439,6 +421,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      */
     private readonly typeAttributes = signal<Map<string, AttributeSpec[]>>(new Map());
 
+    /** S4 dual-read — step types the server says this build supports. */
+    private servedVerbs = signal<readonly { type: string; label: string }[] | null>(null);
+
     readonly selectedNode = signal<AuthoredNode | null>(null);
     readonly selectedEdgeId = signal<string | null>(null);
     /** Two-click edge creation: the first node clicked, awaiting a target. */
@@ -603,226 +588,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             : null;
     });
 
-    // ── Recipe view (ELT amendment UI plan §1, S1) ──────────────────────────────────────────────────
-    /** The device's Recipe/Canvas preference — a UI preference, not config (mirrors the lens/space
-     *  localStorage pattern). Recipe is the default; a graph the recipe cannot express forces Canvas
-     *  regardless (see {@link effectiveMode}), so a stale 'recipe' preference never traps a user on a
-     *  blank view. */
-    private static readonly VIEW_MODE_KEY = 'inspecto.pipelines.viewMode';
-    readonly viewMode = signal<'recipe' | 'canvas'>(
-        (localStorage.getItem(PipelineEditorComponent.VIEW_MODE_KEY) as 'recipe' | 'canvas' | null) ?? 'recipe',
-    );
 
-    setViewMode(mode: 'recipe' | 'canvas'): void {
-        this.viewMode.set(mode);
-        localStorage.setItem(PipelineEditorComponent.VIEW_MODE_KEY, mode);
-    }
-
-    /** `null` when the open graph is not recipe-expressible (§1 — no dual model, no migration risk). */
-    readonly stepChain = computed(() => {
-        const m = this.model();
-        return m ? detectStepChain(m) : null;
-    });
-
-    /** The chain flattened to indented rows for the step-cards view. */
-    readonly stepRows = computed(() => {
-        const chain = this.stepChain();
-        return chain ? flattenStepChain(chain) : [];
-    });
-
-    /** The mode actually shown: the user's preference, unless the open graph forces Canvas. */
-    readonly effectiveMode = computed<'recipe' | 'canvas'>(() => (this.stepChain() ? this.viewMode() : 'canvas'));
-
-    /** Whether the preference is Recipe but the open graph forced a Canvas fallback — drives the alert. */
-    readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
-
-    /**
-     * Steps with no edge at either end. The overwhelmingly common reason the Recipe view gives up is
-     * NOT a branch — it is a Step added from the palette, which lands unconnected. Blaming "a branch
-     * this view can't represent" sent a builder hunting for a branch that was never there
-     * (BUILDER-1c, found by driving the real UI 2026-08-17).
-     */
-    readonly danglingStepNames = computed(() => {
-        const m = this.model();
-        if (!m) return [];
-        const wired = new Set<string>();
-        for (const e of m.edges) {
-            wired.add(e.from);
-            wired.add(e.to);
-        }
-        return m.nodes.filter((n) => !wired.has(n.id)).map((n) => n.name || n.id);
-    });
-
-    /** The served recipe-verb palette (S4), `null` until it loads / on an old server. */
-    private readonly servedVerbs = signal<{ type: string; label: string }[] | null>(null);
-
-    /** What the Add-Step menu offers: the served step-types, else the client verb map (dual-read). */
-    readonly recipeVerbs = computed<readonly { type: string; label: string }[]>(
-        () => this.servedVerbs() ?? RECIPE_VERBS,
-    );
-
-    // ── Recipe editing (S2) — pure reducers over the same model; Save is the unchanged PUT ─────────
-
-    /** Insert a new Step of `type` after `afterId` (null = new entry), then open its config dialog. */
-    onRecipeInsert(e: { type: string; afterId: string | null; branch?: { routeId: string; key: string } }): void {
-        if (!this.canAuthor()) return; // defense in depth, not just the hidden affordance
-        const m = this.model();
-        if (!m) return;
-        // MIDBRANCH-UI-1: an insert INTO a route branch. The palette is already narrowed to what arms
-        // mid-branch; the check here is defense in depth mirroring RouteArming.BRANCH_STEP_KINDS.
-        if (e.branch) {
-            if (!BRANCH_STEP_TYPES.has(e.type)) {
-                // ⛔ Rendered from the set, never hand-written — this message drifted for a week once. See
-                // branchStepTypesLabel's own comment.
-                this.toast.warning(`Only ${branchStepTypesLabel()} Steps can run inside a branch.`);
-                return;
-            }
-            const node: AuthoredNode = { id: uniqueNodeId(m, e.type), type: e.type };
-            const next =
-                e.afterId === null
-                    ? insertBranchHead(m, node, e.branch.routeId, e.branch.key)
-                    : insertStepAfter(m, node, e.afterId);
-            if (!next) {
-                this.toast.warning('Cannot insert here — this branch is wired beyond a linear chain. Use the Canvas.');
-                return;
-            }
-            this.captureUndo();
-            this.model.set(next);
-            this.dirty.set(true);
-            this.openNodeConfig(node);
-            return;
-        }
-        // A route Step splices differently (S3): its downstream edge becomes its first branch, so it
-        // needs a downstream to route to — never insertable at the tail or as the entry.
-        if (e.type === 'transform.route') {
-            if (e.afterId === null) {
-                this.toast.warning('A Route Step needs something to route to — add it after a Step, not at the start.');
-                return;
-            }
-            const node: AuthoredNode = {
-                id: uniqueNodeId(m, e.type),
-                type: e.type,
-                config: { mode: 'case', branches: [{ key: 'branch_1' }] },
-            };
-            const next = insertRouteAfter(m, node, e.afterId);
-            if (!next) {
-                this.toast.warning(
-                    'Cannot insert a Route here — it needs exactly one downstream Step. Use the Canvas.',
-                );
-                return;
-            }
-            this.captureUndo(); // R4: the PRE-mutation state, once the mutation is certain
-            this.model.set(next);
-            this.dirty.set(true);
-            return;
-        }
-        const node: AuthoredNode = { id: uniqueNodeId(m, e.type), type: e.type };
-        const next = insertStepAfter(m, node, e.afterId);
-        if (!next) {
-            this.toast.warning('Cannot insert here — this Step is wired beyond the linear chain. Use the Canvas.');
-            return;
-        }
-        this.captureUndo();
-        this.model.set(next);
-        this.dirty.set(true);
-        this.openNodeConfig(node);
-    }
-
-    /** Remove a trunk Step, reconnecting its neighbours. */
-    onRecipeRemove(id: string): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        if (!m) return;
-        const next = removeStepFromChain(m, id);
-        if (!next) {
-            this.toast.warning('Cannot remove here — this Step is wired beyond the linear chain. Use the Canvas.');
-            return;
-        }
-        this.captureUndo();
-        this.model.set(next);
-        this.clearSelection();
-        this.dirty.set(true);
-    }
-
-    /** Swap a trunk Step with its neighbour. A refused move (chain end / non-linear) is a silent no-op. */
-    onRecipeMove(e: { id: string; dir: 'up' | 'down' }): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        if (!m) return;
-        const next = moveStepInChain(m, e.id, e.dir);
-        if (!next) return;
-        this.captureUndo();
-        this.model.set(next);
-        this.dirty.set(true);
-    }
-
-    // ── Route branch editing (S3, §2.6) — the same pure-reducer pattern ────────────────────────────
-
-    /** Add a named branch (+ its unconfigured sink) to a route Step. */
-    onRecipeAddBranch(e: { routeId: string; key: string }): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        if (!m) return;
-        const next = addRouteBranch(m, e.routeId, e.key);
-        if (!next) {
-            this.toast.warning(`Cannot add branch '${e.key}' — a branch with that key already exists.`);
-            return;
-        }
-        this.captureUndo();
-        this.model.set(next);
-        this.dirty.set(true);
-    }
-
-    /** Remove a branch and its downstream Steps. */
-    onRecipeRemoveBranch(e: { routeId: string; key: string }): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        if (!m) return;
-        const next = removeRouteBranch(m, e.routeId, e.key);
-        if (!next) {
-            this.toast.warning('Cannot remove this branch — its Steps are wired beyond the branch. Use the Canvas.');
-            return;
-        }
-        this.captureUndo();
-        this.model.set(next);
-        this.clearSelection();
-        this.dirty.set(true);
-    }
-
-    /** Set/clear a branch's `when` predicate. */
-    onRecipeBranchWhere(e: { routeId: string; key: string; where: string }): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        if (!m) return;
-        const next = setRouteBranchWhere(m, e.routeId, e.key, e.where);
-        if (!next) return;
-        this.captureUndo();
-        this.model.set(next);
-        this.dirty.set(true);
-    }
-
-    /** Mark/clear the route's default branch (zero-or-one — the engine's real contract). */
-    onRecipeSetDefault(e: { routeId: string; key: string | null }): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        if (!m) return;
-        const next = setRouteDefault(m, e.routeId, e.key);
-        if (!next) return;
-        this.captureUndo();
-        this.model.set(next);
-        this.dirty.set(true);
-    }
-
-    /** Flip the route's `case|clone` mode on its own config. */
-    onRecipeModeChange(e: { routeId: string; mode: 'case' | 'clone' }): void {
-        if (!this.canAuthor()) return;
-        const m = this.model();
-        const route = m?.nodes.find((n) => n.id === e.routeId);
-        if (!m || !route) return;
-        this.captureUndo();
-        this.model.set(applyNodePatchInModel(m, { ...route, config: { ...route.config, mode: e.mode } }));
-        this.dirty.set(true);
-    }
 
     /** The selected node's last-run output (T17), or `null` when that run recorded nothing for it. */
     selectedNodeLastRun(): { rowCount: number; runTs: string } | null {
@@ -848,8 +614,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         );
     }
 
-    /** Bound reference to {@link statusOf} for the step-cards `@Input` (a plain method reference would lose `this`). */
-    readonly boundStatusOf = (n: AuthoredNode): NodeStatus => this.statusOf(n);
 
     // ── guided mode (definition-surface P6-d): the wizard's stage rail as toolbar chips ──
 
@@ -969,16 +733,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             next: (c) => this.paletteProcessors.set(groupByFamily(c)),
             error: () => this.paletteProcessors.set(null),
         });
-        // S4 dual-read: the served recipe-verb palette, falling back to the client verb map
-        // (RECIPE_VERBS) on an old server — mirroring how typeAttributes tolerates one.
         this.api.stepTypes().subscribe({
-            next: (sts) => {
-                const verbs = sts.filter((s) => s.lowerable).map((s) => ({ type: s.type, label: s.label }));
-                // an empty palette is never what a real server means — treat it as "not served"
-                this.servedVerbs.set(verbs.length ? verbs : null);
-            },
+            next: (types) => this.servedVerbs.set(types?.length ? types : null),
             error: () => this.servedVerbs.set(null),
         });
+
         this.loadComponentRefs();
         this.iconMapApi.get().subscribe({
             next: (m) => this.iconMap.set(m),

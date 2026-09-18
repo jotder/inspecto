@@ -32,6 +32,12 @@ final class AssistRoutes implements RouteModule {
         // Registered BEFORE the intent catch-all so "settings" never resolves as a skill intent. ──
         api.get("/assist/settings", (e, m) -> assistAgentOr503(api).settings());
         api.get("/assist/metrics", (e, m) -> assistAgentOr503(api).metrics());
+        api.get("/assist/skills", (e, m) -> List.of(
+                Map.of("id", "explain-entity", "name", "Explain Entity", "description", "Explain catalog tables, streams and metrics in plain business terms"),
+                Map.of("id", "diagnose-break", "name", "Diagnose Break", "description", "Diagnose reconciliation breaks and data discrepancies"),
+                Map.of("id", "draft-pipeline", "name", "Draft Pipeline", "description", "Draft pipeline transformation steps and SQL from natural language"),
+                Map.of("id", "triage-alert", "name", "Triage Alert", "description", "Analyze alerts, suggest remediations and prioritize triage")
+        ));
         // ⛔ These two are gated TOGETHER and must stay that way (ROUTE-UNGATED-DEFAULT-1, grounded
         // 2026-09-15). The settings are SERVER-WIDE — one AssistModelSettings file, no per-caller scope — and
         // /test performs a REAL outbound call to whatever baseUrl/provider was last saved. Ungated, that pair

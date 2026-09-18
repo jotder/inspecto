@@ -65,6 +65,35 @@
             </div>
         </div>
 
+        <!-- Execution & Health Status Banner -->
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-card p-4 shadow-sm dark:border-gray-700">
+            <div class="flex items-center gap-3">
+                <inspecto-status-badge
+                    [value]="drillBreaks().length === 0 ? 'success' : 'warning'"
+                    [label]="drillBreaks().length === 0 ? 'Balanced (0 Breaks)' : drillBreaks().length + ' Discrepancies'"
+                />
+                <div class="flex flex-col">
+                    <span class="text-sm font-medium">
+                        {{ drillBreaks().length === 0 ? 'All records matched within tolerance' : 'Discrepancies require investigation' }}
+                    </span>
+                    <span class="text-xs text-secondary">
+                        @if (lastEvaluated(); as dt) {
+                            Last evaluated: {{ dt | date:'mediumTime' }}
+                        } @else {
+                            Evaluation status: Live
+                        }
+                        · Comparing: {{ side() === 'c' ? 'A vs C' : 'A vs B' }}
+                    </span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button mat-stroked-button color="primary" (click)="compute()" [disabled]="computing()">
+                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                    <span class="ml-1">Run Reconciliation Now</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Count cards -->
         <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div class="bg-card rounded-2xl p-4 shadow">
@@ -120,8 +149,10 @@
             <div class="mt-8">
                 <inspecto-empty-state
                     icon="heroicons_outline:check-circle"
-                    title="No breaks"
-                    message="Both sides agree within tolerance for every key in this scope."
+                    title="Healthy — 0 breaks detected"
+                    message="Both sides agree within tolerance for every key in this scope. Re-evaluate to verify against the latest dataset partitions."
+                    actionLabel="Run Reconciliation Now"
+                    (action)="compute()"
                 />
             </div>
         } @else if (viewMode() === 'tables') {

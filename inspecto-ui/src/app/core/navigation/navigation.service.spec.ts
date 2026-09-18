@@ -115,14 +115,14 @@ describe('NavigationService — optional-module nav entries', () => {
      */
     it('shows Incidents, Case Manager and Tags when the ops module registered its routes', async () => {
         const nav = await firstValueFrom(mount(true, true, true).get());
-        for (const id of ['incidents', 'cases', 'tags']) {
+        for (const id of ['incidents', 'cases', 'tags', 'approvals', 'autonomy', 'learning']) {
             expect(findById(nav.default as never, id), id + ' should be present').toBeDefined();
         }
     });
 
     it('hides them when the ops module is absent (Personal) — but never Alerts', async () => {
         const nav = await firstValueFrom(mount(true, true, false).get());
-        for (const id of ['incidents', 'cases', 'tags']) {
+        for (const id of ['incidents', 'cases', 'tags', 'approvals', 'autonomy', 'learning']) {
             expect(findById(nav.default as never, id), id + ' should be hidden').toBeUndefined();
         }
         expect(

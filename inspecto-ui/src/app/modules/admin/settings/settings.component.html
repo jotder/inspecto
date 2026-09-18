@@ -37,7 +37,9 @@
                     class="block p-6"
                     icon="heroicons_outline:cog-6-tooth"
                     title="Choose a setting"
-                    message="Pick an option from the menu to configure it here."
+                    message="Pick an option from the menu on the left to configure it here, or open platform configuration."
+                    actionLabel="Open Platform Config"
+                    (action)="select(drawers[0])"
                 />
             }
         </section>

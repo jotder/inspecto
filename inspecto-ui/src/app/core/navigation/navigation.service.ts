@@ -56,7 +56,7 @@ export class NavigationService {
      * with an `OperationalObject` type, which is exactly why an over-wide filter would take it — the
      * spec asserts it survives.
      */
-    private static readonly OPS_NAV_IDS = new Set(['incidents', 'cases', 'tags']);
+    private static readonly OPS_NAV_IDS = new Set(['incidents', 'cases', 'tags', 'approvals', 'autonomy', 'learning']);
 
     /** Remove every item whose id is in `ids`, at any depth, in place. */
     private static dropIds(items: GammaNavigationItem[], ids: Set<string>): void {

@@ -218,6 +218,13 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     private rebuild(): void {
         this.graph?.destroy();
         this.graph = null;
+        if (!this.hostEl?.nativeElement) return;
+        if (typeof document !== 'undefined') {
+            const probe = document.createElement('canvas');
+            if (!probe.getContext?.('2d')) {
+                return;
+            }
+        }
         const { fg, surface: nodeFill, edge } = canvasTheme(this.dark);
         const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
         const statusOf = (d: NodeData): NodeStatus => (d.data as { status?: NodeStatus }).status ?? 'configured';

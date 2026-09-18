@@ -49,7 +49,7 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
             <header>
                 <h1 class="text-2xl font-semibold">Scheduler</h1>
                 <p class="text-secondary mt-1 text-sm">
-                    How many Consignments may execute at once — server-wide, per space, and (on each pipeline) per
+                    Maximum concurrent batch executions permitted at once — server-wide, per space, and per
                     pipeline with a 1–3 priority share.
                 </p>
             </header>

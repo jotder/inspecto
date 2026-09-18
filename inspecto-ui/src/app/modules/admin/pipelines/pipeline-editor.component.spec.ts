@@ -3464,54 +3464,11 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
         return c;
     }
 
-    it('defaults to Recipe for an expressible graph and detects its chain', () => {
+    it('renders the canvas view directly for any opened pipeline', () => {
         const c = make();
         c.select('demo');
-        expect(c.viewMode()).toBe('recipe');
-        expect(c.effectiveMode()).toBe('recipe');
-        expect(c.stepChain()?.trunk.map((n) => n.id)).toEqual(['src', 'flt']);
-        expect(c.forcedToCanvas()).toBe(false);
-    });
-
-    it('forces Canvas and flags it when the open graph is not recipe-expressible (fan-in)', () => {
-        api.pipelineGraphRaw.mockReturnValue(
-            of({
-                name: 'demo',
-                active: false,
-                nodes: [
-                    { id: 'a', type: 'acquisition' },
-                    { id: 'b', type: 'acquisition' },
-                    { id: 'c', type: 'sink.persistent' },
-                ],
-                edges: [
-                    { from: 'a', rel: 'data', to: 'c' },
-                    { from: 'b', rel: 'data', to: 'c' },
-                ],
-            }),
-        );
-        const c = make();
-        c.select('demo');
-        expect(c.stepChain()).toBeNull();
-        expect(c.viewMode()).toBe('recipe'); // the preference itself is untouched
-        expect(c.effectiveMode()).toBe('canvas'); // but the graph forces the actual view
-        expect(c.forcedToCanvas()).toBe(true);
-    });
-
-    it('persists the device preference across instances (localStorage, mirrors the lens/space pattern)', () => {
-        const c1 = make();
-        c1.setViewMode('canvas');
-        expect(localStorage.getItem('inspecto.pipelines.viewMode')).toBe('canvas');
-
-        const c2 = make();
-        expect(c2.viewMode()).toBe('canvas');
-    });
-
-    it('flattens the detected chain into step rows for the cards view', () => {
-        const c = make();
-        c.select('demo');
-        const rows = c.stepRows();
-        expect(rows.map((r) => r.rowId)).toEqual(['src', 'flt']);
-        expect(rows.every((r) => r.kind === 'node')).toBe(true);
+        expect(c.model()).not.toBeNull();
+        expect(c.g6Data()?.nodes.length).toBe(2);
     });
 
     /**

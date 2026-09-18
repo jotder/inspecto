@@ -246,4 +246,16 @@ class ControlApiAssistTest {
             assertEquals(0, V1Body.of(r.body()).size());
         }
     }
+
+    @Test
+    void getSkillsReturnsAvailableSkillsList(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, false)) {
+            HttpResponse<String> r = get(c.port, "/assist/skills");
+            assertEquals(200, r.statusCode());
+            JsonNode body = V1Body.of(r.body());
+            assertTrue(body.isArray());
+            assertTrue(body.size() >= 4);
+            assertEquals("explain-entity", body.get(0).get("id").asText());
+        }
+    }
 }

@@ -406,6 +406,12 @@ CREATE TABLE IF NOT EXISTS inspecto_pipeline_provenance (
 );
 ```
 
+`initSchema()` follows the CREATE with `ALTER TABLE inspecto_pipeline_provenance ADD COLUMN IF NOT EXISTS
+simulated BOOLEAN DEFAULT FALSE` (PIPELINE-DRYRUN-1, 2026-09-18) — a row from a whole-pipeline dry run
+(`JobContext.dryRun()`) is written with `simulated = true` so `GET /provenance` can render it distinctly
+instead of indistinguishably from a real run's counts; a row from before the column existed reads back
+`false` (a real run).
+
 ### 3.7 `inspecto_acquisition_ledger` + `_db_watermark` — acquisition dedup  · ledger **M**, watermark **M**
 File: `inspecto-acquisition.db`
 
@@ -468,7 +474,9 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
   bytes          BIGINT,
   written_at     VARCHAR,
   generation     INTEGER,
-  state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY
+  state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY | SIMULATED (PIPELINE-DRYRUN-1 — a dry-run
+                            -- "would-have" row: no bytes written, `path` a placeholder; excluded from every
+                            -- state='LIVE' readability/selection check, so it can never be read as real data
   schema_fingerprint VARCHAR,  -- §3.4.3 CanonicalHash of the schema that wrote the file; NULL pre-column / no-schema paths
   event_time_min VARCHAR,      -- addressing §3.1: ISO-8601 LOCAL, no zone offset
   event_time_max VARCHAR,

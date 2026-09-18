@@ -13,6 +13,7 @@ export interface RequirementFormResult {
     title: string;
     kind: RequirementKind;
     description: string;
+    targetComponent?: string;
 }
 
 const KINDS: { value: RequirementKind; label: string }[] = [
@@ -72,6 +73,14 @@ const KINDS: { value: RequirementKind; label: string }[] = [
                         <mat-error>A description is required</mat-error>
                     }
                 </mat-form-field>
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Target Component / Pipeline (optional)</mat-label>
+                    <input
+                        matInput
+                        formControlName="targetComponent"
+                        placeholder="e.g. pipeline/orders_etl or dataset/mart_sales"
+                    />
+                </mat-form-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -93,6 +102,7 @@ export class RequirementFormDialog {
         title: ['', Validators.required],
         kind: this.fb.nonNullable.control<RequirementKind>('kpi'),
         description: ['', Validators.required],
+        targetComponent: [''],
     });
 
     submit(): void {
@@ -101,6 +111,11 @@ export class RequirementFormDialog {
             return;
         }
         const v = this.form.getRawValue();
-        this.ref.close({ title: v.title.trim(), kind: v.kind, description: v.description.trim() });
+        this.ref.close({
+            title: v.title.trim(),
+            kind: v.kind,
+            description: v.description.trim(),
+            targetComponent: v.targetComponent?.trim() || undefined,
+        });
     }
 }

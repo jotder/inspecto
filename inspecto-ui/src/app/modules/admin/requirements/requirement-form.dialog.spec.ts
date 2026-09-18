@@ -21,10 +21,20 @@ describe('RequirementFormDialog', () => {
         const { c, ref } = create();
         c.submit();
         expect(ref.close).not.toHaveBeenCalled();
-        c.form.setValue({ title: 'Daily churn KPI', kind: 'kpi', description: 'Track churn by region.' });
+        c.form.setValue({
+            title: 'Daily churn KPI',
+            kind: 'kpi',
+            description: 'Track churn by region.',
+            targetComponent: '',
+        });
         c.submit();
         const result = ref.close.mock.calls[0][0] as RequirementFormResult;
-        expect(result).toEqual({ title: 'Daily churn KPI', kind: 'kpi', description: 'Track churn by region.' });
+        expect(result).toEqual({
+            title: 'Daily churn KPI',
+            kind: 'kpi',
+            description: 'Track churn by region.',
+            targetComponent: undefined,
+        });
     });
 
     it('renders with no a11y violations', async () => {

@@ -65,7 +65,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 icon: 'heroicons_outline:signal',
                 link: '/processing-status',
             },
-            { id: 'events', title: 'Events', type: 'basic', icon: 'heroicons_outline:queue-list', link: '/events' },
+            { id: 'events', title: 'Signal Ledger', type: 'basic', icon: 'heroicons_outline:queue-list', link: '/events' },
             { id: 'audit', title: 'Audit log', type: 'basic', icon: 'heroicons_outline:shield-check', link: '/audit' },
             {
                 id: 'diagnoses',
@@ -281,7 +281,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
         title: 'Settings',
         type: 'basic',
         icon: 'heroicons_outline:cog-8-tooth',
-        link: '/settings',
+        link: '/settings/config',
     },
     // One top-level entry for the assistant family (operator, 2026-09-17): "Assistant" folds the skill
     // panel and the agent chat under a single menu item instead of two siblings at the root.
@@ -293,7 +293,7 @@ export const defaultNavigation: GammaNavigationItem[] = [
         children: [
             {
                 id: 'assist-skills',
-                title: 'Assistant',
+                title: 'AI Skills & Tasks',
                 type: 'basic',
                 icon: 'heroicons_outline:sparkles',
                 link: '/assist',

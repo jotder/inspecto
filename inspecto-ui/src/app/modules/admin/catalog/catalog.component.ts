@@ -120,22 +120,44 @@ export class CatalogComponent implements OnInit {
     legend: { kind: NodeKind; fill: string; label: string }[] = [];
 
     readonly nodeColumns: ColDef[] = [
-        { field: 'kind', headerName: 'Kind', width: 130 },
+        { field: 'kind', headerName: 'Kind', width: 110 },
         { field: 'label', headerName: 'Label', flex: 1 },
         { field: 'id', headerName: 'Id', flex: 1 },
-        { field: 'overlay.freshness', headerName: 'Freshness', width: 120 },
-        { field: 'overlay.rowCount', headerName: 'Rows', width: 100 },
+        {
+            field: 'attrs.format',
+            headerName: 'Format',
+            width: 100,
+            cellRenderer: (p: { value?: string }) =>
+                p.value
+                    ? `<span class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">${p.value}</span>`
+                    : '<span class="text-secondary">—</span>',
+        },
+        {
+            field: 'overlay.freshness',
+            headerName: 'Freshness',
+            width: 130,
+            cellRenderer: (p: { value?: string }) =>
+                p.value
+                    ? statusBadgeHtml(p.value)
+                    : '<span class="text-secondary font-mono text-xs">—</span>',
+        },
+        {
+            field: 'overlay.rowCount',
+            headerName: 'Rows',
+            width: 110,
+            valueFormatter: (p) => (p.value != null ? Number(p.value).toLocaleString() : '—'),
+        },
         {
             field: 'overlay.completeness',
             headerName: 'Complete',
             width: 110,
-            valueFormatter: (p) => (p.value == null ? '' : Math.round(p.value * 100) + '%'),
+            valueFormatter: (p) => (p.value == null ? '—' : Math.round(p.value * 100) + '%'),
         },
         {
             field: 'overlay.lastSeen',
             headerName: 'Last seen',
             width: 180,
-            valueFormatter: (p) => fmtDateTime(p.value),
+            valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },
     ];
 
