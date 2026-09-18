@@ -1,13 +1,13 @@
 # PIPELINE-DRYRUN-1 — whole-pipeline dry run design
 
-Status: **partially shipped 2026-09-18** — gates 2/3/4 (execution-phase dry run, both signal-emit sites, the
-provenance marker) are built and unit-tested; gate 1 (acquisition-phase post-action skip) is built and
-unit-tested in isolation but has NO operator-facing trigger wired to it yet (`CollectorService` carries no
-`dryRun` param on any trigger route). See `docs/BACKLOG.md`'s `PIPELINE-DRYRUN-1` row (2026-09-18 block) for
-the full job-flow finding, the correction to this doc's `GET /provenance` claim (it reads `DbProvenanceStore`,
-not `DbConsignmentOutputStore`), and the filed residual (an acquisition-side dry-run trigger route). Does
-**not** yet close `PIPELINE-DRYRUN-1` — do not archive this file until the acquisition-trigger residual
-lands or is explicitly descoped by the operator.
+Status: **partially shipped 2026-09-18** — gates 1-4 (acquisition-phase post-action skip, execution-phase dry
+run, both signal-emit sites, the provenance marker) are all built and unit-tested, and gate 1 now has an
+operator-facing trigger (`POST /runs/{name}/trigger?dryRun=true`, `CollectorService.runPipeline`/
+`triggerRunAsync`/`runPipelineOffThread`, same-day follow-up). See `docs/BACKLOG.md`'s `PIPELINE-DRYRUN-1`
+row (2026-09-18 block) for the full job-flow finding and the correction to this doc's `GET /provenance` claim
+(it reads `DbProvenanceStore`, not `DbConsignmentOutputStore`). Does **not** yet close `PIPELINE-DRYRUN-1` —
+do not archive this file until a single combined "dry-run this whole pipeline" route (both acquisition and
+execution phases under one flag) lands or is explicitly descoped by the operator.
 
 ## Decisions (operator-confirmed 2026-09-18)
 

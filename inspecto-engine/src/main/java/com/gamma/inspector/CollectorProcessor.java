@@ -80,7 +80,18 @@ public class CollectorProcessor {
      */
     public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit)
             throws Exception {
-        acquire(cfg);
+        run(cfg, onCommit, false);
+    }
+
+    /**
+     * As {@link #run(PipelineConfig, java.util.function.Consumer)}, but a {@code dryRun} acquisition
+     * (PIPELINE-DRYRUN-1) never applies the remote source's post-action — see {@link #acquire(PipelineConfig, boolean)}.
+     * Ingest is unaffected: a dry-run manual trigger is scoped to protecting the remote source, not to previewing
+     * the ingest write (that preview already exists via {@code JobContext.dryRun()} for the job-framework path).
+     */
+    public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit, boolean dryRun)
+            throws Exception {
+        acquire(cfg, dryRun);
         ingest(cfg, onCommit);
     }
 
@@ -269,12 +280,13 @@ public class CollectorProcessor {
     }
 
     /**
-     * As above, plus PIPELINE-DRYRUN-1's acquisition-side gate: under {@code dryRun} every file is still
-     * fetched and landed, but the source-side post-action (the land-then-ack remote delete/move/rename/tag)
-     * is skipped — see {@link RemoteAcquisitionHandler#materializeRemote(PipelineConfig, CollectorConnector,
-     * List, RetryPolicy, boolean)}. No caller threads {@code dryRun=true} in today: acquisition and
-     * execution are genuinely separate schedulers (this class vs. {@code JobService}/{@code JobContext}),
-     * and no operator-facing acquisition trigger exists yet to carry the intent — see
+     * As {@link #acquire(PipelineConfig)}, but a {@code dryRun} (PIPELINE-DRYRUN-1) fetches and lands files
+     * exactly as a real cycle would — so a manual preview trigger still proves the pipeline can reach and read
+     * its remote source — while skipping the source-side post-action, so a {@code collector.post_action.on_success}
+     * of {@code DELETE}/{@code MOVE}/{@code RENAME} never touches the remote original. See
+     * {@link RemoteAcquisitionHandler#materializeRemote(PipelineConfig, CollectorConnector, List, RetryPolicy,
+     * boolean)}. {@code CollectorService}'s manual pipeline trigger ({@code POST /runs/{name}/trigger?dryRun=true})
+     * is the one operator-facing route that carries {@code dryRun=true} in; see
      * {@code docs/superpower/pipeline-dryrun-design.md}.
      */
     @PublicApi(since = "4.0.0")

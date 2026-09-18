@@ -861,8 +861,9 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ `X4` is scoped against this row and ⛔ must not pick its replay default first. → `X4` above ·
   `okf/backend/pipeline-graph/execution-lanes.md`
 
-  🟡 **PARTIALLY SHIPPED 2026-09-18 — execution-phase dry run works end-to-end; acquisition-phase has the
-  mechanism but no operator trigger yet. Do not read this as full closure.**
+  🟡 **PARTIALLY SHIPPED 2026-09-18 — execution-phase dry run works end-to-end; acquisition-phase now has
+  both the mechanism AND an operator trigger (`POST /runs/{name}/trigger?dryRun=true`, same-day follow-up
+  below). Still not full closure: no single route dry-runs both phases together.**
 
   **Job-flow finding (the plumbing question this row's design doc asked to resolve first):**
   `CollectorProcessor`/`MultiCollectorProcessor` (acquisition — `CollectorService` schedules them) and
@@ -908,17 +909,24 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
      Sankey overlay. UI badge NOT added (frontend change; the JSON now carries `"simulated": true|false`
      per row for the UI to key off — filing as a residual below rather than attempting it inline).
 
-  **Not shipped / scoped down:** no operator-facing route threads `dryRun=true` into the acquisition side
-  (`CollectorService.triggerRunAsync`/`runPipelineOffThread` carry no such param) — gate 1's mechanism
-  exists and is unit-tested directly against `RemoteAcquisitionHandler`, but nothing in production calls it
-  with `true` yet. **"Dry-run the whole pipeline" today only dry-runs the execution phase**
-  (`POST /jobs/{name}/trigger?dryRun=true` on a `pipeline`-type job) — a pipeline whose acquisition is
-  remote and configured to delete-on-success is NOT protected by a dry-run trigger today, because no such
-  trigger reaches acquisition at all. Filed as a residual: add a `dryRun` param to whichever route triggers
-  `CollectorProcessor.acquire`/`run`, or a combined "dry-run this whole pipeline" route that fires both
-  phases with the same explicit flag. No true end-to-end test spans both phases in one dry run, for the
-  same reason — it would be testing a trigger surface that does not exist; each gate has its own focused
-  test instead against what is actually reachable.
+  ✅ **Residual closed 2026-09-18 (same day, follow-up commit).** `CollectorService`'s manual pipeline
+  trigger now carries a `dryRun` param: `runPipeline`/`triggerRunAsync`/`runPipelineOffThread` all gained
+  `dryRun` overloads threaded through `MultiCollectorProcessor.runAll(..., boolean dryRun)` into
+  `CollectorProcessor.acquire(cfg, dryRun)`. `POST /runs/{name}/trigger?dryRun=true`
+  (`RunRoutes.triggerPipeline`) is the operator-facing route — mirrors `JobRoutes`'s existing `?dryRun=true`
+  convention exactly. Scope stays deliberately narrow: this closes gate 1 only (the remote source is never
+  deleted/moved/renamed), not a preview of the ingest write — acquisition still lands real files and ingest
+  still commits, per the job-flow finding above (acquisition and execution remain separate call stacks with
+  no shared `JobContext`, so this is not "dry-run the whole pipeline" in one flag, only the acquisition
+  half of it). Pinned by `RemoteAcquisitionStagingTest#dryRunLandsTheFileButNeverAppliesTheDeletePostAction`
+  (merged into the existing `dryRunSkipsThePostActionButStillLandsTheFile`/`aRealRunDoesApplyThePostAction`
+  pair above — same assertion, two independent authors landed it the same day).
+
+  **Still open:** no combined "dry-run this whole pipeline" route fires both the acquisition and execution
+  phases under one explicit flag — an operator wanting both must call the pipeline trigger (`?dryRun=true`,
+  acquisition-only) and the job trigger (`?dryRun=true`, execution-only) separately, and only when a
+  `pipeline`-type job is what actually processes that pipeline's ingest. No end-to-end test spans both
+  phases in one dry run, for the same reason.
 
   **Tests:** `PipelineJobRunnerTest` 34/34, `RemoteAcquisitionStagingTest` 6/6, `DatasetWriteSignalTest`
   2/2 — unit-level per CLAUDE.md's convention, not the full reactor gate.

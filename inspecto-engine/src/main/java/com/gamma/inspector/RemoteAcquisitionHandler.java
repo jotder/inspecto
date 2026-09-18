@@ -73,12 +73,12 @@ final class RemoteAcquisitionHandler {
 
     /**
      * As above, plus PIPELINE-DRYRUN-1's acquisition-side gate: under {@code dryRun}, every file is still
-     * fetched and landed exactly as normal (the local copy is real — nothing downstream should see a
-     * difference), but {@link #applyPostAction} skips the actual {@code connector.post(...)} call (the
-     * land-then-ack remote delete/move/rename/tag) and only logs what it would have done. No caller
-     * currently threads {@code dryRun=true} in from an operator trigger — see
-     * {@code docs/superpower/pipeline-dryrun-design.md} for why acquisition has no such trigger surface
-     * today — but the mechanism is here for one to call.
+     * fetched and landed exactly as normal (the local copy is real — a manual preview still proves the
+     * pipeline can reach and read its source, and nothing downstream should see a difference), but
+     * {@link #applyPostAction} skips the actual {@code connector.post(...)} call (the land-then-ack remote
+     * delete/move/rename/tag) and only logs what it would have done. {@code CollectorService}'s manual
+     * pipeline trigger ({@code POST /runs/{name}/trigger?dryRun=true}) is the operator-facing route that
+     * threads {@code dryRun=true} in — see {@code docs/superpower/pipeline-dryrun-design.md}.
      */
     static List<RemoteFile> materializeRemote(PipelineConfig cfg, CollectorConnector primary,
                                               List<RemoteFile> ready, RetryPolicy retry, boolean dryRun) {
@@ -330,6 +330,11 @@ final class RemoteAcquisitionHandler {
      * {@code connector.post}. A runtime failure here does <em>not</em> discard the file — the bytes are already
      * safely staged locally — it is logged + metered and the file proceeds to ingest. Emits {@code FILE_ARCHIVED}
      * on success.
+     *
+     * <p>PIPELINE-DRYRUN-1: on {@code dryRun} this never calls {@code connector.post} — the file has already
+     * landed locally (a dry run still proves the pipeline can read its source), but a {@code DELETE}/{@code MOVE}/
+     * {@code RENAME} on the remote original is exactly the destructive side effect a preview trigger must not
+     * cause.
      */
     private static void applyPostAction(PipelineConfig cfg, CollectorConnector connector, RemoteFile rf,
                                         PostAction action, boolean dryRun) {

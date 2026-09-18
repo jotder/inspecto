@@ -102,7 +102,7 @@ class RemoteAcquisitionStagingTest {
         });
 
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
-                cfg, connector, List.of(listed("cdr_0001.csv", PAYLOAD.length)), RetryPolicy.NONE);
+                cfg, connector, List.of(listed("cdr_0001.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
 
         assertEquals(0L, inboxFilesDuringFetch.get(),
                 "the inbox must be empty while the bytes are still arriving — a partial is never ingestible");
@@ -136,7 +136,7 @@ class RemoteAcquisitionStagingTest {
         // The next attempt must be handed that same path, so a resumable connector can continue it.
         FakeConnector connector = new FakeConnector(null);
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
-                cfg, connector, List.of(listed("cdr_0002.csv", PAYLOAD.length)), RetryPolicy.NONE);
+                cfg, connector, List.of(listed("cdr_0002.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
 
         assertEquals(partial, connector.lastDest.get(),
                 "the staging path is deterministic, so the partial is resumed rather than restarted elsewhere");
@@ -153,7 +153,7 @@ class RemoteAcquisitionStagingTest {
         FakeConnector connector = new FakeConnector(null);
 
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
-                cfg, connector, List.of(listed("../../escaped.csv", PAYLOAD.length)), RetryPolicy.NONE);
+                cfg, connector, List.of(listed("../../escaped.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
 
         assertTrue(out.isEmpty(), "a listing path that escapes its root is skipped, not fetched");
         assertNull(connector.lastDest.get(), "no bytes were requested at all");
@@ -227,8 +227,9 @@ class RemoteAcquisitionStagingTest {
 
         IllegalStateException e = assertThrows(IllegalStateException.class, () ->
                 RemoteAcquisitionHandler.materializeRemote(
-                        cfg, connector, List.of(listed("x.csv", PAYLOAD.length)), RetryPolicy.NONE));
+                        cfg, connector, List.of(listed("x.csv", PAYLOAD.length)), RetryPolicy.NONE, false));
         assertTrue(e.getMessage().contains("staging"), "the refusal names the offending setting: " + e.getMessage());
         assertNull(connector.lastDest.get(), "refused before any bytes moved");
     }
+
 }
