@@ -18,10 +18,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * own note for why `ControlApiScopedObjectsTest` and `ControlApiAccessDeciderTest`'s row-scope case stay
  * in {@code inspecto-ops} instead).
  *
- * <p>Registered via {@code META-INF/services/com.gamma.service.ObjectEngineProvider} in this module's test
- * resources, so a default {@code mvn -o clean test} on {@code inspecto} discovers it and
- * {@code CollectorService.objects()} is non-empty — without pulling in the real {@code inspecto-ops}
- * {@code ObjectService}/DuckDB stores.
+ * <p>⚠ NOT registered module-wide: a global {@code META-INF/services/com.gamma.service.ObjectEngineProvider}
+ * in this module's test resources made {@code ControlApiReconTest}'s "no operational-objects module" 503
+ * tests see a fake engine and fail. {@code ControlApiReconPromoteTest.open()} instead installs a
+ * thread-scoped classloader that contributes that services file only for the duration of the
+ * {@code CollectorService} constructor call it wraps, so {@code CollectorService.objects()} is non-empty
+ * there — without pulling in the real {@code inspecto-ops} {@code ObjectService}/DuckDB stores — and empty
+ * everywhere else in this module's tests, exactly as a default build without {@code inspecto-ops} should be.
  *
  * <p>⚠ <b>Deliberately minimal, not a mirror of the real engine.</b> It implements exactly the
  * {@link ObjectAccess} contract a core route can use — in-memory, single Space, no persistence — plus one

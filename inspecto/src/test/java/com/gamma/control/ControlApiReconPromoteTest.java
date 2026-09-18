@@ -9,12 +9,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 
@@ -54,22 +58,52 @@ class ControlApiReconPromoteTest {
         public void close() { api.close(); svc.close(); }
     }
 
-    /** Boot with a write root carrying a saved {@code reconciliation} component — promote requires one. */
+    /**
+     * Boot with a write root carrying a saved {@code reconciliation} component — promote requires one.
+     *
+     * <p>⚠ {@link FakeObjectEngineProvider} is registered here via a <b>thread-scoped classloader swap</b>,
+     * not this module's own {@code META-INF/services} — a global registration made
+     * {@code ControlApiReconTest}'s "no operational-objects module" 503 tests see a fake engine and fail
+     * (found by the full-reactor {@code -Pcoverage} run, CI-JACOCO-JDK27-1's side effect: fixing that
+     * jacoco gate let the build reach far enough to hit this). {@code CollectorService}'s
+     * {@code OptionalSpi.first(ObjectEngineProvider.class)} resolves via {@code ServiceLoader.load(spi)},
+     * which uses the calling thread's context classloader — so a synthetic services file visible only to
+     * a child classloader, installed only for the duration of this one constructor call, isolates the
+     * fake to this test class without touching what any other test in this module discovers.
+     */
     private Ctx open(Path cfg, Path writeRoot) throws Exception {
         new ComponentStore(writeRoot.resolve("registry")).write("reconciliation", RECON,
                 Map.of("datasets", List.of("a_ds", "b_ds"), "keyColumns", List.of("region")));
         Path toon = TestConfigs.csv(cfg, PipelineConfigBatchTest.miniSchema()).write();
         String prior = System.getProperty("assist.write.root");
         System.setProperty("assist.write.root", writeRoot.toString());
+        ClassLoader outer = Thread.currentThread().getContextClassLoader();
         try {
+            Thread.currentThread().setContextClassLoader(fakeObjectEngineClassLoader(outer));
             CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port());
         } finally {
+            Thread.currentThread().setContextClassLoader(outer);
             if (prior != null) System.setProperty("assist.write.root", prior);
             else System.clearProperty("assist.write.root");
         }
+    }
+
+    /**
+     * A child of {@code parent} contributing exactly one resource — a services file naming
+     * {@link FakeObjectEngineProvider} — so {@code ServiceLoader.load(ObjectEngineProvider.class)}
+     * discovers it while this classloader is current, and discovers nothing once it is not.
+     */
+    private static ClassLoader fakeObjectEngineClassLoader(ClassLoader parent) throws Exception {
+        Path dir = Files.createTempDirectory("recon-fake-engine-spi")
+                .resolve("META-INF").resolve("services");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("com.gamma.service.ObjectEngineProvider"),
+                FakeObjectEngineProvider.class.getName(), StandardOpenOption.CREATE);
+        URL root = dir.getParent().getParent().toUri().toURL();
+        return new URLClassLoader(new URL[]{root}, parent);
     }
 
     private HttpResponse<String> promote(int port, String body) throws Exception {
