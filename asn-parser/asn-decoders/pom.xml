@@ -66,8 +66,18 @@
          absent from a number presented as repo-wide. That is exactly the "scope exemptions are silent by
          default" failure guard-coverage.md documents.
 
-         ⚠ REPORTING only — prepare-agent + report, no `check` goal and no threshold, so it cannot fail a
-         build. Keep it in step with the root profile if that one changes. -->
+         ⚠ REPORTING only — prepare-agent + report, no `check` goal and no threshold — but the `report`
+         goal itself throws (not merely "no coverage"), so it CAN fail a build after all: see the skip
+         below (CI-JACOCO-JDK27-1). Keep it in step with the root profile if that one changes.
+
+         🔴 CI-JACOCO-JDK27-1 (docs/BACKLOG.md, 2026-09-18): every submodule here inherits
+         `maven.compiler.release=27` with no override, so every one of their class files is major version
+         71 — which jacoco-maven-plugin 0.8.13 cannot parse ("Unsupported class file major version 71").
+         Confirmed by building the whole reactor: `asn-core` succeeds once skipped, then `asn-schema` fails
+         identically at the very next module — this is not an asn-core-specific defect, it is every
+         submodule in this POM. Skipped here, at the parent, so all eight inherit the skip in one place
+         rather than needing it repeated per submodule. Real tests are unaffected; only coverage reporting
+         for this reactor stops until a jacoco release supports class file v71. -->
     <profiles>
         <profile>
             <id>coverage</id>
@@ -77,6 +87,9 @@
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
                         <version>0.8.13</version>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
                         <executions>
                             <execution>
                                 <id>prepare-agent</id>

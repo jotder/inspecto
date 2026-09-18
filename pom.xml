@@ -145,7 +145,15 @@
              'mvn -Pcoverage test'. A normal 'mvn test' is unaffected (profile inactive; the default
              empty <argLine> below keeps surefire's @{argLine} resolving cleanly). Formerly duplicated
              in only the inspecto + inspecto-agent child POMs; centralised here so all modules
-             (intelligence + agent-hosted + connectors + security included) report coverage. -->
+             (intelligence + agent-hosted + connectors + security included) report coverage.
+
+             🔴 CI-JACOCO-JDK27-1 (docs/BACKLOG.md, 2026-09-18): `maven.compiler.release` is now 27
+             (below), so every module's class files are major version 71 — jacoco-maven-plugin 0.8.13
+             cannot parse those ("Unsupported class file major version 71"). Confirmed by building the
+             full reactor: `inspecto-util`, the first module after `asn-decoders`, fails identically.
+             Skipped here for the same reason and in the same shape as the mirrored profile in
+             `asn-parser/asn-decoders/pom.xml`. Real tests are unaffected; only coverage reporting stops,
+             repo-wide, until a jacoco release supports class file v71. -->
         <profile>
             <id>coverage</id>
             <build>
@@ -154,6 +162,9 @@
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
                         <version>0.8.13</version>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
                         <executions>
                             <execution>
                                 <id>prepare-agent</id>
