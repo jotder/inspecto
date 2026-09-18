@@ -118,10 +118,16 @@ describe('toPipelineG6Data', () => {
     });
 
     it('overlays provenance counts onto matching edges (label + weight) and leaves others plain', () => {
-        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 1234 }]);
+        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 1234, simulated: false }]);
         const { edges } = toPipelineG6Data(graph, counts);
         expect(edges[0].data).toEqual({ kind: 'data · 1,234', weight: 1234 }); // matched
         expect(edges[1].data).toEqual({ kind: 'route:emea' }); // no count for this rel
+    });
+
+    it('marks a dry run\'s rows as simulated (label suffix + flag, PIPELINE-DRYRUN-1)', () => {
+        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 1234, simulated: true }]);
+        const { edges } = toPipelineG6Data(graph, counts);
+        expect(edges[0].data).toEqual({ kind: 'data · 1,234 (simulated)', weight: 1234, simulated: true });
     });
 });
 
@@ -144,7 +150,7 @@ describe('authoredToG6 last-run overlay (T17)', () => {
     ]);
 
     it('paints matching edges with the last-run count and leaves others plain', () => {
-        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 42 }]);
+        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 42, simulated: false }]);
         const { edges } = authoredToG6(pipeline, typeCat, undefined, undefined, counts);
         expect(edges[0].data).toEqual({ kind: 'data · 42', weight: 42 });
         expect(edges[1].data).toEqual({ kind: 'dropped' });
@@ -160,16 +166,16 @@ describe('authoredToG6 last-run overlay (T17)', () => {
 describe('nodeLastRunTotal', () => {
     it('sums every relationship a node emitted in the run', () => {
         const counts = provenanceCounts([
-            { nodeId: 'acq', rel: 'data', rowCount: 40 },
-            { nodeId: 'acq', rel: 'dropped', rowCount: 2 },
-            { nodeId: 'sink', rel: 'data', rowCount: 40 },
+            { nodeId: 'acq', rel: 'data', rowCount: 40, simulated: false },
+            { nodeId: 'acq', rel: 'dropped', rowCount: 2, simulated: false },
+            { nodeId: 'sink', rel: 'data', rowCount: 40, simulated: false },
         ]);
         expect(nodeLastRunTotal('acq', counts)).toBe(42);
         expect(nodeLastRunTotal('sink', counts)).toBe(40);
     });
 
     it('returns null for a node that recorded nothing in the run (distinct from a real zero)', () => {
-        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 0 }]);
+        const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 0, simulated: false }]);
         expect(nodeLastRunTotal('sink', counts)).toBeNull();
         expect(nodeLastRunTotal('acq', counts)).toBe(0);
     });

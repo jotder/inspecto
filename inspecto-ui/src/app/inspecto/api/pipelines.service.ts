@@ -308,6 +308,7 @@ export interface ProvenanceCount {
     nodeId: string;
     rel: string;
     rowCount: number;
+    simulated: boolean;
 }
 
 /** The result of copying a pipeline into a template (POST /pipelines/{name}/save-as-template). */

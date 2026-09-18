@@ -2637,7 +2637,7 @@ describe('PipelineEditorComponent', () => {
 
     it('selecting a pipeline loads its last-run overlay and paints edge counts (T17)', () => {
         api.provenanceBatches.mockReturnValue(of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50 }]));
-        api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50 }]));
+        api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50, simulated: false }]));
         const c = make();
         c.select('demo');
         expect(api.provenanceBatches).toHaveBeenCalledWith('demo');
@@ -2651,7 +2651,7 @@ describe('PipelineEditorComponent', () => {
 
     it('a node absent from the last run has no overlay (null, not zero)', () => {
         api.provenanceBatches.mockReturnValue(of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50 }]));
-        api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50 }]));
+        api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50, simulated: false }]));
         const c = make();
         c.select('demo');
         c.selectedNode.set(c.model()!.nodes[1]); // flt — never emitted in this run
