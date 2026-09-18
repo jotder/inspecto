@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** — ⬇ **59 → 54 across two passes today.**
+> **55<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18.**
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 21<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1532,6 +1532,31 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ Access details are an owed input in §1. ⛔ `SCR-3`'s acceptance stays unmet until both are run —
   a shift that reads this row looking for code to write will find none and may mark it done.
 ## 4. Engineering / tech-debt
+
+- **P1** · **`CI-JACOCO-JDK27-1` — the `test` CI check has been RED on every `master` push since at least
+  2026-09-17 (5+ consecutive runs), unrelated to the code each push carries.** `ci.yml`'s `test` job builds
+  on JDK 27 (`java-version: '27'`) with the `-Pcoverage` profile active, which binds `jacoco-maven-plugin`
+  `0.8.13` (pinned in the parent `pom.xml`'s `coverage` profile) to every module's `test` phase. JaCoCo
+  0.8.13 cannot parse a JDK 27 class file: `asn-core`'s `report` goal fails with *"Unsupported class file
+  major version 71"* on `ParseError.class`, which fails the whole reactor build at that module (`mvn -rf
+  :asn-core`) regardless of what the push changed — confirmed by two unrelated PRs (`#8`, `#9`, both
+  merged 2026-09-18) failing on the identical error with 0 code overlap between them.
+  ⚠ **Not a code defect** — every module's actual tests pass; the failure is purely
+  `jacoco-maven-plugin` 0.8.13 vs. class file major version 71 (JDK 27) during report generation, not
+  during test execution. ⛔ **Silently masks real breakage**: because `test` has been red for its own
+  reason since 2026-09-17, a genuine test regression landing on `master` in that window would show the
+  same red X and could pass unnoticed by anyone scanning for "is CI green" rather than reading the log.
+  **Fix options** (need an operator call, not just a version bump — check compatibility first): (a) bump
+  `jacoco-maven-plugin` to a release that supports major version 71, if one exists yet; (b) gate the
+  `coverage` profile off `asn-core` (or off the whole `asn-parser` reactor, which the root pom aggregates
+  separately and which inherits nothing from `inspecto-parent` per `java-backend` skill's module map) so
+  an incompatible submodule cannot fail the whole build; (c) drop the JDK version CI builds against, if 27
+  was chosen ahead of jacoco/toolchain support rather than for a language feature the code needs. Until
+  fixed, do not read a red `test` check as evidence of a real regression without reading past the JaCoCo
+  stack trace to confirm — and do not spend more than a glance re-diagnosing this exact stack trace, since
+  it has already been confirmed identical across two unrelated PRs.
+  → `.github/workflows/ci.yml` (`test` job, `-Pcoverage`) · `pom.xml` (`coverage` profile, jacoco 0.8.13) ·
+  `asn-parser/asn-decoders/asn-core/pom.xml`
 
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   ⚠ **RE-GROUNDED 2026-09-16 — still open, still NOT startable, and NOT already shipped.**
