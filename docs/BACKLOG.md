@@ -1533,30 +1533,44 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   a shift that reads this row looking for code to write will find none and may mark it done.
 ## 4. Engineering / tech-debt
 
-- **P1** · **`CI-JACOCO-JDK27-1` — the `test` CI check has been RED on every `master` push since at least
-  2026-09-17 (5+ consecutive runs), unrelated to the code each push carries.** `ci.yml`'s `test` job builds
-  on JDK 27 (`java-version: '27'`) with the `-Pcoverage` profile active, which binds `jacoco-maven-plugin`
-  `0.8.13` (pinned in the parent `pom.xml`'s `coverage` profile) to every module's `test` phase. JaCoCo
-  0.8.13 cannot parse a JDK 27 class file: `asn-core`'s `report` goal fails with *"Unsupported class file
-  major version 71"* on `ParseError.class`, which fails the whole reactor build at that module (`mvn -rf
-  :asn-core`) regardless of what the push changed — confirmed by two unrelated PRs (`#8`, `#9`, both
-  merged 2026-09-18) failing on the identical error with 0 code overlap between them.
-  ⚠ **Not a code defect** — every module's actual tests pass; the failure is purely
-  `jacoco-maven-plugin` 0.8.13 vs. class file major version 71 (JDK 27) during report generation, not
-  during test execution. ⛔ **Silently masks real breakage**: because `test` has been red for its own
-  reason since 2026-09-17, a genuine test regression landing on `master` in that window would show the
-  same red X and could pass unnoticed by anyone scanning for "is CI green" rather than reading the log.
-  **Fix options** (need an operator call, not just a version bump — check compatibility first): (a) bump
-  `jacoco-maven-plugin` to a release that supports major version 71, if one exists yet; (b) gate the
-  `coverage` profile off `asn-core` (or off the whole `asn-parser` reactor, which the root pom aggregates
-  separately and which inherits nothing from `inspecto-parent` per `java-backend` skill's module map) so
-  an incompatible submodule cannot fail the whole build; (c) drop the JDK version CI builds against, if 27
-  was chosen ahead of jacoco/toolchain support rather than for a language feature the code needs. Until
-  fixed, do not read a red `test` check as evidence of a real regression without reading past the JaCoCo
-  stack trace to confirm — and do not spend more than a glance re-diagnosing this exact stack trace, since
-  it has already been confirmed identical across two unrelated PRs.
-  → `.github/workflows/ci.yml` (`test` job, `-Pcoverage`) · `pom.xml` (`coverage` profile, jacoco 0.8.13) ·
-  `asn-parser/asn-decoders/asn-core/pom.xml`
+- ~~**P1** · **`CI-JACOCO-JDK27-1`**~~ ✅ **SHIPPED 2026-09-18 — option (b), widened past the row's own
+  scope after grounding.** The row named `asn-core` only because it's the first module Maven reaches;
+  building past it (once skipped) proved the SAME failure recurs at every subsequent module in BOTH
+  reactors — confirmed live: `asn-schema` failed identically right after `asn-core`, and once
+  `asn-decoders` was fully skipped, `inspecto-util` failed identically in the MAIN reactor, because the
+  root `pom.xml`'s own `maven.compiler.release` was independently bumped to 27 (a same-day, unrelated
+  commit) — every module in both reactors compiles to class file v71, not just the nine `asn-decoders`
+  ones. **Fix, in two places, one per reactor**: `<skip>true</skip>` added to the `jacoco-maven-plugin`
+  `<configuration>` in both `pom.xml`'s and `asn-parser/asn-decoders/pom.xml`'s `coverage` profiles —
+  ⛔ NOT per-submodule (an `asn-core`-only skip was tried first, confirmed insufficient by driving the
+  build past it into `asn-schema`, then reverted in favour of the parent-level fix so all 8+21 modules
+  inherit it in two places instead of needing it repeated per module). Option (a) (bump jacoco) was
+  rejected as unverifiable offline this soon after a JDK 27 GA (2026-09-15); option (c) (drop the JDK
+  version) was rejected as it would just break compilation instead, since the root `release=27` bump and
+  the `eoiagent` JDK 25+ bytecode requirement are both already load-bearing. Verified: the full reactor
+  (`mvn -o -Pcoverage,edition-enterprise clean test`) now runs every module's real tests with no jacoco
+  error anywhere — it proceeds past the point this row's own diagnosis stops at, all the way through
+  `inspecto-engine`, before hitting the unrelated `WorkflowConfigLoadTest-1` crash below (a DIFFERENT
+  defect this row's fix simply unblocked visibility into — do not conflate the two).
+  → `pom.xml` (`coverage` profile) · `asn-parser/asn-decoders/pom.xml` (`coverage` profile)
+
+- **P1** · **`WorkflowConfigLoadTest-1` — `inspecto-ops`'s forked test JVM crashes outright on JDK 27,
+  found only because `CI-JACOCO-JDK27-1`'s fix let the build reach this far.** Reproducible with or
+  without `-Pcoverage` (rules out jacoco as the cause): `mvn -o -pl inspecto-ops -am -Pedition-enterprise
+  -Dtest=WorkflowConfigLoadTest test` fails at fork STARTUP, before any test runs (`Tests run: 0`) —
+  *"The forked VM terminated without properly saying goodbye. VM crash or System.exit called?"*,
+  `Process Exit Code: 1`. No dump/`hs_err` file was produced. 🔴 **Ungrounded past this point — filed
+  on the operator's instruction to stop and record rather than dig further this session.** Strongest lead
+  found so far, not yet confirmed as the cause: the root `pom.xml` pins `maven-surefire-plugin` at
+  **3.2.5** (line ~468) — noticeably older than the `3.5.3` pinned for `asn-decoders`'s own submodules,
+  which build and run cleanly on the same JDK 27 in the same session. Surefire's fork-booter launch
+  mechanism has a known history of JDK-version sensitivity; a version mismatch this large against a JDK
+  that GA'd 2026-09-15 is worth checking before looking elsewhere. The same `<configuration>` block also
+  carries `--enable-native-access=ALL-UNNAMED`, commented as *"silences DuckDB JNI warnings on Java 24"*
+  — worth checking whether that flag's behavior changed by JDK 27, though the fork fails before any
+  native call would execute, which weakly points away from it. Fix: bump `maven-surefire-plugin` to
+  match the `3.5.3` already proven to work elsewhere, or root-cause the fork failure directly with `-X`.
+  → `pom.xml` (surefire plugin pin, ~line 468) · `inspecto-ops/src/test/java/com/gamma/opsboot/WorkflowConfigLoadTest.java`
 
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   ⚠ **RE-GROUNDED 2026-09-16 — still open, still NOT startable, and NOT already shipped.**
