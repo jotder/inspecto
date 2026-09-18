@@ -1658,6 +1658,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * this method, so the two never double up.
      */
     public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName) {
+        return runPipeline(pipelineName, false);
+    }
+
+    /**
+     * As {@link #runPipeline(String)}, but a {@code dryRun} manual run (PIPELINE-DRYRUN-1) acquires without
+     * applying a remote source's post-action — see {@link com.gamma.inspector.CollectorProcessor#acquire(
+     * com.gamma.etl.PipelineConfig, boolean)}. Ingest still commits: this closes the acquisition-phase gap
+     * only (a pipeline with {@code collector.post_action.on_success=DELETE} is otherwise unprotected by any
+     * dry-run trigger), not a preview of the ingest write.
+     */
+    public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName, boolean dryRun) {
         refuseIfTemplate(pipelineName);
         return underSpace(() -> {
             Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
@@ -1667,7 +1678,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     running.add(pipelineName);
                     try {
                         pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence
-                        return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink());
+                        return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), dryRun);
                     } finally {
                         running.remove(pipelineName);
                     }
@@ -1690,6 +1701,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return triggerRunAsync(pipelineName, "manual");
     }
 
+    /** {@link #triggerRunAsync(String)} with a {@code dryRun} preview (PIPELINE-DRYRUN-1) — see {@link #runPipeline(String, boolean)}. */
+    public Optional<String> triggerRunAsync(String pipelineName, boolean dryRun) {
+        return triggerRunAsync(pipelineName, "manual", dryRun);
+    }
+
     /**
      * Back-compat for the pre-v1 trigger routes ({@code POST /runs/{name}/trigger}, {@code /collectors/{id}/notify}):
      * run a pipeline off the request thread and block for its result, so the legacy caller still receives the
@@ -1699,11 +1715,16 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * field doc), without changing the response contract. Empty if no pipeline by that name.
      */
     public Optional<MultiCollectorProcessor.RunResult> runPipelineOffThread(String pipelineName) {
+        return runPipelineOffThread(pipelineName, false);
+    }
+
+    /** {@link #runPipelineOffThread(String)} with a {@code dryRun} preview (PIPELINE-DRYRUN-1) — see {@link #runPipeline(String, boolean)}. */
+    public Optional<MultiCollectorProcessor.RunResult> runPipelineOffThread(String pipelineName, boolean dryRun) {
         if (pathFor(pipelineName).isEmpty()) return Optional.empty();
         refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         try {
             return Optional.of(triggerWorkers.submit(
-                    () -> runPipeline(pipelineName).orElse(new MultiCollectorProcessor.RunResult(0, 0))).get());
+                    () -> runPipeline(pipelineName, dryRun).orElse(new MultiCollectorProcessor.RunResult(0, 0))).get());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("interrupted while awaiting pipeline '" + pipelineName + "'", e);
@@ -1716,6 +1737,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /** {@link #triggerRunAsync(String)} with an explicit trigger label ({@code manual} | {@code notify} — ACQ-6). */
     public Optional<String> triggerRunAsync(String pipelineName, String trigger) {
+        return triggerRunAsync(pipelineName, trigger, false);
+    }
+
+    /** {@link #triggerRunAsync(String, String)} with a {@code dryRun} preview (PIPELINE-DRYRUN-1) — see {@link #runPipeline(String, boolean)}. */
+    public Optional<String> triggerRunAsync(String pipelineName, String trigger, boolean dryRun) {
         if (pathFor(pipelineName).isEmpty()) return Optional.empty();
         refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         String runId = newPipelineRunId(pipelineName);
@@ -1724,7 +1750,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         triggerWorkers.submit(() -> {
             try {
                 MultiCollectorProcessor.RunResult res =
-                        runPipeline(pipelineName).orElse(new MultiCollectorProcessor.RunResult(0, 0));
+                        runPipeline(pipelineName, dryRun).orElse(new MultiCollectorProcessor.RunResult(0, 0));
                 liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start,
                         LocalDateTime.now().format(RUN_AT_TS), "SUCCESS", res.total(), res.failed(),
                         res.failed() + " of " + res.total() + " file(s) failed"));

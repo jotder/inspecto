@@ -55,13 +55,14 @@ class RemoteAcquisitionStagingTest {
     private static class FakeConnector implements CollectorConnector {
         private final Runnable onFetch;
         private final AtomicReference<Path> lastDest = new AtomicReference<>();
+        final List<PostAction> postActionsApplied = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
         FakeConnector(Runnable onFetch) { this.onFetch = onFetch; }
 
         @Override public String scheme() { return "fake"; }
-        @Override public EnumSet<Capability> capabilities() { return EnumSet.of(Capability.RESUMABLE); }
+        @Override public EnumSet<Capability> capabilities() { return EnumSet.allOf(Capability.class); }
         @Override public List<RemoteFile> discover(DiscoveryContext ctx) { return List.of(); }
-        @Override public void post(RemoteFile file, PostAction action) { }
+        @Override public void post(RemoteFile file, PostAction action) { postActionsApplied.add(action); }
         @Override public Readiness readiness(RemoteFile file) { return Readiness.READY; }
         @Override public InputStream open(RemoteFile file) {
             return new ByteArrayInputStream(PAYLOAD);   // unused here: this path stages to disk, never streams
@@ -101,7 +102,7 @@ class RemoteAcquisitionStagingTest {
         });
 
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
-                cfg, connector, List.of(listed("cdr_0001.csv", PAYLOAD.length)), RetryPolicy.NONE);
+                cfg, connector, List.of(listed("cdr_0001.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
 
         assertEquals(0L, inboxFilesDuringFetch.get(),
                 "the inbox must be empty while the bytes are still arriving — a partial is never ingestible");
@@ -135,7 +136,7 @@ class RemoteAcquisitionStagingTest {
         // The next attempt must be handed that same path, so a resumable connector can continue it.
         FakeConnector connector = new FakeConnector(null);
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
-                cfg, connector, List.of(listed("cdr_0002.csv", PAYLOAD.length)), RetryPolicy.NONE);
+                cfg, connector, List.of(listed("cdr_0002.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
 
         assertEquals(partial, connector.lastDest.get(),
                 "the staging path is deterministic, so the partial is resumed rather than restarted elsewhere");
@@ -152,7 +153,7 @@ class RemoteAcquisitionStagingTest {
         FakeConnector connector = new FakeConnector(null);
 
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
-                cfg, connector, List.of(listed("../../escaped.csv", PAYLOAD.length)), RetryPolicy.NONE);
+                cfg, connector, List.of(listed("../../escaped.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
 
         assertTrue(out.isEmpty(), "a listing path that escapes its root is skipped, not fetched");
         assertNull(connector.lastDest.get(), "no bytes were requested at all");
@@ -178,8 +179,63 @@ class RemoteAcquisitionStagingTest {
 
         IllegalStateException e = assertThrows(IllegalStateException.class, () ->
                 RemoteAcquisitionHandler.materializeRemote(
-                        cfg, connector, List.of(listed("x.csv", PAYLOAD.length)), RetryPolicy.NONE));
+                        cfg, connector, List.of(listed("x.csv", PAYLOAD.length)), RetryPolicy.NONE, false));
         assertTrue(e.getMessage().contains("staging"), "the refusal names the offending setting: " + e.getMessage());
         assertNull(connector.lastDest.get(), "refused before any bytes moved");
+    }
+
+    /**
+     * PIPELINE-DRYRUN-1: a {@code dryRun} acquisition still lands the file locally (proving the pipeline can read
+     * its source) but must never call the connector's {@code post()} — a {@code collector.post_action.on_success}
+     * of {@code DELETE} would otherwise destroy the remote original on what an operator triggered as a preview.
+     */
+    @Test
+    void dryRunLandsTheFileButNeverAppliesTheDeletePostAction(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, """
+              batch:
+                max_files: 100
+            """);
+        Files.writeString(toon, Files.readString(toon) + """
+            collector:
+              post_action:
+                on_success: DELETE
+            """);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        FakeConnector connector = new FakeConnector(null);
+
+        List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
+                cfg, connector, List.of(listed("cdr_dryrun.csv", PAYLOAD.length)), RetryPolicy.NONE, true);
+
+        assertEquals(1, out.size(), "a dry run still fetches and lands the file, proving the source is reachable");
+        assertTrue(out.get(0).localPath().startsWith(inbox), "landed in the inbox exactly as a real run would");
+        assertTrue(connector.postActionsApplied.isEmpty(),
+                "DELETE must never be applied to the remote original on a dry-run trigger");
+    }
+
+    /** The non-dry-run counterpart: a real run DOES apply the configured post-action. */
+    @Test
+    void aRealRunAppliesTheDeletePostAction(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, """
+              batch:
+                max_files: 100
+            """);
+        Files.writeString(toon, Files.readString(toon) + """
+            collector:
+              post_action:
+                on_success: DELETE
+            """);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        FakeConnector connector = new FakeConnector(null);
+
+        List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
+                cfg, connector, List.of(listed("cdr_real.csv", PAYLOAD.length)), RetryPolicy.NONE, false);
+
+        assertEquals(1, out.size());
+        assertEquals(1, connector.postActionsApplied.size(), "a real run applies the configured post-action");
+        assertEquals(PostAction.Kind.DELETE, connector.postActionsApplied.get(0).kind());
     }
 }
