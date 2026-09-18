@@ -124,6 +124,7 @@ import {
     nodeConfigEntries,
     nodeLastRunTotal,
     provenanceCounts,
+    ProvenanceOverlay,
     removeEdgeFromModel,
     removeNodeFromModel,
     setEdgeRelInModel,
@@ -478,7 +479,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /** The most recent recorded run of the selected pipeline (`null` = none yet, or provenance backend unset). */
     readonly lastRunBatch = signal<ProvenanceBatch | null>(null);
     /** `nodeId|rel` → row count for {@link lastRunBatch} — paints edge weights and the inspector's node total. */
-    private readonly lastRunCounts = signal<Map<string, number>>(new Map());
+    private readonly lastRunCounts = signal<Map<string, ProvenanceOverlay>>(new Map());
     /** node-type → emitted relationships, for the edge relationship picker. */
     private readonly typeEmits = signal<Map<string, string[]>>(new Map());
     /**

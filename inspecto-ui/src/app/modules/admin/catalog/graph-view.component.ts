@@ -353,7 +353,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     stroke: (d) => edgeColorOf(d),
                     opacity: (d) => (emEdges ? (emEdges.has(d.id as string) ? 1 : 0.2) : 1),
                     endArrow: true,
-                    lineDash: (d) => edgeDash(display?.edgePatterns[baseEdgeKind((d.data as { kind?: string }).kind)]),
+                    // A dry-run's provenance rows (PIPELINE-DRYRUN-1) paint their edge dashed regardless of
+                    // the Display-menu pattern override, so a simulated run stays visually distinct.
+                    lineDash: (d) =>
+                        (d.data as { simulated?: boolean }).simulated
+                            ? edgeDash('dashed')
+                            : edgeDash(display?.edgePatterns[baseEdgeKind((d.data as { kind?: string }).kind)]),
                     // Per-kind size override wins; else the optional data-plane weight (T22 provenance
                     // overlay) scales the line width log-style; else the default (catalog/combined views).
                     lineWidth: (d) => {

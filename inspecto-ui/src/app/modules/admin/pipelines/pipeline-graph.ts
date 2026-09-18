@@ -269,7 +269,11 @@ export function nodeDisplayLabel(n: PipelineNode): string {
  * that relationship and a {@code weight} drives the line width — the structure plane painted with quantities
  * (§11). Edges with no recorded count are left at their default style.
  */
-export function toPipelineG6Data(g: PipelineGraph, counts?: Map<string, number>, iconMap?: IconMap): G6GraphData {
+export function toPipelineG6Data(
+    g: PipelineGraph,
+    counts?: Map<string, ProvenanceOverlay>,
+    iconMap?: IconMap,
+): G6GraphData {
     return {
         nodes: g.nodes.map((n) => ({
             id: n.id,
@@ -288,15 +292,27 @@ export function toPipelineG6Data(g: PipelineGraph, counts?: Map<string, number>,
                 id: `${e.from}->${e.to}:${e.rel}:${i}`,
                 source: e.from,
                 target: e.to,
-                data: count == null ? { kind: rel } : { kind: `${rel} · ${count.toLocaleString()}`, weight: count },
+                data: count == null ? { kind: rel } : edgeOverlayData(rel, count),
             };
         }),
     };
 }
 
-/** Build the {@code <nodeId>|<rel>} → rowCount lookup the overlay paints onto edges. */
-export function provenanceCounts(rows: ProvenanceCount[]): Map<string, number> {
-    return new Map(rows.map((r) => [`${r.nodeId}|${r.rel}`, r.rowCount]));
+/** The last-run row count plus whether that run was a dry run (PIPELINE-DRYRUN-1), keyed per edge. */
+export interface ProvenanceOverlay {
+    rowCount: number;
+    simulated: boolean;
+}
+
+/** Build the {@code <nodeId>|<rel>} → overlay lookup the Sankey/lineage view paints onto edges. */
+export function provenanceCounts(rows: ProvenanceCount[]): Map<string, ProvenanceOverlay> {
+    return new Map(rows.map((r) => [`${r.nodeId}|${r.rel}`, { rowCount: r.rowCount, simulated: r.simulated }]));
+}
+
+/** An edge's G6 `data`: label + weight, with a "(simulated)" suffix and flag for a dry-run's rows. */
+function edgeOverlayData(rel: string, overlay: ProvenanceOverlay): { kind: string; weight: number; simulated?: true } {
+    const label = `${rel} · ${overlay.rowCount.toLocaleString()}${overlay.simulated ? ' (simulated)' : ''}`;
+    return overlay.simulated ? { kind: label, weight: overlay.rowCount, simulated: true } : { kind: label, weight: overlay.rowCount };
 }
 
 /**
@@ -352,7 +368,7 @@ export function authoredToG6(
     typeCat: Map<string, string>,
     statusOf?: (node: AuthoredNode) => NodeStatus,
     iconMap?: IconMap,
-    lastRunCounts?: Map<string, number>,
+    lastRunCounts?: Map<string, ProvenanceOverlay>,
 ): G6GraphData {
     return {
         nodes: pipeline.nodes.map((n) => {
@@ -373,7 +389,7 @@ export function authoredToG6(
                 id: `${e.from}->${e.to}:${e.rel}:${i}`,
                 source: e.from,
                 target: e.to,
-                data: count == null ? { kind: e.rel } : { kind: `${e.rel} · ${count.toLocaleString()}`, weight: count },
+                data: count == null ? { kind: e.rel } : edgeOverlayData(e.rel, count),
             };
         }),
     };
@@ -384,10 +400,10 @@ export function authoredToG6(
  * from the {@code nodeId|rel} → rowCount lookup built by {@link provenanceCounts}. {@code null} when the node
  * recorded nothing in that run (not the same as a real {@code 0} — the inspector should read that as "no data").
  */
-export function nodeLastRunTotal(nodeId: string, counts: ReadonlyMap<string, number>): number | null {
+export function nodeLastRunTotal(nodeId: string, counts: ReadonlyMap<string, ProvenanceOverlay>): number | null {
     let total: number | null = null;
     for (const [key, count] of counts) {
-        if (key.startsWith(`${nodeId}|`)) total = (total ?? 0) + count;
+        if (key.startsWith(`${nodeId}|`)) total = (total ?? 0) + count.rowCount;
     }
     return total;
 }
