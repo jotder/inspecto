@@ -55,13 +55,14 @@ class RemoteAcquisitionStagingTest {
     private static class FakeConnector implements CollectorConnector {
         private final Runnable onFetch;
         private final AtomicReference<Path> lastDest = new AtomicReference<>();
+        final java.util.concurrent.atomic.AtomicInteger postCalls = new java.util.concurrent.atomic.AtomicInteger();
 
         FakeConnector(Runnable onFetch) { this.onFetch = onFetch; }
 
         @Override public String scheme() { return "fake"; }
-        @Override public EnumSet<Capability> capabilities() { return EnumSet.of(Capability.RESUMABLE); }
+        @Override public EnumSet<Capability> capabilities() { return EnumSet.of(Capability.RESUMABLE, Capability.DELETE); }
         @Override public List<RemoteFile> discover(DiscoveryContext ctx) { return List.of(); }
-        @Override public void post(RemoteFile file, PostAction action) { }
+        @Override public void post(RemoteFile file, PostAction action) { postCalls.incrementAndGet(); }
         @Override public Readiness readiness(RemoteFile file) { return Readiness.READY; }
         @Override public InputStream open(RemoteFile file) {
             return new ByteArrayInputStream(PAYLOAD);   // unused here: this path stages to disk, never streams
@@ -157,6 +158,54 @@ class RemoteAcquisitionStagingTest {
         assertTrue(out.isEmpty(), "a listing path that escapes its root is skipped, not fetched");
         assertNull(connector.lastDest.get(), "no bytes were requested at all");
         assertFalse(Files.exists(dir.resolve("escaped.csv")), "and nothing was written outside the roots");
+    }
+
+    /** A config whose collector post-action deletes the remote original on success (land-then-ack). */
+    private static PipelineConfig configWithDeletePostAction(Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, """
+              batch:
+                max_files: 100
+              collector:
+                post_action:
+                  on_success: DELETE
+              """);
+        return PipelineConfig.load(toon.toString());
+    }
+
+    /**
+     * PIPELINE-DRYRUN-1 gate 1 — under dry run the file is still fetched and landed for real (nothing
+     * downstream should see a difference), but the land-then-ack post-action's {@code connector.post(...)}
+     * call — which may delete the remote original — must be skipped.
+     */
+    @Test
+    void dryRunSkipsThePostActionButStillLandsTheFile(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = configWithDeletePostAction(dir);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        FakeConnector connector = new FakeConnector(null);
+
+        List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
+                cfg, connector, List.of(listed("cdr_dry.csv", PAYLOAD.length)), RetryPolicy.NONE, true);
+
+        assertEquals(1, out.size(), "the file is still fetched and landed under dry run");
+        assertTrue(out.get(0).localPath().startsWith(inbox));
+        assertEquals(0, connector.postCalls.get(),
+                "dry run must skip connector.post() — the remote original must not be deleted/moved/renamed/tagged");
+    }
+
+    /** Same config, real run: the post-action DOES fire — the control the dry-run test above is a control for. */
+    @Test
+    void aRealRunDoesApplyThePostAction(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = configWithDeletePostAction(dir);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        FakeConnector connector = new FakeConnector(null);
+
+        List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
+                cfg, connector, List.of(listed("cdr_real.csv", PAYLOAD.length)), RetryPolicy.NONE);
+
+        assertEquals(1, out.size());
+        assertEquals(1, connector.postCalls.get(), "a real run applies the configured post-action");
     }
 
     @Test

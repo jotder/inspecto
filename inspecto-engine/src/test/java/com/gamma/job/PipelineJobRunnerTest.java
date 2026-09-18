@@ -71,6 +71,51 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * PIPELINE-DRYRUN-1 — a manual-trigger dry run ({@code ctx.dryRun() == true}) runs the real
+     * {@code transform → sink} walk (so a broken graph still fails loudly) but writes NO bytes to the
+     * sink store, publishes no {@link com.gamma.etl.ConsignmentEvent} (so no downstream {@code on_pipeline}
+     * job fires), and records a {@code SIMULATED} row in the output registry instead of a silent no-op —
+     * see docs/superpower/pipeline-dryrun-design.md gate 2/3/4.
+     */
+    @Test
+    void dryRunWritesNoBytesFiresNoEventAndRecordsASimulatedRow() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_dryrun", new PipelineGraph("evt_dryrun", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "dryrun_rollup"), null)),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
+
+        java.util.concurrent.atomic.AtomicInteger publishedEvents = new java.util.concurrent.atomic.AtomicInteger();
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        bus.subscribe(e -> publishedEvents.incrementAndGet());
+
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+
+            JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "evt_dryrun", "data_dir", dataDir, "batch_id", "dry-1"));
+            CapturingJobContext ctx = new CapturingJobContext(Map.of(), true);
+            JobResult res = new PipelineJobRunner(cfg, bus, store, dataDir, auditDir).run(ctx);
+
+            assertTrue(res.success(), res.message());
+            assertFalse(Files.exists(Path.of(dataDir, "dryrun_rollup")),
+                    "dry run must write no bytes to the sink store");
+            assertEquals(0, publishedEvents.get(), "dry run must not publish a ConsignmentEvent — nothing downstream may fire");
+
+            List<com.gamma.consignment.ConsignmentOutput> rows = registry.outputs("dry-1");
+            assertEquals(1, rows.size(), "one simulated row for the one sink branch");
+            assertEquals(com.gamma.consignment.ConsignmentOutput.State.SIMULATED, rows.get(0).state());
+            assertEquals(2L, rows.get(0).rows(), "preview count: amt>=100 keeps id1(150) + id3(200)");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /**
      * operations-reference.md / addressing §6: without an enabled {@code retire_superseded} maintenance
      * job, every full recompute leaves a permanent extra copy on disk. The supplier is asked ONLY once a
      * recompute has actually superseded something — a first run over an empty registry has nothing to ask

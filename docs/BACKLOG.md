@@ -860,6 +860,68 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   not a pipeline's data writes, and neither hazard (a) nor (b) above runs through it.
   ⚠ `X4` is scoped against this row and ⛔ must not pick its replay default first. → `X4` above ·
   `okf/backend/pipeline-graph/execution-lanes.md`
+
+  🟡 **PARTIALLY SHIPPED 2026-09-18 — execution-phase dry run works end-to-end; acquisition-phase has the
+  mechanism but no operator trigger yet. Do not read this as full closure.**
+
+  **Job-flow finding (the plumbing question this row's design doc asked to resolve first):**
+  `CollectorProcessor`/`MultiCollectorProcessor` (acquisition — `CollectorService` schedules them) and
+  `PipelineJobRunner` (execution — `JobService`/`JobContext` schedules it) are **genuinely separate call
+  stacks with no shared `JobContext`**, not one Job's `dryRun()` covering both. `CollectorProcessor` never
+  references `JobContext` at all (confirmed zero references, and `JobService.java:1071-1073`'s own comment
+  says so: *"the paths that never reach this scheduler — `CollectorProcessor`, `EnrichJob` — need Run ids
+  that mean the same thing as these, not a second dialect of them"*). The two are chained only through the
+  `ConsignmentEvent`/Signal bus (`JobService.onConsignmentEvent`/`onSignalEvent`), and every firing mints
+  its **own fresh** `JobContext` (`ctx.dryRun(firing.dryRun())` set once per `submitRun`). So "dry-run the
+  whole pipeline" cannot be one ambient flag — it has to be threaded explicitly into each side, per the
+  design doc's own fallback instruction.
+
+  **Shipped:**
+  1. **Gate 1 (`RemoteAcquisitionHandler.applyPostAction`)** — skips `connector.post(...)` under dry run,
+     logs what it would have done. Threaded via new overloads (`CollectorProcessor.acquire(cfg, boolean
+     dryRun)`, `RemoteAcquisitionHandler.materializeRemote(..., boolean dryRun)`) — every existing call
+     site keeps calling the old overload (`dryRun=false`), so behaviour is unchanged today. Pinned by
+     `RemoteAcquisitionStagingTest#dryRunSkipsThePostActionButStillLandsTheFile` +
+     `#aRealRunDoesApplyThePostAction` (the control).
+  2. **Gate 2 (`PipelineJobRunner` → `PipelineExecutor.execute`)** — under `ctx.dryRun()` (manual trigger
+     only), a new no-op `DryRunSinkWriter` (writes no bytes, previews a row count via `SELECT count(*)`)
+     replaces `PartitionSinkWriter`, the `BranchCommitCoordinator` is built over a throwaway scratch
+     `BranchCommitLog` (never touches the real per-batch audit file), and watermark-advance,
+     supersede-earlier-revisions, DuckLake registration and the `ConsignmentEvent` publish (which is what
+     a downstream `on_pipeline` job reacts to) are all skipped. `PipelineExecutor.dryRun()` (T18) itself is
+     untouched, per instruction. Pinned by
+     `PipelineJobRunnerTest#dryRunWritesNoBytesFiresNoEventAndRecordsASimulatedRow`.
+  3. **Gate 3 (`DatasetWriteSignal.emit` × 2)** — both `ConsignmentProcessJobType.java` and
+     `MaterializeTask.java` now gate their emit call directly on the resolved dry-run flag (explicit, even
+     though the `ConsignmentProcessJobType` site was already vacuously safe — its `pending` map is never
+     populated under dry run because `persistSummaries`/`persistDerivedTables` already returned early).
+  4. **Gate 4 (provenance marker)** — `ConsignmentOutput.State` gained a new `SIMULATED` value (excluded
+     from every `state='LIVE'` readability/selection check in `DbConsignmentOutputStore`, so a dry run's
+     row can never be read as real data, superseded, or counted in a KPI); `DryRunSinkWriter` records one
+     such row per sink branch. 🔴 **Design-doc correction**: the doc named `DbConsignmentOutputStore` as
+     what `GET /provenance` renders — traced and confirmed **wrong**: `/provenance` is backed exclusively
+     by `DbProvenanceStore` (table `inspecto_pipeline_provenance`), a different store entirely
+     (`DbConsignmentOutputStore`/`consignment_outputs` is the ingest-side output-file registry, unrelated
+     to that route). Fixed by *also* adding a `simulated BOOLEAN` column to `inspecto_pipeline_provenance`
+     (additive migration) and a `simulated` field to `ProvenanceRow`, threaded through
+     `DbProvenanceStore.record`/`query` so a dry run's per-node counts render distinctly in the actual
+     Sankey overlay. UI badge NOT added (frontend change; the JSON now carries `"simulated": true|false`
+     per row for the UI to key off — filing as a residual below rather than attempting it inline).
+
+  **Not shipped / scoped down:** no operator-facing route threads `dryRun=true` into the acquisition side
+  (`CollectorService.triggerRunAsync`/`runPipelineOffThread` carry no such param) — gate 1's mechanism
+  exists and is unit-tested directly against `RemoteAcquisitionHandler`, but nothing in production calls it
+  with `true` yet. **"Dry-run the whole pipeline" today only dry-runs the execution phase**
+  (`POST /jobs/{name}/trigger?dryRun=true` on a `pipeline`-type job) — a pipeline whose acquisition is
+  remote and configured to delete-on-success is NOT protected by a dry-run trigger today, because no such
+  trigger reaches acquisition at all. Filed as a residual: add a `dryRun` param to whichever route triggers
+  `CollectorProcessor.acquire`/`run`, or a combined "dry-run this whole pipeline" route that fires both
+  phases with the same explicit flag. No true end-to-end test spans both phases in one dry run, for the
+  same reason — it would be testing a trigger surface that does not exist; each gate has its own focused
+  test instead against what is actually reachable.
+
+  **Tests:** `PipelineJobRunnerTest` 34/34, `RemoteAcquisitionStagingTest` 6/6, `DatasetWriteSignalTest`
+  2/2 — unit-level per CLAUDE.md's convention, not the full reactor gate.
 - **P2** · **`STREAM-CONSUMER-1` — adapter stream-consumer runtime** (filed 2026-09-10 — it was committed in `roadmap/ROADMAP.md` §3.4 and listed in `okf/capabilities/acquisition/acquisition.md` §"Open elsewhere on the board" with **no board row**, the id column pointing back at the ROADMAP paragraph). The land-then-ack seam exists (a source-side `post` that deletes the remote original runs only after the local copy is committed); the **consumer loop** that keeps an adapter draining a streaming source with at-least-once semantics does not. Not demand-gated: the ROADMAP commits to it. First action is a design pass on where the loop lives (Collector scan vs a long-running job), not code. → `okf/capabilities/acquisition/acquisition.md`
 - **P2** · **Pipeline graph** — flip the intake cap on by default (needs a soak); a pre-materialise cap to save remote-fetch bandwidth (cap applies post-dedup); 🔴 **THREE** kinds still last-one-wins, deliberately out of A2 scope: `acquisition`, `gap`, `dedup.marker` — *corrected 2026-09-09: `parser` was in this list and does NOT belong; a second parser is REFUSED by name (`MULTI_PARSER`, `PipelineEditable.java:65,720` — *line ref re-grounded 2026-09-16; it read `:696`, which the file has since drifted past*), which is the opposite of last-one-wins. `pipeline-editor.md` §Multiplicity states it correctly.*; 🔴 ~~`BatchGraphRunner` has zero production callers~~ **WRONG ON BOTH COUNTS — corrected 2026-09-09.** (a) **There is no class of that name** — it was renamed in the 2026-08-31 Consignment commit. (b) The class that DOES exist, `ConsignmentGraphRunner`, has **production callers**: `engages()` drives the live lane admission (`ConsignmentIngestStrategy.admittedLift`) and **`run(...)` executes on the ingest path** (`inspecto-engine/.../inspector/ConsignmentIngestStrategy.java:394` — *re-grounded 2026-09-16; it read `:355`, and the class is under `com.gamma.inspector`, not `com.gamma.consignment`. The caller pair is `admittedLift` at `:196` (`ConsignmentGraphRunner.engages`) and the `run(...)` at `:394`; both confirmed live*). ⛔ This row was cited as Row 15's parity blocker, so re-derive that gate before using it. ~~What IS still owed is §6 step 2, the parity gate through the compiled-recipe path.~~ ~~🔴 **The parity gate was RUN 2026-09-16 and is NOT MET**~~ ⛔ **SUPERSEDED — the gate is MET; see the ✅ below. This clause is kept only for the trail and must not be read as current.** — the root pom now passes `-Dingest.lane` to surefire (`mvn -Dingest.lane=graph test` = the whole suite with the flat lane disabled); 13 `inspecto-engine` tests refuse, for exactly two reasons the lane itself names: a **sink-count mismatch** (the multi-schema/plugin-ingester fixtures `events_etl`, `typed_record_etl` lift to 3 sinks against 1 declared) and **a Decision Rule routed rows** (`test_etl`), which the graph lane does not implement. Those two are the remaining work before Row 15's deletion half can start; re-run the one flag after each. ✅ **Each got its own row 2026-09-16, and the multi-schema one SHIPPED the same day** — 12 of the 13 are green and `-Dingest.lane=auto` now diverts multi-schema segment writes to the graph lane; ~~`GRAPH-LANE-RULE-ROUTED-1` is the only one left.~~ ✅ **STALE — corrected 2026-09-17: that row SHIPPED 2026-09-16 too** (`DecisionRuleApplier.java:233-237` deletes the routed rows above the fork, so both lanes see the identical remainder and no graph node was ever needed). ⇒ **the §6 step-2 parity gate is MET** — the whole suite under `-Dingest.lane=graph` is 4603/0/0/28, zero refusals — and **the only surviving clause on this row is the soak-gated intake-cap default flip**, verified still off (`IntakeGovernor.java:74`, `ingest.maxFilesPerCycle` defaults to `0` = UNBOUNDED). ⚠ Its stated cause (an arity mismatch) was NOT the whole gap — read the row before re-deriving it. **~~Pre-materialise cap: design-first~~** ✅ **SHIPPED 2026-09-16** — the §1 input was answered (operator: cap on **BYTES**, remainder **DEFERRED** to the next cycle) and built at the one choke point where candidate sizes are known: `-Dingest.maxBytesPerCycle` (off by default, so no existing install starts throttling) on `IntakeGovernor.Policy`, enforced oldest-first in `CollectorProcessor.admitBytes`. ⛔ **The starvation guard is part of the rule, not a follow-up**: a file LARGER than the cap fits in no cycle ever, so when nothing fits the oldest file is admitted **ALONE** with the overrun logged — otherwise it sits in the inbox permanently while smaller files overtake it, a silent stall that looks like a working cap. Mutation-proved (removing the guard strands it). 🔴 **Two defects found and fixed while building, either of which would have shipped silently:** the per-pipeline `processing.intake` override would have switched the GLOBAL byte cap OFF for any pipeline declaring an intake block (the legacy 3-arg `Policy` constructor defaults it to unbounded — it now inherits explicitly), and a negative/malformed property clamps to *off* rather than to *admit nothing*. ⚠ **Limitation, stated rather than papered over:** the cap runs after listing, on local files, so for a collector that fetches remotely BEFORE that point the saving is on materialisation, not on the fetch itself; moving it earlier needs a listing-with-sizes seam that does not exist. Pinned by `CollectorProcessorByteCapTest` + `IntakeByteCapTest`. As-built: `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.4 · §2.3; → `okf/backend/pipeline-graph/pipeline-graph-design.md` §8
 

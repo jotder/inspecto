@@ -64,6 +64,10 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
                     st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
                             + "pipeline_id VARCHAR, batch_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
                             + "row_count BIGINT, run_ts VARCHAR)");
+                    // PIPELINE-DRYRUN-1: additive migration, same rule as consignment_outputs' own columns —
+                    // CREATE TABLE IF NOT EXISTS never widens a pre-existing table, and a row written before
+                    // this column existed reads back NULL/false (a real run, not a dry one).
+                    st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS simulated BOOLEAN DEFAULT FALSE");
                 }
             });
         } catch (SQLException e) {
@@ -96,7 +100,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement("INSERT INTO " + T
-                        + " (pipeline_id, batch_id, node_id, rel, row_count, run_ts) VALUES (?,?,?,?,?,?)")) {
+                        + " (pipeline_id, batch_id, node_id, rel, row_count, run_ts, simulated) VALUES (?,?,?,?,?,?,?)")) {
                     for (ProvenanceRow r : rows) {
                         ps.setString(1, r.pipelineId());
                         ps.setString(2, r.batchId());
@@ -104,6 +108,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
                         ps.setString(4, r.rel());
                         ps.setLong(5, r.rowCount());
                         ps.setString(6, r.runTs());
+                        ps.setBoolean(7, r.simulated());
                         ps.addBatch();
                     }
                     ps.executeBatch();
@@ -121,7 +126,8 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
      * {@code (nodeId, rel)} onto its outgoing {@code PipelineGraph} edge as the Sankey weight).
      */
     public List<Map<String, Object>> query(String pipelineId, String batchId) {
-        String sql = "SELECT node_id AS \"nodeId\", rel, row_count AS \"rowCount\""
+        String sql = "SELECT node_id AS \"nodeId\", rel, row_count AS \"rowCount\", "
+                + "coalesce(simulated, FALSE) AS \"simulated\""
                 + " FROM " + T + " WHERE pipeline_id = ? AND batch_id = ? ORDER BY node_id, rel";
         try {
             return src.with(conn -> {

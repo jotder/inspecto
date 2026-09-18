@@ -265,6 +265,20 @@ public class CollectorProcessor {
      */
     @PublicApi(since = "1.0.0")
     public static int acquire(PipelineConfig cfg) throws java.io.IOException {
+        return acquire(cfg, false);
+    }
+
+    /**
+     * As above, plus PIPELINE-DRYRUN-1's acquisition-side gate: under {@code dryRun} every file is still
+     * fetched and landed, but the source-side post-action (the land-then-ack remote delete/move/rename/tag)
+     * is skipped — see {@link RemoteAcquisitionHandler#materializeRemote(PipelineConfig, CollectorConnector,
+     * List, RetryPolicy, boolean)}. No caller threads {@code dryRun=true} in today: acquisition and
+     * execution are genuinely separate schedulers (this class vs. {@code JobService}/{@code JobContext}),
+     * and no operator-facing acquisition trigger exists yet to carry the intent — see
+     * {@code docs/superpower/pipeline-dryrun-design.md}.
+     */
+    @PublicApi(since = "4.0.0")
+    public static int acquire(PipelineConfig cfg, boolean dryRun) throws java.io.IOException {
         if (!CollectorConnectors.isRemote(cfg)) return 0;   // local collector: nothing to acquire
 
         PipelineConfig.Collector src = cfg.collector();
@@ -315,7 +329,7 @@ public class CollectorProcessor {
 
             // Fetch the bytes into the staging tree and land them atomically in the poll root (B3a), so the rest
             // of the engine — dedup, markers, ledger, backup — treats them exactly like local files.
-            return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry).size();
+            return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry, dryRun).size();
         }
     }
 

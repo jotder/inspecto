@@ -104,6 +104,15 @@ public record ConsignmentOutput(
         /** Replaced by a reprocess of the same Consignment (§5.3). */
         SUPERSEDED,
         /** Merged into a compacted file and unlinked (§6.3). */
-        COMPACTED_AWAY
+        COMPACTED_AWAY,
+        /**
+         * PIPELINE-DRYRUN-1: a "would-have" row for a dry run — no bytes were written, {@code path} is a
+         * placeholder, and {@code rows} is a best-effort preview count. Deliberately excluded from every
+         * {@code state = 'LIVE'} readability/selection check in {@link DbConsignmentOutputStore} (isReadable,
+         * dailyVolume, supersede, the Sandbox/derived-table readers) so a dry run can never be read as real
+         * data or superseded/counted as one. Visible in the registry (and so in {@code GET /provenance}) only
+         * for the operator to see it happened.
+         */
+        SIMULATED
     }
 }

@@ -21,7 +21,17 @@ import com.gamma.api.PublicApi;
  * @param rel        the outgoing relationship (data / dropped / invalid / duplicate / route:&lt;key&gt;)
  * @param rowCount   the number of records emitted on {@code rel}
  * @param runTs      ISO-8601 timestamp of the run
+ * @param simulated  PIPELINE-DRYRUN-1: {@code true} when this row came from a dry run — no bytes were
+ *                   actually written for the batch it names, and {@code GET /provenance} renders it
+ *                   distinctly rather than as a real run's counts.
  */
 @PublicApi(since = "4.0.0")
 public record ProvenanceRow(String pipelineId, String batchId, String nodeId, String rel,
-                            long rowCount, String runTs) {}
+                            long rowCount, String runTs, boolean simulated) {
+
+    /** Pre-PIPELINE-DRYRUN-1 form — {@code simulated = false}. */
+    public ProvenanceRow(String pipelineId, String batchId, String nodeId, String rel,
+                         long rowCount, String runTs) {
+        this(pipelineId, batchId, nodeId, rel, rowCount, runTs, false);
+    }
+}

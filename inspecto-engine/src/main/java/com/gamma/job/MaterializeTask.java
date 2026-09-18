@@ -142,9 +142,14 @@ final class MaterializeTask {
         // same parameter that ConsignmentProcessJobType filled with a PROCESSOR id, so no consumer could
         // tell the two apart (DATASET-SELF-TRIGGER-1). The owning pipeline is known only when this job was
         // fired by a pipeline commit; a cron or manual materialize has none, and null suppresses nothing.
-        com.gamma.signal.DatasetWriteSignal.emit(target, rows,
-                com.gamma.signal.Ref.of("job", cfg.name()),
-                TriggerInfo.owningPipeline(ctx));
+        // PIPELINE-DRYRUN-1 gate 3: this task's own writes above are unconditional (materialize is not one
+        // of the whole-pipeline dry-run gates — it is its own Job Type, not part of the acquire/execute
+        // pair a pipeline dry run covers), but the announcement itself must still not fire under dry run:
+        // it is what a downstream on:dataset pipeline reacts to, and a dry run must trigger nothing.
+        if (ctx == null || !ctx.dryRun())
+            com.gamma.signal.DatasetWriteSignal.emit(target, rows,
+                    com.gamma.signal.Ref.of("job", cfg.name()),
+                    TriggerInfo.owningPipeline(ctx));
 
         return JobResult.ok("materialize: " + rows + " row(s) → " + outDir.resolve(snapshot)
                 + " (dataset '" + target + "' refreshed)", (System.nanoTime() - t0) / 1_000_000L);

@@ -68,6 +68,20 @@ final class RemoteAcquisitionHandler {
      */
     static List<RemoteFile> materializeRemote(PipelineConfig cfg, CollectorConnector primary,
                                               List<RemoteFile> ready, RetryPolicy retry) {
+        return materializeRemote(cfg, primary, ready, retry, false);
+    }
+
+    /**
+     * As above, plus PIPELINE-DRYRUN-1's acquisition-side gate: under {@code dryRun}, every file is still
+     * fetched and landed exactly as normal (the local copy is real — nothing downstream should see a
+     * difference), but {@link #applyPostAction} skips the actual {@code connector.post(...)} call (the
+     * land-then-ack remote delete/move/rename/tag) and only logs what it would have done. No caller
+     * currently threads {@code dryRun=true} in from an operator trigger — see
+     * {@code docs/superpower/pipeline-dryrun-design.md} for why acquisition has no such trigger surface
+     * today — but the mechanism is here for one to call.
+     */
+    static List<RemoteFile> materializeRemote(PipelineConfig cfg, CollectorConnector primary,
+                                              List<RemoteFile> ready, RetryPolicy retry, boolean dryRun) {
         Path pollRoot = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String etagAlgo = cfg.collector().duplicate().algorithm();
         PipelineConfig.Fetch fetch = cfg.collector().fetch();
@@ -97,7 +111,7 @@ final class RemoteAcquisitionHandler {
             AcquisitionTelemetry.setActiveConnections(cfg, 1);
             try {
                 for (RemoteFile rf : toFetch)
-                    fetchOne(cfg, primary, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged);
+                    fetchOne(cfg, primary, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged, dryRun);
             } finally {
                 AcquisitionTelemetry.setActiveConnections(cfg, 0);
             }
@@ -124,7 +138,7 @@ final class RemoteAcquisitionHandler {
                     futures.add(ex.submit(() -> {
                         CollectorConnector c = pool.take();   // blocks until a session frees up ⇒ bounds concurrency
                         try {
-                            fetchOne(cfg, c, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged);
+                            fetchOne(cfg, c, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged, dryRun);
                         } finally {
                             pool.put(c);
                         }
@@ -161,7 +175,7 @@ final class RemoteAcquisitionHandler {
      */
     private static void fetchOne(PipelineConfig cfg, CollectorConnector connector, RemoteFile rf, Path pollRoot,
                                  Path stagingRoot, String etagAlgo, RetryPolicy retry, RateLimiter limiter,
-                                 PostAction postAction, List<RemoteFile> staged) {
+                                 PostAction postAction, List<RemoteFile> staged, boolean dryRun) {
         if (limiter != null && rf.hasSize()) {
             try { limiter.acquire(rf.size()); }
             catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
@@ -183,7 +197,7 @@ final class RemoteAcquisitionHandler {
         Path landed = land(cfg, rf, fetched, target);
         if (landed == null) return;    // the bytes stay in staging; the next cycle re-lands them
 
-        applyPostAction(cfg, connector, rf, postAction);
+        applyPostAction(cfg, connector, rf, postAction, dryRun);
         staged.add(rf.withLocalPath(landed));
     }
 
@@ -317,8 +331,14 @@ final class RemoteAcquisitionHandler {
      * safely staged locally — it is logged + metered and the file proceeds to ingest. Emits {@code FILE_ARCHIVED}
      * on success.
      */
-    private static void applyPostAction(PipelineConfig cfg, CollectorConnector connector, RemoteFile rf, PostAction action) {
+    private static void applyPostAction(PipelineConfig cfg, CollectorConnector connector, RemoteFile rf,
+                                        PostAction action, boolean dryRun) {
         if (action == null) return;
+        if (dryRun) {
+            log.info("dry run: would apply post-action {} to {} on {} — connector.post() skipped",
+                    action.kind(), rf.relativePath(), cfg.identity().pipelineName());
+            return;
+        }
         try {
             connector.post(rf, action);
             AcquisitionTelemetry.emitFileArchived(cfg, rf, action.kind().name());
