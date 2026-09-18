@@ -284,7 +284,10 @@ public class CollectorProcessor {
      * exactly as a real cycle would — so a manual preview trigger still proves the pipeline can reach and read
      * its remote source — while skipping the source-side post-action, so a {@code collector.post_action.on_success}
      * of {@code DELETE}/{@code MOVE}/{@code RENAME} never touches the remote original. See
-     * {@link RemoteAcquisitionHandler#materializeRemote}.
+     * {@link RemoteAcquisitionHandler#materializeRemote(PipelineConfig, CollectorConnector, List, RetryPolicy,
+     * boolean)}. {@code CollectorService}'s manual pipeline trigger ({@code POST /runs/{name}/trigger?dryRun=true})
+     * is the one operator-facing route that carries {@code dryRun=true} in; see
+     * {@code docs/superpower/pipeline-dryrun-design.md}.
      */
     @PublicApi(since = "4.0.0")
     public static int acquire(PipelineConfig cfg, boolean dryRun) throws java.io.IOException {

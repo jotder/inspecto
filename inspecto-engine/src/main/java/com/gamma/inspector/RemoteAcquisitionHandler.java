@@ -65,11 +65,20 @@ final class RemoteAcquisitionHandler {
      * mtime so METADATA dedup stays stable across cycles. The returned {@link RemoteFile}s carry the local path,
      * so {@code dedupLocal} and the downstream batch path handle them with no special-casing. The
      * {@code inspecto_active_connections} gauge is held at 1 for the duration.
-     *
-     * @param dryRun PIPELINE-DRYRUN-1: {@code true} ⇒ fetch and land exactly as a real cycle would (so a manual
-     *               preview still proves the pipeline can read its source), but skip the source-side
-     *               {@link #applyPostAction post-action} — a {@code DELETE}/{@code MOVE}/{@code RENAME} on
-     *               success must never touch the remote original on a preview trigger.
+     */
+    static List<RemoteFile> materializeRemote(PipelineConfig cfg, CollectorConnector primary,
+                                              List<RemoteFile> ready, RetryPolicy retry) {
+        return materializeRemote(cfg, primary, ready, retry, false);
+    }
+
+    /**
+     * As above, plus PIPELINE-DRYRUN-1's acquisition-side gate: under {@code dryRun}, every file is still
+     * fetched and landed exactly as normal (the local copy is real — a manual preview still proves the
+     * pipeline can reach and read its source, and nothing downstream should see a difference), but
+     * {@link #applyPostAction} skips the actual {@code connector.post(...)} call (the land-then-ack remote
+     * delete/move/rename/tag) and only logs what it would have done. {@code CollectorService}'s manual
+     * pipeline trigger ({@code POST /runs/{name}/trigger?dryRun=true}) is the operator-facing route that
+     * threads {@code dryRun=true} in — see {@code docs/superpower/pipeline-dryrun-design.md}.
      */
     static List<RemoteFile> materializeRemote(PipelineConfig cfg, CollectorConnector primary,
                                               List<RemoteFile> ready, RetryPolicy retry, boolean dryRun) {
@@ -331,8 +340,8 @@ final class RemoteAcquisitionHandler {
                                         PostAction action, boolean dryRun) {
         if (action == null) return;
         if (dryRun) {
-            log.info("[DRY RUN] would apply post-action {} to {} on {} — skipped", action.kind(),
-                    rf.relativePath(), cfg.identity().pipelineName());
+            log.info("dry run: would apply post-action {} to {} on {} — connector.post() skipped",
+                    action.kind(), rf.relativePath(), cfg.identity().pipelineName());
             return;
         }
         try {

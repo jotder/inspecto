@@ -347,8 +347,12 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
             // commit — `event:<pipeline>`; a cron or manual run genuinely has no owner, and passing null
             // then is correct rather than a gap: it suppresses nothing, exactly as before.
             String owningPipeline = TriggerInfo.owningPipeline(ctx);
-            pending.forEach((w, n) -> com.gamma.signal.DatasetWriteSignal.emit(
-                    w.store(), n, com.gamma.signal.Ref.of("processor", w.producer()), owningPipeline));
+            // PIPELINE-DRYRUN-1 gate 3: explicit, though `pending` is already empty under dry run today
+            // (persistSummaries/persistDerivedTables return early before ever populating it) — stated
+            // directly here too so this site stays correct even if that upstream discipline ever changes.
+            if (!ctx.dryRun())
+                pending.forEach((w, n) -> com.gamma.signal.DatasetWriteSignal.emit(
+                        w.store(), n, com.gamma.signal.Ref.of("processor", w.producer()), owningPipeline));
 
             return chain.size() == 1
                     ? new JobResult(last.status(), last.message(), ms(t0))

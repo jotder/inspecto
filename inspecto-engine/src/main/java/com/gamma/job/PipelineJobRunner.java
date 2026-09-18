@@ -24,6 +24,7 @@ import com.gamma.pipeline.exec.BranchCommitCoordinator;
 import com.gamma.pipeline.exec.BranchCommitLog;
 import com.gamma.pipeline.exec.ConservationCheck;
 import com.gamma.pipeline.exec.DbProvenanceStore;
+import com.gamma.pipeline.exec.DryRunSinkWriter;
 import com.gamma.pipeline.exec.PartitionSinkWriter;
 import com.gamma.pipeline.exec.PipelineExecutor;
 import com.gamma.pipeline.exec.PipelineWatermarkStore;
@@ -298,6 +299,7 @@ public final class PipelineJobRunner implements Job {
 
         long t0 = System.nanoTime();
         File db = DuckDbUtil.tempDbFile("flowjob_");
+        File dryRunBranchLog = null;
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             // Flow-jobs have no per-pipeline processing.duckdb config; honour the global -D caps so this
             // scratch connection isn't uncapped (defaults ≈ 80% RAM) while the batch path is capped.
@@ -333,10 +335,22 @@ public final class PipelineJobRunner implements Job {
             // no-arg run() builds a StandaloneRunContext rather than passing null (slice 3a, 2026-09-13).
             // ⚠ The null-guard stays because ctx is a parameter and a caller can still pass null; it is no
             // longer a path this class takes on its own.
-            PartitionSinkWriter writer = new PartitionSinkWriter(
+            // PIPELINE-DRYRUN-1: manual-trigger dry run (POST /jobs/{name}/trigger?dryRun=true), never cron/event.
+            boolean dryRun = ctx != null && ctx.dryRun();
+            PartitionSinkWriter realWriter = dryRun ? null : new PartitionSinkWriter(
                     conn, dir, sinkBase, batchId, ctx == null ? null : ctx.runId(), pipelineId);
-            BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(
-                    Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
+            PipelineExecutor.SinkWriter writer = dryRun
+                    ? new DryRunSinkWriter(conn, batchId, ctx == null ? null : ctx.runId(), pipelineId)
+                    : realWriter;
+            // Gate 2: under dry run the coordinator's branch-commit log is a throwaway scratch file, not the
+            // real per-batch audit log — nothing this run does may be recorded as "committed" for a batch id
+            // a REAL run could later reuse (never persists/commits, per the design doc). Deleted below with
+            // the scratch DuckDB file; a leaked one is inert (never resolved by path elsewhere).
+            if (dryRun) dryRunBranchLog = DuckDbUtil.tempDbFile("flowjob_dryrun_branch_commit_");
+            BranchCommitCoordinator coordinator = dryRun
+                    ? new BranchCommitCoordinator(new BranchCommitLog(dryRunBranchLog.getAbsolutePath()))
+                    : new BranchCommitCoordinator(new BranchCommitLog(
+                            Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
 
             // T20/T21 — collect per-(node, relationship) record counts during the walk (counts must be taken
             // while the scratch relations are live) and persist them as this run's data-plane provenance.
@@ -344,7 +358,8 @@ public final class PipelineJobRunner implements Job {
             List<ProvenanceRow> provRows = new ArrayList<>();
             PipelineExecutor.ProvenanceCollector collector = provenance == null
                     ? PipelineExecutor.ProvenanceCollector.NONE
-                    : (nodeId, rel, rowCount) -> provRows.add(new ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs));
+                    : (nodeId, rel, rowCount) -> provRows.add(
+                            new ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs, dryRun));
 
             // D-9: the at-rest run is the one path with real run context — pipeline id (the ledger's
             // stable key, rename-proof like the watermark's producer), this run's batch id, and the
@@ -354,25 +369,33 @@ public final class PipelineJobRunner implements Job {
 
             if (provenance != null) {
                 provenance.record(provRows);
-                reportConservation(g, pipelineId, batchId, provRows);   // T22 — §11.4 invariant → event/alert
+                if (!dryRun) reportConservation(g, pipelineId, batchId, provRows);   // T22 — §11.4 invariant → event/alert
+            }
+
+            long ms = (System.nanoTime() - t0) / 1_000_000L;
+            List<String> srcStores = seeds.stream().map(Seed::store).toList();
+            if (dryRun) {
+                log.info("[PIPELINEJOB] {} DRY RUN of pipeline '{}' (source_store(s) {}) complete — nothing "
+                        + "written, no watermark/supersede/lakehouse/dataset-write side effects",
+                        cfg.name(), pipelineId, srcStores);
+                return JobResult.ok("dry run: pipeline '" + pipelineId + "' validated, nothing written", ms);
             }
 
             if (incremental) advanceWatermarks(conn, watermarks, pipelineId, seeds, seedViews, incCol);
             else supersedeEarlierRevisions(g, batchId);
 
-            long ms = (System.nanoTime() - t0) / 1_000_000L;
-            List<String> parts = writer.outputs().stream().map(PartitionOutput::partition).distinct().toList();
-            List<String> srcStores = seeds.stream().map(Seed::store).toList();
+            List<String> parts = realWriter.outputs().stream().map(PartitionOutput::partition).distinct().toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
-            recordStoreArtifacts(artifacts, g, writer.rowsByStore());
-            registerInLakehouse(writer);                               // DUCKLAKE-GRAPH-LANE-1 (scale-out §5.4)
-            bus.publish(new ConsignmentEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
+            recordStoreArtifacts(artifacts, g, realWriter.rowsByStore());
+            registerInLakehouse(realWriter);                           // DUCKLAKE-GRAPH-LANE-1 (scale-out §5.4)
+            bus.publish(new ConsignmentEvent(cfg.name(), batchId, "SUCCESS", parts, realWriter.totalRows(), ms, 0));
             log.info("[PIPELINEJOB] {} ran pipeline '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
-                    cfg.name(), pipelineId, srcStores, writer.outputs().size(), writer.totalRows(),
+                    cfg.name(), pipelineId, srcStores, realWriter.outputs().size(), realWriter.totalRows(),
                     PipelineStores.produced(g));
-            return JobResult.ok(writer.outputs().size() + " file(s), " + writer.totalRows()
+            return JobResult.ok(realWriter.outputs().size() + " file(s), " + realWriter.totalRows()
                     + " row(s) → store(s) " + PipelineStores.produced(g), ms);
         } finally {
+            if (dryRunBranchLog != null) DuckDbUtil.deleteTempDb(dryRunBranchLog);
             DuckDbUtil.deleteTempDb(db);
         }
     }
