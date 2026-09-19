@@ -2049,10 +2049,23 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
     header bytes with no bound against `contentEnd`, so a truncated last record crashes the ingester with
     `IndexOutOfBoundsException` instead of a skippable `ParseError`; `RecoveryPolicy.SKIP_RECORD` cannot save
     the file. Fix: move both calls inside the `try` and bounds-check the header first.
-- **P2** · **`RELEASE-PIPELINE-NEVER-EXECUTED-1`** — every step of `release.yml` is unexecuted: the workflow
-  landed 2026-09-02, the newest tag is `v3.9.0` (2026-06-01), the pom is `4.0.0-SNAPSHOT`, and `ci.yml`
-  only PARSES `package.ps1` (`.github/workflows/ci.yml` launcher/SBOM/extension guards) — never runs it.
-  Fix: a `workflow_dispatch` dry-run job that executes the Personal packaging path (no `-Sign`) on master.
+- **P2** · **`RELEASE-PIPELINE-NEVER-EXECUTED-1` — the BUILDABLE half SHIPPED 2026-09-19; what remains is an
+  OPERATOR ACT, not engineering.** `release.yml` now carries `workflow_dispatch`, and every step that signs
+  (`Import the release signing key`, the `-Sign` flag on all three `package.ps1` calls) or that publishes
+  (`Verify checksums and signatures`, `Publish the GitHub release`) is gated on
+  `github.event_name == 'push'` — so a dispatch run builds, packages and SBOMs all three editions and
+  stops, holding no key and creating no release. ⚠ **It therefore proves the reactor-install →
+  extension-cache → package → SBOM → smoke chain ONLY — not signing, not publication.**
+  🔴 **The row's headline premise was already half-stale when re-grounded:** "every step is unexecuted" no
+  longer held — `c0b3e8f9` ("actually RUN a job-bearing example") and `51da1451` had exercised parts of the
+  chain since. What IS still true is that no `v*` tag has been pushed since `v3.9.0` (2026-06-01), so the
+  canonical trigger has never fired end to end.
+  ⛔ **The residual belongs in §2, not here:** "push a real tag" is an operator/release act no shift can do
+  from this checkout — carrying it as a P2 engineering row is what kept it looking buildable.
+  ⚠ Known gap, deliberately not fixed: the checksum half of `Verify checksums and signatures` WOULD be
+  meaningful on a dispatch run; it is push-gated only because the `.asc` files do not exist there. Splitting
+  the two is tracked here, not forgotten.
+  → `.github/workflows/release.yml`
 - ~~**P2**~~ · **`RELEASE-LINUX-ZIP-NEVER-PUBLISHED-1`** — ✅ **SHIPPED 2026-09-17 with `RELEASE-BUNDLE-PLATFORM-MISMATCH-1`** (`tools/release-collect.sh` collects every platform zip and fails short). *(Original:)* `inspecto-deploy-linux.zip` is built only when a
   Linux jmods cache is found (`inspecto/package.ps1:1421-1440`) and the three collect steps in
   `release.yml` name only the `inspecto-deploy.zip*` trio, so no Linux-labelled artifact has ever been

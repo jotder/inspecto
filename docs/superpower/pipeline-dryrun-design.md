@@ -48,7 +48,25 @@ that flag rather than inventing a second one.
 
 ## What "acquisition and execution share one ctx.dryRun()" requires
 
-Confirm before implementing (first task below): does the SAME `JobContext`/trigger cover both
+✅ **ANSWERED 2026-09-19 — they are GENUINELY SEPARATE, and the honest answer is worse than "thread it".**
+`CollectorProcessor` never references `JobContext` at all; execution mints a fresh `RunContext` per firing
+(`JobService.java:1238`, flag set at `:1295`). The two phases meet only at `fireOnCommit`
+(`JobService.java:815-821`), which builds `new Firing(Map.of(), commitPayload(event), false)` — **`dryRun`
+is hardcoded `false` for every chained firing.**
+🔴 **And the obvious fix does not work.** `PipelineJobRunner` returns early under dry run
+(`:381`, "dry run: pipeline validated, nothing written") **before** it publishes the `ConsignmentEvent` at
+`:391` — so an execution dry run emits no event and there is nothing downstream to inherit from. The real
+exposure is the other direction: an ACQUISITION dry run (`POST /runs/{name}/trigger?dryRun=true`) lands
+files without acking, and the chained job then processes them **for real**.
+⛔ **There is no existing carrier.** `ConsignmentEvent` (`inspecto-etl/.../ConsignmentEvent.java:44-47`) is
+a fixed-field `@PublicApi(since = "4.0.0")` record with no attribute map, and `LedgerEntry` likewise; the
+flag must be ADDED. That means a component on a published record (34 construction sites — 4 in main, 30 in
+test; the file's own pre-v3.7.0 back-compat constructor is the idiom to follow) plus deciding which of the
+four publish sites is authoritative for "this batch was simulated".
+⇒ **Re-size: this is NOT the S–M residual the board implies.** It is a published-API change plus a
+four-site decision, and it should be taken as a plan step with that stated, not slipped in as wiring.
+
+Original instruction, now discharged — confirm before implementing (first task below): does the SAME `JobContext`/trigger cover both
 `CollectorProcessor`'s acquisition pass and `PipelineJobRunner`'s execution pass for one pipeline, or are
 they genuinely separate Job types/triggers (e.g. a scheduled "acquire" poll vs. an on-demand "process"
 run)? If separate, `dryRun` must be threaded explicitly from whichever caller holds `ctx` into the other's
