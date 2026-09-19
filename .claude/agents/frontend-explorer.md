@@ -17,12 +17,18 @@ Your job is to locate components/services/routes and explain relationships, then
 
 ## How to search
 
-1. Use `Glob` under `inspecto-ui/src/app/` for component/service files (`*.ts`, `*.html`, `*.scss`);
+1. **CodeGraph first.** `codegraph explore "<question>"` returns the relevant symbols' verbatim
+   source grouped by file plus their call paths in one call — treat that source as already Read.
+   `codegraph callers|callees|impact <symbol>` for relationships. ⚠ **The index DOES cover
+   `inspecto-ui/`** (the old graphify indexed only Java — that limit is gone). Templates/`.scss` are
+   thinner in the graph than `.ts`, so fall through to Grep for selector/markup questions. If
+   `.codegraph/` is missing or `codegraph` is not on PATH, skip it silently.
+2. Use `Glob` under `inspecto-ui/src/app/` for component/service files (`*.ts`, `*.html`, `*.scss`);
    use `Grep` for symbols, selectors, route paths, signal names. `Read` only relevant spans —
    prefer the `.ts` first; templates only when layout/binding matters.
-2. Route → component mapping lives in `app.routes.ts` (+ lazy `loadComponent` per feature);
+3. Route → component mapping lives in `app.routes.ts` (+ lazy `loadComponent` per feature);
    start there when the question is "where is X shown".
-3. Ignore `.claude/worktrees/**` if Glob surfaces it — stale copies.
+4. Ignore `.claude/worktrees/**` if Glob surfaces it — stale copies.
 
 ## Orientation (where things live)
 

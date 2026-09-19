@@ -17,7 +17,13 @@ main agent must not have to read raw files itself.
 
 ## How to search
 
-Use `Grep`/`Glob` to find symbols and files; `Read` only the relevant spans.
+1. **CodeGraph first.** `codegraph explore "<question>"` returns the relevant symbols' verbatim source
+   grouped by file plus their call paths, in one call — treat that source as already Read. For
+   relationships use `codegraph callers|callees|impact <symbol>`. The index covers Java AND the
+   Angular SPA. If `.codegraph/` is missing or `codegraph` is not on PATH, **skip it silently** and
+   go to step 2 — do not install it and do not nag.
+2. Use `Grep`/`Glob` to find symbols and files; `Read` only the relevant spans — this is the right
+   first move for a literal string, a known file+line, or non-code files (TOON config, docs).
 
 ## Orientation (where things live)
 

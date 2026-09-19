@@ -142,3 +142,24 @@ shift gets the identical environment.
   (`mvn -o clean test -Pedition-enterprise`, ~10 min) runs only when the operator asks for it
   (GAUNTLET), before a push that touched shared seams, or at handoff — never once per edit.
 
+## CodeGraph (code knowledge graph)
+
+This project is indexed by **CodeGraph** (`.codegraph/`, machine-local + gitignored). It exposes
+exactly **one** MCP tool, `codegraph_explore`, plus a CLI.
+
+- **Reach for `codegraph_explore` FIRST** for orientation questions — *how does X work*, *where is X*,
+  *what does changing X break* — and before editing an unfamiliar symbol. It returns the **verbatim
+  source** of the relevant symbols grouped by file, plus the call path among them, in one capped call.
+  ⚠ **Treat that source as already Read — do NOT re-open those files**, or the saving is cancelled.
+- **It covers BOTH layers**: Java (`inspecto*/src`) and the Angular SPA (`inspecto-ui/src`), and a single
+  result can cross them. ⛔ Do not carry over the old graphify assumption that the UI is unindexed.
+- **Still use Grep/Read** for pinpoint work: a known file+line, a literal string, config/TOON/docs, or
+  anything non-code. A graph is for *relationships*; grep is for *locations*.
+- **CLI for relationship questions** grep cannot answer: `codegraph callers <symbol>` ·
+  `codegraph callees <symbol>` · `codegraph impact <symbol>` · `codegraph affected <files...>`
+  (which tests a change touches) · `codegraph query <name>` for a quick symbol lookup.
+- **Refresh is automatic** — a file watcher syncs on save. After a big rebase or branch switch,
+  `codegraph sync` catches up; `codegraph index` rebuilds from scratch.
+- ⚠ **Delegation is still the bigger token lever.** For a broad sweep across many files, a subagent
+  (`backend-explorer` / `frontend-explorer` / `Explore`) keeps the raw reads out of the main thread
+  entirely. CodeGraph shrinks a lookup; a subagent removes it from this context.

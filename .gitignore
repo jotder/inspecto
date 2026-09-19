@@ -117,6 +117,9 @@ inspecto-consignment-outputs.db.wal
 # above do not reach a nested one.
 /asn-parser/asn-decoders/legacy-code/bin/
 
+# CodeGraph index (generated, machine-local; rebuild with `codegraph init`)
+/.codegraph/
+
 # Session-local working notes (*.local.* files are intentionally never committed)
 *.local.md
 

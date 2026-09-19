@@ -57,6 +57,25 @@ npm run build    # dist/ (bundled into deploy zip's ./ui by package.ps1)
 
 ---
 
+## Graph (CodeGraph)
+
+MCP tool `codegraph_explore` is the first call for "how does X work / what breaks if I change X".
+Its output is Read-equivalent — do not re-open the files it shows.
+
+```bash
+codegraph callers <symbol>      # who calls it
+codegraph callees <symbol>      # what it calls
+codegraph impact <symbol>       # what a change touches
+codegraph affected <files...>   # which tests a change affects
+codegraph query <name>          # quick symbol lookup
+codegraph status                # index stats
+codegraph sync                  # catch up after a rebase/branch switch
+```
+
+Index lives in `.codegraph/` (gitignored, ~224 MB). Rebuild: `codegraph init`.
+
+---
+
 ## Claude Code (team usage)
 
 This checkout is a **shared team sandbox** (shift work, one account). All Claude Code setup lives

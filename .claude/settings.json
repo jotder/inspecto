@@ -25,6 +25,8 @@
       "Bash(npx ng:*)",
       "Bash(pnpm:*)",
       "Bash(pwsh:*)",
+      "Bash(codegraph:*)",
+      "mcp__codegraph__codegraph_explore",
       "Bash(grep:*)",
       "Bash(rg:*)",
       "Bash(sed:*)",
