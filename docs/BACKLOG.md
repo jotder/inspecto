@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **58<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 34<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **57<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 34<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 58<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 57<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1618,7 +1618,26 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   scan-booting test is written.
   → `okf/backend/build-run/build-test.md` · `inspecto-etl/src/test/java/com/gamma/etl/TestConfigs.java:113`
 
-- **P2** · 🔴 ➕ **`OPENAPI-CONTRACT-RED-ON-MASTER-1` — `-am` builds halt at `inspecto-processor`.**
+- ~~**P2** · 🔴 ➕ **`OPENAPI-CONTRACT-RED-ON-MASTER-1`**~~ ✅ **CLOSED 2026-09-19 — and it was FAR worse than
+  this row said.** ⛔ **Filed as "misattributes the next failure"; MEASURED, one undocumented route was
+  suppressing ~850 tests across TWELVE modules — every Professional and Enterprise module in the build.**
+  Two full-reactor runs at `653a4121` put a number on it: the normal gate
+  (`mvn -o clean test -Pedition-enterprise --fail-at-end`) built **20** modules / **4012** tests with 1
+  failure; the same gate with only `OpenApiPathsContractTest` excluded built **32** modules / **4864**
+  tests, **0 failures, 0 errors**. ⚠ **`--fail-at-end` does NOT rescue a failed module's DEPENDENTS** —
+  Maven bans them outright, so the 12 were not failing, they were never exercised: security (43),
+  Operational objects (206), Embedded Intelligence (203), Assist Agent (158 + 8 hosted), connectors (129),
+  exchange (23), policy (20), geo/link (19), backup/restore (17), notifications (15), event viewer (4),
+  metrics (2) — all green once actually run.
+  Fixed by the sanctioned path: `-Dopenapi.paths.write=true` added a `get` skeleton for `/assist/skills`
+  (`AssistRoutes.java:35`) in the same `x-generated` shape as its siblings — **+14 lines, one path key,
+  nothing dropped or modified** (the write mode's drop-stale behaviour did not fire). Verified WITHOUT
+  write mode: 1/1 green.
+  🔴 **The lesson is the shape, not the route:** a single doc-contract failure in an upstream module is a
+  VERIFICATION OUTAGE for everything downstream, and it presents as one red test. Same shape as the stale
+  doc guard at `ci.yml:64` that suppressed the entire reactor for a day behind six "known red" runs.
+  → `okf/backend/build-run/build-test.md`
+  *(Original:)* — `-am` builds halt at `inspecto-processor`.**
   **FILED 2026-09-19**, observed while verifying an unrelated fix.
   `OpenApiPathsContractTest.everyLiveRouteHasAnOperationInTheContract:116` fails: *1 live route has NO
   operation in `docs/api/openapi-v1.json` — `[GET /assist/skills]`*. ⚠ **This halts the reactor before any
