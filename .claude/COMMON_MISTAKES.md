@@ -71,9 +71,6 @@ per `processing.duplicate_check.retention_days`).
 - **Theming plugin doesn't hot-reload** — editing the gamma Tailwind theming plugin
   (`@gamma/tailwind/plugins/theming.js`) or tokens requires a **dev-server restart**; verify via
   `getComputedStyle(body).getPropertyValue('--gamma-…')`. (See the `angular-ui` skill §5.)
-- **`graphify` CLI is not installed** — the npm package of that name is an unrelated graphing library.
-  The graphify PreToolUse hooks are gated on the binary being on PATH (silent until a real one exists);
-  use Grep/Glob/Read or the `backend-explorer` agent. (See CLAUDE.md → graphify.)
 - **Security/edition direction**: no Spring/Quarkus migration — harden in place as Personal/Standard
   editions with IAM-delegated (Keycloak/WSO2) OIDC resource-server auth. (See `docs/EDITIONS.md`.)
 

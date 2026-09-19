@@ -17,13 +17,7 @@ main agent must not have to read raw files itself.
 
 ## How to search
 
-1. **graphify first if installed.** Check `command -v graphify` (it normally is — installed under
-   the Python Scripts dir). If present, prefer `graphify query "<question>"`,
-   `graphify explain "<concept>"`, `graphify path "<A>" "<B>"` over raw grep — it returns a scoped
-   subgraph. If it is not on PATH, **skip it silently and go straight to Grep/Glob/Read** — do not
-   try to install it and do not nag about it.
-2. Use `Grep`/`Glob` to find symbols and files; `Read` only the relevant spans.
-3. `graphify-out/GRAPH_REPORT.md` (large) exists as a static fallback map if you need broad orientation.
+Use `Grep`/`Glob` to find symbols and files; `Read` only the relevant spans.
 
 ## Orientation (where things live)
 

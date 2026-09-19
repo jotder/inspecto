@@ -378,4 +378,4 @@ re-point tracked under `JOB-PATH-DEMO-CONFIG-REPOINT-1`.)* ⛔ **When those ship
 their bases), §2.1 (the real key list and its three blind spots) and §4's "MEANING CHANGED is empty"
 finding into [`okf/backend/config/config-safety.md`](../okf/backend/config/config-safety.md) beside the
 existing path-containment section, move anything still open to `docs/BACKLOG.md`, `git mv` this file to
-`docs/archived-documents/plans-archive/`, and run `graphify update .`.
+`docs/archived-documents/plans-archive/`.

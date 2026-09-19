@@ -84,7 +84,7 @@ confusing or ambiguous. In all UI text, model/field names, API routes, config ke
 Docs live in exactly three tiers; **`docs/INDEX.md` is the map** and must be updated in the same
 change that adds or retires a doc:
 
-1. **Current knowledge → `docs/okf/`** (one concept per file, cross-linked, graphify-indexed) plus
+1. **Current knowledge → `docs/okf/`** (one concept per file, cross-linked) plus
    the small root canon (GLOSSARY, INDEX, REQUIREMENTS, BACKLOG, USER_GUIDE, PROJECT_NOTES,
    BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE) **and the audience- and surface-specific
    trees** `docs/stakeholders/`, `docs/api/`, `docs/ui/`, `docs/ops/`, `docs/roadmap/`, `docs/wiki/`
@@ -100,7 +100,7 @@ change that adds or retires a doc:
    as current.
 
 Never create a new root-level `docs/*.md` topic file — new knowledge goes into an OKF concept
-(or an existing canon file). After doc moves, run `graphify update .`.
+(or an existing canon file).
 
 ## Working artifacts stay in the repo
 
@@ -142,12 +142,3 @@ shift gets the identical environment.
   (`mvn -o clean test -Pedition-enterprise`, ~10 min) runs only when the operator asks for it
   (GAUNTLET), before a push that touched shared seams, or at handoff — never once per edit.
 
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

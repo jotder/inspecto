@@ -68,8 +68,6 @@ Incremental evolution without breaking existing features.
    2026-08-23). Spec hosts use `ChangeDetectionStrategy.Eager`. (b) **no spread over `NodeListOf`** — use `Array.from(el.querySelectorAll(...))`, not `[...el.querySelectorAll(...)]` (TS2488 under the test tsconfig). Three more recurring traps: (c) mocking `MatDialog` on a component that renders `<inspecto-data-table>` needs `TestBed.overrideProvider(MatDialog, …)` (the table injects the real one) — a plain `{provide: MatDialog, useValue: …}` in the same TestBed is **silently ignored**, and the give-away is a `TypeError: Cannot read properties of undefined (reading 'push')` from `material/dialog/dialog.ts`, i.e. the real dialog ran; (d) specs touching `LensService` must clear `inspecto.currentLens` from localStorage in `beforeEach` (state leaks across specs); (e) the condition-group editor **mutates the bound `ConditionGroup` in place** — hosts must deep-clone before binding. |
 | **Package mgr** | **npm** (`npm ci` in CI — keep `package-lock.json` in sync when adding deps) |
 
-`graphify` indexes only the Java backend — for UI work, read the TS directly (graphify won't orient you).
-
 ## 3. Architecture — feature-based
 
 ```

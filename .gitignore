@@ -117,9 +117,6 @@ inspecto-consignment-outputs.db.wal
 # above do not reach a nested one.
 /asn-parser/asn-decoders/legacy-code/bin/
 
-# graphify knowledge-graph output (generated; regenerate with `graphify update .`)
-graphify-out/
-
 # Session-local working notes (*.local.* files are intentionally never committed)
 *.local.md
 

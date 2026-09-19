@@ -86,7 +86,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 | Perf benchmarks & tuning | [`performance.md`](okf/backend/build-run/performance.md) |
 | Strategy / roadmap / stakeholder decks | [`roadmap/`](roadmap/) |
 | Curated index of all current docs | [`INDEX.md`](INDEX.md) |
-| Engineering knowledge bundle (OKF, consolidated 2026-07-07; graphify-indexed) | [`okf/`](okf/index.md) — sections [`frontend/`](okf/frontend/index.md) · [`backend/`](okf/backend/index.md) · [`agentic/`](okf/agentic/index.md) |
+| Engineering knowledge bundle (OKF, consolidated 2026-07-07) | [`okf/`](okf/index.md) — sections [`frontend/`](okf/frontend/index.md) · [`backend/`](okf/backend/index.md) · [`agentic/`](okf/agentic/index.md) |
 | Requirements-of-record + MoSCoW · stakeholder set | [`REQUIREMENTS.md`](REQUIREMENTS.md) · [`stakeholders/`](stakeholders/README.md) |
 
 ---

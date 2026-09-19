@@ -57,17 +57,6 @@ npm run build    # dist/ (bundled into deploy zip's ./ui by package.ps1)
 
 ---
 
-## Graph (graphify)
-
-```bash
-graphify query "<question>"     # scoped subgraph — prefer over grep/GRAPH_REPORT
-graphify explain "<concept>"
-graphify path "<A>" "<B>"
-graphify update .               # refresh after code changes (AST-only, no API cost)
-```
-
----
-
 ## Claude Code (team usage)
 
 This checkout is a **shared team sandbox** (shift work, one account). All Claude Code setup lives

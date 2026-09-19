@@ -55,7 +55,7 @@
 ## The knowledge bundle — OKF (current as-built truth)
 
 The **one** [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle —
-one concept per file, cross-linked, indexed by graphify. ⚠ It is a **constraint register, not a backlog**:
+one concept per file, cross-linked. ⚠ It is a **constraint register, not a backlog**:
 its invariants and traps are rules future work must not break, several recorded because the repo already
 paid for violating them.
 

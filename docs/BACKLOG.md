@@ -4046,7 +4046,7 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   in `spaces/` or `inspecto/examples/` declares. (`acquisition.md` §8.4 and `ingestion.md` are instances
   of this rule; this is the rule itself.)
 - **GRAPHIFY-1 tool sync** — ⚠ the row's own check is blind: `.graphify_version` and `graphify --version` both
-  read `0.9.53` while `.claude/skills/graphify/SKILL.md` differs from the installed package's copy by ~300 lines
+  read `0.9.53` while `.claude/skills/graphify/SKILL.md` (since DELETED — see the closure below) differed from the installed package's copy by ~300 lines
   (the repo copy carries a uv/pipx detection block labelled "fixes #831" that 0.9.53 does not). Either re-sync from
   the package or record why the repo copy deliberately diverges — comparing version markers will never tell you.
   (The optional `graphifyy[sql]` half is **already satisfied** — `tree-sitter-sql 0.3.11` is installed.)
@@ -4080,10 +4080,14 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   verbatim in the re-sync commit's message, and the pre-re-sync file is one `git show` away.
   ✅ **Verified after the swap**: the frontmatter is intact so the skill still loads, and `graphify
   --version` still reports `0.9.53`.
-  ⇒ **WHAT THIS ROW NOW TRACKS — one question, not the old sync-or-diverge pair: does the team need the
-  PowerShell port back?** If the bash steps turn out to be unusable on this sandbox, the answer is a
-  **merge story** (the port re-applied over the package's newer text), ⛔ not another straight re-sync in
-  either direction — that is the loop this row has now been round once.
+  ✅ **CLOSED 2026-09-19 — graphify UNINSTALLED at the operator's request, so the remaining question
+  (does the team need the PowerShell port back?) is moot.** Removed: the `graphifyy` CLI (both the pip
+  0.9.53 and a second pipx 0.8.44 install — ⚠ **there were two**, and `pip uninstall` alone left the
+  binary on PATH), `.claude/skills/graphify/`, `scripts/setup-graphify.*`, `graphify-out/` (311 MB,
+  gitignored), the two PreToolUse advisory hooks, and every live doc/config reference.
+  ⚠ **Deliberately kept**: `graphify-out` stays in the SKIP_DIRS of `tools/check-doc-{citations,counts,links}.mjs`
+  and `tools/check-secrets.mjs` — a stale checkout may still hold the 311 MB tree, and the guards should
+  keep skipping it rather than scan it. The PowerShell port is one `git show` away in history.
   ⚠ The row's own lesson survives intact and is now doubly earned: **comparing version markers will
   never tell you this** — both read `0.9.53`.
 
