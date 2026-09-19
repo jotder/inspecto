@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **56<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 32<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 31<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 32<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 31<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1596,17 +1596,30 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   match the `3.5.3` already proven to work elsewhere, or root-cause the fork failure directly with `-X`.
   → `pom.xml` (surefire plugin pin, ~line 468) · `inspecto-ops/src/test/java/com/gamma/opsboot/WorkflowConfigLoadTest.java`
 
-- **P2** · ➕ **`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1` — `CollectorService.fromArgs` kills the host JVM.**
-  **FILED 2026-09-19** out of `WorkflowConfigLoadTest-1`'s root cause. `fromArgs` → `ServiceBootstrap.build`
-  → `buildFrom(…, exitIfEmpty=true)` → `System.exit(1)` at `ServiceBootstrap.java:67` when config discovery
-  finds nothing. That is defensible for a CLI `main`, but `fromArgs` is a **public API** that tests and
-  embedders call: the process dies with no exception to catch, no stack trace, and a surefire message that
-  blames a VM crash. ⚠ The failure mode is worse than the bug — it cost this shift a full root-cause hunt
-  and the ORIGINAL filer an entire session that ended in a wrong JDK-27 diagnosis.
-  Fix: `fromArgs` throws (or returns empty) on an empty registry and only `main` translates that to
-  `System.exit(1)`. ⚠ Check the other `System.exit` sites in library paths while there — `CollectorService`,
-  `SpaceMigrator`, `EnrichmentProcessor`, `CollectorProcessor` all carry one.
-  → `okf/backend/build-run/build-test.md` · `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java:67`
+- ~~**P2** · **`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`**~~ ✅ **CLOSED 2026-09-20 — `fromArgs` now throws,
+  the exit moved to the CLI mains.** `ServiceBootstrap.buildFrom(…, exitIfEmpty=true)` no longer calls
+  `System.exit(1)` on an empty registry; it throws a new `com.gamma.service.EmptyConfigException`
+  (unchecked, so `fromArgs`'/`build`'s existing `throws IOException` signature is untouched). Both CLI
+  entry points — `CollectorService.main` and `ControlApi.main` — now wrap their `fromArgs`/`buildFrom`
+  call in a `catch (EmptyConfigException e)` that prints the same message and calls `System.exit(1)`
+  itself, so the CLI's observable behaviour (still exits 1 on empty config) is unchanged; only *where*
+  the exit happens moved. `SpaceBootstrap` already passed `exitIfEmpty=false` and is unaffected.
+  Regression: `FromArgsEmptyConfigTest` (new) proves `CollectorService.fromArgs` and
+  `ServiceBootstrap.buildFrom(..., true)` throw a catchable exception on an empty dir instead of
+  killing the JVM — exactly the scenario that produced `WorkflowConfigLoadTest-1`'s false JDK-27
+  diagnosis. The CLI mains' `System.exit(1)` retention is verified by inspection, not a runnable test
+  (driving a real `System.exit` from a unit test would kill the test JVM). Verified:
+  `mvn -o -pl inspecto -am -Dtest=FromArgsEmptyConfigTest,ServiceBootstrapLedgerTest test` — 5/5 green.
+  ⚠ **Scope narrowed from the filed row**: only `fromArgs`/`buildFrom` were changed, per this pass's
+  task. The row's own suggestion to also check `SpaceMigrator`, `EnrichmentProcessor`, and
+  `CollectorProcessor`'s `System.exit` sites was NOT done here — those are separate call chains, not
+  reachable from `fromArgs`, and out of scope for this fix; leaving as a residual if anyone wants to
+  file it separately.
+  → `inspecto/src/main/java/com/gamma/service/EmptyConfigException.java` (new) ·
+  `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java` ·
+  `inspecto/src/main/java/com/gamma/service/CollectorService.java` ·
+  `inspecto/src/main/java/com/gamma/control/ControlApi.java` ·
+  `inspecto/src/test/java/com/gamma/service/FromArgsEmptyConfigTest.java` (new)
   · `CollectorService.java:1869`
 
 - **P3** · ➕ **`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1` — the shared fixture writes a name the production scanner

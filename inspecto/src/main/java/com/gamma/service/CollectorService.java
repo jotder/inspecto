@@ -1852,7 +1852,14 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     + "[-Dservice.max.runs=M] <pipeline.toon | dir> [more ...]");
             System.exit(1);
         }
-        CollectorService svc = fromArgs(args);
+        CollectorService svc;
+        try {
+            svc = fromArgs(args);
+        } catch (EmptyConfigException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
         CountDownLatch latch = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             svc.close();

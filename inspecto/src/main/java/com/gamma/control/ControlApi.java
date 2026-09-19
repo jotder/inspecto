@@ -404,7 +404,13 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                         + "[-Dservice.poll.seconds=N] [-Dservice.max.runs=M] <pipeline.toon | dir> [more ...]");
                 System.exit(1);
             }
-            spaces = SpaceManager.single(CollectorService.fromArgs(args));
+            try {
+                spaces = SpaceManager.single(CollectorService.fromArgs(args));
+            } catch (com.gamma.service.EmptyConfigException e) {
+                System.err.println(e.getMessage());
+                System.exit(1);
+                return;
+            }
         }
         int port = Integer.getInteger("control.port", 8080);
         ControlApi api = new ControlApi(spaces, port);

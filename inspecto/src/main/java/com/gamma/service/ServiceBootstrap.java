@@ -36,7 +36,8 @@ public final class ServiceBootstrap {
      * Build a fully-wired single-tenant service from CLI-style args (the legacy flat layout): each path (file or
      * dir) is scanned for the {@code *.toon} config types. Reads {@code -Dservice.poll.seconds} (default 60) and
      * {@code -Dservice.max.runs} (default = source count). Shared by the service and Control API entry points.
-     * Exits the JVM with a message if no sources are found.
+     * Throws {@link EmptyConfigException} if no sources are found; callers that want process-exit-on-empty-config
+     * (the CLI mains) must catch it and exit themselves.
      */
     public static CollectorService build(String[] args) throws IOException {
         return buildFrom(SpaceRoot.legacy(), args, true);
@@ -46,8 +47,10 @@ public final class ServiceBootstrap {
      * Build a service rooted at {@code root}, discovering its {@code *.toon} configs by scanning {@code paths}.
      * The single-tenant entry point passes {@link SpaceRoot#legacy()} + the CLI args; {@link SpaceBootstrap}
      * passes a per-space {@link SpaceRoot} + its {@code config/} directory. When {@code exitIfEmpty} is set (the
-     * CLI), a config-less invocation exits the JVM; a space tolerates an empty {@code config/} (a freshly created
-     * space has no sources yet), so {@code SpaceBootstrap} passes {@code false}.
+     * CLI), a config-less invocation throws {@link EmptyConfigException} rather than exiting the JVM here — the
+     * CLI {@code main} methods catch it and exit 1 themselves, so the library entry points ({@link
+     * CollectorService#fromArgs}) stay catchable instead of killing the host process; a space tolerates an empty
+     * {@code config/} (a freshly created space has no sources yet), so {@code SpaceBootstrap} passes {@code false}.
      */
     public static CollectorService buildFrom(SpaceRoot root, String[] paths, boolean exitIfEmpty) throws IOException {
         if (root.config() == null) registerLegacyAcquisitionLedger(root);
@@ -62,9 +65,8 @@ public final class ServiceBootstrap {
         List<SemanticModel> semantics = loadSemantics(resolveBySuffix(paths, "_meta.toon"));
         List<com.gamma.alert.AlertRule> alertRules = loadAlerts(root);
         if (registry.isEmpty() && enrichJobs.isEmpty() && jobConfigs.isEmpty() && exitIfEmpty) {
-            System.err.println("No *_pipeline.toon / *_enrich.toon / *_job.toon files found in: "
+            throw new EmptyConfigException("No *_pipeline.toon / *_enrich.toon / *_job.toon files found in: "
                     + String.join(", ", paths));
-            System.exit(1);
         }
         long pollSeconds = Long.getLong("service.poll.seconds", 60L);
         int  maxRuns     = Integer.getInteger("service.max.runs", Math.max(1, registry.size()));
