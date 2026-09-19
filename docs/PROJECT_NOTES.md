@@ -142,6 +142,24 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- ⚠ **A test-count baseline taken from a `-Dtest=`-filtered run is NOT comparable to a plain run**
+  (2026-09-19). Supplying ANY `-Dtest=` value — even a negation like `-Dtest='!SomeTest'` — switches
+  Surefire's class discovery off its default `**/*Test.java` / `*Tests.java` / `*TestCase.java` patterns
+  and onto "every class minus the excluded one". That sweep picks up classes the default run never sees:
+  here four `*Benchmark` classes (`RescanBenchmark`, `PerfDeepDiveBenchmark`, `PluginIngestBenchmark`,
+  `PipelineBenchmark`), **each of which reports `Tests run` == `Skipped`** — zero real executions, but
+  both counters inflated. A filtered full gate read 4864/34; the plain gate on the same tree read
+  4859/28. ⛔ **The HIGHER number was the misleading one.** Compare like with like, and treat a count
+  that moved without a code change as bookkeeping until proven otherwise.
+- 🔴 **`--fail-at-end` does NOT rescue a failed module's DEPENDENTS** (2026-09-19). Maven bans them
+  ("banned from the build due to previous failures") and they are never exercised — they are not passing,
+  they did not run. One undocumented route failing `OpenApiPathsContractTest` in an upstream module
+  suppressed **~850 tests across 12 modules** — every Professional and Enterprise module — while the
+  build reported a single red test. ⚠ **A doc-contract failure upstream is a VERIFICATION OUTAGE
+  downstream, and it does not look like one.** Same shape as the stale doc guard at `ci.yml:64` that
+  suppressed the whole reactor for a day behind six "known red" runs. Check the SKIPPED list, not just
+  the failure count.
+
 - 🔴 **Surefire's *"The forked VM terminated without properly saying goodbye. VM crash or System.exit
   called?"* is a TWO-PART question — read the second half first** (2026-09-19). `Process Exit Code: 1`
   with **no `hs_err_pid*` and no `.dumpstream`** means nothing crashed: something called `System.exit`.
