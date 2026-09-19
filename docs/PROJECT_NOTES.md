@@ -142,6 +142,23 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **Surefire's *"The forked VM terminated without properly saying goodbye. VM crash or System.exit
+  called?"* is a TWO-PART question — read the second half first** (2026-09-19). `Process Exit Code: 1`
+  with **no `hs_err_pid*` and no `.dumpstream`** means nothing crashed: something called `System.exit`.
+  ⛔ `System.exit` is reachable from LIBRARY paths, not just `main` — `ServiceBootstrap:67` (empty config
+  discovery under `exitIfEmpty`, reached from the PUBLIC `CollectorService.fromArgs`), and also
+  `CollectorService`, `SpaceMigrator`, `EnrichmentProcessor`, `CollectorProcessor`. The forked JVM dies
+  with no exception to catch and no stack trace, so the message blames a VM crash and the hunt starts in
+  the wrong place. ⚠ **This exact symptom consumed two sessions and produced a confident, wrong "JDK 27
+  crashes the fork" diagnosis** whose proposed fix (bump surefire 3.2.5 → 3.5.3) could not have worked —
+  the fork was not failing at startup, it was running and then exiting. Check `java -version` of the
+  FORK, not of Maven, before blaming a JDK. (`WorkflowConfigLoadTest-1`, closed `f1232b03`;
+  `LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1` tracks the library half.)
+- ⚠ **A test fixture can write a name the production scanner cannot see.** `TestConfigs.write()` emits
+  `pipeline_<hash>.toon` (PREFIX) while directory-scanning loaders match `*_pipeline.toon` (SUFFIX). 88
+  test files use it and none noticed, because they load by explicit PATH — the trap springs only for a
+  test that boots by SCAN, and then it presents as the JVM death above rather than as a missing file.
+
 - 🔴 **FOUR NEW FALSE-GREEN MECHANISMS, all of which report SUCCESS** (2026-09-17). (1) `mvn … ; echo
   "EXIT=$?"` records the **echo's** status, so a failed build reports exit 0 — capture Maven's status
   directly. (2) `-DfailIfNoSpecifiedTests=false` is **silently ignored**; the working spelling is
