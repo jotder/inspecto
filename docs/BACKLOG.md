@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **55<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18.**
+> **56<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 22<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -169,8 +169,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 1<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 21<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 22<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -2453,6 +2453,34 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   documented provenance for `asn-golden` GoldenCapture cases. No rename/move/delete: the tree-wide naming
   defect (five sibling files with the same lying `*Test` shape) is left for a separate operator-scoped decision,
   as recommended above — not swept in here.
+
+- **P3** · **`CODEGRAPH-AFFECTED-UNUSABLE-1` — `codegraph affected` over-reports to uselessness; the
+  in-repo half is already fixed, only the upstream defect is open.** CodeGraph was adopted 2026-09-19
+  (`e4ba74a2`) and `CLAUDE.md` advertised `codegraph affected <files...>` as *"which tests a change
+  touches"*. **It does not answer that.** Driven the same day on v1.6.0 against a clean tree:
+  `codegraph affected inspecto-ui/src/app/inspecto/api/config.service.ts` — an **Angular TypeScript**
+  service — returns **953 Java test files**, the first five of them `asn-parser` ASN.1 BER/schema
+  decoder tests, which no change to an Angular service can reach; and
+  `codegraph affected inspecto-sql/src/main/java/com/gamma/sql/SqlGuard.java` returns **1078** test
+  files when the whole checkout contains **1059** (`find` over the indexed trees, excluding
+  `node_modules`/`target`/`worktrees`). ⛔ **It fails in the direction of PASSING** — the same shape as
+  the five guards found failing that way on 2026-09-16. Anyone selecting `-Dtest=` targets from it
+  would quietly run the full reactor on every edit, defeating the unit-tests-per-change rule.
+  ✅ **The repo-side remedy SHIPPED with this row**: `CLAUDE.md`'s CodeGraph section now strikes
+  `affected` outright, and records two lesser caveats found in the same pass — `callers` reports
+  importing files rather than call sites and is not exhaustive (10 files for `SqlGuard` where
+  `grep -rl` finds 40), and `codegraph_explore`'s ranking is substantially lexical, so a concept-phrased
+  query ranked `RowShaper.java` (methods named `validate`/`route`) above the actual gating code.
+  ⬜ **What is left is NOT ours to fix**: the defect is in the third-party CLI. Remaining work is to
+  report it upstream and to re-drive the two commands above on any codegraph upgrade before the
+  guidance is relaxed. **Check: the two commands above stop returning cross-language and
+  larger-than-the-corpus results.** ⚠ **Demand-gated on purpose** — `impact` and `query` were verified
+  sound in the same pass and cover the relationship questions we actually ask, so nothing is blocked.
+  ✅ What the pass CONFIRMED, so it is not re-litigated: `codegraph_explore`'s source is **byte-exact**
+  against disk (diffed for `ConfigSafetyValidator.java` lines 52–58 / 70–78), so the Read-equivalence
+  rule in `CLAUDE.md` is sound; and the SPA **is** indexed — a single call returned Java and TypeScript
+  together, and a UI-only query returned `status-badge.component.ts` with 30 accurate callers.
+
 ## 5. Docs & hygiene
 
 - ~~**P1**~~ · **`ROUTE-UNGATED-DEFAULT-1`** — ✅ **CLOSED 2026-09-17 — grounded against the code, every remaining item was already decided and shipped.** The ratchet is the boot refusal (§0). Item (a)'s "product decision first" was taken 2026-09-15/16: Incident/Case DISPOSITION (`ack/resolve/transition/assign/merge/split/PATCH`, Case-Rule `evaluate`) is `canAdminister`; opening an Incident (`POST /objects`) is `canManageIncidents`; comments/attachments/links/RCA/tag assignments are recorded `collaboration` / `target-visibility-gated` exemptions; agent governance (`feedback`, `approvals/{id}/decision`, `PUT /agent/policy`, `kill-switch`) is `canAdminister` at `AgentRoutes.java:150,177,194,199`. `CapabilityManifest.PENDING_OPERATOR_CALLS` is EMPTY. The only residue was a stale comment in the manifest still calling `POST /objects` PENDING — corrected. 🔴 **Lesson: this row sat at P1 for two days after its own work finished**, because its head paragraph was never rewritten when the sub-items closed. *(Original head:)* 🔴 **an unlisted route is OPEN, not locked down.**

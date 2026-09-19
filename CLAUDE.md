@@ -156,10 +156,23 @@ exactly **one** MCP tool, `codegraph_explore`, plus a CLI.
 - **Still use Grep/Read** for pinpoint work: a known file+line, a literal string, config/TOON/docs, or
   anything non-code. A graph is for *relationships*; grep is for *locations*.
 - **CLI for relationship questions** grep cannot answer: `codegraph callers <symbol>` ·
-  `codegraph callees <symbol>` · `codegraph impact <symbol>` · `codegraph affected <files...>`
-  (which tests a change touches) · `codegraph query <name>` for a quick symbol lookup.
+  `codegraph callees <symbol>` · `codegraph impact <symbol>` · `codegraph query <name>` for a quick
+  symbol lookup. ⚠ `callers` reports IMPORTING FILES (namespace nodes at `:1`), not call sites, and
+  is **not exhaustive** — it returned 10 files for `SqlGuard` where `grep -rl` finds 40. Cross-check
+  with grep before treating a caller list as complete.
+- ⛔ **`codegraph affected <files...>` is BROKEN — never use it to pick tests.** Tested 2026-09-19 on
+  v1.6.0: `affected inspecto-ui/src/app/inspecto/api/config.service.ts` — an **Angular** service —
+  returns **953 Java test files**, led by `asn-parser` ASN.1 decoder tests that cannot possibly be
+  affected; `affected inspecto-sql/.../SqlGuard.java` returns **1078** when the whole repo holds
+  **1059** test files. It fails toward over-reporting, so selecting `-Dtest=` targets from it silently
+  becomes a full-reactor run — the opposite of the unit-test-per-change rule above. Use `impact` plus
+  judgement, or the module the change lives in. (`CODEGRAPH-AFFECTED-UNUSABLE-1`)
+- ⚠ **Name SYMBOLS in a query, don't phrase a concept** — ranking is substantially lexical. Asking
+  *"ConfigSafetyValidator validate control api route gating"* put `RowShaper.java` (a DuckDB row
+  splitter whose methods happen to be named `validate` and `route`) above the actual gating code.
 - **Refresh is automatic** — a file watcher syncs on save. After a big rebase or branch switch,
-  `codegraph sync` catches up; `codegraph index` rebuilds from scratch.
+  `codegraph sync` catches up; `codegraph index` rebuilds from scratch. ⚠ There is no `codegraph
+  stats`; the command is `codegraph status`.
 - ⚠ **Delegation is still the bigger token lever.** For a broad sweep across many files, a subagent
   (`backend-explorer` / `frontend-explorer` / `Explore`) keeps the raw reads out of the main thread
   entirely. CodeGraph shrinks a lookup; a subagent removes it from this context.
