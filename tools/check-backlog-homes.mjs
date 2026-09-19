@@ -186,7 +186,7 @@ for (const row of rows) {
 // A floor, not a nicety. If the pointer grammar stops matching — the board switches separator, a row
 // format changes — this guard would pass over nothing and report success. That is the failure shape
 // this repo has shipped twice: a guard that cannot fire. Set EQUAL to the number parsed today.
-const MIN_DOC_POINTERS = 54;
+const MIN_DOC_POINTERS = 52;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +

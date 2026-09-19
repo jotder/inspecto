@@ -1615,7 +1615,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   `CollectorProcessor`'s `System.exit` sites was NOT done here — those are separate call chains, not
   reachable from `fromArgs`, and out of scope for this fix; leaving as a residual if anyone wants to
   file it separately.
-  → `inspecto/src/main/java/com/gamma/service/EmptyConfigException.java` (new) ·
+  → `okf/backend/build-run/build-test.md` ·
+  `inspecto/src/main/java/com/gamma/service/EmptyConfigException.java` (new) ·
   `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java` ·
   `inspecto/src/main/java/com/gamma/service/CollectorService.java` ·
   `inspecto/src/main/java/com/gamma/control/ControlApi.java` ·
