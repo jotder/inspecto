@@ -829,7 +829,17 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   unanswered. ⚠ Keep the repo's recorded distinction in scope when it IS answered: *"skip the bad file"
   is not "skip the file that throws"* — a validation failure and an exception are different events, and
   conflating them is how eject-and-continue silently swallows a real fault.
-- **P2** · ➕ **`PIPELINE-DRYRUN-1` — run a whole pipeline and discard every write.** **FILED
+- **P2** · ➕ **`PIPELINE-DRYRUN-1` — gates 1-4 SHIPPED; the residual is SCOPED as plan step 5 (2026-09-19)
+  and is M, not the S–M this row implied.** 🔴 **The live defect, stated plainly: `POST
+  /runs/{name}/trigger?dryRun=true` puts ACQUISITION in dry run, and the chained execution job then writes
+  FOR REAL** — `fireOnCommit` hardcodes `dryRun=false` (`JobService.java:815-821`). ⛔ The obvious fix is
+  closed off: `PipelineJobRunner` returns early under dry run (`:381`) BEFORE publishing the
+  `ConsignmentEvent` (`:391`), so there is no event to carry the flag. `ConsignmentEvent` is a fixed-field
+  `@PublicApi` record with **34 construction sites** and no attribute slot, so the flag must be ADDED.
+  **Three decisions are owed before any code** — which of the four publish sites is authoritative, whether
+  an acquisition-only dry run publishes at all, and whether amending an `@PublicApi` record needs a version
+  call. → `superpower/pipeline-dryrun-design.md` §"Step 5". *(Original:)* run a whole pipeline and discard
+  every write. **FILED
   2026-09-15, new scope, operator-asked.** Nothing on the board covered it: the repo can preview a
   *node* (34 read-shaped `preview`/`test`/`probe` POSTs), test a *job pack* (`PackTestHarness`), seal a
   *SQL connection* (`SqlSandboxTest` — `INSTALL` and external access refused while `json_serialize_sql`

@@ -89,6 +89,54 @@ constructor/call — do not assume a single ambient flag reaches both without ch
    provenance schema/UI can carry that marker before assuming it's a one-line change — it may need a
    column addition and a UI badge.
 
+## Step 5 — the cross-phase flag (the residual, scoped 2026-09-19)
+
+Gates 1-4 shipped. What remains is the one the row calls "no single route fires both phases", and it is
+**not wiring** — it is a published-API change plus a decision. Scoped here rather than slipped into a
+commit, because taking it as wiring is how it would ship half-done.
+
+**The exposure, stated precisely.** `POST /runs/{name}/trigger?dryRun=true` puts ACQUISITION in dry run:
+files land, `connector.post` is skipped, nothing is acked. The chained execution job then processes those
+files **for real** — `fireOnCommit` builds `new Firing(Map.of(), commitPayload(event), false)`
+(`JobService.java:815-821`), hardcoding `dryRun=false` for every `on_pipeline` firing. ⚠ So a user who
+asks for a dry run today gets a real write on the execution side. That is the defect; "the phases don't
+share a flag" is only its mechanism.
+
+🔴 **The obvious fix is closed off.** Threading the flag through the event that already chains them
+cannot work: `PipelineJobRunner` returns early under dry run (`:381`, *"dry run: pipeline validated,
+nothing written"*) **before** it publishes the `ConsignmentEvent` at `:391`. An execution dry run emits no
+event at all, so there is nothing for a downstream firing to inherit. Any design that starts "carry the
+flag on the event" must first say which side publishes it and when.
+
+**No carrier exists.** `ConsignmentEvent` (`inspecto-etl/.../ConsignmentEvent.java:44-47`) is a fixed-field
+`@PublicApi(since = "4.0.0")` record — no attribute map; `LedgerEntry` likewise. The flag must be ADDED to
+a published record with **34 construction sites (4 in main, 30 in test)**. ✅ The file's own pre-v3.7.0
+back-compat constructor is the idiom: add the component, keep a delegating overload, and the 30 test sites
+compile untouched.
+
+**Owed decisions — do not start before these are answered:**
+1. **Which publish site is authoritative for "this batch was simulated"?** Four sites publish a
+   `ConsignmentEvent`: `PipelineJobRunner:391`, `EnrichJob:88`, `EnrichmentService:263`,
+   `ConsignmentAuditWriter:178`. They are not equivalent — only the first is on the pipeline execution
+   path. ⛔ Marking all four "for symmetry" would assert simulation about enrichment runs that never
+   consulted a dry-run flag.
+2. **Does an acquisition-only dry run publish an event at all?** If yes, the downstream job must run and
+   refuse to write; if no, the chain simply stops and the operator sees nothing downstream. These give the
+   operator visibly different things, and the answer decides whether step 5 is mostly `JobService` or
+   mostly `CollectorProcessor`.
+3. **Does adding a component to an `@PublicApi(since = "4.0.0")` record need a version call?** Per
+   `docs/BRANCHING.md` nothing after 3.x is in production, so in practice this is free today — but the
+   annotation is a stated intent and the call should be recorded, not assumed. (See the standing
+   “@PublicApi marks INTENT, not exposure” finding.)
+
+**Then build, in this order:** (a) `ConsignmentEvent` gains `boolean dryRun` + back-compat overload;
+(b) the authoritative publish site sets it from `ctx.dryRun()`; (c) `fireOnCommit` reads
+`event.dryRun()` instead of the hardcoded `false`; (d) the end-to-end test below, which is the only thing
+that proves the two phases actually agree.
+
+⚠ **Size: M, not the S–M the board implies** — a published record, four sites to triage, one hardcoded
+constant, and a test that must span both phases in one call.
+
 ## Verification
 
 - Unit/integration tests per gate (this repo's convention: unit-level per change, not the full reactor
