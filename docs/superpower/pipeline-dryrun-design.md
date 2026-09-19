@@ -51,7 +51,7 @@ that flag rather than inventing a second one.
 ✅ **ANSWERED 2026-09-19 — they are GENUINELY SEPARATE, and the honest answer is worse than "thread it".**
 `CollectorProcessor` never references `JobContext` at all; execution mints a fresh `RunContext` per firing
 (`JobService.java:1238`, flag set at `:1295`). The two phases meet only at `fireOnCommit`
-(`JobService.java:815-821`), which builds `new Firing(Map.of(), commitPayload(event), false)` — **`dryRun`
+(`JobService.java:818-823`), which builds `new Firing(Map.of(), commitPayload(event), false)` — **`dryRun`
 is hardcoded `false` for every chained firing.**
 🔴 **And the obvious fix does not work.** `PipelineJobRunner` returns early under dry run
 (`:381`, "dry run: pipeline validated, nothing written") **before** it publishes the `ConsignmentEvent` at
@@ -98,7 +98,7 @@ commit, because taking it as wiring is how it would ship half-done.
 **The exposure, stated precisely.** `POST /runs/{name}/trigger?dryRun=true` puts ACQUISITION in dry run:
 files land, `connector.post` is skipped, nothing is acked. The chained execution job then processes those
 files **for real** — `fireOnCommit` builds `new Firing(Map.of(), commitPayload(event), false)`
-(`JobService.java:815-821`), hardcoding `dryRun=false` for every `on_pipeline` firing. ⚠ So a user who
+(`JobService.java:818-823`), hardcoding `dryRun=false` for every `on_pipeline` firing. ⚠ So a user who
 asks for a dry run today gets a real write on the execution side. That is the defect; "the phases don't
 share a flag" is only its mechanism.
 
@@ -136,6 +136,159 @@ that proves the two phases actually agree.
 
 ⚠ **Size: M, not the S–M the board implies** — a published record, four sites to triage, one hardcoded
 constant, and a test that must span both phases in one call.
+
+### Step 5 grounding + decision brief (2026-09-20)
+
+Every claim above was re-grounded against code. **Four facts held exactly; four were wrong or incomplete,
+and one of the four makes the live defect materially worse than this section states.**
+
+**Held.** `PipelineJobRunner` returns early under dry run at **`:381`** and publishes the `ConsignmentEvent`
+at **`:391`** — exact, the early return really does precede the publish. `ConsignmentEvent`
+(`inspecto-etl/src/main/java/com/gamma/etl/ConsignmentEvent.java`) is a fixed-field
+`@PublicApi(since = "4.0.0")` record of ten components with no attribute map, and it does carry the
+7-arg pre-v3.7.0 back-compat constructor named as the idiom. **The construction-site count is exactly
+right: 34 — 4 in main, 30 in test** (`grep -rn "new ConsignmentEvent(" --include=*.java`, excluding
+`target/`).
+
+**Corrected — line drift.** The hardcoded literal is at **`JobService.java:822`**; the method
+`fireOnCommit` spans **`:818-823`**. The `:815-821` this doc and the BACKLOG row carried pointed at the
+method's javadoc, not its body. Fixed in both.
+
+**Corrected — there are TWO hardcoded firings, not one.** `grep "new Firing("` over main sources returns
+four sites:
+
+| Site | Path | `dryRun` arg |
+|---|---|---|
+| `JobService.java:822` | `fireOnCommit` — the `on_pipeline` chain | **hardcoded `false`** |
+| `JobService.java:847` | `onSignalEvent` — the `on_signal` chain | **hardcoded `false`** |
+| `JobService.java:955` | `triggerRun(name, actor, args, dryRun)` — the manual `/jobs/{name}/trigger` surface | real, threaded |
+| `JobService.java:1088` | `Firing.NONE` constant | `false` (not a firing decision) |
+
+⚠ **`:847` matters here and was missed.** A dry-run ingest also emits the canonical
+`pipeline.batch.committed` Signal onto the ledger — `CollectorProcessor.java:176` wires
+`audit.setTerminalBatchSink(PipelineConsignmentSignal::emit)` **unconditionally** — so the `on_signal`
+chain fires for real too. Fixing only `fireOnCommit` leaves half the chaining unprotected.
+`ctx.dryRun(firing.dryRun())` is set once, at `JobService.java:1295`.
+
+🔴 **Corrected, and this is the important one — the defect is NOT "the chained job writes for real". The
+`?dryRun=true` run writes for real BY ITSELF, in-process, with no chained job configured at all.**
+`CollectorProcessor.run(cfg, onCommit, dryRun)` (`:92-95`) calls `acquire(cfg, dryRun)` — dry-run-gated —
+and then calls **`ingest(cfg, onCommit)` with no flag at all**. Ingest always parses, always writes
+outputs, always writes the audit/commit-log rows, and always publishes the `ConsignmentEvent`. The route
+chain is `RunRoutes.java:159` (`dryRun` query parse) → `:162`/`:167` →
+`CollectorService.triggerRunAsync`/`runPipelineOffThread` → `runPipeline(name, dryRun)` (`:1671`) →
+`MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), dryRun)` (`:1681`). ⚠ **This is documented as
+deliberate, not accidental** — `CollectorService.java:1667-1668` says in so many words *"Ingest still
+commits: this closes the acquisition-phase gap only … not a preview of the ingest write"*, and
+`CollectorProcessor.java:87-91` repeats it. ⇒ The flag's scope is *"do not ack the remote source"*, while
+its name and the operator-facing docs promise *"dry run"*. **The chained-job hole is a second instance of
+the same lie, downstream of the first — not the defect itself.**
+
+**Corrected — "four publish sites" is imprecise, and the one this defect travels through is the fourth,
+not the first.** Three of the four call `bus.publish` directly; the fourth constructs the event and fans it
+to two consumers:
+
+| # | Site | What it publishes / when | On the `?dryRun=true` path? |
+|---|---|---|---|
+| 1 | `PipelineJobRunner.java:391` | `bus.publish` of a `SUCCESS` event after a **graph-lane** batch commits. Unreachable under `ctx.dryRun()` — the `:381` early return precedes it. | ❌ no — different lane |
+| 2 | `EnrichJob.java:88` | `bus.publish` of a `SUCCESS` event after a Stage-2 **enrichment Job** run. Never consults any dry-run flag. | ❌ |
+| 3 | `EnrichmentService.java:263` | `bus.publish` of a `SUCCESS` event after an **event/schedule/CLI-triggered enrichment recompute**. Never consults a dry-run flag. | ❌ |
+| 4 | `ConsignmentAuditWriter.java:178` | **Constructs** the event on every *terminal* batch (`SUCCESS` **and** `FAILED`) and hands it to `commitListener` (→ the bus) **and** `terminalBatchSink` (→ the `pipeline.batch.committed` Signal). Wired from `CollectorProcessor.java:168-176`. | ✅ **yes — this is the one** |
+
+#### Decision (a) — which publish site is authoritative for "this batch was simulated"?
+
+**Options.**
+- **(a1) `ConsignmentAuditWriter:178` only.** Concretely: thread the dry-run flag into `ingest` →
+  `ConsignmentAuditWriter`, and set `dryRun` on the event it builds. This is the **only** site the
+  `?dryRun=true` route actually reaches, and it protects **both** chain paths at once (`commitListener`
+  and `terminalBatchSink` receive the same instance), which is exactly what the `:847` finding demands.
+  Left unprotected: nothing on this route. A future *graph-lane* dry run that somehow published would not
+  be marked — but it cannot publish today (`:381`).
+- **(a2) `PipelineJobRunner:391` only** — what this doc previously implied. Concretely: **a no-op.** That
+  site is unreachable under dry run, and it is not on the defective route. Choosing it fixes nothing and
+  leaves the real exposure open.
+- **(a3) All four "for symmetry".** Sites 2 and 3 never consult a dry-run flag, so the component could
+  only ever be hardcoded `false` there — asserting "this was real" about runs nobody asked about. Harmless
+  but noise; it does not buy the guarantee and it invites a later reader to believe enrichment honours a
+  mode it does not.
+
+⇒ **The evidence favours (a1) decisively.** The previous framing picked the wrong site because it reasoned
+from "the execution lane is where writes happen" rather than from the route the defect is reported on.
+Sites 2 and 3 should take `false` via the existing 7-arg back-compat constructor — no edit at all.
+
+#### Decision (b) — does an acquisition-only dry run publish an event?
+
+**What it does today, end to end:** fetch → land in inbox → **skip** the remote post-action (the only
+thing the flag does) → **ingest for real** (parse, write outputs, write audit + commit-log rows) →
+publish a `ConsignmentEvent` **indistinguishable from a real one** → emit `pipeline.batch.committed` →
+`JobService.onConsignmentEvent` (`:788-808`) fires every Job with a matching `on_pipeline:` **immediately
+and in-process**, each with `dryRun=false`, and `onSignalEvent` does the same for `on_signal:`. A
+downstream Job is *not* required for real writes to occur; it only widens the blast radius.
+
+- **(b-yes) publish, marked.** Downstream consumers still see the batch — the run is visible in the audit,
+  provenance and the run-detail API — and each chained firing inherits `dryRun=true` and refuses to write.
+  Cost: every consumer of `ConsignmentEvent` must now *honour* the flag, and today only the Job path could;
+  `EnrichmentService`/`EnrichJob` subscribe to commits and would silently recompute for real unless they
+  are gated too. ⚠ It also contradicts a written invariant: `JobService.java:945-949` states *"Only this
+  manual path can request it — cron/event/signal fires are always real."* Choosing (b-yes) **changes that
+  rule**, and the change should be recorded, not slipped in.
+- **(b-no) do not publish.** The chain simply stops at the dry-run boundary; nothing downstream runs, and
+  the operator sees the acquisition preview and nothing after it. Cost: the run is invisible to
+  enrichment/observability consumers, and "what would have happened downstream" — the thing the feature is
+  for — is not shown.
+
+⇒ These are genuinely different products and this one is the operator's to call. **But note it is
+currently moot in the worst way**: today the answer is "publish, unmarked, and everything downstream runs
+for real" — the option nobody would choose. Whichever is picked, the work lands mostly in
+`CollectorProcessor.ingest`/`ConsignmentAuditWriter`, **not** in `JobService` as this doc previously
+guessed.
+
+#### Decision (c) — does amending an `@PublicApi(since = "4.0.0")` record need a version call?
+
+✅ **Answered by this repo's own written policy — no call is owed, and it is free.**
+`docs/okf/backend/control-plane/api-stability.md` §"Release baseline" is explicit: the newest release on
+`master`'s ancestry is **v3.11.0**; `since = "4.0.0"` means *"will become public API in 4.0.0"*, not *"has
+been public since"*; and **an element whose `since` is `4.0.0` has never been published in any release, so
+it may still be moved, renamed, or changed freely** — the stability promise binds *within a released
+major*. The doc names the exact test and it passes here: `git ls-tree -r --name-only v3.11.0 | grep
+ConsignmentEvent.java` returns **nothing** — the type did not exist in the last shipped release.
+
+⚠ The same page records that the premise *"`@PublicApi` ⇒ breaking ⇒ bump"* has been **written down and
+refuted three times** already (the Source→Collector rename, <!-- vocab-allow: names the Source→Collector rename itself --> the `ConsignmentProcessor` SPI widening, the
+architecture plan's Phase C cycle cuts); this doc's owed-decision #3 was a fourth instance of the same
+inherited assumption. ⇒ **Adding a `boolean dryRun` component is a plain additive change on an unreleased
+type.** Even under the released-API rules it would be *additive* (minor). Trunk is already
+`4.0.0-SNAPSHOT`, so it ships inside the pending MAJOR with no bump of its own. The only obligation is
+**documentary**: add a line to the "Release notes — the pending MAJOR" draft in `api-stability.md` in the
+same commit, per that page's own standing instruction.
+
+#### The live defect's severity, and a decision-free interim mitigation
+
+**Severity: high, and higher than the row states.** `?dryRun=true` today performs real, unrecoverable-in-
+principle writes on the ingest half — every time, on every pipeline, with no chained Job needed. The one
+thing it does protect (the remote post-action) is the single worst failure named in the BACKLOG row, so
+the flag is not useless; but a caller reading "dryRun" reasonably expects no writes and gets a full
+commit plus live downstream triggering. **This is the repo's own recorded failure mode — a flag that
+silently does the opposite of what it says.** Mitigating factors: the behaviour is documented in the
+javadoc at both `CollectorService.java:1667-1668` and `CollectorProcessor.java:87-91`, and ingest writes
+are the pipeline's normal, idempotent-by-batch output rather than a destructive act.
+
+✅ **A safe interim mitigation exists and needs none of the three decisions.** In `RunRoutes.triggerPipeline`
+(`RunRoutes.java:158-167`), after parsing `dryRun` at `:159` and **before** dispatching at `:162`/`:167`,
+refuse the request when `dryRun` is true — a **422** with a stable error code (e.g.
+`ERR_DRYRUN_NOT_SUPPORTED`) whose message says the flag covers acquisition only, that ingest and any
+chained execution still commit, and that whole-pipeline dry run is not yet available. ⚠ **Scope it to the
+route, not to the service**: `CollectorService.runPipeline(name, true)` and the `CollectorProcessor`
+overloads must keep working, because `RemoteAcquisitionStagingTest` pins them and gate 1 is genuinely
+shipped underneath. This is one guard clause in one method plus one route test, touches no published type,
+and pre-empts none of (a)/(b)/(c).
+
+⚖ **The one real cost, stated so it is not discovered later:** this *removes* the only operator-facing way
+to reach gate 1, so a pipeline with `collector.post_action.on_success=DELETE` goes back to having no way to
+poll without acking. ⇒ **The choice is between a flag that under-delivers loudly and one that
+over-delivers silently**, and the alternative to refusing is renaming the parameter to say what it does
+(e.g. `skipPostAction=true`), which keeps the capability and stops the lie at the same cost. ⛔ Not
+implemented — operator's call.
 
 ## Verification
 

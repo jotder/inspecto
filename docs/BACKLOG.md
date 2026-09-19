@@ -832,13 +832,36 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
 - **P2** · ➕ **`PIPELINE-DRYRUN-1` — gates 1-4 SHIPPED; the residual is SCOPED as plan step 5 (2026-09-19)
   and is M, not the S–M this row implied.** 🔴 **The live defect, stated plainly: `POST
   /runs/{name}/trigger?dryRun=true` puts ACQUISITION in dry run, and the chained execution job then writes
-  FOR REAL** — `fireOnCommit` hardcodes `dryRun=false` (`JobService.java:815-821`). ⛔ The obvious fix is
+  FOR REAL** — `fireOnCommit` hardcodes `dryRun=false` (`JobService.java:818-823`). ⛔ The obvious fix is
   closed off: `PipelineJobRunner` returns early under dry run (`:381`) BEFORE publishing the
   `ConsignmentEvent` (`:391`), so there is no event to carry the flag. `ConsignmentEvent` is a fixed-field
   `@PublicApi` record with **34 construction sites** and no attribute slot, so the flag must be ADDED.
   **Three decisions are owed before any code** — which of the four publish sites is authoritative, whether
   an acquisition-only dry run publishes at all, and whether amending an `@PublicApi` record needs a version
-  call. → `superpower/pipeline-dryrun-design.md` §"Step 5". *(Original:)* run a whole pipeline and discard
+  call.
+  🔴 **RE-GROUNDED 2026-09-20 — the defect above is UNDERSTATED and one decision is already ANSWERED.**
+  (i) **The `?dryRun=true` run writes for real BY ITSELF, with no chained job configured.**
+  `CollectorProcessor.run(cfg, onCommit, dryRun)` (`:92-95`) dry-runs `acquire` and then calls
+  `ingest(cfg, onCommit)` **with no flag** — ingest always commits and always publishes. The chained-job
+  hole is a SECOND instance downstream of the first, not the defect. ⚠ And it is **documented as
+  deliberate** (`CollectorService.java:1667-1668`), so the flag's real scope is *"do not ack the remote
+  source"* while its name promises *"dry run"*.
+  (ii) **There are TWO hardcoded firings, not one** — `JobService.java:822` (`on_pipeline`) *and* `:847`
+  (`on_signal`); the dry-run ingest emits the `pipeline.batch.committed` Signal too
+  (`CollectorProcessor.java:176`, wired unconditionally). Fixing only `fireOnCommit` leaves half the
+  chaining unprotected.
+  (iii) **Decision (c) is ANSWERED and free** — `okf/backend/control-plane/api-stability.md` §"Release
+  baseline": `since = "4.0.0"` has never shipped, so the type may be changed freely; `git ls-tree -r
+  --name-only v3.11.0` confirms `ConsignmentEvent.java` did not exist in the last released ancestor. The
+  only obligation is a release-notes line. ⛔ That page records this same premise being refuted **three**
+  times before; this row was the fourth.
+  (iv) **Decision (a)'s answer is forced by (i)**: the authoritative site is `ConsignmentAuditWriter:178`
+  (the one the route reaches, and the one that feeds BOTH chain paths) — **not** `PipelineJobRunner:391`,
+  which is unreachable under dry run and not on this route.
+  ⚠ A decision-free **interim mitigation** is scoped in the plan (refuse `dryRun=true` at
+  `RunRoutes.java:159` with a 422, or rename the parameter to `skipPostAction`) — **operator's call, not
+  implemented**. ✅ Confirmed unchanged: `:381`/`:391`, the record shape, and the **34** construction sites
+  (4 main / 30 test). → `superpower/pipeline-dryrun-design.md` §"Step 5". *(Original:)* run a whole pipeline and discard
   every write. **FILED
   2026-09-15, new scope, operator-asked.** Nothing on the board covered it: the repo can preview a
   *node* (34 read-shaped `preview`/`test`/`probe` POSTs), test a *job pack* (`PackTestHarness`), seal a
