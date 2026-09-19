@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **55<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 32<!--count:backlog-p2--> × P2 · 22<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **58<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 34<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 32<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 22<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 34<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 58<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -1554,7 +1554,21 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   defect this row's fix simply unblocked visibility into — do not conflate the two).
   → `pom.xml` (`coverage` profile) · `asn-parser/asn-decoders/pom.xml` (`coverage` profile)
 
-- **P1** · **`WorkflowConfigLoadTest-1` — `inspecto-ops`'s forked test JVM crashes outright on JDK 27,
+- ~~**P1** · **`WorkflowConfigLoadTest-1`**~~ ✅ **CLOSED 2026-09-19 `f1232b03` — and EVERY diagnostic claim in
+  the row below was wrong.** Nothing crashed: `TestConfigs.write()` names its fixture `pipeline_<hash>.toon`,
+  a PREFIX, while `ServiceBootstrap` discovers by the SUFFIX `*_pipeline.toon`, so the scan found nothing,
+  the registry came up empty, and `CollectorService.fromArgs` — the CLI entry point, `exitIfEmpty=true` —
+  answered that with `System.exit(1)` (`ServiceBootstrap.java:67`). The crash log's last line is that
+  method's own message. Surefire's "VM crash **or System.exit called?**" was asking the right question.
+  🔴 **Three refutations worth keeping:** (1) NOT JDK 27 — it reproduces identically on JDK 26 and 27;
+  (2) NOT fork startup — the fork starts, prints `Running …` and two log lines, then dies mid-run;
+  (3) the row's own repro command **cannot produce the symptom it describes** — with `-am`, `-Dtest=`
+  applies reactor-wide, so `asn-core` (module 2/17) halts the build on "No tests matching pattern" and
+  `inspecto-ops` is SKIPPED, never forking. Add `-Dsurefire.failIfNoSpecifiedTests=false` to reach it.
+  ⛔ **The proposed fix — bump surefire 3.2.5 → 3.5.3 — would have changed nothing**, and is aimed at a
+  startup mechanism that was never involved. Verified 2/2 green. Fixed test-local: 88 test files use
+  `TestConfigs` and all pass because they load by explicit path; only this scan-booting test was exposed.
+  *(Original, kept for provenance:)* — `inspecto-ops`'s forked test JVM crashes outright on JDK 27,
   found only because `CI-JACOCO-JDK27-1`'s fix let the build reach this far.** Reproducible with or
   without `-Pcoverage` (rules out jacoco as the cause): `mvn -o -pl inspecto-ops -am -Pedition-enterprise
   -Dtest=WorkflowConfigLoadTest test` fails at fork STARTUP, before any test runs (`Tests run: 0`) —
@@ -1571,6 +1585,54 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   native call would execute, which weakly points away from it. Fix: bump `maven-surefire-plugin` to
   match the `3.5.3` already proven to work elsewhere, or root-cause the fork failure directly with `-X`.
   → `pom.xml` (surefire plugin pin, ~line 468) · `inspecto-ops/src/test/java/com/gamma/opsboot/WorkflowConfigLoadTest.java`
+
+- **P2** · ➕ **`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1` — `CollectorService.fromArgs` kills the host JVM.**
+  **FILED 2026-09-19** out of `WorkflowConfigLoadTest-1`'s root cause. `fromArgs` → `ServiceBootstrap.build`
+  → `buildFrom(…, exitIfEmpty=true)` → `System.exit(1)` at `ServiceBootstrap.java:67` when config discovery
+  finds nothing. That is defensible for a CLI `main`, but `fromArgs` is a **public API** that tests and
+  embedders call: the process dies with no exception to catch, no stack trace, and a surefire message that
+  blames a VM crash. ⚠ The failure mode is worse than the bug — it cost this shift a full root-cause hunt
+  and the ORIGINAL filer an entire session that ended in a wrong JDK-27 diagnosis.
+  Fix: `fromArgs` throws (or returns empty) on an empty registry and only `main` translates that to
+  `System.exit(1)`. ⚠ Check the other `System.exit` sites in library paths while there — `CollectorService`,
+  `SpaceMigrator`, `EnrichmentProcessor`, `CollectorProcessor` all carry one.
+  → `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java:67` · `CollectorService.java:1869`
+
+- **P3** · ➕ **`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1` — the shared fixture writes a name the production scanner
+  cannot discover.** **FILED 2026-09-19.** `TestConfigs.write()` emits `pipeline_<hash>.toon`; every loader
+  that scans a directory matches the SUFFIX `*_pipeline.toon`. 88 test files use the fixture and none
+  noticed, because they load by explicit path — the trap only springs for a test that boots by SCAN, and
+  then it presents as a JVM crash (see `LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`). Left as-is deliberately:
+  renaming touches 88 files to fix a trap that has sprung once. ⚠ Re-rank to P2 the moment a second
+  scan-booting test is written.
+  → `inspecto-etl/src/test/java/com/gamma/etl/TestConfigs.java:113`
+
+- **P2** · 🔴 ➕ **`OPENAPI-CONTRACT-RED-ON-MASTER-1` — `-am` builds halt at `inspecto-processor`.**
+  **FILED 2026-09-19**, observed while verifying an unrelated fix.
+  `OpenApiPathsContractTest.everyLiveRouteHasAnOperationInTheContract:116` fails: *1 live route has NO
+  operation in `docs/api/openapi-v1.json` — `[GET /assist/skills]`*. ⚠ **This halts the reactor before any
+  downstream module**, so any `-pl <module> -am` verification currently reports a failure that is not the
+  change under test — exactly the false-red that has cost this board several wrong verdicts.
+  Fix: regenerate with `-Dopenapi.paths.write=true` and fill the schema by hand, or document the route.
+  ⚠ Not grounded beyond the failure text — confirm whether `GET /assist/skills` is newly added or newly
+  matched before assuming which side is wrong.
+
+- **P3** · ➕ **`BOARD-STALE-HEADS-1` — §0's narrative is staler than the rows, and closed rows keep their
+  unstruck heads.** **FILED 2026-09-19** after a shift in which **six of nine grounded rows were already
+  shipped, blocked, or duplicates.** Three distinct shapes, each cost real time today:
+  (a) §0 annotates rows as "unblocked" that the body closes — `TYPEFLOW-DATASET-COLUMNS-1` is called the
+  only startable M-row at `:330`/`:411` and CLOSED at `:1165`; (b) a superseded analysis keeps an unstruck
+  head twelve lines under the row that closed it (`FENCE-STORE-SILENTLY-INERT-1`, struck `e666bafe`) — it
+  caused an operator to be asked a second time for a call already made and built; (c) rows generated from
+  one doc's prose without checking a sibling doc in the same repo — `STREAM-CONSUMER-1` was filed off
+  `ROADMAP.md:720` while `okf/capabilities/acquisition/acquisition.md:60` records the same capability
+  `✅ SHIPPED 2026-07-08` (`KafkaConnector` IS the draining consumer loop).
+  ⚠ **This is a P3 only because it is tooling, not because it is minor** — the cost is measured in whole
+  shifts. Candidate guard: fail when a row id appears both struck and unstruck, or when §0 asserts a row is
+  open whose body carries a CLOSED marker. Today that guard would have saved two of four opening lanes.
+  → also owed: strike `STREAM-CONSUMER-1`, correct `ROADMAP.md:720`, and move
+  `SPACES-FROM-PARTITION-MAP-1` to §2 (blocked on D16/ingress — `grep -rn ingress inspecto/src/main` is
+  EMPTY, so it is not startable by anyone).
 
 - **P2** · **`SPACES-FROM-PARTITION-MAP-1` — answer `/spaces` from the partition map, not a disk scan.**
   ⚠ **RE-GROUNDED 2026-09-16 — still open, still NOT startable, and NOT already shipped.**
