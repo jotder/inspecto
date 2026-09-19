@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **56<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 33<!--count:backlog-p2--> × P2 · 22<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **55<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 32<!--count:backlog-p2--> × P2 · 22<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 1<!--count:backlog-p1--> P1 + 32<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 22<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 56<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -3290,8 +3290,14 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   `reason=FENCED`; an unmatched store yields `STORE_DELETE_UNFENCED` with `reason=UNMATCHED`. 2/2 green
   (`mvn -o -pl inspecto-event,inspecto-engine,inspecto -am test -Dtest=DeletionFenceReasonTest`).
   → `okf/backend/control-plane/jobs.md` · superseded analysis below, kept for provenance.
-- **P2** · **`FENCE-STORE-SILENTLY-INERT-1` — DETECTION SHIPPED 2026-09-17 (`29065137`); the PLACEMENT of
-  a warning is an owed call.** `DeletionFence.coverage(...)` now separates the three reasons a store is
+- ~~**P2** · **`FENCE-STORE-SILENTLY-INERT-1` — DETECTION SHIPPED 2026-09-17 (`29065137`); the PLACEMENT of
+  a warning is an owed call.**~~ ✅ **SUPERSEDED BY THE CLOSED ROW ABOVE — struck 2026-09-19.** The placement
+  call it declares "owed" was MADE and BUILT the same day it was filed (check-time), so this head was the
+  only thing still saying otherwise. 🔴 **Left unstruck, it cost a real operator question**: a grounding pass
+  on 2026-09-19 read this head, reported the call as still owed, and the decision was put to the operator a
+  second time — they chose check-time, which is what had already shipped. ⛔ **A superseded analysis kept for
+  provenance must be STRUCK AT THE HEAD, not merely followed by a closed row** — the head is what a reader
+  and an agent match on. `DeletionFence.coverage(...)` now separates the three reasons a store is
   skipped — `FENCED` / `VIEW_ONLY` / `CONSUMED_ONLY` / `UNMATCHED` — sharing one private `Topology` record
   with `check` so "has a resting producer" is defined once and cannot drift. Purely additive; nothing
   consumes it yet.
@@ -3324,8 +3330,13 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   ⛔ Silently-inert safety is the one option the evidence already rules out.
   → `okf/backend/control-plane/jobs.md`
 
-- **P2** · **`EDITION-GATED-TESTS-IN-WRONG-HOME-1` — six test classes guard CORE behaviour from a module the
-  default reactor never builds.** Filed 2026-09-17. ⚠ **Severity is LOW and must stay stated that way:**
+- **P2** · **`EDITION-GATED-TESTS-IN-WRONG-HOME-1` — TWO test classes guard CORE behaviour from a module the
+  default reactor never builds.** Filed 2026-09-17. 🔴 **The headline said SIX until 2026-09-19 and was wrong by
+  four — re-verified by locating each class on disk:** `ControlApiDbBrowserTest`, `ControlApiDecisionRulesTest`,
+  `ControlApiReconPromoteTest` and `PostgresStateStoreTest` all live in **`inspecto/src/test`**, and `inspecto`
+  IS in the default `<modules>` (`pom.xml:20`), so those four already run in the local loop. ⚠ The row's own
+  detail block below was honest about each class's module; only the bolded count drifted — **a headline that
+  contradicts the body is read first and acted on first.** ⚠ **Severity is LOW and must stay stated that way:**
   `ci.yml:303` runs `-Pedition-enterprise` **with tests**, and Enterprise is the superset, so all of these
   DO run on every CI build. **The exposure is the LOCAL `mvn -o clean test` loop only** — a developer's
   pre-push run cannot see them. The first framing of this called it a CI gap; it is not.
@@ -3333,7 +3344,11 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   green, with `RepoSpacesOpsConfigLoadTest` retained in ops so the three ops-owned kinds keep real-loader
   coverage. Measured with a positive control: a 23-module default run produced zero surefire reports for
   it while the sibling `ShippedCatalogSamplesTest` produced one.
-  ⇒ **Six remain, and each names the core thing it guards:** `ControlApiDbBrowserTest`
+  ⇒ **TWO remain in `inspecto-ops`:** `ControlApiScopedObjectsTest` (**the only test of `RowScope` in the
+  repo**) and `ControlApiAccessDeciderTest` (the core authorize stage). ⚠ `PostgresStateStoreTest` is in
+  `inspecto` but carries its own environment assumptions — in-home, yet not unconditionally run; that is a
+  DIFFERENT gate and not this row's. The original six, each naming the core thing it guards:
+  `ControlApiDbBrowserTest`
   (`DbBrowserRoutes`/`SqlGuard`/`QueryExecutor` — *the only test of any of them*),
   `ControlApiDecisionRulesTest` (`DecisionRoutes` + `ConditionTree` — *no other test exists*),
   `ControlApiScopedObjectsTest` (**the only test of `RowScope` in the repo**), `ControlApiAccessDeciderTest`
