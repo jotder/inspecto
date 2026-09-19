@@ -78,61 +78,78 @@ import {
                 </p>
             }
 
-            @if (compact && !readOnly) {
-                <!-- Identity ON the config page (operator ask 2026-08-22, restyled 2026-09-04): Name is a
-                     PROPERTY ROW above every definition pane — the same .sf-row anatomy as a schema-form
-                     flat row (label · value · pencil → dense inline input; Enter/blur commit, Escape
-                     cancels). Description is no longer authored here (operator ask 2026-09-04); the model
-                     field is carried through the rename event unchanged. -->
-                <form
-                    [formGroup]="renameForm"
-                    class="sf-row mb-2 flex min-h-8 min-w-0 items-center gap-2"
-                    data-key="name"
-                    (ngSubmit)="commitIdentity()"
-                    (keydown.escape)="cancelNameEdit()"
-                >
-                    <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
-                        <span class="truncate" id="pipeline-inspector-name-label" title="Name">Name</span>
-                    </span>
-                    <div class="flex min-w-0 flex-1 items-center">
-                        @if (editingName()) {
-                            <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
-                                <input
-                                    matInput
-                                    #nameInput
-                                    formControlName="name"
-                                    [placeholder]="node.id"
-                                    aria-labelledby="pipeline-inspector-name-label"
-                                    (blur)="commitIdentity()"
-                                />
-                            </mat-form-field>
-                        } @else {
-                            <button
-                                type="button"
-                                class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            @if (compact) {
+                @if (!readOnly) {
+                    <!-- Identity ON the config page (operator ask 2026-08-22, restyled 2026-09-04): Name is a
+                         PROPERTY ROW above every definition pane — the same .sf-row anatomy as a schema-form
+                         flat row (label · value · pencil → dense inline input; Enter/blur commit, Escape
+                         cancels). Description is no longer authored here (operator ask 2026-09-04); the model
+                         field is carried through the rename event unchanged. -->
+                    <form
+                        [formGroup]="renameForm"
+                        class="sf-row mb-2 flex min-h-8 min-w-0 items-center gap-2"
+                        data-key="name"
+                        (ngSubmit)="commitIdentity()"
+                        (keydown.escape)="cancelNameEdit()"
+                    >
+                        <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
+                            <span class="truncate" id="pipeline-inspector-name-label" title="Name">Name</span>
+                        </span>
+                        <div class="flex min-w-0 flex-1 items-center">
+                            @if (editingName()) {
+                                <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
+                                    <input
+                                        matInput
+                                        #nameInput
+                                        formControlName="name"
+                                        [placeholder]="node.id"
+                                        aria-labelledby="pipeline-inspector-name-label"
+                                        (blur)="commitIdentity()"
+                                    />
+                                </mat-form-field>
+                            } @else {
+                                <button
+                                    type="button"
+                                    class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                    [class.text-secondary]="!node.name"
+                                    [attr.aria-label]="'Name: ' + (node.name || node.id)"
+                                    [title]="node.name || node.id"
+                                    (click)="startNameEdit()"
+                                >
+                                    {{ node.name || node.id }}
+                                </button>
+                            }
+                        </div>
+                        <button
+                            type="button"
+                            class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                            [attr.aria-label]="editingName() ? 'Done editing Name' : 'Edit Name'"
+                            (mousedown)="$event.preventDefault()"
+                            (click)="editingName() ? commitIdentity() : startNameEdit()"
+                        >
+                            <mat-icon
+                                class="icon-size-4"
+                                [svgIcon]="editingName() ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
+                            ></mat-icon>
+                        </button>
+                    </form>
+                } @else {
+                    <div class="sf-row mb-2 flex min-h-8 min-w-0 items-center gap-2" data-key="name">
+                        <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
+                            <span class="truncate" id="pipeline-inspector-name-label" title="Name">Name</span>
+                        </span>
+                        <div class="flex min-w-0 flex-1 items-center">
+                            <span
+                                class="sf-value min-w-0 flex-1 truncate px-1 py-0.5 text-left font-mono text-sm"
                                 [class.text-secondary]="!node.name"
-                                [attr.aria-label]="'Name: ' + (node.name || node.id)"
-                                [title]="node.name || node.id"
-                                (click)="startNameEdit()"
                             >
                                 {{ node.name || node.id }}
-                            </button>
-                        }
+                            </span>
+                        </div>
                     </div>
-                    <button
-                        type="button"
-                        class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                        [attr.aria-label]="editingName() ? 'Done editing Name' : 'Edit Name'"
-                        (mousedown)="$event.preventDefault()"
-                        (click)="editingName() ? commitIdentity() : startNameEdit()"
-                    >
-                        <mat-icon
-                            class="icon-size-4"
-                            [svgIcon]="editingName() ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
-                        ></mat-icon>
-                    </button>
-                </form>
-                @if (parkable) {
+                }
+
+                @if (parkable && !readOnly) {
                     <!--
                         Phase 4 S4 / D-13: the per-Step switch. Only a route-branch sink offers it — the
                         host decides that structurally (a sink fed by the route Step), never by mirroring
@@ -318,6 +335,7 @@ export class PipelineInspectorComponent implements OnChanges {
 
     /** Compact mode: open the Name row's inline input, seeded from the node, and focus it. */
     startNameEdit(): void {
+        if (this.readOnly) return;
         const n = this.node;
         if (!n) return;
         this.renameForm.setValue({ name: n.name ?? '' });
@@ -351,6 +369,7 @@ export class PipelineInspectorComponent implements OnChanges {
     }
 
     startRename(): void {
+        if (this.readOnly) return;
         const n = this.node;
         if (!n) return;
         this.renameForm.setValue({ name: n.name ?? '' });

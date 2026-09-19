@@ -203,6 +203,7 @@ describe('PipelineEditorComponent', () => {
                     useValue: {
                         confirm: vi.fn().mockResolvedValue(true),
                         confirmDestructive: vi.fn().mockResolvedValue(true),
+                        confirmUnsavedChanges: vi.fn().mockResolvedValue('discard'),
                         // The delete asks with checkboxes now: schema defaults ON, data OFF.
                         confirmDestructiveWith: vi
                             .fn()
@@ -1516,6 +1517,23 @@ describe('PipelineEditorComponent', () => {
             expect(dock.style.width).toBe('420px');
         });
 
+        it('allows both left and right docks to resize up to 50% of viewport width', () => {
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            fixture.componentRef.setInput('openId', 'demo');
+            const c = fixture.componentInstance;
+            c.ngOnInit();
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges();
+            expect(c.maxDockWidth()).toBeGreaterThanOrEqual(Math.round(window.innerWidth * 0.5));
+
+            const splits = (fixture.nativeElement as HTMLElement).querySelectorAll('[inspectoSplit]');
+            expect(splits.length).toBe(2);
+            // Palette handle
+            expect(splits[0].getAttribute('aria-valuemax')).toBe(String(c.maxDockWidth()));
+            // Inspector handle
+            expect(splits[1].getAttribute('aria-valuemax')).toBe(String(c.maxDockWidth()));
+        });
+
         /**
          * S3 — selection and configuration converge, so the common paths cost one click instead of two.        /**
          * S3 — selection and configuration converge, so the common paths cost one click instead of two.
@@ -1567,20 +1585,38 @@ describe('PipelineEditorComponent', () => {
                 expect(c.definitionNode()?.id).toBe('flt');
             });
 
-            /** A DIRTY pane keeps openDefinition's confirm — that guard is the whole point. */
-            it('a DIRTY open pane confirms before following the selection', async () => {
+            /** A DIRTY open pane confirms before following the selection — offering save, discard, cancel. */
+            it('a DIRTY open pane confirms before following the selection and handles cancel, discard, save', async () => {
                 const confirm = TestBed.inject(InspectoConfirmService) as unknown as {
-                    confirmDestructive: ReturnType<typeof vi.fn>;
+                    confirmUnsavedChanges: ReturnType<typeof vi.fn>;
                 };
-                confirm.confirmDestructive.mockResolvedValue(false);
+                // 1. Cancel: declines switch, stays put
+                confirm.confirmUnsavedChanges.mockResolvedValue('cancel');
                 const c = make();
                 c.select('demo');
                 await c.openDefinition(c.model()!.nodes[0]);
                 c.definitionDirty.set(true);
                 c.onNodeSelected('flt');
                 await new Promise((r) => setTimeout(r)); // the confirm resolves on a microtask chain
-                expect(confirm.confirmDestructive).toHaveBeenCalled();
+                expect(confirm.confirmUnsavedChanges).toHaveBeenCalled();
                 expect(c.definitionNode()?.id).toBe('src'); // declined ⇒ the pane stays put
+
+                // 2. Discard: discards edits and switches to flt
+                confirm.confirmUnsavedChanges.mockResolvedValue('discard');
+                c.onNodeSelected('flt');
+                await new Promise((r) => setTimeout(r));
+                expect(c.definitionNode()?.id).toBe('flt');
+
+                // 3. Save: applies definition and switches
+                c.definitionDirty.set(true);
+                confirm.confirmUnsavedChanges.mockResolvedValue('save');
+                const applySpy = vi.spyOn(c, 'applyDefinition').mockImplementation(() => {
+                    c.definitionDirty.set(false);
+                });
+                c.onNodeSelected('src');
+                await new Promise((r) => setTimeout(r));
+                expect(applySpy).toHaveBeenCalled();
+                expect(c.definitionNode()?.id).toBe('src');
             });
         });
 
@@ -1717,9 +1753,8 @@ describe('PipelineEditorComponent', () => {
             });
 
             /**
-             * Found in the preview, invisible to every unit test above: `openNodeConfig` is gated on
-             * `canAuthor()`, so in View mode the whole strip did nothing at all. Selecting is not
-             * gated, so the chip still reveals its Step and only the editing half is withheld.
+             * Selecting opens the definition drawer directly even in View mode (read-only),
+             * with Save/Cancel hidden by [readOnly]="!canAuthor()".
              */
             it('still reveals the Step when authoring is withheld (View mode / Business lens)', () => {
                 const c = guided();
@@ -1728,8 +1763,8 @@ describe('PipelineEditorComponent', () => {
                 const open = vi.spyOn(c, 'openNodeConfig');
                 c.openStage(c.checklist()[0]);
                 expect(c.selectedNode()?.id).toBe('src');
-                expect(open).toHaveBeenCalled(); // called, and internally a no-op — not skipped here
-                expect(c.definitionNode()).toBeNull(); // nothing opened for editing
+                expect(open).toHaveBeenCalled();
+                expect(c.definitionNode()?.id).toBe('src'); // opens definition drawer directly in read-only mode
             });
 
             it('an empty chip opens nothing', () => {
@@ -3446,6 +3481,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
                     useValue: {
                         confirm: vi.fn().mockResolvedValue(true),
                         confirmDestructive: vi.fn().mockResolvedValue(true),
+                        confirmUnsavedChanges: vi.fn().mockResolvedValue('discard'),
                         // The delete asks with checkboxes now: schema defaults ON, data OFF.
                         confirmDestructiveWith: vi
                             .fn()

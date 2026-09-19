@@ -95,8 +95,9 @@ interface ExtraEntry {
                                 <mat-slide-toggle
                                     class="sf-toggle"
                                     [checked]="e.control.value === 'true'"
+                                    [disabled]="readOnly()"
                                     [aria-labelledby]="labelId(e)"
-                                    (change)="setBoolean(e, $event.checked)"
+                                    (change)="!readOnly() && setBoolean(e, $event.checked)"
                                 ></mat-slide-toggle>
                             }
                             @default {
@@ -127,11 +128,13 @@ interface ExtraEntry {
                                 } @else {
                                     <button
                                         type="button"
-                                        class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                        class="sf-value min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                        [class.hover:bg-hover]="!readOnly()"
+                                        [class.cursor-default]="readOnly()"
                                         [class.text-secondary]="displayValue(e) === '—'"
                                         [attr.aria-label]="e.key + ': ' + displayValue(e)"
                                         [title]="displayValue(e)"
-                                        (click)="startEditing(e)"
+                                        (click)="!readOnly() && startEditing(e)"
                                     >
                                         {{ displayValue(e) }}
                                     </button>
@@ -139,7 +142,7 @@ interface ExtraEntry {
                             }
                         }
                     </div>
-                    @if (e.kind !== 'boolean') {
+                    @if (!readOnly() && e.kind !== 'boolean') {
                         <button
                             type="button"
                             class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -152,15 +155,17 @@ interface ExtraEntry {
                             ></mat-icon>
                         </button>
                     }
-                    <button
-                        type="button"
-                        class="text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                        [attr.aria-label]="'Remove ' + e.key"
-                        [matTooltip]="'Remove ' + e.key"
-                        (click)="remove(e.key)"
-                    >
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
-                    </button>
+                    @if (!readOnly()) {
+                        <button
+                            type="button"
+                            class="text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                            [attr.aria-label]="'Remove ' + e.key"
+                            [matTooltip]="'Remove ' + e.key"
+                            (click)="remove(e.key)"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                    }
                 </div>
                 @if (rowError(e); as err) {
                     <p class="text-warn m-0 pl-40 text-xs" role="alert">{{ err }}</p>
@@ -171,7 +176,7 @@ interface ExtraEntry {
                 </p>
             }
 
-            @if (allowAdd()) {
+            @if (!readOnly() && allowAdd()) {
                 <!-- Adding is offered ONLY where this editor is the node's primary surface (no schema
                      at all) — a schema-backed type's vocabulary is the schema. -->
                 <div class="mt-1 flex items-start gap-1">
@@ -214,6 +219,8 @@ export class PipelineExtraConfigComponent {
     readonly entries = input.required<{ key: string; value: unknown }[]>();
     /** Offer the add affordance — only when this editor is the node's PRIMARY surface (no schema). */
     readonly allowAdd = input(false);
+    /** When true, config entries are view-only: pencil and remove icons are hidden and values cannot be changed inline. */
+    readonly readOnly = input(false);
     /** Any user interaction that changes the eventual value — the host re-derives its dirty flag. */
     readonly changed = output<void>();
 
@@ -247,7 +254,7 @@ export class PipelineExtraConfigComponent {
     readonly editingKey = signal<string | null>(null);
 
     isEditing(e: ExtraEntry): boolean {
-        return this.editingKey() === e.key;
+        return !this.readOnly() && this.editingKey() === e.key;
     }
 
     labelId(e: ExtraEntry): string {
@@ -275,6 +282,7 @@ export class PipelineExtraConfigComponent {
     }
 
     startEditing(e: ExtraEntry): void {
+        if (this.readOnly()) return;
         this.editingKey.set(e.key);
         this.cdr.detectChanges();
         const row = this.host.nativeElement.querySelector<HTMLElement>(

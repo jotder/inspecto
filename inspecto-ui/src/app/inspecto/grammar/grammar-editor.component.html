@@ -13,6 +13,7 @@
     <div class="mb-1 text-xs font-semibold uppercase opacity-70">File format</div>
     <mat-button-toggle-group
         [value]="activeType()"
+        [disabled]="readOnly"
         (change)="setType($event.value)"
         aria-label="File format"
         class="flex-wrap"
@@ -28,11 +29,13 @@
     </mat-button-toggle-group>
 
     @if (suggestion(); as sg) {
-        <button type="button" class="mt-2" (click)="applySuggestion()" matTooltip="Apply the suggested file format">
-            <inspecto-chip variant="soft" tone="primary">
-                Looks like {{ sg.reason }} — use {{ frontendLabel(sg.frontend) }}?
-            </inspecto-chip>
-        </button>
+        @if (!readOnly) {
+            <button type="button" class="mt-2" (click)="applySuggestion()" matTooltip="Apply the suggested file format">
+                <inspecto-chip variant="soft" tone="primary">
+                    Looks like {{ sg.reason }} — use {{ frontendLabel(sg.frontend) }}?
+                </inspecto-chip>
+            </button>
+        }
     }
 </div>
 
@@ -144,6 +147,7 @@
                         [specs]="s.specs"
                         [initial]="seedValue()"
                         [flat]="true"
+                        [readOnly]="readOnly"
                         (submitted)="submitted.emit()"
                     />
                     @if (s.id === 'dialect' && !pluginDef() && frontend() === 'fixedwidth') {
@@ -165,7 +169,7 @@
             }
         </mat-accordion>
     } @else {
-        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" [flat]="true" (submitted)="submitted.emit()" />
+        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" [flat]="true" [readOnly]="readOnly" (submitted)="submitted.emit()" />
         <!-- Unsectioned formats still render the host's slotted content — below the flat form. -->
         <ng-content select="[tabTypes]"></ng-content>
     }
@@ -190,7 +194,12 @@
                         <!-- Row-distinct accessible names: every row's visible label is the same word,
                              so without these a screen reader reads "Name / Start / Length" N times with
                              nothing to tell the slices apart. -->
-                        <input matInput formControlName="name" [attr.aria-label]="'Field ' + ($index + 1) + ' name'" />
+                        <input
+                            matInput
+                            formControlName="name"
+                            [readonly]="readOnly"
+                            [attr.aria-label]="'Field ' + ($index + 1) + ' name'"
+                        />
                         @if (g.get('name')?.hasError('required')) {
                             <mat-error>Required</mat-error>
                         }
@@ -201,6 +210,7 @@
                             matInput
                             type="number"
                             formControlName="start"
+                            [readonly]="readOnly"
                             [attr.aria-label]="'Field ' + ($index + 1) + ' start'"
                         />
                     </mat-form-field>
@@ -210,24 +220,29 @@
                             matInput
                             type="number"
                             formControlName="length"
+                            [readonly]="readOnly"
                             [attr.aria-label]="'Field ' + ($index + 1) + ' length'"
                         />
                     </mat-form-field>
-                    <button
-                        mat-icon-button
-                        type="button"
-                        class="mt-1"
-                        [attr.aria-label]="'Remove field ' + ($index + 1)"
-                        (click)="removeField($index)"
-                    >
-                        <!-- The app ships heroicons as SVG and no Material icon FONT, so a ligature name
-                             renders as the literal words "remove_circle_outline" beside every slice row. -->
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
-                    </button>
+                    @if (!readOnly) {
+                        <button
+                            mat-icon-button
+                            type="button"
+                            class="mt-1"
+                            [attr.aria-label]="'Remove field ' + ($index + 1)"
+                            (click)="removeField($index)"
+                        >
+                            <!-- The app ships heroicons as SVG and no Material icon FONT, so a ligature name
+                                 renders as the literal words "remove_circle_outline" beside every slice row. -->
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
+                        </button>
+                    }
                 </div>
             }
         </div>
-        <button mat-stroked-button type="button" class="mt-2 !text-xs" (click)="addField()">Add field</button>
+        @if (!readOnly) {
+            <button mat-stroked-button type="button" class="mt-2 !text-xs" (click)="addField()">Add field</button>
+        }
     </div>
 </ng-template>
 @if (!pluginDef() && frontend() === 'fixedwidth' && !sections()) {

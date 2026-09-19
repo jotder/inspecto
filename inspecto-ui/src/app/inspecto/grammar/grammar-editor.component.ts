@@ -122,6 +122,8 @@ export class GrammarEditorComponent implements AfterViewInit {
      */
     @ViewChildren(InspectoSchemaFormComponent) private schemaForms?: QueryList<InspectoSchemaFormComponent>;
 
+    @Input() readOnly = false;
+
     /** The single schema-form of a flat (unsectioned) spec set — legacy accessor for specs/hosts. */
     get schemaForm(): InspectoSchemaFormComponent | undefined {
         return this.schemaForms?.first;

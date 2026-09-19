@@ -113,6 +113,7 @@ export class PipelineTransformSqlDefinitionComponent {
     readonly upstreamColumnTypes = input<Record<string, string>>({});
     /** The inbound edges feeding this node, for the workbench's input strip. Pass-through only. */
     readonly inputs = input<readonly InputRelation[]>([]);
+    readonly readOnly = input(false);
 
     readonly applied = output<AuthoredNode>();
     readonly dirtyChange = output<boolean>();
@@ -410,7 +411,7 @@ export class PipelineTransformSqlDefinitionComponent {
             this.sqlText.set('');
             this.fields.set(seedFields(this.upstreamColumns()));
         }
-        this.filter.set('all');
+        this.filter.set(this.allRows().some((row) => row.changed) ? 'changed' : 'all');
         this.loaded = this.snapshot();
     }
 
@@ -438,6 +439,7 @@ export class PipelineTransformSqlDefinitionComponent {
      * `dirtyChange`, so the drawer's Apply never armed and the edit could not be saved at all.
      */
     onSqlEdited(sql: string): void {
+        if (this.readOnly()) return;
         this.sqlText.set(sql);
         this.touched();
     }
@@ -471,6 +473,7 @@ export class PipelineTransformSqlDefinitionComponent {
     // ── row edits ───────────────────────────────────────────────────────────────────────────────────
 
     private patch(id: string, change: (f: SqlField) => SqlField): void {
+        if (this.readOnly()) return;
         this.fields.update((rows) => rows.map((f) => (f.id === id ? change(f) : f)));
         this.touched();
     }
@@ -493,6 +496,7 @@ export class PipelineTransformSqlDefinitionComponent {
 
     /** Leave a field out. Its source column is remembered so it can be put back with one click. */
     removeField(id: string): void {
+        if (this.readOnly()) return;
         const row = this.fields().find((f) => f.id === id);
         this.fields.update((rows) => rows.filter((f) => f.id !== id));
         if (row?.from) this.leftOut.update((names) => (names.includes(row.from) ? names : [...names, row.from]));
@@ -511,6 +515,7 @@ export class PipelineTransformSqlDefinitionComponent {
      * </ul>
      */
     pickField(column: string): void {
+        if (this.readOnly()) return;
         if (this.view() === 'sql') {
             this.editor()?.insertAtCursor(quoteIdentifier(column));
             return;
@@ -523,12 +528,14 @@ export class PipelineTransformSqlDefinitionComponent {
     }
 
     restore(column: string): void {
+        if (this.readOnly()) return;
         this.leftOut.update((names) => names.filter((n) => n !== column));
         this.fields.update((rows) => [...rows, { id: newFieldId(), name: column, from: column, fn: 'keep', args: {} }]);
         this.touched();
     }
 
     addCalculated(): void {
+        if (this.readOnly()) return;
         this.fields.update((rows) => [
             ...rows,
             { id: newFieldId(), name: '', from: '', fn: 'custom', args: { expression: '' } },
@@ -538,6 +545,7 @@ export class PipelineTransformSqlDefinitionComponent {
     }
 
     moveUp(id: string): void {
+        if (this.readOnly()) return;
         const rows = [...this.fields()];
         const idx = rows.findIndex((f) => f.id === id);
         if (idx <= 0) return;
@@ -549,6 +557,7 @@ export class PipelineTransformSqlDefinitionComponent {
     }
 
     moveDown(id: string): void {
+        if (this.readOnly()) return;
         const rows = [...this.fields()];
         const idx = rows.findIndex((f) => f.id === id);
         if (idx < 0 || idx >= rows.length - 1) return;

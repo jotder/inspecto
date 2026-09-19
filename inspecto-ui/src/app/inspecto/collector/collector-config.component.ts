@@ -54,7 +54,7 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
         <div class="flex flex-col gap-4">
             <div>
                 <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Collect from</div>
-                <mat-button-toggle-group [value]="mode()" (change)="setMode($event.value)" aria-label="Collect from">
+                <mat-button-toggle-group [value]="mode()" [disabled]="readOnly" (change)="setMode($event.value)" aria-label="Collect from">
                     <mat-button-toggle value="local" matTooltip="Read files from the pipeline's inbox folder">
                         Local inbox
                     </mat-button-toggle>
@@ -82,6 +82,7 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                 [initial]="seed()"
                 [optionLoaders]="optionLoaders"
                 [flat]="true"
+                [readOnly]="readOnly"
                 (submitted)="submitted.emit()"
             />
 
@@ -91,7 +92,7 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                     <button
                         mat-stroked-button
                         type="button"
-                        [disabled]="testing() || !connectionId()"
+                        [disabled]="testing() || !connectionId() || readOnly"
                         (click)="testConnection()"
                     >
                         @if (testing()) {
@@ -99,7 +100,7 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                         }
                         Test connection
                     </button>
-                    @if (lens.canAuthorWorkbench()) {
+                    @if (lens.canAuthorWorkbench() && !readOnly) {
                         <button mat-stroked-button type="button" (click)="newConnection()">
                             <mat-icon svgIcon="heroicons_outline:plus" class="icon-size-4" />
                             <span class="ml-1">New connection</span>
@@ -150,6 +151,8 @@ export class CollectorConfigComponent {
         dataset: datasetOptionLoader(),
         trigger__from: datasetRefOptionLoader(),
     };
+
+    @Input() readOnly = false;
 
     /** The collector table to render — the WHOLE shared one, `connection` included (filtered in local mode). */
     @Input({ required: true }) set specs(specs: AttributeSpec[]) {
@@ -252,7 +255,7 @@ export class CollectorConfigComponent {
     }
 
     setMode(m: CollectorMode): void {
-        if (m === this.mode()) return;
+        if (this.readOnly || m === this.mode()) return;
         this.seed.update((s) => ({ ...s, ...(this.schemaForm?.value() ?? {}) }));
         this.mode.set(m);
         this.modeTouched.set(true);

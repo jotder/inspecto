@@ -24,6 +24,7 @@ export interface ConfirmCheckbox {
 /** What the operator chose: whether they confirmed, and the state of each offered checkbox. */
 export interface ConfirmChoice {
     ok: boolean;
+    action?: 'confirm' | 'secondary' | 'cancel';
     checked: Record<string, boolean>;
 }
 
@@ -33,6 +34,8 @@ interface ConfirmData {
     message: string;
     confirmText: string;
     cancelText: string;
+    secondaryText?: string;
+    secondaryColor?: 'primary' | 'accent' | 'warn';
     destructive: boolean;
     /** When set, the user must type this exact text to enable the confirm button. */
     requireText?: string;
@@ -67,15 +70,24 @@ interface ConfirmData {
                 </mat-form-field>
             }
         </mat-dialog-content>
-        <mat-dialog-actions align="end">
-            <button mat-button [mat-dialog-close]="{ ok: false, checked: {} }">
+        <mat-dialog-actions align="end" class="gap-2">
+            <button mat-button [mat-dialog-close]="{ ok: false, action: 'cancel', checked: {} }">
                 {{ data.cancelText }}
             </button>
+            @if (data.secondaryText) {
+                <button
+                    mat-stroked-button
+                    [color]="data.secondaryColor ?? 'primary'"
+                    [mat-dialog-close]="{ ok: true, action: 'secondary', checked: checked }"
+                >
+                    {{ data.secondaryText }}
+                </button>
+            }
             <button
                 mat-flat-button
                 [color]="data.destructive ? 'warn' : 'primary'"
                 [disabled]="data.requireText ? typed !== data.requireText : false"
-                [mat-dialog-close]="{ ok: true, checked: checked }"
+                [mat-dialog-close]="{ ok: true, action: 'confirm', checked: checked }"
             >
                 {{ data.confirmText }}
             </button>
@@ -96,6 +108,8 @@ export interface ConfirmOptions {
     title?: string;
     confirmText?: string;
     cancelText?: string;
+    secondaryText?: string;
+    secondaryColor?: 'primary' | 'accent' | 'warn';
     destructive?: boolean;
     /** Require the user to type this exact text (e.g. the resource id) before the confirm enables. */
     requireText?: string;
@@ -138,6 +152,29 @@ export class InspectoConfirmService {
         return this.askWith(message, { destructive: true, title: 'Delete', confirmText: 'Delete', ...opts });
     }
 
+    /**
+     * Three-way confirm for unsaved changes when switching steps or contexts:
+     * - 'save': save and proceed
+     * - 'discard': discard unapplied changes and proceed
+     * - 'cancel': abort the action and stay put
+     */
+    async confirmUnsavedChanges(
+        message = 'You have unsaved changes. What would you like to do?',
+        opts: { title?: string; saveText?: string; discardText?: string; cancelText?: string } = {},
+    ): Promise<'save' | 'discard' | 'cancel'> {
+        const choice = await this.askWith(message, {
+            title: opts.title ?? 'Unsaved Changes',
+            confirmText: opts.saveText ?? 'Save and continue',
+            secondaryText: opts.discardText ?? 'Discard',
+            secondaryColor: 'warn',
+            cancelText: opts.cancelText ?? 'Cancel',
+            destructive: false,
+        });
+        if (!choice.ok) return 'cancel';
+        if (choice.action === 'secondary') return 'discard';
+        return 'save';
+    }
+
     private async ask(message: string, opts: ConfirmOptions): Promise<boolean> {
         return (await this.askWith(message, opts)).ok;
     }
@@ -154,15 +191,21 @@ export class InspectoConfirmService {
             message,
             confirmText: opts.confirmText ?? 'OK',
             cancelText: opts.cancelText ?? 'Cancel',
+            secondaryText: opts.secondaryText,
+            secondaryColor: opts.secondaryColor,
             destructive: opts.destructive ?? false,
             requireText: opts.requireText,
             checkboxes: opts.checkboxes,
         };
         const ref = this.dialog.open(InspectoConfirmDialog, {
             data,
-            width: '420px',
+            width: opts.secondaryText ? '480px' : '420px',
         });
         const closed = (await firstValueFrom(ref.afterClosed())) as ConfirmChoice | undefined;
-        return { ok: closed?.ok === true, checked: closed?.checked ?? {} };
+        return {
+            ok: closed?.ok === true,
+            action: closed?.action ?? (closed?.ok ? 'confirm' : 'cancel'),
+            checked: closed?.checked ?? {},
+        };
     }
 }

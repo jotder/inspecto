@@ -16,6 +16,7 @@ import { DefinitionDrawerComponent } from './definition-drawer.component';
             [title]="title()"
             [kindLabel]="kind"
             [dirty]="dirty()"
+            [readOnly]="readOnly()"
             (apply)="applied = applied + 1"
             (discard)="discarded = discarded + 1"
             (closed)="closedCount = closedCount + 1"
@@ -30,6 +31,7 @@ class HostComponent {
     title = signal('sftp inbox');
     kind = 'Collector';
     dirty = signal(false);
+    readOnly = signal(false);
     applied = 0;
     discarded = 0;
     closedCount = 0;
@@ -79,6 +81,15 @@ describe('DefinitionDrawerComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('unapplied');
         expect(button(fixture, 'Apply').disabled).toBe(false);
         expect(button(fixture, 'Discard').disabled).toBe(false);
+    });
+
+    it('hides the Apply and Discard footer buttons in readOnly mode', async () => {
+        const { fixture } = await create();
+        fixture.componentInstance.dirty.set(true);
+        fixture.componentInstance.readOnly.set(true);
+        fixture.detectChanges();
+        expect(button(fixture, 'Apply')).toBeUndefined();
+        expect(button(fixture, 'Discard')).toBeUndefined();
     });
 
     it('emits apply and discard from the footer', async () => {

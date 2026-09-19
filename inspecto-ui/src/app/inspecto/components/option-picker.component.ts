@@ -16,6 +16,7 @@ interface PickerData {
     title: string;
     options: PickerOption[];
     current: string | null;
+    readOnly?: boolean;
 }
 
 /** How many choices are worth a filter box — below this the list is scannable as-is. */
@@ -33,7 +34,12 @@ const SEARCH_THRESHOLD = 8;
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [FormsModule, MatButtonModule, MatDialogModule, MatIconModule],
     template: `
-        <h2 mat-dialog-title class="truncate">{{ data.title }}</h2>
+        <h2 mat-dialog-title class="truncate">
+            {{ data.title }}
+            @if (data.readOnly) {
+                <span class="text-secondary ml-2 text-xs font-normal">(View only)</span>
+            }
+        </h2>
         <mat-dialog-content class="min-w-80">
             @if (data.options.length >= threshold) {
                 <input
@@ -56,7 +62,7 @@ const SEARCH_THRESHOLD = 8;
                         [attr.cdkFocusInitial]="
                             data.options.length < threshold && opt.value === data.current ? '' : null
                         "
-                        (click)="ref.close(opt.value)"
+                        (click)="data.readOnly ? ref.close() : ref.close(opt.value)"
                     >
                         <mat-icon
                             class="icon-size-5 shrink-0"
@@ -77,7 +83,9 @@ const SEARCH_THRESHOLD = 8;
             </div>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button mat-stroked-button type="button" (click)="ref.close()">Cancel</button>
+            <button mat-stroked-button type="button" (click)="ref.close()">
+                {{ data.readOnly ? 'Close' : 'Cancel' }}
+            </button>
         </mat-dialog-actions>
     `,
 })
@@ -185,6 +193,8 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
     readonly placeholder = input('Select');
     readonly help = input('');
     readonly required = input(false);
+    /** In read-only mode, the dialog can be opened to view options, but picking does not mutate the value. */
+    readonly readOnly = input(false);
     /** Visually hide the label (it stays the trigger's accessible name) — for a host that renders the
      *  label itself, e.g. the schema-form's flat property rows. */
     readonly hideLabel = input(false);
@@ -231,13 +241,18 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
             .open(OptionPickerDialog, {
                 // A null value and a blank-valued option are the SAME choice (see `display`), so the
                 // popup must tick that option rather than showing nothing as selected.
-                data: { title: this.label(), options: this.options(), current: this.value() ?? '' },
+                data: {
+                    title: this.label(),
+                    options: this.options(),
+                    current: this.value() ?? '',
+                    readOnly: this.readOnly(),
+                },
                 autoFocus: true,
                 restoreFocus: true,
             })
             .afterClosed()
             .subscribe((picked) => {
-                if (picked === undefined) return; // dismissed — never write a null over a stored value
+                if (this.readOnly() || picked === undefined) return; // dismissed or read-only — never write a null over a stored value
                 this.value.set(picked);
                 this.onChange(picked);
             });

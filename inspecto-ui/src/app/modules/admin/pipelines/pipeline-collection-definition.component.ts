@@ -58,6 +58,7 @@ import { nodeAttributesFor } from './node-attributes';
                 [specs]="collectorSpecs()"
                 [initial]="split().schemaInitial"
                 [storedConnector]="storedConnector()"
+                [readOnly]="readOnly()"
                 (submitted)="submit()"
             />
 
@@ -75,6 +76,7 @@ import { nodeAttributesFor } from './node-attributes';
                     [flat]="true"
                     [specs]="dedupSpecs()"
                     [initial]="split().schemaInitial"
+                    [readOnly]="readOnly()"
                     (submitted)="submit()"
                 />
             }
@@ -92,6 +94,7 @@ import { nodeAttributesFor } from './node-attributes';
                     [flat]="true"
                     [specs]="unpackSpecs()"
                     [initial]="split().schemaInitial"
+                    [readOnly]="readOnly()"
                     (submitted)="submit()"
                 />
             }
@@ -105,7 +108,11 @@ import { nodeAttributesFor } from './node-attributes';
                     Additional config
                     <span class="opacity-60">({{ split().extraRows.length }})</span>
                 </div>
-                <app-pipeline-extra-config [entries]="split().extraRows" (changed)="onInteraction()" />
+                <app-pipeline-extra-config
+                    [entries]="split().extraRows"
+                    [readOnly]="readOnly()"
+                    (changed)="onInteraction()"
+                />
             }
         </form>
     `,
@@ -115,6 +122,7 @@ export class PipelineCollectionDefinitionComponent {
 
     /** The acquisition node being defined (identity fixed; config/use editable). */
     readonly node = input.required<AuthoredNode>();
+    readonly readOnly = input(false);
     /**
      * The type's config vocabulary as published by the server (`GET /pipelines/node-types`).
      * `undefined` ⇒ catalog not resolved — fall back to the local table, exactly as the dialog does.

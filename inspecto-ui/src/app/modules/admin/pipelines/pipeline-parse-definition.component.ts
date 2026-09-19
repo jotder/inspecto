@@ -203,23 +203,25 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
             -->
             <ng-template #csvActions>
                 @if (csvCapable()) {
-                    <button
-                        mat-icon-button
-                        type="button"
-                        aria-label="Import Grammar from CSV"
-                        matTooltip="Import a Grammar CSV — known options and columns repopulate this surface"
-                        (click)="csvInput.click()"
-                    >
-                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:document-arrow-up"></mat-icon>
-                    </button>
-                    <input
-                        #csvInput
-                        type="file"
-                        accept=".csv,text/csv"
-                        class="hidden"
-                        aria-label="Import Grammar from CSV"
-                        (change)="importCsv($event)"
-                    />
+                    @if (!readOnly()) {
+                        <button
+                            mat-icon-button
+                            type="button"
+                            aria-label="Import Grammar from CSV"
+                            matTooltip="Import a Grammar CSV — known options and columns repopulate this surface"
+                            (click)="csvInput.click()"
+                        >
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:document-arrow-up"></mat-icon>
+                        </button>
+                        <input
+                            #csvInput
+                            type="file"
+                            accept=".csv,text/csv"
+                            class="hidden"
+                            aria-label="Import Grammar from CSV"
+                            (change)="importCsv($event)"
+                        />
+                    }
                     <button
                         mat-icon-button
                         type="button"
@@ -268,6 +270,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     [options]="pluginOptions()"
                     [ngModel]="plugin()?.id ?? null"
                     (ngModelChange)="pickPlugin($event)"
+                    [readOnly]="readOnly()"
                     [help]="pluginChoices().length ? '' : 'No ingestable plugin is deployed on this server.'"
                 />
             }
@@ -280,6 +283,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                 [sample]="sample()?.sample()?.text"
                 [sampleBytes]="sample()?.sample()?.b64"
                 [previewFn]="sample() ? previewFn : undefined"
+                [readOnly]="readOnly()"
                 (pluginChange)="plugin.set($event)"
                 (previewed)="onPreviewed($event)"
                 (submitted)="submit()"
@@ -329,6 +333,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                             [options]="typesModeOptions"
                             [ngModel]="typesMode()"
                             (ngModelChange)="setTypesMode($event)"
+                            [readOnly]="readOnly()"
                         />
                         @if (schemaLoading()) {
                             <p class="text-secondary m-0 mb-1 text-xs">Loading the saved schema…</p>
@@ -414,7 +419,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                         mat-stroked-button
                                         type="button"
                                         class="!text-xs mt-2"
-                                        [disabled]="writing()"
+                                        [disabled]="writing() || readOnly()"
                                         (click)="replaceOutputSchema()"
                                     >
                                         Replace the output schema
@@ -442,7 +447,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     -->
                     @if (filenameColumnTarget(); as t) {
                         <div class="mb-3 mt-3">
-                            <mat-checkbox [checked]="!!t.value" (change)="onFilenameColumnToggle($event.checked)">
+                            <mat-checkbox [checked]="!!t.value" [disabled]="readOnly()" (change)="onFilenameColumnToggle($event.checked)">
                                 Add a column with the source file name
                             </mat-checkbox>
                             <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">
@@ -451,6 +456,7 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                                     [value]="t.value"
                                     placeholder="file_name"
                                     aria-label="Source filename column"
+                                    [readonly]="readOnly()"
                                     (change)="onFilenameColumnBlur($any($event.target).value)"
                                 />
                             </mat-form-field>
@@ -488,6 +494,7 @@ export class PipelineParseDefinitionComponent {
 
     /** The per-format parse node being defined (identity fixed; config editable — name/description carried verbatim). */
     readonly node = input.required<AuthoredNode>();
+    readonly readOnly = input(false);
 
     /**
      * The format this node's type means — the editor is locked to it. Derived from the node type
@@ -574,6 +581,7 @@ export class PipelineParseDefinitionComponent {
      *  (never `<mat-error>` — this input carries no `NgControl`, so a mat-form-field never enters an
      *  error state for it; the schema-form `list`-type fix set the precedent). */
     onFilenameColumnBlur(raw: string): void {
+        if (this.readOnly()) return;
         const value = raw.trim();
         if (!value) {
             this.filenameColumnError.set(null);
@@ -595,6 +603,7 @@ export class PipelineParseDefinitionComponent {
      * name field's own value is authoritative, so a real edit is never clobbered by a stray toggle).
      */
     onFilenameColumnToggle(checked: boolean): void {
+        if (this.readOnly()) return;
         if (!checked) {
             this.filenameColumnError.set(null);
             this.filenameColumnChange.emit(null);

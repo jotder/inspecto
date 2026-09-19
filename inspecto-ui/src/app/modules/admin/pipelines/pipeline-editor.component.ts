@@ -52,7 +52,6 @@ import {
     pipelineId,
     pipelineScaffold,
 } from 'app/inspecto/component-model';
-import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { companionSchemaName, schemaNameFromPath, segmentPathsOf } from 'app/inspecto/segments';
@@ -212,7 +211,6 @@ const UNDO_CAP = 50;
         InspectoEmptyStateComponent,
         InspectoSplitDirective,
         TransferMenuComponent,
-        AiAssistComponent,
     ],
     templateUrl: './pipeline-editor.component.html',
     // The editor is a full-bleed shell: it fills whatever the route gives it, and the canvas takes
@@ -517,6 +515,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     readonly paletteOpen = signal(true);
     /** Which surface the right dock shows: the selection's properties, or the AI authoring surfaces. */
     readonly rightTab = signal<'properties' | 'assist'>('properties');
+    /**
+     * Maximum dock width: 50% of the viewport width, enabling both left (palette) and right
+     * (inspector) docks to expand up to half the screen/viewport.
+     */
+    readonly maxDockWidth = signal(
+        typeof window !== 'undefined' ? Math.max(380, Math.round(window.innerWidth * 0.5)) : 800,
+    );
 
     // ── definition drawer (definition-surface P1 — collector path only for now) ────────────────────
     /** The node open for DEFINITION in the right-dock drawer (null = drawer closed, inspector shows). */
@@ -799,6 +804,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         event.preventDefault();
         // The legacy arming half of the standard pattern — the value itself is never shown.
         event.returnValue = true;
+    }
+
+    @HostListener('window:resize')
+    onWindowResize(): void {
+        if (typeof window !== 'undefined') {
+            this.maxDockWidth.set(Math.max(380, Math.round(window.innerWidth * 0.5)));
+        }
     }
 
     /**
@@ -1863,7 +1875,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      * skipping the summary.
      */
     private async followSelectionIntoDefinition(node: AuthoredNode): Promise<void> {
-        if (!this.canAuthor() || !this.isDrawerKind(node)) return;
+        if (!this.isDrawerKind(node)) return;
         if (this.definitionNode()?.id === node.id) return;
         await this.openDefinition(node);
     }
@@ -1877,12 +1889,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * The node the INSPECTOR SUMMARY should render, or null for the idle hint. Since the 2026-08-22
-     * re-flip, selection opens the config pane directly, so the summary only shows where the pane
-     * cannot serve: the read-only lens and dialog-custody parse nodes. The template prefers
-     * `definitionNode()`, so this only decides what shows when NO pane is open.
+     * The node the INSPECTOR SUMMARY should render, or null for the idle hint.
+     * All step configurations are served directly in the definition drawer, so the summary
+     * is retired and returns null so only edge properties or the idle hint render when no pane is open.
      */
-    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => this.selectedNode());
+    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => null);
 
     /** Double-click a node (or the inspector's Configure button) → open the per-processor config popup. */
     onNodeOpen(id: string): void {
@@ -2161,11 +2172,25 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     async openDefinition(node: AuthoredNode): Promise<void> {
         const open = this.definitionNode();
         if (open && open.id !== node.id && this.definitionDirty()) {
-            const ok = await this.confirm.confirmDestructive(
-                `'${open.id}' has edits that have not been applied. Opening another definition discards them.`,
-                { title: 'Discard unapplied edits?', confirmText: 'Discard' },
+            const action = await this.confirm.confirmUnsavedChanges(
+                `'${open.name || open.id}' has unapplied changes. Do you want to save them before switching to '${node.name || node.id}'?`,
+                {
+                    title: 'Unsaved Changes',
+                    saveText: 'Save and continue',
+                    discardText: 'Discard',
+                    cancelText: 'Cancel',
+                },
             );
-            if (!ok) return;
+            if (action === 'cancel') return;
+            if (action === 'save') {
+                this.applyDefinition();
+                if (this.definitionDirty()) {
+                    // Pane submission failed or validation prevented apply; keep current pane
+                    return;
+                }
+            } else if (action === 'discard') {
+                this.discardDefinition();
+            }
         }
         this.definitionNode.set(this.definitionDraft(node));
         this.definitionEpoch.update((e) => e + 1);
@@ -2314,8 +2339,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      *  width to 100% over the canvas while set; the split handle stays MOUNTED, only hidden. */
     readonly drawerMaximized = signal(false);
 
-    /** Close the drawer (the shell already dirty-confirmed); the inspector summary returns. */
+    /** Close the drawer (the shell already dirty-confirmed); the panel returns to idle. */
     closeDefinition(): void {
+        this.selectedNode.set(null);
         this.definitionNode.set(null);
         this.definitionDirty.set(false);
         this.drawerMaximized.set(false);

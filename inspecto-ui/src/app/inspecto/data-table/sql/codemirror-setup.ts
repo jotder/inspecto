@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { sql } from '@codemirror/lang-sql';
-import { Extension } from '@codemirror/state';
+import { EditorState, Extension } from '@codemirror/state';
 import { EditorView, highlightActiveLine, keymap, lineNumbers, placeholder } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 
@@ -50,6 +50,7 @@ const gammaHighlight = HighlightStyle.define([
 export function sqlEditorExtensions(opts: {
     onChange: (value: string) => void;
     placeholderText?: string;
+    readOnly?: boolean;
 }): Extension[] {
     return [
         lineNumbers(),
@@ -62,6 +63,7 @@ export function sqlEditorExtensions(opts: {
         EditorView.contentAttributes.of({ 'aria-label': 'SQL query editor' }),
         placeholder(opts.placeholderText ?? 'SELECT * FROM …'),
         gammaTheme,
+        EditorState.readOnly.of(opts.readOnly ?? false),
         EditorView.updateListener.of((u) => {
             if (u.docChanged) opts.onChange(u.state.doc.toString());
         }),

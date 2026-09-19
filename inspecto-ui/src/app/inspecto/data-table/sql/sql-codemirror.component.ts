@@ -26,6 +26,7 @@ import { sqlEditorExtensions } from './codemirror-setup';
 })
 export class SqlCodemirrorComponent implements AfterViewInit, OnDestroy {
     readonly value = input('');
+    readonly readOnly = input(false);
     readonly valueChange = output<string>();
 
     private readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
@@ -51,7 +52,10 @@ export class SqlCodemirrorComponent implements AfterViewInit, OnDestroy {
             parent: this.hostEl().nativeElement,
             state: EditorState.create({
                 doc: this.value(),
-                extensions: sqlEditorExtensions({ onChange: (val) => this.syncing || this.valueChange.emit(val) }),
+                extensions: sqlEditorExtensions({
+                    onChange: (val) => this.syncing || this.valueChange.emit(val),
+                    readOnly: this.readOnly(),
+                }),
             }),
         });
     }

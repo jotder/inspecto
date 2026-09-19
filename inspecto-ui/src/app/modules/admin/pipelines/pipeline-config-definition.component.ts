@@ -143,7 +143,7 @@ function mergeFormValues(
             } @else {
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Enrichment name</mat-label>
-                    <input matInput [formControl]="enrichName" [placeholder]="node().id" />
+                    <input matInput [formControl]="enrichName" [placeholder]="node().id" [readonly]="readOnly()" />
                 </mat-form-field>
                 <inspecto-schema-form
                     #wiring
@@ -151,6 +151,7 @@ function mergeFormValues(
                     [initial]="wiringInitial()"
                     [optionLoaders]="wiringLoaders"
                     [flat]="true"
+                    [readOnly]="readOnly()"
                     (submitted)="submit()"
                 ></inspecto-schema-form>
                 <inspecto-enrichment-editor [referenceOptions]="refOptions()" />
@@ -181,6 +182,7 @@ function mergeFormValues(
                 [optionLoaders]="configLoaders"
                 [extraValidators]="configValidators"
                 [flat]="true"
+                [readOnly]="readOnly()"
                 (submitted)="submit()"
             ></inspecto-schema-form>
         }
@@ -199,6 +201,7 @@ function mergeFormValues(
             <app-pipeline-extra-config
                 [entries]="split().extraRows"
                 [allowAdd]="allowAddExtra()"
+                [readOnly]="readOnly()"
                 (changed)="onInteraction()"
             />
         }
@@ -227,23 +230,25 @@ function mergeFormValues(
                     [fieldNames]="schemaFieldNames()"
                     [dateFieldNames]="schemaDateFieldNames()"
                 />
-                <div class="mt-2 flex items-center gap-2">
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        class="!text-xs"
-                        [disabled]="partitionsSaving()"
-                        (click)="savePartitioning()"
-                    >
-                        @if (partitionsSaving()) {
-                            <mat-progress-spinner diameter="14" mode="indeterminate" class="mr-2" />
+                @if (!readOnly()) {
+                    <div class="mt-2 flex items-center gap-2">
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            class="!text-xs"
+                            [disabled]="partitionsSaving()"
+                            (click)="savePartitioning()"
+                        >
+                            @if (partitionsSaving()) {
+                                <mat-progress-spinner diameter="14" mode="indeterminate" class="mr-2" />
+                            }
+                            Save partitioning
+                        </button>
+                        @if (partitionsError(); as e) {
+                            <span class="text-warn text-xs" role="alert">{{ e }}</span>
                         }
-                        Save partitioning
-                    </button>
-                    @if (partitionsError(); as e) {
-                        <span class="text-warn text-xs" role="alert">{{ e }}</span>
-                    }
-                </div>
+                    </div>
+                }
             }
         }
 
@@ -293,6 +298,7 @@ export class PipelineConfigDefinitionComponent {
 
     /** The node being configured (identity fixed; config/use editable). */
     readonly node = input.required<AuthoredNode>();
+    readonly readOnly = input(false);
 
     /**
      * The directory the open pipeline's own config file lives in, relative to the write root (`''` at the

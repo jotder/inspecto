@@ -70,15 +70,17 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
                 <ng-content></ng-content>
             </div>
 
-            <div
-                class="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2"
-                style="border-color: var(--gamma-border)"
-            >
-                <button mat-button type="button" [disabled]="!dirty()" (click)="discard.emit()">Discard</button>
-                <button mat-flat-button color="primary" type="button" [disabled]="!dirty()" (click)="apply.emit()">
-                    Apply
-                </button>
-            </div>
+            @if (!readOnly()) {
+                <div
+                    class="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2"
+                    style="border-color: var(--gamma-border)"
+                >
+                    <button mat-button type="button" [disabled]="!dirty()" (click)="discard.emit()">Discard</button>
+                    <button mat-flat-button color="primary" type="button" [disabled]="!dirty()" (click)="apply.emit()">
+                        Apply
+                    </button>
+                </div>
+            }
         </div>
     `,
 })
@@ -93,6 +95,8 @@ export class DefinitionDrawerComponent {
     readonly icon = input<string>('heroicons_outline:cube');
     /** Whether the projected content holds edits not yet Applied — drives the badge, footer and close guard. */
     readonly dirty = input<boolean>(false);
+    /** View mode: hides the Apply/Discard footer. */
+    readonly readOnly = input<boolean>(false);
 
     /** Apply the drawer's edits to the host's in-memory model (D2 — never a persistence call). */
     readonly apply = output<void>();

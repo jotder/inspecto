@@ -449,6 +449,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                     <mat-slide-toggle
                                         class="sf-toggle"
                                         [formControlName]="spec.key"
+                                        [disabled]="readOnly"
                                         [aria-labelledby]="labelId(spec)"
                                     ></mat-slide-toggle>
                                 }
@@ -465,6 +466,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                         [hideLabel]="true"
                                         [options]="spec.options ?? []"
                                         [required]="!!spec.required"
+                                        [readOnly]="readOnly"
                                     />
                                 }
                                 @case ('list') {
@@ -520,9 +522,11 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                     } @else {
                                         <button
                                             type="button"
-                                            class="sf-value hover:bg-hover flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded px-1 py-0.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                            class="sf-value flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded px-1 py-0.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                            [class.hover:bg-hover]="!readOnly"
+                                            [class.cursor-default]="readOnly"
                                             [attr.aria-label]="'Edit ' + spec.label"
-                                            (click)="startEditing(spec)"
+                                            (click)="!readOnly && startEditing(spec)"
                                         >
                                             @for (item of listValue(spec.key); track $index) {
                                                 <inspecto-chip variant="soft"
@@ -604,11 +608,13 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                     } @else {
                                         <button
                                             type="button"
-                                            class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                            class="sf-value min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                            [class.hover:bg-hover]="!readOnly"
+                                            [class.cursor-default]="readOnly"
                                             [class.text-secondary]="displayValue(spec) === '—'"
                                             [attr.aria-label]="spec.label + ': ' + displayValue(spec)"
                                             [title]="displayValue(spec)"
-                                            (click)="startEditing(spec)"
+                                            (click)="!readOnly && startEditing(spec)"
                                         >
                                             {{ displayValue(spec) }}
                                         </button>
@@ -697,17 +703,21 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
     readonly editingKey = signal<string | null>(null);
     private exitTimer?: ReturnType<typeof setTimeout>;
 
+    /** When true, form values are view-only: pencil icons are hidden and values cannot be changed inline. */
+    @Input() readOnly = false;
+
     isEditing(spec: AttributeSpec): boolean {
         return this.editingKey() === spec.key;
     }
 
-    /** Booleans and selects are their own editors (toggle / click-to-pick), so no pencil. */
+    /** Booleans and selects are their own editors (toggle / click-to-pick), so no pencil. In read-only mode, pencil is hidden. */
     hasPencil(spec: AttributeSpec): boolean {
-        return spec.type !== 'boolean' && spec.type !== 'select';
+        return !this.readOnly && spec.type !== 'boolean' && spec.type !== 'select';
     }
 
     /** Switch a flat row to edit mode and focus its control. */
     startEditing(spec: AttributeSpec): void {
+        if (this.readOnly) return;
         clearTimeout(this.exitTimer);
         this.editingKey.set(spec.key);
         this.cdr.detectChanges();

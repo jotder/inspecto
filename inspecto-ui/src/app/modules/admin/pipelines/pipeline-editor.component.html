@@ -255,18 +255,6 @@
                 </button>
             }
 
-            <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
-            <!-- AGT-6a A2/A5.3 moved off the canvas: the assist surfaces live in the right dock, so they
-                 cost no vertical space until asked for. -->
-            <button
-                mat-icon-button
-                [disabled]="!model()"
-                (click)="showRightTab('assist')"
-                matTooltip="AI assist"
-                aria-label="AI assist"
-            >
-                <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
-            </button>
             <!-- ONE import/export trigger (operator ask, 2026-08-21 — the standalone Export button
                  duplicated this menu's concept). The two READ-ONLY pipeline exports are projected in,
                  so the Business lens keeps them; the bundle items below them are the shared menu's.
@@ -504,7 +492,7 @@
                 inspectoSplit="pipelines.palette"
                 #paletteSplit="inspectoSplit"
                 [min]="170"
-                [max]="380"
+                [max]="maxDockWidth()"
                 [defaultWidth]="215"
                 [class.hidden]="!paletteOpen()"
                 aria-label="Resize the step palette (arrow keys or drag)"
@@ -548,7 +536,7 @@
                 #inspectorSplit="inspectoSplit"
                 pane="right"
                 [min]="240"
-                [max]="560"
+                [max]="maxDockWidth()"
                 [defaultWidth]="300"
                 [class.hidden]="!inspectorOpen() || drawerMaximized()"
                 aria-label="Resize the properties panel (arrow keys or drag)"
@@ -566,39 +554,11 @@
                 aria-label="Properties"
             >
                 @if (inspectorOpen()) {
-                    <div class="flex shrink-0 items-center border-b pr-1" style="border-color: var(--gamma-border)">
-                        <div role="tablist" aria-label="Properties panel" class="flex items-center">
-                            <button
-                                type="button"
-                                role="tab"
-                                id="pipe-tab-properties"
-                                aria-controls="pipe-panel-right"
-                                [attr.aria-selected]="rightTab() === 'properties'"
-                                [attr.tabindex]="rightTab() === 'properties' ? 0 : -1"
-                                class="border-b-2 px-2.5 py-1.5 text-xs font-semibold"
-                                [style.border-color]="
-                                    rightTab() === 'properties' ? 'var(--gamma-primary)' : 'transparent'
-                                "
-                                [class.opacity-60]="rightTab() !== 'properties'"
-                                (click)="rightTab.set('properties')"
-                            >
-                                Properties
-                            </button>
-                            <button
-                                type="button"
-                                role="tab"
-                                id="pipe-tab-assist"
-                                aria-controls="pipe-panel-right"
-                                [attr.aria-selected]="rightTab() === 'assist'"
-                                [attr.tabindex]="rightTab() === 'assist' ? 0 : -1"
-                                class="border-b-2 px-2.5 py-1.5 text-xs font-semibold"
-                                [style.border-color]="rightTab() === 'assist' ? 'var(--gamma-primary)' : 'transparent'"
-                                [class.opacity-60]="rightTab() !== 'assist'"
-                                (click)="rightTab.set('assist')"
-                            >
-                                Assist
-                            </button>
-                        </div>
+                    <div
+                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-3 pr-1"
+                        style="border-color: var(--gamma-border)"
+                    >
+                        <h2 class="text-xs font-semibold uppercase tracking-wide opacity-60">Properties</h2>
                         <button
                             class="ml-auto"
                             mat-icon-button
@@ -612,12 +572,10 @@
 
                     <div
                         id="pipe-panel-right"
-                        role="tabpanel"
-                        [attr.aria-labelledby]="rightTab() === 'properties' ? 'pipe-tab-properties' : 'pipe-tab-assist'"
                         class="min-h-0 flex-1 overflow-y-auto"
-                        [class.p-3]="!(rightTab() === 'properties' && definitionNode())"
+                        [class.p-3]="!definitionNode()"
                     >
-                        @if (rightTab() === 'properties' && definitionNode(); as dn) {
+                        @if (definitionNode(); as dn) {
                             <!-- Definition drawer (definition-surface P1): the collector path is DEFINED
                                  here in the dock, not in a popup. Apply is an in-memory patch (D2);
                                  Discard recreates the pane from the model (the @for tracks the epoch,
@@ -634,6 +592,7 @@
                                     [kindLabel]="definitionKind(dn).label"
                                     [icon]="definitionKind(dn).icon"
                                     [dirty]="definitionDirty()"
+                                    [readOnly]="!canAuthor()"
                                     (apply)="applyDefinition()"
                                     (discard)="discardDefinition()"
                                     (closed)="closeDefinition()"
@@ -658,6 +617,7 @@
                                         <app-pipeline-collection-definition
                                             [node]="dn"
                                             [attributes]="definitionAttributes()"
+                                            [readOnly]="!canAuthor()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
@@ -674,6 +634,7 @@
                                             [upstreamColumns]="upstreamSchemaColumns()"
                                             [upstreamColumnTypes]="upstreamColumnTypes()"
                                             [inputs]="definitionInputs()"
+                                            [readOnly]="!canAuthor()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
@@ -695,6 +656,7 @@
                                             [filenameColumnTarget]="filenameColumnTarget()"
                                             (filenameColumnChange)="onSinkFilenameColumnChange($event)"
                                             [collectorInclude]="collectorInclude()"
+                                            [readOnly]="!canAuthor()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
@@ -714,17 +676,18 @@
                                             [attributes]="definitionAttributes()"
                                             [enrichmentHost]="dn.type === 'enrichment' ? enrichmentHost() : undefined"
                                             [sampleRows]="sampleThread()?.parsedRows()"
+                                            [readOnly]="!canAuthor()"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
                                         />
                                     }
                                 </inspecto-definition-drawer>
                             }
-                        } @else if (rightTab() === 'properties') {
+                        } @else {
                             <!-- The summary renders only where the pane cannot serve: read-only lens +
-                                 dialog-custody parse nodes (inspectorSummaryNode is null otherwise, so
-                                 an authorable node with its pane closed shows the idle hint, never a
-                                 second summary of what the pane already edits). -->
+                                  dialog-custody parse nodes (inspectorSummaryNode is null otherwise, so
+                                  an authorable node with its pane closed shows the idle hint, never a
+                                  second summary of what the pane already edits). -->
                             <div>
                                 <app-pipeline-inspector
                                     [node]="inspectorSummaryNode()"
@@ -742,38 +705,6 @@
                                     (rename)="renameSelected($event)"
                                 >
                                 </app-pipeline-inspector>
-                            </div>
-                        } @else {
-                            <div class="flex flex-col gap-3">
-                                @if (model(); as m) {
-                                    <!-- AGT-6a A2: parse + dry-run-simulate the authored graph, then review the
-                                         result as a diff before it replaces the working model. -->
-                                    <inspecto-ai-assist
-                                        tool="pipeline_author"
-                                        [args]="aiPipelineArgs()"
-                                        [current]="aiCurrentPipeline()"
-                                        label="Check this topology"
-                                        [disabled]="!m.nodes.length"
-                                        disabledReason="Add at least one processor first"
-                                        (applyDraft)="applyPipelineDraft($event)"
-                                    ></inspecto-ai-assist>
-
-                                    <!-- AGT-6a A5.3: the same tool from one sentence. A separate instance, not a
-                                         mode switch on the one above: describing a topology and checking the one
-                                         on screen are different acts, and the check must stay available on a
-                                         backend with no model. -->
-                                    <inspecto-ai-assist
-                                        tool="pipeline_author"
-                                        prompting
-                                        [args]="aiPromptArgs()"
-                                        [current]="aiCurrentPipeline()"
-                                        label="Draft a topology"
-                                        promptHint="e.g. collect orders, drop rows under 100, write the rest to the big store"
-                                        (applyDraft)="applyPipelineDraft($event)"
-                                    ></inspecto-ai-assist>
-                                } @else {
-                                    <p class="text-sm opacity-70">Open a pipeline to use the assist surfaces.</p>
-                                }
                             </div>
                         }
                     </div>
