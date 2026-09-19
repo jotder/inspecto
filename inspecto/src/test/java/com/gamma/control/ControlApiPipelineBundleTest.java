@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.gamma.acquire.ConnectionProfile;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
@@ -244,6 +245,62 @@ class ControlApiPipelineBundleTest {
             assertEquals(200, imp.statusCode(), imp.body());
             assertEquals("prod_sftp", V1Body.of(imp.body()).get("requirements").get(0).get("profile").asText());
         }
+    }
+
+    // ── import-time referential integrity (unification W5) ───────────────────────
+
+    /**
+     * A bundle whose connection reference does not resolve in the target space is REPORTED at import
+     * time — a WARNING finding plus {@code requirements[].status: missing} — instead of importing clean
+     * and breaking at the first poll. It still imports (inactive), because a pipeline bundle never
+     * carries the profile itself; and once the connection exists the same bundle imports with the
+     * status satisfied and no such finding.
+     */
+    @Test
+    void aMissingConnectionIsReportedAtImportTime(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Path toon = fixture(dir);
+        Map<String, Object> raw = ConfigCodec.toMap(Files.readString(toon));
+        Map<String, Object> collector = new LinkedHashMap<>();
+        collector.put("connection", "prod_sftp");
+        raw.put("collector", collector);
+        Files.writeString(toon, ConfigCodec.toToon(raw));
+
+        try (Ctx c = open(dir, wr, toon)) {
+            byte[] zip = sendZip(c.port, "GET", "/pipelines/test_etl/bundle", null).body();
+
+            // (1) nothing registered under that id → imported, but the gap is named
+            HttpResponse<String> imp = send(c.port, "POST", "/pipelines/import?name=needy", zip);
+            assertEquals(200, imp.statusCode(), imp.body());
+            JsonNode body = V1Body.of(imp.body());
+            assertTrue(body.get("written").asBoolean());
+            assertFalse(body.get("active").asBoolean(), "an unresolved reference still lands inactive");
+            assertEquals("missing", body.get("requirements").get(0).get("status").asText());
+            JsonNode warn = findingWithCode(body.get("findings"), "WARN_UNRESOLVED_CONNECTION");
+            assertNotNull(warn, "the missing connection is reported: " + imp.body());
+            assertEquals("WARNING", warn.get("severity").asText());
+            assertEquals("collector.connection", warn.get("fieldPath").asText());
+            assertTrue(warn.get("message").asText().contains("prod_sftp"));
+
+            // (2) register the connection → the same bundle reports it satisfied, with no finding
+            c.svc.registerConnection(new ConnectionProfile("prod_sftp", "sftp", "sftp.example.com", 22,
+                    null, "/out", "svc", null, Map.of(), null));
+            HttpResponse<String> ok = send(c.port, "POST", "/pipelines/import?name=happy", zip);
+            assertEquals(200, ok.statusCode(), ok.body());
+            JsonNode okBody = V1Body.of(ok.body());
+            assertEquals("satisfied", okBody.get("requirements").get(0).get("status").asText());
+            assertNull(findingWithCode(okBody.get("findings"), "WARN_UNRESOLVED_CONNECTION"),
+                    "a resolved reference produces no finding: " + ok.body());
+            assertTrue(Files.exists(wr.resolve("happy").resolve("happy_pipeline.toon")));
+        }
+    }
+
+    /** The first finding carrying {@code code}, or {@code null} — findings are a list, order is not API. */
+    private static JsonNode findingWithCode(JsonNode findings, String code) {
+        if (findings == null) return null;
+        for (JsonNode f : findings)
+            if (f.hasNonNull("code") && code.equals(f.get("code").asText())) return f;
+        return null;
     }
 
     // ── the remaining gates ───────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
@@ -316,6 +317,9 @@ final class PipelineBundleRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", retargeted));
         findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", retargeted));
         findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", retargeted));
+        // Import-time referential integrity (W5): resolve the bundle's declared dependencies against
+        // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
+        List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             for (Path st : satellitePaths) Files.deleteIfExists(st);
             if (createdDir) {
@@ -387,8 +391,7 @@ final class PipelineBundleRoutes implements RouteModule {
         r.put("files", written);
         r.put("active", false);
         if (renamedFrom != null) r.put("renamedFrom", renamedFrom);
-        Object requirements = manifest.get("requirements");
-        if (requirements instanceof List<?> l && !l.isEmpty()) r.put("requirements", requirements);
+        if (!requirements.isEmpty()) r.put("requirements", requirements);
         if (!notes.isEmpty()) r.put("notes", notes);
         r.put("findings", findings);
         return r;
@@ -643,6 +646,56 @@ final class PipelineBundleRoutes implements RouteModule {
             }
         }
         return changed;
+    }
+
+    /**
+     * Import-time referential integrity for the bundle's declared dependencies (unification W5): every
+     * connection the incoming pipeline binds is resolved against THIS space's connection registry, each
+     * manifest {@code requirements} entry is echoed back classified {@code satisfied} | {@code missing},
+     * and an unresolved one adds a WARNING {@link Finding} to the envelope the route already returns.
+     * Before this, a bundle naming a connection the target space does not hold imported clean and the
+     * breakage surfaced only at the first poll cycle.
+     *
+     * <p><b>Reported, never refused</b> — deliberately, and unlike the whole-space import's ERROR gate
+     * ({@code DataSourceRoutes.referentialFindings}). A <em>space</em> bundle can carry the connection
+     * profile, so demanding that the reference resolve is satisfiable; a <em>pipeline</em> bundle
+     * deliberately never carries one (secrets never travel — a bound connection becomes a
+     * {@code requirements[]} entry, see the class doc), so a refusal would make promotion into any space
+     * that does not already hold the profile impossible, which is the exact workflow {@code requirements}
+     * exists to serve. The import also ALWAYS lands {@code active: false}, so nothing polls before an
+     * operator acts on the warning. Hence a WARNING beside the route's other findings rather than the
+     * ERROR verdict that refuses the write.
+     *
+     * @param findings the route's finding list, appended to in place
+     * @return the manifest requirements, each carrying a {@code status}
+     */
+    private static List<Map<String, Object>> classifyRequirements(ApiContext api, Map<String, Object> manifest,
+                                                                  Map<String, Object> pipeline,
+                                                                  List<Finding> findings) {
+        Set<String> known = api.service().connections().keySet();
+        Set<String> wanted = new java.util.LinkedHashSet<>();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> req : asMapList(manifest.get("requirements"))) {
+            Map<String, Object> row = new LinkedHashMap<>(req);
+            String profile = ApiContext.str(req, "profile");
+            if ("connection".equals(ApiContext.str(req, "kind")) && profile != null) {
+                wanted.add(profile);
+                row.put("status", known.contains(profile) ? "satisfied" : "missing");
+            }
+            out.add(row);
+        }
+        // The pipeline BODY is the authority on what will actually be bound, so a hand-built bundle (or
+        // one from an exporter predating `requirements`) is checked too, not only the manifest's claims.
+        String bound = connectionRef(pipeline);
+        if (bound != null) wanted.add(bound);
+        for (String id : wanted)
+            if (!known.contains(id))
+                findings.add(new Finding(Severity.WARNING, "collector.connection",
+                        "unknown connection '" + id + "' — this space has no such connection profile,"
+                                + " so the imported pipeline cannot poll",
+                        FindingCodes.WARN_UNRESOLVED_CONNECTION,
+                        "register the connection before activating the pipeline"));
+        return out;
     }
 
     /** A pipeline's bound connection id ({@code collector.connection}; {@code source:} legacy), or null. */

@@ -64,6 +64,14 @@ public final class FindingCodes {
     /** The same measure-type refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_SUMMARIZE_MEASURE_TYPE = "WARN_SUMMARIZE_MEASURE_TYPE";
 
+    // ── Referential integrity ────────────────────────────────────────────────────────────────
+
+    /** A bundle-imported pipeline binds a connection profile the target space does not hold. WARNING,
+     *  not ERROR, on purpose: a pipeline bundle never carries connection profiles (secrets never
+     *  travel), the import lands inactive, and refusing would make promotion into a fresh space
+     *  impossible — see {@code PipelineBundleRoutes.classifyRequirements}. */
+    public static final String WARN_UNRESOLVED_CONNECTION = "WARN_UNRESOLVED_CONNECTION";
+
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 
