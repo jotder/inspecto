@@ -59,8 +59,13 @@ class WorkflowConfigLoadTest {
 
     @Test
     void buildFromWiresOverrideIntoObjectService(@TempDir Path dir) throws Exception {
-        // a normal pipeline so the boot is realistic, plus the workflow override in the same config dir
-        TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
+        // a normal pipeline so the boot is realistic, plus the workflow override in the same config dir.
+        // ⚠ TestConfigs writes `pipeline_<hash>.toon` — a PREFIX — but ServiceBootstrap discovers by the
+        // SUFFIX `*_pipeline.toon`, so the fixture file is invisible to a directory scan. Every other user of
+        // TestConfigs loads by explicit path and never notices; this test boots by scanning, and an undiscovered
+        // config means an empty registry, which `fromArgs` answers with System.exit(1) — killing the test JVM.
+        Files.move(TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write(),
+                dir.resolve("mini_pipeline.toon"));
         Files.writeString(dir.resolve("task_workflow.toon"), TASK_OVERRIDE);
 
         try (var svc = CollectorService.fromArgs(new String[]{dir.toString()})) {
