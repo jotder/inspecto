@@ -246,7 +246,7 @@ describe('DataTableComponent', () => {
         try {
             const c = (await create('pro')).componentInstance;
             const refreshCells = vi.fn();
-            c.refresh({ api: { isDestroyed: () => false, refreshCells } as never });
+            c.refresh({ api: { isDestroyed: () => false, refreshCells, getDisplayedRowCount: () => 2 } as never });
             vi.runAllTimers();
             expect(refreshCells).toHaveBeenCalledTimes(1);
             const arg = refreshCells.mock.calls[0][0];
@@ -428,5 +428,54 @@ describe('DataTableComponent', () => {
         expect(c.searchOpen()).toBe(false);
         pressKey('/');
         expect(c.searchOpen()).toBe(true);
+    });
+
+    // `refresh()` schedules a deferred `refreshAllCells`, so a count-only mock still needs the members
+    // that timer touches — otherwise the callback throws after the test and vitest exits non-zero.
+    const apiWith = (rowCount: number) =>
+        ({ isDestroyed: () => false, refreshCells: vi.fn(), getDisplayedRowCount: () => rowCount }) as never;
+
+    // Audit F2 (WCAG 4.1.3 Status Messages). Assert the RENDERED live region, never just the computed:
+    // a getter returning the right string while nothing reaches the DOM is the failure mode this guards.
+    it('announces the displayed row count in a polite live region', async () => {
+        const f = await create('standard');
+        const c = f.componentInstance;
+        const region = (f.nativeElement as HTMLElement).querySelector('[role="status"][aria-live="polite"]');
+        expect(region).not.toBeNull();
+
+        // nothing announced before the grid has reported a count
+        expect(region!.textContent?.trim()).toBe('');
+
+        c.refresh({ api: apiWith(2) });
+        f.detectChanges();
+        expect(region!.textContent?.trim()).toBe('2 rows');
+
+        // singular, and the filtered wording once a quick filter is active
+        c.refresh({ api: apiWith(1) });
+        f.detectChanges();
+        expect(region!.textContent?.trim()).toBe('1 row');
+
+        c.search.set('alpha');
+        c.onFilterChanged({ api: apiWith(1) });
+        f.detectChanges();
+        expect(region!.textContent?.trim()).toBe('1 matching row');
+
+        c.onFilterChanged({ api: apiWith(0) });
+        f.detectChanges();
+        expect(region!.textContent?.trim()).toBe('No matching rows');
+    });
+
+    it('announces nothing while loading, so a mid-fetch 0 is never read out', async () => {
+        const f = await create('standard');
+        const c = f.componentInstance;
+        c.onFilterChanged({ api: apiWith(0) });
+        f.componentRef.setInput('loading', true);
+        f.detectChanges();
+        const region = (f.nativeElement as HTMLElement).querySelector('[role="status"][aria-live="polite"]');
+        expect(region!.textContent?.trim()).toBe('');
+
+        f.componentRef.setInput('loading', false);
+        f.detectChanges();
+        expect(region!.textContent?.trim()).toBe('No rows');
     });
 });

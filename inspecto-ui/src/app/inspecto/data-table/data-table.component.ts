@@ -330,6 +330,25 @@ export class DataTableComponent {
     /** Rows shown in the grid: the last Run result in pro, else the source rows. */
     readonly displayRows = computed<unknown[]>(() => this.proResult() ?? this.rows());
 
+    /** Rows ag-Grid is actually displaying (post-filter), fed by the grid's own events. */
+    private readonly displayedCount = signal<number | null>(null);
+
+    /**
+     * Text alternative for the result count (WCAG 4.1.3 Status Messages, audit F2): a grid updating
+     * asynchronously — a fetch landing, a live-tail tick, a quick-filter keystroke — changes what is on
+     * screen with nothing announced. Rendered into a polite live region, so it reaches assistive tech
+     * without stealing focus. Blank while loading, so a mid-fetch "0 rows" is never announced.
+     */
+    readonly countAnnouncement = computed<string>(() => {
+        if (this.loading()) return '';
+        const n = this.displayedCount();
+        if (n == null) return '';
+        const filtered = !!this.search();
+        if (n === 0) return filtered ? 'No matching rows' : 'No rows';
+        const noun = n === 1 ? 'row' : 'rows';
+        return filtered ? `${n} matching ${noun}` : `${n} ${noun}`;
+    });
+
     readonly gridColumns = computed<ColDef[]>(() => {
         const acts = this.rowActions();
         const result = this.proResult();
@@ -443,6 +462,12 @@ export class DataTableComponent {
         // materialization on the initial render, which otherwise leaves `statusBadgeHtml` badge
         // columns (severity / level / status …) empty until the next data change.
         refreshAllCells(e);
+        this.displayedCount.set(e.api.getDisplayedRowCount());
+    }
+
+    /** Quick-filter / column-filter changes alter the displayed count without a data change. */
+    onFilterChanged(e: { api: GridApi }): void {
+        this.displayedCount.set(e.api.getDisplayedRowCount());
     }
 
     // ── layout persistence (`stateKey`) ──────────────────────────────────────────

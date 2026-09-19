@@ -4,9 +4,10 @@
 **Standard:** WCAG 2.2, conformance target **Level AA** · **Scope:** the inspecto operator panes (`modules/admin/**`)
 and shared components (`inspecto/**`); vendored Fuse auth/error scaffolding excluded.
 
-This is the **manual** half of UI/UX-audit Long-term #2 — an **audit + findings report**. Fixes are **deferred** to a
-separate prioritized pass (none were applied here). The **automated** half (axe-core regression gate) is described below
-and is live in CI.
+This is the **manual** half of UI/UX-audit Long-term #2 — an **audit + findings report**. Fixes were originally
+**deferred** to a separate prioritized pass; that pass has since begun, so §1 and §3 are **living** — a finding's row
+and its §1 entry move together as it closes (**last closed: F1, F2; F4 retired as N/A — 2026-09-20**). The **automated**
+half (axe-core regression gate) is described below and is live in CI.
 
 > This is a self-assessment by heuristic walkthrough + automated tooling, not a formal third-party VPAT/certification.
 
@@ -26,6 +27,14 @@ Verified still in place; not re-listed as findings:
 - **1.3.1 status not by color alone** — status badges always render the text token alongside the color.
 - **2.2.2 pause/stop/hide** — the Events live-tail auto-refresh is opt-in via a toggle (not auto-playing).
 - **prefers-reduced-motion** — `<inspecto-skeleton>` disables its pulse under reduced-motion.
+- **1.1.1 chart text alternative (was F1)** — `chart.component.ts` renders the canvas with `role="img"` +
+  an `altText` summary (chart type plus each category's first-series value, capped at 10). Shipped after
+  this audit was written; the F1 row below is retained struck-through for provenance.
+- **4.1.3 status messages (was F2)** — `<inspecto-data-table>` announces its displayed row count through a
+  visually-hidden `role="status" aria-live="polite"` region, fed by the grid's own `rowDataUpdated` /
+  `firstDataRendered` / `filterChanged` events. One shared region covers **every** grid host, so async
+  loads, live-tail ticks and quick-filter keystrokes are all announced. Blank while `loading`, so a
+  mid-fetch "0 rows" is never read out.
 
 ---
 
@@ -52,10 +61,10 @@ Severity: **Moderate** = a real AA gap affecting some users; **Low** = edge/need
 
 | # | WCAG SC (level) | Severity | Location | Finding | Recommendation |
 |---|---|---|---|---|---|
-| F1 | 1.1.1 Non-text Content (A) | **Moderate** | `inspecto/components/chart.component.ts` (dashboard, sources) | The Chart.js `<canvas>` has no text alternative (`role`/`aria-label`/summary). A screen reader announces nothing for each chart. | Add `role="img"` + an `aria-label` summarizing the chart, and/or a visually-hidden data table / caption. Adjacent KPI cards partially mitigate but don't replace it. |
-| F2 | 4.1.3 Status Messages (AA) | **Moderate** | Grids with async/live updates (Events live-tail, search result counts) | Result counts and live-tail row additions are not announced to assistive tech. (Toasts are fine — ngx-toastr emits `role="alert"`.) | Add a polite `aria-live` region announcing e.g. "N events, updated" after each load/tick. |
-| F3 | 1.4.1 Use of Color (A) | **Low** | `chart-tokens.ts` series, multi-series charts | Line/bar series may be distinguishable by color only. | Ensure every series has a text label/legend entry; consider dash/pattern for line charts. |
-| F4 | 2.4.11 Focus Not Obscured (AA, **new in 2.2**) | **Low** | Sticky page headers/toolbars over scrollable panes | A control focused via keyboard could be hidden behind a sticky header when the pane is scrolled. | Add `scroll-margin-top` to focusable content (or `scroll-padding-top` on the scroll container) equal to the sticky header height. |
+| ~~F1~~ | 1.1.1 Non-text Content (A) | ~~Moderate~~ **FIXED** | `inspecto/components/chart.component.ts` | ~~The Chart.js `<canvas>` has no text alternative.~~ Resolved — see §1. | — |
+| ~~F2~~ | 4.1.3 Status Messages (AA) | ~~Moderate~~ **FIXED** | `inspecto/data-table/` (all grid hosts) | ~~Result counts and live-tail row additions are not announced.~~ Resolved 2026-09-20 in the shared data-table — see §1. | — |
+| ~~F3~~ | 1.4.1 Use of Color (A) | ~~Low~~ **Conformant** | `chart-tokens.ts` series | **Verified 2026-09-20.** Chart.js renders a legend by default, so every genuinely multi-series chart labels its series in text. Only two charts disable the legend and **neither is multi-series**: the `gauge` branch in `viz/viz-render.component.ts` (a single value) and `objects/case-analytics.dialog.ts` (one dataset whose per-bar colors are decorative — each bar is identified by its x-axis label, not its color). The F1 `altText` also enumerates every label/value pair. Dash/pattern for line series remains an optional enhancement, not a conformance gap. | — |
+| ~~F4~~ | 2.4.11 Focus Not Obscured (AA, **new in 2.2**) | ~~Low~~ **N/A** | — | **Premise does not hold** (verified 2026-09-20): there is no `position: sticky` / fixed header in authored source, and the classic layout's header and footer are both `relative` (`classic.component.html`), so they scroll away with the page and cannot obscure a focused control. No `scroll-margin-top` is needed. Re-open if a sticky toolbar is ever introduced. | — |
 | F5 | 2.5.8 Target Size (Minimum) (AA, **new in 2.2**) | **Low** | `gamma-mat-dense` toolbar controls; ag-Grid action icons | Standard `mat-icon-button` is 40×40 (pass ≥24×24). Dense filter controls and grid action icons need spot-verification at ≥24×24 with adequate spacing. | Measure dense controls; bump to ≥24×24 (or add spacing exception) where short. |
 | F6 | 2.5.7 Dragging Movements (AA, **new in 2.2**) | **Low** | ag-Grid column resize/reorder | These are drag gestures. ag-Grid exposes header keyboard interaction + a column menu, so a non-drag path likely exists — **verify**. | Confirm sort/resize/reorder are reachable without dragging; document the keyboard path. |
 | F7 | 1.4.10 Reflow (AA) | **Low** | Toolbars/forms at 320px | Wide data grids may scroll horizontally (data-table exception applies). Verify filter toolbars and forms reflow without loss at 320px / 400% zoom. | Manual check at 320 CSS px; the toolbars already use `flex-wrap`. |
@@ -69,12 +78,18 @@ Severity: **Moderate** = a real AA gap affecting some users; **Low** = edge/need
 
 ---
 
-## 4. Suggested fix priority (when the deferred pass is scheduled)
+## 4. Remaining fix priority
 
-1. **F1** (chart text alternatives) — highest user impact, self-contained in `chart.component.ts`.
-2. **F2** (live-region announcements) — a small shared `aria-live` helper reusable across grids.
-3. **F4 / F5 / F6 / F7** — verification + small CSS/markup tweaks.
-4. **F3** — design-token / legend review.
+F1 and F2 are **fixed**; F3 was verified **conformant**; F4 was **retired** as not applicable (see their rows).
+
+Still open — **F5 / F6 / F7**, all three verification tasks that need a real browser (measure dense control
+hit areas at ≥24×24; confirm ag-Grid's non-drag path for column resize/reorder; check reflow at 320 CSS px
+and 400% zoom). None is a code change until the measurement says otherwise, and none can be settled in
+jsdom — which is why they are the natural scope of the real-browser pass in §5, not a separate effort.
+
+> ⚠ When closing a finding, update **both** its row here and §1 in the same change. F1 shipped well before
+> this doc recorded it, so the audit advertised a deferred gap that no longer existed — check the code
+> before scheduling work off this table.
 
 ## 5. Out of scope here (future)
 
