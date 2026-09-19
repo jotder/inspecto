@@ -120,9 +120,6 @@ inspecto-consignment-outputs.db.wal
 # CodeGraph index (generated, machine-local; rebuild with `codegraph init`)
 /.codegraph/
 
-# code-review-graph index (generated, machine-local)
-/.code-review-graph/
-
 # Session-local working notes (*.local.* files are intentionally never committed)
 *.local.md
 
