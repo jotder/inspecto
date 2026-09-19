@@ -252,6 +252,25 @@ Root `compliance/` is **not** under `docs/` and has never shipped in the bundle 
 ⚠ Listed here so the concept knows what it owes; the board carries the detail. A pointer from a row to
 this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 
+- **`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1`** — `TestConfigs.write()` emits `pipeline_<hash>.toon`, a PREFIX,
+  while every directory-scanning loader matches the SUFFIX `*_pipeline.toon`. 88 test files use the
+  fixture and none noticed, because they load by explicit PATH; the trap springs only for a test that
+  boots by SCAN — and then it presents as a JVM crash, not a missing file. Left as-is deliberately
+  (88 files to fix a trap that has sprung once); re-rank on the second scan-booting test.
+
+- **`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`** — `CollectorService.fromArgs` → `ServiceBootstrap.buildFrom(…,
+  exitIfEmpty=true)` calls `System.exit(1)` when config discovery finds nothing. Defensible for a CLI
+  `main`; `fromArgs` is a PUBLIC API that tests and embedders call, so the process dies with no exception
+  to catch and no stack trace. ⚠ **Surefire reports it as "The forked VM terminated without properly
+  saying goodbye. VM crash or System.exit called?" — read the second half of that question first.**
+  This exact symptom consumed two sessions and produced a wrong JDK-27 diagnosis before being traced
+  (`WorkflowConfigLoadTest-1`, closed `f1232b03`).
+
+- **`OPENAPI-CONTRACT-RED-ON-MASTER-1`** — `OpenApiPathsContractTest` fails on an undocumented
+  `GET /assist/skills` and halts the reactor at `inspecto-processor`, so any `-pl <module> -am` run
+  currently reports a failure that is NOT the change under test. Regenerate with
+  `-Dopenapi.paths.write=true` or document the route.
+
 - **`REACTOR-VERDICT-CI-1`** — wire `check-reactor-verdict.mjs` into `ci.yml`. ⛔ Deliberately NOT
   pre-push: it judges a *build*, not repo state, and producing a log at push time means a ~20-minute
   reactor per push. CI already runs one, so the log is free there.

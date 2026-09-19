@@ -1596,7 +1596,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   Fix: `fromArgs` throws (or returns empty) on an empty registry and only `main` translates that to
   `System.exit(1)`. ⚠ Check the other `System.exit` sites in library paths while there — `CollectorService`,
   `SpaceMigrator`, `EnrichmentProcessor`, `CollectorProcessor` all carry one.
-  → `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java:67` · `CollectorService.java:1869`
+  → `okf/backend/build-run/build-test.md` · `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java:67`
+  · `CollectorService.java:1869`
 
 - **P3** · ➕ **`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1` — the shared fixture writes a name the production scanner
   cannot discover.** **FILED 2026-09-19.** `TestConfigs.write()` emits `pipeline_<hash>.toon`; every loader
@@ -1605,7 +1606,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   then it presents as a JVM crash (see `LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`). Left as-is deliberately:
   renaming touches 88 files to fix a trap that has sprung once. ⚠ Re-rank to P2 the moment a second
   scan-booting test is written.
-  → `inspecto-etl/src/test/java/com/gamma/etl/TestConfigs.java:113`
+  → `okf/backend/build-run/build-test.md` · `inspecto-etl/src/test/java/com/gamma/etl/TestConfigs.java:113`
 
 - **P2** · 🔴 ➕ **`OPENAPI-CONTRACT-RED-ON-MASTER-1` — `-am` builds halt at `inspecto-processor`.**
   **FILED 2026-09-19**, observed while verifying an unrelated fix.
@@ -1616,6 +1617,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   Fix: regenerate with `-Dopenapi.paths.write=true` and fill the schema by hand, or document the route.
   ⚠ Not grounded beyond the failure text — confirm whether `GET /assist/skills` is newly added or newly
   matched before assuming which side is wrong.
+  → `okf/backend/build-run/build-test.md`
 
 - **P3** · ➕ **`BOARD-STALE-HEADS-1` — §0's narrative is staler than the rows, and closed rows keep their
   unstruck heads.** **FILED 2026-09-19** after a shift in which **six of nine grounded rows were already
