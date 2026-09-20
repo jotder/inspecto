@@ -831,14 +831,27 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   conflating them is how eject-and-continue silently swallows a real fault.
 - **P2** · ➕ **`PIPELINE-DRYRUN-1` — gates 1-4 SHIPPED; the residual is SCOPED as plan step 5 (2026-09-19)
   and is M, not the S–M this row implied.** 🔴 **The live defect, stated plainly: `POST
-  /runs/{name}/trigger?dryRun=true` puts ACQUISITION in dry run, and the chained execution job then writes
+  /runs/{name}/trigger?skipPostAction=true` (renamed from `?dryRun=true` 2026-09-20) puts ACQUISITION in
+  dry run, and the chained execution job then writes
   FOR REAL** — `fireOnCommit` hardcodes `dryRun=false` (`JobService.java:818-823`). ⛔ The obvious fix is
   closed off: `PipelineJobRunner` returns early under dry run (`:381`) BEFORE publishing the
   `ConsignmentEvent` (`:391`), so there is no event to carry the flag. `ConsignmentEvent` is a fixed-field
   `@PublicApi` record with **34 construction sites** and no attribute slot, so the flag must be ADDED.
-  **Three decisions are owed before any code** — which of the four publish sites is authoritative, whether
-  an acquisition-only dry run publishes at all, and whether amending an `@PublicApi` record needs a version
-  call.
+  ✅ **ALL THREE DECISIONS ANSWERED by the operator 2026-09-20** — (a) the authoritative publish site is
+  **`ConsignmentAuditWriter:178`** (it is what the defective route actually reaches and it fans to both the
+  bus and the Signal ledger, covering `JobService:822` `on_pipeline` and `:847` `on_signal`;
+  `PipelineJobRunner:391` rejected as unreachable under dry run); (b) an **acquisition-only dry run does
+  NOT publish a `ConsignmentEvent`** — the chain stops cleanly (publishing-marked rejected: every consumer
+  would have to honour the flag or silently act for real, and it would overturn the invariant at
+  `JobService.java:947-949`); (c) **no version call needed** — `ConsignmentEvent` is confirmed absent from
+  `v3.11.0`, so only a release-notes line is owed. ⇒ **The row's remaining scope is now the step-5 BUILD
+  only**: carry the flag on `ConsignmentEvent`, set it at `ConsignmentAuditWriter:178`, have `fireOnCommit`
+  read it instead of the hardcoded `false`, and the two-phase end-to-end test. **The row stays OPEN.**
+  ✅ **INTERIM SHIPPED 2026-09-20** — the route's query parameter is renamed `?dryRun=true` →
+  **`?skipPostAction=true`** (and the v1 response field with it), because the flag's real scope never
+  suppressed the ingest write and the name overpromised exactly the guarantee this row proves it cannot
+  make; it is now documented in `docs/api/openapi-v1.json`, where it was previously absent entirely. The
+  capability is unchanged, and the job framework's unrelated `JobContext.dryRun()` (MNT-1) keeps its name.
   🔴 **RE-GROUNDED 2026-09-20 — the defect above is UNDERSTATED and one decision is already ANSWERED.**
   (i) **The `?dryRun=true` run writes for real BY ITSELF, with no chained job configured.**
   `CollectorProcessor.run(cfg, onCommit, dryRun)` (`:92-95`) dry-runs `acquire` and then calls

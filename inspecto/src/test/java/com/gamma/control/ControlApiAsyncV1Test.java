@@ -415,6 +415,28 @@ class ControlApiAsyncV1Test {
     }
 
 
+    /**
+     * PIPELINE-DRYRUN-1 — the trigger's opt-out is spelled {@code ?skipPostAction=true} (renamed from
+     * {@code ?dryRun=true} on 2026-09-20, because it does NOT suppress the ingest write), and the v1 body
+     * echoes the flag under that same name.
+     */
+    @Test
+    void pipelineTriggerAcceptsSkipPostActionAndEchoesItByThatName(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, List.of())) {
+            String pipe = c.svc.pipelines().get(0).name();
+
+            HttpResponse<String> accepted = post(c.port, "/runs/" + pipe + "/trigger?skipPostAction=true", null);
+            assertEquals(202, accepted.statusCode(), accepted.body());
+            JsonNode data = V1Body.of(accepted.body());
+            assertTrue(data.get("skipPostAction").asBoolean(), accepted.body());
+            assertTrue(data.path("dryRun").isMissingNode(), "the old name must be gone: " + accepted.body());
+
+            // Absent → false, so the default fire is fully real.
+            JsonNode plain = V1Body.of(post(c.port, "/runs/" + pipe + "/trigger", null).body());
+            assertFalse(plain.get("skipPostAction").asBoolean(), plain.toString());
+        }
+    }
+
     @Test
     void unknownPipelineTriggerIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, List.of())) {

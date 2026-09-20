@@ -149,22 +149,23 @@ final class RunRoutes implements RouteModule {
      * executes on the trigger pool via {@link CollectorService#runPipelineOffThread} (blocking for the result), so
      * even the legacy path no longer holds the ingest lock on the request thread. 404 if no such pipeline.
      *
-     * <p>Optional {@code ?dryRun=true} (PIPELINE-DRYRUN-1, mirrors {@code JobRoutes}' job-trigger convention):
-     * acquisition still fetches from a remote collector, so the trigger proves it can reach its source, but
-     * skips the source-side post-action — a {@code collector.post_action.on_success} of
-     * {@code DELETE}/{@code MOVE}/{@code RENAME} never touches the remote original. Manual triggers only, never
-     * cron/event.
+     * <p>Optional {@code ?skipPostAction=true} (PIPELINE-DRYRUN-1): acquisition still fetches from a remote
+     * collector, so the trigger proves it can reach its source, but skips the source-side post-action — a
+     * {@code collector.post_action.on_success} of {@code DELETE}/{@code MOVE}/{@code RENAME} never touches the
+     * remote original. <b>The ingest write still happens for real</b>; this is not a preview. Manual triggers
+     * only, never cron/event. Renamed from {@code ?dryRun=true} on 2026-09-20 because that name overpromised —
+     * it is deliberately NOT {@code JobRoutes}' {@code ?dryRun=true} (MNT-1), which previews without mutating.
      */
     private Object triggerPipeline(ApiContext api, HttpExchange e, String name) throws IOException {
-        boolean dryRun = "true".equalsIgnoreCase(ApiContext.query(e, "dryRun"));
+        boolean skipPostAction = "true".equalsIgnoreCase(ApiContext.query(e, "skipPostAction"));
         try {
             if (ApiContext.v1(e)) {
-                String runId = api.service().triggerRunAsync(name, dryRun).orElseThrow(() -> notFound(name));
+                String runId = api.service().triggerRunAsync(name, skipPostAction).orElseThrow(() -> notFound(name));
                 e.getResponseHeaders().set("Location", "/api/v1/runs/runs/" + runId);
                 return ApiContext.respondJson(e, 202,
-                        Map.of("runId", runId, "pipeline", name, "status", "running", "dryRun", dryRun));
+                        Map.of("runId", runId, "pipeline", name, "status", "running", "skipPostAction", skipPostAction));
             }
-            return api.service().runPipelineOffThread(name, dryRun).orElseThrow(() -> notFound(name));
+            return api.service().runPipelineOffThread(name, skipPostAction).orElseThrow(() -> notFound(name));
         } catch (IllegalStateException notRunnable) {
             throw new ApiException(409, notRunnable.getMessage());   // a `template: true` pipeline
         }

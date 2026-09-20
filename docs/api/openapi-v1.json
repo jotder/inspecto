@@ -1497,9 +1497,9 @@
     "/runs/{runId}/trigger" : {
       "post" : {
         "tags" : [ "runs" ],
-        "summary" : "POST /runs/{runId}/trigger (generated skeleton)",
+        "summary" : "Trigger a pipeline",
         "operationId" : "postRunsByRunIdTrigger",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Fires one registered pipeline. On the v1 surface returns 202 + {runId,pipeline,status,skipPostAction} and a Location to poll; the legacy unversioned route keeps its 200 RunResult body. Response schemas are otherwise undocumented — see control-api.md §5 for the exemplar-coverage decision.",
         "parameters" : [ {
           "name" : "runId",
           "in" : "path",
@@ -1507,13 +1507,21 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "skipPostAction",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          },
+          "description" : "Skip the source-side post-action for this fire (PIPELINE-DRYRUN-1). Acquisition still fetches from the remote collector for real, so the trigger proves the pipeline can reach and read its source; a collector.post_action.on_success of DELETE/MOVE/RENAME never touches the remote original; and the ingest write STILL HAPPENS FOR REAL. This is not a preview and not the job framework's ?dryRun=true. Renamed from ?dryRun=true on 2026-09-20. Manual triggers only — cron/event/signal fires are always real."
         } ],
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/runs/runs/{runId}" : {

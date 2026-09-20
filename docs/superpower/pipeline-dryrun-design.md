@@ -2,7 +2,7 @@
 
 Status: **partially shipped 2026-09-18** — gates 1-4 (acquisition-phase post-action skip, execution-phase dry
 run, both signal-emit sites, the provenance marker) are all built and unit-tested, and gate 1 now has an
-operator-facing trigger (`POST /runs/{name}/trigger?dryRun=true`, `CollectorService.runPipeline`/
+operator-facing trigger (`POST /runs/{name}/trigger?skipPostAction=true`, `CollectorService.runPipeline`/
 `triggerRunAsync`/`runPipelineOffThread`, same-day follow-up). See `docs/BACKLOG.md`'s `PIPELINE-DRYRUN-1`
 row (2026-09-18 block) for the full job-flow finding and the correction to this doc's `GET /provenance` claim
 (it reads `DbProvenanceStore`, not `DbConsignmentOutputStore`). Does **not** yet close `PIPELINE-DRYRUN-1` —
@@ -56,7 +56,7 @@ is hardcoded `false` for every chained firing.**
 🔴 **And the obvious fix does not work.** `PipelineJobRunner` returns early under dry run
 (`:381`, "dry run: pipeline validated, nothing written") **before** it publishes the `ConsignmentEvent` at
 `:391` — so an execution dry run emits no event and there is nothing downstream to inherit from. The real
-exposure is the other direction: an ACQUISITION dry run (`POST /runs/{name}/trigger?dryRun=true`) lands
+exposure is the other direction: an ACQUISITION dry run (`POST /runs/{name}/trigger?skipPostAction=true`) lands
 files without acking, and the chained job then processes them **for real**.
 ⛔ **There is no existing carrier.** `ConsignmentEvent` (`inspecto-etl/.../ConsignmentEvent.java:44-47`) is
 a fixed-field `@PublicApi(since = "4.0.0")` record with no attribute map, and `LedgerEntry` likewise; the
@@ -95,7 +95,7 @@ Gates 1-4 shipped. What remains is the one the row calls "no single route fires 
 **not wiring** — it is a published-API change plus a decision. Scoped here rather than slipped into a
 commit, because taking it as wiring is how it would ship half-done.
 
-**The exposure, stated precisely.** `POST /runs/{name}/trigger?dryRun=true` puts ACQUISITION in dry run:
+**The exposure, stated precisely.** `POST /runs/{name}/trigger?skipPostAction=true` puts ACQUISITION in dry run:
 files land, `connector.post` is skipped, nothing is acked. The chained execution job then processes those
 files **for real** — `fireOnCommit` builds `new Firing(Map.of(), commitPayload(event), false)`
 (`JobService.java:818-823`), hardcoding `dryRun=false` for every `on_pipeline` firing. ⚠ So a user who
@@ -114,20 +114,47 @@ a published record with **34 construction sites (4 in main, 30 in test)**. ✅ T
 back-compat constructor is the idiom: add the component, keep a delegating overload, and the 30 test sites
 compile untouched.
 
-**Owed decisions — do not start before these are answered:**
-1. **Which publish site is authoritative for "this batch was simulated"?** Four sites publish a
-   `ConsignmentEvent`: `PipelineJobRunner:391`, `EnrichJob:88`, `EnrichmentService:263`,
-   `ConsignmentAuditWriter:178`. They are not equivalent — only the first is on the pipeline execution
-   path. ⛔ Marking all four "for symmetry" would assert simulation about enrichment runs that never
-   consulted a dry-run flag.
-2. **Does an acquisition-only dry run publish an event at all?** If yes, the downstream job must run and
-   refuse to write; if no, the chain simply stops and the operator sees nothing downstream. These give the
-   operator visibly different things, and the answer decides whether step 5 is mostly `JobService` or
-   mostly `CollectorProcessor`.
-3. **Does adding a component to an `@PublicApi(since = "4.0.0")` record need a version call?** Per
-   `docs/BRANCHING.md` nothing after 3.x is in production, so in practice this is free today — but the
-   annotation is a stated intent and the call should be recorded, not assumed. (See the standing
-   “@PublicApi marks INTENT, not exposure” finding.)
+**Owed decisions — ALL THREE ANSWERED by the operator, DECIDED 2026-09-20:**
+
+1. ✅ **DECIDED — the authoritative publish site is `ConsignmentAuditWriter:178`.** It is the site the
+   defective route actually reaches, and it fans to **both** the bus and the Signal ledger, so it covers
+   both chaining paths at once (`JobService:822` `on_pipeline` and `JobService:847` `on_signal`).
+   ⛔ **Rejected: `PipelineJobRunner:391`** — unreachable under dry run, because the runner returns early
+   at `:381` before it ever publishes. ⛔ **Rejected: marking all four sites** — `EnrichJob:88` and
+   `EnrichmentService:263` would then assert simulation about enrichment runs that never consulted the flag.
+2. ✅ **DECIDED — an acquisition-only dry run does NOT publish a `ConsignmentEvent`.** The chain stops
+   cleanly and the operator sees nothing downstream. ⛔ **Rejected: publish the event marked as a dry
+   run** — every downstream consumer would then have to honour the flag or silently act for real (a
+   fail-open shape), and it would overturn the written invariant at `JobService.java:947-949`
+   (*"cron/event/signal fires are always real"*). This makes step 5 mostly `CollectorProcessor`-side.
+3. ✅ **DECIDED — no version call needed** (already settled by the grounding pass). `ConsignmentEvent` is
+   `@PublicApi(since = "4.0.0")` and is confirmed **absent from `v3.11.0`**, so the record may be amended
+   freely; only a release-notes line is owed. (See the standing “@PublicApi marks INTENT, not exposure”
+   finding.)
+
+### Interim: the query parameter renamed to `?skipPostAction=true` — SHIPPED 2026-09-20
+
+Approved and built ahead of the step-5 build, because the honest name is owed now and does not depend on it.
+`POST /runs/{name}/trigger?skipPostAction=true` became **`?skipPostAction=true`**, and the v1 response body's
+`dryRun` field became `skipPostAction`.
+
+**Why.** The parameter's real, deliberate scope — as its own javadoc already stated — is *"acquisition still
+fetches, but the source-side post-action never fires"*. It does **not** suppress the ingest write. The name
+`dryRun` overpromised exactly the guarantee the step-5 defect above shows it cannot make, and the parameter
+was **absent from `docs/api/openapi-v1.json` entirely**, so the name was all an API consumer had to go on.
+The capability is unchanged: polling a `post_action=DELETE` pipeline without acking still works.
+
+**Scope of the rename — verified before touching anything.** The renamed chain is
+`RunRoutes.triggerPipeline:159` → `CollectorService.triggerRunAsync` / `runPipelineOffThread` /
+`runPipeline` (boolean overloads) → `MultiCollectorProcessor.runAll(…, boolean)` →
+`CollectorProcessor.run(…, boolean)` → `CollectorProcessor.acquire(cfg, boolean)` →
+`RemoteAcquisitionHandler.materializeRemote/fetchOne/applyPostAction`. Every boolean-carrying overload on
+that chain has **exactly one entry point, `RunRoutes:159`** — the internal names were renamed the whole way
+down for the same honesty reason. ⛔ The job framework's unrelated `dryRun` (MNT-1: `JobContext.dryRun()`,
+`JobRoutes:155`, `DryRunServices`, the `*Task` previews, `SpaceMigrator`, and the UI's `dryRunAuthored`)
+shares **no** method on this chain and was deliberately left untouched — it is a genuine preview and keeps
+the name. `docs/api/openapi-v1.json` now documents `skipPostAction` on the route, stating plainly that the
+ingest write still happens for real.
 
 **Then build, in this order:** (a) `ConsignmentEvent` gains `boolean dryRun` + back-compat overload;
 (b) the authoritative publish site sets it from `ctx.dryRun()`; (c) `fireOnCommit` reads
@@ -171,7 +198,7 @@ chain fires for real too. Fixing only `fireOnCommit` leaves half the chaining un
 `ctx.dryRun(firing.dryRun())` is set once, at `JobService.java:1295`.
 
 🔴 **Corrected, and this is the important one — the defect is NOT "the chained job writes for real". The
-`?dryRun=true` run writes for real BY ITSELF, in-process, with no chained job configured at all.**
+`?skipPostAction=true` run writes for real BY ITSELF, in-process, with no chained job configured at all.**
 `CollectorProcessor.run(cfg, onCommit, dryRun)` (`:92-95`) calls `acquire(cfg, dryRun)` — dry-run-gated —
 and then calls **`ingest(cfg, onCommit)` with no flag at all**. Ingest always parses, always writes
 outputs, always writes the audit/commit-log rows, and always publishes the `ConsignmentEvent`. The route
@@ -188,7 +215,7 @@ the same lie, downstream of the first — not the defect itself.**
 not the first.** Three of the four call `bus.publish` directly; the fourth constructs the event and fans it
 to two consumers:
 
-| # | Site | What it publishes / when | On the `?dryRun=true` path? |
+| # | Site | What it publishes / when | On the `?skipPostAction=true` path? |
 |---|---|---|---|
 | 1 | `PipelineJobRunner.java:391` | `bus.publish` of a `SUCCESS` event after a **graph-lane** batch commits. Unreachable under `ctx.dryRun()` — the `:381` early return precedes it. | ❌ no — different lane |
 | 2 | `EnrichJob.java:88` | `bus.publish` of a `SUCCESS` event after a Stage-2 **enrichment Job** run. Never consults any dry-run flag. | ❌ |
@@ -200,7 +227,7 @@ to two consumers:
 **Options.**
 - **(a1) `ConsignmentAuditWriter:178` only.** Concretely: thread the dry-run flag into `ingest` →
   `ConsignmentAuditWriter`, and set `dryRun` on the event it builds. This is the **only** site the
-  `?dryRun=true` route actually reaches, and it protects **both** chain paths at once (`commitListener`
+  `?skipPostAction=true` route actually reaches, and it protects **both** chain paths at once (`commitListener`
   and `terminalBatchSink` receive the same instance), which is exactly what the `:847` finding demands.
   Left unprotected: nothing on this route. A future *graph-lane* dry run that somehow published would not
   be marked — but it cannot publish today (`:381`).
@@ -264,7 +291,7 @@ same commit, per that page's own standing instruction.
 
 #### The live defect's severity, and a decision-free interim mitigation
 
-**Severity: high, and higher than the row states.** `?dryRun=true` today performs real, unrecoverable-in-
+**Severity: high, and higher than the row states.** `?skipPostAction=true` today performs real, unrecoverable-in-
 principle writes on the ingest half — every time, on every pipeline, with no chained Job needed. The one
 thing it does protect (the remote post-action) is the single worst failure named in the BACKLOG row, so
 the flag is not useless; but a caller reading "dryRun" reasonably expects no writes and gets a full

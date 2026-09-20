@@ -84,14 +84,14 @@ public class CollectorProcessor {
     }
 
     /**
-     * As {@link #run(PipelineConfig, java.util.function.Consumer)}, but a {@code dryRun} acquisition
+     * As {@link #run(PipelineConfig, java.util.function.Consumer)}, but a {@code skipPostAction} acquisition
      * (PIPELINE-DRYRUN-1) never applies the remote source's post-action — see {@link #acquire(PipelineConfig, boolean)}.
      * Ingest is unaffected: a dry-run manual trigger is scoped to protecting the remote source, not to previewing
      * the ingest write (that preview already exists via {@code JobContext.dryRun()} for the job-framework path).
      */
-    public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit, boolean dryRun)
+    public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit, boolean skipPostAction)
             throws Exception {
-        acquire(cfg, dryRun);
+        acquire(cfg, skipPostAction);
         ingest(cfg, onCommit);
     }
 
@@ -280,17 +280,17 @@ public class CollectorProcessor {
     }
 
     /**
-     * As {@link #acquire(PipelineConfig)}, but a {@code dryRun} (PIPELINE-DRYRUN-1) fetches and lands files
+     * As {@link #acquire(PipelineConfig)}, but a {@code skipPostAction} (PIPELINE-DRYRUN-1) fetches and lands files
      * exactly as a real cycle would — so a manual preview trigger still proves the pipeline can reach and read
      * its remote source — while skipping the source-side post-action, so a {@code collector.post_action.on_success}
      * of {@code DELETE}/{@code MOVE}/{@code RENAME} never touches the remote original. See
      * {@link RemoteAcquisitionHandler#materializeRemote(PipelineConfig, CollectorConnector, List, RetryPolicy,
-     * boolean)}. {@code CollectorService}'s manual pipeline trigger ({@code POST /runs/{name}/trigger?dryRun=true})
-     * is the one operator-facing route that carries {@code dryRun=true} in; see
+     * boolean)}. {@code CollectorService}'s manual pipeline trigger ({@code POST /runs/{name}/trigger?skipPostAction=true})
+     * is the one operator-facing route that carries {@code skipPostAction=true} in; see
      * {@code docs/superpower/pipeline-dryrun-design.md}.
      */
     @PublicApi(since = "4.0.0")
-    public static int acquire(PipelineConfig cfg, boolean dryRun) throws java.io.IOException {
+    public static int acquire(PipelineConfig cfg, boolean skipPostAction) throws java.io.IOException {
         if (!CollectorConnectors.isRemote(cfg)) return 0;   // local collector: nothing to acquire
 
         PipelineConfig.Collector src = cfg.collector();
@@ -341,7 +341,7 @@ public class CollectorProcessor {
 
             // Fetch the bytes into the staging tree and land them atomically in the poll root (B3a), so the rest
             // of the engine — dedup, markers, ledger, backup — treats them exactly like local files.
-            return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry, dryRun).size();
+            return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry, skipPostAction).size();
         }
     }
 

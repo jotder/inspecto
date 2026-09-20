@@ -132,13 +132,13 @@ public final class MultiCollectorProcessor {
     }
 
     /**
-     * As {@link #runAll(List, int, java.util.function.Consumer)}, but a {@code dryRun} manual trigger
+     * As {@link #runAll(List, int, java.util.function.Consumer)}, but a {@code skipPostAction} manual trigger
      * (PIPELINE-DRYRUN-1) acquires without applying the remote source's post-action — see
      * {@link CollectorProcessor#acquire(com.gamma.etl.PipelineConfig, boolean)}.
      */
     public static RunResult runAll(List<Path> configs, int maxConcurrent,
                                    java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit,
-                                   boolean dryRun) {
+                                   boolean skipPostAction) {
         Semaphore permits   = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
@@ -152,7 +152,7 @@ public final class MultiCollectorProcessor {
                         permits.acquire();
                         try {
                             PipelineConfig cfg = PipelineConfig.load(cfgPath.toString());
-                            CollectorProcessor.run(cfg, onCommit, dryRun);
+                            CollectorProcessor.run(cfg, onCommit, skipPostAction);
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();

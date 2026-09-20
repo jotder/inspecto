@@ -173,12 +173,12 @@ class RemoteAcquisitionStagingTest {
     }
 
     /**
-     * PIPELINE-DRYRUN-1 gate 1 — under dry run the file is still fetched and landed for real (nothing
-     * downstream should see a difference), but the land-then-ack post-action's {@code connector.post(...)}
-     * call — which may delete the remote original — must be skipped.
+     * PIPELINE-DRYRUN-1 gate 1 — under {@code skipPostAction} the file is still fetched and landed for real
+     * (nothing downstream should see a difference), but the land-then-ack post-action's
+     * {@code connector.post(...)} call — which may delete the remote original — must be skipped.
      */
     @Test
-    void dryRunSkipsThePostActionButStillLandsTheFile(@TempDir Path dir) throws Exception {
+    void skipPostActionSkipsThePostActionButStillLandsTheFile(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = configWithDeletePostAction(dir);
         Path inbox = Path.of(cfg.dirs().poll());
         Files.createDirectories(inbox);
@@ -187,13 +187,13 @@ class RemoteAcquisitionStagingTest {
         List<RemoteFile> out = RemoteAcquisitionHandler.materializeRemote(
                 cfg, connector, List.of(listed("cdr_dry.csv", PAYLOAD.length)), RetryPolicy.NONE, true);
 
-        assertEquals(1, out.size(), "the file is still fetched and landed under dry run");
+        assertEquals(1, out.size(), "the file is still fetched and landed under skipPostAction");
         assertTrue(out.get(0).localPath().startsWith(inbox));
         assertEquals(0, connector.postCalls.get(),
-                "dry run must skip connector.post() — the remote original must not be deleted/moved/renamed/tagged");
+                "skipPostAction must skip connector.post() — the remote original must not be deleted/moved/renamed/tagged");
     }
 
-    /** Same config, real run: the post-action DOES fire — the control the dry-run test above is a control for. */
+    /** Same config, ordinary run: the post-action DOES fire — the control for the skipPostAction test above. */
     @Test
     void aRealRunDoesApplyThePostAction(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = configWithDeletePostAction(dir);
