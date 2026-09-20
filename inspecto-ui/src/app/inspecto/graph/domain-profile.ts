@@ -54,7 +54,7 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
     {
         id: 'supply-chain',
         label: 'Supply chain — shipments',
-        description: 'Parties linked by shipments; sums weight or quantity, foregrounds flow and cut points.',
+        description: 'Parties linked by shipments; sums weight or quantity, foregrounds throughput and cut points.',
         labels: { nodes: 'Parties', links: 'Shipments', rows: 'Consignments' },
         measureHints: [/weight/i, /qty/i, /quantity/i, /volume/i],
         timeHints: [/shipped/i, /dispatch/i, /_at$/i, /date/i],
@@ -62,9 +62,9 @@ export const DOMAIN_PROFILES: readonly DomainProfile[] = [
     },
     {
         id: 'cyber',
-        label: 'Cyber — network flows',
-        description: 'Hosts linked by flows; sums bytes, foregrounds centrality, cycles and communities.',
-        labels: { nodes: 'Hosts', links: 'Flows', rows: 'Flow records' },
+        label: 'Cyber — network traffic',
+        description: 'Hosts linked by network sessions; sums bytes, foregrounds centrality, cycles and communities.',
+        labels: { nodes: 'Hosts', links: 'Sessions', rows: 'Traffic records' },
         measureHints: [/bytes/i, /packets/i, /octets/i],
         timeHints: [/^ts$/i, /timestamp/i, /_at$/i, /time/i],
         suggestedTools: ['centrality', 'cycles', 'communities'],
