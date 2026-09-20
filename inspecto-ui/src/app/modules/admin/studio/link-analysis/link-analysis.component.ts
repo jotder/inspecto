@@ -71,7 +71,15 @@ import {
     attrColumns,
     domainProfile,
     workingSetOptionsFor,
+    EndpointColumns,
+    cloneGroup,
+    filterEdgesByPredicate,
+    hasConditions,
+    markStranded,
+    predicateColumns,
 } from 'app/inspecto/graph';
+import { ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
+import { LinkAnalysisFilterComponent, LocalMatch } from './link-analysis-filter.component';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 import { NodeKind } from 'app/inspecto/api';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
@@ -167,6 +175,7 @@ interface PresentationSnapshot {
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
+        LinkAnalysisFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         AiExplainComponent,
@@ -352,10 +361,41 @@ export class LinkAnalysisComponent implements OnInit {
         const g = this.graph();
         if (!g) return null;
         const kindFiltered = filterByKinds(g, this.kindFilter(), []);
+        const lf = this.localFilter();
+        const predicateFiltered = lf ? filterEdgesByPredicate(kindFiltered, lf, this.endpointColumns()) : kindFiltered;
         const col = this.timeColumn();
         const cutoff = this.timeCutoff();
-        return col && cutoff != null ? filterByTime(kindFiltered, col, cutoff) : kindFiltered;
+        return col && cutoff != null ? filterByTime(predicateFiltered, col, cutoff) : predicateFiltered;
     });
+
+    // ── the two-stage query loop (spec §3.7 / plan S1.4): one predicate tree, two evaluators ──
+    /** The tree being edited (deep-cloned on apply — the editor mutates in place). */
+    readonly filterWhere = signal<ConditionGroup>(emptyGroup());
+    /** Stage 1: the predicate currently applied to the working set in the browser; null = none. */
+    readonly localFilter = signal<ConditionGroup | null>(null);
+    /** Stage 2 status line for the panel. */
+    readonly pushState = signal('not pushed');
+    readonly pushing = signal(false);
+    /** The projection's endpoint column names — the tree's node conditions are ordinary leaves on these. */
+    readonly endpointColumns = computed<EndpointColumns>(() => {
+        const p = this.lastRun()?.query.projection;
+        return { sourceCol: p?.sourceCol || 'source', targetCol: p?.targetCol || 'target' };
+    });
+    readonly filterColumns = computed(() => {
+        const g = this.graph();
+        return g ? predicateColumns(g, this.endpointColumns()) : [];
+    });
+    /** What the tree as edited would keep of the loaded links — live, before Apply. */
+    readonly localMatch = computed<LocalMatch | null>(() => {
+        const g = this.graph();
+        if (!g) return null;
+        const w = this.filterWhere();
+        const matched = hasConditions(w)
+            ? filterEdgesByPredicate(g, w, this.endpointColumns()).edges.length
+            : g.edges.length;
+        return { matched, total: g.edges.length };
+    });
+    readonly strandedCount = computed(() => this.graph()?.nodes.filter((n) => n.data.missing).length ?? 0);
     readonly displayed = computed<G6GraphData | null>(() => {
         const g = this.baseGraph();
         return g ? collapseBranches(g, this.collapsedRoots()) : null;
@@ -533,6 +573,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.collapsedRoots.set([]);
         this.timeColumn.set('');
         this.timeCutoff.set(null);
+        this.localFilter.set(null);
+        this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         try {
             const g = await source.query(q);
@@ -559,6 +601,58 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.loading.set(false);
         }
+    }
+
+    // ── the two-stage query loop ──
+
+    /** The condition-group editor mutated the tree in place — new root ref so the computeds re-run. */
+    onFilterChanged(): void {
+        this.filterWhere.update((w) => ({ ...w }));
+    }
+
+    /** Stage 1: apply the tree to the working set in the browser (free — no round-trip). */
+    applyFilterLocally(): void {
+        const w = this.filterWhere();
+        this.localFilter.set(hasConditions(w) ? cloneGroup(w) : null);
+    }
+
+    clearFilter(): void {
+        this.filterWhere.set(emptyGroup());
+        this.localFilter.set(null);
+    }
+
+    /**
+     * Stage 2: re-run the last query with the tree as `filter`, merging the result over the working set so
+     * layout and selection survive and every node the narrower question excluded is MARKED, never dropped.
+     * `truncated` on the result is the loop's signal to refine again.
+     */
+    async pushFilter(): Promise<void> {
+        const run = this.lastRun();
+        const source = run && this.graphSources.byId(run.sourceId);
+        const prev = this.graph();
+        if (!run || !source || !prev) return;
+        const w = this.filterWhere();
+        const q: GraphSourceQuery = { ...run.query, filter: hasConditions(w) ? cloneGroup(w) : undefined };
+        this.pushing.set(true);
+        try {
+            const next = await source.query(q);
+            const truncated = !!(next as ProjectedGraph).truncated;
+            this.graph.set(markStranded(prev, next));
+            this.truncated.set(truncated);
+            this.lastRun.set({ sourceId: run.sourceId, query: q });
+            this.localFilter.set(null); // the server applied it; the local stage starts clean
+            const n = next.edges.length.toLocaleString();
+            this.pushState.set(truncated ? `${n} links · truncated — refine and push again` : `${n} links · complete`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Pushing the predicate to the server failed.'));
+        } finally {
+            this.pushing.set(false);
+        }
+    }
+
+    /** Placeholder until the advanced-search dialog lands (plan review point 4). */
+    openAdvancedSearch(): void {
+        this.toastr.info('Advanced search is coming next.');
     }
 
     // ── workspace layout ──

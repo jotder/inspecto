@@ -334,6 +334,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     fill: nodeFill,
                     stroke: (d) => colorOf(d),
                     lineWidth: 2,
+                    // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
+                    // sees what the narrower question removed) renders dimmed with a dashed outline.
+                    lineDash: (d) => ((d.data as { missing?: boolean }).missing ? [4, 3] : undefined),
                     iconSrc: (d) => iconOf(d),
                     iconWidth: 22,
                     iconHeight: 22,
@@ -343,7 +346,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     labelFontSize: 11,
                     labelPlacement: 'bottom',
                     cursor: 'pointer',
-                    opacity: (d) => (nodeDim(d.id as string) ? 0.25 : 1),
+                    opacity: (d) =>
+                        nodeDim(d.id as string) ? 0.25 : (d.data as { missing?: boolean }).missing ? 0.45 : 1,
                     labelOpacity: (d) => (nodeDim(d.id as string) ? 0.35 : 1),
                 },
             },

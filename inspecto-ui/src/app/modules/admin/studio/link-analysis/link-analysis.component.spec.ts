@@ -49,6 +49,8 @@ function create(
         views?: LinkAnalysisView[];
         expand?: GraphSource['expand'];
         graph?: G6GraphData;
+        /** What the fake source returns when the query carries a `filter` (the stage-2 push). */
+        filtered?: G6GraphData;
         queryParams?: Record<string, string>;
     } = {},
 ) {
@@ -58,7 +60,9 @@ function create(
         label: 'Entity/Link (from a Dataset)',
         query: (q) => {
             queried.push(q);
-            return opts.fail ? Promise.reject(new Error('bad mapping')) : Promise.resolve(opts.graph ?? GRAPH);
+            if (opts.fail) return Promise.reject(new Error('bad mapping'));
+            const q2 = q as { filter?: unknown };
+            return Promise.resolve(q2.filter && opts.filtered ? opts.filtered : (opts.graph ?? GRAPH));
         },
         expand: opts.expand,
     };
@@ -537,5 +541,38 @@ describe('LinkAnalysisComponent', () => {
 
         await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
         expect(c.profileId()).toBe('generic'); // a view without a profile resets to generic
+    });
+    it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {
+        const FILTERED: G6GraphData = { nodes: GRAPH.nodes.slice(0, 3), edges: GRAPH.edges.slice(0, 2) }; // a–b–c only
+        const { fixture, queried } = create({ filtered: FILTERED });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.filterColumns().map((col) => col.name)).toEqual(['source', 'target', 'kind', 'count']);
+        expect(c.localMatch()).toEqual({ matched: 3, total: 3 });
+
+        // Stage 1 — edit the tree (as the editor would, in place) and apply locally: no query issued.
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'D' });
+        c.onFilterChanged();
+        expect(c.localMatch()).toEqual({ matched: 1, total: 3 });
+        c.applyFilterLocally();
+        expect(c.displayed()!.edges.map((e) => e.id)).toEqual(['d->e']);
+        expect(c.displayed()!.nodes.map((n) => n.id)).toEqual(['d', 'e']);
+        expect(queried).toHaveLength(1);
+
+        // Stage 2 — push: the query carries the tree as `filter`; the result merges over the working set.
+        await c.pushFilter();
+        expect(queried).toHaveLength(2);
+        expect((queried[1] as { filter?: unknown }).filter).toMatchObject({ kind: 'group', op: 'AND' });
+        expect(c.localFilter()).toBeNull(); // the server applied it
+        expect(c.pushState()).toBe('2 links · complete');
+        const g = c.graph()!;
+        expect(g.edges.map((e) => e.id)).toEqual(['a->b', 'b->c']);
+        expect(g.nodes.filter((n) => n.data.missing).map((n) => n.id)).toEqual(['d', 'e']); // marked, kept
+        expect(c.strandedCount()).toBe(2);
+        expect(c.lastRun()!.query.filter).toBeDefined(); // a saved view now persists the predicate
+
+        c.clearFilter();
+        expect(c.filterWhere().items).toEqual([]);
     });
 });

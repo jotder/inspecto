@@ -615,6 +615,24 @@
                             (run)="run()"
                             (edit)="editQuery()"
                         ></inspecto-link-analysis-query-panel>
+
+                        <!-- Filter predicate — the two-stage loop over the loaded graph (hidden until one exists). -->
+                        @if (graph()) {
+                            <inspecto-link-analysis-filter
+                                class="mt-4 border-t pt-3"
+                                [where]="filterWhere()"
+                                [columns]="filterColumns()"
+                                [localMatch]="localMatch()"
+                                [pushState]="pushState()"
+                                [truncated]="truncated()"
+                                [busy]="pushing()"
+                                (changed)="onFilterChanged()"
+                                (applyLocal)="applyFilterLocally()"
+                                (pushToServer)="pushFilter()"
+                                (clear)="clearFilter()"
+                                (advanced)="openAdvancedSearch()"
+                            ></inspecto-link-analysis-filter>
+                        }
                     </div>
                 } @else {
                     <button
@@ -698,7 +716,7 @@
                             class="absolute right-2 top-2 z-10"
                             [stats]="workingSet()"
                             [truncated]="truncated()"
-                            mode="top-N by count"
+                            [mode]="strandedCount() ? strandedCount() + ' stranded' : 'top-N by count'"
                             [open]="workingSetOpen()"
                             (openChange)="workingSetOpen.set($event)"
                         ></inspecto-link-analysis-working-set>

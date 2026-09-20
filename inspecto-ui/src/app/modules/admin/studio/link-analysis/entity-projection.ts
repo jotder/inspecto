@@ -188,15 +188,15 @@ export class EntityProjectionGraphSource implements GraphSource {
 
     async query(q: GraphSourceQuery): Promise<ProjectedGraph> {
         if (q.projections?.length) {
-            const graphs = await Promise.all(q.projections.map((p) => this.queryOne(p)));
+            const graphs = await Promise.all(q.projections.map((p) => this.queryOne(p, q.filter)));
             return mergeProjectedGraphs(graphs);
         }
         if (!q.projection) throw new Error('The entity-projection source needs a Dataset mapping.');
-        return this.queryOne(q.projection);
+        return this.queryOne(q.projection, q.filter);
     }
 
     /** One mapping's projection: backend-first, falling back to the client sample fold on failure. */
-    private async queryOne(p: EntityProjection): Promise<ProjectedGraph> {
+    private async queryOne(p: EntityProjection, filter?: GraphSourceQuery['filter']): Promise<ProjectedGraph> {
         if (!p.datasetId) throw new Error('The entity-projection source needs a Dataset mapping.');
         if (!p.sourceCol || !p.targetCol) throw new Error('The mapping needs a source and a target column.');
         const res = await firstValueFrom(
@@ -206,6 +206,7 @@ export class EntityProjectionGraphSource implements GraphSource {
                 targetCol: p.targetCol,
                 linkKindCol: p.linkKindCol || undefined,
                 attrCols: p.attrCols?.length ? p.attrCols : undefined,
+                filter,
             }),
         );
         return projectTriples(res.rows, res.truncated, p);
@@ -227,6 +228,7 @@ export class EntityProjectionGraphSource implements GraphSource {
                 targetCol: p.targetCol,
                 linkKindCol: p.linkKindCol || undefined,
                 attrCols: p.attrCols?.length ? p.attrCols : undefined,
+                filter: q.filter,
                 value: nodeLabel,
             }),
         );

@@ -1,5 +1,6 @@
 import type { GraphDirection } from 'app/inspecto/api';
 import type { G6GraphData } from './graph-types';
+import type { ConditionGroup } from '../query/query-types';
 
 /**
  * The **GraphSource seam** (GLOSSARY §11, design: docs/superpower/link-analysis-and-graphsource.md):
@@ -62,6 +63,13 @@ export interface GraphSourceQuery {
      * results into one graph (entity-projection only). When present, takes precedence over `projection`.
      */
     projections?: EntityProjection[];
+    /**
+     * Stage 2 of the two-stage query loop (spec §3.7): the shared condition tree, applied to the Dataset's
+     * rows BEFORE the fold so edge counts stay right. Sent verbatim as `filter` on `POST /inv/projection`.
+     * ⚠ Until the backend gains the field (plan S1.4) the server ignores it and returns the unfiltered
+     * projection — the UI says so instead of pretending.
+     */
+    filter?: ConditionGroup;
 }
 
 /** One pluggable origin of graph data. `query()` may hit the backend or derive client-side. */

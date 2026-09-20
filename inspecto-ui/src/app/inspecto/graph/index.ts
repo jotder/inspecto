@@ -5,3 +5,4 @@ export * from './graph-export';
 export * from './graph-history';
 export * from './working-set-stats';
 export * from './domain-profile';
+export * from './graph-filter';

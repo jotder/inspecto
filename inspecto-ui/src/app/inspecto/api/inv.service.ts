@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
+import type { ConditionGroup } from '../query/query-types';
 
 /** One aggregated projection triple: a distinct (source, target[, kind]) pair with its folded row count. */
 export interface ProjectionTriple {
@@ -30,6 +31,8 @@ export interface ProjectionRequest {
     /** Extra columns to carry as per-edge attributes; differing values split a folded pair into separate rows. */
     attrCols?: string[];
     limit?: number;
+    /** Plan S1.4 — a structured predicate applied pre-fold. Ignored by the backend until the field lands. */
+    filter?: ConditionGroup;
 }
 
 /** {@code POST /inv/projection/neighbors} request — a mapping plus the entity value to expand. */
