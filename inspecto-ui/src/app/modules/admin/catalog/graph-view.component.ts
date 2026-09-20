@@ -40,6 +40,49 @@ export type EdgePattern = 'solid' | 'dashed' | 'dotted';
  * the base kind (the projection's folded `calls · 2` styles as `calls`). `null` = the built-in
  * defaults.
  */
+/**
+ * Opt-in canvas plugins and behaviors (Link Analysis's View toolbox, mockup review point 6). Each flag maps to
+ * a G6 v5 built-in — no new engine. `hulls` draws one hull per group (community id → member node ids).
+ */
+export interface GraphViewPlugins {
+    minimap?: boolean;
+    gridLine?: boolean;
+    fisheye?: boolean;
+    edgeFilterLens?: boolean;
+    edgeBundling?: boolean;
+    hulls?: Map<string, string[]> | null;
+    behaviors?: ('brush-select' | 'lasso-select' | 'hover-activate')[];
+}
+
+/** The G6 plugin list for a {@link GraphViewPlugins} — pure, so the mapping is unit-testable without a canvas. */
+export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
+    if (!p) return [];
+    const out: Record<string, unknown>[] = [];
+    if (p.minimap) out.push({ type: 'minimap', key: 'minimap', size: [160, 100], position: 'right-bottom' });
+    if (p.gridLine) out.push({ type: 'grid-line', key: 'grid-line', follow: true });
+    if (p.fisheye) out.push({ type: 'fisheye', key: 'fisheye', trigger: 'drag', r: 120, scaleRBy: 'wheel' });
+    if (p.edgeFilterLens) out.push({ type: 'edge-filter-lens', key: 'edge-filter-lens', trigger: 'drag', r: 90 });
+    if (p.edgeBundling) out.push({ type: 'edge-bundling', key: 'edge-bundling', bundleThreshold: 0.6 });
+    let i = 0;
+    for (const [group, members] of p.hulls ?? []) {
+        if (members.length < 2) continue;
+        const color = swatches[i++ % swatches.length];
+        out.push({
+            type: 'hull',
+            key: `hull-${group}`,
+            members,
+            corner: 'smooth',
+            padding: 14,
+            labelText: `community ${group}`,
+            fill: color,
+            fillOpacity: 0.08,
+            stroke: color,
+            strokeOpacity: 0.5,
+        });
+    }
+    return out;
+}
+
 export interface GraphDisplayOptions {
     nodeLabels: boolean;
     edgeLabels: boolean;
@@ -207,6 +250,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Input() tooltips = false;
     /** Graph layout; `null` = the default LR layered layout (the 4 existing hosts). */
     @Input() layout: GraphLayoutId | null = null;
+    /** Opt-in canvas plugins/behaviors (Link Analysis View toolbox); `null` = the four existing hosts' defaults. */
+    @Input() plugins: GraphViewPlugins | null = null;
     @Output() nodeClick = new EventEmitter<string>();
     @Output() edgeClick = new EventEmitter<string>();
 
@@ -379,16 +424,19 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 },
             },
             layout: layoutConfig(this.layout) as LayoutOptions,
-            behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element'],
-            plugins: this.tooltips
-                ? [
-                      {
-                          type: 'tooltip',
-                          trigger: 'hover',
-                          getContent: async (_e: unknown, items: ElementDatum[]) => this.tooltipHtml(items),
-                      },
-                  ]
-                : [],
+            behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element', ...(this.plugins?.behaviors ?? [])],
+            plugins: [
+                ...(this.tooltips
+                    ? [
+                          {
+                              type: 'tooltip',
+                              trigger: 'hover',
+                              getContent: async (_e: unknown, items: ElementDatum[]) => this.tooltipHtml(items),
+                          },
+                      ]
+                    : []),
+                ...(buildPluginList(this.plugins, ICON_COLOR_SWATCHES) as unknown as never[]),
+            ],
         });
         graph.on(NodeEvent.CLICK, (e) => {
             const id = (e as unknown as { target?: { id?: string } }).target?.id;

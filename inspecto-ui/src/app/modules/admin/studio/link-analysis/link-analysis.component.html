@@ -701,6 +701,7 @@
                             [display]="displayOptions()"
                             [tooltips]="true"
                             [layout]="layoutId()"
+                            [plugins]="canvasPlugins()"
                             (nodeClick)="onNodeClick($event)"
                             (edgeClick)="onEdgeClick($event)"
                         ></inspecto-graph-view>
@@ -836,6 +837,60 @@
                                 <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">
                                     Link labels
                                 </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().minimap"
+                                    (change)="toggleViewFlag('minimap', $event.checked)"
+                                >
+                                    Minimap
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().gridLine"
+                                    (change)="toggleViewFlag('gridLine', $event.checked)"
+                                >
+                                    Grid
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().hulls"
+                                    (change)="toggleViewFlag('hulls', $event.checked)"
+                                >
+                                    Community hulls
+                                    <span class="text-secondary text-xs">(Louvain)</span>
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().edgeBundling"
+                                    (change)="toggleViewFlag('edgeBundling', $event.checked)"
+                                >
+                                    Link bundling
+                                </mat-checkbox>
+                            </section>
+                            <section aria-label="Lenses and selection" class="flex flex-col">
+                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
+                                    Lenses &amp; selection
+                                </h3>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().fisheye"
+                                    (change)="toggleViewFlag('fisheye', $event.checked)"
+                                >
+                                    Fisheye lens <span class="text-secondary text-xs">(drag; wheel resizes)</span>
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().edgeFilterLens"
+                                    (change)="toggleViewFlag('edgeFilterLens', $event.checked)"
+                                >
+                                    Link filter lens <span class="text-secondary text-xs">(drag)</span>
+                                </mat-checkbox>
+                                @for (b of viewBehaviors; track b.id) {
+                                    <mat-checkbox
+                                        [checked]="hasBehavior(b.id)"
+                                        (change)="toggleBehavior(b.id, $event.checked)"
+                                    >
+                                        {{ b.label }} <span class="text-secondary text-xs">({{ b.hint }})</span>
+                                    </mat-checkbox>
+                                }
+                                <p class="text-secondary mt-1 text-[11px]">
+                                    Each item is an AntV G6 v5 built-in layout, behavior or plugin — the canvas engine
+                                    the studio already renders with.
+                                </p>
                             </section>
                         </div>
                     </div>

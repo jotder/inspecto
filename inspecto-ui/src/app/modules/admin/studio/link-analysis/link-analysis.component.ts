@@ -54,6 +54,7 @@ import {
     GraphSourceQuery,
     HistoryStack,
     collapseBranches,
+    louvainCommunities,
     descendants,
     filterByKinds,
     filterByTime,
@@ -104,6 +105,7 @@ import {
     GraphEmphasis,
     GraphLayoutId,
     GraphViewComponent,
+    GraphViewPlugins,
     baseEdgeKind,
 } from 'app/modules/admin/catalog/graph-view.component';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
@@ -113,7 +115,7 @@ import { ProjectedGraph } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
-import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
+import { LinkAnalysisService, LinkAnalysisView, LinkAnalysisViewOptions } from './link-analysis.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -241,6 +243,53 @@ export class LinkAnalysisComponent implements OnInit {
     readonly workingSetOpen = signal(true);
     /** The docks give the canvas their width in one step (and take it back). */
     readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
+
+    // ── View toolbox: canvas plugins and behaviors (each a G6 v5 built-in), persisted with a saved view ──
+    readonly viewOptions = signal<NonNullable<LinkAnalysisViewOptions['plugins']>>({
+        minimap: true,
+        behaviors: ['hover-activate'],
+    });
+    readonly canvasPlugins = computed<GraphViewPlugins>(() => {
+        const o = this.viewOptions();
+        return { ...o, hulls: o.hulls ? this.communityHulls() : null };
+    });
+    /** Louvain communities of the displayed graph as hull member lists; empty above the analysis cap. */
+    private readonly communityHulls = computed<Map<string, string[]>>(() => {
+        const g = this.displayed();
+        const out = new Map<string, string[]>();
+        if (!g) return out;
+        try {
+            for (const [node, community] of louvainCommunities(g))
+                out.set(community, [...(out.get(community) ?? []), node]);
+        } catch {
+            return out; // the cap is a refusal (spec §4.1) — no hulls rather than a throw in a template
+        }
+        return out;
+    });
+    readonly viewBehaviors: { id: NonNullable<GraphViewPlugins['behaviors']>[number]; label: string; hint: string }[] =
+        [
+            { id: 'hover-activate', label: 'Hover activate', hint: 'light up a node and its links' },
+            { id: 'brush-select', label: 'Brush select', hint: 'shift + drag a box' },
+            { id: 'lasso-select', label: 'Lasso select', hint: 'shift + free-hand' },
+        ];
+
+    toggleViewFlag(
+        flag: 'minimap' | 'gridLine' | 'fisheye' | 'edgeFilterLens' | 'edgeBundling' | 'hulls',
+        on: boolean,
+    ): void {
+        this.viewOptions.update((o) => ({ ...o, [flag]: on }));
+    }
+
+    toggleBehavior(id: NonNullable<GraphViewPlugins['behaviors']>[number], on: boolean): void {
+        this.viewOptions.update((o) => {
+            const rest = (o.behaviors ?? []).filter((b) => b !== id);
+            return { ...o, behaviors: on ? [...rest, id] : rest };
+        });
+    }
+
+    hasBehavior(id: NonNullable<GraphViewPlugins['behaviors']>[number]): boolean {
+        return (this.viewOptions().behaviors ?? []).includes(id);
+    }
 
     // ── query source (the form itself lives in the query-panel child) ──
     readonly sourceId = signal<GraphSourceId>('entity-projection');
@@ -1107,6 +1156,7 @@ export class LinkAnalysisComponent implements OnInit {
             display: this.displayOptions(), // styling travels with the view; reapplied on load
             layout: this.layoutId(),
             profile: this.profileId() === 'generic' ? undefined : this.profileId(),
+            view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
         };
         this.saving.set(true);
         try {
@@ -1127,6 +1177,9 @@ export class LinkAnalysisComponent implements OnInit {
         this.applyDisplay(view.display);
         this.layoutId.set(view.layout ?? 'dagre');
         this.profileControl.setValue(view.profile ?? 'generic');
+        if (view.view?.plugins) this.viewOptions.set(view.view.plugins);
+        this.legendOpen.set(view.view?.legend ?? true);
+        this.workingSetOpen.set(view.view?.workingSet ?? true);
         this.queryPanel?.patchFormFromView(view);
         await this.execute(view.sourceId, view.query);
     }

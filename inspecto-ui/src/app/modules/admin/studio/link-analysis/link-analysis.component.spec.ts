@@ -606,4 +606,34 @@ describe('LinkAnalysisComponent', () => {
         ]);
         expect(c.pushState()).toBe('0 links · from advanced search');
     });
+    it('view toolbox: plugin and behavior toggles build the canvas plugin set, hulls follow communities, and the view persists them', async () => {
+        const { fixture, save } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.canvasPlugins()).toEqual({ minimap: true, behaviors: ['hover-activate'], hulls: null });
+
+        c.toggleViewFlag('minimap', false);
+        c.toggleViewFlag('hulls', true);
+        c.toggleBehavior('brush-select', true);
+        c.toggleBehavior('hover-activate', false);
+        const p = c.canvasPlugins();
+        expect(p.minimap).toBe(false);
+        expect(p.behaviors).toEqual(['brush-select']);
+        expect([...p.hulls!.values()].map((m) => m.length).sort()).toEqual([2, 3]); // a–b–c and d–e
+
+        c.legendOpen.set(false);
+        c.saveForm.setValue({ name: 'Hulls', description: '' });
+        await c.saveView();
+        const saved = save.mock.calls[0][0] as LinkAnalysisView;
+        expect(saved.view).toEqual({
+            plugins: { minimap: false, hulls: true, behaviors: ['brush-select'] },
+            legend: false,
+            workingSet: true,
+        });
+
+        await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
+        expect(c.legendOpen()).toBe(true); // a view without options resets the overlays
+        expect(c.viewOptions().hulls).toBe(true); // …but keeps the plugin set the analyst last chose
+    });
 });

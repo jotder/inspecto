@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
 import { GraphSourceId, GraphSourceQuery, DomainProfileId } from 'app/inspecto/graph';
 import { SavedViewStore } from 'app/inspecto/investigation';
-import { GraphDisplayOptions, GraphLayoutId } from 'app/modules/admin/catalog/graph-view.component';
+import { GraphDisplayOptions, GraphLayoutId, GraphViewPlugins } from 'app/modules/admin/catalog/graph-view.component';
 
 /**
  * A saved investigation — a **Link-Analysis View** (GLOSSARY §11), persisted as the
@@ -23,6 +23,14 @@ export interface LinkAnalysisView {
     layout?: GraphLayoutId;
     /** The domain profile shaping statistics and suggested tools; absent = generic. */
     profile?: DomainProfileId;
+    /** View toolbox state: canvas plugins/behaviors and which overlays are open; absent = defaults. */
+    view?: LinkAnalysisViewOptions;
+}
+
+export interface LinkAnalysisViewOptions {
+    plugins?: Omit<GraphViewPlugins, 'hulls'> & { hulls?: boolean };
+    legend?: boolean;
+    workingSet?: boolean;
 }
 
 /** View store — a thin kind/codec binding over the shared {@link SavedViewStore}. */
@@ -59,6 +67,7 @@ function toContent(v: LinkAnalysisView): Record<string, unknown> {
         display: v.display,
         layout: v.layout,
         profile: v.profile,
+        view: v.view,
     };
 }
 
@@ -71,6 +80,7 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         display?: GraphDisplayOptions;
         layout?: GraphLayoutId;
         profile?: DomainProfileId;
+        view?: LinkAnalysisViewOptions;
     };
     return {
         id,
@@ -81,5 +91,6 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         display: c.display,
         layout: c.layout,
         profile: c.profile,
+        view: c.view,
     };
 }
