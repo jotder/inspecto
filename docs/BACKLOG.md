@@ -3104,8 +3104,64 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   to `dataset != null && maximumAge == null` because BOTH shapes use `dataset:`, so the skip had to be
   stated separately. ⛔ **A compile is not a verification**, and a worktree cannot supply one here
   (`REACTOR-HALT-IS-A-SILENT-PASS-1`).
-  ⚠ **Still open:** the once-a-minute dedicated thread (the existing `alert.evaluate` Job is today's
-  cadence seam) · owner-routed alerting · duckle **S2** retention · the Catalog Dataset badge (UI).
+  ✅ **ALL FOUR RESIDUALS TRIAGED 2026-09-20; one of them BUILT.** Verdicts, in the order they were listed:
+
+  1. ✅ **The once-a-minute dedicated thread — REFUTED and CLOSED, replaced by a narrower sweep.** The
+  constraint duckle wrote ("on its own thread, not the scheduler's") is already met without a thread:
+  `AlertEvaluateJob:33` is the cadence seam, `CronExpression:16-20` accepts a minute field so
+  `* * * * *` is legal today, and the Job body runs on `JobService:135`'s virtual-thread executor —
+  `Scheduler:46`'s two `inspecto-scheduler` threads only TRIGGER, so a long sweep never blocks the
+  timer, and a fire landing on an in-flight run records SKIPPED (`JobService:66-68`). ⛔ **A dedicated
+  thread would duplicate a cadence that already exists, which is worse than none.**
+  🔴 **What the minute cadence actually cost was SCOPE, not threading** — and that is now fixed.
+  `evaluateRules()` also runs the full per-pipeline ledger pass (`AlertService:226-249`, one
+  `status.batches(cfg)` read per Pipeline), so putting it on a one-minute timer to compare a clock
+  re-read every Pipeline's ledger 60× an hour. **SHIPPED 2026-09-20:**
+  `AlertService.evaluateFreshnessRules()` (freshness pass only, still fires/cools down/clears — narrower,
+  not gentler) · `AlertAccess.evaluateFreshnessRules()` (a **default** that answers with the FULL sweep, so
+  a stand-in without a narrow form does more rather than less and can never answer with a silence it did
+  not earn) · `alert.evaluate` gains `scope: freshness`; any other value and none keep today's behaviour
+  exactly. Pinned by `FreshnessAlertTest` 11/11 — the new cases assert **zero** ledger reads through a
+  counting `StatusStore`, that the grant does not widen the sweep, and that an absent engine still fails
+  loudly. ⚠ The one residue is **ownership, not threading**: nothing forces a `maximumAge` rule to have a
+  minute-cadence instance armed. Auto-arming one when a freshness rule exists is the follow-up, and it is a
+  scheduling-policy question, not a thread.
+  2. ⛔ **Owner-routed alerting — STILL BLOCKED, and the "blocker is answered" clause above overstates
+  what was decided.** The 2026-09-15 operator decision settled the *design* (owner = the authenticated
+  `Subject`, `"appUser"` where none), and that remains the answer — ⛔ do not re-open it. But the
+  *substrate* is absent and the decision did not create it: `AlertRule:60-62` has no owner component;
+  `NotificationRule:112-113` still hardcodes the recipient; `ChannelConfig:23-24` routes by a flat
+  `target`, with no per-owner destination. 🔴 **And the decision does not reach this code path at all** —
+  `Subject` (`Subject.java:26`) is attached per HTTP request by `ControlApi#dispatch` and is "absent
+  entirely on Personal edition", whereas Alert Rules are loaded from config at service construction
+  (`CollectorService:340-353`) and evaluated on a background sweep with no exchange. ⇒ there is no moment
+  at which a `Subject` could be captured for a config-authored rule. **This is a multi-seam design pass
+  (record + notification routing + a capture point), not a residual of this row.**
+  3. ⚠ **duckle S2 retention — IN SCOPE, still open, and the stated harm is RESTATED.**
+  `duckle-concepts-candidates.md:74` explicitly rules that S2 stays attached to C1 rather than being
+  ranked separately, and it has no row of its own — ⛔ filing one would reproduce the "retrofit the
+  exemption afterwards" order that line warns against. 🔴 **But S2's stated harm cannot occur here.** It
+  was filed as a false breach ("a 30-day window reports a 90-day SLA breached 45 days early"), which
+  would need the evaluator to read a pruned absence as *stale*; `DatasetFreshnessProbe:46-50` answers
+  **unknown** and `AlertService.evaluateFreshness` returns **silently**. ⇒ the real defect is the
+  opposite one: after `EventPruneTask` drops the day-partition holding a Dataset's last publication
+  **and** the process restarts, a genuine breach becomes invisible. Under-reporting, not a false alarm.
+  ⚠ It is also **not a flag**: `EventPruneTask:32-34` deletes whole `level/year/month/day` partitions, so
+  a per-Dataset exemption is not expressible in that shape — honouring S2 needs a durable last-publication
+  record or a prune floor. Carry it as a C1 acceptance criterion, not as buildable work.
+  4. ⚠ **The Catalog Dataset badge (UI) — BUILDABLE NOW, not built this pass; the path is grounded.**
+  ⛔ It does **not** need the in-memory state persisted, so `stale-tiles.ts:1-34` is honoured rather than
+  breached: the `dataset.write` Signal is already durable in the event store — `DatasetFreshnessProbe` is
+  a cache over it, not the record — so the badge **derives** at read time exactly as that objection
+  demands. `GET /signals?type=dataset.write&source=dataset:<id>` already serves it
+  (`SignalRoutes.java:80-93`; `DatasetWriteSignal:82-84` sets the compact `dataset:<id>` join key), and
+  `EventsService.signals` already calls that type (`dashboard-editor.component.ts:321`), needing only a
+  `source` filter added. ⚠ **Two real traps for whoever builds it:** `type`/`source` are **post-filters
+  over the store page**, so `limit=1` usually returns `[]` and a busy ledger can push the target off the
+  page — failing to *unknown*, the same safe direction the probe chose. ⚠ Note the Dataset list is a
+  registry surface (`modules/admin/studio/datasets/`), **not** the Catalog module, and `latestRunTime`
+  stays unavailable (`CatalogOverlay:54-62` maps `DATASET` to `OperationalOverlay.NONE`) — the badge must
+  come from the Signal, never from the overlay. Render through `<inspecto-status-badge>`.
   ⚠ Pre-existing and untouched: `ConfigSpecs.alert()` marks `metric`/`threshold`/`window` **required**,
   which a freshness rule omits — exactly as a BI-5 measure rule already does. The flat `alert-rule`
   component is written through `AlertRoutes`, not `/config/write`, so that required-ness never gates it;

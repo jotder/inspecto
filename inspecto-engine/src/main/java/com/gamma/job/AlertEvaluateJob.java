@@ -64,7 +64,13 @@ final class AlertEvaluateJob implements Job {
                         + "Service, which is not available in this build"));
 
         String only = ctx.params().get("rule");
-        List<Alert> fired = alerts.evaluateRules();
+        // DUCKLE-C1: `scope: freshness` narrows the sweep to the Dataset maximumAge rules. This is what
+        // a once-a-minute instance arms — the default sweep also re-reads every pipeline's ledger, a
+        // price worth paying hourly and not sixty times an hour for a clock comparison. Any other value
+        // (and none) means the full sweep, so an unset scope keeps today's behaviour exactly.
+        String scope = ctx.params().get("scope");
+        boolean freshnessOnly = scope != null && "freshness".equalsIgnoreCase(scope.trim());
+        List<Alert> fired = freshnessOnly ? alerts.evaluateFreshnessRules() : alerts.evaluateRules();
         if (only != null && !only.isBlank())
             fired = fired.stream().filter(a -> only.equalsIgnoreCase(a.rule())).toList();
 
@@ -74,6 +80,7 @@ final class AlertEvaluateJob implements Job {
         payload.put("fired", fired.size());
         payload.put("rules", names);
         if (only != null && !only.isBlank()) payload.put("scopedTo", only);
+        if (freshnessOnly) payload.put("scope", "freshness");
         // WARN when something breached, so the Run itself is visible in the feed — the Alert/Incident
         // objects are opened by the Alert engine, not here.
         ctx.signals().emit("alert.evaluate.completed",

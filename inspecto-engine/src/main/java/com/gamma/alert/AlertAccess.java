@@ -38,15 +38,40 @@ public interface AlertAccess {
      */
     List<Alert> evaluateRules();
 
+    /**
+     * DUCKLE-C1 — evaluate only the Dataset <b>freshness</b> ({@code maximumAge}) rules.
+     *
+     * <p>This is what a minute-cadence {@code alert.evaluate} instance should call. The full sweep
+     * also re-reads every pipeline's ledger, which is the wrong price to pay sixty times an hour for a
+     * clock comparison; see {@link AlertService#evaluateFreshnessRules()} for why this is a narrower
+     * sweep and not a dedicated thread.
+     *
+     * <p>⚠ The default answers with the <b>full</b> sweep. Narrowing is an optimization, not a change
+     * of meaning — every freshness rule is evaluated either way — so an implementation without a
+     * narrower form (a dry-run stand-in, a test double) stays correct by doing more, never less.
+     */
+    default List<Alert> evaluateFreshnessRules() {
+        return evaluateRules();
+    }
+
     /** The production implementation over an {@link AlertService}, resolved lazily so boot wiring can
      *  register the service before the Alert engine is constructed. An absent engine fails loudly:
      *  evaluation is the whole work, so reporting success would report health that was never checked. */
     static AlertAccess over(Supplier<AlertService> alerts) {
-        return () -> {
-            AlertService svc = alerts.get();
-            if (svc == null)
-                throw new IllegalStateException("the alerts Platform Service has no Alert engine in this space");
-            return svc.evaluateRules();
+        return new AlertAccess() {
+            @Override public List<Alert> evaluateRules() {
+                return engine().evaluateRules();
+            }
+            @Override public List<Alert> evaluateFreshnessRules() {
+                return engine().evaluateFreshnessRules();
+            }
+            private AlertService engine() {
+                AlertService svc = alerts.get();
+                if (svc == null)
+                    throw new IllegalStateException(
+                            "the alerts Platform Service has no Alert engine in this space");
+                return svc;
+            }
         };
     }
 }

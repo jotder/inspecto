@@ -200,6 +200,37 @@ public final class AlertService {
     }
 
     /**
+     * DUCKLE-C1 — the <b>freshness-only</b> sweep: evaluate just the {@code maximumAge} rules and
+     * nothing else.
+     *
+     * <h3>Why this exists instead of a dedicated once-a-minute thread</h3>
+     * The duckle source asked for freshness to be evaluated "once a minute on its own thread, not the
+     * scheduler's". In this codebase that constraint is already met without a thread: the
+     * {@code alert.evaluate} Job is the cadence seam, its cron reaches one minute
+     * ({@code * * * * *}), and the Job body runs on {@code JobService}'s virtual-thread executor — the
+     * two {@code inspecto-scheduler} threads only TRIGGER, so a long sweep never blocks the timer. A
+     * dedicated thread would duplicate a cadence that already exists, which is worse than none.
+     *
+     * <p>What the minute cadence genuinely cost was not threading but <b>scope</b>:
+     * {@link #evaluateRules()} also runs the measure pass and the full per-pipeline ledger pass — one
+     * {@code status.batches(cfg)} read for EVERY pipeline — so putting it on a one-minute timer to
+     * check a Dataset's age re-read every pipeline's ledger 60× an hour. This entry point removes that
+     * cost rather than moving it to another thread.
+     *
+     * <p>⚠ It is deliberately <b>not</b> a preview: like the full sweep it fires, advances cooldowns
+     * and emits the all-clear. It is narrower, not gentler.
+     */
+    public synchronized List<Alert> evaluateFreshnessRules() {
+        long nowMs = System.currentTimeMillis();
+        List<Alert> out = new ArrayList<>();
+        for (AlertRule rule : rules) {
+            if (!rule.isFreshnessRule()) continue;
+            evaluateFreshness(rule, nowMs, out);
+        }
+        return out;
+    }
+
+    /**
      * Evaluate rules; {@code pipelineFilter} (a pipeline's display or normalized name) restricts to
      * one pipeline's ledger, {@code null} sweeps all. Returns the alerts fired by this pass.
      */

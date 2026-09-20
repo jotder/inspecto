@@ -571,7 +571,12 @@ public final class JobService implements AutoCloseable {
                 "Evaluates this space's Alert Rules on a schedule. A breaching error/critical rule opens an "
                         + "Incident (AlertService promotes it); lower severities stay Alerts.",
                 List.of(ParameterDecl.of("rule", ParamType.STRING).label("Only this rule")
-                        .description("Evaluate a single Alert Rule by name; every rule when unset").build()),
+                        .description("Evaluate a single Alert Rule by name; every rule when unset").build(),
+                        ParameterDecl.of("scope", ParamType.STRING).label("Sweep scope")
+                                .description("'freshness' evaluates only the Dataset maximumAge rules — "
+                                        + "what a once-a-minute instance should arm, since the full sweep "
+                                        + "also re-reads every pipeline's ledger. Unset = every rule.")
+                                .build()),
                 List.of("alert.evaluate.completed"), List.of(), List.of("alerts")),
                 c -> new AlertEvaluateJob(c)));
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds
