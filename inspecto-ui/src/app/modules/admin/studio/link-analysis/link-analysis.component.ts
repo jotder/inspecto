@@ -85,6 +85,14 @@ import {
     LinkAnalysisAdvancedSearchDialog,
     LinkAnalysisAdvancedSearchData,
 } from './link-analysis-advanced-search.dialog';
+import {
+    AttachCaseDialogData,
+    LinkAnalysisAttachCaseDialog,
+    LinkAnalysisSnapshotDialog,
+    SnapshotDialogData,
+} from './link-analysis-evidence.dialogs';
+import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
+import { GraphSnapshot } from 'app/inspecto/graph';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 import { NodeKind } from 'app/inspecto/api';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
@@ -220,6 +228,10 @@ export class LinkAnalysisComponent implements OnInit {
     private datasetsService = inject(DatasetsService);
     private pipelinesService = inject(PipelinesService);
     private viewsService = inject(LinkAnalysisService);
+    /** Evidence snapshots (UI-first, session-scoped — see the service). */
+    readonly snapshots = inject(LinkAnalysisSnapshotsService);
+    /** The most recent snapshot of the current graph, if any — what Attach to Case offers first. */
+    readonly latestSnapshot = signal<GraphSnapshot | null>(null);
 
     readonly sources = this.graphSources.sources;
 
@@ -627,6 +639,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.timeColumn.set('');
         this.timeCutoff.set(null);
         this.localFilter.set(null);
+        this.latestSnapshot.set(null);
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         try {
@@ -701,6 +714,59 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.pushing.set(false);
         }
+    }
+
+    // ── evidence: snapshot the answer, attach it to a Case (spec §3.6 / plan S1.3, UI first) ──
+
+    private snapshotData(): SnapshotDialogData | null {
+        const g = this.displayed();
+        const run = this.lastRun();
+        if (!g || !run) return null;
+        const p = run.query.projection;
+        return {
+            graph: g,
+            predicate: run.query.filter ?? this.localFilter() ?? null,
+            origin: { sourceId: run.sourceId, dataset: p?.datasetId, query: run.query },
+            layout: this.layoutId(),
+            suggestedTitle: `${this.sourceLabel()} — ${g.nodes.filter((n) => !n.data.missing).length} nodes`,
+        };
+    }
+
+    /** Freeze the displayed graph as a snapshot; resolves with it (or undefined when cancelled). */
+    openSnapshot(): Promise<GraphSnapshot | undefined> {
+        const data = this.snapshotData();
+        if (!data) return Promise.resolve(undefined);
+        return new Promise((resolve) =>
+            this.dialog
+                .open<LinkAnalysisSnapshotDialog, SnapshotDialogData, GraphSnapshot | undefined>(
+                    LinkAnalysisSnapshotDialog,
+                    { data, width: '36rem' },
+                )
+                .afterClosed()
+                .subscribe((snap) => {
+                    if (snap) {
+                        this.latestSnapshot.set(snap);
+                        this.toastr.success(`Snapshot “${snap.title}” saved (${snap.manifestHash.slice(0, 12)}…).`);
+                    }
+                    resolve(snap ?? undefined);
+                }),
+        );
+    }
+
+    /** Attach the latest snapshot to a Case — taking one first when the graph has not been frozen yet. */
+    async openAttachToCase(): Promise<void> {
+        const snapshot = this.latestSnapshot() ?? (await this.openSnapshot());
+        if (!snapshot) return;
+        const data: AttachCaseDialogData = { snapshot };
+        this.dialog
+            .open<LinkAnalysisAttachCaseDialog, AttachCaseDialogData, { caseId: string } | undefined>(
+                LinkAnalysisAttachCaseDialog,
+                { data, width: '36rem' },
+            )
+            .afterClosed()
+            .subscribe((r) => {
+                if (r) this.toastr.success(`Attached “${snapshot.title}” to ${r.caseId}.`);
+            });
     }
 
     /**

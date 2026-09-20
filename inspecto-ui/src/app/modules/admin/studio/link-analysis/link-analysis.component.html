@@ -183,6 +183,31 @@
                     </mat-menu>
                 }
 
+                <!-- evidence: snapshot the answer, attach it to a Case (spec §3.6) -->
+                <button
+                    mat-icon-button
+                    (click)="openSnapshot()"
+                    matTooltip="Snapshot this graph as evidence"
+                    aria-label="Snapshot this graph as evidence"
+                >
+                    <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
+                </button>
+                <button
+                    mat-stroked-button
+                    class="!min-h-0 !px-2 !py-1 text-xs"
+                    (click)="openAttachToCase()"
+                    [matTooltip]="
+                        latestSnapshot() ? 'Attach the latest snapshot to a Case' : 'Snapshot first, then attach'
+                    "
+                    aria-label="Attach to Case"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:paper-clip"></mat-icon>
+                    Attach to Case
+                    @if (snapshots.count(); as n) {
+                        <span class="text-secondary ml-1">· {{ n }}</span>
+                    }
+                </button>
+                <span class="mx-1 h-5 w-px" style="background: var(--gamma-border)"></span>
                 <!-- graph-algorithms toolbox (opens the right dock's Analysis tab) -->
                 <button
                     mat-icon-button

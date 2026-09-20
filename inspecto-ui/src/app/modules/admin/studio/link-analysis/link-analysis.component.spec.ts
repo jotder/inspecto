@@ -636,4 +636,31 @@ describe('LinkAnalysisComponent', () => {
         expect(c.legendOpen()).toBe(true); // a view without options resets the overlays
         expect(c.viewOptions().hulls).toBe(true); // …but keeps the plugin set the analyst last chose
     });
+    it('evidence: snapshot freezes the displayed graph (stranded excluded) and Attach to Case snapshots first when none exists', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        const snap = { id: 'snp-1', title: 'T', manifestHash: 'abcdef0123456789', attachedTo: [] };
+        const open = vi
+            .spyOn(dialog, 'open')
+            .mockReturnValueOnce({ afterClosed: () => of(snap) } as never) // the snapshot dialog
+            .mockReturnValueOnce({ afterClosed: () => of({ caseId: 'CASE-1' }) } as never); // the attach dialog
+
+        expect(c.latestSnapshot()).toBeNull();
+        await c.openAttachToCase();
+        expect(open).toHaveBeenCalledTimes(2);
+        const snapData = (
+            open.mock.calls[0] as unknown as [unknown, { data: { graph: G6GraphData; origin: unknown } }]
+        )[1].data;
+        expect(snapData.graph.nodes).toHaveLength(5);
+        expect(snapData.origin).toMatchObject({ sourceId: 'entity-projection', dataset: 'links-ds' });
+        const attachData = (open.mock.calls[1] as unknown as [unknown, { data: { snapshot: unknown } }])[1].data;
+        expect(attachData.snapshot).toBe(snap);
+        expect(c.latestSnapshot()).toBe(snap);
+
+        await runQuery(fixture); // a fresh graph is a new answer — the old snapshot no longer describes it
+        expect(c.latestSnapshot()).toBeNull();
+    });
 });

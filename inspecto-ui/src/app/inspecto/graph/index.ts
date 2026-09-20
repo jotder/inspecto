@@ -6,3 +6,4 @@ export * from './graph-history';
 export * from './working-set-stats';
 export * from './domain-profile';
 export * from './graph-filter';
+export * from './graph-snapshot';
