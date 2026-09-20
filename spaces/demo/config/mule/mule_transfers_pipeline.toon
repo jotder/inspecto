@@ -1,0 +1,39 @@
+name: mule_transfers
+active: true
+description: "Link Analysis demo feed — account-to-account transfers with a planted money-mule layering ring (structuring, pass-through, circular financing). Synthetic; regenerate with data/samples/gen-link-analysis-demos.py."
+
+dirs:
+  poll:       spaces/demo/data/inbox/mule_transfers
+  database:   spaces/demo/data/mule_transfers/database
+  backup:     spaces/demo/data/mule_transfers/backup
+  temp:       spaces/demo/data/mule_transfers/temp
+  errors:     spaces/demo/data/mule_transfers/errors
+  quarantine: spaces/demo/data/mule_transfers/quarantine
+  markers:    spaces/demo/data/mule_transfers/markers
+  status_dir: spaces/demo/data/mule_transfers/status
+  log_dir:    spaces/demo/data/mule_transfers/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/demo/config/mule/mule_transfers_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  gap_detection:
+    enabled: true
+    sequence: "TRANSFERS_{yyyyMMdd}"

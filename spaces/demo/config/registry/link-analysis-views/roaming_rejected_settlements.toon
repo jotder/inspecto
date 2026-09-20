@@ -1,0 +1,24 @@
+name: roaming_rejected_settlements
+description: "DEMO 1b — Revenue leakage: the same partner graph narrowed by a saved predicate to REJECTED settlements. Kestrel Telecom's TAP files are rejected ~40% of the time; the predicate travels with the view (two-stage loop: Apply locally is free, Push to server re-projects the Dataset once the backend accepts the filter). Then switch to the IMSI view for the impossible traveller (001010000000042 on four visited networks in three days)."
+sourceId: entity-projection
+layout: force
+profile: telecom
+query:
+  projection:
+    datasetId: roaming_tap_dataset
+    sourceCol: SENDER_NAME
+    targetCol: RECIPIENT_NAME
+    linkKindCol: EVENT_TYPE
+    attrCols[3]: EVENT_AT,CHARGE_SDR,SETTLEMENT_STATUS
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,SETTLEMENT_STATUS,"=",REJECTED
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

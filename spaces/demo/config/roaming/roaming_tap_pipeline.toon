@@ -1,0 +1,39 @@
+name: roaming_tap
+active: true
+description: "Link Analysis demo feed — inter-operator roaming (TAP) charge records between partner operators. Synthetic; regenerate with data/samples/gen-link-analysis-demos.py."
+
+dirs:
+  poll:       spaces/demo/data/inbox/roaming_tap
+  database:   spaces/demo/data/roaming_tap/database
+  backup:     spaces/demo/data/roaming_tap/backup
+  temp:       spaces/demo/data/roaming_tap/temp
+  errors:     spaces/demo/data/roaming_tap/errors
+  quarantine: spaces/demo/data/roaming_tap/quarantine
+  markers:    spaces/demo/data/roaming_tap/markers
+  status_dir: spaces/demo/data/roaming_tap/status
+  log_dir:    spaces/demo/data/roaming_tap/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/demo/config/roaming/roaming_tap_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  gap_detection:
+    enabled: true
+    sequence: "TAP_{yyyyMMdd}"

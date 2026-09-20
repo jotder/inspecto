@@ -1,0 +1,19 @@
+name: mule_layering_ring
+description: "DEMO 2 — Money-mule layering ring: accounts linked by transfers, links folded per (payer, payee, channel), width = transfer count, Σ AMOUNT in the Working set. Planted inside ~1 800 ordinary transfers: 12 SMURF accounts each place four cash deposits just under 1 000 into MULE-HUB-01 (structuring), the hub wires 98% within hours to RELAY-01/02, which move it on by crypto to OFFSHORE-77 (pass-through); and SHELL-A→B→C→D→A circulate 24 000 with a 2.5% decay per hop (circular financing). Run Pattern match with the layering-chain, pass-through, inbound-collector and circular-flow packs; Suspicion score ranks the hub first; Communities separates the ring from the noise."
+sourceId: entity-projection
+layout: force
+profile: finance
+query:
+  projection:
+    datasetId: mule_transfers_dataset
+    sourceCol: PAYER_ACCOUNT
+    targetCol: PAYEE_ACCOUNT
+    linkKindCol: CHANNEL
+    attrCols[3]: BOOKED_AT,AMOUNT,PAYEE_COUNTRY
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

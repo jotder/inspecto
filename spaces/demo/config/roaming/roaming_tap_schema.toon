@@ -1,0 +1,61 @@
+partitionKey: EVENT_DATE
+raw:
+  name: TAP
+  format: CSV
+  fields[13]{name,selector,type}:
+    TAP_FILE_ID,"0",VARCHAR
+    SENDER_PLMN,"1",VARCHAR
+    SENDER_NAME,"2",VARCHAR
+    RECIPIENT_PLMN,"3",VARCHAR
+    RECIPIENT_NAME,"4",VARCHAR
+    EVENT_TYPE,"5",VARCHAR
+    IMSI,"6",VARCHAR
+    CHARGED_UNITS,"7",DOUBLE
+    CHARGE_SDR,"8",DOUBLE
+    TAX_SDR,"9",DOUBLE
+    EVENT_DATE,"10",DATE
+    EVENT_AT,"11",TIMESTAMP
+    SETTLEMENT_STATUS,"12",VARCHAR
+mapping:
+  canonicalName: roaming_tap
+  rawName: TAP
+  fields[13]:
+    - name: TAP_FILE_ID
+      from: TAP_FILE_ID
+      fn: keep
+    - name: SENDER_PLMN
+      from: SENDER_PLMN
+      fn: keep
+    - name: SENDER_NAME
+      from: SENDER_NAME
+      fn: keep
+    - name: RECIPIENT_PLMN
+      from: RECIPIENT_PLMN
+      fn: keep
+    - name: RECIPIENT_NAME
+      from: RECIPIENT_NAME
+      fn: keep
+    - name: EVENT_TYPE
+      from: EVENT_TYPE
+      fn: keep
+    - name: IMSI
+      from: IMSI
+      fn: keep
+    - name: CHARGED_UNITS
+      from: CHARGED_UNITS
+      fn: keep
+    - name: CHARGE_SDR
+      from: CHARGE_SDR
+      fn: keep
+    - name: TAX_SDR
+      from: TAX_SDR
+      fn: keep
+    - name: EVENT_DATE
+      from: EVENT_DATE
+      fn: keep
+    - name: EVENT_AT
+      from: EVENT_AT
+      fn: keep
+    - name: SETTLEMENT_STATUS
+      from: SETTLEMENT_STATUS
+      fn: keep

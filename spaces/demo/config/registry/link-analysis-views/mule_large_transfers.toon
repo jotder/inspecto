@@ -1,0 +1,23 @@
+name: mule_large_transfers
+description: "DEMO 2b — The ring without the noise: the same transfer graph narrowed by a saved predicate to AMOUNT ≥ 5 000. Ordinary transfers are a long tail under 3 000, so only the hub → relay wires, the relay → offshore crypto legs and the shell loop survive; the smurf deposits (each under 1 000) vanish — which is exactly what structuring is designed to do, so compare with DEMO 2. Cycles finds the shell loop; Shortest path from SMURF-01 to OFFSHORE-77 on the unfiltered view shows the three-hop layering chain."
+sourceId: entity-projection
+layout: dagre
+profile: finance
+query:
+  projection:
+    datasetId: mule_transfers_dataset
+    sourceCol: PAYER_ACCOUNT
+    targetCol: PAYEE_ACCOUNT
+    linkKindCol: CHANNEL
+    attrCols[3]: BOOKED_AT,AMOUNT,PAYEE_COUNTRY
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,AMOUNT,">=","5000"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    behaviors[1]: hover-activate

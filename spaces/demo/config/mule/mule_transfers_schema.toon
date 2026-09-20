@@ -1,0 +1,49 @@
+partitionKey: BOOKED_DATE
+raw:
+  name: TRANSFERS
+  format: CSV
+  fields[10]{name,selector,type}:
+    TRANSFER_ID,"0",VARCHAR
+    PAYER_ACCOUNT,"1",VARCHAR
+    PAYEE_ACCOUNT,"2",VARCHAR
+    CHANNEL,"3",VARCHAR
+    AMOUNT,"4",DOUBLE
+    CURRENCY,"5",VARCHAR
+    PAYER_COUNTRY,"6",VARCHAR
+    PAYEE_COUNTRY,"7",VARCHAR
+    BOOKED_DATE,"8",DATE
+    BOOKED_AT,"9",TIMESTAMP
+mapping:
+  canonicalName: mule_transfers
+  rawName: TRANSFERS
+  fields[10]:
+    - name: TRANSFER_ID
+      from: TRANSFER_ID
+      fn: keep
+    - name: PAYER_ACCOUNT
+      from: PAYER_ACCOUNT
+      fn: keep
+    - name: PAYEE_ACCOUNT
+      from: PAYEE_ACCOUNT
+      fn: keep
+    - name: CHANNEL
+      from: CHANNEL
+      fn: keep
+    - name: AMOUNT
+      from: AMOUNT
+      fn: keep
+    - name: CURRENCY
+      from: CURRENCY
+      fn: keep
+    - name: PAYER_COUNTRY
+      from: PAYER_COUNTRY
+      fn: keep
+    - name: PAYEE_COUNTRY
+      from: PAYEE_COUNTRY
+      fn: keep
+    - name: BOOKED_DATE
+      from: BOOKED_DATE
+      fn: keep
+    - name: BOOKED_AT
+      from: BOOKED_AT
+      fn: keep

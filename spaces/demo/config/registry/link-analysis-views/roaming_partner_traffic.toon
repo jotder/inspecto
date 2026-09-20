@@ -1,0 +1,18 @@
+name: roaming_partner_traffic
+description: "DEMO 1 — Revenue assurance: which partner operators exchange roaming traffic, how much, and where the charges look wrong. Links fold TAP records per (visited, home, event type); width = record count, Σ CHARGE_SDR in the Working set. Look for the Aurora Telecom ← Northwind Mobile GPRS link (billed at 3.2× the agreed rate) and the Quartz↔Fjord backbone (Flow & backbone, Cut points)."
+sourceId: entity-projection
+layout: circular
+profile: telecom
+query:
+  projection:
+    datasetId: roaming_tap_dataset
+    sourceCol: SENDER_NAME
+    targetCol: RECIPIENT_NAME
+    linkKindCol: EVENT_TYPE
+    attrCols[3]: EVENT_AT,CHARGE_SDR,SETTLEMENT_STATUS
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    behaviors[1]: hover-activate
