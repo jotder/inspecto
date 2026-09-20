@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
-import { GraphSourceId, GraphSourceQuery } from 'app/inspecto/graph';
+import { GraphSourceId, GraphSourceQuery, DomainProfileId } from 'app/inspecto/graph';
 import { SavedViewStore } from 'app/inspecto/investigation';
 import { GraphDisplayOptions, GraphLayoutId } from 'app/modules/admin/catalog/graph-view.component';
 
@@ -21,6 +21,8 @@ export interface LinkAnalysisView {
     display?: GraphDisplayOptions;
     /** The chosen graph layout; absent = the default layered layout. */
     layout?: GraphLayoutId;
+    /** The domain profile shaping statistics and suggested tools; absent = generic. */
+    profile?: DomainProfileId;
 }
 
 /** View store — a thin kind/codec binding over the shared {@link SavedViewStore}. */
@@ -56,6 +58,7 @@ function toContent(v: LinkAnalysisView): Record<string, unknown> {
         query: v.query,
         display: v.display,
         layout: v.layout,
+        profile: v.profile,
     };
 }
 
@@ -67,6 +70,7 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         query?: GraphSourceQuery;
         display?: GraphDisplayOptions;
         layout?: GraphLayoutId;
+        profile?: DomainProfileId;
     };
     return {
         id,
@@ -76,5 +80,6 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         query: c.query ?? {},
         display: c.display,
         layout: c.layout,
+        profile: c.profile,
     };
 }

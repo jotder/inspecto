@@ -16,6 +16,15 @@
                 @if (toolBadge(t.id); as badge) {
                     <inspecto-chip class="whitespace-nowrap">{{ badge }}</inspecto-chip>
                 }
+                @if (suggested().includes(t.id)) {
+                    <inspecto-chip
+                        class="whitespace-nowrap"
+                        variant="soft"
+                        tone="primary"
+                        title="Foregrounded by the selected domain profile"
+                        >suggested</inspecto-chip
+                    >
+                }
                 <mat-icon
                     class="icon-size-4 ml-auto shrink-0"
                     [svgIcon]="tab() === t.id ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"

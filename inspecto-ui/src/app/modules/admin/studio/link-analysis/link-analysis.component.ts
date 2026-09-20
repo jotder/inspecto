@@ -8,7 +8,15 @@ import {
     inject,
     signal,
 } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl, ValidatorFn } from '@angular/forms';
+import {
+    FormBuilder,
+    FormControl,
+    ReactiveFormsModule,
+    Validators,
+    AbstractControl,
+    ValidatorFn,
+} from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -57,7 +65,22 @@ import {
     searchNodes,
     toGraphml,
     undo as undoHistory,
+    workingSetStats,
+    DOMAIN_PROFILES,
+    DomainProfileId,
+    attrColumns,
+    domainProfile,
+    workingSetOptionsFor,
 } from 'app/inspecto/graph';
+import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
+import { NodeKind } from 'app/inspecto/api';
+import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
+import { nodeColor } from 'app/modules/admin/catalog/catalog-graph';
+import {
+    LegendItem,
+    LinkAnalysisLegendComponent,
+    LinkAnalysisWorkingSetComponent,
+} from './link-analysis-overlays.component';
 import { ICON_COLOR_SWATCHES } from 'app/inspecto/theme/chart-tokens';
 import {
     EdgePattern,
@@ -142,6 +165,10 @@ interface PresentationSnapshot {
         TransferMenuComponent,
         LinkAnalysisToolboxComponent,
         LinkAnalysisQueryPanelComponent,
+        LinkAnalysisLegendComponent,
+        LinkAnalysisWorkingSetComponent,
+        InspectoSplitDirective,
+        InspectoOptionPickerComponent,
         AiExplainComponent,
     ],
     templateUrl: './link-analysis.component.html',
@@ -188,9 +215,19 @@ export class LinkAnalysisComponent implements OnInit {
     @ViewChild('canvasZone') private canvasZone?: ElementRef<HTMLElement>;
     @ViewChild('saveTrigger') private saveTrigger?: MatMenuTrigger;
 
-    // ── workspace layout: canvas-first; a single bottom panel holds Query / Analysis / Data ──
+    // ── workspace layout: [query dock] │ canvas │ [toolbox dock], Data as a bottom strip ──
     /** Full query form vs its collapsed selected-values summary (auto-collapses after a run). */
     readonly queryOpen = signal(true);
+    /** The left dock (Query + Filter); collapses to an icon rail. */
+    readonly queryDockOpen = signal(true);
+    /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
+    readonly toolboxDockOpen = signal(true);
+    readonly toolboxTab = signal<'analysis' | 'view'>('analysis');
+    /** Canvas overlays — each minimises to a pill so the graph gets the space. */
+    readonly legendOpen = signal(true);
+    readonly workingSetOpen = signal(true);
+    /** The docks give the canvas their width in one step (and take it back). */
+    readonly canvasMaximized = computed(() => !this.queryDockOpen() && !this.toolboxDockOpen());
 
     // ── query source (the form itself lives in the query-panel child) ──
     readonly sourceId = signal<GraphSourceId>('entity-projection');
@@ -366,11 +403,31 @@ export class LinkAnalysisComponent implements OnInit {
         return !!g && isForest(g);
     });
 
-    // ── fullscreen (whole studio or just the canvas zone) + bottom panel (Query/Analysis/Data) ──
+    // ── fullscreen (whole studio or just the canvas zone) + the Data strip below the workspace ──
     readonly fullscreen = signal<'app' | 'graph' | null>(null);
-    readonly bottomOpen = signal(true);
-    readonly bottomTab = signal<'query' | 'analysis' | 'data'>('query');
+    readonly bottomOpen = signal(false);
     readonly tableMode = signal<'links' | 'nodes'>('links');
+
+    // ── canvas overlays: legend (kind → colour → count) and the working set tiles ──
+    readonly legendItems = computed<LegendItem[]>(() => {
+        const g = this.displayed();
+        if (!g) return [];
+        const counts = new Map<string, number>();
+        for (const n of g.nodes) counts.set(n.data.kind, (counts.get(n.data.kind) ?? 0) + 1);
+        const colors = this.nodeColors();
+        return [...counts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([kind, count]) => ({ kind, count, color: colors[kind] ?? nodeColor(kind as NodeKind) }));
+    });
+    // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
+    readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
+    readonly profileOptions = DOMAIN_PROFILES.map((p) => ({ value: p.id, label: p.label, hint: p.description }));
+    readonly profileId = toSignal(this.profileControl.valueChanges, { initialValue: this.profileControl.value });
+    readonly profile = computed(() => domainProfile(this.profileId()));
+    readonly workingSet = computed(() => {
+        const g = this.graph();
+        return workingSetStats(this.displayed(), g, g ? workingSetOptionsFor(this.profile(), attrColumns(g)) : {});
+    });
     /** The displayed graph as rows — search-narrowed, so canvas and table show the same result. */
     readonly tableRows = computed<Record<string, unknown>[]>(() => {
         const g = this.displayed();
@@ -506,23 +563,29 @@ export class LinkAnalysisComponent implements OnInit {
 
     // ── workspace layout ──
 
-    /** Reopen the full query form (status-bar pencil) in the bottom panel's Query tab. */
+    /** Reopen the full query form (status-bar pencil) in the query dock. */
     editQuery(): void {
-        this.bottomOpen.set(true);
-        this.bottomTab.set('query');
+        this.queryDockOpen.set(true);
         this.queryOpen.set(true);
     }
 
-    /** Open the graph-algorithms toolbox (the bottom panel's Analysis tab). */
+    /** Open the graph-algorithms toolbox (the right dock's Analysis tab). */
     openAnalysis(): void {
-        this.bottomOpen.set(true);
-        this.bottomTab.set('analysis');
+        this.toolboxDockOpen.set(true);
+        this.toolboxTab.set('analysis');
     }
 
-    /** Switch the bottom panel to a tab, opening it if collapsed. */
-    selectBottomTab(tab: 'query' | 'analysis' | 'data'): void {
-        this.bottomTab.set(tab);
-        this.bottomOpen.set(true);
+    /** Open the View toolbox (layouts, lenses, overlays). */
+    openViewTools(): void {
+        this.toolboxDockOpen.set(true);
+        this.toolboxTab.set('view');
+    }
+
+    /** Collapse both docks so the canvas takes the row; a second call restores them. */
+    toggleCanvasMaximized(): void {
+        const open = this.canvasMaximized();
+        this.queryDockOpen.set(open);
+        this.toolboxDockOpen.set(open);
     }
 
     // ── display options ──
@@ -921,6 +984,7 @@ export class LinkAnalysisComponent implements OnInit {
             query: q,
             display: this.displayOptions(), // styling travels with the view; reapplied on load
             layout: this.layoutId(),
+            profile: this.profileId() === 'generic' ? undefined : this.profileId(),
         };
         this.saving.set(true);
         try {
@@ -940,6 +1004,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.sourceId.set(view.sourceId);
         this.applyDisplay(view.display);
         this.layoutId.set(view.layout ?? 'dagre');
+        this.profileControl.setValue(view.profile ?? 'generic');
         this.queryPanel?.patchFormFromView(view);
         await this.execute(view.sourceId, view.query);
     }

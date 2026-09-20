@@ -135,6 +135,8 @@ export class LinkAnalysisToolboxComponent {
     readonly nodeOptions = input<{ id: string; label: string }[]>([]);
     readonly nodeKinds = input<string[]>([]);
     readonly edgeKinds = input<string[]>([]);
+    /** Tool-group ids the host's domain profile foregrounds — badged "suggested" on the header. */
+    readonly suggested = input<string[]>([]);
     /** Node-id → label lookup, supplied by the host (its full-graph labels). */
     readonly labelOf = input<(id: string) => string>((id) => id);
 

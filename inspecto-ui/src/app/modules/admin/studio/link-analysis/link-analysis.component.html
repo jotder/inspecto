@@ -13,6 +13,18 @@
         <button
             mat-icon-button
             class="ml-auto"
+            (click)="toggleCanvasMaximized()"
+            [matTooltip]="canvasMaximized() ? 'Show the side panels' : 'Maximize the canvas (hide both side panels)'"
+            [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Maximize the canvas'"
+        >
+            <mat-icon
+                [svgIcon]="
+                    canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
+                "
+            ></mat-icon>
+        </button>
+        <button
+            mat-icon-button
             (click)="toggleFullscreen('app')"
             [matTooltip]="fullscreen() === 'app' ? 'Exit full screen' : 'Full screen'"
             [attr.aria-label]="fullscreen() === 'app' ? 'Exit full screen' : 'Open the studio in full screen'"
@@ -171,11 +183,11 @@
                     </mat-menu>
                 }
 
-                <!-- graph-algorithms toolbox (opens the bottom Analysis tab) -->
+                <!-- graph-algorithms toolbox (opens the right dock's Analysis tab) -->
                 <button
                     mat-icon-button
                     (click)="openAnalysis()"
-                    [color]="bottomOpen() && bottomTab() === 'analysis' ? 'primary' : undefined"
+                    [color]="toolboxDockOpen() && toolboxTab() === 'analysis' ? 'primary' : undefined"
                     matTooltip="Graph algorithms"
                     aria-label="Open the graph-algorithms toolbox"
                 >
@@ -549,74 +561,300 @@
             }
         </div>
 
-        <!-- ══ canvas zone (graph + states) — the graph-fullscreen target ══ -->
+        <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            #canvasZone
-            class="flex min-h-0 flex-auto flex-col gap-2"
-            [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
-            [class.p-3]="fullscreen() === 'graph'"
+            class="relative flex min-h-[28rem] overflow-hidden rounded-lg border"
+            [class.flex-auto]="fullscreen() !== null"
+            [style.height]="fullscreen() === null ? 'calc(100dvh - 17rem)' : null"
         >
-            @if (graph(); as g) {
-                <!-- top status panel: the active query as chips, with edit-to-change -->
-                <div class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5" aria-label="Active query">
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:circle-stack"></mat-icon>
-                    <span class="text-sm font-medium">{{ sourceLabel() }}</span>
-                    @for (item of querySummary(); track item.label) {
-                        <inspecto-chip>
-                            <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
-                            <span class="text-secondary">{{ item.label }}:</span>
-                            {{ item.value }}
-                        </inspecto-chip>
-                    }
+            <!-- left dock — Query (+ Filter); collapses to an icon rail -->
+            <aside
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r"
+                [class.w-10]="!queryDockOpen()"
+                [style.width.px]="queryDockOpen() ? querySplit.width() : null"
+                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                aria-label="Query"
+            >
+                @if (queryDockOpen()) {
+                    <div
+                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-3 pr-1"
+                        style="border-color: var(--gamma-border)"
+                    >
+                        <h2 class="text-xs font-semibold uppercase tracking-wide opacity-60">Query</h2>
+                        <button
+                            class="ml-auto"
+                            mat-icon-button
+                            (click)="queryDockOpen.set(false)"
+                            matTooltip="Hide the query panel"
+                            aria-label="Hide the query panel"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:chevron-double-left"></mat-icon>
+                        </button>
+                    </div>
+                    <div class="min-h-0 flex-auto overflow-y-auto p-3">
+                        <!-- Domain profile — shapes the working-set statistics and the suggested tools; saved with a view. -->
+                        <inspecto-option-picker
+                            class="mb-3 block"
+                            label="Domain profile"
+                            [formControl]="profileControl"
+                            [options]="profileOptions"
+                            help="Names the statistics after the data and foregrounds the tools that matter for it."
+                        ></inspecto-option-picker>
+                        <!-- Query — the query-panel child owns the form + buildQuery; the host keeps sourceId and the
+                             run/save/load lifecycle, reached via a ViewChild. -->
+                        <inspecto-link-analysis-query-panel
+                            [sources]="sources"
+                            [datasets]="datasets()"
+                            [pipelines]="pipelines()"
+                            [sourceId]="sourceId()"
+                            [queryOpen]="queryOpen()"
+                            [loading]="loading()"
+                            [querySummary]="querySummary()"
+                            [sourceLabel]="sourceLabel()"
+                            (sourceIdChange)="sourceId.set($event)"
+                            (run)="run()"
+                            (edit)="editQuery()"
+                        ></inspecto-link-analysis-query-panel>
+                    </div>
+                } @else {
                     <button
                         mat-icon-button
-                        (click)="editQuery()"
-                        matTooltip="Change the query"
-                        aria-label="Change the query"
+                        (click)="queryDockOpen.set(true)"
+                        matTooltip="Show the query panel"
+                        aria-label="Show the query panel"
                     >
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                        <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
                     </button>
-                    <span class="text-secondary ml-auto text-xs">
-                        {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
-                    </span>
-                </div>
+                    <button mat-icon-button (click)="editQuery()" matTooltip="Query" aria-label="Open the query form">
+                        <mat-icon svgIcon="heroicons_outline:circle-stack"></mat-icon>
+                    </button>
+                }
+            </aside>
+            <!-- Kept mounted (hidden, not @if'd) while collapsed so #querySplit stays resolvable. -->
+            <div
+                inspectoSplit="link-analysis.query"
+                #querySplit="inspectoSplit"
+                [min]="240"
+                [max]="560"
+                [defaultWidth]="320"
+                [class.hidden]="!queryDockOpen()"
+                aria-label="Resize the query panel (arrow keys or drag)"
+            ></div>
 
-                <inspecto-graph-view
-                    [fill]="true"
-                    [data]="displayed()"
-                    [emphasis]="emphasis()"
-                    [display]="displayOptions()"
-                    [tooltips]="true"
-                    [layout]="layoutId()"
-                    (nodeClick)="onNodeClick($event)"
-                    (edgeClick)="onEdgeClick($event)"
-                ></inspecto-graph-view>
-            } @else if (loading()) {
-                <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>
-            } @else {
-                <div class="flex flex-auto items-center justify-center">
-                    <inspecto-empty-state
-                        icon="heroicons_outline:share"
-                        title="No graph yet"
-                        message="Pick a graph source in the Query panel below and run a query to start investigating."
-                    ></inspecto-empty-state>
-                </div>
-            }
+            <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
+            <div
+                #canvasZone
+                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-2"
+                [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
+            >
+                @if (graph(); as g) {
+                    <!-- top status panel: the active query as chips, with edit-to-change -->
+                    <div
+                        class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5"
+                        aria-label="Active query"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:circle-stack"></mat-icon>
+                        <span class="text-sm font-medium">{{ sourceLabel() }}</span>
+                        @for (item of querySummary(); track item.label) {
+                            <inspecto-chip>
+                                <mat-icon class="icon-size-3" [svgIcon]="item.icon"></mat-icon>
+                                <span class="text-secondary">{{ item.label }}:</span>
+                                {{ item.value }}
+                            </inspecto-chip>
+                        }
+                        <button
+                            mat-icon-button
+                            (click)="editQuery()"
+                            matTooltip="Change the query"
+                            aria-label="Change the query"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                        </button>
+                        <span class="text-secondary ml-auto text-xs">
+                            {{ displayed()?.nodes?.length ?? 0 }} nodes · {{ displayed()?.edges?.length ?? 0 }} links
+                        </span>
+                    </div>
+
+                    <div class="relative min-h-0 flex-auto">
+                        <inspecto-graph-view
+                            [fill]="true"
+                            [data]="displayed()"
+                            [emphasis]="emphasis()"
+                            [display]="displayOptions()"
+                            [tooltips]="true"
+                            [layout]="layoutId()"
+                            (nodeClick)="onNodeClick($event)"
+                            (edgeClick)="onEdgeClick($event)"
+                        ></inspecto-graph-view>
+                        <!-- overlays: legend (top-left) and working set (top-right), each minimisable -->
+                        <inspecto-link-analysis-legend
+                            class="absolute left-2 top-2 z-10"
+                            [items]="legendItems()"
+                            [edgeKinds]="edgeKinds()"
+                            [open]="legendOpen()"
+                            (openChange)="legendOpen.set($event)"
+                        ></inspecto-link-analysis-legend>
+                        <inspecto-link-analysis-working-set
+                            class="absolute right-2 top-2 z-10"
+                            [stats]="workingSet()"
+                            [truncated]="truncated()"
+                            mode="top-N by count"
+                            [open]="workingSetOpen()"
+                            (openChange)="workingSetOpen.set($event)"
+                        ></inspecto-link-analysis-working-set>
+                    </div>
+                } @else if (loading()) {
+                    <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>
+                } @else {
+                    <div class="flex flex-auto items-center justify-center">
+                        <inspecto-empty-state
+                            icon="heroicons_outline:share"
+                            title="No graph yet"
+                            message="Pick a graph source in the Query panel and run a query to start investigating."
+                        ></inspecto-empty-state>
+                    </div>
+                }
+            </div>
+
+            <div
+                inspectoSplit="link-analysis.toolbox"
+                #toolboxSplit="inspectoSplit"
+                pane="right"
+                [min]="260"
+                [max]="560"
+                [defaultWidth]="340"
+                [class.hidden]="!toolboxDockOpen()"
+                aria-label="Resize the toolbox (arrow keys or drag)"
+            ></div>
+            <!-- right dock — Analysis | View toolbox; collapses to an icon rail -->
+            <aside
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l"
+                [class.w-10]="!toolboxDockOpen()"
+                [style.width.px]="toolboxDockOpen() ? toolboxSplit.width() : null"
+                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                aria-label="Toolbox"
+            >
+                @if (toolboxDockOpen()) {
+                    <div
+                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-3 pr-1"
+                        style="border-color: var(--gamma-border)"
+                    >
+                        <h2 class="text-xs font-semibold uppercase tracking-wide opacity-60">Toolbox</h2>
+                        <mat-button-toggle-group
+                            class="ml-2"
+                            [value]="toolboxTab()"
+                            (change)="toolboxTab.set($event.value)"
+                            aria-label="Toolbox tab"
+                        >
+                            <mat-button-toggle value="analysis">Analysis</mat-button-toggle>
+                            <mat-button-toggle value="view">View</mat-button-toggle>
+                        </mat-button-toggle-group>
+                        <button
+                            class="ml-auto"
+                            mat-icon-button
+                            (click)="toolboxDockOpen.set(false)"
+                            matTooltip="Hide the toolbox"
+                            aria-label="Hide the toolbox"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
+                        </button>
+                    </div>
+                    <div class="min-h-0 flex-auto overflow-y-auto p-3">
+                        <!-- Analysis (the graph-algorithms toolbox). Kept mounted via `[hidden]` so its results
+                             survive tab switches; emits emphasis for the canvas. -->
+                        <inspecto-link-analysis-toolbox
+                            [hidden]="toolboxTab() !== 'analysis'"
+                            [graph]="displayed()"
+                            [nodeOptions]="nodeOptions()"
+                            [nodeKinds]="nodeKinds()"
+                            [edgeKinds]="edgeKinds()"
+                            [suggested]="profile().suggestedTools"
+                            [labelOf]="labelOf"
+                            (emphasisChange)="emphasis.set($event)"
+                        ></inspecto-link-analysis-toolbox>
+
+                        <!-- View — layouts and canvas overlays -->
+                        <div [hidden]="toolboxTab() !== 'view'" class="flex flex-col gap-3">
+                            <section aria-label="Layout">
+                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
+                                    Layout
+                                </h3>
+                                <div class="grid grid-cols-2 gap-1">
+                                    @for (l of layouts; track l.id) {
+                                        <button
+                                            type="button"
+                                            class="rounded-md border px-2 py-1.5 text-left text-xs"
+                                            [class.font-semibold]="layoutId() === l.id"
+                                            [style.borderColor]="layoutId() === l.id ? 'var(--gamma-primary)' : null"
+                                            [disabled]="l.tree && !isTreeShaped()"
+                                            (click)="setLayout(l.id)"
+                                            [attr.aria-pressed]="layoutId() === l.id"
+                                            [attr.aria-label]="
+                                                l.label +
+                                                (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')
+                                            "
+                                        >
+                                            {{ l.label }}
+                                        </button>
+                                    }
+                                </div>
+                            </section>
+                            <section aria-label="Overlays" class="flex flex-col">
+                                <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
+                                    Overlays
+                                </h3>
+                                <mat-checkbox [checked]="legendOpen()" (change)="legendOpen.set($event.checked)">
+                                    Legend
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="workingSetOpen()"
+                                    (change)="workingSetOpen.set($event.checked)"
+                                >
+                                    Working set
+                                </mat-checkbox>
+                                <mat-checkbox [checked]="nodeLabels()" (change)="nodeLabels.set($event.checked)">
+                                    Node labels
+                                </mat-checkbox>
+                                <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">
+                                    Link labels
+                                </mat-checkbox>
+                            </section>
+                        </div>
+                    </div>
+                } @else {
+                    <button
+                        mat-icon-button
+                        (click)="toolboxDockOpen.set(true)"
+                        matTooltip="Show the toolbox"
+                        aria-label="Show the toolbox"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:chevron-double-left"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        (click)="openAnalysis()"
+                        matTooltip="Analysis"
+                        aria-label="Open the analysis tools"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        (click)="openViewTools()"
+                        matTooltip="View"
+                        aria-label="Open the view tools"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
+                    </button>
+                }
+            </aside>
         </div>
 
-        <!-- ══ bottom panel: Query · Analysis · Data ══ -->
+        <!-- ══ Data strip: the displayed graph as rows (links or nodes) ══ -->
         <div class="rounded-lg border">
             <div class="flex flex-wrap items-center gap-2 px-3 py-1">
-                <mat-button-toggle-group
-                    [value]="bottomTab()"
-                    (change)="selectBottomTab($event.value)"
-                    aria-label="Bottom panel"
-                >
-                    <mat-button-toggle value="query">Query</mat-button-toggle>
-                    <mat-button-toggle value="analysis" [disabled]="!graph()">Analysis</mat-button-toggle>
-                    <mat-button-toggle value="data" [disabled]="!graph()">Data</mat-button-toggle>
-                </mat-button-toggle-group>
-                @if (bottomOpen() && bottomTab() === 'data') {
+                <span class="text-sm font-medium">Data</span>
+                @if (bottomOpen()) {
                     <mat-button-toggle-group
                         class="ml-2"
                         [value]="tableMode()"
@@ -632,55 +870,19 @@
                     mat-icon-button
                     class="ml-auto"
                     (click)="bottomOpen.set(!bottomOpen())"
+                    [disabled]="!graph()"
                     [attr.aria-expanded]="bottomOpen()"
                     aria-controls="bottom-panel-body"
-                    [matTooltip]="bottomOpen() ? 'Hide the panel' : 'Show the panel'"
-                    [attr.aria-label]="bottomOpen() ? 'Hide the panel' : 'Show the panel'"
+                    [matTooltip]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
+                    [attr.aria-label]="bottomOpen() ? 'Hide the rows' : 'Show the rows'"
                 >
                     <mat-icon
                         [svgIcon]="bottomOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-up'"
                     ></mat-icon>
                 </button>
             </div>
-
-            <!-- body: panes are `[hidden]`-gated (not `@if`/`@switch`) so the toolbox child keeps its
-                 result state across tab switches and panel collapse (angular-ui skill idiom). -->
-            <div
-                id="bottom-panel-body"
-                [hidden]="!bottomOpen()"
-                class="max-h-[45vh] overflow-y-auto border-t px-3 py-3"
-            >
-                <!-- ── Query — extracted to the query-panel child (owns the form + buildQuery; the host
-                     keeps sourceId and the run/save/load lifecycle, reached via a ViewChild). ── -->
-                <inspecto-link-analysis-query-panel
-                    [hidden]="bottomTab() !== 'query'"
-                    [sources]="sources"
-                    [datasets]="datasets()"
-                    [pipelines]="pipelines()"
-                    [sourceId]="sourceId()"
-                    [queryOpen]="queryOpen()"
-                    [loading]="loading()"
-                    [querySummary]="querySummary()"
-                    [sourceLabel]="sourceLabel()"
-                    (sourceIdChange)="sourceId.set($event)"
-                    (run)="run()"
-                    (edit)="editQuery()"
-                ></inspecto-link-analysis-query-panel>
-
-                <!-- ── Analysis (the graph-algorithms toolbox) — extracted to a smart child. Kept mounted
-                     via `[hidden]` so its results survive tab switches; emits emphasis for the canvas. ── -->
-                <inspecto-link-analysis-toolbox
-                    [hidden]="bottomTab() !== 'analysis'"
-                    [graph]="displayed()"
-                    [nodeOptions]="nodeOptions()"
-                    [nodeKinds]="nodeKinds()"
-                    [edgeKinds]="edgeKinds()"
-                    [labelOf]="labelOf"
-                    (emphasisChange)="emphasis.set($event)"
-                ></inspecto-link-analysis-toolbox>
-
-                <!-- ── Data ── -->
-                <div [hidden]="bottomTab() !== 'data'">
+            @if (bottomOpen()) {
+                <div id="bottom-panel-body" class="border-t px-3 py-3">
                     <inspecto-data-table
                         stateKey="link-analysis-rows"
                         tier="standard"
@@ -693,7 +895,7 @@
                         (rowClick)="onTableRow($event)"
                     ></inspecto-data-table>
                 </div>
-            </div>
+            }
         </div>
     </div>
 </div>

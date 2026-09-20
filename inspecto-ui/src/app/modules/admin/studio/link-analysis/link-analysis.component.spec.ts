@@ -320,14 +320,13 @@ describe('LinkAnalysisComponent', () => {
             'Mapping: source → target',
         ]);
 
-        c.bottomTab.set('data');
-        c.editQuery(); // the status-bar pencil jumps back to the Query tab, form expanded
-        expect(c.bottomTab()).toBe('query');
-        expect(c.bottomOpen()).toBe(true);
+        c.queryDockOpen.set(false);
+        c.editQuery(); // the status-bar pencil reopens the query dock with the form expanded
+        expect(c.queryDockOpen()).toBe(true);
         expect(c.queryOpen()).toBe(true);
     });
 
-    it('workspace: a failed query keeps the form open; openAnalysis opens the bottom Analysis tab', async () => {
+    it('workspace: a failed query keeps the form open; the docks open, collapse to rails and maximize', async () => {
         const { fixture } = create({ fail: true });
         fixture.detectChanges();
         await runQuery(fixture);
@@ -335,10 +334,28 @@ describe('LinkAnalysisComponent', () => {
         expect(c.queryOpen()).toBe(true); // a failing query needs its form back
         expect(c.querySummary()).toEqual([]);
 
-        c.bottomOpen.set(false);
-        c.openAnalysis(); // the toolbar algorithms icon opens the bottom Analysis tab
-        expect(c.bottomOpen()).toBe(true);
-        expect(c.bottomTab()).toBe('analysis');
+        c.toolboxDockOpen.set(false);
+        c.toolboxTab.set('view');
+        c.openAnalysis(); // the toolbar algorithms icon opens the right dock on its Analysis tab
+        expect(c.toolboxDockOpen()).toBe(true);
+        expect(c.toolboxTab()).toBe('analysis');
+        c.openViewTools();
+        expect(c.toolboxTab()).toBe('view');
+
+        // Maximize hides both docks in one step and a second call restores them.
+        c.toggleCanvasMaximized();
+        expect(c.canvasMaximized()).toBe(true);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[aria-label="Show the query panel"]')).not.toBeNull(); // the rail
+        expect(el.querySelector('[aria-label="Show the toolbox"]')).not.toBeNull();
+        expect(el.querySelector('inspecto-link-analysis-query-panel')).toBeNull();
+        c.toggleCanvasMaximized();
+        expect(c.queryDockOpen()).toBe(true);
+        expect(c.toolboxDockOpen()).toBe(true);
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-link-analysis-query-panel')).not.toBeNull();
+        expect(el.querySelector('[aria-label="Resize the query panel (arrow keys or drag)"]')).not.toBeNull();
     });
 
     it('surfaces a failing source as an inline error, not a blank pane', async () => {
@@ -501,5 +518,24 @@ describe('LinkAnalysisComponent', () => {
         openSpy.mockReturnValue({ afterClosed: () => of(undefined) } as never);
         c.openHistory(view);
         expect(reloadSpy).toHaveBeenCalledTimes(1);
+    });
+    it('domain profile: renames the working-set tiles, badges suggested tools, and travels with a saved view', async () => {
+        const { fixture, save } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.workingSet().map((s) => s.label)).toEqual(['Nodes', 'Links']); // generic: no counts/attrs in GRAPH
+        expect(c.profile().suggestedTools).toEqual([]);
+
+        c.profileControl.setValue('finance');
+        expect(c.workingSet().map((s) => s.label)).toEqual(['Accounts', 'Transfers']);
+        expect(c.profile().suggestedTools).toContain('scoring');
+
+        c.saveForm.setValue({ name: 'Falcon', description: '' });
+        await c.saveView();
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ profile: 'finance' }), expect.anything());
+
+        await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
+        expect(c.profileId()).toBe('generic'); // a view without a profile resets to generic
     });
 });
