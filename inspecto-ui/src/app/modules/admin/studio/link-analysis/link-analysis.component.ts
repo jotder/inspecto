@@ -1257,6 +1257,8 @@ export class LinkAnalysisComponent implements OnInit {
         this.applyDisplay(view.display);
         this.layoutId.set(view.layout ?? 'dagre');
         this.profileControl.setValue(view.profile ?? 'generic');
+        // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
+        this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         if (view.view?.plugins) this.viewOptions.set(view.view.plugins);
         this.legendOpen.set(view.view?.legend ?? true);
         this.workingSetOpen.set(view.view?.workingSet ?? true);

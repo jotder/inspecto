@@ -115,9 +115,11 @@ hides the menu entry and the route 503s.
 
 **Demo 1 — Revenue assurance on roaming (TAP) between partner operators** (`roaming_tap`, 1 864 records,
 14 synthetic operators on the 001 test MCC). Open `roaming_partner_traffic`: a circular graph of operators;
-link width is the TAP record count, the Working set sums `CHARGE_SDR`. Story beats, all planted by the
-generator: (a) the *Northwind Mobile → Aurora Telecom* GPRS link carries the highest Σ charge on far fewer
-records than Fjord↔Quartz — a 3.2× rate error; (b) `roaming_rejected_settlements` narrows the same graph by
+link width is the TAP record count (links fold per operator pair, event type and settlement status — a
+timestamp or amount attribute would give one link per record). Story beats, all planted by the generator:
+(a) Advanced search (`SELECT SENDER_NAME, RECIPIENT_NAME, SUM(CHARGE_SDR) … GROUP BY 1,2`) puts the
+*Northwind Mobile → Aurora Telecom* GPRS pair at the top on far fewer records than Fjord↔Quartz — a 3.2× rate
+error; (b) `roaming_rejected_settlements` narrows the same graph by
 a saved predicate to `SETTLEMENT_STATUS = REJECTED` and isolates Kestrel Telecom; (c) the *Flow & backbone* toolbox group (the shipped `flow` tool id, a graph max-flow sense) and Cut <!-- vocab-allow: Link Analysis toolbox group label, the sanctioned max-flow sense -->
 points show the Quartz↔Fjord dependency; (d) `roaming_imsi_footprint` projects IMSI → visited network, where
 `001010000000042` touches four networks in three days — an impossible traveller.

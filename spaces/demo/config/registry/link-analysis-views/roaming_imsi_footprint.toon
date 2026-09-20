@@ -1,5 +1,5 @@
 name: roaming_imsi_footprint
-description: "DEMO 1c — Subscriber footprint: each roaming IMSI linked to the visited networks that billed it (synthetic 001-prefixed IMSIs). A normal roamer touches one or two partners; IMSI 001010000000042 touches four in three days — Explain node / Centrality surface it, and the timeline slider on EVENT_AT shows the hops."
+description: "DEMO 1c — Subscriber footprint: each roaming IMSI linked to the visited networks that billed it (synthetic 001-prefixed IMSIs). A normal roamer touches one or two partners; IMSI 001010000000042 touches four in three days — Explain node / Centrality surface it (links fold per IMSI, network and event type)."
 sourceId: entity-projection
 layout: force-cluster
 profile: telecom
@@ -9,7 +9,6 @@ query:
     sourceCol: IMSI
     targetCol: SENDER_NAME
     linkKindCol: EVENT_TYPE
-    attrCols[2]: EVENT_AT,CHARGE_SDR
 view:
   legend: true
   workingSet: true

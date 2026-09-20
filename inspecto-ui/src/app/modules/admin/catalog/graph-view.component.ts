@@ -364,6 +364,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             container: this.hostEl.nativeElement,
             data: this.data as unknown as GraphData,
             autoFit: 'view',
+            // No element/layout animation (operator, 2026-09-20): on a few-hundred-node Link Analysis canvas the
+            // enter/update tweens cost frames on every re-render (filter, emphasis, layout switch) for no
+            // analytical value. Static draw — the same graph, just immediately.
+            animation: false,
             // See the pipeline editor canvas: G6's default [0.01, 10] lets a flick of the wheel land on
             // specks or on one node filling the viewport. Floored much lower than the editor's because
             // this host is shared with Link Analysis and the catalog metadata graph, where a

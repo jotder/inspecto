@@ -30,6 +30,16 @@
       ],
       "autoPort": true,
       "port": 8080
+    },
+    {
+      "name": "inspecto-geolink",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-deploy && runtime\\bin\\java.exe --enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=..\\spaces -Dui.dir=./ui -Dduckdb.extension.dir=duckdb-extensions\\windows_amd64 -cp inspecto.jar;inspecto-connectors.jar;inspecto-notify-channels.jar;inspecto-backup.jar;inspecto-geo-link.jar;inspecto-exchange.jar;inspecto-metrics.jar;inspecto-events.jar;inspecto-ops.jar;inspecto-agent.jar com.gamma.control.ControlApi"
+      ],
+      "autoPort": true,
+      "port": 8090
     }
   ]
 }

@@ -574,6 +574,18 @@ describe('LinkAnalysisComponent', () => {
 
         c.clearFilter();
         expect(c.filterWhere().items).toEqual([]);
+
+        // Loading a view that carries a predicate seeds the builder (and a view without one clears it).
+        await c.loadView({ id: 'v', name: 'v', sourceId: 'entity-projection', query: c.lastRun()!.query });
+        expect(c.filterWhere().items).toHaveLength(1);
+        expect(c.pushState()).toBe('sent with the query');
+        await c.loadView({
+            id: 'w',
+            name: 'w',
+            sourceId: 'entity-projection',
+            query: { ...c.lastRun()!.query, filter: undefined },
+        });
+        expect(c.filterWhere().items).toEqual([]);
     });
     it('advanced search: needs a loaded Dataset projection, then adopts the folded result with stranded marks', async () => {
         const { fixture } = create();

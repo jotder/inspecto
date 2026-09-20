@@ -9,7 +9,7 @@ query:
     sourceCol: SENDER_NAME
     targetCol: RECIPIENT_NAME
     linkKindCol: EVENT_TYPE
-    attrCols[3]: EVENT_AT,CHARGE_SDR,SETTLEMENT_STATUS
+    attrCols[1]: SETTLEMENT_STATUS
   filter:
     kind: group
     op: AND
