@@ -9,25 +9,57 @@ timestamp: 2026-09-17T00:00:00Z
 
 # Link Analysis Advancement Plan (`INV-1` / `CP-09`)
 
-Link Analysis is the primary visual and computational investigation environment in Inspecto Studio for discovering hidden relationships, entity clusters, money flows, and communication topologies. While the existing implementation provides rich client-side analytics (25+ pure algorithms across 13 toolbox tabs) and foundational projection routes, significant architectural gaps remain between the initial design plans and production requirements for enterprise-scale forensic investigations.
+Link Analysis is the primary visual and computational investigation environment in Inspecto Studio for discovering hidden relationships, entity clusters, money flows, and communication topologies. While the existing implementation provides rich client-side analytics (27 wired algorithms across 13 toolbox groups) and foundational projection routes, significant architectural gaps remain between the initial design plans and production requirements for enterprise-scale forensic investigations.
 
 This plan details the grounded state of Link Analysis, enumerates the 7 core architectural gaps, and establishes a phased delivery roadmap across Sprints 9–11.
 
+⇒ **What this plan builds toward is specified in [`link-analysis-spec.md`](link-analysis-spec.md)**
+(functional specification, every clause tagged SHIPPED / PARTIAL / NOT BUILT). Read the spec for
+*what the feature must do*; read this for *how and in what order*.
+
 ---
 
-## 1. Grounding & As-Built Audit (2026-09-17)
+## 1. Grounding & As-Built Audit
 
-An audit of existing code, design documents, and archived plans confirms the following baseline:
+🔴 **RE-GROUNDED 2026-09-20 by two independent code reads (backend + SPA), and the 2026-09-17 table
+below was WRONG IN FIVE PLACES.** The corrections are listed here rather than silently applied,
+because three of them change what the roadmap should build:
+
+1. ⛔ **The toolbox tab list was largely invented.** It named `Structural`, `Filtering`,
+   `Clustering`, `Temporal`, `Geospatial`, `Timeline`, **`Case Board`** and `Metrics`. **None of
+   those exist.** The real 13 accordion groups are: shortest path · all paths · explain node ·
+   centrality · communities · connected components · cycles · cut points · cohesive groups ·
+   similarity & prediction · flow & backbone · suspicion score · pattern match
+   (`link-analysis-toolbox.component.ts:145-158`). 🔴 **A `Case Board` tab implies Case integration
+   already has a UI surface. It does not** — and GAP 5 below is precisely about that absence, so the
+   table contradicted the gap it sits above.
+2. ⛔ **They are not tabs.** One accordion, one group open at a time — not `mat-tab`. One group can
+   front several metrics through a dropdown, which is why "13 tabs" and "27 algorithms" are not in
+   tension.
+3. 🔴 **"Freeze the browser DOM on graphs > 2,000 nodes" understates the defect.** Above
+   `ANALYSIS_NODE_CAP = 2000` the super-linear algorithms **throw** (`graph-analysis.ts:11,204-205,
+   324-325`). It is a hard functional ceiling, not a slowdown — **so a Web Worker alone (S1.1) fixes
+   responsiveness and leaves the ceiling exactly where it is.** See the spec §4.1.
+4. ⚠ **"Single dataset projection" is true of the `/inv/projection` endpoint, not of the feature** —
+   four graph source planes ship (lineage/catalog, artifact/component-model, pipeline, dataset entity
+   projection; `graph-sources.ts:20-60`). Scope S1.2 to the endpoint.
+5. ⚠ **Drifted citation:** schema-relationship inference is `InvRoutes.java:83-137`, not `:188-254`.
+
+⚠ Also worth stating, because the old table did not: **Geo and Link are not fully decoupled** — a
+one-way Geo→Link handoff already exists (`colocation-graph.dialog.ts:8-10`). GAP 6 is about
+*synchronisation*, not connection.
+
+The corrected baseline:
 
 | Dimension | Planned / Documented | Shipped As-Built | Status & Grounding |
 |---|---|---|---|
 | **Projection API** | Ad-hoc graph generation across arbitrary datasets (`link-analysis-and-graphsource.md`) | Single dataset projection via `POST /inv/projection` and 1-hop neighbor expansion via `POST /inv/projection/neighbors` | **PARTIALLY DELIVERED** — `inspecto-geo-link/.../InvRoutes.java`. Projection operates on one dataset at a time; cannot perform multi-dataset cross-joins in a single pass. |
 | **Relationship Metadata** | Schema-driven foreign key / edge discovery (`link-analysis-toolboxes-plan.md`) | `GET /inv/schema/relationships` introspects dataset metadata and suggests potential node/edge mappings | **DELIVERED** — `InvRoutes.java:188-254`. Suggests ID pairs based on column naming conventions and foreign references. |
 | **Graph Algorithms** | Full graph metrics, centrality, community detection, pathfinding (`link-analysis-studio-plan.md`) | 25+ pure algorithms: Degree, Betweenness, Closeness, PageRank, Louvain modularity, Connected Components, Dijkstra, Cycle detection, Articulation Points | **DELIVERED** — `inspecto-ui/.../graph/graph-analysis.ts` (1,348 lines of pure TypeScript). |
-| **Toolbox Tabs** | 13 specialized analysis toolboxes (`link-analysis-toolboxes-plan.md`) | 13 UI tabs: `Structural`, `Flow & backbone`, `Centrality`, `Community`, `Paths`, `Patterns`, `Filtering`, `Clustering`, `Temporal`, `Geospatial`, `Timeline`, `Case Board`, `Metrics` | **DELIVERED** — `inspecto-ui/.../studio/link-analysis/` UI components and service integrations. |
+| **Toolbox groups** | 13 specialized analysis toolboxes (`link-analysis-toolboxes-plan.md`) | 13 accordion groups (⚠ NOT tabs, and ⛔ no `Case Board`): shortest path, all paths, explain node, centrality, communities, connected components, cycles, cut points, cohesive groups, similarity & prediction, flow & backbone, suspicion score, pattern match | **DELIVERED** — `link-analysis-toolbox.component.ts:145-158`. Every group is signal-backed and reachable; none is a stub. |
 | **Pattern Packs** | Pre-packaged forensic query templates (`link-analysis-pattern-packs-plan.md`) | Hardcoded client-side structural filters (rings, star hubs, bridges) | **INCOMPLETE** — Only evaluates linear topologies client-side; no declarative multi-branch query engine or temporal sequence motifs. |
-| **Execution Architecture** | Responsive interactive exploration on 50,000+ nodes (`link-analysis-studio-plan.md`) | Algorithms run synchronously on the browser UI main thread | **UNSATISFACTORY** — O(V³) and O(V·E) algorithms (Betweenness, All-Pairs Shortest Path, Louvain) freeze the browser DOM on graphs > 2,000 nodes. |
-| **Case Evidence Integration** | Save graph substructures directly into Cases (`docs/okf/capabilities/studio/studio.md`) | Client-side visual tagging only; no durable Case snapshot attachment | **UNSATISFACTORY** — Annotations remain in local component state; cannot be attached to a durable Case evidence record. |
+| **Execution Architecture** | Responsive interactive exploration on 50,000+ nodes (`link-analysis-studio-plan.md`) | All algorithms run on the browser main thread; the backend does **no** graph analysis at all, only SQL fold/filter (`InvRoutes.java:36-39`, deliberate) | 🔴 **UNSATISFACTORY, and worse than "freezes"** — above `ANALYSIS_NODE_CAP = 2000` the super-linear algorithms **THROW** (`graph-analysis.ts:11,204-205,324-325`). A hard ceiling on supported investigation size, not a responsiveness problem. ⛔ A worker alone does not lift it. |
+| **Case Evidence Integration** | Save graph substructures directly into Cases (`docs/okf/capabilities/studio/studio.md`) | Nothing. A grep of `inspecto-geo-link` for `ObjectService`/`OperationalObject` returns **zero** hits | 🔴 **UNSATISFACTORY — confirmed ABSENT, not merely incomplete.** The only persistence is an opaque `link-analysis-view` JSON component with no Case/Incident linkage. ⚠ And because projections re-run on every call, **a saved view is not evidence**: re-opening it after the Dataset changes silently shows a different graph. |
 
 ---
 
