@@ -829,6 +829,60 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   unanswered. ⚠ Keep the repo's recorded distinction in scope when it IS answered: *"skip the bad file"
   is not "skip the file that throws"* — a validation failure and an exception are different events, and
   conflating them is how eject-and-continue silently swallows a real fault.
+  ✅ **RE-GROUNDED 2026-09-20 — the dry run LANDED and X4's gate is STILL CLOSED, now for a precise
+  reason.** `PIPELINE-DRYRUN-1` closed the same day, so "the sandbox exists" is true — **but the sandbox
+  it built cannot show the thing X4 was waiting to observe.** Evidence, read on `5af44d2f`:
+  `ConsignmentIngestor.process` takes a `dryRun` branch (`:86-95`) that **never calls `strategy.ingest`
+  (`:96`)** — the only statement in the lane that parses a member — and instead **fabricates**
+  `new IngestOutcome(now, "SUCCESS", null, List.of(), List.of(), …, 0L, …)` (`:92-93`): an all-empty,
+  unconditional SUCCESS carrying **zero `memberAudits`**. `memberAudits` is the per-file carrier
+  (`MemberAudit(srcId, filename, MemberStatus, parsedRows, errorRows, error, …)`,
+  `inspecto-etl/src/main/java/com/gamma/etl/MemberAudit.java:13-15`), so under `?dryRun=true` every
+  per-file and per-record outcome is **not merely unreported — it is never computed**, and the run
+  reports SUCCESS/0 rows for members that would in fact quarantine.
+  What a dry run **does** evaluate is the **cycle plan only**: eligibility
+  (`CollectorProcessor.ingest` → `collect(cfg, !dryRun)`, `:150` — the read-only form, so no
+  `FILE_STABLE` readiness Signal escapes), schema *selection* (the `SchemaResolver`, `:193-196`), and
+  batching (`ConsignmentPlanner.plan`, `:197`). ⚠ It does not even plan the true shapes for compressed
+  inputs: `UnpackStage.expand` is skipped (`:175`), so Archives are planned **pre-expansion**.
+  ⇒ **NO — the shipped dry run does not deliver X4's observability.** ⛔ **The gate stays closed; do not
+  read "the dry run landed" as "X4 is unblocked".**
+
+  🔴 **THE GATE, RE-STATED.** X4's per-pipeline default may be picked only once a run exists that
+  **parses real members without landing anything and reports, per member, WHICH KIND of failure
+  occurred** — because all-or-nothing vs eject-and-continue is a choice about *what to do with a member
+  the run rejects*, and a run that rejects nothing exhibits neither option. ⚠ The repo's recorded
+  distinction is load-bearing here and must **not** be collapsed — *"skip the bad file" is not "skip the
+  file that throws"*. They are already two kinds in the model and stay two in the gate:
+  - a **validation rejection** = a *planned* member that failed on the way in, carried as a
+    `MemberStatus` (`QUARANTINED_*`); the batch around it can still be `SUCCESS`. This is the event
+    eject-and-continue exists for. ⚠ `SKIPPED_UNREADABLE` is a *third* thing again — an Archive entry
+    never planned into a batch, `srcId = -1` (`MemberStatus.java:43-50`) — not a rejected member.
+  - a **thrown fault** = an exception out of `strategy.ingest`, which fails the **whole batch**
+    (`CollectorProcessor.java:246-251`) and is a framework/schema fault, not a bad member.
+    Eject-and-continue must never swallow it, and a default chosen off evidence that conflates the two
+    will do exactly that.
+  ⚠ `MemberStatus`'s own javadoc already warns that **three status vocabularies meet here and none may
+  be cross-mapped** (`MemberStatus.java:18-27`): member vs batch (`IngestOutcome.status`) vs Archive
+  (`UnpackStatus`). Any X4 sidecar manifest must key on the **member** vocabulary.
+
+  **What would have to be built — NOT built here; this row is a gate, not a feature.** The general
+  answer is a **parse-validating dry-run mode**, flagged at ship time as a separate, larger build and
+  stated as the accepted cost: *a dry run answers "what would this cycle touch", not "would these files
+  parse"* (`superpower/pipeline-dryrun-design.md` §"Step 5 — AS BUILT"). ⚠ **A nearer starting point
+  EXISTS and the earlier framing missed it**: `PipelineTestRun`
+  (`inspecto-engine/src/main/java/com/gamma/inspector/PipelineTestRun.java`) already parses **real**
+  inbox files through the **real** `strategy.ingest` with zero production side effects, under two
+  independent containments (it calls only `strategy.ingest`, never `commit`/`writeAudit`/
+  `recordProvenance`; and it **copies** the picked files into a scratch root, because
+  `QuarantineManager` *moves* the original). It surfaces `FileResult(filename, status, parsedRows,
+  errorRows, error)` per file and is exposed today at `POST /pipelines/authored/{id}/run?to={nodeId}`
+  (`PipelineGraphRoutes.java:498-542`). ⇒ the honest gap is **granularity, not existence**: that path
+  reaches **per-FILE** outcomes with an `errorRows` *count*, while X4's sidecar manifest needs
+  **per-RECORD offset + reason**. So the build X4 waits on is *"carry per-record reject offsets and
+  reasons out of the ingest strategies, then surface them on a run that lands nothing"* — and it should
+  be scoped against `PipelineTestRun`, **not** against `?dryRun=true`. ⛔ **No default picked** — that
+  remains the operator's call, and the evidence it needs still does not exist.
 - ~~**P2**~~ · ✅ **`PIPELINE-DRYRUN-1` CLOSED 2026-09-20 — step 5 BUILT as the FULL flat-lane no-op.**
   `POST /runs/{name}/trigger?dryRun=true` now runs a whole pipeline and **lands nothing**, for **every**
   pipeline, with no per-pipeline caveats: no partition outputs, no quarantine/backup moves, no manifest,
