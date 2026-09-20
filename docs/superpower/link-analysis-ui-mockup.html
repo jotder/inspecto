@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Link Analysis — target-state UI mockup</title>
+<meta name="description" content="Clickable design mockup (dummy data) for the Link Analysis Advancement Plan: domain profiles, resizable panels, two-stage filter loop, advanced SQL search, worker offload, large-graph rendering, view toolbox, evidence snapshots, multi-Dataset projection, traversal, Geo sync, dossier." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --gamma-bg-default:#f3f4f6; --gamma-bg-card:#ffffff; --gamma-bg-hover:#eef0f4; --gamma-border:#d9dde3;
+  --gamma-text-default:#111827; --gamma-text-secondary:#6b7280; --gamma-primary:#4f46e5; --gamma-primary-soft:#e0e7ff;
+  --gamma-warn:#b45309; --gamma-warn-soft:#fef3c7; --gamma-error:#b91c1c; --gamma-error-soft:#fee2e2;
+  --gamma-ok:#047857; --gamma-ok-soft:#d1fae5; --gamma-info:#1d4ed8; --gamma-info-soft:#dbeafe;
+  --n-a:#4f46e5; --n-b:#0891b2; --n-c:#d97706; --n-hot:#dc2626; --n-stranded:#9ca3af;
+  --canvas:#fafbfc; --grid:#eceff3; --hull:rgba(79,70,229,.10);
+  --l:300px; --r:320px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --gamma-bg-default:#0f1115; --gamma-bg-card:#171a21; --gamma-bg-hover:#1f2430; --gamma-border:#2a3040;
+  --gamma-text-default:#e5e7eb; --gamma-text-secondary:#9aa3b2; --gamma-primary:#818cf8; --gamma-primary-soft:#2b2f6b;
+  --gamma-warn:#fbbf24; --gamma-warn-soft:#3a2d0c; --gamma-error:#f87171; --gamma-error-soft:#4a1d1d;
+  --gamma-ok:#34d399; --gamma-ok-soft:#0f3b2e; --gamma-info:#60a5fa; --gamma-info-soft:#172554;
+  --canvas:#12151b; --grid:#1c2029; --n-stranded:#4b5563; --hull:rgba(129,140,248,.14);
+}}
+:root[data-theme="dark"]{
+  --gamma-bg-default:#0f1115; --gamma-bg-card:#171a21; --gamma-bg-hover:#1f2430; --gamma-border:#2a3040;
+  --gamma-text-default:#e5e7eb; --gamma-text-secondary:#9aa3b2; --gamma-primary:#818cf8; --gamma-primary-soft:#2b2f6b;
+  --gamma-warn:#fbbf24; --gamma-warn-soft:#3a2d0c; --gamma-error:#f87171; --gamma-error-soft:#4a1d1d;
+  --gamma-ok:#34d399; --gamma-ok-soft:#0f3b2e; --gamma-info:#60a5fa; --gamma-info-soft:#172554;
+  --canvas:#12151b; --grid:#1c2029; --n-stranded:#4b5563; --hull:rgba(129,140,248,.14);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.45 Inter,system-ui,sans-serif;background:var(--gamma-bg-default);color:var(--gamma-text-default)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.app{display:flex;flex-direction:column;min-height:100vh;padding:16px;gap:12px}
+.sec{color:var(--gamma-text-secondary)}
+.sm{font-size:12px}.xs{font-size:11px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.01em;margin:0}
+h2{font-size:12px;font-weight:600;margin:0;text-transform:uppercase;letter-spacing:.04em;color:var(--gamma-text-secondary)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card{background:var(--gamma-bg-card);border:1px solid var(--gamma-border);border-radius:10px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;border:1px solid var(--gamma-border);background:var(--gamma-bg-card);font-weight:500;font-size:13px;white-space:nowrap}
+.btn:hover{background:var(--gamma-bg-hover)}
+.btn.primary{background:var(--gamma-primary);border-color:var(--gamma-primary);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.icon{padding:6px;width:32px;height:32px;justify-content:center}
+.btn.tiny{padding:1px 6px;font-size:11px;border-radius:6px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.active{border-color:var(--gamma-primary);color:var(--gamma-primary);background:var(--gamma-primary-soft)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+.chip.ok{background:var(--gamma-ok-soft);color:var(--gamma-ok)} .chip.warn{background:var(--gamma-warn-soft);color:var(--gamma-warn)}
+.chip.info{background:var(--gamma-info-soft);color:var(--gamma-info)} .chip.err{background:var(--gamma-error-soft);color:var(--gamma-error)}
+.chip.neutral{background:var(--gamma-bg-hover);color:var(--gamma-text-secondary)}
+.chip.plan{border-color:var(--gamma-border);color:var(--gamma-text-secondary);background:transparent}
+.chip.sug{background:var(--gamma-primary-soft);color:var(--gamma-primary)}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;border:1px solid}
+.alert.warn{background:var(--gamma-warn-soft);border-color:color-mix(in srgb,var(--gamma-warn) 40%,transparent);color:var(--gamma-warn)}
+.alert.ok{background:var(--gamma-ok-soft);border-color:color-mix(in srgb,var(--gamma-ok) 40%,transparent);color:var(--gamma-ok)}
+.alert.info{background:var(--gamma-info-soft);border-color:color-mix(in srgb,var(--gamma-info) 40%,transparent);color:var(--gamma-info)}
+.alert b{font-weight:600}.alert .body{color:var(--gamma-text-default)}.alert .body .sec{font-size:12px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--gamma-border);overflow-x:auto}
+.tab{padding:8px 12px;border-bottom:2px solid transparent;font-weight:500;font-size:13px;white-space:nowrap;color:var(--gamma-text-secondary)}
+.tab .tag{margin-left:6px}
+.tab.active{color:var(--gamma-primary);border-color:var(--gamma-primary)}
+/* ── resizable / collapsible 3-column grid ── */
+.grid{display:grid;grid-template-columns:var(--l) 6px minmax(0,1fr) 6px var(--r);gap:0 4px;flex:1;min-height:0}
+.gutter{cursor:col-resize;border-radius:3px;position:relative}
+.gutter:hover,.gutter.on{background:var(--gamma-primary-soft)}
+.gutter::after{content:'';position:absolute;left:2px;top:50%;width:2px;height:28px;margin-top:-14px;border-radius:1px;background:var(--gamma-border)}
+aside.side{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+aside.side .panel{display:flex;flex-direction:column;gap:10px;padding:12px;overflow:auto;flex:1}
+aside.side .rail{display:none;flex-direction:column;align-items:center;gap:6px;padding:8px 4px}
+aside.side.collapsed .panel,aside.side.collapsed .sidehead,aside.side.collapsed .seg{display:none}
+aside.side.collapsed .rail{display:flex}
+.sidehead{display:flex;align-items:center;gap:6px;padding:8px 8px 0 12px}
+.sidehead h2{flex:1}
+.rail .btn{width:32px;height:32px}
+.rail .vlabel{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;color:var(--gamma-text-secondary);font-weight:600;letter-spacing:.04em;margin-top:6px}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}.gutter{display:none}}
+.seg{display:flex;margin:8px 12px 0;border:1px solid var(--gamma-border);border-radius:8px;overflow:hidden}
+.seg button{flex:1;padding:6px;font-size:12px;font-weight:600;color:var(--gamma-text-secondary)}
+.seg button.on{background:var(--gamma-primary-soft);color:var(--gamma-primary)}
+.field{display:flex;flex-direction:column;gap:3px}
+.field label{font-size:11px;color:var(--gamma-text-secondary);font-weight:500}
+.input{border:1px solid var(--gamma-border);background:var(--gamma-bg-default);border-radius:6px;padding:6px 8px;font-size:13px;min-height:32px;display:flex;align-items:center;gap:6px}
+select.input,textarea.input{font:inherit;color:inherit;width:100%}
+textarea.input{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;min-height:120px;resize:vertical;display:block}
+.cond{border:1px dashed var(--gamma-border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.cond.nested{margin-left:14px;border-color:var(--gamma-primary)}
+.leaf{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center}
+.leaf .input{min-height:28px;padding:3px 6px;font-size:12px}
+.leaf .op{font-family:ui-monospace,monospace;font-size:12px;color:var(--gamma-primary);font-weight:600;text-align:center}
+.grp-head{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--gamma-text-secondary)}
+.grp-head .op{background:var(--gamma-primary-soft);color:var(--gamma-primary);padding:1px 6px;border-radius:4px}
+.loop{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stage{padding:8px;border-radius:8px;border:1px solid var(--gamma-border);background:var(--gamma-bg-default);display:flex;flex-direction:column;gap:4px}
+.stage .t{font-size:11px;font-weight:600;color:var(--gamma-text-secondary)}
+.stage .v{font-weight:600;font-size:15px}
+/* ── canvas ── */
+.canvasWrap{display:flex;flex-direction:column;min-height:560px;min-width:0}
+.toolbar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--gamma-border);flex-wrap:wrap;position:relative}
+.toolbar .sep{width:1px;height:20px;background:var(--gamma-border);margin:0 4px}
+.canvas{position:relative;flex:1;background:var(--canvas);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;min-height:480px;overflow:hidden}
+.canvas>svg{width:100%;height:100%;position:absolute;inset:0}
+.edge{stroke:var(--gamma-text-secondary);stroke-opacity:.55;fill:none}
+.edge.hot{stroke:var(--n-hot);stroke-opacity:.9}
+.edge.path{stroke:var(--gamma-primary);stroke-opacity:1;stroke-dasharray:6 4;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-20}}
+.edge.stranded{stroke-dasharray:3 4;stroke-opacity:.35}
+.elabel{font-size:10px;fill:var(--gamma-text-secondary);font-weight:600}
+.node circle{stroke:var(--gamma-bg-card);stroke-width:2}
+.node text{font-size:11px;fill:var(--gamma-text-default);font-weight:500}
+.node .sub{font-size:9px;fill:var(--gamma-text-secondary);font-weight:400}
+.node.stranded circle{fill:var(--n-stranded);stroke-dasharray:3 2;stroke:var(--gamma-text-secondary)}
+.node.stranded text{fill:var(--gamma-text-secondary)}
+.node.sel circle{stroke:var(--gamma-primary);stroke-width:3}
+.hull{fill:var(--hull);stroke:var(--gamma-primary);stroke-opacity:.35;stroke-width:1}
+.dotn{fill:var(--n-a);opacity:.85}
+.sup circle{fill:var(--gamma-bg-card);stroke:var(--gamma-primary);stroke-width:2.5}
+.sup text{font-size:11px;font-weight:600;fill:var(--gamma-primary);text-anchor:middle}
+.sup .sub{font-size:9px;fill:var(--gamma-text-secondary);font-weight:400}
+/* overlays: minimizable */
+.ov{position:absolute;z-index:2;font-size:11px;max-width:290px}
+.ov .ov-h{display:flex;align-items:center;gap:6px;padding:6px 8px 6px 10px;font-weight:600}
+.ov .ov-h .btn{margin-left:auto;width:20px;height:20px;padding:0}
+.ov .ov-b{padding:0 10px 8px;display:flex;flex-direction:column;gap:4px}
+.ov.min .ov-b{display:none}
+.ov.min{border-radius:999px}
+.ov.min .ov-h{padding:3px 8px 3px 10px}
+.ov.tl{left:12px;top:12px}.ov.tr{right:12px;top:12px}.ov.br{right:12px;bottom:12px}.ov.bl{left:12px;bottom:12px}
+.legend span{display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:2px}
+.stat{padding:5px 7px;border-radius:6px;background:var(--gamma-bg-default);border:1px solid var(--gamma-border)}
+.stat .t{font-size:10px;color:var(--gamma-text-secondary);font-weight:600}
+.stat .v{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.minimap svg{width:150px;height:90px;display:block;background:var(--gamma-bg-default);border-radius:6px}
+.minimap rect.vp{fill:none;stroke:var(--gamma-primary);stroke-width:1.5}
+.progress{position:absolute;left:12px;right:12px;bottom:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.bar{height:6px;border-radius:3px;background:var(--gamma-bg-hover);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gamma-primary);width:0;transition:width .25s}
+.pop{position:absolute;top:44px;left:0;z-index:20;padding:10px 12px;min-width:260px;display:none;flex-direction:column;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.pop.open{display:flex}
+.sw{display:flex;align-items:center;gap:8px;font-size:12px;padding:2px 0}
+.sw i{width:28px;height:16px;border-radius:8px;background:var(--gamma-bg-hover);border:1px solid var(--gamma-border);position:relative;flex:none;transition:background .15s}
+.sw i::after{content:'';position:absolute;top:1px;left:1px;width:12px;height:12px;border-radius:50%;background:var(--gamma-bg-card);box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.sw.on i{background:var(--gamma-primary);border-color:var(--gamma-primary)}
+.sw.on i::after{left:13px}
+.sw .k{margin-left:auto;color:var(--gamma-text-secondary);font-size:11px}
+/* toolbox */
+.acc{display:flex;flex-direction:column}
+.acc .h{display:flex;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--gamma-border);font-weight:500;font-size:13px}
+.acc .h:first-child{border-top:0}
+.acc .h .n{margin-left:auto}
+.acc .h.open{background:var(--gamma-bg-hover)}
+.acc .body{padding:10px 12px 12px;border-top:1px solid var(--gamma-border);display:flex;flex-direction:column;gap:8px;background:var(--gamma-bg-default)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:var(--gamma-text-secondary);font-weight:600;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--gamma-border);white-space:nowrap}
+td{padding:5px 6px;border-bottom:1px solid var(--gamma-border)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.meter{height:5px;border-radius:3px;background:var(--gamma-bg-hover);position:relative;top:2px}
+.meter i{display:block;height:100%;border-radius:3px;background:var(--gamma-primary)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px}
+.kv dt{color:var(--gamma-text-secondary)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+pre{margin:0;padding:8px;border-radius:6px;background:var(--gamma-bg-default);border:1px solid var(--gamma-border);overflow:auto;font-size:11px;line-height:1.4}
+/* view toolbox */
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px 12px}
+.lay{border:1px solid var(--gamma-border);border-radius:8px;padding:6px 4px 5px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:500;background:var(--gamma-bg-card);text-align:center}
+.lay:hover{background:var(--gamma-bg-hover)}
+.lay.on{border-color:var(--gamma-primary);background:var(--gamma-primary-soft);color:var(--gamma-primary)}
+.lay svg{width:44px;height:30px}
+.lay svg circle{fill:currentColor}.lay svg line,.lay svg path{stroke:currentColor;stroke-width:1;fill:none;opacity:.6}
+.lay .add{font-size:9px;color:var(--gamma-text-secondary);font-weight:600}
+.vsec{padding:8px 12px 4px;border-top:1px solid var(--gamma-border)}
+.vlist{padding:0 12px 10px;display:flex;flex-direction:column}
+/* modals */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal.open{display:flex}
+.dialog{width:min(640px,100%);max-height:92vh;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.dialog h3{margin:0;font-size:16px}
+.dialog.wide{width:min(980px,100%)}
+.split{display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:480px}
+.map{position:relative;background:#dfe9dc;background-image:radial-gradient(circle at 30% 40%,#c9dcc0 0 28%,transparent 29%),radial-gradient(circle at 70% 65%,#bcd3b8 0 22%,transparent 23%);border-right:1px solid var(--gamma-border);overflow:hidden}
+:root[data-theme="dark"] .map,:root:not([data-theme="light"]) .map{background:#1b2a1f}
+.pin{position:absolute;width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pin.sel{outline:3px solid var(--gamma-primary);outline-offset:1px}
+.brush{position:absolute;border:2px dashed var(--gamma-primary);background:color-mix(in srgb,var(--gamma-primary) 12%,transparent);border-radius:4px}
+.route{position:absolute;inset:0;pointer-events:none}
+.footer{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--gamma-text-secondary);padding:6px 10px;align-items:center}
+.dossier{display:grid;grid-template-columns:200px 1fr;gap:12px}
+.toc{display:flex;flex-direction:column;gap:2px;font-size:12px}
+.toc a{padding:5px 8px;border-radius:6px;color:inherit;text-decoration:none}
+.toc a.on{background:var(--gamma-primary-soft);color:var(--gamma-primary);font-weight:600}
+.page{padding:16px;background:var(--gamma-bg-card);border:1px solid var(--gamma-border);border-radius:8px;font-size:12.5px;line-height:1.5}
+.page h4{margin:0 0 4px;font-size:14px}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);padding:10px 14px;border-radius:8px;background:var(--gamma-text-default);color:var(--gamma-bg-card);font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+.toast.show{opacity:1}
+.dtab{max-height:300px;overflow:auto;border:1px solid var(--gamma-border);border-radius:8px}
+.dtab table{font-size:11.5px}.dtab td,.dtab th{padding:4px 8px;white-space:nowrap}
+.dtab tbody tr:hover{background:var(--gamma-bg-hover)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── header ── -->
+  <div class="row">
+    <h1>Link Analysis</h1>
+    <span class="sec sm">project a Dataset — or the lineage / component / pipeline planes — into an Entity/Link graph, then analyze it.</span>
+    <span class="chip plan" style="margin-left:auto">MOCKUP v2 · dummy data · plan S1–S3</span>
+    <button class="btn icon ghost" id="themeBtn" title="Toggle theme" aria-label="Toggle light/dark">◐</button>
+    <button class="btn icon ghost" id="maxBtn" title="Maximize graph (collapse both panels)" aria-label="Maximize graph" onclick="maximize()">⤢</button>
+  </div>
+
+  <!-- ── scenario strip ── -->
+  <div class="tabs" role="tablist" id="scenarios">
+    <button class="tab active" role="tab" data-s="filter">Two-stage filter loop <span class="chip info tag">S1.4</span></button>
+    <button class="tab" role="tab" data-s="worker">Analysis off the main thread <span class="chip info tag">S1.1</span></button>
+    <button class="tab" role="tab" data-s="large">Large graphs <span class="chip warn tag">render</span></button>
+    <button class="tab" role="tab" data-s="evidence">Snapshot · Attach to Case <span class="chip info tag">S1.3</span></button>
+    <button class="tab" role="tab" data-s="multi">Multi-Dataset projection <span class="chip info tag">S1.2</span></button>
+    <button class="tab" role="tab" data-s="traverse">Traversal & motifs <span class="chip neutral tag">S2</span></button>
+    <button class="tab" role="tab" data-s="geo">Geo sync & dossier <span class="chip neutral tag">S3</span></button>
+  </div>
+
+  <!-- ── alert row ── -->
+  <div id="alerts">
+    <div class="alert warn" id="truncAlert">
+      <span>⚠</span>
+      <div class="body">
+        <b>Truncated — you are looking at a bounded slice, not the whole answer.</b>
+        <div class="sec">The server returned the <b>2,000 heaviest edges</b> (ordered by count) of <b id="truncDs">transactions</b>. Narrow the predicate and <b>Push to server</b> to refine. Loop iteration <b id="iter">1</b>.</div>
+      </div>
+      <button class="btn sm" style="margin-left:auto" onclick="focusFilter()">Refine filter</button>
+    </div>
+    <div class="alert ok hidden" id="doneAlert">
+      <span>✓</span>
+      <div class="body"><b>Complete — the predicate selects the whole answer.</b>
+        <div class="sec">1,214 edges · 388 nodes returned untruncated after <b id="iter2">2</b> iterations. <b>3</b> nodes from the earlier working set no longer match and are <b>marked, not dropped</b>.</div>
+      </div>
+      <button class="btn sm" style="margin-left:auto" onclick="toggleStranded()">Hide stranded</button>
+    </div>
+  </div>
+
+  <!-- ── main grid: left | gutter | canvas | gutter | right ── -->
+  <div class="grid" id="grid">
+
+    <!-- ═══ LEFT ═══ -->
+    <aside class="card side" id="left" aria-label="Query panel">
+      <div class="rail">
+        <button class="btn icon ghost" title="Expand query panel" onclick="collapse('left',false)">»</button>
+        <button class="btn icon ghost" title="Query" onclick="collapse('left',false)">⚲</button>
+        <button class="btn icon ghost active" title="Filter predicate (active)" onclick="collapse('left',false)">⛉</button>
+        <button class="btn icon ghost" title="Advanced search" onclick="openModal('advModal')">SQL</button>
+        <span class="vlabel">QUERY</span>
+      </div>
+      <div class="sidehead"><h2>Query</h2><button class="btn icon ghost" title="Collapse panel" aria-label="Collapse query panel" onclick="collapse('left',true)">«</button></div>
+      <div class="panel">
+        <div class="field"><label>Domain profile <span class="chip neutral xs" title="Maps columns to entity types, formats measures, and picks which statistics and toolbox groups are foregrounded">shapes stats &amp; legend</span></label>
+          <select class="input" id="domainSel" onchange="setDomain(this.value)">
+            <option value="finance">Financial crime — transactions</option>
+            <option value="telecom">Telecom — call detail records</option>
+            <option value="supply">Supply chain — shipments</option>
+            <option value="cyber">Cyber — network flows</option>
+          </select></div>
+        <div class="field"><label>Graph source</label><div class="input">Dataset entity projection ▾</div></div>
+        <div class="field" id="datasetField"><label>Dataset</label><div class="input"><span id="dsName">transactions</span> <span class="chip neutral" style="margin-left:auto" id="dsRows">2.4M rows</span></div></div>
+        <div class="row" style="gap:6px">
+          <div class="field" style="flex:1"><label>Source entity column</label><div class="input mono" id="srcCol">payer_id</div></div>
+          <div class="field" style="flex:1"><label>Target entity column</label><div class="input mono" id="tgtCol">payee_id</div></div>
+        </div>
+        <div class="field"><label>Link type column (optional)</label><div class="input mono" id="kindCol">channel</div></div>
+        <div class="field"><label>Attribute columns (optional)</label><div class="input" id="attrCols"></div></div>
+
+        <!-- S1.4: predicate builder -->
+        <div id="filterBlock" style="display:flex;flex-direction:column;gap:10px">
+          <div class="row" style="margin-top:6px">
+            <h2>Filter predicate</h2>
+            <span class="chip info" title="Same tree the data-table builder emits; compiled by ConditionSql on the server">1 tree · 2 evaluators</span>
+            <button class="btn tiny" style="margin-left:auto" title="Advanced search: SQL over the Dataset with a tabular result" onclick="openModal('advModal')">⌥ Advanced</button>
+          </div>
+          <div class="cond" id="condRoot">
+            <div class="grp-head"><span class="op">AND</span> all of <button class="btn ghost tiny" style="margin-left:auto">+ condition</button><button class="btn ghost tiny">+ group</button></div>
+            <div class="leaf"><div class="input mono" id="p0f"></div><span class="op">between</span><div class="input mono">2026-01-01 … 03-31</div></div>
+            <div class="leaf"><div class="input mono" id="p1f"></div><span class="op">in</span><div class="input mono" id="p1v"></div></div>
+            <div class="leaf"><div class="input mono" id="p2f"></div><span class="op">&gt;=</span><div class="input mono" contenteditable="true" id="amtVal"></div></div>
+            <div class="cond nested">
+              <div class="grp-head"><span class="op">OR</span> node present as either endpoint <span class="chip neutral xs" title="A client-side node filter pushes down as an OR over sourceCol/targetCol">translated</span></div>
+              <div class="leaf"><div class="input mono" id="p3f"></div><span class="op">=</span><div class="input mono" id="p3v"></div></div>
+              <div class="leaf"><div class="input mono" id="p4f"></div><span class="op">=</span><div class="input mono" id="p4v"></div></div>
+            </div>
+          </div>
+          <div class="loop">
+            <div class="stage"><span class="t">Stage 1 · local (browser)</span><span class="v" id="localMatch">1,217 / 2,000</span><span class="xs sec">edges in working set match · 0 ms round-trip</span></div>
+            <div class="stage"><span class="t">Stage 2 · pushdown (DuckDB)</span><span class="v" id="pushState">not pushed</span><span class="xs sec">applied before GROUP BY, so counts stay right</span></div>
+          </div>
+          <div class="row" style="gap:6px">
+            <button class="btn" style="flex:1;justify-content:center" onclick="applyLocal()">Apply locally</button>
+            <button class="btn primary" style="flex:1;justify-content:center" id="pushBtn" onclick="pushDown()">Push to server ↗</button>
+          </div>
+          <div class="row" style="gap:6px"><button class="btn ghost tiny" onclick="toast('Saved as filter template')">Save template</button><span class="xs sec">Fields are validated against the relation's columns (422 on unknown). Values never reach the statement as text.</span></div>
+        </div>
+
+        <!-- S1.2 -->
+        <div id="multiBlock" class="hidden" style="display:flex;flex-direction:column;gap:8px">
+          <div class="row" style="margin-top:6px"><h2>Node planes</h2><span class="chip neutral">2 Datasets</span></div>
+          <div class="cond"><div class="grp-head"><span class="dot" style="background:var(--n-a)"></span> ORGANIZATION</div>
+            <div class="kv"><dt>Dataset</dt><dd class="mono">entities_registry</dd><dt>id</dt><dd class="mono">entity_urn</dd><dt>label</dt><dd class="mono">legal_name</dd><dt>attrs</dt><dd class="mono">jurisdiction, incorporation_date</dd></div></div>
+          <div class="cond"><div class="grp-head"><span class="dot" style="background:var(--n-b)"></span> PERSON</div>
+            <div class="kv"><dt>Dataset</dt><dd class="mono">beneficial_owners</dd><dt>id</dt><dd class="mono">person_id</dd><dt>label</dt><dd class="mono">full_name</dd><dt>attrs</dt><dd class="mono">citizenship, risk_rating</dd></div></div>
+          <div class="row" style="margin-top:6px"><h2>Edge planes</h2><span class="chip neutral">2 Datasets</span></div>
+          <div class="cond"><div class="grp-head">BENEFICIAL_OWNER</div><div class="kv"><dt>Dataset</dt><dd class="mono">ownership_links</dd><dt>from → to</dt><dd class="mono">owner_person_id → company_urn</dd></div></div>
+          <div class="cond"><div class="grp-head">WIRE_TRANSFER</div><div class="kv"><dt>Dataset</dt><dd class="mono">bank_wires</dd><dt>from → to</dt><dd class="mono">originating_entity_urn → beneficiary_entity_urn</dd></div></div>
+          <div class="alert info sm"><span>ℹ</span><div class="body sm">Suggested by <b>overlap profiling</b> (S2.3): <span class="mono">bank_wires.beneficiary_entity_urn</span> ∩ <span class="mono">entities_registry.entity_urn</span> — Jaccard <b>0.81</b>, 41k shared values. <button class="btn ghost tiny" style="text-decoration:underline">use as join</button></div></div>
+          <button class="btn primary" style="justify-content:center" onclick="toast('POST /inv/projection/multi — unified graph, provenance tagged per Dataset')">Project unified graph</button>
+        </div>
+
+        <!-- S2.1 -->
+        <div id="traverseBlock" class="hidden" style="display:flex;flex-direction:column;gap:8px">
+          <div class="row" style="margin-top:6px"><h2>Server-side traversal</h2><span class="chip neutral">recursive CTE</span></div>
+          <div class="row" style="gap:6px">
+            <div class="field" style="flex:1"><label>Start node</label><div class="input mono" id="trStart"></div></div>
+            <div class="field" style="flex:1"><label>Target node</label><div class="input mono" id="trEnd"></div></div>
+          </div>
+          <div class="row" style="gap:6px">
+            <div class="field" style="flex:1"><label>Max depth</label><div class="input">5 <span class="xs sec" style="margin-left:auto">fence 6</span></div></div>
+            <div class="field" style="flex:1"><label>Direction</label><div class="input">Directed ▾</div></div>
+            <div class="field" style="flex:1"><label>Weight</label><div class="input mono" id="trWeight"></div></div>
+          </div>
+          <div class="cond"><div class="grp-head">Temporal constraint</div>
+            <div class="kv"><dt>timestamp</dt><dd class="mono" id="trTs"></dd><dt>monotonic</dt><dd>yes — each hop later than the last</dd><dt>total window</dt><dd>≤ 72 h</dd></div></div>
+          <div class="alert info sm"><span>ℹ</span><div class="body sm">Only pruned paths come back over HTTP; the predicate above still applies to every hop. Fences: depth 6 · timeout 5,000 ms · max 20,000 edges.</div></div>
+          <button class="btn primary" style="justify-content:center" onclick="showPath()">Find paths</button>
+        </div>
+      </div>
+    </aside>
+    <div class="gutter" id="gL" role="separator" aria-orientation="vertical" aria-label="Resize query panel" title="Drag to resize · double-click to collapse"></div>
+
+    <!-- ═══ CENTER ═══ -->
+    <section class="card canvasWrap" aria-label="Graph canvas">
+      <div class="toolbar">
+        <button class="btn icon ghost" title="Search nodes">⌕</button>
+        <button class="btn icon ghost active" title="Filter node types">⛉</button>
+        <button class="btn icon ghost" title="Layout" onclick="rightTab('view')">▦</button>
+        <button class="btn icon ghost active" title="Timeline">◷</button>
+        <button class="btn icon ghost" title="Render settings" id="renderBtn" onclick="togglePop('renderPop')">⚙</button>
+        <div class="card pop" id="renderPop">
+          <div class="row"><h2>Render</h2><span class="chip neutral xs" style="margin-left:auto">G6 v5</span></div>
+          <div class="field"><label>Renderer</label><div class="seg" style="margin:0"><button id="rCanvas" onclick="setRenderer('canvas')">Canvas</button><button class="on" id="rWebgl" onclick="setRenderer('webgl')">WebGL</button></div></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Level of detail <span class="k">labels off when zoomed out</span></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Viewport culling <span class="k">draw only what is visible</span></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Aggregate into super-nodes <span class="k">above 5,000 nodes</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Edge bundling <span class="k">dense hubs</span></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Progressive load <span class="k">heaviest edges first</span></div>
+          <div class="xs sec">Rendering limits are separate from the analysis cap (spec §4.1). Both are published numbers in the footer.</div>
+        </div>
+        <span class="sep"></span>
+        <div class="input" style="min-height:28px;padding:2px 8px;gap:8px"><span class="xs sec">Saved view</span> <b class="sm" id="viewName">Falcon layering — Q1</b> ▾</div>
+        <button class="btn sm">Save</button>
+        <span class="sep"></span>
+        <button class="btn sm" onclick="openModal('snapModal')">📷 Snapshot</button>
+        <button class="btn sm primary" onclick="openModal('caseModal')">Attach to Case</button>
+        <button class="btn sm" onclick="openModal('dossierModal')">Dossier ▾</button>
+        <span class="sep"></span>
+        <button class="btn sm" id="geoBtn" onclick="setScenario('geo')">🗺 Geo sync</button>
+        <button class="btn icon ghost" title="Export JSON / PNG / SVG / GraphML" style="margin-left:auto">⇩</button>
+        <button class="btn icon ghost" title="Comments">💬</button>
+        <button class="btn icon ghost" title="Share via Exchange">↗</button>
+      </div>
+
+      <div class="canvas" id="graphCanvas">
+        <svg id="gsvg" viewBox="0 0 900 520" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Entity link graph, dummy data"></svg>
+
+        <div class="card ov tl legend" id="legend">
+          <div class="ov-h">Legend <button class="btn ghost" title="Minimize" onclick="toggleOv('legend')">–</button></div>
+          <div class="ov-b" id="legendBody"></div>
+        </div>
+
+        <div class="card ov tr" id="ws">
+          <div class="ov-h">Working set <span class="chip neutral xs" id="wsMode">top-N by count</span><button class="btn ghost" title="Minimize" onclick="toggleOv('ws')">–</button></div>
+          <div class="ov-b">
+            <div class="stats" id="statGrid"></div>
+            <div class="row" style="gap:6px;margin-top:2px"><button class="btn ghost tiny" onclick="openModal('statsModal')">⚙ Customize statistics</button><span class="xs sec" id="wsNote">Local filtering is free; a push re-projects only matching rows.</span></div>
+          </div>
+        </div>
+
+        <div class="card ov br minimap" id="minimap">
+          <div class="ov-h">Minimap <button class="btn ghost" title="Minimize" onclick="toggleOv('minimap')">–</button></div>
+          <div class="ov-b"><svg id="mmsvg" viewBox="0 0 900 520"></svg></div>
+        </div>
+
+        <div class="card progress hidden" id="progress">
+          <div class="row"><b class="sm" id="progTitle">Betweenness centrality</b><span class="chip info xs">worker</span><span class="sm sec" id="progPct" style="margin-left:auto">0 %</span><button class="btn sm" onclick="cancelJob()">Cancel</button></div>
+          <div class="bar"><i id="progBar"></i></div>
+          <div class="xs sec">Brandes over the working set — UI stays interactive; cancel discards partial scores.</div>
+        </div>
+      </div>
+
+      <!-- S3.1 dual pane -->
+      <div class="split hidden" id="geoSplit">
+        <div class="map" aria-label="Map pane">
+          <div class="brush" style="left:22%;top:28%;width:34%;height:30%"></div>
+          <div class="pin sel" style="left:30%;top:40%;background:var(--n-a)"></div>
+          <div class="pin sel" style="left:46%;top:36%;background:var(--n-hot)"></div>
+          <div class="pin" style="left:68%;top:22%;background:var(--n-c)"></div>
+          <div class="pin" style="left:78%;top:70%;background:var(--n-c)"></div>
+          <div class="pin" style="left:15%;top:75%;background:var(--n-b)"></div>
+          <svg class="route" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M31,42 Q40,30 47,38 T69,25" fill="none" stroke="var(--gamma-primary)" stroke-width=".8" stroke-dasharray="2 1.5" vector-effect="non-scaling-stroke"/></svg>
+          <div class="card" style="position:absolute;left:10px;bottom:10px;padding:8px 10px;font-size:11px"><b>Brush on map → selects on graph</b><br/><span class="sec">2 of 5 located entities selected · path traced as transit route</span></div>
+        </div>
+        <div class="canvas">
+          <svg viewBox="0 0 450 520" preserveAspectRatio="xMidYMid meet" id="geoG"></svg>
+          <div class="card" style="position:absolute;right:10px;top:10px;padding:8px 10px;font-size:11px;max-width:200px"><b>Selection is one channel</b><br/><span class="sec">Selecting on either pane highlights on both. Today's one-way Geo→Link handoff becomes two-way.</span></div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>Layout: <b id="layoutName">Layered</b></span><span>Timeline: 2026-01-01 → 2026-03-31</span><span id="typesOn">Node types: 3 of 4</span>
+        <span class="chip neutral xs" id="perf">WebGL · 60 fps · 611 / 611 nodes drawn · LOD 2 (labels on)</span>
+        <span style="margin-left:auto">Render <b>50k nodes · 250k edges</b> · Analysis <b>20k nodes (worker)</b> <span class="chip neutral xs" title="Published, enforced numbers — never an exception. Values are targets pending spec decision §7.3">stated caps</span></span>
+      </div>
+    </section>
+    <div class="gutter" id="gR" role="separator" aria-orientation="vertical" aria-label="Resize toolbox" title="Drag to resize · double-click to collapse"></div>
+
+    <!-- ═══ RIGHT ═══ -->
+    <aside class="card side" id="right" aria-label="Toolbox">
+      <div class="rail">
+        <button class="btn icon ghost" title="Expand toolbox" onclick="collapse('right',false)">«</button>
+        <button class="btn icon ghost" title="Analysis" onclick="collapse('right',false);rightTab('analysis')">∑</button>
+        <button class="btn icon ghost" title="View" onclick="collapse('right',false);rightTab('view')">▦</button>
+        <span class="vlabel">TOOLBOX</span>
+      </div>
+      <div class="sidehead"><h2>Toolbox</h2><button class="btn icon ghost" title="Collapse panel" aria-label="Collapse toolbox" onclick="collapse('right',true)">»</button></div>
+      <div class="seg"><button class="on" id="tabAnalysis" onclick="rightTab('analysis')">Analysis · 13</button><button id="tabView" onclick="rightTab('view')">View</button></div>
+
+      <!-- Analysis: the 13 real groups -->
+      <div class="panel acc" id="toolbox" style="padding:8px 0 0;gap:0">
+        <div class="h" data-g="Shortest path">Shortest path</div>
+        <div class="h" data-g="All paths" id="allPathsH">All paths <span class="n chip neutral xs hidden" id="pathsChip">3 found</span></div>
+        <div class="body hidden" id="allPathsBody">
+          <table><thead><tr><th>#</th><th>Path</th><th class="num">hops</th><th class="num" id="pathMeasureH">Σ</th><th class="num">window</th></tr></thead><tbody id="pathRows"></tbody></table>
+          <div class="xs sec">Ran server-side (recursive CTE) in <b>212 ms</b> over the full Dataset · depth fence 6 honoured · pruned paths only.</div>
+        </div>
+        <div class="h" data-g="Explain node">Explain node</div>
+        <div class="h open" data-g="Centrality" id="centH">Centrality <span class="n chip info xs" id="centChip">running</span></div>
+        <div class="body" id="centBody">
+          <div class="row"><div class="input" style="flex:1;min-height:28px;font-size:12px">Betweenness ▾</div><button class="btn sm primary" onclick="runJob('Betweenness centrality')">Run</button></div>
+          <table><thead><tr><th>Node</th><th>Score</th><th class="num">value</th></tr></thead><tbody id="centRows"></tbody></table>
+          <div class="alert warn sm"><span>⚠</span><div class="body sm"><b>Above the supported size, this stops gracefully.</b> <span class="sec">Past the analysis cap the run is refused with a message and a “narrow the graph” action, instead of throwing.</span></div></div>
+          <div class="xs sec">Scores are only as meaningful as the raw column values: nodes have no identity resolution.</div>
+        </div>
+        <div class="h" data-g="Communities">Communities <span class="n chip neutral xs">Louvain · 6</span></div>
+        <div class="h" data-g="Connected components">Connected components</div>
+        <div class="h" data-g="Cycles">Cycles</div>
+        <div class="h" data-g="Cut points">Cut points</div>
+        <div class="h" data-g="Cohesive groups">Cohesive groups</div>
+        <div class="h" data-g="Similarity & prediction">Similarity &amp; prediction</div>
+        <div class="h" data-g="Flow & backbone">Flow &amp; backbone</div>
+        <div class="h" data-g="Suspicion score">Suspicion score <span class="n chip err xs">1 ≥ 0.8</span></div>
+        <div class="h" data-g="Pattern match" id="patH">Pattern match <span class="n chip neutral xs">packs · 3</span></div>
+        <div class="body hidden" id="patBody">
+          <div class="field"><label>Pattern pack</label><div class="input" id="patPack">Layering / Pass-through ▾</div></div>
+          <pre class="mono" id="patText"></pre>
+          <div class="kv"><dt>branching</dt><dd>diamond · funnel · star-burst</dd><dt>temporal</dt><dd>ordered, window ≤ 48 h</dd><dt>matches</dt><dd><b>1</b> — <span id="patMatch"></span></dd></div>
+          <div class="row" style="gap:6px"><button class="btn sm primary" onclick="toast('Motif engine ran in worker · 1 match highlighted')">Run motif</button><button class="btn sm" onclick="openModal('caseModal')">Attach match to Case</button></div>
+        </div>
+      </div>
+
+      <!-- View toolbox: layouts, lenses, overlays (G6 v5 example gallery) -->
+      <div class="panel hidden" id="viewbox" style="padding:0;gap:0">
+        <div class="vsec" style="border-top:0"><div class="row"><h2>Layout</h2><span class="xs sec" style="margin-left:auto">11 shipped · 4 to add</span></div></div>
+        <div class="gallery" id="layoutGallery"></div>
+        <div class="vsec"><h2>Lenses &amp; selection</h2></div>
+        <div class="vlist">
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Brush select <span class="k">drag a box</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Lasso select <span class="k">free-hand</span></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Hover activate <span class="k">light up neighbours</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Fisheye lens <span class="k">magnify a region</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Edge filter lens <span class="k">show edges under cursor</span></div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Collapse / expand branch</div>
+        </div>
+        <div class="vsec"><h2>Overlays &amp; plugins</h2></div>
+        <div class="vlist">
+          <div class="sw on" onclick="this.classList.toggle('on');toggleOv('minimap',!this.classList.contains('on'))"><i></i>Minimap</div>
+          <div class="sw on" onclick="this.classList.toggle('on');toggleOv('legend',!this.classList.contains('on'))"><i></i>Legend</div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Timebar <span class="k">edge time column</span></div>
+          <div class="sw" id="swHull" onclick="this.classList.toggle('on');toast(this.classList.contains('on')?'Hulls drawn around Louvain communities':'Hulls hidden')"><i></i>Community hulls <span class="k">hull / bubble sets</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Combos <span class="k">group nodes into boxes</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Edge bundling</div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Tooltip</div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>Context menu <span class="k">expand · pin · attach</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Snapline &amp; grid</div>
+          <div class="sw on" onclick="this.classList.toggle('on')"><i></i>History <span class="k">undo / redo</span></div>
+          <div class="sw" onclick="this.classList.toggle('on')"><i></i>Watermark <span class="k">Case id on export</span></div>
+        </div>
+        <div class="vsec" style="padding-bottom:10px"><div class="xs sec">Mirrors the AntV G6 v5 example gallery; the SPA already renders with G6 v5, so each item is a layout id, a behavior or a plugin, not a new engine.</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ══ modals ══ -->
+  <div class="modal" id="advModal" role="dialog" aria-modal="true" aria-labelledby="advT">
+    <div class="card dialog wide">
+      <div class="row"><h3 id="advT">Advanced search</h3>
+        <div class="seg" style="margin:0 0 0 12px"><button class="on" id="advSql" onclick="advTab('sql')">SQL</button><button id="advGql" onclick="advTab('gql')">Graph query</button></div>
+        <span class="chip ok xs" style="margin-left:8px">read-only · guarded</span>
+        <button class="btn icon ghost" style="margin-left:auto" onclick="closeModals()" aria-label="Close">✕</button></div>
+      <div id="advSqlPane" style="display:flex;flex-direction:column;gap:10px">
+        <div class="alert info sm"><span>ℹ</span><div class="body sm">Seeded from the predicate builder, so both stay in step. Free-text SQL never reaches the projection route: the <b>result relation</b> is what gets projected. Guards: single read-only statement (<span class="mono">SqlGuard.isReadOnly</span>), Dataset-scoped, row cap 20,000, 5 s timeout.</div></div>
+        <textarea class="input" id="sqlText" spellcheck="false" aria-label="SQL"></textarea>
+        <div class="row" style="gap:6px"><button class="btn primary sm" onclick="runSqlDemo()">Run ▷</button><button class="btn sm" onclick="toast('Predicate builder updated from the WHERE clause')">↩ Back to builder</button><span class="sm sec" id="sqlStats" style="margin-left:auto"></span></div>
+        <div class="dtab"><table><thead id="sqlHead"></thead><tbody id="sqlBody"></tbody></table></div>
+        <div class="row" style="gap:6px;justify-content:flex-end"><button class="btn sm" onclick="closeModals();toast('Rows loaded as the working set (stage 1)')">Use rows as working set</button><button class="btn sm primary" onclick="closeModals();toast('Result relation projected as a graph')">Project result as graph</button></div>
+      </div>
+      <div id="advGqlPane" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+        <div class="alert warn sm"><span>⚠</span><div class="body sm"><b>Graph-database edition.</b> The same panel accepts a graph query dialect when the projection is backed by a graph store; over a Dataset it stays disabled rather than being emulated.</div></div>
+        <textarea class="input" id="gqlText" spellcheck="false" aria-label="Graph query" disabled></textarea>
+        <div class="row" style="gap:6px"><button class="btn primary sm" disabled>Run ▷</button><span class="sm sec">Not available for a Dataset-backed projection.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="statsModal" role="dialog" aria-modal="true" aria-labelledby="statsT">
+    <div class="card dialog">
+      <div class="row"><h3 id="statsT">Statistics profile</h3><span class="chip neutral xs" id="statsDomain"></span><button class="btn icon ghost" style="margin-left:auto" onclick="closeModals()" aria-label="Close">✕</button></div>
+      <div class="sm sec">The working-set statistics are derived from the attribute columns' detected types, then overridable per domain profile. A saved view keeps the profile.</div>
+      <table><thead><tr><th>Column</th><th>Detected</th><th>Aggregate</th><th>Shown as</th><th></th></tr></thead><tbody id="statsRows"></tbody></table>
+      <div class="row" style="gap:6px"><button class="btn ghost tiny">+ derived statistic</button><span class="xs sec">e.g. pass-through ratio = Σ out / Σ in per node</span></div>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModals()">Cancel</button><button class="btn primary" onclick="closeModals();toast('Statistics profile saved with the view')">Save</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="snapModal" role="dialog" aria-modal="true" aria-labelledby="snapT">
+    <div class="card dialog">
+      <div class="row"><h3 id="snapT">Snapshot this graph as evidence</h3><button class="btn icon ghost" style="margin-left:auto" onclick="closeModals()" aria-label="Close">✕</button></div>
+      <div class="alert info"><span>ℹ</span><div class="body sm">A <b>saved view</b> re-runs the question and may show a different graph tomorrow. A <b>snapshot</b> freezes the answer as it is now, with a hash.</div></div>
+      <div class="field"><label>Title</label><div class="input" id="snapTitle"></div></div>
+      <div class="field"><label>Description</label><div class="input" style="min-height:52px;align-items:flex-start" id="snapDesc"></div></div>
+      <div class="kv">
+        <dt>Subgraph</dt><dd>8 nodes · 9 edges (3 stranded nodes excluded)</dd>
+        <dt>Metrics frozen</dt><dd>betweenness, degree, suspicion score, community id</dd>
+        <dt>Predicate</dt><dd class="mono" id="snapPred"></dd>
+        <dt>Viewport</dt><dd>zoom 1.25 · pan (420.5, −118.0) · layout dagre</dd>
+        <dt>Annotations</dt><dd>1 — “Intermediate node with 98 % pass-through within 4 h.”</dd>
+        <dt>Dataset state</dt><dd class="mono"><span id="snapDs"></span> @ 2026-09-20T09:41Z · 2,401,338 rows</dd>
+        <dt>Manifest hash</dt><dd class="mono">sha256:7f3a…c91e <span class="chip ok xs">computed on save</span></dd>
+      </div>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModals()">Cancel</button><button class="btn primary" onclick="closeModals();toast('Snapshot SNP-0142 saved · POST /inv/snapshots')">Save snapshot</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="caseModal" role="dialog" aria-modal="true" aria-labelledby="caseT">
+    <div class="card dialog">
+      <div class="row"><h3 id="caseT">Attach to Case</h3><button class="btn icon ghost" style="margin-left:auto" onclick="closeModals()" aria-label="Close">✕</button></div>
+      <div class="field"><label>Case</label><div class="input">CASE-2026-0318 · <span id="caseName"></span> ▾</div></div>
+      <div class="field"><label>What gets attached</label>
+        <div class="cond">
+          <label class="row sm"><input type="radio" name="att" checked/> <b>New snapshot</b> <span class="sec">— frozen graph, metrics, predicate, hash (recommended)</span></label>
+          <label class="row sm"><input type="radio" name="att"/> Existing snapshot <span class="sec">SNP-0139 · 2026-09-18</span></label>
+          <label class="row sm"><input type="radio" name="att"/> Saved view only <span class="chip warn xs">not evidence</span> <span class="sec">— re-projects live, may change</span></label>
+        </div>
+      </div>
+      <div class="field"><label>Note for the Case ledger</label><div class="input" style="min-height:52px;align-items:flex-start" id="caseNote"></div></div>
+      <div class="xs sec">Writes <span class="mono">POST /cases/CASE-2026-0318/evidence/graph</span> and records actor, time and manifest hash in the Case audit ledger.</div>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModals()">Cancel</button><button class="btn primary" onclick="closeModals();toast('Attached SNP-0142 to CASE-2026-0318 · ledger entry #27')">Attach</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="dossierModal" role="dialog" aria-modal="true" aria-labelledby="dosT">
+    <div class="card dialog" style="width:min(860px,100%)">
+      <div class="row"><h3 id="dosT">Forensic dossier — preview</h3><span class="chip neutral">S3.2</span><button class="btn icon ghost" style="margin-left:auto" onclick="closeModals()" aria-label="Close">✕</button></div>
+      <div class="dossier">
+        <nav class="toc"><a class="on">1 · Executive summary</a><a>2 · Graph topology</a><a>3 · Critical nodes (centrality)</a><a>4 · Community membership</a><a>5 · Interaction ledger</a><a>6 · Predicate &amp; provenance</a><a>7 · Chain of custody</a></nav>
+        <div class="page">
+          <h4>1 · Executive summary</h4>
+          <p id="dosSummary"></p>
+          <p>The structure matches the <b id="dosMotif"></b> motif (branching pattern pack v2) with one confirmed instance and no out-of-order timestamps.</p>
+          <h4 style="margin-top:12px">7 · Chain of custody</h4>
+          <div class="kv"><dt>Snapshot</dt><dd class="mono">SNP-0142 · 2026-09-20T09:41Z</dd><dt>Manifest</dt><dd class="mono">sha256:7f3a91c4…c91e (nodes, edges, metric vectors)</dd><dt>Dataset</dt><dd class="mono"><span id="dosDs"></span> · 2,401,338 rows · registry rev 3f2c</dd><dt>Produced by</dt><dd>analyst r.patel · Inspecto Studio · Enterprise</dd><dt>Signature</dt><dd><span class="chip ok xs">valid</span> Space signing key 2026-Q3</dd></div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn" onclick="closeModals()">Close</button><button class="btn" onclick="toast('dossier.html generated')">Export HTML</button><button class="btn primary" onclick="toast('dossier.pdf generated · manifest embedded')">Export PDF</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const toast=(m)=>{const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2600)};
+$('themeBtn').onclick=()=>{const r=document.documentElement;const d=r.dataset.theme==='dark'||(!r.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'light':'dark'};
+
+/* ══════════ 1. Domain profiles — same topology, different data, statistics and emphasis ══════════ */
+const POS=[[150,260,22],[400,200,18],[660,255,20],[390,340,14],[570,100,14],[410,80,10],[230,90,12],[200,440,12],[780,430,12],[660,470,10],[380,455,10]];
+const STRANDED=[6,7,8];
+const EDGES=[ // d, width, cls, label position
+ ['M170,260 C260,180 300,180 380,200',5,'hot',[270,188]],
+ ['M420,200 C520,200 560,240 640,250',4.5,'hot',[515,212]],
+ ['M170,260 C220,340 300,360 380,340',2,'',[270,368]],
+ ['M400,340 C500,340 560,300 640,270',1.5,'',null],
+ ['M400,200 C420,120 480,90 560,100',2.5,'',[470,108]],
+ ['M580,100 C640,110 660,180 660,235',1.5,'',null],
+ ['M150,270 C110,340 130,420 200,440',1.5,'stranded',null],
+ ['M660,270 C720,330 760,380 780,430',1.5,'stranded',null],
+ ['M390,180 C330,110 280,80 230,90',1.5,'stranded',null],
+ ['M240,90 C290,60 360,60 400,80',1,'',null],
+ ['M780,430 C760,470 700,480 660,470',1,'',null],
+ ['M200,440 C260,470 320,470 380,455',1,'',null]];
+const N=(l,s,t)=>({l,s,t});
+const DOMAINS={
+ finance:{label:'Financial crime',dataset:'transactions',rows:'2.4M rows',src:'payer_id',tgt:'payee_id',kind:'channel',attrs:['booked_at','amount'],
+  types:{a:'Organization',b:'Person',c:'Account',hot:'Suspicion ≥ 0.8'},measure:'Σ amount',
+  nodes:[N('Falcon Holdings','ACC-99201 · deg 14','a'),N('Meridian Trade Ltd','ACC-88122 · betweenness 0.884','hot'),N('CH-44109 (Zurich)','ACC-44109','c'),N('Nova Exchange','ACC-71550','c'),N('R. Okafor','P-2201 · UBO 40%','b'),N('L. Brandt','P-2207','b'),N('Kestrel Freight','stranded · excluded by predicate','s'),N('ACC-30021','stranded','s'),N('ACC-51877','stranded','s'),N('ACC-90411','','c'),N('ACC-12009','','c')],
+  elabels:['wire · 412 · €9.8M','wire · 397 · €9.6M','crypto · 61','wire · 88'],edgeHint:'edge width = count · label = channel · count · Σ amount',
+  stats:[['Edges','2,000'],['Nodes','611'],['Σ amount','€41.2M'],['Median hop time','3 h 50']],
+  pred:{p1v:'wire, crypto',amt:'10000',nodeId:'ACC-99201'},suggested:['Suspicion score','Pattern match','Flow & backbone'],
+  paths:[['99201 → 88122 → 44109',2,'9.6M','3 h 50'],['99201 → 71550 → 44109',2,'0.4M','31 h'],['99201 → 88122 → P-2201 → 44109',3,'0.9M','68 h']],pathMeasure:'Σ €',
+  pack:'Layering / Pass-through',motif:'Node(A) -[transfer t1]-> Node(B)\n        -[transfer t2 > t1, within 48h]-> Node(C)\nwhere sum(t2) >= 0.9 * sum(t1)',
+  view:'Falcon layering — Q1',caseName:'Falcon Holdings — suspected layering',
+  summary:'Between <b>2026-01-01</b> and <b>2026-03-31</b>, <b>Falcon Holdings (ACC-99201)</b> moved <b>€9.8M</b> across <b>412 wire transfers</b> to <b>Meridian Trade Ltd (ACC-88122)</b>, which forwarded <b>€9.6M (98 %)</b> to <b>CH-44109 (Zurich)</b> within a median of <b>3 h 50 m</b>. Meridian\'s betweenness centrality of <b>0.884</b> is the highest in the projected graph; its suspicion score is <b>0.91</b>.',
+  rows:[['ACC-99201','ACC-88122','wire','2026-01-04 09:12','24,900.00'],['ACC-99201','ACC-88122','wire','2026-01-04 11:40','24,800.00'],['ACC-88122','ACC-44109','wire','2026-01-04 13:05','49,200.00'],['ACC-99201','ACC-71550','crypto','2026-01-06 22:18','12,400.00'],['ACC-88122','ACC-44109','wire','2026-01-07 08:51','61,000.00'],['ACC-99201','ACC-88122','wire','2026-01-09 10:02','24,950.00'],['P-2201','ACC-44109','wire','2026-01-12 15:44','18,000.00'],['ACC-71550','ACC-44109','crypto','2026-01-13 03:27','10,050.00']]},
+ telecom:{label:'Telecom CDR',dataset:'cdr',rows:'18.7M rows',src:'caller_msisdn',tgt:'callee_msisdn',kind:'call_type',attrs:['started_at','duration_s','cell_id'],
+  types:{a:'Subscriber',b:'Device (IMEI)',c:'Cell tower',hot:'Burner suspect'},measure:'Σ duration',
+  nodes:[N('+356 7912 0041','subscriber · deg 14','a'),N('+357 9944 1820','burner? · betweenness 0.884','hot'),N('Cell LIM-0412','Limassol · tower','c'),N('+971 50 220 9911','subscriber','a'),N('IMEI 35-209900-176148','device · 3 SIMs','b'),N('IMEI 86-014500-221903','device','b'),N('+44 7700 900123','stranded · excluded by predicate','s'),N('Cell VLT-0088','stranded','s'),N('+39 320 555 0199','stranded','s'),N('+356 7912 7788','','a'),N('+356 9900 1122','','a')],
+  elabels:['voice · 412 · 38 h 12','voice · 397 · 36 h 04','sms · 61','attach · 88'],edgeHint:'edge width = count · label = call type · count · Σ duration',
+  stats:[['Calls','2,000'],['Subscribers','611'],['Σ duration','1,204 h'],['Peak hour','22:00–23:00'],['Co-located cells','14'],['Night share','61 %']],
+  pred:{p1v:'voice, sms',amt:'60',nodeId:'+356 7912 0041'},suggested:['Communities','Explain node','Cohesive groups'],
+  paths:[['7912 0041 → 9944 1820 → LIM-0412',2,'38 h','3 h 50'],['7912 0041 → 50 220 9911 → LIM-0412',2,'2 h','31 h'],['7912 0041 → 9944 1820 → IMEI 35-2099… → LIM-0412',3,'6 h','68 h']],pathMeasure:'Σ dur',
+  pack:'Burner rotation',motif:'Device(D) -[uses t1]-> SIM(A)\n          -[uses t2 > t1, within 7d]-> SIM(B)\nwhere A.contacts ∩ B.contacts >= 3',
+  view:'Limassol burner cluster — Q1',caseName:'Limassol burner rotation',
+  summary:'Between <b>2026-01-01</b> and <b>2026-03-31</b>, <b>+356 7912 0041</b> placed <b>412 voice calls (38 h)</b> to <b>+357 9944 1820</b>, a number whose IMEI has rotated three SIMs in 90 days. <b>61 %</b> of traffic falls between 22:00 and 02:00 and attaches to <b>Cell LIM-0412</b>. Its betweenness centrality of <b>0.884</b> is the highest in the projected graph.',
+  rows:[['+356 7912 0041','+357 9944 1820','voice','2026-01-04 22:12','312'],['+356 7912 0041','+357 9944 1820','voice','2026-01-04 23:40','98'],['+357 9944 1820','+971 50 220 9911','voice','2026-01-05 00:05','1,140'],['+356 7912 0041','+356 7912 7788','sms','2026-01-06 21:18','—'],['+357 9944 1820','+971 50 220 9911','voice','2026-01-07 01:51','604'],['+356 7912 0041','+357 9944 1820','voice','2026-01-09 22:02','77'],['+356 9900 1122','+357 9944 1820','voice','2026-01-12 15:44','180'],['+357 9944 1820','+356 7912 0041','voice','2026-01-13 03:27','2,050']]},
+ supply:{label:'Supply chain',dataset:'shipments',rows:'640k rows',src:'shipper_id',tgt:'consignee_id',kind:'mode',attrs:['shipped_at','weight_kg','hs_code'],
+  types:{a:'Supplier',b:'Freight forwarder',c:'Consignee / port',hot:'Sanctioned party'},measure:'Σ weight',
+  nodes:[N('Falcon Metals Ltd','FALCON-MET · deg 14','a'),N('Meridian Freight SA','sanctioned · betweenness 0.884','hot'),N('Port of Rotterdam','NLRTM','c'),N('Nova Trading FZE','AE-DXB-2210','c'),N('Okafor Logistics','forwarder','b'),N('Brandt Spedition','forwarder','b'),N('Kestrel Freight','stranded · excluded by predicate','s'),N('Port of Valletta','stranded','s'),N('Pinnacle Imports','stranded','s'),N('Delta Consignee','','c'),N('Aurora GmbH','','c')],
+  elabels:['sea · 412 · 9,800 t','sea · 397 · 9,610 t','air · 61','road · 88'],edgeHint:'edge width = count · label = mode · count · Σ weight',
+  stats:[['Shipments','2,000'],['Parties','611'],['Σ weight','41,200 t'],['Avg lead time','18 d'],['Top HS code','7601 (71 %)'],['Transhipments','2.3 / route']],
+  pred:{p1v:'sea, air',amt:'1000',nodeId:'FALCON-MET'},suggested:['Flow & backbone','Shortest path','Cut points'],
+  paths:[['FALCON-MET → MERIDIAN → NLRTM',2,'9,610 t','12 d'],['FALCON-MET → NOVA-FZE → NLRTM',2,'400 t','31 d'],['FALCON-MET → MERIDIAN → OKAFOR → NLRTM',3,'900 t','44 d']],pathMeasure:'Σ t',
+  pack:'Transhipment relabelling',motif:'Supplier(A) -[ship t1, hs=X]-> Hub(B)\n            -[ship t2 > t1, hs=Y≠X, within 14d]-> Port(C)\nwhere weight(t2) >= 0.95 * weight(t1)',
+  view:'Falcon Metals transhipment — Q1',caseName:'Falcon Metals — sanctioned forwarder',
+  summary:'Between <b>2026-01-01</b> and <b>2026-03-31</b>, <b>Falcon Metals Ltd</b> shipped <b>9,800 t</b> across <b>412 sea consignments</b> to <b>Meridian Freight SA</b>, a sanctioned forwarder, which forwarded <b>9,610 t (98 %)</b> to the <b>Port of Rotterdam</b> under a different HS code within a median of <b>12 days</b>. Meridian\'s betweenness centrality of <b>0.884</b> is the highest in the projected graph.',
+  rows:[['FALCON-MET','MERIDIAN','sea','2026-01-04','24,900'],['FALCON-MET','MERIDIAN','sea','2026-01-04','24,800'],['MERIDIAN','NLRTM','sea','2026-01-16','49,200'],['FALCON-MET','NOVA-FZE','air','2026-01-06','1,240'],['MERIDIAN','NLRTM','sea','2026-01-19','61,000'],['FALCON-MET','MERIDIAN','sea','2026-01-09','24,950'],['OKAFOR','NLRTM','road','2026-01-22','18,000'],['NOVA-FZE','NLRTM','sea','2026-02-01','10,050']]},
+ cyber:{label:'Cyber network',dataset:'netflow',rows:'96M rows',src:'src_ip',tgt:'dst_ip',kind:'protocol',attrs:['ts','bytes','dst_port'],
+  types:{a:'Internal host',b:'Server',c:'External host',hot:'C2 suspect'},measure:'Σ bytes',
+  nodes:[N('10.4.12.7','workstation · deg 14','a'),N('185.220.101.4','C2? · betweenness 0.884','hot'),N('45.9.148.22','external · AS 208091','c'),N('10.4.0.5','DNS server','b'),N('10.4.9.14','workstation','a'),N('10.4.9.21','workstation','a'),N('10.4.2.2','stranded · excluded by predicate','s'),N('8.8.8.8','stranded','s'),N('104.16.1.1','stranded','s'),N('10.4.7.3','','a'),N('10.4.7.9','','a')],
+  elabels:['tcp/443 · 412 · 9.8 GB','tcp/443 · 397 · 9.6 GB','udp/53 · 61','smb · 88'],edgeHint:'edge width = flow count · label = protocol/port · count · Σ bytes',
+  stats:[['Flows','2,000'],['Hosts','611'],['Σ bytes','41.2 GB'],['Distinct ports','27'],['Beacon interval','60 s ± 2'],['Ext. ASNs','9']],
+  pred:{p1v:'tcp, udp',amt:'1048576',nodeId:'10.4.12.7'},suggested:['Centrality','Cycles','Communities'],
+  paths:[['10.4.12.7 → 185.220.101.4 → 45.9.148.22',2,'9.6 GB','3 h 50'],['10.4.12.7 → 10.4.0.5 → 45.9.148.22',2,'0.4 GB','31 h'],['10.4.12.7 → 185.220.101.4 → 10.4.9.14 → 45.9.148.22',3,'0.9 GB','68 h']],pathMeasure:'Σ bytes',
+  pack:'Beacon & exfiltration',motif:'Host(A) -[flow every ~60s, small]-> C2(B)\n        -[flow t2 > t1, bytes >= 100MB]-> Ext(C)\nwhere count(beacons) >= 50',
+  view:'10.4.12.7 beaconing — Q1',caseName:'Workstation 10.4.12.7 — suspected C2',
+  summary:'Between <b>2026-01-01</b> and <b>2026-03-31</b>, <b>10.4.12.7</b> opened <b>412 TLS sessions</b> to <b>185.220.101.4</b> at a <b>60 s ± 2</b> cadence, moving <b>9.8 GB</b>; the same external host relayed <b>9.6 GB (98 %)</b> onward to <b>45.9.148.22</b>. Its betweenness centrality of <b>0.884</b> is the highest in the projected graph.',
+  rows:[['10.4.12.7','185.220.101.4','tcp','2026-01-04 09:12:00','1,204,112'],['10.4.12.7','185.220.101.4','tcp','2026-01-04 09:13:01','1,199,870'],['185.220.101.4','45.9.148.22','tcp','2026-01-04 13:05:44','49,200,000'],['10.4.12.7','10.4.0.5','udp','2026-01-06 22:18:09','2,048'],['185.220.101.4','45.9.148.22','tcp','2026-01-07 08:51:30','61,000,000'],['10.4.12.7','185.220.101.4','tcp','2026-01-09 10:02:00','1,205,000'],['10.4.9.14','45.9.148.22','tcp','2026-01-12 15:44:10','18,000,000'],['10.4.0.5','45.9.148.22','udp','2026-01-13 03:27:55','10,050']]}
+};
+let D=DOMAINS.finance;
+const typeColor=t=>t==='s'?'var(--n-stranded)':`var(--n-${t})`;
+const detect=c=>/(_at|^ts$|time|date)/.test(c)?'temporal':/(amount|duration|weight|bytes|_s$|_kg$)/.test(c)?'numeric':'categorical';
+const aggFor=t=>t==='temporal'?'span (min → max)':t==='numeric'?'sum':'count distinct';
+
+function renderGraph(){
+  const s=$('gsvg');let h='<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" opacity=".6"/></marker></defs>';
+  if($('swHull').classList.contains('on')) h+='<path class="hull" d="M120,150 C140,80 470,60 520,140 C560,210 470,300 350,290 C230,280 100,220 120,150Z"/><path class="hull" d="M560,60 C640,40 740,160 720,290 C700,400 610,420 580,330 C550,240 520,100 560,60Z"/>';
+  h+='<g style="color:var(--gamma-text-secondary)">'+EDGES.map((e,i)=>`<path class="edge ${e[2]}" id="e${i}" d="${e[0]}" stroke-width="${e[1]}" marker-end="url(#arr)"/>`).join('')+'</g>';
+  let li=0;h+=EDGES.map(e=>e[3]?`<text class="elabel" x="${e[3][0]}" y="${e[3][1]}">${esc(D.elabels[li++]||'')}</text>`:'').join('');
+  h+=POS.map((p,i)=>{const n=D.nodes[i];const st=STRANDED.includes(i);return `<g class="node${st?' stranded':''}${i===0?' sel':''}" transform="translate(${p[0]},${p[1]})"><circle r="${p[2]}" fill="${typeColor(n.t)}"/><text y="${p[2]+16}" text-anchor="middle">${esc(n.l)}</text>${n.s?`<text class="sub" y="${p[2]+28}" text-anchor="middle">${esc(n.s)}</text>`:''}</g>`}).join('');
+  s.innerHTML=h;
+  $('mmsvg').innerHTML=EDGES.map(e=>`<path d="${e[0]}" stroke="var(--gamma-text-secondary)" stroke-opacity=".4" stroke-width="3" fill="none"/>`).join('')+POS.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${p[2]*1.6}" fill="${typeColor(D.nodes[i].t)}"/>`).join('')+'<rect class="vp" x="60" y="40" width="780" height="440" rx="8" vector-effect="non-scaling-stroke"/>';
+  $('geoG').innerHTML=`<path class="edge path" d="M80,260 C160,180 200,180 260,200" stroke-width="4"/><path class="edge" d="M270,200 C330,200 360,240 400,250" stroke-width="3"/><path class="edge" d="M80,260 C130,340 200,360 260,340" stroke-width="2"/>`+[[80,260,18,0],[265,200,15,1],[400,250,16,2],[265,340,12,3]].map(([x,y,r,i])=>`<g class="node${i<2?' sel':''}" transform="translate(${x},${y})"><circle r="${r}" fill="${typeColor(D.nodes[i].t)}"/><text y="${r+14}" text-anchor="middle">${esc(D.nodes[i].l)}</text></g>`).join('');
+}
+function renderLarge(){ // LOD 0: dots, hulls, super-nodes, no labels
+  let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const C=[[150,140,70],[420,110,60],[720,150,80],[200,400,65],[500,380,90],[780,420,60]];
+  let h='<g style="color:var(--gamma-text-secondary)">';
+  C.forEach(([cx,cy,r])=>{h+=`<ellipse class="hull" cx="${cx}" cy="${cy}" rx="${r+18}" ry="${r*0.75+18}"/>`;const pts=[];for(let i=0;i<55;i++){const a=rnd()*6.283,d=Math.sqrt(rnd())*r;pts.push([cx+Math.cos(a)*d,cy+Math.sin(a)*d*0.75])}
+    for(let i=0;i<70;i++){const a=pts[Math.floor(rnd()*55)],b=pts[Math.floor(rnd()*55)];h+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="currentColor" stroke-opacity=".18" stroke-width=".7"/>`}
+    pts.forEach(p=>h+=`<circle class="dotn" cx="${p[0]}" cy="${p[1]}" r="2.4" fill="${['var(--n-a)','var(--n-b)','var(--n-c)'][Math.floor(rnd()*3)]}"/>`)});
+  const S=[[330,270,'⊕ 1,240',D.types.c+'s'],[620,270,'⊕ 8,912',D.types.a+'s'],[470,490,'⊕ 3,105','low-degree leaves']];
+  S.forEach(([x,y,l,s])=>{C.slice(0,4).forEach(([cx,cy])=>h+=`<line x1="${x}" y1="${y}" x2="${cx}" y2="${cy}" stroke="currentColor" stroke-opacity=".25" stroke-width="1.5"/>`);h+=`<g class="sup" transform="translate(${x},${y})"><circle r="24"/><text y="3">${l}</text><text class="sub" y="38" text-anchor="middle">${esc(s)}</text></g>`});
+  h+=`<g class="node" transform="translate(${C[4][0]},${C[4][1]})"><circle r="9" fill="var(--n-hot)"/></g></g>`;
+  $('gsvg').innerHTML=h;
+}
+function setDomain(k){
+  D=DOMAINS[k];$('domainSel').value=k;
+  $('dsName').textContent=D.dataset;$('truncDs').textContent=D.dataset;$('dsRows').textContent=D.rows;$('srcCol').textContent=D.src;$('tgtCol').textContent=D.tgt;$('kindCol').textContent=D.kind;
+  $('attrCols').innerHTML=D.attrs.map(a=>`<span class="chip neutral mono">${a}</span>`).join('');
+  $('p0f').textContent=D.attrs[0];$('p1f').textContent=D.kind;$('p1v').textContent=D.pred.p1v;$('p2f').textContent=D.attrs[1];$('amtVal').textContent=D.pred.amt;
+  $('p3f').textContent=D.src;$('p4f').textContent=D.tgt;$('p3v').textContent=D.pred.nodeId;$('p4v').textContent=D.pred.nodeId;
+  $('legendBody').innerHTML=Object.entries(D.types).map(([t,l])=>`<span><i class="dot" style="background:${typeColor(t)}"></i> ${esc(l)}</span>`).join('')+`<span><i class="dot" style="background:var(--n-stranded);outline:1px dashed var(--gamma-text-secondary)"></i> Stranded (no longer matches)</span><span class="sec" style="margin-top:2px">${esc(D.edgeHint)}</span>`;
+  $('statGrid').innerHTML=D.stats.map(([t,v])=>`<div class="stat"><div class="t">${esc(t)}</div><div class="v">${esc(v)}</div></div>`).join('');
+  $('centRows').innerHTML=[[1,.884,88],[0,.612,61],[2,.437,44],[3,.19,19],[4,.121,12]].map(([i,v,w])=>`<tr><td>${esc(D.nodes[i].l)}</td><td><div class="meter"><i style="width:${w}%"></i></div></td><td class="num">${v.toFixed(3)}</td></tr>`).join('');
+  document.querySelectorAll('#toolbox .h').forEach(h=>{const old=h.querySelector('.sug');old&&old.remove();if(D.suggested.includes(h.dataset.g)){const c=document.createElement('span');c.className='chip sug xs';c.textContent='suggested';c.title='Foregrounded by the '+D.label+' domain profile';h.insertBefore(c,h.children[0]?.classList?.contains('n')?h.children[0]:null)}});
+  $('pathMeasureH').textContent=D.pathMeasure;$('pathRows').innerHTML=D.paths.map((p,i)=>`<tr><td>${i+1}</td><td class="mono">${esc(p[0])}</td><td class="num">${p[1]}</td><td class="num">${esc(p[2])}</td><td class="num">${esc(p[3])}</td></tr>`).join('');
+  $('patPack').textContent=D.pack+' ▾';$('patText').textContent=D.motif;$('patMatch').textContent=`${D.nodes[0].l} → ${D.nodes[1].l} → ${D.nodes[2].l} (98 %)`;
+  $('viewName').textContent=D.view;$('trStart').textContent=D.pred.nodeId;$('trEnd').textContent=D.nodes[2].s||D.nodes[2].l;$('trWeight').textContent=D.attrs[1];$('trTs').textContent=D.attrs[0];
+  $('snapTitle').textContent=`Chain — ${D.nodes[0].l} to ${D.nodes[2].l}`;$('snapDesc').textContent=`Suspected pass-through network identified via Louvain community 4 (${D.label}).`;$('snapDs').textContent=D.dataset;
+  $('snapPred').textContent=`${D.attrs[0]} between … AND ${D.kind} in (${D.pred.p1v}) AND ${D.attrs[1]} >= ${D.pred.amt} AND (${D.src} = ${D.pred.nodeId} OR ${D.tgt} = ${D.pred.nodeId})`;
+  $('caseName').textContent=D.caseName;$('caseNote').textContent=`Pass-through chain via ${D.nodes[1].l}; 98 % within the window; motif “${D.pack}” matched.`;
+  $('dosSummary').innerHTML=D.summary;$('dosMotif').textContent=D.pack;$('dosDs').textContent=D.dataset;
+  $('statsDomain').textContent=D.label;
+  $('statsRows').innerHTML=[['(edges)','count','count','Edges'],['(nodes)','distinct endpoints','count distinct','Nodes']].concat(D.attrs.map(a=>[a,detect(a),aggFor(detect(a)),D.stats.find(s=>s[0].toLowerCase().includes(a.split('_')[0]))?.[0]||'—'])).map(r=>`<tr><td class="mono">${esc(r[0])}</td><td><span class="chip neutral xs">${esc(r[1])}</span></td><td><select class="input" style="min-height:26px;padding:2px 6px;font-size:12px"><option>${esc(r[2])}</option><option>sum</option><option>avg</option><option>median</option><option>min / max</option><option>count distinct</option><option>span</option><option>share by ${esc(D.kind)}</option></select></td><td>${esc(r[3])}</td><td><span class="sw on" style="padding:0" onclick="this.classList.toggle('on')"><i></i></span></td></tr>`).join('');
+  $('sqlText').value=`SELECT ${D.src}, ${D.tgt}, ${D.kind}, ${D.attrs.join(', ')}\nFROM ${D.dataset}\nWHERE ${D.attrs[0]} BETWEEN DATE '2026-01-01' AND DATE '2026-03-31'\n  AND ${D.kind} IN (${D.pred.p1v.split(', ').map(v=>`'${v}'`).join(', ')})\n  AND ${D.attrs[1]} >= ${D.pred.amt}\n  AND (${D.src} = '${D.pred.nodeId}' OR ${D.tgt} = '${D.pred.nodeId}')\nORDER BY ${D.attrs[0]}\nLIMIT 20000;`;
+  $('gqlText').value=`MATCH (a)-[t:${D.kind.toUpperCase()}]->(b)\nWHERE t.${D.attrs[0]} >= date('2026-01-01') AND t.${D.attrs[1]} >= ${D.pred.amt}\n  AND (a.id = '${D.pred.nodeId}' OR b.id = '${D.pred.nodeId}')\nRETURN a, t, b LIMIT 20000`;
+  $('sqlHead').innerHTML=`<tr>${[D.src,D.tgt,D.kind,...D.attrs.slice(0,2)].map(c=>`<th class="mono">${esc(c)}</th>`).join('')}</tr>`;$('sqlBody').innerHTML='';$('sqlStats').textContent='';
+  if(currentScenario==='large')renderLarge();else renderGraph();
+}
+
+/* ══════════ 2. Resizable, collapsible side panels ══════════ */
+const sizes={left:300,right:320};
+function collapse(side,on){const el=$(side);el.classList.toggle('collapsed',on);document.documentElement.style.setProperty(side==='left'?'--l':'--r',on?'44px':sizes[side]+'px');}
+function maximize(){const both=$('left').classList.contains('collapsed')&&$('right').classList.contains('collapsed');collapse('left',!both);collapse('right',!both);}
+function drag(gutter,side,dir){let x0,w0;gutter.addEventListener('pointerdown',e=>{if($(side).classList.contains('collapsed'))return;x0=e.clientX;w0=sizes[side];gutter.classList.add('on');gutter.setPointerCapture(e.pointerId);document.body.style.cursor='col-resize'});
+  gutter.addEventListener('pointermove',e=>{if(x0==null)return;const w=Math.max(200,Math.min(560,w0+dir*(e.clientX-x0)));sizes[side]=w;document.documentElement.style.setProperty(side==='left'?'--l':'--r',w+'px')});
+  const end=()=>{x0=null;gutter.classList.remove('on');document.body.style.cursor=''};gutter.addEventListener('pointerup',end);gutter.addEventListener('pointercancel',end);
+  gutter.addEventListener('dblclick',()=>collapse(side,!$(side).classList.contains('collapsed')));}
+drag($('gL'),'left',1);drag($('gR'),'right',-1);
+
+/* ══════════ 3. Minimizable overlays ══════════ */
+function toggleOv(id,force){const el=$(id);const min=force===undefined?!el.classList.contains('min'):force;el.classList.toggle('min',min);el.querySelector('.ov-h .btn').textContent=min?'+':'–';el.querySelector('.ov-h .btn').title=min?'Restore':'Minimize';}
+
+/* ══════════ 4. Advanced search ══════════ */
+function advTab(t){$('advSql').classList.toggle('on',t==='sql');$('advGql').classList.toggle('on',t==='gql');$('advSqlPane').classList.toggle('hidden',t!=='sql');$('advGqlPane').classList.toggle('hidden',t!=='gql');}
+function runSqlDemo(){$('sqlBody').innerHTML=D.rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i===4?'num':''} ${i<2?'mono':''}">${esc(c)}</td>`).join('')}</tr>`).join('');$('sqlStats').textContent='1,214 rows · 184 ms · read-only · guard OK';toast('Guard passed: single SELECT, Dataset-scoped, under the row cap')}
+
+/* ══════════ 5. Render settings & perf HUD ══════════ */
+function togglePop(id){$(id).classList.toggle('open')}
+document.addEventListener('click',e=>{if(!e.target.closest('.pop')&&!e.target.closest('#renderBtn'))document.querySelectorAll('.pop').forEach(p=>p.classList.remove('open'))});
+function setRenderer(r){$('rCanvas').classList.toggle('on',r==='canvas');$('rWebgl').classList.toggle('on',r==='webgl');const big=currentScenario==='large';$('perf').textContent=r==='webgl'?(big?'WebGL · 58 fps · 48,211 nodes → 6 hulls · 3 super-nodes · 412 drawn · LOD 0 (labels off)':'WebGL · 60 fps · 611 / 611 nodes drawn · LOD 2 (labels on)'):(big?'Canvas · 21 fps · 48,211 nodes → aggregated · LOD 0 · consider WebGL':'Canvas · 60 fps · 611 / 611 nodes drawn · LOD 2 (labels on)');}
+
+/* ══════════ 6. View toolbox: layout gallery ══════════ */
+const LAYOUTS=[['dagre','Layered','<circle cx="8" cy="15" r="3"/><circle cx="22" cy="8" r="3"/><circle cx="22" cy="22" r="3"/><circle cx="36" cy="15" r="3"/><line x1="8" y1="15" x2="22" y2="8"/><line x1="8" y1="15" x2="22" y2="22"/><line x1="22" y1="8" x2="36" y2="15"/><line x1="22" y1="22" x2="36" y2="15"/>'],
+ ['force','Force','<circle cx="22" cy="15" r="3"/><circle cx="8" cy="8" r="2.5"/><circle cx="36" cy="6" r="2.5"/><circle cx="10" cy="25" r="2.5"/><circle cx="34" cy="24" r="2.5"/><line x1="22" y1="15" x2="8" y2="8"/><line x1="22" y1="15" x2="36" y2="6"/><line x1="22" y1="15" x2="10" y2="25"/><line x1="22" y1="15" x2="34" y2="24"/>'],
+ ['force-cluster','Clustering force','<circle cx="10" cy="10" r="2.5"/><circle cx="15" cy="7" r="2.5"/><circle cx="12" cy="16" r="2.5"/><circle cx="32" cy="20" r="2.5"/><circle cx="36" cy="14" r="2.5"/><circle cx="30" cy="26" r="2.5"/><line x1="12" y1="16" x2="30" y2="26"/>'],
+ ['radial','Radial','<circle cx="22" cy="15" r="3"/><circle cx="22" cy="4" r="2"/><circle cx="33" cy="15" r="2"/><circle cx="22" cy="26" r="2"/><circle cx="11" cy="15" r="2"/><circle cx="8" cy="5" r="1.5"/><circle cx="37" cy="26" r="1.5"/><line x1="22" y1="15" x2="22" y2="4"/><line x1="22" y1="15" x2="33" y2="15"/><line x1="22" y1="15" x2="22" y2="26"/><line x1="22" y1="15" x2="11" y2="15"/>'],
+ ['concentric','Degree ordered','<circle cx="22" cy="15" r="3"/><path d="M22,7 a8,8 0 1,0 0.1,0"/><path d="M22,2 a13,13 0 1,0 0.1,0"/><circle cx="30" cy="15" r="1.8"/><circle cx="14" cy="15" r="1.8"/><circle cx="22" cy="2" r="1.8"/>'],
+ ['circular','Circular','<path d="M22,3 a12,12 0 1,0 0.1,0"/><circle cx="22" cy="3" r="2"/><circle cx="34" cy="15" r="2"/><circle cx="22" cy="27" r="2"/><circle cx="10" cy="15" r="2"/><circle cx="30" cy="6" r="2"/><circle cx="14" cy="24" r="2"/>'],
+ ['grid','Grid','<circle cx="8" cy="8" r="2.5"/><circle cx="22" cy="8" r="2.5"/><circle cx="36" cy="8" r="2.5"/><circle cx="8" cy="22" r="2.5"/><circle cx="22" cy="22" r="2.5"/><circle cx="36" cy="22" r="2.5"/>'],
+ ['mds','Information density','<circle cx="10" cy="20" r="2.5"/><circle cx="14" cy="24" r="2.5"/><circle cx="19" cy="18" r="2.5"/><circle cx="30" cy="8" r="2.5"/><circle cx="36" cy="12" r="2.5"/><circle cx="26" cy="14" r="2"/>'],
+ ['mindmap','Mind map','<circle cx="22" cy="15" r="3"/><circle cx="8" cy="7" r="2"/><circle cx="8" cy="23" r="2"/><circle cx="36" cy="7" r="2"/><circle cx="36" cy="23" r="2"/><path d="M22,15 C15,15 15,7 8,7"/><path d="M22,15 C15,15 15,23 8,23"/><path d="M22,15 C29,15 29,7 36,7"/><path d="M22,15 C29,15 29,23 36,23"/>'],
+ ['org','Organization chart','<circle cx="22" cy="5" r="2.5"/><circle cx="10" cy="16" r="2.5"/><circle cx="34" cy="16" r="2.5"/><circle cx="6" cy="26" r="2"/><circle cx="14" cy="26" r="2"/><path d="M22,5 L22,10 L10,10 L10,16 M22,10 L34,10 L34,16 M10,16 L10,21 L6,21 L6,26 M10,21 L14,21 L14,26"/>'],
+ ['radial-tree','Radial tree','<circle cx="22" cy="15" r="3"/><circle cx="22" cy="4" r="2"/><circle cx="32" cy="9" r="2"/><circle cx="32" cy="21" r="2"/><circle cx="22" cy="26" r="2"/><circle cx="12" cy="21" r="2"/><circle cx="12" cy="9" r="2"/><line x1="22" y1="15" x2="22" y2="4"/><line x1="22" y1="15" x2="32" y2="9"/><line x1="22" y1="15" x2="32" y2="21"/><line x1="22" y1="15" x2="22" y2="26"/><line x1="22" y1="15" x2="12" y2="21"/><line x1="22" y1="15" x2="12" y2="9"/>'],
+ ['fruchterman','Fruchterman','<circle cx="12" cy="10" r="2.5"/><circle cx="30" cy="8" r="2.5"/><circle cx="34" cy="22" r="2.5"/><circle cx="14" cy="24" r="2.5"/><circle cx="23" cy="16" r="2.5"/><line x1="12" y1="10" x2="23" y2="16"/><line x1="30" y1="8" x2="23" y2="16"/><line x1="34" y1="22" x2="23" y2="16"/><line x1="14" y1="24" x2="23" y2="16"/>','add'],
+ ['combo-force','Combo force','<rect x="3" y="4" width="18" height="22" rx="3" fill="none" stroke="currentColor" opacity=".5"/><rect x="24" y="8" width="17" height="16" rx="3" fill="none" stroke="currentColor" opacity=".5"/><circle cx="9" cy="10" r="2"/><circle cx="15" cy="20" r="2"/><circle cx="32" cy="16" r="2"/>','add'],
+ ['fishbone','Fishbone','<line x1="4" y1="15" x2="40" y2="15"/><line x1="12" y1="15" x2="18" y2="5"/><line x1="22" y1="15" x2="28" y2="5"/><line x1="12" y1="15" x2="18" y2="25"/><line x1="22" y1="15" x2="28" y2="25"/><circle cx="40" cy="15" r="3"/>','add'],
+ ['dendrogram','Dendrogram','<path d="M6,26 L6,18 L14,18 L14,26 M10,18 L10,10 L26,10 L26,18 M22,18 L22,26 M30,18 L30,26 M18,10 L18,4"/><circle cx="18" cy="4" r="2"/>','add']];
+$('layoutGallery').innerHTML=LAYOUTS.map(([id,l,g,add])=>`<button class="lay${id==='dagre'?' on':''}" data-l="${id}" onclick="pickLayout('${id}','${l}')" title="${add?'Not in the SPA yet — G6 v5 built-in':'Shipped in the SPA layout menu'}"><svg viewBox="0 0 44 30">${g}</svg>${l}${add?'<span class="add">+ add</span>':''}</button>`).join('');
+function pickLayout(id,l){document.querySelectorAll('.lay').forEach(b=>b.classList.toggle('on',b.dataset.l===id));$('layoutName').textContent=l;toast('Layout → '+l+(['mindmap','org','radial-tree','dendrogram'].includes(id)?' (needs a tree-shaped graph)':''))}
+function rightTab(t){$('tabAnalysis').classList.toggle('on',t==='analysis');$('tabView').classList.toggle('on',t==='view');$('toolbox').classList.toggle('hidden',t!=='analysis');$('viewbox').classList.toggle('hidden',t!=='view');}
+$('swHull').addEventListener('click',()=>{if(currentScenario!=='large')renderGraph()});
+
+/* ══════════ scenarios ══════════ */
+let currentScenario='filter';
+const scenarios={
+  filter:{show:['filterBlock','truncAlert','graphCanvas'],hide:['multiBlock','traverseBlock','geoSplit','doneAlert','progress'],open:'cent',tab:'analysis'},
+  worker:{show:['filterBlock','graphCanvas'],hide:['multiBlock','traverseBlock','geoSplit','truncAlert','doneAlert'],open:'cent',tab:'analysis',after:()=>runJob('Betweenness centrality')},
+  large:{show:['filterBlock','graphCanvas','truncAlert'],hide:['multiBlock','traverseBlock','geoSplit','doneAlert','progress'],open:'cent',tab:'view',after:()=>{renderLarge();$('wsMode').textContent='48k nodes · aggregated';$('typesOn').textContent='Node types: 4 of 4';setRenderer('webgl');toast('LOD 0: labels off, communities as hulls, leaves folded into super-nodes — click a super-node to unfold')}},
+  evidence:{show:['filterBlock','doneAlert','graphCanvas'],hide:['multiBlock','traverseBlock','geoSplit','truncAlert','progress'],open:'cent',tab:'analysis',after:()=>openModal('snapModal')},
+  multi:{show:['multiBlock','graphCanvas'],hide:['filterBlock','traverseBlock','geoSplit','truncAlert','doneAlert','progress'],open:'cent',tab:'analysis'},
+  traverse:{show:['traverseBlock','graphCanvas'],hide:['filterBlock','multiBlock','geoSplit','truncAlert','doneAlert','progress'],open:'allPaths',tab:'analysis',after:showPath},
+  geo:{show:['filterBlock','geoSplit'],hide:['multiBlock','traverseBlock','truncAlert','doneAlert','progress','graphCanvas'],open:'cent',tab:'analysis'},
+};
+function setScenario(s){
+  const prev=currentScenario;currentScenario=s;
+  document.querySelectorAll('#scenarios .tab').forEach(t=>t.classList.toggle('active',t.dataset.s===s));
+  const sc=scenarios[s];sc.hide.forEach(id=>$(id)?.classList.add('hidden'));sc.show.forEach(id=>$(id)?.classList.remove('hidden'));
+  openGroup(sc.open);rightTab(sc.tab);$('geoBtn').classList.toggle('active',s==='geo');
+  if(prev==='large'&&s!=='large'){renderGraph();$('wsMode').textContent='top-N by count';$('typesOn').textContent='Node types: 3 of 4';setRenderer('webgl')}
+  if(s==='multi'){$('datasetField').classList.add('hidden');$('wsMode').textContent='4 Datasets · provenance tagged'}else if(s!=='large'){$('datasetField').classList.remove('hidden')}
+  sc.after&&sc.after();
+}
+document.querySelectorAll('#scenarios .tab').forEach(t=>t.onclick=()=>setScenario(t.dataset.s));
+
+/* toolbox accordion: one open at a time */
+function openGroup(k){['cent','allPaths','pat'].forEach(g=>{$(g+'H').classList.toggle('open',g===k);$(g+'Body').classList.toggle('hidden',g!==k)})}
+$('centH').onclick=()=>openGroup('cent');$('allPathsH').onclick=()=>openGroup('allPaths');$('patH').onclick=()=>openGroup('pat');
+
+/* S1.4 loop */
+let iter=1;
+function focusFilter(){$('amtVal').focus();$('condRoot').style.outline='2px solid var(--gamma-primary)';setTimeout(()=>$('condRoot').style.outline='',900)}
+function applyLocal(){const v=parseInt($('amtVal').textContent.replace(/\D/g,''))||0,base=parseInt(D.pred.amt);const n=Math.max(120,Math.round(1217*Math.exp(-(v-base)/(base*6))));$('localMatch').textContent=n.toLocaleString()+' / 2,000';toast('Applied locally — '+n.toLocaleString()+' edges match, 0 ms')}
+function pushDown(){const b=$('pushBtn');b.disabled=true;b.textContent='Pushing…';$('pushState').textContent='running';
+  setTimeout(()=>{iter++;b.disabled=false;b.textContent='Push to server ↗';const v=parseInt($('amtVal').textContent.replace(/\D/g,''))||0;const done=v>=parseInt(D.pred.amt);
+    $('pushState').textContent=done?'1,214 edges · 184 ms':'2,000 (truncated)';
+    if(done){$('truncAlert').classList.add('hidden');$('doneAlert').classList.remove('hidden');$('iter2').textContent=iter;$('wsMode').textContent='complete · 3 stranded';toast('Untruncated — the working set is now the whole answer')}
+    else{$('iter').textContent=iter;toast('Still truncated — refine and push again')}},900)}
+let strandedHidden=false;
+function toggleStranded(){strandedHidden=!strandedHidden;document.querySelectorAll('#gsvg .stranded').forEach(e=>e.style.display=strandedHidden?'none':'')}
+
+/* S1.1 worker job */
+let jobT;
+function runJob(name){clearInterval(jobT);const p=$('progress');p.classList.remove('hidden');$('progTitle').textContent=name;$('centChip').textContent='running';$('centChip').className='n chip info xs';
+  let pct=0;jobT=setInterval(()=>{pct=Math.min(100,pct+Math.random()*9);$('progBar').style.width=pct+'%';$('progPct').textContent=Math.round(pct)+' %';
+    if(pct>=100){clearInterval(jobT);setTimeout(()=>p.classList.add('hidden'),500);$('centChip').textContent='done · 2.3 s';$('centChip').className='n chip ok xs'}},180)}
+function cancelJob(){clearInterval(jobT);$('progress').classList.add('hidden');$('centChip').textContent='cancelled';$('centChip').className='n chip neutral xs';toast('Cancelled via AbortController — no partial scores written')}
+
+/* S2.1 paths */
+function showPath(){['e0','e1'].forEach(id=>$(id)?.classList.add('path'));$('pathsChip').classList.remove('hidden');openGroup('allPaths')}
+
+/* modals */
+function openModal(id){$(id).classList.add('open')}
+function closeModals(){document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open'))}
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals()}));
+addEventListener('keydown',e=>{if(e.key==='Escape'){closeModals();document.querySelectorAll('.pop').forEach(p=>p.classList.remove('open'))}});
+
+setDomain('finance');
+</script>
+</body>
+</html>

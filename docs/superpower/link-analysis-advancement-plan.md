@@ -17,6 +17,10 @@ This plan details the grounded state of Link Analysis, enumerates the 7 core arc
 (functional specification, every clause tagged SHIPPED / PARTIAL / NOT BUILT). Read the spec for
 *what the feature must do*; read this for *how and in what order*.
 
+⇒ **What the target state looks like** is sketched in
+[`link-analysis-ui-mockup.html`](link-analysis-ui-mockup.html) (2026-09-20, dummy data) — one scenario tab
+per work item S1.1–S3.2; a design reference for the SPA changes, not product code.
+
 ---
 
 ## 1. Grounding & As-Built Audit
@@ -159,6 +163,39 @@ already samples top-N by `cnt DESC` (`InvRoutes.java:215`). Only the `filter` fi
 **Acceptance:** an analyst projects a Dataset, narrows it in the browser with no round-trip, pushes
 the predicate, and either receives an untruncated result or a `truncated` flag telling them to
 refine further — and at no point can the pushed filter reach the statement unvalidated.
+
+#### UI design requirements from the mockup review (operator, 2026-09-20)
+
+Raised against [`link-analysis-ui-mockup.html`](link-analysis-ui-mockup.html) v1 and reflected in v2. They
+bind the SPA work in S1.1, S1.3, S1.4 and any rendering item; none is sized here.
+
+1. **Domain profiles.** Data comes from different domains (finance, telecom CDR, supply chain, cyber) and
+   the statistics differ with the nature of the data. A **domain profile** maps the projection's columns to
+   entity types, formats the edge measure, derives the working-set statistics from the attribute columns'
+   detected types (temporal → span, numeric → sum, categorical → count distinct, plus derived ratios), and
+   foregrounds the toolbox groups that matter for that domain. The profile is saved with the view.
+2. **Side panels resize and collapse.** Query panel and toolbox are draggable gutters with a minimum and
+   maximum width, collapse to an icon rail, and a single action maximises the canvas.
+3. **Canvas overlays minimise.** Legend, Working set and Minimap each fold to a pill so the graph gets the
+   space; the View toolbox toggles them.
+4. **Advanced search beside the predicate builder.** The builder stays the primary surface; an *Advanced*
+   action opens SQL over the Dataset with a **tabular** result. ⚠ Spec §4.3 (no free-text SQL) still
+   holds for `/inv/projection`: the SQL rides the data-table's existing Pro SQL editor pattern
+   (`SqlEditorComponent`, `sqlOverride`) and the `SqlGuard.isReadOnly` check, is seeded from the predicate
+   tree, and what gets projected is the **result relation**, never the text. A graph-query dialect tab is
+   reserved for a graph-store-backed edition and stays disabled over a Dataset rather than being emulated.
+5. **Rendering at scale is a requirement of its own.** The spec §4.1 records *no virtualisation or
+   level-of-detail* on the canvas, and no roadmap item covers it — S1.1 moves *analysis* off the main
+   thread, not *drawing*. Target: WebGL renderer, level of detail (labels off when zoomed out), viewport
+   culling, progressive load (heaviest edges first), and aggregation of low-degree leaves into
+   super-nodes above a threshold, with the rendering limit published in the footer next to the analysis
+   cap. ⇒ **Open: add a rendering item (S1.5) and size it, or fold it into S1.1.** Operator's call.
+6. **A View toolbox alongside Analysis.** The right panel gains a second tab mirroring the AntV G6 v5
+   example gallery: the 11 layouts the SPA already offers (`graph-view.component.ts:95-127`) plus
+   Fruchterman, combo force, fishbone and dendrogram to add; lenses and selection (brush, lasso, fisheye,
+   edge-filter lens, hover activate); overlays and plugins (minimap, timebar, legend, community hulls /
+   bubble sets, combos, edge bundling, tooltip, context menu, snapline, history, watermark). Each is a
+   G6 layout id, behavior or plugin, not a new engine.
 
 ### Phase 2: DuckDB Recursive Traversal & Declarative Motif Engine (Sprint 10)
 *Objective: Shift multi-hop graph expansion to server-side DuckDB execution and deploy declarative forensic pattern matching.*
