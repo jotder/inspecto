@@ -148,7 +148,7 @@ class AssistAuditTest {
             agent.init(svc);   // subscribes the failure reactor to the bus
 
             svc.eventBus().publish(new ConsignmentEvent("MINI_ETL", "B1", "FAILED", List.of(),
-                    0, 10L, 1, "schema selector mismatch", "bad.csv", 3));
+                    0, 10L, 1, "schema selector mismatch", "bad.csv", 3, false));
 
             // Diagnosis happens on the reactor's executor — await the audit event.
             long deadline = System.nanoTime() + 5_000_000_000L;

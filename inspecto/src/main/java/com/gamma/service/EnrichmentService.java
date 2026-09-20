@@ -170,6 +170,14 @@ public final class EnrichmentService implements AutoCloseable {
     /** Dispatch a committed-batch event to any job listening on its pipeline. */
     private void onConsignmentEvent(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;   // enrichment acts only on successful commits
+        // PIPELINE-DRYRUN-1 step 5 — enrichment has no dry-run mode to inherit and a recompute writes for
+        // real, so it REFUSES loudly. ⚠ It would otherwise recompute partitions the simulated batch did
+        // not write, which is the exact fail-open shape the flag exists to prevent.
+        if (event.dryRun()) {
+            log.info("dry run: would dispatch simulated consignment {} of '{}' to any enrichment job "
+                    + "listening on it — no recompute scheduled", event.batchId(), event.pipeline());
+            return;
+        }
         for (EnrichmentConfig job : jobs) {
             EnrichmentConfig.Triggers t = job.triggers();
             if (!t.hasEvent()) continue;

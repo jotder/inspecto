@@ -818,8 +818,10 @@ public final class JobService implements AutoCloseable {
     private void fireOnCommit(String name, ConsignmentEvent event) {
         if (!jobs.containsKey(name)) return;
         String runId = newRunId(name);
+        // PIPELINE-DRYRUN-1 step 5: the firing inherits the upstream batch's dry-run flag instead of the
+        // hardcoded `false` it carried until 2026-09-20. A simulated batch chains a simulated Job.
         submitRun(runId, name, "event:" + event.pipeline(), runId, null, 0,
-                new Firing(Map.of(), commitPayload(event), false));
+                new Firing(Map.of(), commitPayload(event), event.dryRun()));
     }
 
     /**
@@ -844,7 +846,13 @@ public final class JobService implements AutoCloseable {
             }
             if (newDepth > maxChainDepth) { cutChain(c.name(), sig, newDepth); continue; }
             String cid = sig.correlationId();
-            Firing firing = new Firing(Map.of(), sig.payload(), false);   // §7.2 layer 2: bind: resolves $signal.<field>
+            // §7.2 layer 2: bind: resolves $signal.<field>.
+            // ⚠ PIPELINE-DRYRUN-1 step 5 — this path needs a DIFFERENT mechanism from fireOnCommit's, and
+            // the plan read as if both were the same one-line fix. fireOnCommit has the ConsignmentEvent in
+            // hand; here the Firing is built from a Signal's payload, so the flag has to travel IN the
+            // payload — put there by PipelineConsignmentSignal.emit (pipeline.batch.*) and by
+            // commitPayload (the pipeline.commit mirror) — and be read back out here.
+            Firing firing = new Firing(Map.of(), sig.payload(), signalDryRun(sig.payload()));
             signalCoalescers.computeIfAbsent(c.name(), k -> new TriggerCoalescer())
                     .signal(() -> submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid,
                             // 🔴 THE causation link: every signal this Run emits nests under the signal
@@ -865,6 +873,9 @@ public final class JobService implements AutoCloseable {
      *  against this map whether the Job fired {@code on_signal: pipeline.commit} or {@code on_pipeline}. */
     private static Map<String, Object> commitPayload(ConsignmentEvent be) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        // PIPELINE-DRYRUN-1 step 5 — carried on the payload so the pipeline.commit MIRROR
+        // (mirrorPipelineCommit → onSignalEvent) inherits the flag too, not only the on_pipeline path.
+        payload.put("dryRun", be.dryRun());
         payload.put("pipeline", be.pipeline());
         payload.put("batchId", be.batchId());
         payload.put("status", be.status());
@@ -909,6 +920,18 @@ public final class JobService implements AutoCloseable {
     private static int intOf(Object o) {
         try { return o == null ? 0 : (int) Double.parseDouble(String.valueOf(o)); }
         catch (RuntimeException e) { return 0; }
+    }
+
+    /**
+     * PIPELINE-DRYRUN-1 step 5 — the {@code dryRun} flag a Signal payload carries, or {@code false} when it
+     * carries none. ⚠ Deliberately fails CLOSED to "real": a payload with no flag is an ordinary Signal
+     * from one of the many emitters that know nothing about dry run, and firing those dry would silently
+     * disarm real work. Only a payload that says {@code dryRun: true} fires dry. A Signal serialised through
+     * the ledger may return the value as a String, so parse rather than cast.
+     */
+    private static boolean signalDryRun(Map<String, Object> payload) {
+        Object v = payload == null ? null : payload.get("dryRun");
+        return v instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(v));
     }
 
     /** Run a job once by name, off the caller's thread. Returns false if no such (enabled) job. */

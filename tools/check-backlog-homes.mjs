@@ -186,7 +186,9 @@ for (const row of rows) {
 // A floor, not a nicety. If the pointer grammar stops matching — the board switches separator, a row
 // format changes — this guard would pass over nothing and report success. That is the failure shape
 // this repo has shipped twice: a guard that cannot fire. Set EQUAL to the number parsed today.
-const MIN_DOC_POINTERS = 52;
+// 2026-09-20: 52 → 51, because `PIPELINE-DRYRUN-1` CLOSED and left the board with its pointer. The
+// grammar is unchanged — 53 rows still parse, one fewer than yesterday.
+const MIN_DOC_POINTERS = 51;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +

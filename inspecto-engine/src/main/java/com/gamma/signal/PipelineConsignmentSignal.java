@@ -37,6 +37,11 @@ public final class PipelineConsignmentSignal {
         // Event's payload immutability (Map.copyOf, Event.java) rejects null values, so only put the
         // optional error-detail fields when present — mirrors ConsignmentEvent's own null-ability.
         Map<String, Object> payload = new LinkedHashMap<>();
+        // PIPELINE-DRYRUN-1 step 5 — the on_signal chain builds its Firing from THIS payload, not from the
+        // ConsignmentEvent, so the flag has to travel here or half the chaining stays unprotected
+        // (JobService.onSignalEvent reads it back). The Signal itself is still emitted: it is the
+        // observability record that a simulated batch happened, and it is marked as such.
+        payload.put("dryRun", event.dryRun());
         payload.put("status", event.status());
         payload.put("outputRows", event.outputRows());
         payload.put("durationMs", event.durationMs());

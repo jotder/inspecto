@@ -60,6 +60,19 @@ MAJOR" row, moved here so it accrues in one place; add a line in the same commit
 The GitHub release is cut by `.github/workflows/release.yml` with `--generate-notes`; paste this section
 above the generated commit list.
 
+**Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
+- `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or
+  commit-log rows, no provenance row, no markers, no backup/quarantine moves — logging each suppressed
+  mutation as `dry run: would …`. It **implies** `?skipPostAction=true`, which remains the separate,
+  narrower capability (fetch without acking; the ingest write still happens for real). The v1 response
+  body gains a `dryRun` field alongside `skipPostAction`.
+- `com.gamma.etl.ConsignmentEvent` gains a **`boolean dryRun`** component (11 in total). Additive, on a
+  type whose `since = "4.0.0"` has never shipped (absent from `v3.11.0`), so no bump of its own. A
+  published event that carries it MUST be honoured or refused by every consumer; `JobService`'s
+  `on_pipeline` and `on_signal` firings now inherit it instead of hardcoding `false`, which narrowly
+  overturns the old *"cron/event/signal fires are always real"* rule — a fire is dry exactly when the
+  batch that caused it was simulated.
+
 **Breaking — route registration (2026-09-16, `ROUTE-UNGATED-DEFAULT-1` step 3)**
 - A **mutating route** (`POST`/`PUT`/`PATCH`/`DELETE`) that declares neither a capability
   (`ApiContext.withCapability`) nor a recorded `CapabilityManifest` exemption now **fails the server's

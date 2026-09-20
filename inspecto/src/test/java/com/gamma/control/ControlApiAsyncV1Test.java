@@ -419,6 +419,11 @@ class ControlApiAsyncV1Test {
      * PIPELINE-DRYRUN-1 — the trigger's opt-out is spelled {@code ?skipPostAction=true} (renamed from
      * {@code ?dryRun=true} on 2026-09-20, because it does NOT suppress the ingest write), and the v1 body
      * echoes the flag under that same name.
+     *
+     * <p>⚠ Since PIPELINE-DRYRUN-1 step 5 the body ALSO carries a {@code dryRun} field — but it is a
+     * different, genuine capability (the whole cycle lands nothing), not the old synonym. The assertion
+     * that matters is therefore that {@code skipPostAction=true} does <b>not</b> turn {@code dryRun} on:
+     * the two must stay tellable apart, or the rename's whole point is lost.
      */
     @Test
     void pipelineTriggerAcceptsSkipPostActionAndEchoesItByThatName(@TempDir Path cfg, @TempDir Path root) throws Exception {
@@ -429,11 +434,34 @@ class ControlApiAsyncV1Test {
             assertEquals(202, accepted.statusCode(), accepted.body());
             JsonNode data = V1Body.of(accepted.body());
             assertTrue(data.get("skipPostAction").asBoolean(), accepted.body());
-            assertTrue(data.path("dryRun").isMissingNode(), "the old name must be gone: " + accepted.body());
+            assertFalse(data.get("dryRun").asBoolean(),
+                    "skipPostAction must NOT imply dryRun — the ingest write still happens: " + accepted.body());
 
             // Absent → false, so the default fire is fully real.
             JsonNode plain = V1Body.of(post(c.port, "/runs/" + pipe + "/trigger", null).body());
             assertFalse(plain.get("skipPostAction").asBoolean(), plain.toString());
+            assertFalse(plain.get("dryRun").asBoolean(), plain.toString());
+        }
+    }
+
+    /**
+     * PIPELINE-DRYRUN-1 step 5 — {@code ?dryRun=true} is the genuine whole-pipeline dry run, and it
+     * <b>implies</b> {@code skipPostAction}: hazard (a), a "dry run" that deletes the customer's remote
+     * source file, is the single worst failure this feature can have, so the implication is enforced at
+     * the route rather than left to each caller.
+     */
+    @Test
+    void pipelineTriggerDryRunImpliesSkipPostAction(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, List.of())) {
+            String pipe = c.svc.pipelines().get(0).name();
+
+            HttpResponse<String> accepted = post(c.port, "/runs/" + pipe + "/trigger?dryRun=true", null);
+            assertEquals(202, accepted.statusCode(), accepted.body());
+            JsonNode data = V1Body.of(accepted.body());
+            assertTrue(data.get("dryRun").asBoolean(), accepted.body());
+            assertTrue(data.get("skipPostAction").asBoolean(),
+                    "dryRun must imply skipPostAction — a dry run must never ack the remote source: "
+                            + accepted.body());
         }
     }
 

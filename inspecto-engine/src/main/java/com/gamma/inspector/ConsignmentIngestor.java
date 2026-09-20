@@ -54,28 +54,66 @@ public final class ConsignmentIngestor {
      * shares one Run id, which is what {@code GLOSSARY.md} §6-A's {@code Run ⊇ Consignment} means.
      */
     public static void process(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit) {
-        process(batch, cfg, audit, com.gamma.job.RunIds.next(cfg.identity().pipelineName()));
+        process(batch, cfg, audit, com.gamma.job.RunIds.next(cfg.identity().pipelineName()), false);
     }
 
+    /**
+     * As above, under an explicit Run id and — {@code dryRun=true} (PIPELINE-DRYRUN-1 step 5) — with every
+     * mutating site on this lane suppressed.
+     *
+     * <p>🔴 <b>Why the strategy is skipped whole rather than substituted.</b> {@code strategy.ingest} is not
+     * one write: it writes partition files ({@code PartitionWriter.write}), moves rejected members into the
+     * quarantine tree ({@code QuarantineManager.quarantine}), emits a schema-drift Signal, drives the graph
+     * lane's branch commits, writes the branch commit log and, on a park, copies parquet into the park home —
+     * ~20 durable sites across {@code CsvIngestStrategy}, {@code StreamingPluginIngestStrategy} and the
+     * shared helpers in {@code ConsignmentIngestStrategy}. Substituting each one is exactly the
+     * "every sink honours a flag" shape that misses one, and it is the failure mode
+     * {@code DryRunServices}'s javadoc names. Skipping the pass is the only form that is true by
+     * construction: <b>no write can be missed if no writer runs.</b> The cost — a dry run does not
+     * re-validate parsing — is stated in the plan's as-built and is deliberate.
+     *
+     * <p>The tail below (park / commit / audit / provenance / retry bookkeeping) is then gated site by site
+     * so the log still reads as "what would have happened", and {@link ConsignmentAuditWriter#setDryRun}
+     * marks the published {@link ConsignmentEvent} so the chained Job inherits the flag.
+     */
     public static void process(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit,
-                               String runId) {
+                               String runId, boolean dryRun) {
         ConsignmentIngestStrategy strategy = (cfg.schemas().ingesterClass() == null)
                 ? new CsvIngestStrategy()
                 : new StreamingPluginIngestStrategy();
 
         IngestOutcome outcome;
-        try {
-            outcome = strategy.ingest(batch, cfg);
-        } finally {
-            // The strategies report per-member/per-step progress; a snapshot must never outlive the batch.
-            IngestProgress.clear(cfg.identity().pipelineName());
-            StepProgress.clear(cfg.identity().pipelineName());
+        if (dryRun) {
+            log.info("dry run: would ingest consignment {} — {} member(s) via {} into table '{}' "
+                            + "(parse, transform, partition writes, quarantine moves and the branch commit "
+                            + "log all skipped)",
+                    batch.batchId(), batch.members().size(), strategy.getClass().getSimpleName(),
+                    batch.table());
+            outcome = new IngestOutcome(LocalDateTime.now(), "SUCCESS", null, List.of(), List.of(),
+                    List.of(), List.of(), 0L, batch.schemaName());
+        } else {
+            try {
+                outcome = strategy.ingest(batch, cfg);
+            } finally {
+                // The strategies report per-member/per-step progress; a snapshot must never outlive the batch.
+                IngestProgress.clear(cfg.identity().pipelineName());
+                StepProgress.clear(cfg.identity().pipelineName());
+            }
         }
 
         String status = outcome.status();
         String error  = outcome.error();
 
-        if ("SUCCESS".equals(status)) {
+        if (dryRun) {
+            // Every durable tail site in one place, each logged as a would-have. ParkedBranches.drain is
+            // not consulted: the strategy never ran, so nothing can be parked.
+            log.info("dry run: would commit consignment {} — DuckLake register, manifest, §11.3 output "
+                            + "registration, backup moves, markers, the fingerprint ledger and any DB-export "
+                            + "watermark all skipped (run {})", batch.batchId(), runId);
+            log.info("dry run: would record provenance for consignment {} (parse/sink row counts)",
+                    batch.batchId());
+            log.info("dry run: would clear the COMMIT-retry record for consignment {}", batch.batchId());
+        } else if ("SUCCESS".equals(status)) {
             // Phase 4 S4b: the graph lane parked one or more disabled branch sinks — the batch is
             // deliberately UNCOMMITTED. Parked finalisation (manifest + park-home move, nothing
             // else) replaces the commit tail; the drain (S4c) completes the normal sequence later.
@@ -109,12 +147,14 @@ public final class ConsignmentIngestor {
         } catch (Exception e) {
             log.error("Consignment {} failed during audit", batch.batchId(), e);
         }
-        recordProvenance(cfg.identity().pipelineName(), batch, outcome, status);
-        // X1: a FAILED Consignment's files stay in the inbox and re-encounter next cycle — that retry is
-        // now BOUNDED (attempt record, backoff, exhaustion → quarantine + CRITICAL Signal). A committed
-        // or parked one has spent its record. After the audit, so the attempt is on the record first.
-        if ("FAILED".equals(status)) CommitRetry.recordFailure(batch, cfg, error);
-        else CommitRetry.clear(batch, cfg);
+        if (!dryRun) {
+            recordProvenance(cfg.identity().pipelineName(), batch, outcome, status);
+            // X1: a FAILED Consignment's files stay in the inbox and re-encounter next cycle — that retry is
+            // now BOUNDED (attempt record, backoff, exhaustion → quarantine + CRITICAL Signal). A committed
+            // or parked one has spent its record. After the audit, so the attempt is on the record first.
+            if ("FAILED".equals(status)) CommitRetry.recordFailure(batch, cfg, error);
+            else CommitRetry.clear(batch, cfg);
+        }
     }
 
     // ── data-plane provenance (T21 — consignment-chain-plan.md S3) ─────────────

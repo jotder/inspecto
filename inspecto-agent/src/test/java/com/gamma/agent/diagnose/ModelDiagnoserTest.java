@@ -27,7 +27,7 @@ class ModelDiagnoserTest {
 
     private static ConsignmentEvent failed(String pipeline) {
         return new ConsignmentEvent(pipeline, "B1", "FAILED", List.of(), 0, 10L, 1,
-                "schema selector mismatch", "bad.csv", 3);
+                "schema selector mismatch", "bad.csv", 3, false);
     }
 
     @Test

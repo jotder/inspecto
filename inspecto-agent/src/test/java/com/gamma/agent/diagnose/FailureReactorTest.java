@@ -22,7 +22,7 @@ class FailureReactorTest {
     private static final long EPOCH = 1_700_000_000_000L;
 
     private static ConsignmentEvent failed(String batchId, String error, String offending, long outRows, long errRows) {
-        return new ConsignmentEvent("EVENTS", batchId, "FAILED", List.of(), outRows, 10L, 1, error, offending, errRows);
+        return new ConsignmentEvent("EVENTS", batchId, "FAILED", List.of(), outRows, 10L, 1, error, offending, errRows, false);
     }
 
     private static FailureReactor.Diagnoser heuristic() {
@@ -37,7 +37,7 @@ class FailureReactorTest {
                 HeuristicDiagnoser.severityOf(failed("b", "boom", null, 0, 5)), "FAILED with no output");
         assertEquals(Diagnosis.Severity.WARNING,
                 HeuristicDiagnoser.severityOf(failed("b", "boom", null, 3, 1)), "FAILED but some output");
-        ConsignmentEvent partial = new ConsignmentEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0, null, null, 2);
+        ConsignmentEvent partial = new ConsignmentEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0, null, null, 2, false);
         assertEquals(Diagnosis.Severity.WARNING, HeuristicDiagnoser.severityOf(partial), "success w/ error rows");
         ConsignmentEvent clean = new ConsignmentEvent("EVENTS", "b", "SUCCESS", List.of(), 9, 1L, 0);
         assertEquals(Diagnosis.Severity.INFO, HeuristicDiagnoser.severityOf(clean), "clean success");

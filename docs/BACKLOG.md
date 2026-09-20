@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 31<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 30<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 31<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 30<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -829,7 +829,36 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   unanswered. ⚠ Keep the repo's recorded distinction in scope when it IS answered: *"skip the bad file"
   is not "skip the file that throws"* — a validation failure and an exception are different events, and
   conflating them is how eject-and-continue silently swallows a real fault.
-- **P2** · ➕ **`PIPELINE-DRYRUN-1` — gates 1-4 SHIPPED; the residual is SCOPED as plan step 5 (2026-09-19)
+- ~~**P2**~~ · ✅ **`PIPELINE-DRYRUN-1` CLOSED 2026-09-20 — step 5 BUILT as the FULL flat-lane no-op.**
+  `POST /runs/{name}/trigger?dryRun=true` now runs a whole pipeline and **lands nothing**, for **every**
+  pipeline, with no per-pipeline caveats: no partition outputs, no quarantine/backup moves, no manifest,
+  no markers, no audit or commit-log rows, no provenance row, no fingerprint/watermark ledger entries, no
+  unpack scratch — each suppressed mutation logged `dry run: would …`. It **implies** `?skipPostAction`
+  (hazard (a): a dry run must never ack the remote source), while `?skipPostAction=true` stays the
+  separate, narrower capability it was renamed to describe; both are documented on the route in
+  `docs/api/openapi-v1.json` and pinned by `ControlApiAsyncV1Test`.
+  🔴 **The previously-recorded decisions (a) and (b) are SUPERSEDED because they were INCOHERENT.**
+  `ConsignmentAuditWriter` is constructed at `CollectorProcessor.java:168`, **inside `ingest(...)`** — so
+  (a)'s "the authoritative site is the one the defective route reaches" **presupposed that ingest runs and
+  writes**, and (b) then said the dry run publishes nothing. Together they described a dry run that writes
+  everything and merely stays quiet: the same overpromise `9e101cdc` removed. ⛔ Also rejected and
+  recorded: rerouting through the job lane (covers only `pipeline`-type Jobs ⇒ silently writes for
+  flat-lane pipelines), a narrow build + another rename, and parking step 5.
+  ✅ **It PUBLISHES, marked — and that is safe because every consumer was enumerated and handled.** There
+  is exactly one fan-out (`ConsignmentAuditWriter:178`), so the set is closed: `JobService.fireOnCommit`
+  (`:822`) and `onSignalEvent` (`:847`) **honour** it — ⚠ by **different** mechanisms, which the plan's
+  text wrongly read as one fix: the first has the event in hand, the second builds its `Firing` from
+  `sig.payload()`, so the flag is put in the payload by `PipelineConsignmentSignal.emit` + `commitPayload`
+  and read back by `signalDryRun` (which fails **closed to "real"** for a payload with no flag). The other
+  four — `AlertService.onEvent`, `CollectorService`'s event-store bridge,
+  `PipelineScheduler.onUpstreamCommit`, `EnrichmentService.onConsignmentEvent` — **refuse loudly**.
+  ⚖ **Deliberate cost:** `strategy.ingest` is skipped **whole** rather than substituted (~20 durable sites
+  live inside it; substituting each is the "every sink honours a flag" shape that misses one), so a dry
+  run answers *"what would this cycle touch"*, not *"would this file parse"*. Tests:
+  `FlatLaneDryRunTest` (3), `JobServiceTest.aChainedOnPipelineFiringInheritsTheUpstreamBatchesDryRunFlag`,
+  `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`. Release note in
+  `okf/backend/control-plane/api-stability.md`. *(Historical record below.)*
+  **P2** · ➕ **`PIPELINE-DRYRUN-1` — gates 1-4 SHIPPED; the residual is SCOPED as plan step 5 (2026-09-19)
   and is M, not the S–M this row implied.** 🔴 **The live defect, stated plainly: `POST
   /runs/{name}/trigger?skipPostAction=true` (renamed from `?dryRun=true` 2026-09-20) puts ACQUISITION in
   dry run, and the chained execution job then writes

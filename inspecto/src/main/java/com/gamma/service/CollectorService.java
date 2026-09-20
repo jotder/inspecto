@@ -880,6 +880,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * recorded.
      */
     private void onConsignmentEvent(ConsignmentEvent e) {
+        // PIPELINE-DRYRUN-1 step 5 — a BATCH_COMMITTED row in the event store is a durable write that
+        // asserts a commit happened. A simulated batch committed nothing, so this bridge REFUSES loudly
+        // rather than seeding an investigation with a batch that does not exist. The simulated run is
+        // still visible: PipelineConsignmentSignal emits its pipeline.batch.* Signal marked dryRun.
+        if (e.dryRun()) {
+            log.info("dry run: would record a BATCH_{} event for simulated consignment {}/{} — not recorded",
+                    "SUCCESS".equalsIgnoreCase(e.status()) ? "COMMITTED" : "FAILED", e.pipeline(), e.batchId());
+            return;
+        }
         boolean ok = "SUCCESS".equalsIgnoreCase(e.status());
         Event.Builder b = Event.builder(ok ? EventType.BATCH_COMMITTED : EventType.BATCH_FAILED)
                 .level(ok ? EventLevel.INFO : EventLevel.ERROR)
@@ -1669,6 +1678,18 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * dry-run trigger), not a preview of the ingest write.
      */
     public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName, boolean skipPostAction) {
+        return runPipeline(pipelineName, skipPostAction, false);
+    }
+
+    /**
+     * As above, with the whole-pipeline <b>dry run</b> (PIPELINE-DRYRUN-1 step 5). ⚠ Keep the two apart:
+     * {@code skipPostAction} is the narrow capability — acquisition fetches but never acks the remote
+     * source, and <b>the ingest write still happens for real</b>; {@code dryRun} is the genuine one — the
+     * cycle lands nothing at all, and it implies {@code skipPostAction} because a dry run that deleted the
+     * customer's source file would be the worst possible outcome.
+     */
+    public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName, boolean skipPostAction,
+                                                                   boolean dryRun) {
         refuseIfTemplate(pipelineName);
         return underSpace(() -> {
             Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
@@ -1677,8 +1698,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 try (RunLease.Claim claim = runGuard.acquire(pipelineName)) {
                     running.add(pipelineName);
                     try {
-                        pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence
-                        return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction);
+                        // T13: any run resets the cadence — but a simulated one must not, or a dry run
+                        // would silently delay the next real scheduled run.
+                        if (!dryRun)
+                            pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());
+                        return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun);
                     } finally {
                         running.remove(pipelineName);
                     }
@@ -1686,7 +1710,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             });
             // After the run, and after the claim is released: the audit is on disk, so the projection can
             // read it, and a DB hiccup cannot hold the pipeline's lock. No-op for the file store.
-            if (result.isPresent()) syncStatus();
+            // Nothing to re-project after a dry run — the audit on disk is byte-for-byte unchanged.
+            if (result.isPresent() && !dryRun) syncStatus();
             return result;
         });
     }
@@ -1706,6 +1731,12 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return triggerRunAsync(pipelineName, "manual", skipPostAction);
     }
 
+    /** {@link #triggerRunAsync(String, boolean)} with the whole-pipeline dry run — see
+     *  {@link #runPipeline(String, boolean, boolean)}. */
+    public Optional<String> triggerRunAsync(String pipelineName, boolean skipPostAction, boolean dryRun) {
+        return triggerRunAsync(pipelineName, "manual", skipPostAction, dryRun);
+    }
+
     /**
      * Back-compat for the pre-v1 trigger routes ({@code POST /runs/{name}/trigger}, {@code /collectors/{id}/notify}):
      * run a pipeline off the request thread and block for its result, so the legacy caller still receives the
@@ -1720,11 +1751,20 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /** {@link #runPipelineOffThread(String)} with the source-side post-action skipped (PIPELINE-DRYRUN-1) — see {@link #runPipeline(String, boolean)}. */
     public Optional<MultiCollectorProcessor.RunResult> runPipelineOffThread(String pipelineName, boolean skipPostAction) {
+        return runPipelineOffThread(pipelineName, skipPostAction, false);
+    }
+
+    /** {@link #runPipelineOffThread(String, boolean)} with the whole-pipeline dry run — see
+     *  {@link #runPipeline(String, boolean, boolean)}. */
+    public Optional<MultiCollectorProcessor.RunResult> runPipelineOffThread(String pipelineName,
+                                                                            boolean skipPostAction,
+                                                                            boolean dryRun) {
         if (pathFor(pipelineName).isEmpty()) return Optional.empty();
         refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         try {
             return Optional.of(triggerWorkers.submit(
-                    () -> runPipeline(pipelineName, skipPostAction).orElse(new MultiCollectorProcessor.RunResult(0, 0))).get());
+                    () -> runPipeline(pipelineName, skipPostAction, dryRun)
+                            .orElse(new MultiCollectorProcessor.RunResult(0, 0))).get());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("interrupted while awaiting pipeline '" + pipelineName + "'", e);
@@ -1742,6 +1782,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /** {@link #triggerRunAsync(String, String)} with the source-side post-action skipped (PIPELINE-DRYRUN-1) — see {@link #runPipeline(String, boolean)}. */
     public Optional<String> triggerRunAsync(String pipelineName, String trigger, boolean skipPostAction) {
+        return triggerRunAsync(pipelineName, trigger, skipPostAction, false);
+    }
+
+    /** {@link #triggerRunAsync(String, String, boolean)} with the whole-pipeline dry run — see
+     *  {@link #runPipeline(String, boolean, boolean)}. */
+    public Optional<String> triggerRunAsync(String pipelineName, String trigger, boolean skipPostAction,
+                                            boolean dryRun) {
         if (pathFor(pipelineName).isEmpty()) return Optional.empty();
         refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         String runId = newPipelineRunId(pipelineName);
@@ -1750,7 +1797,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         triggerWorkers.submit(() -> {
             try {
                 MultiCollectorProcessor.RunResult res =
-                        runPipeline(pipelineName, skipPostAction).orElse(new MultiCollectorProcessor.RunResult(0, 0));
+                        runPipeline(pipelineName, skipPostAction, dryRun)
+                                .orElse(new MultiCollectorProcessor.RunResult(0, 0));
                 liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start,
                         LocalDateTime.now().format(RUN_AT_TS), "SUCCESS", res.total(), res.failed(),
                         res.failed() + " of " + res.total() + " file(s) failed"));

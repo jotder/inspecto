@@ -91,8 +91,24 @@ public class CollectorProcessor {
      */
     public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit, boolean skipPostAction)
             throws Exception {
-        acquire(cfg, skipPostAction);
-        ingest(cfg, onCommit);
+        run(cfg, onCommit, skipPostAction, false);
+    }
+
+    /**
+     * As above, with the whole-pipeline <b>dry run</b> (PIPELINE-DRYRUN-1 step 5): when {@code dryRun} is
+     * true this cycle lands <b>nothing</b> — acquisition never applies the source-side post-action and
+     * {@link #ingest} suppresses every mutating site, logging each as {@code "dry run: would …"}.
+     *
+     * <p>🔴 <b>{@code dryRun} implies {@code skipPostAction}, and that implication is not optional.</b> The
+     * design doc's hazard (a) — a "dry run" that deletes the customer's remote source file — is the single
+     * worst failure this feature can have, so the flag is OR-ed in here rather than left to each caller to
+     * remember. The converse does not hold: {@code skipPostAction=true} alone is the pre-existing, narrower
+     * capability (fetch without acking; the ingest write still happens for real), and the two stay distinct.
+     */
+    public static void run(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit,
+                           boolean skipPostAction, boolean dryRun) throws Exception {
+        acquire(cfg, skipPostAction || dryRun);
+        ingest(cfg, onCommit, dryRun);
     }
 
     /**
@@ -105,15 +121,33 @@ public class CollectorProcessor {
     @PublicApi(since = "1.0.0")
     public static void ingest(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit)
             throws Exception {
+        ingest(cfg, onCommit, false);
+    }
+
+    /**
+     * As above, with the whole-pipeline <b>dry run</b> (PIPELINE-DRYRUN-1 step 5). Under {@code dryRun} this
+     * cycle writes nothing at all: no outputs, no quarantine or backup moves, no manifest, no markers, no
+     * audit/commit-log rows, no provenance row, no ledger entries and no unpack scratch. Every suppressed
+     * mutation is logged {@code "dry run: would …"} so an operator can read the log and see what the real
+     * run would have done. The {@link ConsignmentEvent} is still published, <b>marked</b>
+     * {@code dryRun=true}, so the chained Job runs dry too instead of the chain simply stopping — see
+     * {@link ConsignmentEvent#dryRun()} for the consumer contract that makes that safe.
+     */
+    @PublicApi(since = "4.0.0")
+    public static void ingest(PipelineConfig cfg, java.util.function.Consumer<ConsignmentEvent> onCommit,
+                              boolean dryRun) throws Exception {
         Path root           = Paths.get(cfg.dirs().poll()).toAbsolutePath();
         if (!Files.exists(root)) Files.createDirectories(root);
 
-        MarkerManager.cleanupStaleMarkers(cfg);
+        // cleanupStaleMarkers DELETES marker files — a mutation, so it is suppressed too.
+        if (dryRun) log.info("dry run: would clean up stale markers under {}", cfg.dirs().markers());
+        else MarkerManager.cleanupStaleMarkers(cfg);
 
         // The set of inbox files this cycle will ingest (matching, ready/stable, not already-processed).
         // The real run path emits readiness signals (FILE_STABLE + the waiting-stability gauge); the
-        // read-only countPending scan does not.
-        List<File> candidates = collect(cfg, true);
+        // read-only countPending scan does not — which is exactly what a dry run wants, so it takes the
+        // read-only form and no readiness Signal escapes for a cycle that is not happening.
+        List<File> candidates = collect(cfg, !dryRun);
 
         if (candidates.isEmpty()) {
             log.info("No new files to process in {}", root);
@@ -133,7 +167,12 @@ public class CollectorProcessor {
         // freezes the list — every expanded file is an ordinary member from birth, so the EL below
         // stays untouched. Expansion failures fall through as the ORIGINAL file, which the engine
         // then quarantines with a per-file audit row exactly as today.
-        candidates = com.gamma.etl.unpack.UnpackStage.expand(cfg, candidates);
+        // ⚠ expand() writes expanded copies into dirs.temp and registers origin mappings — scratch, but
+        // still a write, and the mappings drive later backup/marker decisions. A dry run skips it and
+        // plans the archives as-is; the batch shapes it reports are therefore the pre-expansion ones.
+        if (dryRun) log.info("dry run: would expand any compressed candidate among {} file(s) into the "
+                + "unpack scratch", candidates.size());
+        else candidates = com.gamma.etl.unpack.UnpackStage.expand(cfg, candidates);
 
         // ── branch-aware engagement (arming plan S1 — observe-only) ─────────────
         // An authored route: block lifts to a graph with >1 data-fed sink. Engagement is computed
@@ -169,6 +208,9 @@ public class CollectorProcessor {
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath(),
                 cfg.dirs().commitLogPath());
         if (onCommit != null) audit.setCommitListener(onCommit);
+        // One guard covers all four of this writer's durable writes (the three audit CSVs + the commit
+        // log) and marks the event it publishes, so the chained Job inherits the flag.
+        audit.setDryRun(dryRun);
         // Emit the canonical pipeline.batch.committed|failed Signal onto the ledger for every terminal
         // batch. Formerly inlined in ConsignmentAuditWriter; lifted to signal.PipelineConsignmentSignal so etl stays
         // a foundation layer (no event/signal imports). Wired unconditionally — PipelineConsignmentSignal uses
@@ -201,11 +243,12 @@ public class CollectorProcessor {
                         try (ConcurrencyBroker.Permit permit =
                                      broker.admit(spaceId, pipelineId, maxConcurrent, priority)) {
                             try {
-                                ConsignmentIngestor.process(b, cfg, audit, cycleRunId);
+                                ConsignmentIngestor.process(b, cfg, audit, cycleRunId, dryRun);
                             } catch (Exception thrown) {
                                 // X1: a THROWN ingest (framework/schema fault) also leaves its files for the
                                 // next cycle — count the attempt, then let the failure surface as before.
-                                CommitRetry.recordFailure(b, cfg, ConsignmentIngestStrategy.msg(thrown));
+                                if (!dryRun)
+                                    CommitRetry.recordFailure(b, cfg, ConsignmentIngestStrategy.msg(thrown));
                                 throw thrown;
                             }
                         }
@@ -234,13 +277,18 @@ public class CollectorProcessor {
         // that fails at COMMIT runs neither the finalize nor the quarantine path, so the release
         // never fires for exactly the archives an operator most needs a row for.
         // flush() is idempotent (it removes the run's rows), so this cannot double-report.
-        com.gamma.etl.unpack.UnpackLedger.flush(cfg.identity().runTimestamp(),
-                cfg.dirs().unpackFilePath(), Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
+        if (dryRun) {
+            log.info("dry run: would write the run-level unpack ledger to {}", cfg.dirs().unpackFilePath());
+        } else {
+            com.gamma.etl.unpack.UnpackLedger.flush(cfg.identity().runTimestamp(),
+                    cfg.dirs().unpackFilePath(), Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
+        }
 
         // Sweep unpack-origin mappings left by batches that failed at COMMIT (neither the finalize nor
         // the quarantine release path ran for them) — BACKLOG §4 unpack open item (9). Restores the
         // crash posture: originals stay in the inbox and re-expand next cycle.
-        int leakedOrigins = com.gamma.etl.unpack.UnpackOrigins.sweep(
+        // Nothing to sweep under dry run — expand() never ran, so no origin mapping was registered.
+        int leakedOrigins = dryRun ? 0 : com.gamma.etl.unpack.UnpackOrigins.sweep(
                 Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize());
         if (leakedOrigins > 0) {
             log.warn("Swept {} unpack origin mapping(s) unreleased by COMMIT-failed batches; "

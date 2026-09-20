@@ -1499,7 +1499,7 @@
         "tags" : [ "runs" ],
         "summary" : "Trigger a pipeline",
         "operationId" : "postRunsByRunIdTrigger",
-        "description" : "Fires one registered pipeline. On the v1 surface returns 202 + {runId,pipeline,status,skipPostAction} and a Location to poll; the legacy unversioned route keeps its 200 RunResult body. Response schemas are otherwise undocumented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Fires one registered pipeline. On the v1 surface returns 202 + {runId,pipeline,status,skipPostAction,dryRun} and a Location to poll; the legacy unversioned route keeps its 200 RunResult body. Response schemas are otherwise undocumented — see control-api.md §5 for the exemplar-coverage decision.",
         "parameters" : [ {
           "name" : "runId",
           "in" : "path",
@@ -1516,6 +1516,15 @@
             "default" : false
           },
           "description" : "Skip the source-side post-action for this fire (PIPELINE-DRYRUN-1). Acquisition still fetches from the remote collector for real, so the trigger proves the pipeline can reach and read its source; a collector.post_action.on_success of DELETE/MOVE/RENAME never touches the remote original; and the ingest write STILL HAPPENS FOR REAL. This is not a preview and not the job framework's ?dryRun=true. Renamed from ?dryRun=true on 2026-09-20. Manual triggers only — cron/event/signal fires are always real."
+        }, {
+          "name" : "dryRun",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          },
+          "description" : "Dry-run the WHOLE pipeline (PIPELINE-DRYRUN-1 step 5): the cycle lands NOTHING — no partition outputs, no quarantine or backup moves, no manifest, no markers, no audit or commit-log rows, no provenance row, no fingerprint/watermark ledger entries — and every suppressed mutation is logged as 'dry run: would ...' so an operator can read the log and see what the real run would have done. The terminal ConsignmentEvent is still published, MARKED dryRun, so a chained Job runs dry too; every other consumer (alert evaluation, the event-store bridge, event-triggered pipelines, enrichment) refuses and logs instead of acting. Choosing between the two: skipPostAction means 'fetch, but do not ack the remote source' and the ingest write still happens for real; dryRun means 'show me what would happen' and nothing happens. dryRun=true IMPLIES skipPostAction — a dry run that deleted the customer's source file is the worst failure this feature can have. Manual triggers only."
         } ],
         "responses" : {
           "default" : {

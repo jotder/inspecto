@@ -1,6 +1,8 @@
 package com.gamma.etl;
 
 import com.gamma.util.CsvLedger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -22,12 +24,15 @@ import java.util.stream.Collectors;
  */
 public final class ConsignmentAuditWriter {
 
-    private final CsvLedger<FileRow> status;     // null when no status path configured
+    private static final Logger log = LoggerFactory.getLogger(ConsignmentAuditWriter.class);
+
+    private final CsvLedger<FileRow> status;    // null when no status path configured
     private final CsvLedger<ConsignmentRow> batches;   // null when no batches path configured
     private final CsvLedger<LineageRow> lineage; // null when no lineage path configured
     private final CommitLog commitLog;           // null when no commit-log path is configured
     private Consumer<ConsignmentEvent> commitListener; // null = no event emission
     private Consumer<ConsignmentEvent> terminalBatchSink; // null = no ledger Signal emission
+    private boolean dryRun;                      // PIPELINE-DRYRUN-1 step 5 — see setDryRun
 
     /** Back-compat: audit CSVs only, no durable commit log. */
     public ConsignmentAuditWriter(String statusPath, String batchesPath, String lineagePath) {
@@ -64,6 +69,19 @@ public final class ConsignmentAuditWriter {
      */
     public void setCommitListener(Consumer<ConsignmentEvent> listener) {
         this.commitListener = listener;
+    }
+
+    /**
+     * PIPELINE-DRYRUN-1 step 5 — put this writer in <b>dry run</b>: {@link #flush} writes no audit row
+     * and no commit-log line, logs what it would have written, and marks the {@link ConsignmentEvent} it
+     * publishes {@code dryRun=true}.
+     *
+     * <p>Gating here rather than at the caller is deliberate: the three CSV ledgers and the commit log are
+     * this class's only durable writes, so one guard covers all four, and the event still publishes —
+     * marked — so the chained Job runs dry too instead of the chain simply stopping.
+     */
+    public void setDryRun(boolean dryRun) {
+        this.dryRun = dryRun;
     }
 
     /**
@@ -150,13 +168,19 @@ public final class ConsignmentAuditWriter {
      * there means the audit rows are also written.
      */
     public synchronized void flush(ConsignmentRow batch, List<FileRow> files, List<LineageRow> lineageRows) {
-        if (status  != null) status.appendAll(files);
-        if (batches != null) batches.append(batch);
-        if (lineage != null) lineage.appendAll(lineageRows);
-        if (commitLog != null) {
-            commitLog.record(batch.endTime(), batch.batchId(), batch.pipeline(), batch.status(),
-                    batch.memberCount(), batch.outputFileCount(),
-                    batch.totalOutputRows(), batch.totalOutputBytes());
+        if (dryRun) {
+            log.info("dry run: would append {} file audit row(s), 1 batch row and {} lineage row(s) for "
+                            + "consignment {} ({}), and record it in the commit log — nothing written",
+                    files.size(), lineageRows.size(), batch.batchId(), batch.status());
+        } else {
+            if (status  != null) status.appendAll(files);
+            if (batches != null) batches.append(batch);
+            if (lineage != null) lineage.appendAll(lineageRows);
+            if (commitLog != null) {
+                commitLog.record(batch.endTime(), batch.batchId(), batch.pipeline(), batch.status(),
+                        batch.memberCount(), batch.outputFileCount(),
+                        batch.totalOutputRows(), batch.totalOutputBytes());
+            }
         }
         // Build the terminal-batch event once (every flush is a terminal batch: SUCCESS + FAILED) and
         // fan it out to both observers so observability sees error rates and latency; enrichment
@@ -178,7 +202,7 @@ public final class ConsignmentAuditWriter {
             ConsignmentEvent event = new ConsignmentEvent(
                     batch.pipeline(), batch.batchId(), batch.status(),
                     partitions, batch.totalOutputRows(), batch.durationMs(), batch.rejectedCount(),
-                    batch.error(), offendingFile, errorRows);
+                    batch.error(), offendingFile, errorRows, dryRun);
             if (commitListener != null) commitListener.accept(event);
             if (terminalBatchSink != null) terminalBatchSink.accept(event);
         }

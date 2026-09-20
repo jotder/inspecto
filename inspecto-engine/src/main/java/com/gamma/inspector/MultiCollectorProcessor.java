@@ -139,6 +139,17 @@ public final class MultiCollectorProcessor {
     public static RunResult runAll(List<Path> configs, int maxConcurrent,
                                    java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit,
                                    boolean skipPostAction) {
+        return runAll(configs, maxConcurrent, onCommit, skipPostAction, false);
+    }
+
+    /**
+     * As above, with the whole-pipeline <b>dry run</b> (PIPELINE-DRYRUN-1 step 5): {@code dryRun=true}
+     * lands nothing for any of {@code configs} and implies {@code skipPostAction} — see
+     * {@link CollectorProcessor#run(PipelineConfig, java.util.function.Consumer, boolean, boolean)}.
+     */
+    public static RunResult runAll(List<Path> configs, int maxConcurrent,
+                                   java.util.function.Consumer<com.gamma.etl.ConsignmentEvent> onCommit,
+                                   boolean skipPostAction, boolean dryRun) {
         Semaphore permits   = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
@@ -152,7 +163,7 @@ public final class MultiCollectorProcessor {
                         permits.acquire();
                         try {
                             PipelineConfig cfg = PipelineConfig.load(cfgPath.toString());
-                            CollectorProcessor.run(cfg, onCommit, skipPostAction);
+                            CollectorProcessor.run(cfg, onCommit, skipPostAction, dryRun);
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CollectorProcessor.ConsignmentProcessingException e) {
                             failed.incrementAndGet();

@@ -131,13 +131,13 @@ class AlertServiceTest {
                 configs(cfg), store(ledger));
 
         // Event-driven entry point: a terminal batch for this pipeline triggers evaluation.
-        svc.onEvent(new ConsignmentEvent("MINI_ETL", "B9", "SUCCESS", List.of(), 10, 100, 0, null, null, 0));
+        svc.onEvent(new ConsignmentEvent("MINI_ETL", "B9", "SUCCESS", List.of(), 10, 100, 0, null, null, 0, false));
         List<Map<String, Object>> recent = svc.recent(10);
         assertEquals(1, recent.size(), "only the matching, breached rule fires");
         assertEquals("r-failed_batches", recent.get(0).get("rule"));
 
         // Same condition immediately after: suppressed by the cooldown, not duplicated.
-        svc.onEvent(new ConsignmentEvent("MINI_ETL", "B10", "SUCCESS", List.of(), 10, 100, 0, null, null, 0));
+        svc.onEvent(new ConsignmentEvent("MINI_ETL", "B10", "SUCCESS", List.of(), 10, 100, 0, null, null, 0, false));
         assertEquals(1, svc.recent(10).size(), "re-fire suppressed while in cooldown");
     }
 

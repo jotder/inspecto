@@ -1,13 +1,14 @@
 # PIPELINE-DRYRUN-1 — whole-pipeline dry run design
 
-Status: **partially shipped 2026-09-18** — gates 1-4 (acquisition-phase post-action skip, execution-phase dry
+Status: **SHIPPED 2026-09-20** — gates 1-4 plus **step 5** (the full flat-lane no-op, the marked
+`ConsignmentEvent`, both chaining paths, and the consumer contract) are all built and tested. See
+*Step 5 — AS BUILT* below; `PIPELINE-DRYRUN-1` is closed. *(Previously: partially shipped 2026-09-18 —
+gates 1-4 (acquisition-phase post-action skip, execution-phase dry
 run, both signal-emit sites, the provenance marker) are all built and unit-tested, and gate 1 now has an
 operator-facing trigger (`POST /runs/{name}/trigger?skipPostAction=true`, `CollectorService.runPipeline`/
 `triggerRunAsync`/`runPipelineOffThread`, same-day follow-up). See `docs/BACKLOG.md`'s `PIPELINE-DRYRUN-1`
 row (2026-09-18 block) for the full job-flow finding and the correction to this doc's `GET /provenance` claim
-(it reads `DbProvenanceStore`, not `DbConsignmentOutputStore`). Does **not** yet close `PIPELINE-DRYRUN-1` —
-do not archive this file until a single combined "dry-run this whole pipeline" route (both acquisition and
-execution phases under one flag) lands or is explicitly descoped by the operator.
+(it reads `DbProvenanceStore`, not `DbConsignmentOutputStore`).)*
 
 ## Decisions (operator-confirmed 2026-09-18)
 
@@ -116,17 +117,41 @@ compile untouched.
 
 **Owed decisions — ALL THREE ANSWERED by the operator, DECIDED 2026-09-20:**
 
-1. ✅ **DECIDED — the authoritative publish site is `ConsignmentAuditWriter:178`.** It is the site the
-   defective route actually reaches, and it fans to **both** the bus and the Signal ledger, so it covers
-   both chaining paths at once (`JobService:822` `on_pipeline` and `JobService:847` `on_signal`).
+> ⛔ **(a) and (b) below are SUPERSEDED (2026-09-20, operator) — they were INCOHERENT together, and the
+> record of why they were wrong is the point of leaving them here.** Grounding: `ConsignmentAuditWriter` is
+> constructed at `CollectorProcessor.java:168`, **inside `ingest(...)`**. So (a)'s reasoning — "the
+> authoritative site is `ConsignmentAuditWriter:178`, because it is what the defective route reaches" —
+> **presupposes that ingest runs and writes**. (b) then said the dry run publishes no event at all.
+> Together they described a "dry run" that **writes everything and merely stays quiet** — precisely the
+> overpromise commit `9e101cdc` removed by renaming the parameter. The decision that replaces both: build
+> the **full flat-lane no-op** (nothing is written, for every pipeline, with no per-pipeline caveats) and
+> **publish a MARKED event** so the chain runs dry too. See *Step 5 — AS BUILT* below. (c) stands unchanged.
+
+1. ⛔ **SUPERSEDED — see the note above.** ~~DECIDED — the authoritative publish site is
+   `ConsignmentAuditWriter:178`.~~ It *is* still the site that carries the flag, but not for the reason
+   given: it is where the event is built on the lane that is now a genuine no-op, not "the site the
+   defective route reaches while writing for real". It is the site the
+   defective route actually reaches, and it fans to **both** the bus and the Signal ledger.
+   ⚠ **Corrected — it does NOT "cover both chaining paths at once".** The two need **different**
+   mechanisms and this text read as if they were one fix: `fireOnCommit` (`JobService:822`) has the
+   `ConsignmentEvent` in hand and reads `event.dryRun()`, but `onSignalEvent` (`:847`) builds its `Firing`
+   from `sig.payload()` — a `Signal`, not an event — so the flag has to be **put into the payload** at
+   `PipelineConsignmentSignal.emit` (and at `commitPayload`, for the `pipeline.commit` mirror) and **read
+   back out** there. Both are built; see the as-built.
    ⛔ **Rejected: `PipelineJobRunner:391`** — unreachable under dry run, because the runner returns early
    at `:381` before it ever publishes. ⛔ **Rejected: marking all four sites** — `EnrichJob:88` and
    `EnrichmentService:263` would then assert simulation about enrichment runs that never consulted the flag.
-2. ✅ **DECIDED — an acquisition-only dry run does NOT publish a `ConsignmentEvent`.** The chain stops
+2. ⛔ **SUPERSEDED — see the note above. The dry run DOES publish, marked.** ~~DECIDED — an
+   acquisition-only dry run does NOT publish a `ConsignmentEvent`.~~ Its stated concern is still live and
+   is what the as-built discharges: every consumer must honour the flag or refuse loudly. ~~The chain stops
    cleanly and the operator sees nothing downstream. ⛔ **Rejected: publish the event marked as a dry
-   run** — every downstream consumer would then have to honour the flag or silently act for real (a
+   run**~~ — ✅ **this is what shipped**; the objection that follows is discharged consumer by consumer in
+   the as-built. ~~every downstream consumer would then have to honour the flag or silently act for real (a
    fail-open shape), and it would overturn the written invariant at `JobService.java:947-949`
-   (*"cron/event/signal fires are always real"*). This makes step 5 mostly `CollectorProcessor`-side.
+   (*"cron/event/signal fires are always real"*). This makes step 5 mostly `CollectorProcessor`-side.~~
+   ⚠ **That invariant IS overturned, deliberately and narrowly**: an `on_pipeline`/`on_signal` fire is now
+   dry exactly when the batch that caused it was simulated, and never otherwise (`signalDryRun` fails
+   closed to "real" for any payload that carries no flag).
 3. ✅ **DECIDED — no version call needed** (already settled by the grounding pass). `ConsignmentEvent` is
    `@PublicApi(since = "4.0.0")` and is confirmed **absent from `v3.11.0`**, so the record may be amended
    freely; only a release-notes line is owed. (See the standing “@PublicApi marks INTENT, not exposure”
@@ -316,6 +341,70 @@ poll without acking. ⇒ **The choice is between a flag that under-delivers loud
 over-delivers silently**, and the alternative to refusing is renaming the parameter to say what it does
 (e.g. `skipPostAction=true`), which keeps the capability and stops the lie at the same cost. ⛔ Not
 implemented — operator's call.
+
+### Step 5 — AS BUILT (2026-09-20)
+
+**Shape: the full flat-lane no-op.** `POST /runs/{name}/trigger?dryRun=true` runs the whole cycle and
+lands **nothing**, for **every** pipeline, with no per-pipeline caveats. ⛔ Rejected on the way here, and
+recorded so they are not re-proposed: **rerouting `?dryRun=true` through the job lane** (where gate 2's
+`DryRunSinkWriter` already works) — it covers only pipelines a `pipeline`-type Job processes, so it would
+silently write for flat-lane pipelines; a **narrow build + another rename** (make only the chained job
+dry) — it does not deliver a dry run at all; and **parking step 5**.
+
+**The two flags, kept distinct.** `?skipPostAction=true` = *acquisition fetches but never acks the remote
+source; the ingest write still happens for real.* `?dryRun=true` = *nothing happens.* ✅ **`dryRun`
+implies `skipPostAction`**, OR-ed in at `RunRoutes.triggerPipeline` and again at
+`CollectorProcessor.run(...)`, because hazard (a) — a "dry run" that deletes the customer's source file —
+is the single worst failure this feature can have and must not depend on a caller remembering. The
+converse does not hold. Both are documented on the route in `docs/api/openapi-v1.json`.
+
+**Where the flag is enforced (the mutating sites).**
+
+| Site | Under dry run |
+|---|---|
+| `CollectorProcessor.ingest` — `MarkerManager.cleanupStaleMarkers` | skipped (it DELETES markers) |
+| `CollectorProcessor.ingest` — `collect(cfg, true)` | takes the read-only form: no `FILE_STABLE` readiness Signal escapes |
+| `CollectorProcessor.ingest` — `UnpackStage.expand` | skipped (writes scratch + origin mappings) |
+| `CollectorProcessor.ingest` — `UnpackLedger.flush`, `UnpackOrigins.sweep` | skipped / moot |
+| `CollectorProcessor.ingest` — `CommitRetry.recordFailure` on a thrown batch | skipped |
+| `ConsignmentIngestor.process` — **`strategy.ingest`** | **skipped whole** (see below) |
+| `ConsignmentIngestor.process` — `parkSource`, `commit`/`finalizeSource` | skipped, logged |
+| `ConsignmentIngestor.process` — `recordProvenance`, `CommitRetry` | skipped, logged |
+| `ConsignmentAuditWriter.flush` — 3 audit CSVs + commit log | skipped, logged (`setDryRun`) |
+| `CollectorService.runPipeline` — `recordManualRun`, `syncStatus` | skipped (a dry run must not reset the cadence) |
+
+🔴 **Why `strategy.ingest` is skipped WHOLE rather than substituted — the completeness argument.** A
+survey of the lane found **~20** durable sites inside it: `PartitionWriter.write`,
+`QuarantineManager.quarantine` (×3), `SchemaDriftSignal.emit`, the `BranchCommitLog` write, the park-home
+parquet `COPY`, `ParkedBranches.record`, `ConsignmentGraphRunner`'s branch commits, plus the unpack
+plugins' scratch expansion. Substituting each is exactly the *"every sink honours a flag"* shape that
+misses one — and `DryRunServices`'s own javadoc names that failure mode. **Skipping the pass is true by
+construction: no write can be missed if no writer runs.** That is how I satisfied myself the list is
+complete: the gated list is not "every write I found", it is "every call that could reach a write", and it
+is short enough to read in one screen. ⚖ The cost, stated so it is not discovered later: **a dry run does
+not re-validate parsing** — it answers "what would this cycle touch", not "would this file parse". The
+per-node `preview`/`test` POSTs remain the way to answer the latter.
+
+**Does it publish? YES — marked — and every consumer was enumerated and made safe.** The evidence: there
+is exactly **one** fan-out (`ConsignmentAuditWriter:178` → `commitListener` → the bus, and
+`terminalBatchSink` → the Signal ledger), so the consumer set is enumerable and was enumerated:
+
+| Consumer | Verdict |
+|---|---|
+| `JobService.onConsignmentEvent` → `fireOnCommit` (`:822`) | **HONOURS** — the `Firing` now inherits `event.dryRun()` instead of the hardcoded `false`. The chained Job runs dry, which is the point. |
+| `JobService.onSignalEvent` (`:847`) | **HONOURS** — via a *different* mechanism: `PipelineConsignmentSignal.emit` and `commitPayload` put `dryRun` **in the payload**; `signalDryRun(...)` reads it back. Fails **closed to "real"** for any payload with no flag. |
+| `AlertService.onEvent` | **REFUSES loudly** — evaluation is not a read (it fires Alerts, advances cooldowns, may open Incidents); same call `DryRunServices` makes for `AlertAccess`. |
+| `CollectorService.onConsignmentEvent` (event-store bridge) | **REFUSES loudly** — a `BATCH_COMMITTED` row asserts a commit that did not happen. |
+| `PipelineScheduler.onUpstreamCommit` | **REFUSES loudly** — a downstream *pipeline* run has no dry mode to inherit. |
+| `EnrichmentService.onConsignmentEvent` | **REFUSES loudly** — a recompute writes for real, over partitions the simulated batch never wrote. |
+| `PipelineConsignmentSignal.emit` (the ledger Signal itself) | **MARKED, still emitted** — it is the observability record that a simulated batch happened, the same choice gate 4 made for the provenance marker. |
+
+⇒ No consumer silently ignores the flag, so publishing does not make the flag a lie.
+
+**The record.** `ConsignmentEvent` gained `boolean dryRun` (11 components). Of the 34 construction sites,
+3 of the 4 main ones use the pre-existing 7-arg constructor (unrelated — it defaults a v3.7.0 error
+detail) and needed no edit; only `ConsignmentAuditWriter:178` sets it. Six test sites used the 10-arg form
+and took an explicit `false`. Release-notes line owed and added to `api-stability.md`.
 
 ## Verification
 

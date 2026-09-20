@@ -173,7 +173,7 @@ class AssistEndToEndTest {
                     "no failures yet");
 
             c.svc.eventBus().publish(new ConsignmentEvent("MINI_ETL", "B1", "FAILED", List.of(),
-                    0, 10L, 1, "schema selector mismatch", "bad.csv", 3));
+                    0, 10L, 1, "schema selector mismatch", "bad.csv", 3, false));
 
             // Diagnosis runs off-thread; poll the endpoint until it lands.
             JsonNode arr = null;

@@ -165,6 +165,14 @@ public final class AlertService {
 
     /** Bus subscriber: a terminal batch re-evaluates the rules scoped to its pipeline. */
     public void onEvent(ConsignmentEvent event) {
+        // PIPELINE-DRYRUN-1 step 5 — evaluation is not a read: a breach fires an Alert, advances its
+        // cooldown and may open an Incident. DryRunServices makes exactly this call for AlertAccess, so
+        // this consumer REFUSES loudly for the same reason.
+        if (event.dryRun()) {
+            log.info("dry run: would evaluate '{}'s Alert Rules after simulated consignment {} — "
+                    + "nothing was checked", event.pipeline(), event.batchId());
+            return;
+        }
         try {
             evaluate(event.pipeline(), System.currentTimeMillis());
         } catch (RuntimeException e) {

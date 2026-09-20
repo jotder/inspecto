@@ -521,6 +521,16 @@ final class PipelineScheduler {
      */
     void onUpstreamCommit(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
+        // PIPELINE-DRYRUN-1 step 5 — this consumer cannot honour the flag: a downstream pipeline run has
+        // no dry-run mode of its own to inherit (that is CollectorProcessor.ingest's parameter, and
+        // triggerWorkers reaches it through the scheduler's own real-run path). So it REFUSES, loudly,
+        // rather than acting for real on a batch that never happened.
+        if (event.dryRun()) {
+            log.info("dry run: would trigger every event-triggered pipeline whose `from` names '{}' "
+                    + "(simulated consignment {}) — no downstream run started", event.pipeline(),
+                    event.batchId());
+            return;
+        }
         for (Path p : registry) {
             PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
             if (cfg == null) continue;

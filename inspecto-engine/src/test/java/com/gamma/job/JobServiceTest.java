@@ -949,6 +949,28 @@ class JobServiceTest {
     }
 
     @Test
+    void aChainedOnPipelineFiringInheritsTheUpstreamBatchesDryRunFlag(@TempDir Path root, @TempDir Path dir)
+            throws Exception {
+        // PIPELINE-DRYRUN-1 step 5 — THE defect this row was filed against: fireOnCommit hardcoded
+        // dryRun=false, so a simulated upstream batch chained a job that wrote FOR REAL. The `compact`
+        // maintenance task has no preview, so under dry run it must refuse rather than touch the file.
+        Files.writeString(root.resolve("keep.parquet"), "not-really-parquet");
+        JobConfig j = maintenance("compactor", null, "UPSTREAM",
+                Map.of("task", "compact", "dir", root.toString()));
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(j), bus, s, null, dir.resolve("audit").toString())) {
+            js.start();
+            bus.publish(new ConsignmentEvent("UPSTREAM", "b_dry", "SUCCESS", List.of("p=1"), 1L, 1L, 0,
+                    null, null, 0L, true));
+            JobRun run = await(() -> js.lastRunOf("compactor").orElse(null));
+            assertTrue(run.message().contains("no preview — no action taken"),
+                    "the chained run must have inherited dryRun=true: " + run.message());
+            assertTrue(Files.exists(root.resolve("keep.parquet")), "fail-closed: nothing was touched");
+        }
+    }
+
+    @Test
     void aCommaListOnPipelineFiresOnAnyUpstreamByDefault(@TempDir Path dir) throws Exception {
         // multiplicity Part B residual (a): several upstreams, default gate = any → each commit fires.
         JobConfig j = maintenance("merger", null, "a_etl, b_etl", Map.of("task", "heartbeat"));
