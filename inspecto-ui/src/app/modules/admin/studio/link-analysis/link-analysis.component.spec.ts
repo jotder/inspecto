@@ -575,4 +575,35 @@ describe('LinkAnalysisComponent', () => {
         c.clearFilter();
         expect(c.filterWhere().items).toEqual([]);
     });
+    it('advanced search: needs a loaded Dataset projection, then adopts the folded result with stranded marks', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        const open = vi.spyOn(dialog, 'open').mockReturnValue({
+            afterClosed: () =>
+                of({
+                    nodes: [{ id: 'a', data: { label: 'A', kind: 'entity' } }],
+                    edges: [],
+                    truncated: false,
+                }),
+        } as never);
+
+        c.openAdvancedSearch(); // nothing loaded yet — a hint, not a dialog
+        expect(open).not.toHaveBeenCalled();
+
+        await runQuery(fixture);
+        c.openAdvancedSearch();
+        expect(open).toHaveBeenCalledTimes(1);
+        const data = (open.mock.calls[0] as unknown as [unknown, { data: { dataset: Dataset } }])[1].data;
+        expect(data.dataset.id).toBe('links-ds');
+        expect(c.graph()!.nodes.map((n) => [n.id, !!n.data.missing])).toEqual([
+            ['a', false],
+            ['b', true],
+            ['c', true],
+            ['d', true],
+            ['e', true],
+        ]);
+        expect(c.pushState()).toBe('0 links · from advanced search');
+    });
 });

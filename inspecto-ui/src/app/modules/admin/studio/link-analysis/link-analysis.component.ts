@@ -80,6 +80,10 @@ import {
 } from 'app/inspecto/graph';
 import { ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import { LinkAnalysisFilterComponent, LocalMatch } from './link-analysis-filter.component';
+import {
+    LinkAnalysisAdvancedSearchDialog,
+    LinkAnalysisAdvancedSearchData,
+} from './link-analysis-advanced-search.dialog';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 import { NodeKind } from 'app/inspecto/api';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
@@ -650,9 +654,33 @@ export class LinkAnalysisComponent implements OnInit {
         }
     }
 
-    /** Placeholder until the advanced-search dialog lands (plan review point 4). */
+    /**
+     * Advanced search (mockup review point 4): SQL over the projected Dataset with a tabular result, beside
+     * the predicate builder. The dialog hands back a graph folded from the RESULT rows — SQL text never
+     * reaches the projection route — which replaces the working set with the previous nodes marked stranded.
+     */
     openAdvancedSearch(): void {
-        this.toastr.info('Advanced search is coming next.');
+        const p = this.lastRun()?.query.projection;
+        const dataset = p && this.datasets().find((d) => d.id === p.datasetId);
+        if (!p || !dataset) {
+            this.toastr.info('Advanced search needs a single-Dataset projection to be loaded first.');
+            return;
+        }
+        const data: LinkAnalysisAdvancedSearchData = { dataset, projection: p };
+        this.dialog
+            .open<LinkAnalysisAdvancedSearchDialog, LinkAnalysisAdvancedSearchData, ProjectedGraph | undefined>(
+                LinkAnalysisAdvancedSearchDialog,
+                { data, width: '64rem', maxWidth: '96vw' },
+            )
+            .afterClosed()
+            .subscribe((g) => {
+                if (!g) return;
+                const prev = this.graph();
+                this.graph.set(prev ? markStranded(prev, g) : g);
+                this.truncated.set(!!g.truncated);
+                this.localFilter.set(null);
+                this.pushState.set(`${g.edges.length.toLocaleString()} links · from advanced search`);
+            });
     }
 
     // ── workspace layout ──
