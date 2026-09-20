@@ -738,6 +738,23 @@
                             [open]="legendOpen()"
                             (openChange)="legendOpen.set($event)"
                         ></inspecto-link-analysis-legend>
+                        <!-- render footer: what is drawn, the level-of-detail state and the STATED caps -->
+                        <div
+                            class="text-secondary absolute bottom-1 left-2 right-2 z-10 flex flex-wrap items-center gap-x-3 text-[11px]"
+                            aria-label="Render status"
+                        >
+                            <span
+                                >{{ displayed()?.nodes?.length ?? 0 }} nodes ·
+                                {{ displayed()?.edges?.length ?? 0 }} links drawn</span
+                            >
+                            @if (lodLabelsOff()) {
+                                <span>labels off above {{ lodLabelCap }} nodes (level of detail)</span>
+                            }
+                            <span class="ml-auto">
+                                caps: projection {{ caps.projection }} nodes (server) · analysis
+                                {{ caps.analysis }} nodes (browser)
+                            </span>
+                        </div>
                         <inspecto-link-analysis-working-set
                             class="absolute right-2 top-2 z-10"
                             [stats]="workingSet()"
@@ -861,6 +878,12 @@
                                 </mat-checkbox>
                                 <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">
                                     Link labels
+                                </mat-checkbox>
+                                <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
+                                    Level of detail
+                                    <span class="text-secondary text-xs"
+                                        >(labels off above {{ lodLabelCap }} nodes)</span
+                                    >
                                 </mat-checkbox>
                                 <mat-checkbox
                                     [checked]="!!viewOptions().minimap"

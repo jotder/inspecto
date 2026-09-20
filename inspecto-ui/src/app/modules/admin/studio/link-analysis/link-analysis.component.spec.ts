@@ -663,4 +663,21 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture); // a fresh graph is a new answer — the old snapshot no longer describes it
         expect(c.latestSnapshot()).toBeNull();
     });
+    it('level of detail: drops labels above the cap while on, and the footer states the published caps', async () => {
+        const big: G6GraphData = {
+            nodes: Array.from({ length: 301 }, (_, i) => ({ id: `n${i}`, data: { label: `N${i}`, kind: 'entity' } })),
+            edges: [],
+        };
+        const { fixture } = create({ graph: big });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.lodLabelsOff()).toBe(true);
+        expect(c.displayOptions().nodeLabels).toBe(false);
+        expect(c.displayOptions().edgeLabels).toBe(false);
+
+        c.levelOfDetail.set(false);
+        expect(c.displayOptions().nodeLabels).toBe(true);
+        expect(c.caps).toEqual({ projection: 500, analysis: 2000 });
+    });
 });

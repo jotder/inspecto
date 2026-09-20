@@ -52,6 +52,7 @@ import {
     G6GraphData,
     GraphSourceId,
     GraphSourceQuery,
+    ANALYSIS_NODE_CAP,
     HistoryStack,
     collapseBranches,
     louvainCommunities,
@@ -119,7 +120,7 @@ import {
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { ProjectedGraph } from './entity-projection';
+import { PROJECTION_NODE_CAP, ProjectedGraph } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
@@ -127,6 +128,9 @@ import { LinkAnalysisService, LinkAnalysisView, LinkAnalysisViewOptions } from '
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+
+/** Level of detail: displayed-node count above which labels are dropped (they are unreadable there anyway). */
+export const LOD_LABEL_CAP = 300;
 
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
@@ -474,9 +478,19 @@ export class LinkAnalysisComponent implements OnInit {
     readonly nodeShapes = signal<Record<string, string>>({});
     readonly edgePatterns = signal<Record<string, EdgePattern>>({});
     readonly edgeSizes = signal<Record<string, number>>({});
+    // ── level of detail (mockup review point 5): labels are the first thing to go on a big canvas ──
+    readonly levelOfDetail = signal(true);
+    /** Above this many displayed nodes, labels are dropped while level of detail is on. */
+    readonly lodLabelCap = LOD_LABEL_CAP;
+    readonly lodLabelsOff = computed(
+        () => this.levelOfDetail() && (this.displayed()?.nodes.length ?? 0) > LOD_LABEL_CAP,
+    );
+    /** The published size limits the footer states — the server-side projection cap and the browser analysis cap. */
+    readonly caps = { projection: PROJECTION_NODE_CAP, analysis: ANALYSIS_NODE_CAP };
+
     readonly displayOptions = computed<GraphDisplayOptions>(() => ({
-        nodeLabels: this.nodeLabels(),
-        edgeLabels: this.edgeLabels(),
+        nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
+        edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
         nodeColors: this.nodeColors(),
         edgeColors: this.edgeColors(),
         nodeShapes: this.nodeShapes(),
