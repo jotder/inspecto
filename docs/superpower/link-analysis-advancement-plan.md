@@ -197,6 +197,29 @@ bind the SPA work in S1.1, S1.3, S1.4 and any rendering item; none is sized here
    bubble sets, combos, edge bundling, tooltip, context menu, snapline, history, watermark). Each is a
    G6 layout id, behavior or plugin, not a new engine.
 
+#### As built, UI first (2026-09-20) — what the SPA now does ahead of the backend
+
+Shipped on `master` in seven commits (`fe7b678b` … `92032f78`), each unit-tested (26 spec files, 216
+tests green across `link-analysis/`, `inspecto/graph/`, `inspecto/query/` and `graph-view`), production
+build green, and driven in the preview over the demo space's lineage plane (the Personal build here has
+`geoLink: false`, so the Dataset projection route 503s — the lineage plane exercised the same surface).
+
+| Review point | As built | Backend still owed |
+|---|---|---|
+| Workspace | Query dock left · Analysis / View toolbox dock right, both `inspectoSplit`-resizable and collapsible to icon rails; maximize-canvas toggle; Data table as a bottom strip | — |
+| 1 Domain profiles | `inspecto/graph/domain-profile.ts` (generic · finance · telecom · supply chain · cyber): tile labels, measure/time column hints, suggested toolbox groups; picker in the query dock; persisted as `LinkAnalysisView.profile` | — |
+| 3 Overlays | Legend (kind · colour · count · link kinds) and Working set (`workingSetStats`: shown/loaded, folded rows, Σ measure, time span, `truncated`) — each minimises to a pill; open state persisted with the view | — |
+| S1.4 loop | `inspecto/graph/graph-filter.ts` + `<inspecto-link-analysis-filter>`: the shared condition tree over endpoint columns + edge attrs; **Apply locally** (browser, live matched/total) · **Push to server** (tree sent as `query.filter`, result merged with `markStranded` — excluded nodes dimmed/dashed, never dropped); the predicate travels in the saved view's `query` | **`filter` on `POST /inv/projection` and `/neighbors`** — today the map-typed body ignores the key, so a push returns the unfiltered projection and the panel shows the count it got. Decision §7.5 (bind vs escape) first. |
+| 4 Advanced search | Dialog over the data-table Pro tier: offline SQL over a 500-row sample, *Run on server* via `DatasetRowsService.sql` (`POST /db/query`), **Project result as graph** folds the RESULT rows client-side — SQL text never reaches `/inv/projection` (spec §4.3 holds); graph-query tab stated unavailable over a Dataset | — (a graph-store edition would light the graph-query tab) |
+| S1.3 evidence | `inspecto/graph/graph-snapshot.ts` (canonical JSON + FNV-1a fingerprint, `verifySnapshot`), Snapshot dialog (stranded excluded, predicate + origin frozen), Attach to Case dialog (real Cases via `GET /objects?type=CASE` when ops is present, placeholder Cases otherwise; saved-view option labelled *not evidence*) | **`POST /inv/snapshots`** and **`POST /cases/{id}/evidence/graph`** — `LinkAnalysisSnapshotsService` is a session-scoped signal store; swap its `add`/`attach` when the routes land. SHA-256 replaces the fingerprint (S3.2). |
+| 6 View toolbox | `graph-view` gains `[plugins]` (`GraphViewPlugins`, pure `buildPluginList`): minimap · grid · Louvain community hulls · link bundling · fisheye · link-filter lens · hover-activate / brush / lasso; layout gallery; label toggles | — |
+| 5 Rendering at scale | Level of detail (labels off above 300 displayed nodes, a View toggle) and a render footer stating what is drawn and the two published caps (projection 500 server-side · analysis 2 000 browser) | WebGL renderer, viewport culling, super-node aggregation, progressive load — **still no roadmap item (S1.5 open, above)** |
+| S1.1 worker | not started — the toolbox still runs algorithms synchronously | `graph-worker.ts` + `GraphAnalysisClient` per S1.1 |
+
+⚠ Two UI-first honesty rules the code enforces: every mock-backed surface says so on screen (the filter
+panel's stage-2 line, the snapshot dialogs' warning alerts), and nothing invents a result a route did not
+return — a push without backend support shows the unfiltered count, never a fake narrowing.
+
 ### Phase 2: DuckDB Recursive Traversal & Declarative Motif Engine (Sprint 10)
 *Objective: Shift multi-hop graph expansion to server-side DuckDB execution and deploy declarative forensic pattern matching.*
 
