@@ -2205,6 +2205,14 @@ position read any CSV/Parquet/JSON on the server (DuckDB replacement scan — re
   canonical trigger has never fired end to end.
   ⛔ **The residual belongs in §2, not here:** "push a real tag" is an operator/release act no shift can do
   from this checkout — carrying it as a P2 engineering row is what kept it looking buildable.
+  🔴 **PARKED INDEFINITELY 2026-09-20 — the operator states there are practically no releases after 3.x:
+  *"just carry on master."*** So the tag-push half is not merely *owed*, it is **not going to happen on any
+  foreseeable schedule**, and no shift can close this row by working on it. ⛔ Do not pick this row up
+  expecting to finish it, and do not re-file the tag-push as engineering work. It re-enters play only if a
+  release is ever cut, at which point the first `v*` tag IS the test. (Same standing model as
+  `docs/BRANCHING.md` §0-A: master is the only line, the merge-forward set is permanently empty.)
+  ⇒ **The row's ONLY buildable remainder is the checksum/signature split**, below — everything else here is
+  waiting on an event that is not scheduled.
   ⚠ Known gap, deliberately not fixed: the checksum half of `Verify checksums and signatures` WOULD be
   meaningful on a dispatch run; it is push-gated only because the `.asc` files do not exist there. Splitting
   the two is tracked here, not forgotten.
