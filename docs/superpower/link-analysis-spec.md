@@ -174,6 +174,91 @@ analysis whatsoever — only SQL fold and filter (`InvRoutes.java:36-39` states 
   evidence.**
 - ⬜ **NOT BUILT — dossier export.** No automated case report assembling graphs, findings and notes.
 
+### 3.7 Refine locally, push the filter down, converge — the two-stage query loop
+
+**The problem.** The backend holds Datasets too large for a browser; the browser holds a bounded
+working set (§4.1); an analyst must not pay a backend round-trip per interaction, yet must be able to
+reach data the working set does not contain. The answer is a **loop, not two stages**: filter the
+local working set → discover the predicate → push it down → if the result is still `truncated`,
+refine again. `truncated` is the loop's termination signal, so the analyst always knows whether they
+are looking at the whole answer or a bounded slice of it.
+
+**The design rule.** The filter is **one structured predicate with two evaluators** — never SQL
+text:
+
+| Stage | Evaluator | Over |
+|---|---|---|
+| 1 — local | TypeScript, in the browser | the working set (≤ 2000 nodes) |
+| 2 — pushdown | Java, compiled to a DuckDB predicate | the full Dataset, **before** the `GROUP BY` |
+
+⚠ *Before the `GROUP BY`* is the crux. Edges are folded aggregates carrying a `count` (§2.1), so a
+time or kind condition must apply to the underlying rows **pre-fold**, or the counts come back wrong.
+
+🔴 **Grounding found this stack already built and LIVE — the work is wiring, not construction.** A
+first design pass (recorded in the plan) named three "genuinely new" pieces; two of the three exist.
+
+- ✅ **SHIPPED — the predicate model.** `{kind:'group', op:'AND'|'OR', items}` /
+  `{kind:'condition', field, operator, value?, value2?}` with **13 operators** (`=` `!=` `<` `<=`
+  `>` `>=` `contains` `startsWith` `endsWith` `in` `between` `isNull` `isNotNull`) —
+  `inspecto-ui/src/app/inspecto/query/query-types.ts:22-40`.
+- ✅ **SHIPPED — the visual builder.** `QueryConditionGroupComponent`
+  (`<inspecto-query-condition-group>`, standalone, inputs `group`/`columns`/`root`, output `changed`;
+  `query-condition-group.component.ts:19-37`), already hosted by the data-table over a `where`
+  signal (`data-table.component.ts:258`). ⬜ **Not yet mounted on the Link Analysis surface.**
+- ✅ **SHIPPED — the server-side compiler.** `ConditionSql.predicate(when)` renders the tree as a
+  DuckDB boolean expression, with **three production consumers** (`DecisionRuleApplier:185`,
+  `ExpectationEvaluator:62`, `InspectoTools:868`) and a parity test that asserts against a **live
+  DuckDB** (`ConditionSqlTest`, 10 cases incl. nested groups, empty group, incomplete leaf). Its
+  semantics deliberately mirror the in-JVM evaluator `ConditionTree` (`AlertService:544`,
+  `DecisionRoutes:120`).
+- ✅ **SHIPPED — the insertion point.** `InvRoutes.project()` already builds
+  `WHERE src IS NOT NULL AND tgt IS NOT NULL` + a `neighborFilter`, with a `binds` list
+  (`InvRoutes.java:208-215`). A pushed-down predicate `AND`s in right there, ahead of the `GROUP BY`.
+  `ConditionSql` renders an empty tree as `TRUE`, so an absent filter is a no-op by construction.
+- ✅ **SHIPPED — the working set is already the right sample.** `project()` orders by
+  `cnt DESC, source, target` before applying the limit (`InvRoutes.java:215`), i.e. **top-N by edge
+  weight**. ⚠ Correcting the first design pass, which claimed the sample was "an arbitrary first
+  2000 groups". The heaviest edges surface structure; that is the sample you want to discover
+  rules from.
+- ✅ **SHIPPED — merge on return.** `mergeGraphs` (`graph-analysis.ts:464`) folds a stage-2 result
+  into the working set so layout and selection survive the refetch.
+- 🟡 **PARTIAL — the stage-1 engine.** `evaluateRows(QueryModel, QuerySource)` is the browser-side
+  reference evaluator `ConditionTree` was ported from (`query-eval.ts:9`). It is **retained but has
+  zero live callers** — the offline mode it served was removed 2026-08-31, and it survives as the
+  semantic reference with its own 6-case spec. Stage 1 revives it over `edges.map(e => e.attrs)`
+  with a minimal `{projection:'*', where}` model. ⚠ That revival must turn its spec from mirror
+  coverage into live coverage; this repo has a recorded lesson about a well-tested evaluator that was
+  dead while the live path had none.
+- ⬜ **NOT BUILT — the `filter` field.** `POST /inv/projection` (and `/neighbors`) do not accept a
+  predicate. See the contract in the plan §4.
+- ⬜ **NOT BUILT — the loop UX.** "Apply locally" / "Push to server" actions, `truncated` surfaced as
+  the loop signal, and **stranded-node marking** on merge (a node the new predicate would have
+  excluded is marked, never silently dropped).
+- ⬜ **NOT BUILT — cross-stage parity coverage.** Same tree + same rows ⇒ stage-1 edge set equals
+  stage-2 edge set. `ConditionSqlTest.assertParity` is the template.
+- 🟡 **PARTIAL — persisting the discovered predicate.** A saved view keeps the query but not a
+  predicate. The shape already exists: `RuleTemplate` (persisted as a `rule-template` component,
+  `rule-types.ts:14-27`, carrying `where` plus named `params`), built from a finished data-table
+  query. Execution of a `RuleTemplate` is "still to come" per its own javadoc, so today it is a
+  container, not a runnable. ⚠ Prose here says *saved filter template*; `RuleTemplate` is the code
+  identifier only.
+
+**Node conditions need no special machinery.** The tree operates on the relation's columns, and
+`sourceCol`/`targetCol` *are* relation columns, so a condition on either is an ordinary leaf. One
+subtlety the stage-1→stage-2 translation owns: a client-side node filter means "this value appears
+as **either** endpoint", which pushes down as an `OR` group over `sourceCol` and `targetCol`, not a
+single leaf.
+
+**Why this comes before server-side traversal.** It delivers most of the value of server-side
+filtering — cost that scales with the predicate's selectivity instead of the Dataset's size — with
+none of the recursive-CTE risk, and it is the prerequisite for making any later traversal
+*filtered*. It does **not** lift the client analysis cap (§4.1); that remains a separate decision.
+
+**A consequence for §3.6.** Once the predicate is a first-class object, a saved view can persist
+*the predicate*, which is reproducible, instead of only the projected graph, which is not. That
+does not make a saved view evidence by itself — the Dataset can still change under it — but it makes
+the *question* asked reproducible even when the *answer* is not.
+
 ## 4. Non-functional requirements
 
 ### 4.1 Limits, as built
@@ -226,7 +311,8 @@ Falsifiable, in the repo's house style — each states what would have to be obs
 
 1. **Re-projection on every call** (§2.1) means cost scales with usage, not with graph size, and two
    analysts on one Dataset pay twice. It also makes §3.6's snapshotting impossible without a new
-   persistence seam.
+   persistence seam. ⚠ §3.7's pushdown changes the *shape* of that cost — a filtered re-projection
+   scales with the predicate's selectivity rather than the Dataset's size — but not the *fact* of it.
 2. **All analysis is client-side** (§3.3) means the supported graph size is bounded by one browser
    tab. Server-side traversal is the only route past it.
 3. **Nodes have no identity** (§2.1) means centrality and community results are only as meaningful as
@@ -241,6 +327,17 @@ Owed before the corresponding work starts. ⛔ None should be answered by an imp
    the UI so nobody treats it as such. Blocks §3.6.
 2. **Where does traversal run?** Recursive CTE in DuckDB, or a worker plus a raised cap? Decides
    whether the ceiling problem is solved server-side or client-side. Blocks §4.2.
+   ⚠ **Narrowed 2026-09-20 by §3.7:** *filtering* now runs server-side by design (the predicate
+   pushdown), which was half of what this decision covered. What remains open is only *traversal* —
+   multi-hop expansion beyond `neighbors`' one hop — and the client cap.
+5. **Bind or escape the pushed-down predicate?** `ConditionSql` **quote-escapes** literals (its
+   tested contract, written for authored config). `InvRoutes` deliberately moved to **JDBC bind
+   params** for the neighbor value and retired hand-rolled escaping. An analyst's ad-hoc filter is
+   *less* trusted than authored config, not more. Options: (a) reuse `ConditionSql` as-is **and**
+   validate every `field` against the relation's actual columns before compiling (422 on an unknown
+   column) — the column check is the stronger safeguard either way, and the schema-relationships path
+   already reads those columns; (b) add a bind-emitting variant and keep it in parity with the string
+   one. ⇒ Recommended: (a) now, (b) as a follow-on. Blocks the `filter` field in §3.7.
 3. **What is the supported graph size?** A number must be chosen and enforced. Blocks §4.2.
 4. **Does Link Analysis get a first-class node model,** or stay value-projected? Blocks §2.1's
    identity gap and any attribute-rich analysis.

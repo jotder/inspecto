@@ -115,6 +115,51 @@ Investigative teams require defensible, auditable reports. Currently, exporting 
 
 ---
 
+#### S1.4: Two-Stage Query — refine locally, push the predicate down (added 2026-09-20)
+
+Specified in the spec §3.7. **Ordered before S2.1 on purpose**: it delivers most of the value of
+server-side filtering with none of the recursive-CTE risk, and it is the prerequisite for making
+S2.1's traversal *filtered* rather than exhaustive.
+
+🔴 **Sizing: S–M, because it is wiring, not construction.** A first design pass (chat, 2026-09-20)
+named three "genuinely new" pieces — a SQL compiler for the predicate, a `filter` field, and a better
+sample. Grounding refuted two of the three: `ConditionSql.predicate()` already compiles this exact
+tree to DuckDB with three production consumers and a live-DuckDB parity test, and `project()`
+already samples top-N by `cnt DESC` (`InvRoutes.java:215`). Only the `filter` field is new.
+
+1. **Backend — the `filter` field.** `POST /inv/projection` and `/neighbors` accept
+   `filter?: ConditionGroup`. Validate every leaf `field` against the relation's actual columns
+   (the `schemaRelationships` path already reads them) → 422 `CONFIG_VALIDATION_FAILED` on an unknown
+   column. Then `AND (ConditionSql.predicate(filter))` into the existing `WHERE` at
+   `InvRoutes.java:213`, **ahead of the `GROUP BY`** so `count` folds correctly. An absent filter
+   renders `TRUE` — no-op by construction. Tests (real-HTTP, house idiom): a time-window filter
+   changes `count`, not just membership; an `OR` group over `sourceCol`/`targetCol` implements
+   "node present as either endpoint"; an unknown `field` is 422; an injection probe on `field` and
+   on a `contains` operand lands nowhere. ⚠ Decision §7.5 (bind vs escape) must be answered first —
+   recommended (a).
+2. **Client — mount the builder and revive the engine.** Host `<inspecto-query-condition-group>` on
+   the Link Analysis query panel with `columns` = `sourceCol` + `targetCol` + `attrCols` (typed via
+   `inferColumns()` over the working set). Stage 1 evaluates via `evaluateRows` over
+   `edges.map(e => e.attrs)` with `{projection:'*', where}` — **reviving a retained evaluator with
+   zero live callers**; its `query-eval.spec.ts` becomes live coverage the day this lands. Two
+   actions: **Apply locally** (stage 1) and **Push to server** (stage 2, sends the tree as `filter`).
+   Surface `truncated` as the loop's signal; on return, `mergeGraphs` into the working set and
+   **mark** stranded nodes, never drop them.
+3. **The stage-1 → stage-2 translation.** A client node filter (by G6 node id) becomes an `OR` group
+   over `sourceCol`/`targetCol`; everything else passes through unchanged because the tree already
+   operates on relation columns. Pin this with a unit test on the translator alone.
+4. **Cross-stage parity test.** Same tree + same rows ⇒ identical edge set from stage 1 and stage 2.
+   Template: `ConditionSqlTest.assertParity`. ⚠ This is the test that keeps the two evaluators in
+   lockstep as operators are added; without it the repo's recorded "full parity that wasn't
+   injective" failure returns.
+5. **Persist the predicate.** Extend the `link-analysis-view` component to carry `filter`. Note
+   `RuleTemplate` (`rule-template` component) as the shared shape for a reusable saved filter
+   template; do not fork a second one.
+
+**Acceptance:** an analyst projects a Dataset, narrows it in the browser with no round-trip, pushes
+the predicate, and either receives an untruncated result or a `truncated` flag telling them to
+refine further — and at no point can the pushed filter reach the statement unvalidated.
+
 ### Phase 2: DuckDB Recursive Traversal & Declarative Motif Engine (Sprint 10)
 *Objective: Shift multi-hop graph expansion to server-side DuckDB execution and deploy declarative forensic pattern matching.*
 
@@ -165,6 +210,45 @@ Investigative teams require defensible, auditable reports. Currently, exporting 
 ---
 
 ## 4. API & Contract Specifications
+
+### S1.4 Contract: `filter` on `POST /inv/projection` (and `/neighbors`)
+
+The existing body gains one optional field. Everything else is unchanged.
+
+```json
+{
+  "dataset": "transactions",
+  "sourceCol": "payer_id",
+  "targetCol": "payee_id",
+  "linkKindCol": "channel",
+  "attrCols": ["booked_at", "amount"],
+  "limit": 2000,
+  "filter": {
+    "kind": "group", "op": "AND", "items": [
+      { "kind": "condition", "field": "booked_at", "operator": "between",
+        "value": "2026-01-01", "value2": "2026-03-31" },
+      { "kind": "condition", "field": "channel", "operator": "in", "value": "wire,crypto" },
+      { "kind": "group", "op": "OR", "items": [
+        { "kind": "condition", "field": "payer_id", "operator": "=", "value": "ACME-001" },
+        { "kind": "condition", "field": "payee_id", "operator": "=", "value": "ACME-001" }
+      ]}
+    ]
+  }
+}
+```
+
+**Semantics.** `filter` is the `query-types.ts` condition tree, verbatim — the same object the
+data-table's builder emits and `ConditionSql` compiles. It is applied to the underlying relation
+**before** the `GROUP BY`, so edge `count` reflects only matching rows. The nested `OR` group is the
+canonical "node present as either endpoint" form (spec §3.7). An absent or empty `filter` imposes no
+constraint (`ConditionSql` renders `TRUE`).
+
+**Validation, fail-closed.** Every leaf `field` must name a column of the Dataset's relation;
+otherwise 422 `CONFIG_VALIDATION_FAILED` naming the offending field. Operands are quote-escaped by
+`ConditionSql` (or bound, per decision §7.5). Identifiers never come from the tree unvalidated.
+
+**Response.** Unchanged: `{rows:[{source,target,kind?,count,attrs?}], truncated}`. `truncated: true`
+is the loop's signal to refine further.
 
 ### S1.2 Contract: `POST /inv/projection/multi`
 ```json
