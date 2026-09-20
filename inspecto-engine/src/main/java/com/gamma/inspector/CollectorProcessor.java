@@ -335,7 +335,7 @@ public class CollectorProcessor {
      * {@link RemoteAcquisitionHandler#materializeRemote(PipelineConfig, CollectorConnector, List, RetryPolicy,
      * boolean)}. {@code CollectorService}'s manual pipeline trigger ({@code POST /runs/{name}/trigger?skipPostAction=true})
      * is the one operator-facing route that carries {@code skipPostAction=true} in; see
-     * {@code docs/superpower/pipeline-dryrun-design.md}.
+     * {@code docs/archived-documents/plans-archive/pipeline-dryrun-design.md}.
      */
     @PublicApi(since = "4.0.0")
     public static int acquire(PipelineConfig cfg, boolean skipPostAction) throws java.io.IOException {

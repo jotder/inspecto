@@ -75,7 +75,7 @@ class PipelineJobRunnerTest {
      * {@code transform → sink} walk (so a broken graph still fails loudly) but writes NO bytes to the
      * sink store, publishes no {@link com.gamma.etl.ConsignmentEvent} (so no downstream {@code on_pipeline}
      * job fires), and records a {@code SIMULATED} row in the output registry instead of a silent no-op —
-     * see docs/superpower/pipeline-dryrun-design.md gate 2/3/4.
+     * see docs/archived-documents/plans-archive/pipeline-dryrun-design.md gate 2/3/4.
      */
     @Test
     void dryRunWritesNoBytesFiresNoEventAndRecordsASimulatedRow() throws Exception {

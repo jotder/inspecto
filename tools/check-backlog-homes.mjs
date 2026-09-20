@@ -188,7 +188,12 @@ for (const row of rows) {
 // this repo has shipped twice: a guard that cannot fire. Set EQUAL to the number parsed today.
 // 2026-09-20: 52 → 51, because `PIPELINE-DRYRUN-1` CLOSED and left the board with its pointer. The
 // grammar is unchanged — 53 rows still parse, one fewer than yesterday.
-const MIN_DOC_POINTERS = 51;
+// 2026-09-20 (later, same day): 51 → 52. A pointer genuinely JOINED the board — archiving
+// `PIPELINE-DRYRUN-1`’s plan carried out its undropped residual as a new row,
+// `DRYRUN-INVISIBLE-ON-FLAT-LANE-1`, which points at the same OKF concept. The grammar is
+// unchanged and every previously-parsed pointer still parses; this is one more row, not one
+// fewer break.
+const MIN_DOC_POINTERS = 52;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +

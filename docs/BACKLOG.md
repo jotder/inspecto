@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 30<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 30<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -169,8 +169,8 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
 > ⚠ **Only the 0<!--count:backlog-p1--> P1 + 30<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 24<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 54<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> someone asks by name"** — so those 25<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -869,7 +869,8 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   **What would have to be built — NOT built here; this row is a gate, not a feature.** The general
   answer is a **parse-validating dry-run mode**, flagged at ship time as a separate, larger build and
   stated as the accepted cost: *a dry run answers "what would this cycle touch", not "would these files
-  parse"* (`superpower/pipeline-dryrun-design.md` §"Step 5 — AS BUILT"). ⚠ **A nearer starting point
+  parse"* (`archived-documents/plans-archive/pipeline-dryrun-design.md` §"Step 5 — AS BUILT"; the
+  as-built now lives in `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.11). ⚠ **A nearer starting point
   EXISTS and the earlier framing missed it**: `PipelineTestRun`
   (`inspecto-engine/src/main/java/com/gamma/inspector/PipelineTestRun.java`) already parses **real**
   inbox files through the **real** `strategy.ingest` with zero production side effects, under two
@@ -883,6 +884,21 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   reasons out of the ingest strategies, then surface them on a run that lands nothing"* — and it should
   be scoped against `PipelineTestRun`, **not** against `?dryRun=true`. ⛔ **No default picked** — that
   remains the operator's call, and the evidence it needs still does not exist.
+- **P3** · `DRYRUN-INVISIBLE-ON-FLAT-LANE-1` — a flat-lane dry run is INVISIBLE in the very overlay
+  gate 4 built for it. ⚠ Carried out of `PIPELINE-DRYRUN-1` at archive time (2026-09-20) rather than
+  dropped: it lived only inside that row’s now-closed narrative. **Two halves, one cause.**
+  (a) Step 5’s full no-op gates `recordProvenance` off in `ConsignmentIngestor`, so a
+  `?dryRun=true` flat-lane run writes **no `inspecto_pipeline_provenance` row at all** — while the
+  job/graph lane still records a marked one (`PipelineJobRunner`, before its early return). So the
+  `simulated BOOLEAN` column and the gate-3 decision *“a dry run should be visible in the
+  Lineage/Sankey overlay”* are reachable on one lane only, and **not** on the lane the feature
+  actually shipped for. ⚠ Decide, do not patch: either the no-op writes a marked provenance row (a
+  deliberate exception to “skip the pass whole”, and the ONLY write a dry run makes — say so loudly),
+  or the overlay promise is retracted and the log becomes the sole report.
+  (b) The **UI badge was never added**. `GET /provenance` already carries `"simulated": true|false`
+  per row for the UI to key off; nothing renders it, so even a graph-lane dry run’s rows are drawn
+  as if real. Half (b) is moot for the flat lane until (a) is answered.
+  → `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.11
 - ~~**P2**~~ · ✅ **`PIPELINE-DRYRUN-1` CLOSED 2026-09-20 — step 5 BUILT as the FULL flat-lane no-op.**
   `POST /runs/{name}/trigger?dryRun=true` now runs a whole pipeline and **lands nothing**, for **every**
   pipeline, with no per-pipeline caveats: no partition outputs, no quarantine/backup moves, no manifest,
@@ -957,7 +973,9 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   ⚠ A decision-free **interim mitigation** is scoped in the plan (refuse `dryRun=true` at
   `RunRoutes.java:159` with a 422, or rename the parameter to `skipPostAction`) — **operator's call, not
   implemented**. ✅ Confirmed unchanged: `:381`/`:391`, the record shape, and the **34** construction sites
-  (4 main / 30 test). → `superpower/pipeline-dryrun-design.md` §"Step 5". *(Original:)* run a whole pipeline and discard
+  (4 main / 30 test). → `okf/capabilities/pipeline-execution/pipeline-execution.md` §3.11 · `archived-documents/plans-archive/pipeline-dryrun-design.md`
+  (the as-built now lives in the OKF concept; the plan is archived for provenance, 2026-09-20).
+  *(Original:)* run a whole pipeline and discard
   every write. **FILED
   2026-09-15, new scope, operator-asked.** Nothing on the board covered it: the repo can preview a
   *node* (34 read-shaped `preview`/`test`/`probe` POSTs), test a *job pack* (`PackTestHarness`), seal a

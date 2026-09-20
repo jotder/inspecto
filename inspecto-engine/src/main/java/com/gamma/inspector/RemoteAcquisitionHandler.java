@@ -78,7 +78,7 @@ final class RemoteAcquisitionHandler {
      * {@link #applyPostAction} skips the actual {@code connector.post(...)} call (the land-then-ack remote
      * delete/move/rename/tag) and only logs what it would have done. {@code CollectorService}'s manual
      * pipeline trigger ({@code POST /runs/{name}/trigger?skipPostAction=true}) is the operator-facing route that
-     * threads {@code skipPostAction=true} in — see {@code docs/superpower/pipeline-dryrun-design.md}.
+     * threads {@code skipPostAction=true} in — see {@code docs/archived-documents/plans-archive/pipeline-dryrun-design.md}.
      */
     static List<RemoteFile> materializeRemote(PipelineConfig cfg, CollectorConnector primary,
                                               List<RemoteFile> ready, RetryPolicy retry, boolean skipPostAction) {

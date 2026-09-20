@@ -20,7 +20,7 @@ import java.util.List;
  * {@code ConsignmentOutput} row with {@link ConsignmentOutput.State#SIMULATED} — a best-effort preview row
  * count over the sink's already-materialised input relation, and a placeholder path — so the run is visible
  * in the output registry (and {@code GET /provenance}) instead of invisible, per the operator-confirmed
- * design (docs/superpower/pipeline-dryrun-design.md).
+ * design (docs/archived-documents/plans-archive/pipeline-dryrun-design.md).
  *
  * <p>{@code sink.view} nodes are skipped exactly as {@link PartitionSinkWriter} skips them (no bytes either
  * way). The row count query is best-effort: a failure is logged and the row is still recorded, with
