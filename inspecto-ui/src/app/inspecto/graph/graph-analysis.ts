@@ -14,8 +14,12 @@ import type { G6Edge, G6GraphData, G6Node } from './graph-types';
  * ⚠ This is a **default, not a truth**. It was measured on one host, one browser and one synthetic graph
  * shape (2026-09-22, plan §1.7): 25 of the 27 algorithms stay under 60 ms even at ~2 000 nodes, while
  * suspicion score alone takes 6.7 s there. An analyst's laptop, a denser graph or a different
- * edge-to-node ratio all move that. ⇒ deployments override it via {@link configureGraphLimits}; the
- * server publishes the value at `/bootstrap` (`limits.analysisNodeCap`).
+ * edge-to-node ratio all move that. ⇒ deployments override it via {@link configureGraphLimits}, fed from
+ * the per-space `GET|PUT /settings/link-analysis`.
+ * ⚠ This block previously said the value is published at `/bootstrap` (`limits.analysisNodeCap`). It is
+ * NOT — verified 2026-09-22: the caps appear in exactly three Java files (the settings record, its route
+ * and its test) and no `limits` key is served anywhere. Corrected rather than left, because a comment
+ * naming a mechanism that does not exist is how the next reader wires against nothing.
  */
 export const ANALYSIS_NODE_CAP_DEFAULT = 2000;
 
@@ -34,14 +38,44 @@ export function analysisNodeCapValue(): number {
  * turn the whole analysis toolbox off, which is a far worse outcome than ignoring a bad setting. Passing
  * `undefined` leaves the value alone, so a partial payload is safe.
  */
-export function configureGraphLimits(limits: { analysisNodeCap?: number } | null | undefined): void {
+export function configureGraphLimits(
+    limits: { analysisNodeCap?: number; suspicionNodeCap?: number } | null | undefined,
+): void {
     const v = limits?.analysisNodeCap;
     if (typeof v === 'number' && Number.isFinite(v) && v >= 1) analysisNodeCap = Math.floor(v);
+    const sv = limits?.suspicionNodeCap;
+    if (typeof sv === 'number' && Number.isFinite(sv) && sv >= 1) suspicionNodeCap = Math.floor(sv);
 }
 
-/** Restore the measured default — for tests, and for a deployment that clears its override. */
+/**
+ * The ceiling for **suspicion score alone** (decision D-S3, operator 2026-09-22). It gets its own,
+ * lower default because the shared {@link ANALYSIS_NODE_CAP_DEFAULT} is sized for the other 26
+ * algorithms, which are trivial at 2 000 nodes; this one is not, and one slow algorithm should not
+ * drag the cap down for the 25 that finish in under 60 ms.
+ *
+ * Measured on the dev host, median of 3, ~3 edges per node:
+ * 250 → 103 ms · 500 → 402 ms · **750 → 972 ms** · 1 000 → 1 608 ms · 1 500 → 3 774 ms · 2 000 → 7 277 ms.
+ *
+ * 🔴 **The curve is quadratic** — betweenness dominates, and doubling the nodes costs ~4.5× the time,
+ * so this cap is far more sensitive than a linear one: halving it from 2 000 to 1 000 cuts the work to
+ * about a quarter, not a half. 750 is chosen as the last MEASURED point under one second; the
+ * interpolated crossing is ~760, and a default should be a number someone actually observed.
+ *
+ * ⚠ Like the others this is a DEFAULT, not a truth — one host, one browser, one synthetic shape.
+ */
+export const SUSPICION_NODE_CAP_DEFAULT = 750;
+
+let suspicionNodeCap = SUSPICION_NODE_CAP_DEFAULT;
+
+/** The suspicion-score ceiling currently in force. Read it — never cache it. */
+export function suspicionNodeCapValue(): number {
+    return suspicionNodeCap;
+}
+
+/** Restore the measured defaults — for tests, and for a deployment that clears its override. */
 export function resetGraphLimits(): void {
     analysisNodeCap = ANALYSIS_NODE_CAP_DEFAULT;
+    suspicionNodeCap = SUSPICION_NODE_CAP_DEFAULT;
 }
 
 /** A highlightable analysis result: the node/edge ids to emphasize on the canvas. */
@@ -1018,8 +1052,7 @@ export function egoNetwork(g: G6GraphData, nodeId: string, direction: GraphDirec
 // V2 — Algorithm library (centrality family, cohesive subgroups, flow, similarity, link prediction)
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 
-function requireUnderCap(g: G6GraphData, what: string): void {
-    const cap = analysisNodeCapValue();
+function requireUnderCap(g: G6GraphData, what: string, cap = analysisNodeCapValue()): void {
     if (g.nodes.length > cap) {
         throw new Error(`${what} is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
@@ -1501,10 +1534,15 @@ function normalize(scores: NodeScore[]): Map<string, number> {
  * signals — degree, betweenness, PageRank, k-core, and triangle participation — that surface the
  * over-connected brokers and dense-cluster members an investigator should look at first. Weights are
  * tunable (default 1 each); the per-node `factors` breakdown drives risk sizing/colouring on the
- * canvas and an explainable ranking. Throws above {@link analysisNodeCapValue} (betweenness dominates).
+ * canvas and an explainable ranking.
+ *
+ * ⚠ Refuses above {@link suspicionNodeCapValue}, its OWN lower ceiling — not the shared
+ * {@link analysisNodeCapValue} — because betweenness dominates the cost and the growth is quadratic
+ * (D-S3). The refusal names this cap, so an analyst who can run every other tool at 2 000 nodes is told
+ * why this one stopped at 750 instead of being left to guess.
  */
 export function suspicionScore(g: G6GraphData, weights: SuspicionWeights = {}): SuspicionScore[] {
-    requireUnderCap(g, 'Suspicion scoring');
+    requireUnderCap(g, 'Suspicion scoring', suspicionNodeCapValue());
     const w = { degree: 1, betweenness: 1, pageRank: 1, core: 1, triangles: 1, ...weights };
     const deg = normalize(degreeCentrality(g));
     const btw = normalize(betweennessCentrality(g));

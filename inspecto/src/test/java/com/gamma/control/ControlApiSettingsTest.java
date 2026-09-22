@@ -139,19 +139,24 @@ class ControlApiSettingsTest {
 
             // absent document reads as both-null (inherit the shipped defaults), not a failure
             JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
-            assertTrue(def.get("projectionNodeCap").isNull() && def.get("analysisNodeCap").isNull(),
-                    "no document yet ⇒ inherit both");
+            assertTrue(def.get("projectionNodeCap").isNull() && def.get("analysisNodeCap").isNull()
+                            && def.get("suspicionNodeCap").isNull(),
+                    "no document yet ⇒ inherit all three");
 
             // PUT round-trip of both values, persisted as link-analysis.toon in the space's config tree
             HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
-                    "{\"projectionNodeCap\":1200,\"analysisNodeCap\":4000}");
+                    "{\"projectionNodeCap\":1200,\"analysisNodeCap\":4000,\"suspicionNodeCap\":800}");
             assertEquals(200, put.statusCode(), put.body());
             assertEquals(1200, json(put).get("projectionNodeCap").asInt());
             assertEquals(4000, json(put).get("analysisNodeCap").asInt());
+            // Suspicion score's ceiling is INDEPENDENT of the shared one: its cost is quadratic while the
+            // other 26 algorithms are trivial at the shared cap, so it must be settable lower (D-S3).
+            assertEquals(800, json(put).get("suspicionNodeCap").asInt());
             assertTrue(Files.exists(root.resolve("acme").resolve("config").resolve("link-analysis.toon")));
             JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
             assertEquals(1200, got.get("projectionNodeCap").asInt());
             assertEquals(4000, got.get("analysisNodeCap").asInt());
+            assertEquals(800, got.get("suspicionNodeCap").asInt(), "the third cap survives the round trip");
 
             // per-space isolation: 'beta' still inherits
             assertTrue(json(send(c.port, "GET", "/spaces/beta/settings/link-analysis", null))
@@ -182,6 +187,13 @@ class ControlApiSettingsTest {
                     "{\"analysisNodeCap\":100001}");
             assertEquals(422, huge.statusCode(), huge.body());
             assertTrue(huge.body().contains("analysisNodeCap") && huge.body().contains("1..100000"), huge.body());
+
+            HttpResponse<String> badSuspicion = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"suspicionNodeCap\":0}");
+            assertEquals(422, badSuspicion.statusCode(), badSuspicion.body());
+            assertTrue(badSuspicion.body().contains("suspicionNodeCap")
+                            && badSuspicion.body().contains("1..100000"),
+                    "the third cap is refused by name and range like the other two: " + badSuspicion.body());
 
             // a refused write left the last good values standing
             assertEquals(900, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null))

@@ -5,9 +5,11 @@ import { apiUrl } from './api-base';
 import { SpacesService } from './spaces.service';
 import {
     ANALYSIS_NODE_CAP_DEFAULT,
+    SUSPICION_NODE_CAP_DEFAULT,
     analysisNodeCapValue,
     configureGraphLimits,
     resetGraphLimits,
+    suspicionNodeCapValue,
 } from 'app/inspecto/graph';
 import {
     PROJECTION_NODE_CAP_DEFAULT,
@@ -25,16 +27,24 @@ export interface LinkAnalysisLimits {
     projectionNodeCap: number | null;
     /** Nodes above which the browser-side algorithms refuse; `null` = the shipped default. */
     analysisNodeCap: number | null;
+    /**
+     * Nodes above which **suspicion score alone** refuses; `null` = the shipped default. It has its own,
+     * lower ceiling because its cost is quadratic while the other 26 algorithms are trivial at the shared
+     * cap — one slow algorithm should not set the limit for the 25 that finish in under 60 ms (D-S3).
+     */
+    suspicionNodeCap: number | null;
 }
 
-const UNSET: LinkAnalysisLimits = { projectionNodeCap: null, analysisNodeCap: null };
+const UNSET: LinkAnalysisLimits = { projectionNodeCap: null, analysisNodeCap: null, suspicionNodeCap: null };
 
 /**
  * Holds the active space's graph limits and applies them to the two pure graph modules.
  *
  * <p><b>Why this exists.</b> The shipped caps were measured on ONE host, ONE browser and ONE synthetic
  * graph shape (plan §1.7): the default layered layout draws 500 nodes in ~0.9 s but 750 in ~10.7 s, and
- * 25 of 27 algorithms are trivial at 2 000 nodes while suspicion score alone takes 6.7 s. An analyst's
+ * 25 of 27 algorithms are trivial at 2 000 nodes while suspicion score alone takes ~7 s — which is why it
+ * now carries its OWN lower cap (750, the last measured point under a second; the curve is quadratic).
+ * An analyst's
  * laptop, a denser graph or a different edge-to-node ratio all move those numbers, so a single
  * compiled-in constant is necessarily someone else's wrong answer. The measured values stay as
  * DEFAULTS; a deployment tunes them per space.
@@ -56,7 +66,11 @@ export class LinkAnalysisSettingsService {
     /** What the server last said, `null` fields meaning "inherit". */
     readonly limits = signal<LinkAnalysisLimits>(UNSET);
     /** The shipped defaults, for a settings form to show as placeholder text. */
-    readonly defaults = { projectionNodeCap: PROJECTION_NODE_CAP_DEFAULT, analysisNodeCap: ANALYSIS_NODE_CAP_DEFAULT };
+    readonly defaults = {
+        projectionNodeCap: PROJECTION_NODE_CAP_DEFAULT,
+        analysisNodeCap: ANALYSIS_NODE_CAP_DEFAULT,
+        suspicionNodeCap: SUSPICION_NODE_CAP_DEFAULT,
+    };
 
     constructor() {
         effect(() => {
@@ -79,8 +93,12 @@ export class LinkAnalysisSettingsService {
     }
 
     /** The values actually in force right now — what the footer publishes to the analyst. */
-    effective(): { projectionNodeCap: number; analysisNodeCap: number } {
-        return { projectionNodeCap: projectionNodeCapValue(), analysisNodeCap: analysisNodeCapValue() };
+    effective(): { projectionNodeCap: number; analysisNodeCap: number; suspicionNodeCap: number } {
+        return {
+            projectionNodeCap: projectionNodeCapValue(),
+            analysisNodeCap: analysisNodeCapValue(),
+            suspicionNodeCap: suspicionNodeCapValue(),
+        };
     }
 
     private apply(l: LinkAnalysisLimits): void {
@@ -90,6 +108,7 @@ export class LinkAnalysisSettingsService {
         resetGraphLimits();
         resetProjectionLimits();
         if (l?.analysisNodeCap != null) configureGraphLimits({ analysisNodeCap: l.analysisNodeCap });
+        if (l?.suspicionNodeCap != null) configureGraphLimits({ suspicionNodeCap: l.suspicionNodeCap });
         if (l?.projectionNodeCap != null) configureProjectionLimits({ projectionNodeCap: l.projectionNodeCap });
     }
 }

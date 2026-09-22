@@ -12,7 +12,8 @@ import java.util.Map;
  *   PUT /settings/branding   replace the space's branding (write-root gated, capability-gated)         [v4.10.0]
  *   GET /settings/geo        the space's {tileServerUrl} (null = no self-hosted tile server)
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
- *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap} (nulls = shipped defaults)
+ *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap}
+ *                                 (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis caps (same gates as branding)
  *   GET /config/icon-map     the space's processor-icon map { "&lt;type&gt;": {glyph,color}, … } ({} = none) [v5.0.0]
  *   PUT /config/icon-map     replace the space's icon map (same gates as branding)                          [v5.0.0]
@@ -110,7 +111,7 @@ final class SettingsRoutes implements RouteModule {
     private Object writeLinkAnalysis(ApiContext api, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
-                nodeCap(body, "analysisNodeCap"));
+                nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -120,6 +121,7 @@ final class SettingsRoutes implements RouteModule {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("projectionNodeCap", s.projectionNodeCap());
         m.put("analysisNodeCap", s.analysisNodeCap());
+        m.put("suspicionNodeCap", s.suspicionNodeCap());
         return m;
     }
 

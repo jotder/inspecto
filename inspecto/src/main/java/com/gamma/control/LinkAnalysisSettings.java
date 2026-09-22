@@ -12,8 +12,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Per-space Link Analysis tuning limits — the two node caps the Link Analysis studio applies before it
- * projects entities and before it runs the super-linear graph algorithms. Persisted as
+ * Per-space Link Analysis tuning limits — the three node caps the Link Analysis studio applies before it
+ * projects entities, before it runs the super-linear graph algorithms, and before it runs suspicion
+ * score, which carries its OWN lower ceiling because its cost is quadratic while the other 26
+ * algorithms are trivial at the shared cap (decision D-S3). Persisted as
  * {@code link-analysis.toon} in the space's config tree (crash-safe TOON, mirroring {@link GeoSettings}
  * and {@link SchedulerSettings}).
  *
@@ -27,16 +29,17 @@ import java.util.Map;
  * so recursive config discovery never mistakes it for a runnable config. A missing or unreadable file
  * reads as {@link #EMPTY} (the {@code BrandingSettings} posture — settings never fail a boot).
  */
-record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap) {
+record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap) {
 
     static final String FILE = "link-analysis.toon";
-    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null);
+    static final LinkAnalysisSettings EMPTY = new LinkAnalysisSettings(null, null, null);
 
     /** Write to {@code link-analysis.toon} at {@code path} (canonical TOON, crash-safe). */
     void write(Path path) throws IOException {
         Map<String, Object> m = new LinkedHashMap<>();
         if (projectionNodeCap != null) m.put("projection_node_cap", projectionNodeCap);
         if (analysisNodeCap != null) m.put("analysis_node_cap", analysisNodeCap);
+        if (suspicionNodeCap != null) m.put("suspicion_node_cap", suspicionNodeCap);
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
     }
 
@@ -45,7 +48,8 @@ record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap) 
         if (path == null || !Files.exists(path)) return EMPTY;
         try {
             Map<String, Object> m = ToonHelper.load(path.toString());
-            return new LinkAnalysisSettings(optInt(m, "projection_node_cap"), optInt(m, "analysis_node_cap"));
+            return new LinkAnalysisSettings(optInt(m, "projection_node_cap"), optInt(m, "analysis_node_cap"),
+                    optInt(m, "suspicion_node_cap"));
         } catch (Exception e) {
             return EMPTY;
         }
