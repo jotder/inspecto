@@ -15,6 +15,11 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoStatTileComponent } from 'app/inspecto/components/stat-tile.component';
+import { InspectoSectionTabsComponent, SectionTab } from 'app/inspecto/components/section-tabs.component';
+import { BulkAction, InspectoBulkActionsComponent } from 'app/inspecto/components/bulk-actions.component';
+import { FilterField, FilterValues, InspectoFilterBarComponent } from 'app/inspecto/components/filter-bar.component';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -69,6 +74,11 @@ interface DemoRow {
         DefinitionDrawerComponent,
         ChipComponent,
         InspectoEmptyStateComponent,
+        InspectoPageHeaderComponent,
+        InspectoStatTileComponent,
+        InspectoSectionTabsComponent,
+        InspectoBulkActionsComponent,
+        InspectoFilterBarComponent,
         InspectoSchemaFormComponent,
         InspectoSkeletonComponent,
         AiAssistComponent,
@@ -86,6 +96,37 @@ export class DesignSystemComponent {
     private toast = inject(ToastrService);
     private dialog = inject(MatDialog);
     readonly themeSvc = inject(InspectoGridThemeService);
+
+    // ── Page chrome (UI consolidation plan, 2026-09-22) ──────────────────────────────────────
+    readonly demoTabs: SectionTab[] = [
+        { id: 'grammar', label: 'Grammar', count: 3 },
+        { id: 'schema', label: 'Schema', count: 0 },
+        { id: 'sink', label: 'Sink' },
+    ];
+    readonly demoTab = signal('grammar');
+    readonly demoBulkCount = signal(0);
+    readonly demoBulkActions: BulkAction[] = [
+        { id: 'accept', label: 'Accept', icon: 'heroicons_outline:check' },
+        { id: 'tag', label: 'Tag', icon: 'heroicons_outline:tag' },
+        { id: 'archive', label: 'Archive', icon: 'heroicons_outline:archive-box', destructive: true },
+    ];
+    readonly demoFilterFields: FilterField[] = [
+        {
+            key: 'level',
+            label: 'Min level',
+            type: 'select',
+            defaultValue: '',
+            width: 'w-36',
+            options: [
+                { value: '', label: 'All' },
+                { value: 'WARN', label: 'WARN' },
+                { value: 'ERROR', label: 'ERROR' },
+            ],
+        },
+        { key: 'pipeline', label: 'Pipeline', type: 'text', placeholder: 'exact name', width: 'w-44' },
+        { key: 'limit', label: 'Limit', type: 'number', defaultValue: 100, width: 'w-28' },
+    ];
+    readonly demoFilterValue = signal<FilterValues>({ level: 'WARN', pipeline: '', limit: 100 });
 
     // ── Status badges ────────────────────────────────────────────────────────────────────────
     readonly tones: StatusTone[] = ['error', 'warning', 'info', 'success', 'neutral'];
@@ -316,6 +357,28 @@ export class DesignSystemComponent {
 
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {
+        pageHeader: `<!-- the ONE page header: 22px title, ONE-line subtitle, ? explain, actions right -->
+<inspecto-page-header title="Alerts" subtitle="Fired alert-rule breaches." [terms]="['Alert', 'Alert Rule']">
+  <ng-container actions>
+    <button mat-icon-button aria-label="Refresh" (click)="load()">
+      <mat-icon svgIcon="heroicons_outline:arrow-path" />
+    </button>
+    <button mat-flat-button color="primary" (click)="newRule()">New rule</button>
+  </ng-container>
+</inspecto-page-header>`,
+        statTile: `<!-- an ABSENT value renders as an em dash with a reason — never a 0 nobody measured -->
+<inspecto-stat-tile label="Recent Runs" [value]="runs() ?? null" absentReason="Jobs backend not configured" />
+<inspecto-stat-tile label="Datasets written" [value]="written()" hint="last 24h" />`,
+        sectionTabs: `<!-- label strip only: the HOST owns the content, so no lazily-mounted tab bodies -->
+<inspecto-section-tabs [tabs]="tabs" [selected]="tab()" (selectedChange)="tab.set($event)" />
+@switch (tab()) { @case ('grammar') { ... } @case ('schema') { ... } }`,
+        bulkActions: `<!-- renders NOTHING at 0 selected — no row of greyed-out pills on first load -->
+<inspecto-bulk-actions [count]="selected().length" [actions]="actions"
+                       (run)="apply($event)" (clear)="clearSelection()" />`,
+        filterBar: `<!-- collapsed to chips; the host queries on (apply), not on every keystroke -->
+<inspecto-filter-bar [fields]="fields" [value]="filters()" (valueChange)="filters.set($event)" (apply)="load()">
+  <button end mat-stroked-button (click)="exportCsv()">Export CSV</button>
+</inspecto-filter-bar>`,
         badge: `<inspecto-status-badge [value]="event.level" />\n// in an ag-Grid cellRenderer:\ncellRenderer: (p) => statusBadgeHtml(p.value)`,
         chip: `<!-- tag / token / filter pill — variant: outline | soft, tone: neutral | primary -->\n<inspecto-chip variant="soft">{{ tag }}</inspecto-chip>\n<!-- selectable filter toggle: -->\n<button (click)="toggle(t)" [attr.aria-pressed]="active(t)">\n  <inspecto-chip [tone]="active(t) ? 'primary' : 'neutral'">{{ t }}</inspecto-chip>\n</button>\n<!-- removable active filter: -->\n<inspecto-chip variant="soft" tone="primary" removable (removed)="clear()">correlation: {{ id }}</inspecto-chip>`,
         alert: `<inspecto-alert variant="warning" title="Read-only">\n  Editing is disabled (no write root configured).\n</inspecto-alert>`,

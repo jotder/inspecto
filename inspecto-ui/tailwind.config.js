@@ -72,6 +72,8 @@ const config = {
     theme: {
         fontSize: {
             xs: '0.625rem',
+            // UI consolidation plan §3.1 (2026-09-22): the ONE page-title size, used by <inspecto-page-header>.
+            title: '1.375rem',
             sm: '0.75rem',
             md: '0.8125rem',
             base: '0.875rem',

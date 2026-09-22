@@ -11,7 +11,7 @@
 
 | | |
 |---|---|
-| Status | ACTIVE PLAN — **approved 2026-09-22; decisions D1–D8 delegated to the implementer and taken as recommended (§6)**; phase 1 in flight |
+| Status | ACTIVE PLAN — **approved 2026-09-22; decisions D1–D8 delegated to the implementer and taken as recommended (§6)**; **phase 1 SHIPPED** (UI-01..UI-04, 2026-09-22); phase 2 next |
 | Raised by | Operator, 2026-09-22: *functionality is growing and interface complexity with it — consolidate the UI before implementing the Link Analysis backlog* |
 | Method | Every nav target driven in the preview at 1440×900, dark scheme (the app's default), plus header flyouts and the New-job dialog. Findings are what was **seen**, cited to the pane; nothing here is inferred from code alone |
 | Binding rules | `.claude/skills/angular-ui/SKILL.md` (design system, a11y, no hardcoded colours, option-picker, schema-form), `docs/GLOSSARY.md` (canonical words in every label) |
@@ -123,14 +123,22 @@ Every new component gets a `/design` gallery entry and an axe assertion in its s
 
 Sizes: S ≤ 1 day · M ≤ 3 days · L ≤ 1 week. Phase = order. "Proof" is what is observed in the preview, never a unit test alone.
 
-### Phase 1 — the tokens and the three shared pieces (everything else depends on them)
+### Phase 1 — the tokens and the shared pieces ✅ SHIPPED 2026-09-22
+
+⇒ **As built.** `text-title` (22 px) added to the Tailwind scale; ag-Grid `rowHeight`/`headerHeight` 34 px
+in `INSPECTO_DEFAULT_COL_DEF`'s theme params. Five components under `inspecto/components/`, each with a
+spec (28 assertions, axe included) and a `/design` gallery entry, all five driven in the preview.
+🔴 Two defects the work surfaced and fixed before any pane adopted them: a `MatTabGroup` whose
+`[selectedIndex]` is bound to a derived getter **springs back** on click, and `ngModel` inside the new
+filter `<form>` throws **NG01352** without `standalone: true`. ⚠ And a testing trap worth carrying:
+a synthetic click cannot drive a Material tab in jsdom (first one swallowed, later ones alternate).
 
 | Id | Item | Size | Touches | Proof |
 |---|---|---|---|---|
-| **UI-01** | Type scale + density tokens (§3.1, §3.2): Tailwind theme extension, `styles.scss` `h1/h2` defaults, ag-Grid row height and header font in `InspectoGridThemeService` | S | `tailwind.config.js`, `styles.scss`, `inspecto/grid/` | `getComputedStyle(h1).fontSize === '22px'` on Home; grid row 34 px on Alerts |
-| **UI-02** | `<inspecto-page-header>` + gallery entry + spec (axe) | M | `inspecto/components/page-header.component.ts`, `/design` | renders title/subtitle/actions/tabs; subtitle ellipsis at one line |
-| **UI-03** | `<inspecto-stat-tile>`, `<inspecto-section-tabs>`, `<inspecto-bulk-actions>` + gallery entries | M | `inspecto/components/` | gallery shows all three in both schemes |
-| **UI-04** | `<inspecto-filter-bar>` over the existing `query-types.ts` tree + gallery entry | M | `inspecto/components/filter-bar.component.ts` | collapsed → chips → popover → emits; Reset clears chips |
+| ~~**UI-01**~~ ✅ | Type scale + density tokens (§3.1, §3.2): Tailwind theme extension, `styles.scss` `h1/h2` defaults, ag-Grid row height and header font in `InspectoGridThemeService` | S | `tailwind.config.js`, `styles.scss`, `inspecto/grid/` | `getComputedStyle(h1).fontSize === '22px'` on Home; grid row 34 px on Alerts |
+| ~~**UI-02**~~ ✅ | `<inspecto-page-header>` + gallery entry + spec (axe) | M | `inspecto/components/page-header.component.ts`, `/design` | renders title/subtitle/actions/tabs; subtitle ellipsis at one line |
+| ~~**UI-03**~~ ✅ | `<inspecto-stat-tile>`, `<inspecto-section-tabs>`, `<inspecto-bulk-actions>` + gallery entries | M | `inspecto/components/` | gallery shows all three in both schemes |
+| ~~**UI-04**~~ ✅ | `<inspecto-filter-bar>` over the existing `query-types.ts` tree + gallery entry | M | `inspecto/components/filter-bar.component.ts` | collapsed → chips → popover → emits; Reset clears chips |
 
 ### Phase 2 — adopt on every pane (mechanical, one commit per group)
 

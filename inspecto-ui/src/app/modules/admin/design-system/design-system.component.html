@@ -642,5 +642,154 @@
                 class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
             ><code>{{ snippets.menuFavorites }}</code></pre>
         </section>
+
+        <!-- ── Page chrome (UI consolidation plan, 2026-09-22) ───────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Page header</h2>
+                <button mat-stroked-button (click)="copy(snippets.pageHeader)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-page-header&gt;</code> is the ONE page header: the 22&nbsp;px title (the page's only
+                <code>&lt;h1&gt;</code>), a subtitle clamped to one line that expands on click, the <code>?</code>
+                explain affordance, and a right-aligned actions slot. One filled primary action per page; refresh is
+                always an icon button.
+            </p>
+            <div class="bg-card overflow-hidden rounded-2xl shadow">
+                <inspecto-page-header
+                    title="Alerts"
+                    subtitle="Fired alert-rule breaches — an Alert Rule watches a Measure over a Dataset against a threshold and fires when it crosses."
+                    [terms]="['Alert', 'Alert Rule']"
+                    eyebrow="default"
+                >
+                    <ng-container actions>
+                        <button mat-icon-button aria-label="Refresh">
+                            <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                        </button>
+                        <button mat-flat-button color="primary">New rule</button>
+                    </ng-container>
+                </inspecto-page-header>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.pageHeader }}</code></pre>
+        </section>
+
+        <!-- ── Stat tile ──────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Stat tile</h2>
+                <button mat-stroked-button (click)="copy(snippets.statTile)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-stat-tile&gt;</code> — label · value · hint, with tabular numerals so a row lines up.
+                An absent value renders as an em dash carrying its reason, never as a <code>0</code> nobody measured.
+            </p>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <inspecto-stat-tile label="Incidents open" [value]="0" />
+                <inspecto-stat-tile label="Datasets written" [value]="1284" hint="last 24h" />
+                <inspecto-stat-tile label="Recent Runs" [value]="null" absentReason="Jobs backend not configured" />
+                <inspecto-stat-tile label="Error rate" value="0.0%">
+                    <inspecto-status-badge value="healthy" />
+                </inspecto-stat-tile>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.statTile }}</code></pre>
+        </section>
+
+        <!-- ── Section tabs ──────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Section tabs</h2>
+                <button mat-stroked-button (click)="copy(snippets.sectionTabs)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-section-tabs&gt;</code> replaces a page of stacked sections with one strip plus one
+                content area, and the count pill says which section holds anything. Labels only — the host renders the
+                content, so nothing is hidden inside a lazily-mounted tab body.
+            </p>
+            <div class="bg-card rounded-2xl p-4 shadow">
+                <inspecto-section-tabs
+                    [tabs]="demoTabs"
+                    [selected]="demoTab()"
+                    (selectedChange)="demoTab.set($event)"
+                />
+                <div class="text-secondary p-4 text-sm">
+                    Showing the <b>{{ demoTab() }}</b> section.
+                </div>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.sectionTabs }}</code></pre>
+        </section>
+
+        <!-- ── Bulk actions ──────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Bulk actions</h2>
+                <button mat-stroked-button (click)="copy(snippets.bulkActions)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-bulk-actions&gt;</code> renders nothing until rows are selected, then a count chip
+                and one Actions menu — instead of a row of six greyed-out buttons above an empty grid.
+            </p>
+            <div class="bg-card flex items-center gap-3 rounded-2xl p-4 shadow">
+                <button mat-stroked-button (click)="demoBulkCount.set(demoBulkCount() ? 0 : 3)">
+                    {{ demoBulkCount() ? 'Clear demo selection' : 'Select 3 rows' }}
+                </button>
+                <inspecto-bulk-actions
+                    [count]="demoBulkCount()"
+                    [actions]="demoBulkActions"
+                    (clear)="demoBulkCount.set(0)"
+                />
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.bulkActions }}</code></pre>
+        </section>
+
+        <!-- ── Filter bar ────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Filter bar</h2>
+                <button mat-stroked-button (click)="copy(snippets.filterBar)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-filter-bar&gt;</code> collapses a pane's filters to one row: a Filter toggle with the
+                active count, a removable chip per active filter, and Reset. The fields open beneath it. The host runs
+                its query on <code>(apply)</code>, not on every keystroke.
+            </p>
+            <div class="bg-card rounded-2xl p-4 shadow">
+                <inspecto-filter-bar
+                    [fields]="demoFilterFields"
+                    [value]="demoFilterValue()"
+                    (valueChange)="demoFilterValue.set($event)"
+                >
+                    <button end mat-stroked-button>
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                        <span class="ml-1">Export CSV</span>
+                    </button>
+                </inspecto-filter-bar>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.filterBar }}</code></pre>
+        </section>
     </div>
 </div>

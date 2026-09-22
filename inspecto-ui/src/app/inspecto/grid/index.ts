@@ -71,6 +71,10 @@ ModuleRegistry.registerModules([
 const GAMMA_GRID_PARAMS = {
     fontFamily: 'inherit',
     fontSize: '13px',
+    // UI consolidation plan §3.2 (2026-09-22): 34 px rows/headers in every list pane (was the Quartz
+    // default 42/48) — the density change that lets a triage list show ~25 % more rows per screen.
+    rowHeight: 34,
+    headerHeight: 34,
     headerFontSize: '12px',
     headerFontWeight: 600,
     foregroundColor: 'var(--gamma-text-default)',

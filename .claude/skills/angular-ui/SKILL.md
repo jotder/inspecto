@@ -126,6 +126,37 @@ src/app/
   pill — never hand-roll a `rounded-full … text-xs` span; content is projected, `(removed)` emits on
   the optional ✕; a clickable filter toggle keeps its own `<button>` around the chip for
   `aria-pressed`/keyboard).
+- **Page chrome — the five pieces every routed pane is built from** (UI consolidation plan, 2026-09-22;
+  gallery: `/design`). A pane composes these instead of re-rolling its own header, filter row, tiles,
+  section stack or bulk-action row:
+  - **`<inspecto-page-header title subtitle [terms] [eyebrow] [backLink] [mono] [hasTabs]>`** — the ONE
+    header. It renders the page's only `<h1>` at the shared `text-title` size (22 px / 600), a subtitle
+    **clamped to one line** that expands on click, the `<inspecto-ai-explain>` affordance when `terms`
+    are declared, and slots `[badge]`, `[actions]`, `[tabs]`. Rules it exists to enforce: one `<h1>` per
+    page, ONE filled primary action at the right end (everything else an icon button or a `⋯` menu), and
+    refresh is always an icon button. ⚠ Put the essay in the explain dialog, not the subtitle.
+  - **`<inspecto-stat-tile label [value] [hint] [absentReason]>`** — the KPI tile. Tabular numerals so a
+    row lines up; 🔴 an **absent** value (`null`/`undefined`/`''`) renders as an em dash carrying
+    `absentReason`, never as a `0` nobody measured — `0` itself still renders as `0`.
+  - **`<inspecto-section-tabs [tabs] [selected] (selectedChange)>`** — a label strip with a count pill
+    per section; the **host** renders the content under it (`@switch`), so nothing hides inside a lazily
+    mounted tab body (the R9 rule). 🔴 It holds the active index in its OWN signal: binding
+    `MatTabGroup`'s `[selectedIndex]` to a getter over the selected id makes Material re-assert the old
+    index in the same CD pass, `selectedIndexChange` never fires and **the tab springs back**.
+  - **`<inspecto-bulk-actions [count] [actions] (run) (clear)>`** — renders **nothing** at 0 selected,
+    then a count chip plus one `Actions ▾` menu with destructive entries after a divider. Replaces the
+    row of greyed-out pills over an empty grid.
+  - **`<inspecto-filter-bar [fields] [value] (valueChange) (apply)>`** — the ONE list-pane filter:
+    collapsed to a Filter toggle with the active count, a removable chip per active filter, and Reset;
+    fields open in a panel beneath, with an `[end]` slot for the pane's own actions. The host queries on
+    `(apply)`, never per keystroke. Its panel is a real `<form>` (Enter submits, and a div with a
+    `keyup` handler fails `interactive-supports-focus`), so every `ngModel` in it carries
+    `[ngModelOptions]="{standalone: true}"` or Angular throws **NG01352** the moment the panel opens.
+    Its selects stay `mat-select` under the grid-toolbar exemption.
+  ⚠ **Material tabs cannot be driven by a synthetic click in jsdom** (measured 2026-09-22): the FIRST
+  dispatched click is swallowed whichever element it targets (`.mat-mdc-tab`, `.mdc-tab__content`, the
+  label), and later ones alternate — so a click-based tab spec passes or fails on attempt order. Drive
+  the component's own handler and assert the rendered active tab; prove the click in the preview.
 - **Authoring an enrichment → `<inspecto-enrichment-editor>`** (`inspecto/enrichment/`, W4b 2026-08-01).
   ONE shared references+transform editor for the companion `*_enrich.toon`; adopters: the Onboarding
   Enrichment stage and the Pipelines `enrichment` config pane (drawer since canvas-UX S2) — never fork it. Hosts own everything
