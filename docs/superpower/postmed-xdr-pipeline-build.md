@@ -243,7 +243,12 @@ Pipeline worked first run. The telecom-specific processors are the planned ones 
 `transform.telecom.rating`, `transform.telecom.roaming` (TAP3/CIBER surcharge),
 `transform.telecom.simbox`, and `parser.asn1.per` — while `parser.asn1.ber`, the decoder you would
 need for *pre*-mediation switch CDRs, is delivered. Full analysis:
-[`pipelines-workbench-moscow.md`](pipelines-workbench-moscow.md).
+[`pipelines-workbench-moscow.md`](pipelines-workbench-moscow.md) — **v2 of which is multi-domain**: a
+sweep of all 26 shipped Pipelines and a test run over 24 of them, with this build kept as the depth probe.
+⚠ v2 **corrects** three claims first made here: the parse stage IS testable in the builder (*Run to here*
+parses real inbox bytes through the real frontend — W4 drove only the dry-run panel), *"not yet tested"*
+is a recorded decision rather than a gap (W3), and the palette's orphan drop was considered and declined
+(W5). The findings stand as measured; their framing in v2 is the current one.
 
 ## 6. Reproducing this
 
