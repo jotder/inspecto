@@ -268,6 +268,34 @@ As-built facts are distilled into [`okf/frontend/features/link-analysis.md`](../
 §*Grounded limits and consequences*; read that, not these rows, for what the code now does.
 ⚠ The rows below are kept for provenance and record what each one actually turned out to be.
 
+✅ **Second pass, 2026-09-22 — every gate-free item taken.** `LA-09`, `LA-14a` and `LA-15` shipped.
+🔴 **Grounding moved three items OUT of the gate-free set**, and the honest result is that the set was
+smaller than the register claimed:
+
+- **`LA-22` is NOT gate-free.** Its scope assumes a bounding box on the map can isolate graph nodes, but
+  **no shared identity exists between a `GeoPoint` and a `G6Node`.** The one existing bridge
+  (`coLocationGraph`) re-derives a synthetic id as `` `entity:${label}` `` from a *display string*; nothing
+  guarantees that matches the projection's own node ids. Separately, **MapLibre has no box-select** — adding
+  one is a new dependency, not wiring. Two decisions, filed as **D-U3** and **D-U4**.
+  ⚠ The row also overstates today's state: there is no route-level hand-off at all, only a preview dialog
+  that happens to reuse the same G6 host.
+- **`LA-16` is NOT gate-free either.** `postmed_xdr` landed on 2026-09-22, *after* this plan's 2026-09-20
+  grounding, and already carries A-party, B-party, start time, duration, cell and link kind — missing only
+  device, explicit direction, a timezone contract, seeding and a planted story. Building a fourth telecom
+  feed beside it would duplicate ~80 %. ⚠ And a peer worktree is actively building `postmed_xdr` right now,
+  so this is a collision risk as well as a scope question. Filed as **D-U2**.
+- **`LA-06` was already gated and its row did not say so.** §4's `D-U1` names LA-06 in its *Blocks* column
+  while the row's *Blocked on* cell read `—`. The row is corrected. Its "published render limit" clause
+  additionally depends on `D-S3`'s number. ⛔ **A register whose two halves disagree is how an item gets
+  picked up as free work** — the *Blocks* column is the one to trust, because it is where a decision is
+  written down.
+
+⚠ **`LA-14` is split.** `LA-14a` (temporal ordering on the existing linear matcher) shipped; `LA-14b`
+(branching runtime + SQL compiler + structuring pack) is the unavoidably large half and is blocked in
+practice by `LA-16`, because a timestamp attribute column joins the projection's `GROUP BY` fold key and
+de-folds the graph — so client-side temporal matching only holds at demo cardinality. As written, the
+small win that makes two shipped packs honest was trapped behind a two-week rewrite it does not need.
+
 ### 3.1 Foundations (do first)
 
 | Id | Item | State | Size | Blocked on | Detail |
@@ -284,8 +312,8 @@ As-built facts are distilled into [`okf/frontend/features/link-analysis.md`](../
 | **LA-03** | `POST /inv/snapshots` + `POST /cases/{id}/evidence/graph` | ⬜ backend · ✅ SPA mock store | M | D-S1, D-E2 | Serialise sub-graph, scores, positions, viewport, annotations, predicate, origin, pinned Dataset version; persist as an Artifact anchored to `opSeq`; swap `LinkAnalysisSnapshotsService.add/attach`. Contract §5.4. |
 | **LA-07** | Web Worker computation (`graph-worker.ts`, `GraphAnalysisClient`) | ⬜ | M | D-S3 | Move the 27 algorithms off the main thread; zero-copy `ArrayBuffer` transfer; `PROGRESS` messages; `AbortController` cancellation. ⚠ Fixes responsiveness only — the cap stays until D-S3 states a graceful published number. |
 | **LA-08** | `POST /inv/projection/multi` | ⬜ | M | D-S4 | Node mappings + edge projections across Datasets in one call; unified DuckDB union views; `__provenance_dataset` tagging. Contract §5.2. |
-| **LA-06** | Rendering at scale | 🟡 LOD labels only | M | — | Viewport culling, progressive load (heaviest edges first), super-node aggregation of low-degree leaves above a threshold, published render limit in the footer. **WebGL renderer only after measuring** — `package.json:33` installs `@antv/g6` alone, no `g6-plugin-webgl` / `layout-gpu`, and §1.6(4) says the canvas is not the bottleneck. |
-| **LA-09** | View toolbox completions | 🟡 | S | — | Add Fruchterman, combo force, fishbone, dendrogram layouts; remaining G6 v5 plugins (timebar, bubble sets, combos, edge bundling, context menu, snapline, history, watermark). Each is a G6 id, not an engine. |
+| **LA-06** | Rendering at scale | 🟡 LOD labels only | M | **D-U1** · partly D-S3 | Viewport culling, progressive load (heaviest edges first), super-node aggregation of low-degree leaves above a threshold, published render limit in the footer. **WebGL renderer only after measuring** — `package.json:33` installs `@antv/g6` alone, no `g6-plugin-webgl` / `layout-gpu`, and §1.6(4) says the canvas is not the bottleneck. |
+| **LA-09** | View toolbox completions | ✅ **SHIPPED 2026-09-22** (5 of 12; 4 refused, 3 gated — see below) | S | — | Add Fruchterman, combo force, fishbone, dendrogram layouts; remaining G6 v5 plugins (timebar, bubble sets, combos, edge bundling, context menu, snapline, history, watermark). Each is a G6 id, not an engine. |
 
 ### 3.3 Phase 2 — the object, the ladder, the clock (Sprint 10)
 
@@ -294,9 +322,10 @@ As-built facts are distilled into [`okf/frontend/features/link-analysis.md`](../
 | **LA-10** | Enquiry object + ordered op log + incremental evaluator | ⬜ | L | D-E1, D-E2, D-E3 | `POST /inv/enquiries`, `/ops`, `/replay`, `GET /log` (§5.5). Ops `seed`, `expand` (one hop over `neighbors`), `exclude`, `hide`, `keep`; real undo; replaces the mock snapshot store. *Delivers prune-then-expand — the scenario's blocking step.* |
 | **LA-11** | Server-side multi-hop traversal `POST /inv/traversal/recursive-paths` | ⬜ | L | D-S2 | DuckDB recursive CTE; fences — max depth (default 6), timeout (5 000 ms), max edge yield; the primitive `expand` compiles to. Contract §5.3. Working Set materialised so pruning does not re-query; pre-aggregated contact-pair Dataset (A, B, window, count, duration, value) as substrate, raw records on drill-down. |
 | **LA-13** | Hop ladder + time model | ⬜ | L | LA-10, LA-11 | Per-rung fields §2.4; absolute range + midnight-crossing intraday window + **timezone contract**; in-window thresholds; `truncated` per rung. *Delivers the motivating scenario end to end.* |
-| **LA-14** | Branching pattern runtime + temporal ordering | 🟡 packs ship, linear only | L | — | `BranchingPatternEngine.ts` + `PatternQueryCompiler.java`; JSON motif schema (multi-branch, attribute constraints, `t₂ > t₁`, `DELTA ≤ 48h`); fix `layering-chain` / `pass-through` to require temporal order; ship structuring / layering / circular-financing packs. |
-| **LA-15** | `POST /inv/schema/overlap-profile` | ⬜ | M | — | Cardinality and Jaccard across candidate key columns via `APPROX_COUNT_DISTINCT`; surfaces implicit foreign keys. |
-| **LA-16** | Synthetic call-records Dataset | ⬜ | S | — | ⚠ No call-records Dataset exists — `roaming_tap` is operator↔operator, `mule_transfers` account↔account; neither carries A/B-party, duration, device or cell. Prerequisite for every §6.3 gate. |
+| **LA-14a** | Temporal ordering on the linear matcher | ✅ **SHIPPED 2026-09-22** | S | — |
+| **LA-14b** | Branching pattern runtime (`BranchingPatternEngine.ts` + `PatternQueryCompiler.java`) + the structuring pack | ⬜ | L | LA-16 in practice | `BranchingPatternEngine.ts` + `PatternQueryCompiler.java`; JSON motif schema (multi-branch, attribute constraints, `t₂ > t₁`, `DELTA ≤ 48h`); fix `layering-chain` / `pass-through` to require temporal order; ship structuring / layering / circular-financing packs. |
+| **LA-15** | `POST /inv/schema/overlap-profile` | ✅ **SHIPPED 2026-09-22** | M | — | Cardinality and Jaccard across candidate key columns via `APPROX_COUNT_DISTINCT`; surfaces implicit foreign keys. |
+| **LA-16** | Synthetic call-records Dataset | ⬜ **NOT STARTED — newly gated** | S | **D-U2** | ⚠ No call-records Dataset exists — `roaming_tap` is operator↔operator, `mule_transfers` account↔account; neither carries A/B-party, duration, device or cell. Prerequisite for every §6.3 gate. |
 
 ### 3.4 Phase 3 — identity, value, evidence, detection (Sprint 11+)
 
@@ -308,7 +337,7 @@ As-built facts are distilled into [`okf/frontend/features/link-analysis.md`](../
 | **LA-20** | Working Set as a log-defined derived relation + cache | ⬜ | L | D-E3, D-E7 | §2.7; the cache is a functional requirement (six tiles = six re-runs per view). |
 | **LA-21** | Evidence / Monitoring Widgets | ⬜ | M | LA-20, D-E6 | Pinned default; kind on the tile; drift line. |
 | **LA-12** | Dossier + three renderings + chain of custody | ⬜ | L | LA-10 | `GraphDossierBuilder.java`: summary, topology, centrality/risk tables, chronological ledger, SHA-256 manifest (replaces the FNV-1a fingerprint); JSON / numbered steps / method statement; **negative space in all three**. |
-| **LA-22** | Synchronised Geo ↔ Link brushing | 🟡 one-way handoff | M | — | `GeoLinkSyncService.ts`: bounding-box on map isolates nodes; path on graph traces the route; split-pane mode. |
+| **LA-22** | Synchronised Geo ↔ Link brushing | ⬜ **NOT STARTED — newly gated** | M | **D-U3, D-U4** | `GeoLinkSyncService.ts`: bounding-box on map isolates nodes; path on graph traces the route; split-pane mode. |
 | **LA-23** | Enquiry Templates → Measure → Alert Rule → Incident | ⬜ | M | LA-20, D-E8 | Cheap once LA-20 lands; every downstream noun ships. |
 
 ---
@@ -332,7 +361,10 @@ Enquiry model.
 | **D-E6** | Saved Widget frozen or live by default; may a live one leave the Space? | LA-21 | §2.7 recommends frozen. |
 | **D-E7** | Who may evaluate an Enquiry's derived relation? | LA-20 | Must inherit the **Case's** scope, not the Space's Dataset permissions — 🔴 otherwise a Dashboard tile is a side channel around scope binding. |
 | **D-E8** | Does an Enquiry Template carry its exclusion lists? | LA-17, LA-23 | Likely: named reference lists travel; analyst-judgement sets do not. |
-| **D-U1** | Rendering item: own item (LA-06) or fold into LA-07? | LA-06 | Raised 2026-09-20 at the mockup review; this plan lists it separately pending the call. |
+| **D-U1** | Rendering item: own item (LA-06) or fold into LA-07? | LA-06 | Raised 2026-09-20 at the mockup review; this plan lists it separately pending the call. ⚠ LA-06's row claimed no gate until 2026-09-22 — corrected. |
+| **D-U2** | Extend `postmed_xdr` into the call-records Dataset, or build a fourth feed beside it? | LA-16 (and LA-14b, LA-11 through it) | `postmed_xdr` (landed 2026-09-22, after this plan's grounding) already has A-party, B-party, start, duration, cell and kind; it lacks device, explicit direction, a timezone contract, `seed-inbox.{ps1,sh}` entries and a planted investigative story. ⇒ **Recommended: extend it** — a fourth feed duplicates ~80 % and splits the demo. ⚠ A peer worktree is mid-build on `postmed_xdr`; reconcile with that work first. |
+| **D-U3** | What identity ties a `GeoPoint` to a Link Analysis node? | LA-22 | There is none today. `coLocationGraph` keys on `` `entity:${label}` `` — a DISPLAY string, which can collide and need not match the projection's node ids. ⛔ Do not adopt that key by default; it would silently isolate the wrong nodes. Needs a real entity identity, which is also what D-S4/LA-17 decide ⇒ consider sequencing LA-22 behind LA-17. |
+| **D-U4** | Add a map box-select dependency? | LA-22 | MapLibre GL JS has no built-in rectangle draw; today's map offers measure/radius/polygon/note only. A box-select means a new library (e.g. terra-draw / mapbox-gl-draw) or a hand-rolled overlay. A dependency addition is an operator call, and it also touches `tools/dependencies.lock`. |
 
 ---
 

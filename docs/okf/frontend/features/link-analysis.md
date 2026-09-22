@@ -267,6 +267,55 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   each carrying the dataset, the result size and `truncated`, best-effort so an audit failure can never
   fail the analyst's query. ⚠ Exclusion, reveal and export remain **client-side** and so are still
   unaudited — they have no server surface to emit from.
+* **The View toolbox offers 14 layouts and 8 canvas plugins**, each a G6 v5 built-in id, and LA-09 added
+  what was genuinely drop-in: the `fruchterman` layout, plus `dendrogram` and `fishbone`, which carry the
+  same tree/forest gate as the three hierarchical layouts already did. `snapline` is a new lens, and
+  `bubble-sets` draws the SAME Louvain communities as the hull overlay in G6's set renderer — the two are
+  **mutually exclusive by construction** (both draw one shape per community, so enabling both would paint
+  every community twice; bubble sets win and hulls are skipped).
+* ⚠ **"Each is a G6 id, not an engine" is only two-thirds true** — four of LA-09's named items were
+  REFUSED on grounding rather than wired, and the reasons are worth keeping because each would have
+  shipped something worse than nothing:
+  * `timebar` — its options require a `data` array and a `getTime` accessor; it is not a bare flag. It
+    also duplicates the pane's existing time column + cutoff control, so wiring it is a UX decision.
+  * `history` — 🔴 the studio **already has its own Ctrl/Cmd+Z undo** over presentation state
+    (`undoPresentation`/`redoPresentation`). G6's history plugin would put a second, competing undo stack
+    on the same keystroke.
+  * `contextmenu` — empty without a decided action set, and node actions already live in the element
+    detail dialog.
+  * `watermark` — its content (case id? "not evidence"?) is a decision, and a blank watermark toggle is
+    not a feature.
+  * Two more are not drop-ins at all: **`combo-force` is not a real G6 v5 id** (the nearest built-in is
+    `combo-combined`), and **"combos" is a data-model change**, not a plugin — it needs `comboId` on the
+    graph data.
+* **A pattern can require its hops to be in TIME ORDER** (LA-14a). A step marked `afterPrevious` must
+  carry an event time strictly later than the previous step's, optionally within `maxGapHours`; the time
+  comes from an edge attribute column chosen in the pane, parsed with `Date.parse` exactly as the time
+  filter does. `layering-chain` and `pass-through` now set it, within 48 hours, in the built-in constants
+  **and in all six authored TOON copies** — authored packs merge OVER built-ins by id, so a TOON copy left
+  untouched would have silently reinstated the unordered motif.
+* 🔴 **Before that, a pass-through match was a topology claim wearing the language of a flow claim.**
+  `A → B → C` matched whether B forwarded to C a day after or a year before receiving from A. Measured on
+  the demo projection: the pack reported **200 matches** with no regard to time.
+* ⛔ **A temporal motif FAILS CLOSED.** With no time column the matcher returns nothing and the toolbox
+  says why — "choose a time column" — because "No matches" is the same sentence a genuinely empty result
+  produces, and would tell the analyst the chain is absent when it was never looked for. An edge whose
+  time is missing or unparseable is rejected on the same principle.
+* ⚠ **Ordering is all that survives the projection.** A timestamp reaches the graph as a STRING
+  (`CAST(col AS VARCHAR)`), and 🔴 an attribute column **joins the `GROUP BY` fold key**, so selecting a
+  timestamp de-folds a projection into one edge per instant. Temporal matching is therefore honest at demo
+  cardinality and needs the SQL compiler (LA-14b) at call-record scale. Comparing values within one
+  dataset is unaffected by the host-timezone question, because every value is parsed the same way.
+* **`POST /inv/schema/overlap-profile` measures what naming only guesses** (LA-15). The sibling
+  `GET /inv/schema/relationships` infers a foreign key from a `<base>_id` column name; this one measures
+  the real overlap of two columns' value sets, so an implicit join with no naming hint is visible and a
+  name match whose values never meet can be discounted. Jaccard comes from inclusion–exclusion over
+  `APPROX_COUNT_DISTINCT` — `|A∩B| = |A|+|B|−|A∪B|` — so no values cross into the JVM and there is no
+  cross join. Pair count is the only quadratic axis and is capped, with the true total still reported.
+* 🔴 **A relation must be passed as `relationSql`, never inlined as a subquery.** `QueryExecutor.run`
+  registers the relation BEFORE it seals the sandbox, and that registration is the only place
+  file-reading SQL may run — an inlined subquery works against a VALUES-backed test fixture and is
+  refused against a real Parquet-backed Dataset, so the fixtures would never have shown it.
 * 🔴 **An expand used to drop `truncated`** (LA-02): `mergeGraphs` returns a bare `G6GraphData` and
   structurally loses the flag, so a neighbourhood that hit the row limit or the node cap read as a
   complete finding. `expandNode` now carries it onto the signal, monotonically — only a fresh `run()`
