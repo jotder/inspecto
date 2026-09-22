@@ -167,6 +167,14 @@ export const appRoutes: Route[] = [
             // standalone /settings/models|icons|map|transfer|access|notifications routes are gone;
             // those URLs now open the same components inside the Settings pane.
             { path: 'settings', loadChildren: () => import('app/modules/admin/settings/settings.routes') },
+            // 🔴 Last resort. Without it an unmatched URL left the SPA on the splash screen forever with
+            // only an NG04002 in the console — which is what a stale bookmark, a renamed route or a link
+            // this app itself still carried (Home's `/catalog-onboard`) looked like to an operator.
+            {
+                path: '**',
+                loadComponent: () =>
+                    import('app/modules/admin/not-found/not-found.component').then((m) => m.NotFoundComponent),
+            },
         ],
     },
 ];
