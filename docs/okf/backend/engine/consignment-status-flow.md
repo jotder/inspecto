@@ -80,6 +80,25 @@ pre-token spelling until Phase 7. Rejects are scratch unless the author **wires 
 outlet** — the designed pattern ("the user never wires these, only tunes where they rest").
 `ConservationCheck` alerts on an unexplained in/out imbalance either way.
 
+### Rejects are counted in TWO columns, files and rows (D2, signed 2026-09-22)
+
+✅ **Decision (operator, 2026-09-22):** `rejected_count` is **split, not redefined** — `rejected_files`
+(today's value: members not `SUCCESS`) **and** `rejected_rows` (the sum of `IngestResult.errorRows`), with
+`total_input_rows` = parsed + rejected rows so the ledger reconciles to the file on disk. Renaming rather
+than overloading is what the ledger needs: one number that meant both was the ambiguity. ✅ Breaking the
+header is free — nothing after 3.x shipped.
+
+🔴 **Why:** measured 2026-09-22 on a 20-data-row file carrying one row truncated mid-write to 9 of 18
+fields, the batch row read `status=SUCCESS · rejected_count=0 · total_input_rows=19 ·
+total_output_rows=19` — **the counters reconcile (19 = 19) while a record is missing.** The drop is
+recorded only in `<dirs.errors>/<file>_errors.csv`, which nothing in the audit row points at. An operator
+reconciling output against the store by these counters concludes nothing was lost.
+
+⚠ The invariant the split buys: `total_input_rows = total_output_rows + rejected_rows` when no Step drops
+rows; a Step that drops rows is the other, already-honest half (see
+[`step-catalog.md`](../pipeline-graph/step-catalog.md)'s counted reject relation). Tracked as `WB-09` in
+`superpower/workbench-trust-plan.md`; row `INGEST-REJECT-ACCOUNTING-1`.
+
 ⚠ **The batches-ledger header has FIVE mirrors** — `ConsignmentAuditWriter`'s header string, its
 `batchLine()` codec, `ConsignmentRow`, and `OperationalTables.BATCHES` (the agent's SQL surface, which
 declares the header explicitly). Readers parse **by header name per file** (`Csv.readInto`), so

@@ -111,6 +111,24 @@ Parser-only (10):
 | `processing.duplicate_check` | marker-file dedup on the local poll path (`CollectorProcessor`) — ⚠ the `collector.duplicate:` block is a no-op there | guided create derives it silently; hand |
 | `processing.schemas` | `SchemaSelector` two-pass multi-schema dispatch (file-pattern fast path, column-count probe) — replaces `schema_file` | hand-authored only |
 | `processing.segments` | plugin-ingester segment→schema map (`StreamingPluginIngestStrategy`); required non-empty when `ingester` is set | hand-authored only |
+
+### A `segments{}` block IS a schema for the arming gate (D7, signed 2026-09-22)
+
+✅ **Decision (operator, 2026-09-22):** a non-empty `parsing.<frontend>.segments{}` — `parsing.asn1.segments`
+and its plugin twin — **counts as a schema source** wherever the code asks *“is this Pipeline armed without
+a schema?”*, alongside `processing.schema_file`, `processing.schemas[]` and a plugin ingester. It is the only
+schema source a segment-routed frontend has.
+
+🔴 **The two surfaces disagree today, and that is the defect the decision settles.** Measured across the
+corpus 2026-09-22: `POST /validate` returns no ERROR for `asn1_example`, while `PUT …/graph` with the
+editor's own lossless payload refuses **422 `ERR_ARMED_WITHOUT_SCHEMA`**. Net effect: a shipped, active,
+working ASN.1 Pipeline can be **opened but never saved** from the workbench. ✅ It fails closed
+(`written:false`, file byte-identical), so nothing is corrupted — it is simply unauthorable.
+
+⚠ The remedy is **one predicate called by both call sites**, never two agreeing implementations:
+`ConfigRoutes.armedWithoutSchemaFindings` learns the source, the predicate is extracted, and
+`ConfigPreviewRoutes` (`/validate`) calls it. Tracked as `WB-03` in
+`superpower/workbench-trust-plan.md`; row `SAVE-GATE-VS-VALIDATE-DISAGREE-1`.
 | `processing.ingester_config` | free-form map handed to the plugin ingester | hand-authored only |
 | `processing.mapping_file` | `RowShaper` — a *declared* mapping reference; authored `processing.map.columns` beside it refuses `MAPPING_CONFLICT` | hand-authored only |
 

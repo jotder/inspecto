@@ -118,6 +118,24 @@ Two boundaries worth keeping straight:
 
 An unknown `to=` throws → **400**, rather than silently widening to the whole graph.
 
+## A `route:<segment>` edge out of a parser IS walked (D5, signed 2026-09-22)
+
+✅ **Decision (operator, 2026-09-22):** the test run **walks segment routes**. The alternative — declaring
+segment-routed frontends out of scope with a named 422 — was considered and declined, because it would
+leave 2 of 8 parse frontends, and every multi-record-type feed, with no test instrument past the decoder.
+
+🔴 **As-built until `WB-08` lands, the walk stops at the parser.** Measured 2026-09-22: `asn1_example`
+(BER) and `xml_example` (plugin) both lift as `parse →(route:<segment>)→ map_<segment> → sink_<segment>`
+plus `unmatched → quarantine`. *Run to here* decoded 3 records from each and returned `relations: []` with
+the honest DRYRUN-2 warning *“the sample reached no node past the seed 'parse' — nothing downstream
+consumed it”*. The warning is accurate; the coverage is not.
+
+⚠ **The fix is the seed shape, not the walker.** `PipelineDryRun.run` / `PipelineExecutor.dryRun` seed
+`produced` with **one relation per segment**, keyed exactly as production's multi-seed `execute` overload
+and `SchemaSelector` key them, plus `unmatched`. `liveInbound` then follows the existing edges unchanged.
+⛔ Do not special-case the walker for `route:` — a second traversal rule is how the preview and the run
+start disagreeing. Tracked as `WB-08`; row `TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`.
+
 ## Testing note worth keeping
 
 Both safety properties were **falsification-probed**, and one probe changed the test:

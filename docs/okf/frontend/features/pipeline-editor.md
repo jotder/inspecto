@@ -334,6 +334,14 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   the add is REFUSED naming the format that holds the slot. Predicate: `isParseNodeType` — ⛔ never
   the catalog CATEGORY (the rule must hold before the catalog resolves). ⛔ This is NOT
   auto-connecting: an ordinary Step still lands unconnected on purpose (considered and declined).
+  🔴 **That decline is AMENDED (D8, signed 2026-09-22).** It rested on the Recipe view's
+  insert-between as the author's alternative; `<app-pipeline-step-cards>` was deleted in `6d3c68fa`
+  (2026-09-18), so there is no one-gesture insert anywhere and inserting mid-chain costs three graph
+  operations. The narrow reopening: when a node **is selected**, an added Step is wired **after** it —
+  the selected node's outgoing `data` edge is rewired through the new node; with nothing selected the
+  bare add stands, because there is no anchor to guess from. ⚠ Validation keeps catching orphans either
+  way (*“has no input connection”*), so this is ergonomics, not integrity. Tracked as `WB-14`; row
+  `PALETTE-ADD-DROPS-ORPHAN-1`.
 - **One sample thread per tab**: `DefinitionStateService` instances live in a `Map<id, …>` beside
   `cachedModels`, born in `select()`, dropped by `forgetTab()`. 🔴 A Map, NOT a `providers:` entry —
   DI providers are static per component instance and this editor is ONE instance hosting every tab.
@@ -379,6 +387,14 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   read-only in the `types` section's columns table — ⅋ never a "Column metadata list", which left Parse
 entirely with the metadata grid (D2) — (it IS an output column, stamped at write
   time) — never as a fake `schemaSeed` row, which risks being written back as authored.
+- ✅ **A created Pipeline lands in `config/<id>/`, not at the space config root (D3, signed
+  2026-09-22).** Measured 2026-09-22: *New pipeline* wrote `spaces/demo/config/<name>.toon` while all
+  eight existing Pipelines in that space live in a per-Pipeline directory. The scaffold itself was
+  sound — `active: false`, `id` stamped, all nine `dirs` leaves derived from the name,
+  `duplicate_check` on, `parsing.frontend` from the chosen format — only its home was wrong. ⚠ **The
+  path is chosen server-side in the write handler**, because the client sends none; every
+  SATELLITE-WRITE-1 call site (schema, grammar, config-definition) passes the same subdir, or the
+  satellite orphans at the root. Tracked as `WB-15`; row `UI-CREATED-PIPELINE-FLAT-HOME-1`.
 - **Partitioning** (`<inspecto-schema-partitions-editor>`, `inspecto/schema/`; **rendered on the Sink
   pane since 2026-09-04**, which reads/writes the SAME companion schema toon's `partitions[]` key directly;
   ⚠ the Parse pane still seeds `partitions[]` on load and carries it through its `overwrite: true` write, so
@@ -699,6 +715,13 @@ Enrich → Publish — each with a status word and finding count, each click ope
 
 - ⛔ **The stage model is derived from the graph** (`pipeline-stages.ts`, reusing `NodeStatus`),
   never a second readiness opinion — that is how a chip and the canvas card under it disagree.
+  ✅ **D6 (signed 2026-09-22) holds this line:** node test state may **not** read operate-lane
+  provenance into `tested`. The complaint was real — four nodes read *not yet tested* over three
+  completed runs and 1219 rows, and a signal that is wrong for every Pipeline in production is one
+  readers learn to ignore — but the remedy is a **third source, not a second opinion**: a distinct
+  *ran* badge fed by `lastRunCounts` (*“last run: 400 rows · <date>”*), with the finding reworded to
+  *“not yet tested in this session”*. `tested` keeps meaning *the editor ran this test*. Tracked as
+  `WB-11`; row `PIPELINE-NODE-TEST-STATE-STALE-1`.
 - ⛔ **The go-live readiness gate is guided-only**: `validatePipeline` does not require a parse
   Step; a hand-built collect→sink graph is legitimate. ⚠ Every stage resolves through the served
   catalog — unresolved catalog reads as five empty stages.

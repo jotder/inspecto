@@ -496,3 +496,15 @@ THIS seam: a first cut used `PipelineLift.lift(cfg)` alone and every fixture "fa
 materialises engine defaults (`duckdb_threads=0`) and typed records (`PostActionConfig[…]`) that the editable
 projection strips — that is the projection's business, not a loss. `RecipeConverterTest` gates the recipe
 projection over the same fixtures; a hand-authored fixture must pass both before it is committed.
+
+✅ **Verbatim means the decoded map, never the bytes (D4, signed 2026-09-22).** A workbench save rewrites
+the whole TOON file: measured over the corpus, keys and values survive intact — including undeclared
+`dirs` leaves and `description` — but blank lines, column alignment, quoting, key order within
+`collector` and the trailing newline do not. 🔴 The rewritten quoting (`delimiter: "|"` →
+`delimiter: |`) **looks like** the classic comment-character loss and was first read as corruption; it is
+not — the reader parses those back identically and a re-run produced the same row counts. The operator
+**accepted the churn** rather than fund a format-preserving writer, which would add a second drift
+surface of its own; what is funded instead is the guard — a round trip through the real `PUT …/graph`
+asserting the key set AND the re-read node configs (`WB-01`, which this in-process sweep cannot see).
+⚠ So when a diff looks alarming, compare key sets and re-read values, never the text. Row:
+`GRAPH-SAVE-REFORMATS-CONFIG-1`.

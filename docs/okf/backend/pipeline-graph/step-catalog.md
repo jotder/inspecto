@@ -125,7 +125,12 @@ mapped columns — the one an explicit `steps[]` filter runs), and the **pre-par
 `filter_target_column`) that speak raw-column vocabulary.
 
 **Behaviour.** `RowShaper.filter` splits the input into `data` (kept) and `dropped` — a counted reject
-relation, so nothing disappears unaccounted. A NULL predicate result drops the row. Mid-branch (inside
+relation, so nothing disappears unaccounted. 🔴 **The Step lane keeps that promise; the INGEST lane does
+not yet** — a parse-rejected row lands in the errors CSV while the batch ledger reports
+`rejected_count=0` (measured 2026-09-22). ✅ `D2` (signed 2026-09-22) settles it: ingest counts
+`rejected_files` **and** `rejected_rows`, and `total_input_rows` includes the rejected rows — see
+[`consignment-status-flow.md`](../engine/consignment-status-flow.md). Until `WB-09` lands, cite this
+promise for Steps only. A NULL predicate result drops the row. Mid-branch (inside
 `route:`) a filter must carry `where:`; a blank predicate or a pre-parse key refuses to arm. At rest the
 legacy pre-map filter (`csv_settings.where`) is refused because the landed store no longer has raw columns.
 

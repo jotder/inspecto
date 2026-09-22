@@ -403,6 +403,8 @@ migration to reach semantics that composition already provides.
 | 2026-09-05 | **`fields` must be lowerable because it is executable** — a key that becomes executable without joining the allow-list is silently dropped on save | engineering |
 | 2026-09-06 | **A Parse Step is three things and the drawer is its one home** — a grammar, the schemas it emits, and its other properties, including a dangling binding | engineering |
 | 2026-09-06 | **Paths derive from the slug id too** — one identity for id, file and directories | engineering |
+| 2026-09-22 | **A created Pipeline lands in `config/<id>/`, decided server-side (D3).** Every shipped Pipeline already lives in a per-Pipeline directory while the workbench scaffold wrote flat at the space config root — two layouts, one of which had to go. This one, because it is what the 2026-09-06 identity rule above already implies, and because satellites (`<id>_schema.toon`, enrich, grammar) must land beside their Pipeline rather than at the root. ⚠ The client sends no path: the choice is made in the write handler, and every SATELLITE-WRITE-1 call site passes the same subdir | operator |
+| 2026-09-22 | **`GET …/graph` is NOT renamed; it says what it is instead (D9).** The read-only projection stays at its name and gains `links.roundTrip: …/graph/raw` plus a projection flag in its own response. 🔴 PUTting a `/graph` body back is refused 422 on 26 of 26 shipped Pipelines — it fails closed everywhere, and it is still the natural wrong guess for any client. A link buys the discoverability; a rename would have broken every client for the same gain | operator |
 | 2026-09-06 | **Enrichment stays first-class; the retirement narrowed to nothing** after grounding found the one committed fixture does not migrate. ⛔ Not a pending rename — do not re-file it as one | operator |
 | 2026-09-07 | **The workbench field list is capped at fifty rendered rows** with the filter always visible — 🔴 the cap applies to what is *rendered*, never to what is *searched*, because a cap that narrowed the search would hide columns with no way to reach them | operator |
 | 2026-09-07 | ⛔ **The merge and join input picker is refused** — there are no input keys to write; a picker would have written a key nothing reads. Edges stay authored on the canvas | engineering |
@@ -547,7 +549,7 @@ of those citations is wrong (§5.2 item 9).
 | The type vocabulary | `BuiltinNodeType` (30 constants) | ⚠ Counted 20/28/20 in three docs |
 | Published config shapes | `NodeAttributes` + its committed contract | 11 of 30 by design |
 | The authoring round trip | `PipelineEditable.toMap` / `.lower` | — |
-| The read-only projection | `PipelineLift.lift` | ⚠ Documented as *internal only, never a file rewrite*; do not cite it as the round trip |
+| The read-only projection | `PipelineLift.lift` | ⚠ Documented as *internal only, never a file rewrite*; do not cite it as the round trip. ✅ **D9 (2026-09-22): not renamed** — its `GET …/graph` response carries `links.roundTrip` to `…/graph/raw` and a `readOnlyProjection` flag, so the pairing is discoverable at the route (`WB-18`) |
 | The at-rest projection | `PipelineLift.stageTwo` | Execution spec's |
 | Executor dispatch | `RowShaper.shape` in `com.gamma.pipeline.exec` | ⚠ Four docs cite the wrong package **and** wrong lines |
 | The executable map-node keys | `RowShaper.MAP_NODE_CONFIG_KEYS` | 🔴 Contradicted by the config-key reference (§2.3) |

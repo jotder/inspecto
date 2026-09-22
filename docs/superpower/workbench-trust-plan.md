@@ -22,7 +22,8 @@ sign**; work items are written against those answers and say where an amendment 
   seam it edits. Where a `BACKLOG.md` row exists the item names it; the row stays the tracker, this page
   is the plan.
 - §4 is the **decision register** — every owed operator call with a recommendation. ⛔ None may be answered
-  by an implementer in passing; ✍ marks where a signature is awaited.
+  by an implementer in passing; ✍ marked where a signature was awaited. ✅ **As of 2026-09-22 none are:**
+  all eight were signed as recommended and written into their durable homes (§8.2) the same day.
 - §5 holds **contracts** (request/response and file shapes the items change); §6 the **acceptance gates**,
   each falsifiable; §7 the **corrections** this plan's own sources accumulated, kept so nobody re-derives them.
 
@@ -161,7 +162,7 @@ Sizes: **S** ≤ half a day · **M** 1–2 days · **L** > 2 days. "Blocked on" 
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **WB-03** | **One "has a schema" predicate, called by the gate AND the validator** | ⬜ | M | **D7** ✍ | `ConfigRoutes.armedWithoutSchemaFindings` (`:90-111`) learns `parsing.<frontend>.segments{}` non-empty as a schema source (D7 recommended yes); extract the predicate; `ConfigPreviewRoutes` (`/validate`, `:40`) calls it so the two answer alike. Gate: `asn1_example` saves and validates the same. Row: `SAVE-GATE-VS-VALIDATE-DISAGREE-1`. |
+| **WB-03** | **One "has a schema" predicate, called by the gate AND the validator** | ⬜ | M | **D7** ✅ | `ConfigRoutes.armedWithoutSchemaFindings` (`:90-111`) learns `parsing.<frontend>.segments{}` non-empty as a schema source (D7 recommended yes); extract the predicate; `ConfigPreviewRoutes` (`/validate`, `:40`) calls it so the two answer alike. Gate: `asn1_example` saves and validates the same. Row: `SAVE-GATE-VS-VALIDATE-DISAGREE-1`. |
 | **WB-04** | **Frontend-gated `csv_settings` rules** | ⬜ | S | — | `ConfigValidator.java:81-84`: emit the `date_formats`/`timestamp_formats` warnings only when the resolved frontend is delimited (and `csv_settings` is authored). 6/26 Pipelines stop being born `clean:false` for a rule that cannot apply. Row: `VALIDATE-CSV-RULE-FRONTEND-BLIND-1`. |
 | **WB-05** | **Named reference refusal on both test paths** | ⬜ | S | — | `PipelineGraphRoutes.dryRunReferences:685-687`: move the `CREATE OR REPLACE VIEW` into the try/catch; on failure raise the same **`JOIN_REFERENCE_MISSING`**-coded 422 the save path uses, carrying the resolved path. Test run inherits via `:562`. Row: `TESTRUN-REFERENCE-REFUSAL-UNNAMED-1`. |
 | **WB-06** | **Malformed dry-run body → 400** | ⬜ | S | — | `PipelineGraphRoutes:64/468`: catch the body-shape mismatch before `dryRunFlow` and answer 400 *"body must be an object: {sampleRows:[…], pipeline?}"*. Row: `DRYRUN-MALFORMED-BODY-500-1`. |
@@ -171,27 +172,27 @@ Sizes: **S** ≤ half a day · **M** 1–2 days · **L** > 2 days. "Blocked on" 
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **WB-08** | **Test run seeds one relation per `route:<segment>`** | ⬜ | M–L | **D5** ✍ | In `PipelineDryRun.run` (`:97-104`) / `PipelineExecutor.dryRun` (`:295`): when the seed node's frontend emits segments, seed `produced` with one table per segment keyed exactly as production does (`execute`'s multi-seed overload `:94-98`, `SchemaSelector`), plus `unmatched`. `liveInbound` (`:322-329`) then follows the existing edges unchanged. Gate: `asn1_example` and `xml_example` report `relations` past the parser and the quarantine sink's `unmatched` count. ⚠ Do not special-case the walker; the fix is the seed shape. Row: `TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`. |
+| **WB-08** | **Test run seeds one relation per `route:<segment>`** | ⬜ | M–L | **D5** ✅ | In `PipelineDryRun.run` (`:97-104`) / `PipelineExecutor.dryRun` (`:295`): when the seed node's frontend emits segments, seed `produced` with one table per segment keyed exactly as production does (`execute`'s multi-seed overload `:94-98`, `SchemaSelector`), plus `unmatched`. `liveInbound` (`:322-329`) then follows the existing edges unchanged. Gate: `asn1_example` and `xml_example` report `relations` past the parser and the quarantine sink's `unmatched` count. ⚠ Do not special-case the walker; the fix is the seed shape. Row: `TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`. |
 
 ### 3.4 Phase 3 — accounting (Sprint B)
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **WB-09** | **Reject accounting that honours the contract** | ⬜ | M | **D2** ✍ | `CsvIngestStrategy.java:165` carries `ing.errorRows()` into `IngestOutcome`; `ConsignmentIngestor.java:748-751` writes **two** columns: `rejected_files` (today's value, renamed) and `rejected_rows` (the sum); `total_input_rows` = parsed + rejected rows so the ledger reconciles to the file. `ConsignmentAuditWriter.java:52-56,149-160` header + line; `ConsignmentEvent` field. Breaking header change is free (nothing after 3.x shipped). Row: `INGEST-REJECT-ACCOUNTING-1`. |
+| **WB-09** | **Reject accounting that honours the contract** | ⬜ | M | **D2** ✅ | `CsvIngestStrategy.java:165` carries `ing.errorRows()` into `IngestOutcome`; `ConsignmentIngestor.java:748-751` writes **two** columns: `rejected_files` (today's value, renamed) and `rejected_rows` (the sum); `total_input_rows` = parsed + rejected rows so the ledger reconciles to the file. `ConsignmentAuditWriter.java:52-56,149-160` header + line; `ConsignmentEvent` field. Breaking header change is free (nothing after 3.x shipped). Row: `INGEST-REJECT-ACCOUNTING-1`. |
 | **WB-10** | **Errors CSV: one row per bad line** | ⬜ | S | — | `DuckDbCsvIngester.writeRejects`: group `reject_errors` by `line`, emit `line_number, columns (c9–c17), reason, raw_line`. Independent of `WB-09` (the count is by line either way once `WB-09` sums rows, not column errors — state which in the gate). Row: `INGEST-ERRORS-CSV-PER-COLUMN-1`. |
 
 ### 3.5 Phase 4 — trust and shape (Sprint C)
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **WB-11** | **A *ran* badge that is not a *tested* claim** | ⬜ | S–M | **D6** ✍ | Keep `computeNodeStatus` (`pipeline-graph.ts:103`) and its `testedStatus` feed untouched (the test lane, `pipeline-stages.ts:13`). Add a separate card badge from `lastRunCounts` (already loaded, `:1173-1189`) — *"last run: 400 rows · 2026-09-22"* — and reword the finding to *"not yet tested in this session"*. Respects `:693/:701` by adding a third source, not a second opinion. Row: `PIPELINE-NODE-TEST-STATE-STALE-1`. |
+| **WB-11** | **A *ran* badge that is not a *tested* claim** | ⬜ | S–M | **D6** ✅ | Keep `computeNodeStatus` (`pipeline-graph.ts:103`) and its `testedStatus` feed untouched (the test lane, `pipeline-stages.ts:13`). Add a separate card badge from `lastRunCounts` (already loaded, `:1173-1189`) — *"last run: 400 rows · 2026-09-22"* — and reword the finding to *"not yet tested in this session"*. Respects `:693/:701` by adding a third source, not a second opinion. Row: `PIPELINE-NODE-TEST-STATE-STALE-1`. |
 | **WB-12** | **Dry-run panel seeds from the last test run** | ⬜ | S–M | — | `RunToHereDialog` (`run-to-here.dialog.ts:240,296-311`) returns `result` through `MatDialogRef.close`; the editor routes `relations[seed].rows` into the tab's sample thread (`.html:780` `capturedRows`), so *"Use the captured sample"* is one click after a run. Row: `DRYRUN-SEEDS-AFTER-PARSE-1`. |
 | **WB-13** | **Palette disabled in the read-only lens** | ⬜ | S | — | Add `@Input() readOnly` to `PipelinePaletteComponent`; host binds `[readOnly]="!canAuthor()"`; buttons get `disabled` + `aria-disabled`. Extend `pipeline-editor.component.spec.ts:2859` to assert 0 enabled `Add …` controls in the Business lens. Row: `READONLY-LENS-PALETTE-ENABLED-1`. |
-| **WB-14** | **One-gesture insert on the canvas** | ⬜ | M | **D8** ✍ | `insertNode` (`:2511-2517`): when a node is selected, add the new node **after** it — rewire the selected node's outgoing `data` edge through the new node (`addEdge`/`removeEdge` in `pipeline-graph.ts`); else the current bare add. Validation keeps catching orphans. Row: `PALETTE-ADD-DROPS-ORPHAN-1` (corrected, §7.3). |
-| **WB-15** | **Created Pipelines land in `config/<name>/`** | ⬜ | M | **D3** ✍ | Server-side in the `configApi.write('pipeline', …)` handler (the client sends no path — `pipeline-scaffold.ts`, `pipeline-editor.component.ts:1214-1219`): choose `config/<id>/<id>_pipeline.toon`; audit every SATELLITE-WRITE-1 call site (`pipeline-config-definition.component.ts:311`, `schema-editor.dialog.ts:42`, `grammar-editor.dialog.ts:197`) to pass the same subdir. Guard: a test that creates through the route and asserts the path. Row: `UI-CREATED-PIPELINE-FLAT-HOME-1`. |
+| **WB-14** | **One-gesture insert on the canvas** | ⬜ | M | **D8** ✅ | `insertNode` (`:2511-2517`): when a node is selected, add the new node **after** it — rewire the selected node's outgoing `data` edge through the new node (`addEdge`/`removeEdge` in `pipeline-graph.ts`); else the current bare add. Validation keeps catching orphans. Row: `PALETTE-ADD-DROPS-ORPHAN-1` (corrected, §7.3). |
+| **WB-15** | **Created Pipelines land in `config/<name>/`** | ⬜ | M | **D3** ✅ | Server-side in the `configApi.write('pipeline', …)` handler (the client sends no path — `pipeline-scaffold.ts`, `pipeline-editor.component.ts:1214-1219`): choose `config/<id>/<id>_pipeline.toon`; audit every SATELLITE-WRITE-1 call site (`pipeline-config-definition.component.ts:311`, `schema-editor.dialog.ts:42`, `grammar-editor.dialog.ts:197`) to pass the same subdir. Guard: a test that creates through the route and asserts the path. Row: `UI-CREATED-PIPELINE-FLAT-HOME-1`. |
 | **WB-17** | **Samples for the sample-less, demos for the synthetic-only** | ⬜ | M | `WB-16` | `lookup_step` gets a sample file; one domain-shaped demo each for ASN.1, Excel, fixed-width, XML and `route` in `spaces/demo`. Could-tier: value is in coverage, not features. Row: `DEMO-CORPUS-FORMAT-COVERAGE-1`. |
-| **WB-18** | **The projection says what it is** | ⬜ | S | **D9** ✍ | `GET …/graph` response gains `links.roundTrip: …/graph/raw` and `metadata.readOnlyProjection: true`; no rename (D9 recommended). Row: `GRAPH-READ-SHAPE-NOT-WRITE-SHAPE-1`. |
-| **WB-19** | **Formatting churn — decide, document, guard** | ⬜ | S | **D4** ✍ | D4 recommended: accept the churn; `WB-01` guards semantic losslessness; `editable-round-trip.md` states *"verbatim = decoded map, not bytes"* in one sentence. No writer work. Row: `GRAPH-SAVE-REFORMATS-CONFIG-1` (the decision half). |
+| **WB-18** | **The projection says what it is** | ⬜ | S | **D9** ✅ | `GET …/graph` response gains `links.roundTrip: …/graph/raw` and `metadata.readOnlyProjection: true`; no rename (D9 recommended). Row: `GRAPH-READ-SHAPE-NOT-WRITE-SHAPE-1`. |
+| **WB-19** | **Formatting churn — decide, document, guard** | ⬜ | S | **D4** ✅ | D4 recommended: accept the churn; `WB-01` guards semantic losslessness; `editable-round-trip.md` states *"verbatim = decoded map, not bytes"* in one sentence. No writer work. Row: `GRAPH-SAVE-REFORMATS-CONFIG-1` (the decision half). |
 | **WB-20** | **Fix the stale Recipe-view claim and the row that rested on it** | ✅ **done in this change** | S | — | `pipeline-editor.md:550` now records that `<app-pipeline-step-cards>` was removed in `6d3c68fa`; `PALETTE-ADD-DROPS-ORPHAN-1` re-edited (§7.3). |
 
 ### 3.6 Sequencing
@@ -199,7 +200,9 @@ Sizes: **S** ≤ half a day · **M** 1–2 days · **L** > 2 days. "Blocked on" 
 `WB-01`, `WB-02`, `WB-16` first (no decisions, half a day each, and `WB-01` is the safety net for
 everything after). Then Sprint A (`WB-03`…`WB-07`) — five small changes that end the *two answers*
 shape. Sprint B (`WB-08`, `WB-09`, `WB-10`) is the substantive engineering. Sprint C is polish and
-trust. `D2`, `D5`, `D7` must be signed before Sprint B starts; `D3`, `D6`, `D8` before Sprint C.
+trust. `D2`, `D5`, `D7` gated Sprint B and `D3`, `D6`, `D8` gated Sprint C — ✅ **all eight were signed
+2026-09-22 as recommended (§4), so no item on this register is decision-blocked any more.** Every `✍`
+marker below is discharged; what remains is build order, not permission.
 
 ---
 
@@ -208,17 +211,20 @@ trust. `D2`, `D5`, `D7` must be signed before Sprint B starts; `D3`, `D6`, `D8` 
 | # | Question | Recommendation | Evidence | Forecloses | Items |
 |---|---|---|---|---|---|
 | **D1** | Real frontend server-side vs client approximation for the parse test | ✅ **already answered** — real, server-side, jailed (`pipeline-test-run.md:12,70`) | E2, E3 | — | — |
-| **D2** ✍ | What does `rejected_count` mean? | **Split it.** `rejected_files` (today's semantics: members not `SUCCESS`) **and** `rejected_rows` (sum of `IngestResult.errorRows`); `total_input_rows` = parsed + rejected rows. Rename rather than overload — breaking the audit header is free. | E5 `ConsignmentIngestor:748-751`, `CsvIngestStrategy:165`, `IngestResult:16` | "one number that means both" | WB-09 |
-| **D3** ✍ | Where does a UI-created Pipeline live? | **`config/<id>/`**, server-side. Every shipped Pipeline uses it; *"one identity for id, file and directories"* (`pipeline-authoring.md:405`) points the same way; satellites get the subdir too. | E4, E3 | flattening 26 Pipelines | WB-15 |
-| **D4** ✍ | Formatting churn on save | **Accept it.** Fund the guard (`WB-01`), not a format-preserving writer; state map-verbatim ≠ byte-verbatim in the concept. | E1 24/25, `editable-round-trip.md:494` | a writer with its own drift surface | WB-19 |
-| **D5** ✍ | Segment-routed frontends in the test run | **Walk the edge** by seeding one relation per segment (production's seed shape). Refusing would leave 2/8 frontends — and every multi-record feed — untestable past the decoder. | E2, E5 `PipelineExecutor:94-98,295,322-329` | a named 501 for `parser.asn1`/`plugin` | WB-08 |
-| **D6** ✍ | May node state read operate-lane provenance? | **Not into `tested`.** Add a distinct *ran* badge from `lastRunCounts`; reword the finding. Keeps `pipeline-editor.md:693/701` intact. | E3, E5 `pipeline-graph.ts:103`, `editor:459,1173` | merging lanes; a second readiness opinion | WB-11 |
-| **D7** ✍ | Is `parsing.<frontend>.segments{}` a schema for the arming gate? | **Yes** — it is the only schema source a segment-routed frontend has, and the validator already treats the config as sound. One predicate, both call sites. | E1, E5 `ConfigRoutes:99-103`, `ConfigPreviewRoutes:40` | a shipped ASN.1 Pipeline that can never be saved | WB-03 |
-| **D8** ✍ *(new)* | Reopen the declined orphan-drop? | **Yes, narrowly.** The decline (`pipeline-editor.md:336`) assumed the Recipe view's insert-between as the alternative; that component was deleted in `6d3c68fa`. Wire an added Step after the **selected** node only; bare add otherwise. | E5 `:2511-2517`, git | auto-connect with no selection | WB-14 |
-| **D9** ✍ *(new)* | Rename `GET …/graph`? | **No.** Add `links.roundTrip` + a projection flag to its response and one sentence at the route. Renaming touches every client for a discoverability gain a link provides. | E1 26/26, E3 | `/graph/view` | WB-18 |
+| **D2** ✅ | What does `rejected_count` mean? | ✅ **SIGNED 2026-09-22 — split it.** `rejected_files` (today's semantics: members not `SUCCESS`) **and** `rejected_rows` (sum of `IngestResult.errorRows`); `total_input_rows` = parsed + rejected rows. Rename rather than overload — breaking the audit header is free. Written into `okf/backend/engine/consignment-status-flow.md` and `okf/backend/pipeline-graph/step-catalog.md` the same day. | E5 `ConsignmentIngestor:748-751`, `CsvIngestStrategy:165`, `IngestResult:16` | "one number that means both" | WB-09 |
+| **D3** ✅ | Where does a UI-created Pipeline live? | ✅ **SIGNED 2026-09-22 — `config/<id>/`, server-side.** Every shipped Pipeline uses it; *"one identity for id, file and directories"* (`pipeline-authoring.md:405`) points the same way; satellites get the subdir too. Written into `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §4 and `okf/frontend/features/pipeline-editor.md` the same day. | E4, E3 | flattening 26 Pipelines | WB-15 |
+| **D4** ✅ | Formatting churn on save | ✅ **SIGNED 2026-09-22 — accept it.** Fund the guard (`WB-01`), not a format-preserving writer; map-verbatim ≠ byte-verbatim is now stated in `okf/backend/pipeline-graph/editable-round-trip.md` beside the standing gate. | E1 24/25, `editable-round-trip.md:494` | a writer with its own drift surface | WB-19 |
+| **D5** ✅ | Segment-routed frontends in the test run | ✅ **SIGNED 2026-09-22 — walk the edge** by seeding one relation per segment (production's seed shape). Refusing would leave 2/8 frontends — and every multi-record feed — untestable past the decoder. Written into `okf/backend/engine/pipeline-test-run.md` the same day. | E2, E5 `PipelineExecutor:94-98,295,322-329` | a named 501 for `parser.asn1`/`plugin` | WB-08 |
+| **D6** ✅ | May node state read operate-lane provenance? | ✅ **SIGNED 2026-09-22 — not into `tested`.** Add a distinct *ran* badge from `lastRunCounts`; reword the finding. Keeps `pipeline-editor.md:693/701` intact — written beside those lines the same day. | E3, E5 `pipeline-graph.ts:103`, `editor:459,1173` | merging lanes; a second readiness opinion | WB-11 |
+| **D7** ✅ | Is `parsing.<frontend>.segments{}` a schema for the arming gate? | ✅ **SIGNED 2026-09-22 — yes.** It is the only schema source a segment-routed frontend has, and the validator already treats the config as sound. One predicate, both call sites. Written into `okf/backend/pipeline-graph/pipeline-config-keys.md` the same day. | E1, E5 `ConfigRoutes:99-103`, `ConfigPreviewRoutes:40` | a shipped ASN.1 Pipeline that can never be saved | WB-03 |
+| **D8** ✅ | Reopen the declined orphan-drop? | ✅ **SIGNED 2026-09-22 — yes, narrowly.** The decline (`pipeline-editor.md:336`) assumed the Recipe view's insert-between as the alternative; that component was deleted in `6d3c68fa`. Wire an added Step after the **selected** node only; bare add otherwise. The decline is amended in place the same day. | E5 `:2511-2517`, git | auto-connect with no selection | WB-14 |
+| **D9** ✅ | Rename `GET …/graph`? | ✅ **SIGNED 2026-09-22 — no.** Add `links.roundTrip` + a projection flag to its response and one sentence at the route. Renaming touches every client for a discoverability gain a link provides. Written into `pipeline-authoring.md` §7's pointer row the same day. | E1 26/26, E3 | `/graph/view` | WB-18 |
 
-⛔ Items marked ✍ in §3 do not start until their decision is signed. An amendment to `D2` changes
-`WB-09`'s columns; to `D5`, `WB-08` becomes a named refusal (S, not M–L); to `D8`, `WB-14` is dropped.
+✅ **All eight owed calls were signed 2026-09-22, each as recommended**, and each was written into its
+durable home (§8.2) the same day rather than waiting for its item to ship. ⛔ The `✍` markers in §3 are
+therefore discharged; nothing on the register is decision-blocked. *(Kept for provenance: an amendment to
+`D2` would change `WB-09`'s columns; to `D5`, `WB-08` would become a named refusal (S, not M–L); to `D8`,
+`WB-14` would be dropped.)*
 
 ---
 
@@ -390,15 +396,15 @@ this plan; what the plan adds is the register and the model, and those are what 
 
 | Fact (from §1.4 / §4) | Durable home | Written when |
 |---|---|---|
-| Test-run seed is one relation per segment; `liveInbound` follows any present rel | `okf/backend/engine/pipeline-test-run.md` (the walk section) | `WB-08` ships |
-| One "has a schema" predicate; `segments{}` is a schema source; `/validate` calls the gate's predicate (`D7`) | `okf/backend/pipeline-graph/pipeline-config-keys.md` (arming rules) | `WB-03` ships |
-| `rejected_files` / `rejected_rows` semantics; input = parsed + rejected (`D2`) | the consignment audit concept (batch CSV section) and `step-catalog.md:91,127` (the *never silently dropped* promise, now true for ingest) | `WB-09` ships |
+| Test-run seed is one relation per segment; `liveInbound` follows any present rel | `okf/backend/engine/pipeline-test-run.md` (the walk section) | ✅ **written 2026-09-22** (decision `D5` + the measured as-built gap); flips to as-built when `WB-08` ships |
+| One "has a schema" predicate; `segments{}` is a schema source; `/validate` calls the gate's predicate (`D7`) | `okf/backend/pipeline-graph/pipeline-config-keys.md` (arming rules) | ✅ **written 2026-09-22** (decision); as-built note flips when `WB-03` ships |
+| `rejected_files` / `rejected_rows` semantics; input = parsed + rejected (`D2`) | `okf/backend/engine/consignment-status-flow.md` (batch ledger section) and `step-catalog.md` (the *never silently dropped* promise, scoped to Steps until ingest follows) | ✅ **written 2026-09-22** (decision); the promise's ingest half flips when `WB-09` ships |
 | Reference refusal is one code on all three paths | `okf/backend/pipeline-graph/editable-round-trip.md` (DRYRUN-1 section) | `WB-05` ships |
-| The projection carries `links.roundTrip` (`D9`) | `pipeline-authoring.md` pointer-table row for `PipelineLift.lift` | `WB-18` ships |
-| `config/<id>/` is the write location for created Pipelines (`D3`) | `pipeline-authoring.md` (the 2026-09-06 id/paths decision) + `pipeline-editor.md` (`pipelineScaffold`) | `WB-15` ships |
-| Formatting churn accepted; verbatim = decoded map (`D4`) | `editable-round-trip.md` (one sentence beside the sweep test) | `WB-19` — can be written **today**; it is a decision, not code |
-| *Ran* badge is a third source, not a readiness opinion (`D6`) | `pipeline-editor.md` beside `:693/:701` | `WB-11` ships |
-| The orphan-drop decline is reopened; selected-node insert (`D8`) | `pipeline-editor.md:336` (amend the decline in place) | `WB-14` ships — or the moment `D8` is signed, whichever first |
+| The projection carries `links.roundTrip` (`D9`) | `pipeline-authoring.md` pointer-table row for `PipelineLift.lift` + §4 | ✅ **written 2026-09-22** (decision); flips to as-built when `WB-18` ships |
+| `config/<id>/` is the write location for created Pipelines (`D3`) | `pipeline-authoring.md` (beside the 2026-09-06 id/paths decision) + `pipeline-editor.md` (`pipelineScaffold`) | ✅ **written 2026-09-22** (decision); flips to as-built when `WB-15` ships |
+| Formatting churn accepted; verbatim = decoded map (`D4`) | `editable-round-trip.md` (beside the standing sweep gate) | ✅ **written 2026-09-22** — `WB-19` is now documentation-complete; only `WB-01`'s guard remains |
+| *Ran* badge is a third source, not a readiness opinion (`D6`) | `pipeline-editor.md` beside `:693/:701` | ✅ **written 2026-09-22** (decision); flips to as-built when `WB-11` ships |
+| The orphan-drop decline is reopened; selected-node insert (`D8`) | `pipeline-editor.md:336` (the decline, amended in place) | ✅ **written 2026-09-22**, the day `D8` was signed |
 | The Recipe view no longer exists | `pipeline-editor.md:550` | ✅ **already written** (this change) |
 | The round-trip guard goes through the HTTP route, and why | `okf/backend/build-run/guard-coverage.md` | `WB-01` ships |
 | Which surfaces disagreed and why that is the defect shape (§1.5) | `pipeline-authoring.md` §*Corrections* | at archival, as one paragraph |
