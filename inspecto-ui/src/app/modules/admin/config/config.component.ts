@@ -25,6 +25,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 const CONFIG_TYPES: ConfigType[] = ['pipeline', 'enrichment', 'job', 'schema', 'meta'];
 
@@ -110,6 +111,7 @@ export function assembleConfig(fields: FieldSpec[], values: Record<string, unkno
     selector: 'app-config',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,

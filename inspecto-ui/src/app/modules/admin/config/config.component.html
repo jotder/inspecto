@@ -1,9 +1,10 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div class="bg-card border-b p-6 sm:px-10 sm:py-8 dark:bg-transparent">
-        <h1 class="text-3xl font-extrabold leading-none tracking-tight">Configuration</h1>
-        <div class="text-secondary mt-1.5">Spec-driven authoring: draft → validate → copy the .toon</div>
-    </div>
+    <inspecto-page-header
+        title="Configuration"
+        subtitle="Spec-driven authoring: draft → validate → copy the .toon"
+        [terms]="['Pipeline', 'Job', 'Collector']"
+    />
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
