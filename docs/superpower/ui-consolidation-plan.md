@@ -146,10 +146,11 @@ a synthetic click cannot drive a Material tab in jsdom (first one swallowed, lat
 codemod, 14 by hand), the Signal Ledger filter bar, the degrade rule, Components' tabs, the Incidents and
 Cases bulk actions, wrapping grid headers, empty charts that say why, the retired entity word gone, the
 D8-scoped picker sweep (Geo Map, the Link Analysis dock, Assistant), Jobs and Overview named after their nav
-items, and the shell cleanup. **Still open — the editor panes only:** `config`, `pipeline-editor`,
-`dashboard-editor`, `dataset-editor`, `explore`, and the three bounded IDE panes (Link Analysis, Geo Map,
-Pipelines list). Each has bespoke chrome inside a bounded row that a full-bleed header breaks; they need a
-**compact** header mode designed for them, not a conversion. Follow-on BACKLOG rows: the remaining
+items, and the shell cleanup. **The three bounded IDE panes are DONE** (2026-09-22, later the same day): the header gained a
+`compact` mode — one 40 px row, no padding or border, subtitle inline — and Link Analysis and Geo Map adopt
+it; the Pipelines list pane took the standard header, which on its own never overflowed. **Still open —
+the five editors only:** `config`, `pipeline-editor`, `dashboard-editor`, `dataset-editor`, `explore`.
+Each has a bespoke toolbar row; `compact` is the mode to fit into it. Follow-on BACKLOG rows: the remaining
 `mat-select`s (23 templates + the Shortest-path toolbox From/To) and the four editor panes.
 
 🔴 **Three findings from doing the sweep, each of which would have bitten the remaining rows:**
@@ -229,6 +230,12 @@ only made it uniform enough to see. Fixed by letting the shell drop to an eyebro
 ⚠ The same dual-hosting means any future Settings section must expect its own header to BE the page's
 heading. `UIB-23` — a series of explicit zeros is indistinguishable from "nothing has run yet", so
 `<inspecto-chart>` cannot decide emptiness alone; the pane passes `[empty]`.
+
+⇒ **Added 2026-09-22, fourth batch:** `UIB-26` — 🔴 **projected content goes to the FIRST matching
+`<ng-content>` in a template, and a slot inside an un-rendered `@if` branch swallows it.** Adding the
+header's compact branch, with its own `[actions]` slot, made every standard-mode pane lose its action row
+— the spec caught it, the build did not. Capture each slot once in an `<ng-template>` and stamp it into the
+rendered branch with `*ngTemplateOutlet`.
 
 ⇒ **Added 2026-09-22, third batch:** `UIB-24` — 🔴 **the Notifications panel could not be closed from the
 keyboard.** Its content `<div>` did `(keydown)="$event.stopPropagation()"` so MatMenu's type-ahead would

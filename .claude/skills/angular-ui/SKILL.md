@@ -138,6 +138,14 @@ src/app/
     `[headingLevel]="2"` is for the ONE case the header is not the page — the `/design` live example, or a
     section mounted inside a pane that already owns the `<h1>` (Settings sections are dual-hosted this
     way; the Settings shell itself steps down to an eyebrow once a section is open, UIB-22).
+    **`compact`** is the ONE-row variant for a bounded editor pane (Link Analysis, Geo Map, the Pipelines
+    editor): no padding or border, subtitle inline and hidden below `md`, actions at the row's end. 🔴 The
+    standard header overflowed those panes (Link Analysis to 1591 px in an 886 px viewport) — never give an
+    IDE-style pane the full-bleed header.
+  ⚠ **Projected content goes to the FIRST matching `<ng-content>`, and a slot inside an un-rendered `@if`
+  branch swallows it** (UIB-26, 2026-09-22): one `[actions]` slot per branch silently emptied every
+  standard pane's action row. Capture a slot once in an `<ng-template>` and stamp it into the rendered
+  branch with `*ngTemplateOutlet` — the header does exactly this.
   - **`<inspecto-stat-tile label [value] [hint] [absentReason]>`** — the KPI tile. Tabular numerals so a
     row lines up; 🔴 an **absent** value (`null`/`undefined`/`''`) renders as an em dash carrying
     `absentReason`, never as a `0` nobody measured — `0` itself still renders as `0`.
