@@ -154,7 +154,7 @@ Sizes: **S** ≤ half a day · **M** 1–2 days · **L** > 2 days. "Blocked on" 
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **WB-01** | **Round-trip guard through the HTTP write path** | ⬜ | S | — | New test beside `LiftLowerFixtureSweepTest`: for every `spaces/**/*_pipeline.toon`, boot `ControlApi` on an ephemeral port (house idiom), `GET …/graph/raw` → `PUT …/graph` → re-`GET`; assert (a) the config's key set is unchanged, (b) node configs are `equals` after re-read, (c) `written:true`. Adds what the in-process sweep cannot see: write-route defaults, `active` coercion, findings-driven rewrites. ⚠ It will **fail on `asn1_example` until `WB-03` lands** — that is the guard doing its job; pin the expectation and flip it with `WB-03`. Protects §1.1's two properties. Row: `GRAPH-SAVE-REFORMATS-CONFIG-1` (the guard half). |
+| **WB-01** | **Round-trip guard through the HTTP write path** | ✅ **SHIPPED 2026-09-22** | S | — | New test beside `LiftLowerFixtureSweepTest`: for every `spaces/**/*_pipeline.toon`, boot `ControlApi` on an ephemeral port (house idiom), `GET …/graph/raw` → `PUT …/graph` → re-`GET`; assert (a) the config's key set is unchanged, (b) node configs are `equals` after re-read, (c) `written:true`. Adds what the in-process sweep cannot see: write-route defaults, `active` coercion, findings-driven rewrites. ⚠ It will **fail on `asn1_example` until `WB-03` lands** — that is the guard doing its job; pin the expectation and flip it with `WB-03`. Protects §1.1's two properties. Row: `GRAPH-SAVE-REFORMATS-CONFIG-1` (the guard half). ✅ **Shipped 2026-09-22** as `ControlApiPipelineGraphRoundTripSweepTest`: **25 of 26 shipped Pipelines save losslessly** through the real route, `asn1_example` refuses exactly as predicted, and the pin is **falsification-probed** — removing it turns the guard red, so it is not vacuous. 🔴 **Two corrections to this item as written.** (1) It canNOT sit beside `LiftLowerFixtureSweepTest`: that is `inspecto-engine`, which has no `ControlApi`. It lives in `inspecto`, package `com.gamma.control`, where the package-private `V1Body` envelope-unwrap helper is. (2) It canNOT drive the committed `spaces/` tree — the write path WRITES, and fixture paths are repo-relative while surefire's CWD is the module dir (`SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`). Each fixture is staged into a temp copy with its `spaces/<space>/` prefix rewritten absolute. |
 | **WB-02** | **Toolbar copy — say what each instrument does** | ✅ **SHIPPED 2026-09-22** | S | — | `pipeline-editor.component.html:170-180,216-224`: tooltips become *"Dry-run — rehearse the Steps after the parser over sample rows (no write)"* and *"Run to here — parse real inbox files through this Pipeline into a scratch root (no write)"*; the dry-run dock's heading already says the first, the toolbar does not. Zero logic. This is the gap that made an evaluator drive the wrong instrument and file its absence (§7.1). ✅ **Shipped 2026-09-22** — both tooltips and both `aria-label`s now name the instrument's seed and say nothing is written; the comment above the button records why they must not be shortened back to one word. `pipeline-editor.component.spec.ts`'s `RUN` label constant follows the new text; 188/188 pass. |
 | **WB-16** | **One seed script: `data/samples/**` → inboxes and `data/ref/`** | ✅ **SHIPPED 2026-09-22** | S | — | `tools/seed-samples.mjs <space>|--all`: copies each Pipeline's sample dir into its `dirs.poll` and `data/samples/ref/*` into `data/ref/`; idempotent; printed plan. Wire into `.claude/launch.json` pre-step and the smoke skill. Turns `join_step` / `orders_enriched_rollup` from "fails on a fresh checkout" into runnable. Row: `REFERENCE-EXAMPLES-NEED-UNRUN-SEED-1`. ✅ **Shipped 2026-09-22** as `tools/seed-samples.mjs` — 23 inboxes, 2 reference sets, 225 working dirs across 4 spaces, idempotency proved by byte-comparing a second run; wired into all four space-serving launchers and `smoke` step 2. 🔴 **The row's cause was refuted while building it:** the per-space `seed-inbox.sh`/`.ps1` DO copy `ref/*`; what was missing is that nothing ran them, and their pipeline list is hand-written. The tool derives it from `dirs.poll` instead. |
 
@@ -338,6 +338,39 @@ re-checked on every change.
 | G-C4 | WB-14 | with `map` selected, adding a filter yields edges `map → filter → sink` and validation reports 0 orphans; with nothing selected, the bare add is unchanged | the old edge survives alongside the new (fan-out) |
 | G-C5 | WB-15 | creating `x` through the route writes `config/x/x_pipeline.toon`; a schema satellite lands beside it | a satellite lands at the root |
 | G-C6 | WB-18 | `GET …/graph` carries `links.roundTrip` resolving to a 200 | — |
+
+---
+
+## 6a. What `WB-01` measured on the day it landed (2026-09-22)
+
+The guard is also the first census of the write path taken through the route rather than in process:
+
+| Outcome | Count | Which |
+|---|---|---|
+| **Saved losslessly** — PUT `written:true` and the re-read editable graph is IDENTICAL | **25** | every shipped Pipeline but `asn1_example` |
+| **Refused, known and pinned** | **1** | `asn1_example` — 422 `ERR_ARMED_WITHOUT_SCHEMA`, *"active: true but no schema is configured"* |
+
+✅ So the passthrough contract holds **through the HTTP route**, not merely at the in-process seam — which
+is what `§1.1`'s two properties claimed and nothing checked. ⚠ The refusal is an INDEPENDENT reproduction
+of `SAVE-GATE-VS-VALIDATE-DISAGREE-1`: it was found by driving the corpus, not by re-reading the row.
+
+🔴 **Three harness defects were paid for before the guard was honest**, each of which would have made it
+report the wrong thing, and all three are the same shape — *a guard that fails toward passing, or toward a
+message that says nothing*:
+
+1. **The pin check ran BEFORE the census**, so the first two runs reported *“expected 1 refusal, got 0”*
+   and printed nothing about what the write path did. The census now goes first. A run spent to learn only
+   what the bookkeeping expected is a run wasted.
+2. **Staging relativized from the config root while the path rewrite assumed the space root**, so every
+   staged config looked for its schema one directory too high and **all 26 fixtures** failed with
+   *"registered no pipeline at all"* — which reads exactly like 26 broken Pipelines and was a one-line
+   harness bug.
+3. **An absolute Windows path begins `C:/`, and inside a TOON array row that parses as a KEY.**
+   `sinks[2]{database,format}:` rows in `route_step` stopped being rows (*"Array length mismatch: declared
+   2, found 0"*). The rewritten field is now quoted. ⚠ Staging relative to `target/` was tried first and
+   **rejected**: it removes the drive letter but made five at-rest Step Pipelines refuse with *"must
+   declare a top-level `output_store`"* for reasons never established — **an unexplained failure inside a
+   guard is worse than the problem it fixes.**
 
 ---
 
