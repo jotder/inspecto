@@ -74,7 +74,6 @@ const GAMMA_GRID_PARAMS = {
     // UI consolidation plan §3.2 (2026-09-22): 34 px rows/headers in every list pane (was the Quartz
     // default 42/48) — the density change that lets a triage list show ~25 % more rows per screen.
     rowHeight: 34,
-    headerHeight: 34,
     headerFontSize: '12px',
     headerFontWeight: 600,
     foregroundColor: 'var(--gamma-text-default)',
@@ -94,10 +93,22 @@ const GAMMA_GRID_PARAMS = {
 export const INSPECTO_GRID_LIGHT: Theme = themeQuartz.withParams(GAMMA_GRID_PARAMS);
 export const INSPECTO_GRID_DARK: Theme = themeQuartz.withPart(colorSchemeDark).withParams(GAMMA_GRID_PARAMS);
 
-/** Shared column defaults for Inspecto grids. */
+/**
+ * Shared column defaults for Inspecto grids.
+ *
+ * 🔴 `wrapHeaderText` + `autoHeaderHeight` are the fix for the truncated headers the 2026-09-22 UI walk
+ * found on Alerts, Events, Collectors, Processing Status and Jobs — "Sev…", "Collec…", "Quaran…",
+ * "What's sch…". A clipped header loses the column's meaning exactly where an operator is scanning, and
+ * ag-Grid clips rather than wraps by default. With these two the header wraps to a second line and the
+ * row of headers grows to fit, so `headerHeight` is deliberately NOT pinned in the theme params.
+ * `minWidth` stops a column collapsing so far that even a wrapped word cannot show.
+ */
 export const INSPECTO_DEFAULT_COL_DEF: ColDef = {
     sortable: true,
     resizable: true,
+    minWidth: 96,
+    wrapHeaderText: true,
+    autoHeaderHeight: true,
 };
 
 /**
