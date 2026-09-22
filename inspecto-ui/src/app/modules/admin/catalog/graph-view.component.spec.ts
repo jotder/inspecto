@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from './catalog-graph';
-import { GraphViewComponent, buildPluginList, stableKey } from './graph-view.component';
+import { GRAPH_LAYOUTS, GraphViewComponent, buildPluginList, layoutConfig, stableKey } from './graph-view.component';
 
 /** G6 can't instantiate in jsdom (per the angular-ui skill) — only the empty/no-data path is testable
  *  here; `rebuild()` returns before touching the canvas when there are no nodes. */
@@ -54,6 +54,56 @@ describe('GraphViewComponent', () => {
             'hull',
         ]);
         expect(list[5]).toMatchObject({ key: 'hull-0', members: ['a', 'b', 'c'], fill: 'swatch-a' });
+    });
+
+    // ── LA-09: View toolbox completions ──
+    it('buildPluginList maps the snapline flag to its G6 built-in', () => {
+        expect(buildPluginList({ snapline: true }, []).map((p) => p['type'])).toEqual(['snapline']);
+    });
+
+    it('bubble sets REPLACE hulls rather than drawing a second shape per community', () => {
+        const hulls = new Map([['0', ['a', 'b', 'c']]]);
+        const asHulls = buildPluginList({ hulls }, ['swatch-a']);
+        expect(asHulls.map((p) => p['type'])).toEqual(['hull']);
+
+        const asSets = buildPluginList({ hulls, bubbleSets: true }, ['swatch-a']);
+        // One shape per community either way - both on must NOT paint the community twice.
+        expect(asSets.map((p) => p['type'])).toEqual(['bubble-sets']);
+        expect(asSets[0]).toMatchObject({ key: 'bubble-sets-0', members: ['a', 'b', 'c'], fill: 'swatch-a' });
+    });
+
+    it('bubble sets honour the same singleton rule as hulls', () => {
+        const hulls = new Map([['0', ['a']]]); // a community of one gets no shape
+        expect(buildPluginList({ hulls, bubbleSets: true }, ['swatch-a'])).toEqual([]);
+    });
+});
+
+describe('GRAPH_LAYOUTS (LA-09)', () => {
+    it('every offered layout id resolves to a G6 layout type', () => {
+        for (const l of GRAPH_LAYOUTS) {
+            const cfg = layoutConfig(l.id);
+            expect(cfg['type'], `layout '${l.id}' must map to a G6 type`).toBeTruthy();
+        }
+    });
+
+    it('offers the layouts LA-09 adds, each mapped to its installed G6 built-in', () => {
+        expect(layoutConfig('fruchterman')).toMatchObject({ type: 'fruchterman' });
+        expect(layoutConfig('fishbone')).toMatchObject({ type: 'fishbone' });
+        expect(layoutConfig('dendrogram')).toMatchObject({ type: 'dendrogram', radial: false });
+        // the pre-existing radial variant is the SAME engine and must stay radial
+        expect(layoutConfig('radial-tree')).toMatchObject({ type: 'dendrogram', radial: true });
+    });
+
+    it('gates the hierarchical additions on a tree-shaped graph, as the existing tree layouts are', () => {
+        const byId = Object.fromEntries(GRAPH_LAYOUTS.map((l) => [l.id, l.tree]));
+        expect(byId['dendrogram']).toBe(true);
+        expect(byId['fishbone']).toBe(true);
+        expect(byId['fruchterman']).toBe(false); // force-directed, works on any graph
+    });
+
+    it('has no duplicate ids and every id is unique to one label', () => {
+        const ids = GRAPH_LAYOUTS.map((l) => l.id);
+        expect(new Set(ids).size).toBe(ids.length);
     });
 });
 
@@ -120,6 +170,9 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
         comp.display = { nodeLabels: false } as GraphViewComponent['display'];
         comp.ngOnChanges({ display: {} });
         expect(create).not.toHaveBeenCalled();
+        // Gate G-R7 states the criterion as `destroy()` specifically, so assert that literally and not
+        // only through the spied `create()` — the two can drift if teardown ever moves.
+        expect(graph.destroy).not.toHaveBeenCalled();
         expect(graph.render).not.toHaveBeenCalled();
         expect(graph.setData).toHaveBeenCalledTimes(1);
         expect(graph.draw).toHaveBeenCalledTimes(1);
@@ -130,6 +183,7 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
         comp.emphasis = { nodeIds: ['a'] };
         comp.ngOnChanges({ emphasis: {} });
         expect(create).not.toHaveBeenCalled();
+        expect(graph.destroy).not.toHaveBeenCalled();
         expect(graph.render).not.toHaveBeenCalled();
         expect(graph.draw).toHaveBeenCalledTimes(1);
     });

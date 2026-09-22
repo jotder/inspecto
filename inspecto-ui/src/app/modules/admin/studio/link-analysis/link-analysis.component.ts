@@ -298,7 +298,15 @@ export class LinkAnalysisComponent implements OnInit {
         ];
 
     toggleViewFlag(
-        flag: 'minimap' | 'gridLine' | 'fisheye' | 'edgeFilterLens' | 'edgeBundling' | 'hulls',
+        flag:
+            | 'minimap'
+            | 'gridLine'
+            | 'fisheye'
+            | 'edgeFilterLens'
+            | 'edgeBundling'
+            | 'hulls'
+            | 'bubbleSets'
+            | 'snapline',
         on: boolean,
     ): void {
         this.viewOptions.update((o) => ({ ...o, [flag]: on }));

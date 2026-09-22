@@ -891,6 +891,14 @@
                                     <span class="text-secondary text-xs">(Louvain)</span>
                                 </mat-checkbox>
                                 <mat-checkbox
+                                    [checked]="!!viewOptions().bubbleSets"
+                                    [disabled]="!viewOptions().hulls"
+                                    (change)="toggleViewFlag('bubbleSets', $event.checked)"
+                                >
+                                    Bubble sets
+                                    <span class="text-secondary text-xs">(draw the communities as sets)</span>
+                                </mat-checkbox>
+                                <mat-checkbox
                                     [checked]="!!viewOptions().edgeBundling"
                                     (change)="toggleViewFlag('edgeBundling', $event.checked)"
                                 >
@@ -912,6 +920,12 @@
                                     (change)="toggleViewFlag('edgeFilterLens', $event.checked)"
                                 >
                                     Link filter lens <span class="text-secondary text-xs">(drag)</span>
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="!!viewOptions().snapline"
+                                    (change)="toggleViewFlag('snapline', $event.checked)"
+                                >
+                                    Snap lines <span class="text-secondary text-xs">(align while dragging)</span>
                                 </mat-checkbox>
                                 @for (b of viewBehaviors; track b.id) {
                                     <mat-checkbox

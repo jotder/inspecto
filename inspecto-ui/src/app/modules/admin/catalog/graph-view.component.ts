@@ -52,6 +52,15 @@ export interface GraphViewPlugins {
     edgeFilterLens?: boolean;
     edgeBundling?: boolean;
     hulls?: Map<string, string[]> | null;
+    /**
+     * Draw the SAME community membership as {@link hulls} with G6's bubble-sets renderer instead of its
+     * hull renderer — a softer, set-theoretic outline that reads better when communities interleave.
+     * Mutually exclusive with `hulls`: both draw one shape per community, so enabling both would paint
+     * every community twice. When this is on, bubble sets win and hulls are skipped.
+     */
+    bubbleSets?: boolean;
+    /** Alignment guides while dragging a node — a pure interaction aid, no data required. */
+    snapline?: boolean;
     behaviors?: ('brush-select' | 'lasso-select' | 'hover-activate')[];
 }
 
@@ -64,22 +73,36 @@ export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly s
     if (p.fisheye) out.push({ type: 'fisheye', key: 'fisheye', trigger: 'drag', r: 120, scaleRBy: 'wheel' });
     if (p.edgeFilterLens) out.push({ type: 'edge-filter-lens', key: 'edge-filter-lens', trigger: 'drag', r: 90 });
     if (p.edgeBundling) out.push({ type: 'edge-bundling', key: 'edge-bundling', bundleThreshold: 0.6 });
+    if (p.snapline) out.push({ type: 'snapline', key: 'snapline' });
     let i = 0;
     for (const [group, members] of p.hulls ?? []) {
         if (members.length < 2) continue;
         const color = swatches[i++ % swatches.length];
-        out.push({
-            type: 'hull',
-            key: `hull-${group}`,
-            members,
-            corner: 'smooth',
-            padding: 14,
-            labelText: `community ${group}`,
-            fill: color,
-            fillOpacity: 0.08,
-            stroke: color,
-            strokeOpacity: 0.5,
-        });
+        out.push(
+            p.bubbleSets
+                ? {
+                      type: 'bubble-sets',
+                      key: `bubble-sets-${group}`,
+                      members,
+                      labelText: `community ${group}`,
+                      fill: color,
+                      fillOpacity: 0.1,
+                      stroke: color,
+                      strokeOpacity: 0.5,
+                  }
+                : {
+                      type: 'hull',
+                      key: `hull-${group}`,
+                      members,
+                      corner: 'smooth',
+                      padding: 14,
+                      labelText: `community ${group}`,
+                      fill: color,
+                      fillOpacity: 0.08,
+                      stroke: color,
+                      strokeOpacity: 0.5,
+                  },
+        );
     }
     return out;
 }
@@ -146,9 +169,12 @@ export type GraphLayoutId =
     | 'concentric'
     | 'circular'
     | 'mds'
+    | 'fruchterman'
     | 'mindmap'
     | 'org'
-    | 'radial-tree';
+    | 'radial-tree'
+    | 'dendrogram'
+    | 'fishbone';
 
 /** The layouts the Link Analysis "Layout" toolbox offers; `tree` ones need a tree/forest graph. */
 export const GRAPH_LAYOUTS: readonly {
@@ -164,9 +190,14 @@ export const GRAPH_LAYOUTS: readonly {
     { id: 'concentric', label: 'Degree ordered', tree: false },
     { id: 'circular', label: 'Circular', tree: false },
     { id: 'mds', label: 'Information density', tree: false },
+    { id: 'fruchterman', label: 'Fruchterman', tree: false },
     { id: 'mindmap', label: 'Mind map', tree: true },
     { id: 'org', label: 'Organization chart', tree: true },
     { id: 'radial-tree', label: 'Radial tree', tree: true },
+    // Hierarchical like the three above, so they carry the same tree/forest gate: G6's tree layouts
+    // read a root and a child order, and handed a cyclic graph they lay out only what they can reach.
+    { id: 'dendrogram', label: 'Dendrogram', tree: true },
+    { id: 'fishbone', label: 'Fishbone', tree: true },
 ];
 
 /** The G6 layout options for an id; `null`/`dagre` = the default LR layered layout (unchanged). */
@@ -191,6 +222,8 @@ export function layoutConfig(id: GraphLayoutId | null): Record<string, unknown> 
             return { type: 'circular' };
         case 'mds':
             return { type: 'mds' };
+        case 'fruchterman':
+            return { type: 'fruchterman', gravity: 5, speed: 5 };
         case 'mindmap':
             return {
                 type: 'mindmap',
@@ -211,6 +244,11 @@ export function layoutConfig(id: GraphLayoutId | null): Record<string, unknown> 
             };
         case 'radial-tree':
             return { type: 'dendrogram', radial: true, nodeSep: 40, rankSep: 120 };
+        // The same G6 engine as `radial-tree`, laid out left-to-right instead of around a centre.
+        case 'dendrogram':
+            return { type: 'dendrogram', radial: false, nodeSep: 36, rankSep: 120 };
+        case 'fishbone':
+            return { type: 'fishbone', direction: 'LR', hGap: 60, vGap: 40 };
         case 'dagre':
         default:
             return { type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 };
