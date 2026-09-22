@@ -15,7 +15,7 @@ processing:
   schema_file: spaces/demo/config/orders/orders_schema.toon
   dedup:
     keys[1]: ORDER_ID
-    order_by: EVENT_TS DESC
+    order_by: ORDER_DATE DESC
   join:
     reference: spaces/demo/data/ref/region_dim.csv
     on[1]: REGION

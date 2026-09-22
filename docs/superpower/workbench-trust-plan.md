@@ -374,6 +374,46 @@ message that says nothing*:
 
 ---
 
+## 6b. The live verification (2026-09-23) — what a builder actually gets
+
+All 26 shipped Pipelines driven against a **running control plane** over their real inboxes, read-only
+except the test run (which jails itself to a scratch root). This is the objective's own check: *is the
+workbench trustworthy as a GENERIC ingest-authoring surface* — not for the format it was built around.
+
+| Property | Result |
+|---|---|
+| Lifts (`GET …/graph`, `…/graph/raw`) | **26/26** 200 |
+| Validates with no ERROR finding | **26/26** |
+| `csv_settings` warnings on a non-delimited Pipeline | **0** (was 6 of 26 born `clean:false`) |
+| Projection declares itself + links the round trip | **26/26** |
+| Test run reaches a node PAST the parser | **every Pipeline with an inbox**, including both segment-routed frontends |
+| Dataset-fed Pipeline refuses a file test run | **501**, by name |
+
+✅ **The two frontends the plan was written for now test end to end.** `asn1_example` (BER) returns
+`map_moCallRecord · data · 3 rows` carrying the decoded values, and writes 3 rows under the
+`moCallRecord` partition; `xml_example` (plugin) returns `map_order · data · 3 rows`. Both previously
+returned `relations: []`.
+
+🔴 **Two findings, and one of them is the shape worth remembering.**
+
+1. **`ROLLUP-ORDERS-BY-ABSENT-COLUMN-1` — a shipped example could never run** (fixed same day).
+   `orders_enriched_rollup`'s `dedup.order_by: EVENT_TS DESC` named a column its own schema does not
+   declare. ⚠ It was **hidden behind** `REFERENCE-EXAMPLES-NEED-UNRUN-SEED-1`: while the reference file
+   was missing the run never reached the dedup, so seeding the reference is what exposed it. **A fix
+   that removes one failure can reveal the next one behind it** — the corpus looked worse before it
+   looked better, and that is the honest direction of travel, not a regression.
+2. **`TESTRUN-BINDER-ERROR-LEAKS-PREAMBLE-1`** — the 422 above arrived as *“Invalid Input Error:
+   Attempting to execute an unsuccessful or closed pending query result”* before the useful part
+   (*“Binder Error: Referenced column ‘EVENT_TS’ not found … Candidate bindings”*). ✅ The actionable half
+   IS present, unlike the missing-reference case `WB-05` fixed — hence P3 — but an author reads past
+   DuckDB's bookkeeping to get to it.
+
+⚠ **What this check does NOT cover**, stated so nobody reads it as more than it is: it drives the HTTP
+surface, not the Angular canvas; it asserts refusals and row counts, not rendering; and a test run
+consumes its inbox, so a second identical sweep sees fewer rows unless re-seeded.
+
+---
+
 ## 7. Corrections and lessons carried forward
 
 1. **"You cannot test the parse stage in the builder" — false.** *Run to here* is that test and has been
