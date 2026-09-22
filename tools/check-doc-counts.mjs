@@ -28,6 +28,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { bundleModules, editionOnlyModules } from './bundle-modules.mjs';
 import { join, relative, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { trackedPaths } from './tracked-paths.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACTS = 'inspecto-ui/src/app/inspecto/contracts';
@@ -341,6 +342,18 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target'
 // be a standing failure by policy rather than a drift anyone is expected to fix.
 const EXEMPT = ['docs/archived-documents'];
 
+
+/*
+ * ⛔ TRACKED markdown only. A document this checkout does not track is not a current doc, and it must
+ * not be able to refuse an unrelated lane's push in a shared sandbox.
+ * `DOC-GUARDS-SCAN-IGNORED-SOURCES-1`: three guards collected their SUBJECTS with a filesystem walk,
+ * so another session's gitignored `*.local.md` — rewritten by a stop hook, and unfixable by its own
+ * rules because the correction does not survive the hook — made the gate red for one shift and green
+ * for another on the same commit, which is the property a gate exists to deny.
+ * The target side already moved to `git ls-files` (`tracked-paths.mjs`, LINKGUARD-CASE-1); this is the
+ * same rule applied to the subject side, as guard-coverage.md §"A fourth shape" already prescribes.
+ * ⚠ What this gives up, stated plainly: a NEW doc goes unchecked until it is `git add`ed.
+ */
 function walk(dir, out = []) {
     let entries;
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return out; }
@@ -358,7 +371,10 @@ const rel = f => relative(ROOT, f).split(sep).join('/');
 // The `.` walk subsumes what used to be a separate root-level `*.md` pass.
 const all = [];
 for (const t of ROOTS) all.push(...walk(join(ROOT, t)));
-const files = all.filter(f => !EXEMPT.some(x => rel(f).startsWith(x + '/')));
+const trackedMd = new Set(trackedPaths());
+const untrackedSkipped = all.map(rel).filter(r => !trackedMd.has(r));
+const tracked = all.filter(f => trackedMd.has(rel(f)));
+const files = tracked.filter(f => !EXEMPT.some(x => rel(f).startsWith(x + '/')));
 
 // ── derive first, so a broken parse fails loudly rather than comparing against NaN ──────────────
 const derived = {};
@@ -460,7 +476,8 @@ if (failures.length) {
 }
 
 console.log(`✓ Doc-count guard: ${markers} marked count statement(s) all match what their owning `
-    + `contract derives — ${tally}; scope: ${files.length} current-tier markdown file(s) `
+    + `contract derives — ${tally}; scope: ${files.length} current-tier TRACKED markdown file(s)`
+    + (untrackedSkipped.length ? ` (+${untrackedSkipped.length} untracked/ignored NOT read)` : '') + ` `
     + `(${all.length} total — the WHOLE repo minus ${[...SKIP_DIRS].join('/')}; `
     + `${EXEMPT.join(', ')} exempt as never-maintained); ${quoted} further marker(s) quoted inside a `
     + `fenced block and NOT asserted; inline \`code\` IS still scanned.`);

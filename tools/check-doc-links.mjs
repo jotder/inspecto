@@ -55,7 +55,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
-import { checkoutIndex } from './tracked-paths.mjs';
+import { checkoutIndex, trackedPaths } from './tracked-paths.mjs';
 
 /**
  * Scope: the WHOLE repository, as a DENY-list (`SKIP_DIRS`), not an allow-list of trees.
@@ -156,6 +156,24 @@ function collect(dir, out) {
 const files = [];
 // The `.` walk subsumes what used to be a separate root-level `*.md` pass.
 for (const root of ROOTS) if (existsSync(root)) collect(root, files);
+/*
+ * ⛔ TRACKED markdown only. A document this checkout does not track is not a current doc, and it must
+ * not be able to refuse an unrelated lane's push in a shared sandbox.
+ * `DOC-GUARDS-SCAN-IGNORED-SOURCES-1`: three guards collected their SUBJECTS with a filesystem walk,
+ * so another session's gitignored `*.local.md` — rewritten by a stop hook, and unfixable by its own
+ * rules because the correction does not survive the hook — made the gate red for one shift and green
+ * for another on the same commit, which is the property a gate exists to deny.
+ * The target side already moved to `git ls-files` (`tracked-paths.mjs`, LINKGUARD-CASE-1); this is the
+ * same rule applied to the subject side, as guard-coverage.md §"A fourth shape" already prescribes.
+ * ⚠ What this gives up, stated plainly: a NEW doc goes unchecked until it is `git add`ed.
+ */
+const trackedMd = new Set(trackedPaths().map(slash));
+const skippedUntracked = files.map(slash).filter((r) => !trackedMd.has(r));
+{
+    const kept = files.filter((f) => trackedMd.has(slash(f)));
+    files.length = 0;
+    files.push(...kept);
+}
 
 if (files.length < MIN_FILES) {
     fail(
