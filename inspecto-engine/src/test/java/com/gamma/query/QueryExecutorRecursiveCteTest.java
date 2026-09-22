@@ -28,6 +28,41 @@ class QueryExecutorRecursiveCteTest {
         return QueryExecutor.run(new QueryExecutor.Request(null, null, sql, 100, 0, List.of(), List.of(), List.of()));
     }
 
+    private static QueryExecutor.Result run(String sql, List<String> binds) throws Exception {
+        return QueryExecutor.run(new QueryExecutor.Request(null, null, sql, 100, 0, List.of(), List.of(), binds));
+    }
+
+    /**
+     * 🔴 The question D-S2's original probe did NOT ask, and the one that decides how LA-11's depth fence is
+     * written: does a bound {@code ?} survive INSIDE a recursive member, through this wrap-and-prepare path?
+     *
+     * <p>It matters because the fence must live inside the recursion (the outer {@code LIMIT} bounds the
+     * result, never the work). If a bind works, the caller's depth is a parameter and never becomes statement
+     * text. If it does not, the depth must be validated as an int and clamped before being inlined — the
+     * pattern {@code limit} already uses — and that difference is a security property, not a style choice.
+     */
+    @Test
+    void aBoundParameterSurvivesInsideTheRecursiveMember() throws Exception {
+        QueryExecutor.Result r = run(
+                "WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < CAST(? AS INTEGER))"
+                        + " SELECT n FROM t",
+                List.of("4"));
+
+        assertEquals(4, r.rowCount(), "the bound depth should fence the recursion at 4 rows");
+        assertEquals(4, ((Number) r.rows().get(3).get("n")).intValue());
+    }
+
+    /** And the bind is DATA, never statement text — the property the whole bind path exists to guarantee. */
+    @Test
+    void aBoundDepthCannotCarrySql() throws Exception {
+        QueryExecutor.Result r = run(
+                "WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < CAST(? AS INTEGER))"
+                        + " SELECT count(*) AS c FROM t",
+                List.of("2"));
+
+        assertEquals(2, ((Number) r.rows().get(0).get("c")).intValue());
+    }
+
     /** The bare shape: does a recursive CTE survive being wrapped into {@code FROM (…) AS "__q"} at all? */
     @Test
     void recursiveCteSurvivesTheDerivedTableWrap() throws Exception {
