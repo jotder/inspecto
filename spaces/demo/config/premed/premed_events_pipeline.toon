@@ -1,0 +1,48 @@
+name: premed_events
+active: false
+description: "Pre-mediation event feed: one mixed stream of switch events routed by record type into a store per type. The domain-shaped counterpart to the synthetic route_step example, and the shape a multi-record-type feed actually has."
+
+dirs:
+  poll:       spaces/demo/data/inbox/premed_events
+  database:   spaces/demo/data/premed_events/voice
+  backup:     spaces/demo/data/premed_events/backup
+  temp:       spaces/demo/data/premed_events/temp
+  errors:     spaces/demo/data/premed_events/errors
+  quarantine: spaces/demo/data/premed_events/quarantine
+  markers:    spaces/demo/data/premed_events/markers
+  status_dir: spaces/demo/data/premed_events/status
+  log_dir:    spaces/demo/data/premed_events/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+sinks[3]{database,format}:
+  spaces/demo/data/premed_events/voice,PARQUET
+  spaces/demo/data/premed_events/sms,PARQUET
+  spaces/demo/data/premed_events/other,PARQUET
+
+route:
+  mode: case
+  default: other
+  branches[3]{key,where,database}:
+    voice,"EVENT_TYPE = 'VOICE'",spaces/demo/data/premed_events/voice
+    sms,"EVENT_TYPE = 'SMS'",spaces/demo/data/premed_events/sms
+    other,"EVENT_TYPE NOT IN ('VOICE', 'SMS')",spaces/demo/data/premed_events/other
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/demo/config/premed/premed_events_schema.toon
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
