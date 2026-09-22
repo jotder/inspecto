@@ -115,20 +115,25 @@ with an `unmatched → quarantine` edge. *Run to here* parses them (3 records ea
 *"the sample reached no node past the seed 'parse' — nothing downstream consumed it"*. The walk does not
 follow a `route:` edge out of a parser. This is the pre-mediation telecom shape, the XML shape, and the
 shape of every multi-record-type feed; for those the builder's only test instrument tests the decoder
-and nothing after it. (`TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`)
+and nothing after it. ✅ **`D5` signed 2026-09-22: walk the edge** — seed one relation per segment, as
+production's multi-seed `execute` does; refusing segment-routed frontends by name was declined.
+(`TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`)
 
 **M2 · The save gate and the validator must agree — GAP (measured).** For `asn1_example`,
 `POST /validate` returns **no ERROR** while `PUT /graph` with the editor's own lossless payload refuses
 **422 `ERR_ARMED_WITHOUT_SCHEMA`** — *"active: true but no schema is configured (processing.schema_file,
 processing.schemas[], or a plugin ingester)"*. The gate does not count `parsing.asn1.segments{}` as a
 schema. Net effect: a shipped, active, working ASN.1 Pipeline can be **opened but never saved** from the
-workbench. Two gates, two answers, on the same config. (`SAVE-GATE-VS-VALIDATE-DISAGREE-1`)
+workbench. Two gates, two answers, on the same config. ✅ **`D7` signed 2026-09-22: `segments{}` IS a
+schema source** — one predicate, called by the gate and the validator alike.
+(`SAVE-GATE-VS-VALIDATE-DISAGREE-1`)
 
 **M3 · Reject accounting must honour the documented contract — GAP (E4, contract in E3).** A 20-row file
 that lost one truncated record reported `rejected_count = 0` and `total_input_rows = 19`, against the
 durable promise *"never silently dropped … a counted reject relation, so nothing disappears
-unaccounted"*. The filter Step keeps that promise (§3.2); ingest does not. `D2` decides what
-`rejected_count` means first. (`INGEST-REJECT-ACCOUNTING-1`)
+unaccounted"*. The filter Step keeps that promise (§3.2); ingest does not. ✅ **`D2` signed 2026-09-22:
+split it** — `rejected_files` **and** `rejected_rows`, with `total_input_rows` = parsed + rejected rows.
+(`INGEST-REJECT-ACCOUNTING-1`)
 
 **M4 · Reference-dependent examples must run on a fresh checkout — GAP (measured, 2 Pipelines).**
 `join_step` and `orders_enriched_rollup` point at `spaces/<space>/data/ref/region_dim.csv`; the file
@@ -150,12 +155,12 @@ a jailed scratch root. Listed so the tier is honest about what it already gets.
 
 | # | Item | Measured / doc | Workaround |
 |---|---|---|---|
-| S1 | **Canvas parity for insert-between.** Palette-add lands disconnected *by decision*; the Recipe view already has insert-between. Give the canvas the same gesture or a drop-on-edge. | E3 `:336,:550` · E4 | use the Recipe view |
-| S2 | **Format-preserving writer, or an accepted decision that churn is the cost.** 24/25 saves rewrite the file. Hand-editability is an asserted value (`pipeline-editor.md:255`). `D4`. | E1 | hand-restore |
-| S3 | **Created Pipelines in `config/<name>/`.** Scaffold lands at the space config root; all shipped Pipelines use a per-Pipeline directory; *"one identity for id, file and directories"* (`pipeline-authoring.md:405`) points the same way, and `pipelineScaffold()` is the single choke point to guard. `D3`. | E4 · E3 | move by hand |
-| S4 | **Name the projection.** `/graph` is the read-only view and `/graph/raw` the round-trip pair — deliberate, documented, and still the natural wrong guess for a client. Rename or document at the route. | E1 26/26 · E3 | use `/graph/raw` |
+| S1 | **One-gesture insert, anywhere.** 🔴 **Corrected 2026-09-22 — this row twice said "the Recipe view already has insert-between, give the canvas parity". It does not: `<app-pipeline-step-cards>` was deleted in `6d3c68fa` (2026-09-18) and `inspecto-ui/src` has no Recipe view.** There is no one-gesture insert on any surface, and `insertNode` (`:2511-2517`) is a bare `addNodeToModel` that ignores selection. ✅ `D8` (signed 2026-09-22) reopens the decline narrowly: wire an added Step after the **selected** node, bare add otherwise. | E3 `:336` · E4 · E5 `:2511-2517` | ⛔ none — the named workaround does not exist; insert mid-chain by hand is three graph operations |
+| S2 | **Format-preserving writer, or an accepted decision that churn is the cost.** 24/25 saves rewrite the file. Hand-editability is an asserted value (`pipeline-editor.md:255`). ✅ `D4` **signed 2026-09-22: the churn is ACCEPTED** — no writer is funded; `WB-01`'s guard is what protects the semantic round trip instead. The row survives as the guard, not the writer. | E1 | hand-restore |
+| S3 | **Created Pipelines in `config/<name>/`.** Scaffold lands at the space config root; all shipped Pipelines use a per-Pipeline directory; *"one identity for id, file and directories"* (`pipeline-authoring.md:405`) points the same way, and `pipelineScaffold()` is the single choke point to guard. ✅ `D3` **signed 2026-09-22: `config/<id>/`, chosen server-side** (the client sends no path). | E4 · E3 | move by hand |
+| S4 | **Name the projection.** `/graph` is the read-only view and `/graph/raw` the round-trip pair — deliberate, documented, and still the natural wrong guess for a client. ✅ `D9` **signed 2026-09-22: no rename** — the response carries `links.roundTrip` and a `readOnlyProjection` flag instead, so no client breaks. | E1 26/26 · E3 | use `/graph/raw` |
 | S5 | **Disable the palette in the read-only lens.** 36 `Add …` controls render enabled where the docs say affordances are *"disabled and hidden"*; the handler guard holds. Extend the existing spec to the palette. | E4 · E3 `:313,:591` | none needed |
-| S6 | **Node test state — decide, then either surface operate-lane provenance or say why not.** v1's `M3`; now `D6`, because it overturns `:693`/`:701`. | E3 | `/runs` |
+| S6 | **Node test state — a *ran* badge beside `tested`, not inside it.** v1's `M3`. ✅ `D6` **signed 2026-09-22: provenance may NOT feed `tested`** — `:693`/`:701` stand; the remedy is a third source (`lastRunCounts`) plus rewording the finding to *“not yet tested in this session”*. | E3 | `/runs` |
 | S7 | **Dry-run panel seeds from the test run, not a textarea.** The parse-stage test exists (`M1` corrected); the panel that shows per-node samples still starts from hand-typed JSON, and the two instruments do not hand off. E3 says *"Use the captured sample"* appears once a Parse-drawer thread exists — two hops away and invisible from the panel. | E4 · E3 `:593` | run the Parse drawer first |
 | S8 | **Run history, not just the last run.** Last-batch overlay only. | inventory | `/runs` |
 | S9 | **A responsive floor for the 3-pane shell.** At ~660px the canvas is a sliver. | E4 | widen |
@@ -221,15 +226,20 @@ delimited/JSON/Excel/fixed-width over files**, and the gaps cluster on **routed-
 
 ## 7. Decisions owed
 
+✅ **ALL EIGHT OWED CALLS WERE SIGNED 2026-09-22, each as recommended**, and each was written into its
+durable home the same day — the map is `workbench-trust-plan.md` §8.2. Nothing in the tiers above is
+decision-blocked any more; what is left is build order. The table is kept as the record of what was
+asked and what was answered.
+
 | # | Decision | Status | Why it blocks |
 |---|---|---|---|
 | D1 | Real frontend server-side vs client approximation for the parse test | **✅ answered** — real, server-side, jailed (`pipeline-test-run.md:12,70`) | — |
-| D2 | Is `rejected_count` *records the parser refused* or *records not persisted*? | owed | `M3`'s fix differs; the errors CSV and the batch row currently answer differently |
-| D3 | UI-created Pipelines move to `config/<name>/`, or the shipped ones flatten? | owed — the docs lean to the directory | `S3` guard needs a target |
-| D4 | Formatting churn accepted, or a format-preserving writer funded? | owed | `S2` |
-| D5 | Should a `route:<segment>` edge out of a parser be walked by the test run, or does the test run declare segment-routed frontends out of scope with a named 422? | owed | `M1` — either is defensible; silence is not |
-| D6 | Does node test state ever read operate-lane provenance? Overturns `pipeline-editor.md:693/701`. | owed | `S6` |
-| D7 | Is a `parsing.<frontend>.segments{}` block *a schema* for the arming gate? | owed | `M2` — the validator thinks so, the gate does not |
+| D2 | Is `rejected_count` *records the parser refused* or *records not persisted*? | ✅ **signed 2026-09-22 — NEITHER: split it** into `rejected_files` + `rejected_rows` | unblocks `M3` / `WB-09`; `total_input_rows` = parsed + rejected rows |
+| D3 | UI-created Pipelines move to `config/<name>/`, or the shipped ones flatten? | ✅ **signed 2026-09-22 — `config/<id>/`, chosen server-side** | unblocks `S3` / `WB-15`; satellites take the same subdir |
+| D4 | Formatting churn accepted, or a format-preserving writer funded? | ✅ **signed 2026-09-22 — churn ACCEPTED, no writer funded** | `S2` becomes the guard (`WB-01`), not a writer |
+| D5 | Should a `route:<segment>` edge out of a parser be walked by the test run, or does the test run declare segment-routed frontends out of scope with a named 422? | ✅ **signed 2026-09-22 — WALK it** (one seed relation per segment) | unblocks `M1` / `WB-08`; the refusal was declined |
+| D6 | Does node test state ever read operate-lane provenance? Overturns `pipeline-editor.md:693/701`. | ✅ **signed 2026-09-22 — NOT into `tested`; a separate *ran* badge** | `:693`/`:701` stand; unblocks `S6` / `WB-11` |
+| D7 | Is a `parsing.<frontend>.segments{}` block *a schema* for the arming gate? | ✅ **signed 2026-09-22 — YES**, one predicate for gate and validator alike | unblocks `M2` / `WB-03`; the disagreement ends |
 
 ## References
 
