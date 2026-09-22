@@ -75,7 +75,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
         <mat-menu #notificationsMenu="matMenu" xPosition="before" class="!max-h-none !p-0">
             <div
                 (click)="$event.stopPropagation()"
-                (keydown)="$event.stopPropagation()"
+                (keydown)="keepPanelKeys($event)"
                 role="dialog"
                 aria-label="Notifications"
                 class="bg-card flex max-h-[28rem] w-[22rem] flex-col overflow-hidden rounded-lg border shadow-lg"
@@ -238,5 +238,17 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
         this.polling = visibleInterval(DEFAULT_REFRESH_MS)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe(() => this.svc.refresh());
+    }
+
+    /**
+     * The panel swallows its own keystrokes so MatMenu's type-ahead and arrow handling do not hijack the
+     * buttons and the list inside it — but 🔴 swallowing EVERYTHING also ate Escape, so the panel could
+     * not be closed from the keyboard (UIB-24, found 2026-09-22: Esc left it open). Escape must reach
+     * the menu, which is what closes it.
+     */
+    keepPanelKeys(event: KeyboardEvent): void {
+        if (event.key !== 'Escape') {
+            event.stopPropagation();
+        }
     }
 }

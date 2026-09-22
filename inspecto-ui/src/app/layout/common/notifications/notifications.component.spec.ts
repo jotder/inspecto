@@ -30,6 +30,33 @@ describe('NotificationBellComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('lets Escape reach the menu but keeps every other key inside the panel', () => {
+        // UIB-24 (2026-09-22): the panel stopped propagation of EVERY keydown so MatMenu's type-ahead would
+        // not hijack its buttons — which also swallowed Escape, the key that closes the menu. Asserted at
+        // the handler boundary rather than by driving Material's overlay in jsdom.
+        const fixture = TestBed.createComponent(NotificationBellComponent);
+        const cmp = fixture.componentInstance;
+
+        const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        const arrow = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+        let escapeReachedParent = false;
+        let arrowReachedParent = false;
+        const parent = document.createElement('div');
+        const panel = document.createElement('div');
+        parent.appendChild(panel);
+        parent.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') escapeReachedParent = true;
+            if (e.key === 'ArrowDown') arrowReachedParent = true;
+        });
+        panel.addEventListener('keydown', (e) => cmp.keepPanelKeys(e));
+
+        panel.dispatchEvent(escape);
+        panel.dispatchEvent(arrow);
+
+        expect(escapeReachedParent).toBe(true);
+        expect(arrowReachedParent).toBe(false);
+    });
+
     it('shows the unread count in the bell aria-label', () => {
         const fixture = TestBed.createComponent(NotificationBellComponent);
         const cmp = fixture.componentInstance;

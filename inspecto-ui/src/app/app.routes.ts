@@ -121,6 +121,12 @@ export const appRoutes: Route[] = [
                 path: 'reconciliation',
                 loadChildren: () => import('app/modules/admin/reconciliation/reconciliation.routes'),
             },
+            // D2 (UI consolidation plan, 2026-09-22): Connections, Config, Spaces, Design and the Notification
+            // center are Settings SECTIONS. Their standalone routes were reachable from nothing but an unmounted
+            // header flyout and one dialog link, so they now redirect into the Settings pane — kept as routes,
+            // not deleted, so an old bookmark still lands somewhere. ⚠ `/connections/:id` is the Connection
+            // workbench and stays: only the exact list path redirects.
+            { path: 'connections', pathMatch: 'full', redirectTo: 'settings/connections' },
             { path: 'connections', loadChildren: () => import('app/modules/admin/connections/connections.routes') },
             { path: 'expectations', loadChildren: () => import('app/modules/admin/expectations/expectations.routes') },
             {
@@ -139,18 +145,15 @@ export const appRoutes: Route[] = [
             { path: 'studio', loadChildren: () => import('app/modules/admin/studio/studio.routes') },
             // Registry folded into Catalog's Usage tab (IA reorg phase B.4).
             { path: 'registry', redirectTo: 'catalog' },
-            { path: 'config', loadChildren: () => import('app/modules/admin/config/config.routes') },
-            { path: 'spaces', loadChildren: () => import('app/modules/admin/spaces/spaces.routes') },
-            { path: 'design', loadChildren: () => import('app/modules/admin/design-system/design-system.routes') },
+            { path: 'config', redirectTo: 'settings/config' },
+            { path: 'spaces', redirectTo: 'settings/spaces' },
+            { path: 'design', redirectTo: 'settings/design' },
             { path: 'assist', loadChildren: () => import('app/modules/admin/assist/assist.routes') },
             { path: 'agent-chat', loadChildren: () => import('app/modules/admin/agent-chat/agent-chat.routes') },
             { path: 'approvals', loadChildren: () => import('app/modules/admin/approvals/approvals.routes') }, // AGT-5 P3 approvals inbox
             { path: 'autonomy', loadChildren: () => import('app/modules/admin/autonomy/autonomy.routes') }, // AGT-5 P4 autonomy dashboard
             { path: 'learning', loadChildren: () => import('app/modules/admin/learning/learning.routes') }, // AGT-5 P5 learning dashboard
-            {
-                path: 'notification-center',
-                loadChildren: () => import('app/modules/admin/notification-center/notification-center.routes'),
-            },
+            { path: 'notification-center', redirectTo: 'settings/notifications' },
             // Menu Builder: the authoring pane + the dynamic host every custom menu leaf links to (`/w/<nodeId>`).
             // Registered BEFORE the settings matcher so /settings/menus stays a standalone page.
             {

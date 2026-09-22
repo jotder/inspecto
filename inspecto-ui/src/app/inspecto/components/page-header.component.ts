@@ -56,12 +56,21 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
                         <div class="text-secondary text-xs font-semibold uppercase tracking-wider">{{ eyebrow }}</div>
                     }
                     <div class="flex min-w-0 items-center gap-2">
-                        <h1
-                            class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
-                            [class.font-mono]="mono"
-                        >
-                            {{ title }}
-                        </h1>
+                        @if (headingLevel === 1) {
+                            <h1
+                                class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
+                                [class.font-mono]="mono"
+                            >
+                                {{ title }}
+                            </h1>
+                        } @else {
+                            <h2
+                                class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
+                                [class.font-mono]="mono"
+                            >
+                                {{ title }}
+                            </h2>
+                        }
                         @if (terms?.length) {
                             <inspecto-ai-explain [screen]="title" [terms]="terms!" />
                         }
@@ -113,6 +122,13 @@ export class InspectoPageHeaderComponent {
      * end up double-indented.
      */
     @Input({ transform: booleanAttribute }) inset = true;
+
+    /**
+     * `1` (the default) renders the page's `<h1>`. Pass `2` when the header is NOT the page — the
+     * `/design` gallery's live example, or a section mounted inside another pane that already owns the
+     * heading — so the document keeps exactly one `<h1>` (WCAG; the sweep's own rule).
+     */
+    @Input() headingLevel: 1 | 2 = 1;
 
     readonly expanded = signal(false);
 }
