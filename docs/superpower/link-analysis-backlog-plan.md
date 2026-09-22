@@ -423,12 +423,30 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
 | **LA-10** | Enquiry object + ordered op log + incremental evaluator | ⬜ | L | D-E1, D-E2, D-E3 | `POST /inv/enquiries`, `/ops`, `/replay`, `GET /log` (§5.5). Ops `seed`, `expand` (one hop over `neighbors`), `exclude`, `hide`, `keep`; real undo; replaces the mock snapshot store. *Delivers prune-then-expand — the scenario's blocking step.* |
-| **LA-11** | Server-side multi-hop traversal `POST /inv/traversal/recursive-paths` | ⬜ **UNBLOCKED 2026-09-22** | L | — (D-S2 answered: server-side recursive CTE) | DuckDB recursive CTE; fences — max depth (default 6), timeout (5 000 ms), max edge yield; the primitive `expand` compiles to. Contract §5.3. Working Set materialised so pruning does not re-query; pre-aggregated contact-pair Dataset (A, B, window, count, duration, value) as substrate, raw records on drill-down. |
+| **LA-11** | Server-side multi-hop traversal `POST /inv/traversal/recursive-paths` | ⬜ **UNBLOCKED 2026-09-22 · fences GROUNDED 2026-09-23** | L | — (D-S2 answered: server-side recursive CTE) | DuckDB recursive CTE; fences — max depth (default 6), timeout (5 000 ms), max edge yield; the primitive `expand` compiles to. Contract §5.3. Working Set materialised so pruning does not re-query; pre-aggregated contact-pair Dataset (A, B, window, count, duration, value) as substrate, raw records on drill-down. |
 | **LA-13** | Hop ladder + time model | ⬜ | L | LA-10, LA-11 | Per-rung fields §2.4; absolute range + midnight-crossing intraday window + **timezone contract**; in-window thresholds; `truncated` per rung. *Delivers the motivating scenario end to end.* |
 | **LA-14a** | Temporal ordering on the linear matcher | ✅ **SHIPPED 2026-09-22** | S | — |
 | **LA-14b** | Branching pattern runtime (`BranchingPatternEngine.ts` + `PatternQueryCompiler.java`) + the structuring pack | ⬜ | L | LA-16 in practice | `BranchingPatternEngine.ts` + `PatternQueryCompiler.java`; JSON motif schema (multi-branch, attribute constraints, `t₂ > t₁`, `DELTA ≤ 48h`); fix `layering-chain` / `pass-through` to require temporal order; ship structuring / layering / circular-financing packs. |
 | **LA-15** | `POST /inv/schema/overlap-profile` | ✅ **SHIPPED 2026-09-22** | M | — | Cardinality and Jaccard across candidate key columns via `APPROX_COUNT_DISTINCT`; surfaces implicit foreign keys. |
 | **LA-16** | Synthetic call-records Dataset | ✅ **SHIPPED 2026-09-23** — `postmed_xdr` extended, not a fourth feed | S | — (D-U2 answered) | ⚠ No call-records Dataset exists — `roaming_tap` is operator↔operator, `mule_transfers` account↔account; neither carries A/B-party, duration, device or cell. Prerequisite for every §6.3 gate. |
+
+✅ **LA-11's three fences, grounded 2026-09-23 — and the plan had their costs the wrong way round.**
+Insertion point is a new route in `InvRoutes` beside `project`/`neighbors`, reusing that file's
+validated-identifier → server-built-SQL → `QueryExecutor.Request` pipeline unchanged.
+
+| Fence | Verdict |
+|---|---|
+| **timeout** | 🔴 **CHEAPEST, not the expensive one.** The mechanism already ships: `SqlSandbox.statement()`/`preparedStatement()` call `setQueryTimeout`, defaulting to **30 s** via `-Dassist.sql.timeout_seconds`. ⚠ It is JVM-wide, because `QueryExecutor.run` hardcodes `SqlSandboxPolicy.defaultPolicy()` — so the contract's 5 000 ms needs a policy-carrying `Request` field or a `run(Request, policy)` overload. **Plumbing, not invention.** ⇒ the plan's "fences have no equivalent today" is wrong for this one. |
+| **max depth** | ✅ **SETTLED 2026-09-23 — write it as a BOUND PARAMETER.** A JDBC `?` survives inside a recursive member through the wrap-and-prepare path, and a bound value cannot smuggle SQL; both pinned by `QueryExecutorRecursiveCteTest` (5/5). ⇒ the caller's depth never becomes statement text, so the validate-and-clamp-then-inline fallback (the `limit` pattern) is **not needed**. D-S2's original probe had only ever used a literal, which left a security property unproven rather than proven. |
+| **max edge yield** | ⛔ **The genuinely new one.** Nothing in `QueryExecutor`/`SqlSandbox`/`SqlGuard` bounds rows INSIDE a recursion; the outer `LIMIT n+1` is a paging device, proven not to bound the walk. Hand-written SQL shape. |
+
+⚠ **`SqlGuard` is MOOT on this path** — nothing in `InvRoutes` calls it. Identifiers are validated by
+`SAFE_IDENT` and the SQL is server-built, exactly as `project` does, so the guard's admission of `with`
+(recorded under D-S2) is true of `QueryExecutor` generally and irrelevant here.
+⚠ **`QueryExecutor.run` never calls `sandbox.seal()`**, so file access stays enabled for every dataset
+query. A route that stays purely server-built inherits `project`'s posture; one that accepted
+caller-shaped SQL would not.
+⚠ **No existing route anywhere is recursive or long-running**, so there is no fence pattern to copy.
 
 ### 3.4 Phase 3 — identity, value, evidence, detection (Sprint 11+)
 
