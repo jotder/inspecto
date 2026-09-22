@@ -1085,6 +1085,12 @@ export class LinkAnalysisComponent implements OnInit {
         try {
             const extra = await source.expand(id, nodeLabel, run.query);
             this.graph.update((g) => (g ? mergeGraphs([g, extra]) : extra));
+            // LA-02: an expand that hit the server's row limit, or the browser's node cap, leaves the
+            // working set INCOMPLETE. `mergeGraphs` returns a bare `G6GraphData` and structurally drops
+            // `truncated`, so the flag has to be carried onto the signal here or the overlay keeps
+            // saying "complete" over a partial neighbourhood - a false negative presented as a finding.
+            // Monotonic on purpose: only a fresh `run()` replaces the graph and so resets it.
+            if ((extra as ProjectedGraph).truncated) this.truncated.set(true);
         } catch (err) {
             this.toastr.error(apiErrorMessage(err, 'Could not fetch neighbors for this node.'));
         }

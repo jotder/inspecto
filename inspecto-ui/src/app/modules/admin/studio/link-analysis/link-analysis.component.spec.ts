@@ -249,6 +249,40 @@ describe('LinkAnalysisComponent', () => {
         expect(c.emphasis()?.nodeIds).toEqual(['a']); // untouched by the merge
     });
 
+    // LA-02: an unsurfaced truncation is a false negative presented as a finding. `mergeGraphs` returns
+    // a bare `G6GraphData` and structurally drops `truncated`, so the flag has to be carried onto the
+    // signal by `expandNode` itself.
+    it('expandNode surfaces a TRUNCATED neighborhood instead of leaving the working set reading complete', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [{ id: 'f', data: { label: 'F', kind: 'entity' } }],
+            edges: [{ id: 'c->f', source: 'c', target: 'f', data: { kind: 'link' } }],
+            truncated: true,
+        }));
+        const { fixture } = create({ expand: expand as unknown as GraphSource['expand'] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.truncated()).toBe(false); // the initial projection was complete
+
+        await c.expandNode('c', 'C');
+        expect(c.truncated()).toBe(true);
+    });
+
+    it('expandNode leaves the flag alone when the neighborhood came back complete', async () => {
+        const expand = vi.fn(async () => ({
+            nodes: [{ id: 'f', data: { label: 'F', kind: 'entity' } }],
+            edges: [{ id: 'c->f', source: 'c', target: 'f', data: { kind: 'link' } }],
+            truncated: false,
+        }));
+        const { fixture } = create({ expand: expand as unknown as GraphSource['expand'] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+
+        await c.expandNode('c', 'C');
+        expect(c.truncated()).toBe(false);
+    });
+
     it('expandNode is a no-op when the source has no expand()', async () => {
         const { fixture } = create();
         fixture.detectChanges();
