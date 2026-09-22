@@ -1,14 +1,12 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
-    <nav class="text-secondary mb-1 text-sm" aria-label="Breadcrumb">
-        <a routerLink="/studio/widgets" class="hover:underline">Viz Library</a>
-        <span class="px-1">/</span>
-        <span>{{ editing() ? id : 'New widget' }}</span>
-    </nav>
-    <div class="flex items-center justify-between">
-        <h1 class="text-3xl font-extrabold leading-tight tracking-tight">
-            {{ editing() ? 'Edit widget' : 'Widget Builder' }}
-        </h1>
-        <div class="flex items-center gap-2">
+    <inspecto-page-header
+        [title]="editing() ? 'Edit widget' : 'Widget Builder'"
+        [eyebrow]="editing() ? id : ''"
+        backLink="/studio/widgets"
+        backLabel="Viz Library"
+        [inset]="false"
+    >
+        <ng-container actions>
             <inspecto-transfer-menu
                 [items]="transferItems"
                 [allowedKinds]="['widget']"
@@ -39,8 +37,8 @@
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
                 <span class="ml-2">Save widget</span>
             </button>
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     @if (writesDisabled()) {
         <inspecto-alert class="mt-4 block" variant="warning" icon="heroicons_outline:lock-closed">

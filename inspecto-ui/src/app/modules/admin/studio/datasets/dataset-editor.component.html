@@ -1,15 +1,13 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
     <!-- Breadcrumb + header -->
-    <nav class="text-secondary mb-1 text-sm" aria-label="Breadcrumb">
-        <a routerLink="/catalog/datasets" class="hover:underline">Datasets</a>
-        <span class="px-1">/</span>
-        <span>{{ editing() ? id : 'New dataset' }}</span>
-    </nav>
-    <div class="flex items-center justify-between">
-        <h1 class="text-3xl font-extrabold leading-tight tracking-tight">
-            {{ editing() ? 'Edit dataset' : 'New dataset' }}
-        </h1>
-        <div class="flex items-center gap-2">
+    <inspecto-page-header
+        [title]="editing() ? 'Edit dataset' : 'New dataset'"
+        [eyebrow]="editing() ? id : ''"
+        backLink="/catalog/datasets"
+        backLabel="Datasets"
+        [inset]="false"
+    >
+        <ng-container actions>
             <inspecto-transfer-menu
                 [items]="transferItems"
                 [allowedKinds]="['dataset']"
@@ -38,8 +36,8 @@
                 }
                 <span>Save dataset</span>
             </button>
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     @if (writesDisabled()) {
         <inspecto-alert class="mt-4 block" variant="warning" icon="heroicons_outline:lock-closed">

@@ -52,6 +52,7 @@ import { DashboardTileComponent } from './dashboard-tile.component';
 import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import '../widgets/widget.kind'; // register widget kind + viz plugins (tiles call getViz)
 import './dashboard.kind'; // register the dashboard kind
 
@@ -80,6 +81,7 @@ function splitStores(v: string | undefined): string[] | undefined {
     selector: 'app-dashboard-editor',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         DragDropModule,
         ReactiveFormsModule,
         FormsModule,

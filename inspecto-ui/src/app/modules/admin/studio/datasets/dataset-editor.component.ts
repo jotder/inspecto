@@ -31,6 +31,7 @@ import {
 import { DatasetsService } from './datasets.service';
 import { MaterializeDatasetDialog } from './materialize-dataset.dialog';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
 
@@ -44,6 +45,7 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
     selector: 'app-dataset-editor',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatFormFieldModule,

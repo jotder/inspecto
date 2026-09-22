@@ -32,6 +32,7 @@ import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
 import { WidgetOptionsDialog } from './widget-options.dialog';
 import { WidgetsService } from './widgets.service';
 import { ExploreControlsComponent } from './explore-controls.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import './widget.kind'; // ensure the widget kind + viz plugins are registered
 
 /**
@@ -43,6 +44,7 @@ import './widget.kind'; // ensure the widget kind + viz plugins are registered
     selector: 'app-explore',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatFormFieldModule,
