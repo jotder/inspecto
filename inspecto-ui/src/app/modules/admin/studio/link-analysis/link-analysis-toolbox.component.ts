@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -47,6 +47,8 @@ import {
 import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
 import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-packs';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { FormsModule } from '@angular/forms';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 type AnalysisTab =
     | 'path'
@@ -95,6 +97,8 @@ type CentralityMetric =
         MatInputModule,
         MatSelectModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        FormsModule,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -133,6 +137,31 @@ export class LinkAnalysisToolboxComponent {
     /** The graph the tools operate on — the host's displayed (filtered + collapsed) graph. */
     readonly graph = input<G6GraphData | null>(null);
     readonly nodeOptions = input<{ id: string; label: string }[]>([]);
+    /** The graph's nodes as picker options — every From / To / Node / Source / Sink asks through the shared picker (UI-13). */
+    readonly pathNodeOptions = computed<PickerOption[]>(() =>
+        this.nodeOptions().map((n) => ({ value: n.id, label: n.label })),
+    );
+    /** Centrality algorithms — "Metric" here is the graph-analysis term, not the BI Measure. */
+    readonly centralityOptions: PickerOption[] = [
+        { value: 'degree', label: 'Degree' },
+        { value: 'betweenness', label: 'Betweenness' },
+        { value: 'closeness', label: 'Closeness' },
+        { value: 'eigenvector', label: 'Eigenvector' },
+        { value: 'katz', label: 'Katz' },
+        { value: 'pagerank', label: 'PageRank' },
+        { value: 'hub', label: 'HITS — hub' },
+        { value: 'authority', label: 'HITS — authority' },
+    ];
+    readonly cohesionOptions: PickerOption[] = [
+        { value: 'k-core', label: 'k-core' },
+        { value: 'triangles', label: 'Triangle count' },
+        { value: 'cliques', label: 'Cliques' },
+    ];
+    /** "Custom motif" is a real, blank-valued choice (the skill's idiom), then every loaded pack. */
+    readonly packOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Custom motif' },
+        ...this.patternPacks().map((p) => ({ value: p.id, label: p.label })),
+    ]);
     readonly nodeKinds = input<string[]>([]);
     readonly edgeKinds = input<string[]>([]);
     /** Tool-group ids the host's domain profile foregrounds — badged "suggested" on the header. */

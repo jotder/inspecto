@@ -36,22 +36,20 @@
                     @switch (t.id) {
                         @case ('path') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>From</mat-label>
-                                    <mat-select [value]="pathFrom()" (valueChange)="pathFrom.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>To</mat-label>
-                                    <mat-select [value]="pathTo()" (valueChange)="pathTo.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="From"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="pathFrom()"
+                                    (ngModelChange)="pathFrom.set($any($event))"
+                                />
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="To"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="pathTo()"
+                                    (ngModelChange)="pathTo.set($any($event))"
+                                />
                                 <mat-button-toggle-group
                                     [value]="pathMetric()"
                                     (change)="pathMetric.set($event.value)"
@@ -79,22 +77,20 @@
                         }
                         @case ('all-paths') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>From</mat-label>
-                                    <mat-select [value]="pathFrom()" (valueChange)="pathFrom.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>To</mat-label>
-                                    <mat-select [value]="pathTo()" (valueChange)="pathTo.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="From"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="pathFrom()"
+                                    (ngModelChange)="pathFrom.set($any($event))"
+                                />
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="To"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="pathTo()"
+                                    (ngModelChange)="pathTo.set($any($event))"
+                                />
                                 <button
                                     mat-stroked-button
                                     (click)="runAllPaths()"
@@ -121,14 +117,13 @@
                         }
                         @case ('explain') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>Node</mat-label>
-                                    <mat-select [value]="explainFor()" (valueChange)="explainFor.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="Node"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="explainFor()"
+                                    (ngModelChange)="explainFor.set($any($event))"
+                                />
                                 <mat-form-field subscriptSizing="dynamic" class="w-28">
                                     <mat-label>Hops</mat-label>
                                     <input
@@ -151,22 +146,13 @@
                         }
                         @case ('centrality') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>Metric</mat-label>
-                                    <mat-select
-                                        [value]="centralityMetric()"
-                                        (valueChange)="centralityMetric.set($event)"
-                                    >
-                                        <mat-option value="degree">Degree</mat-option>
-                                        <mat-option value="betweenness">Betweenness</mat-option>
-                                        <mat-option value="closeness">Closeness</mat-option>
-                                        <mat-option value="eigenvector">Eigenvector</mat-option>
-                                        <mat-option value="katz">Katz</mat-option>
-                                        <mat-option value="pagerank">PageRank</mat-option>
-                                        <mat-option value="hub">HITS — hub</mat-option>
-                                        <mat-option value="authority">HITS — authority</mat-option>
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="Metric"
+                                    [options]="centralityOptions"
+                                    [ngModel]="centralityMetric()"
+                                    (ngModelChange)="centralityMetric.set($any($event))"
+                                />
                                 <button mat-stroked-button (click)="runCentrality()">
                                     <mat-icon svgIcon="heroicons_outline:star"></mat-icon>
                                     Rank nodes
@@ -310,14 +296,13 @@
                         }
                         @case ('cohesion') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-48">
-                                    <mat-label>Method</mat-label>
-                                    <mat-select [value]="cohesionMetric()" (valueChange)="cohesionMetric.set($event)">
-                                        <mat-option value="k-core">k-core</mat-option>
-                                        <mat-option value="triangles">Triangle count</mat-option>
-                                        <mat-option value="cliques">Cliques</mat-option>
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-48"
+                                    label="Method"
+                                    [options]="cohesionOptions"
+                                    [ngModel]="cohesionMetric()"
+                                    (ngModelChange)="cohesionMetric.set($any($event))"
+                                />
                                 <button mat-stroked-button (click)="runCohesion()">
                                     <mat-icon svgIcon="heroicons_outline:cube"></mat-icon>
                                     Analyze
@@ -370,14 +355,13 @@
                         }
                         @case ('similarity') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                                    <mat-label>Node</mat-label>
-                                    <mat-select [value]="similarityFor()" (valueChange)="similarityFor.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-56"
+                                    label="Node"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="similarityFor()"
+                                    (ngModelChange)="similarityFor.set($any($event))"
+                                />
                                 <button mat-stroked-button (click)="runSimilarity()" [disabled]="!similarityFor()">
                                     <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
                                     Find similar
@@ -436,22 +420,20 @@
                         }
                         @case ('flow') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-48">
-                                    <mat-label>Source</mat-label>
-                                    <mat-select [value]="flowFrom()" (valueChange)="flowFrom.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
-                                <mat-form-field subscriptSizing="dynamic" class="w-48">
-                                    <mat-label>Sink</mat-label>
-                                    <mat-select [value]="flowTo()" (valueChange)="flowTo.set($event)">
-                                        @for (n of nodeOptions(); track n.id) {
-                                            <mat-option [value]="n.id">{{ n.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-48"
+                                    label="Source"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="flowFrom()"
+                                    (ngModelChange)="flowFrom.set($any($event))"
+                                />
+                                <inspecto-option-picker
+                                    class="w-48"
+                                    label="Sink"
+                                    [options]="pathNodeOptions()"
+                                    [ngModel]="flowTo()"
+                                    (ngModelChange)="flowTo.set($any($event))"
+                                />
                                 <button mat-stroked-button (click)="runFlow()" [disabled]="!flowFrom() || !flowTo()">
                                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                                     Max flow / min cut
@@ -520,18 +502,13 @@
                                 Match a path motif — a start node, then one hop per step.
                             </p>
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-form-field subscriptSizing="dynamic" class="w-64">
-                                    <mat-label>Pattern pack</mat-label>
-                                    <mat-select
-                                        [value]="loadedPack()?.id ?? ''"
-                                        (valueChange)="loadPatternPack($event)"
-                                    >
-                                        <mat-option [value]="''">Custom motif</mat-option>
-                                        @for (p of patternPacks(); track p.id) {
-                                            <mat-option [value]="p.id">{{ p.label }}</mat-option>
-                                        }
-                                    </mat-select>
-                                </mat-form-field>
+                                <inspecto-option-picker
+                                    class="w-64"
+                                    label="Pattern pack"
+                                    [options]="packOptions()"
+                                    [ngModel]="loadedPack()?.id ?? ''"
+                                    (ngModelChange)="loadPatternPack($event)"
+                                />
                             </div>
                             @if (loadedPack(); as pack) {
                                 <p class="text-sm text-secondary" role="status">
