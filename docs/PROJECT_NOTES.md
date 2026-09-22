@@ -143,6 +143,29 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- 🔴 **A new control-API ROUTE needs an entry in `docs/api/openapi-v1.json`, and your own green tests will
+  not tell you** (2026-09-22). `OpenApiPathsContractTest` requires every live route to have an operation.
+  Measured: a new per-space settings route passed **its own four real-HTTP tests**,
+  `CapabilityManifestTest`, the route-gating guard and all six doc guards — and took the **whole reactor
+  red**. ⚠ It fails in `inspecto-processor`, nowhere near the route, and the fail-fast reactor left **13
+  modules SKIPPED with 136 STALE surefire reports** on disk; summing those would have read as a
+  comfortable green. ⇒ The route checklist is **register → `CapabilityManifest` if gated →
+  `openapi-v1.json` → `route-gating-report.mjs` if mutating**. Regenerate, never hand-edit:
+  `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-professional`.
+  Two of this repo's three route contracts fail in a module you did not touch — so **"my targeted tests
+  are green" is not a verdict on a route.** Now in `.claude/skills/endpoint/SKILL.md`.
+- ✅ **The doc guards no longer read UNTRACKED markdown** (2026-09-22, `DOC-GUARDS-SCAN-IGNORED-SOURCES-1`
+  closed). All three — `check-doc-citations.mjs`, `check-doc-links.mjs`, `check-doc-counts.mjs` — now take
+  their SUBJECT set from `trackedPaths()`. Before this, another session's gitignored `*.local.md` could
+  refuse your push: a gate red for one shift and green for another on the same commit, which is the
+  property a gate exists to deny, and unfixable by its own rules because a stop hook rewrites the file.
+  ⚠ The cost, stated: **a new doc is unchecked until `git add`ed.**
+- ⚠ **`tsc -p tsconfig.app.json` does not compile `.spec.ts`.** Renaming an exported constant passed the
+  app typecheck AND the production build, and failed only under `npm run test:ci`. For any rename or type
+  change to a shared symbol, **`test:ci` is the type gate, not `build`.**
+- 🔴 **Piping a gate into `head`/`grep` reports the PIPE's exit code**, not the gate's. This printed a
+  false `TSC-OK` over a real TypeScript error. Redirect to a file and read `$?`.
+
 - ⚠ **A test-count baseline taken from a `-Dtest=`-filtered run is NOT comparable to a plain run**
   (2026-09-19). Supplying ANY `-Dtest=` value — even a negation like `-Dtest='!SomeTest'` — switches
   Surefire's class discovery off its default `**/*Test.java` / `*Tests.java` / `*TestCase.java` patterns
