@@ -175,12 +175,13 @@ refuses — the four editors (`config`, `pipeline-editor`, `dashboard-editor`, `
 | ~~**UI-12**~~ ✅ | Bulk actions → `<inspecto-bulk-actions>` | S | Incidents, Cases | no pill row on load; count chip + menu appear on selection |
 | **UI-13** | `mat-select` → `<inspecto-option-picker>` sweep (27 templates; table cells and grid toolbars stay dropdowns per the skill); Geo Map's 8-field row becomes a `<inspecto-schema-form>` with Latitude/Longitude required and the four optional columns under one disclosure | L | Geo Map, Link Analysis query dock, Events, Assistant, + 23 others | zero `<mat-select>` outside the two exempt categories; Geo Map query fits one row + one disclosure |
 | ~~**UI-14**~~ ✅ | Grid header legibility: `minWidth` per column, `headerTooltip` on every `ColDef`, `[pinActions]` wherever an actions column exists, `suppressHorizontalScroll` on empty grids | S | all data-table hosts (shared default in `INSPECTO_DEFAULT_COL_DEF`) | no truncated header at 1440 px on Alerts, Events, Collectors, Jobs |
-| ~~**UI-15**~~ ✅ | Vocabulary sweep in UI text: Batch → Consignment (Overview ×3, Diagnoses, Processing Status, Assistant placeholder); page titles match nav labels (Jobs, Overview) or the nav is changed — operator call D3 | S | 6 templates + `navigation-data.ts` | grep for `[Bb]atch` in `src/app/modules/**/*.html` returns only the grouping sense |
+| ~~**UI-15**~~ ✅ *(vocabulary half only — the D3 title-vs-nav half is OPEN, see `UI-17`)* | Vocabulary sweep in UI text: Batch → Consignment (Overview ×3, Diagnoses, Processing Status, Assistant placeholder); page titles match nav labels (Jobs, Overview) or the nav is changed — operator call D3 | S | 6 templates + `navigation-data.ts` | grep for `[Bb]atch` in `src/app/modules/**/*.html` returns only the grouping sense |
 
 ### Phase 3 — the shell
 
 | Id | Item | Size | Proof |
 |---|---|---|---|
+| **UI-17** | **Page titles follow their nav label (D3), which is NOT done**: the nav says *Jobs* and the pane says *Scheduler*; the nav says *Overview* and the pane says *Dashboard*. ⚠ Decide per pair which name is right — the glossary governs, and "Scheduler" may be the better word, in which case the NAV changes and `ACCESS_ACTION_NODES` must be re-homed with it (a nav edit is three edits, not one) | S | D3 |
 | **UI-16** | Nav: auto-expand the group holding the active route on deep link; remove the unmounted `settings-drawer` component and its dead links (D2); delete the four orphaned `*.routes.ts` (D4). ~~Wildcard `**` route + Home's dead link~~ ✅ **SHIPPED 2026-09-22** | S | deep-link to `/overview` shows Business expanded; `/catalog-onboard` shows a not-found pane, not the splash |
 
 ---
@@ -208,8 +209,8 @@ Logged while walking. **None is in scope of this plan unless its row says so.** 
 | ~~UIB-14~~ ✅ | Jobs | Actions column clips its third icon at 1440 px | grid | fix in UI-14 |
 | UIB-15 | Header | after closing the Notifications flyout with Esc, its tooltip "Notifications" stays on screen over the search bar | tooltip stuck | BACKLOG, low — reproduce and check `matTooltip` hide on blur |
 | UIB-16 | Header ▸ lens switcher | clicking *Builder* rendered no visible menu in the preview screenshot one second later | **unverified** — may be animation timing; re-drive before filing | verify in UI-16 |
-| UIB-17 | Collectors, Overview | Chart.js renders an empty 0–1.0 axis with a legend when the series is empty | presentation (F5) | fix in UI-09 |
-| UIB-18 | Diagnoses, Overview, Processing Status, Assistant | "Batch" in labels after the Consignment rename | vocabulary (F10) | fix in UI-15 |
+| ~~UIB-17~~ ✅ | Collectors, Overview | Chart.js renders an empty 0–1.0 axis with a legend when the series is empty | presentation (F5) | fix in UI-09 |
+| ~~UIB-18~~ ✅ | Diagnoses, Overview, Processing Status, Assistant | "Batch" in labels after the Consignment rename | vocabulary (F10) | fix in UI-15 |
 
 ⇒ **Added 2026-09-22 while fixing UIB-14:** `UIB-19` — grid headers were clipping because ag-Grid
 clips rather than wraps by default; `wrapHeaderText` + `autoHeaderHeight` in the shared column defaults
