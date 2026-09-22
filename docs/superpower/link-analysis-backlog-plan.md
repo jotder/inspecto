@@ -261,16 +261,21 @@ periodicity detection.
 ## 3. Work item register — everything pending, one id each
 
 Sizes: S ≤ 2 days · M ≤ 2 weeks · L > 2 weeks. "Blocked on" names §4 decisions. Phase = suggested order,
-not a promise. ⚠ Two items are **bug-shaped and cheap** (LA-05, LA-01); do them before any architecture.
+not a promise.
+
+✅ **§3.1 Foundations is COMPLETE — all four items shipped 2026-09-22** (LA-01, LA-02, LA-04, LA-05).
+As-built facts are distilled into [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md)
+§*Grounded limits and consequences*; read that, not these rows, for what the code now does.
+⚠ The rows below are kept for provenance and record what each one actually turned out to be.
 
 ### 3.1 Foundations (do first)
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **LA-01** | `filter` on `POST /inv/projection` and `/neighbors` | ⬜ backend · ✅ SPA | S–M | D-S5 | Validate every leaf `field` against the relation's actual columns → 422 `CONFIG_VALIDATION_FAILED`; `AND (ConditionSql.predicate(filter))` into the existing `WHERE` at `InvRoutes.java:213`, **ahead of the `GROUP BY`** so `count` folds correctly; empty tree renders `TRUE`. Revive `evaluateRows` (`query-eval.ts:9`, zero live callers) as the stage-1 engine so its spec becomes live coverage. Translator unit test: a client node filter → `OR` group over `sourceCol`/`targetCol`. Cross-stage parity test (template `ConditionSqlTest.assertParity`). Persist the predicate in the view (`RuleTemplate` is the shared shape for a reusable saved filter template — do not fork). Contract §5.1. |
-| **LA-02** | `truncated` reaches the analyst | ⚠ unverified in the SPA | S | — | Server sets it; the working-set overlay prints it; verify end to end and pin with a spec. In investigative use an unsurfaced truncation is a false negative presented as a finding. |
-| **LA-05** | Incremental `rebuild()` | ⬜ | S–M | — | Diff and apply via G6 update APIs; recreate only when layout id or renderer changes; memoise the `computed()` inputs so cosmetic changes do not yield new references; separate cosmetic from structural (a display change never touches layout); persist layout positions across rebuilds. **Single highest-value performance fix.** |
-| **LA-04** | Audit emit from `InvRoutes` / `GeoRoutes` | ⬜ | S | — | Every projection, expansion, exclusion, reveal, export → `EventLog.current().emit(...)`. Mechanism ships; nothing calls it. |
+| **LA-01** | `filter` on `POST /inv/projection` and `/neighbors` | ✅ **SHIPPED 2026-09-22** | S–M | — (D-S5 answered) | Validate every leaf `field` against the relation's actual columns → 422 `CONFIG_VALIDATION_FAILED`; `AND (ConditionSql.predicate(filter))` into the existing `WHERE` at `InvRoutes.java:213`, **ahead of the `GROUP BY`** so `count` folds correctly; empty tree renders `TRUE`. Revive `evaluateRows` (`query-eval.ts:9`, zero live callers) as the stage-1 engine so its spec becomes live coverage. Translator unit test: a client node filter → `OR` group over `sourceCol`/`targetCol`. Cross-stage parity test (template `ConditionSqlTest.assertParity`). Persist the predicate in the view (`RuleTemplate` is the shared shape for a reusable saved filter template — do not fork). Contract §5.1. |
+| **LA-02** | `truncated` reaches the analyst | ✅ **SHIPPED 2026-09-22** — a REAL defect, not just unverified | S | — | Server sets it; the working-set overlay prints it; verify end to end and pin with a spec. In investigative use an unsurfaced truncation is a false negative presented as a finding. |
+| **LA-05** | Incremental `rebuild()` | ✅ **SHIPPED 2026-09-22** | S–M | — | Diff and apply via G6 update APIs; recreate only when layout id or renderer changes; memoise the `computed()` inputs so cosmetic changes do not yield new references; separate cosmetic from structural (a display change never touches layout); persist layout positions across rebuilds. **Single highest-value performance fix.** |
+| **LA-04** | Audit emit from `InvRoutes` / `GeoRoutes` | ✅ **SHIPPED 2026-09-22** (server-visible acts only) | S | — | Every projection, expansion, exclusion, reveal, export → `EventLog.current().emit(...)`. Mechanism ships; nothing calls it. |
 
 ### 3.2 Phase 1 — offload, projection, evidence (Sprint 9)
 
@@ -319,7 +324,7 @@ Enquiry model.
 | **D-S2** | Where does multi-hop traversal run? | LA-11 | Filtering is settled server-side (LA-01). Open: recursive CTE vs worker + raised cap. |
 | **D-S3** | What is the supported graph size? | LA-07, LA-06 | A published number, enforced gracefully, never an exception. Must target `PROJECTION_NODE_CAP` (500) first. |
 | **D-S4** | First-class node model, or stay value-projected? | LA-08, LA-17 | Blocks identity, attribute-rich analysis and persistent exclusion lists. |
-| **D-S5** | Bind or escape the pushed-down predicate? | LA-01 | `ConditionSql` quote-escapes (tested contract for authored config); `InvRoutes` binds. ⇒ **Recommended (a):** reuse `ConditionSql` and validate every `field` against the relation's columns (the stronger safeguard); (b) bind-emitting variant as a follow-on. |
+| ~~**D-S5**~~ | ~~Bind or escape the pushed-down predicate?~~ | ~~LA-01~~ | ✅ **ANSWERED 2026-09-22 (operator): (a)** — reuse `ConditionSql` and validate every `field` against the relation's actual columns. Shipped that way; an unknown field is 422 before the renderer is called. The bind-emitting variant (b) stays an explicit follow-on, not built. |
 | **D-E1** | What is the object called? | every LA-10+ touchpoint | `Investigation` reserved by `GLOSSARY-CASE-1`; `Case` is `ObjectType.CASE`; `Enquiry` is the placeholder. Decide first. |
 | **D-E2** | Where does a Working Set live? | LA-03, LA-10 | In-memory per session, DuckDB temp relation, or durable store. Durability is what makes replay and evidence possible. |
 | **D-E3** | Dataset version pinned at creation, or per op? | LA-10, LA-20, G-E11 | Incompatible options. Pin-at-creation matches evidence. One decision with §2.7's "reproducible from the queries". |

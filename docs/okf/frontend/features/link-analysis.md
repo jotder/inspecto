@@ -238,11 +238,39 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (`InvRoutes.java:36-39`, deliberate). Supported graph size is therefore bounded by one tab.
 * **Safety is narrowness:** identifiers must match `SAFE_IDENT` (`InvRoutes.java:61`), values bind as JDBC
   `?`; 503 without a write root, 404 unknown Dataset, 422 bad identifier.
-* 🔴 **The canvas is not the performance bottleneck.** `rebuild()` (`graph-view.component.ts:362-489`)
-  destroys and recreates the whole G6 graph on ANY `@Input` change, and every bound input is a `computed()`
-  yielding a new reference — a cosmetic toggle reruns the full layout synchronously.
-* **The two-stage filter loop's stage 2 is a no-op today**: the SPA sends `query.filter`, `InvRoutes.project()`
-  never reads it, and the panel says so on screen rather than pretending.
+* **The canvas is not the performance bottleneck**, and since LA-05 it is not a rebuild either.
+  `GraphViewComponent.ngOnChanges` classifies the change and does the smallest thing that satisfies it:
+  a layout, plugin, tooltip or fill change recreates; a data change is applied onto the live graph; a
+  cosmetic change (emphasis, display overrides, theme) repaints without running layout. Every comparison
+  is by VALUE (`stableKey`), because each bound input is a `computed()` yielding a fresh reference — an
+  identity check would rebuild on every toggle. Measured in the preview on a 170-node projection: toggling
+  node labels keeps the same G6 instance and moves **0 of 170** nodes, where it previously re-laid-out
+  the whole canvas. `displayOptions` and `canvasPlugins` carry `equal:` comparators so an unchanged value
+  never reaches the host at all.
+* 🔴 **`graph.draw()` DOES NOT REPAINT** — the single most surprising thing about the G6 v5 host.
+  It re-renders from the element specs it already holds; it does **not** re-evaluate the style mapper
+  functions. A repaint must re-set the data (`setData(this.data)` then `draw()`), which re-runs the
+  mappers and does **not** re-run layout. Found by measurement, not by reading: with a bare `draw()` the
+  "node labels off" toggle left every label on the canvas while the component's own state said they were
+  off — a silent, invisible no-op that no unit test in jsdom can see.
+* ⚠ **A `labelText` mapper that returns `undefined` does not clear a label.** G6 reads `undefined` as
+  "no change" and keeps the previous text. Use G6's own `label: boolean` switch to remove the label shape.
+* **The two-stage filter loop's stage 2 is live since LA-01**: `POST /inv/projection` and `/neighbors`
+  accept an optional `filter` (the `query-types.ts` condition tree verbatim), rendered by the existing
+  `ConditionSql` and `AND`-ed into the `WHERE` **ahead of the `GROUP BY`**, so `count` folds over the
+  filtered rows. Every leaf `field` is checked against the relation's actual columns first and an unknown
+  one is 422 `CONFIG_VALIDATION_FAILED` naming the field — identifiers never reach the renderer
+  unvalidated (operator decision D-S5, 2026-09-22). Cost: a filtered call probes the relation's columns
+  with one extra zero-row query; unfiltered calls are unchanged.
+* **Projection, expansion and schema inspection are audited** (LA-04): `InvRoutes`/`GeoRoutes` emit
+  `link.projected`, `link.expanded`, `link.schema.inspected`, `geo.projected` and `geo.routes.projected`,
+  each carrying the dataset, the result size and `truncated`, best-effort so an audit failure can never
+  fail the analyst's query. ⚠ Exclusion, reveal and export remain **client-side** and so are still
+  unaudited — they have no server surface to emit from.
+* 🔴 **An expand used to drop `truncated`** (LA-02): `mergeGraphs` returns a bare `G6GraphData` and
+  structurally loses the flag, so a neighbourhood that hit the row limit or the node cap read as a
+  complete finding. `expandNode` now carries it onto the signal, monotonically — only a fresh `run()`
+  resets it.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)

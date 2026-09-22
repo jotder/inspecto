@@ -241,7 +241,9 @@ the guard exists to catch, caught only because someone RAN it. Regenerated 2026-
 ✅ **The guard was falsified in BOTH directions before being trusted**: flipping one row's posture in the
 doc fails with *“its table differs from the code”*, while adding an undeclared `api.post` fails with a
 DIFFERENT message, *“1 mutating route(s) declare no posture”* ⇒ it is not merely a text diff.
-Clean-tree inventory: **172 mutating routes — 109 gated, 63 exempt, 0 undeclared.**
+Clean-tree inventory: **172 mutating routes — 115 gated, 57 exempt, 0 undeclared** (re-derived from
+`tools/route-gating-report.mjs` on 2026-09-22; the `109/63` this line used to state was stale prose, not
+a change — the generated table already said 115/57).
 ⬜ **One operator item is still owed, and it now blocks only WORDING:** which framework the evidence is
 written against. It is written against **SOC 2 Type II** (CC6.1/CC6.3) as an ASSUMPTION, labelled as such
 at the top of `evidence/route-gating.md`; ⛔ no ISO 27001 A.9 mapping has been invented, because the same
