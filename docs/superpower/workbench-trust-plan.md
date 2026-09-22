@@ -26,6 +26,13 @@ sign**; work items are written against those answers and say where an amendment 
 - §5 holds **contracts** (request/response and file shapes the items change); §6 the **acceptance gates**,
   each falsifiable; §7 the **corrections** this plan's own sources accumulated, kept so nobody re-derives them.
 
+**This document is a register with a model in front of it, and it is built to die.** §8 states when
+it is archived, what leaves it for which durable page, and the two conditions under which it is archived
+*unbuilt* rather than kept as intent. Link Analysis wrote nine plan documents (2,637 lines) and archived
+eight; the 616-line model plan carries the note *"nothing was built from it"*. The difference between a
+plan that ships and one that is archived unbuilt was never the writing — it was whether the register was
+worked. §8 is the check that this one is.
+
 Status tags: ✅ SHIPPED (built, reachable, tested, cited) · 🟡 PARTIAL (something real exists, gap stated) ·
 ⬜ NOT BUILT (absence confirmed by running it, not merely unfound). Evidence tags: **E1** API sweep of 26 ·
 **E2** test run over real bytes, 24 · **E3** OKF concepts · **E4** the browser-driven build · **E5** source read
@@ -351,9 +358,66 @@ re-checked on every change.
 7. **The formatting churn is not corruption.** Unquoted scalars re-read identically; `verbatim` in the
    round-trip docs means the decoded map. `D4` is about diffs, not data.
 8. **Documents did not build Link Analysis; an item list did.** Nine plan documents, eight archived; the
-   surviving artefact is a register. This page is a register with a model in front of it, and it is
-   archived — durable facts into `pipeline-editor.md` / `editable-round-trip.md` / `pipeline-test-run.md` —
-   the day Sprint C closes.
+   surviving artefact is a register. This page's answer to that is §8, not a resolution.
+
+## 8. Lifecycle — how this document leaves the in-flight tier
+
+CLAUDE.md's rule is that a plan lives in `docs/superpower/` **only while its work is in flight**, and that
+when work ships the durable facts are distilled into the matching OKF concept, open items move to
+`BACKLOG.md`, and the plan is `git mv`ed to `plans-archive/`. Link Analysis shows the failure mode that
+rule does not prevent: a plan that is *never worked* is never "shipped", so it never triggers archival,
+and sits in the active tier looking like intent. This section closes that gap.
+
+### 8.1 Three exits, one of which must fire
+
+| Exit | Trigger | What happens |
+|---|---|---|
+| **Shipped** | every `WB-nn` in §3 is ✅ or explicitly ⛔ refused with a decision entry | distil per §8.2; move remaining ⛔ rationale to `BACKLOG.md` §6 *Standing refusals*; `git mv` to `plans-archive/`; INDEX row moves to the archive table |
+| **Partially shipped, stalled** | **no `WB-nn` changes state for 30 days** (next check: **2026-10-22**) | the shipped items are distilled per §8.2 *now*; the unshipped remainder is re-filed as `BACKLOG.md` rows with the plan's evidence copied into each; the plan is archived with the header *"PARTIAL — stalled <date>; items X..Y unbuilt, see rows"*. ⛔ It is **not** kept in the active tier as intent. |
+| **Superseded** | the operator refuses the model in §2 or the scope changes | archive with the refusal recorded in the header; nothing is "kept for later" |
+
+The 30-day clock is deliberate and short: this plan's items are S–M with one M–L; a month with no state
+change means it is not being worked, and a register nobody works is documentation debt with a
+misleading tier label. ⚠ The clock is checked by hand at each `handoff` — there is no guard for it. If a
+guard is wanted, it is one rule in `check-doc-counts`' spirit: *a `superpower/*.md` whose INDEX row's date
+is > 30 days old and whose register has no ✅ fails the build*. That guard is **not** in this plan's scope;
+it is noted so the next person to hit this does not think it was overlooked.
+
+### 8.2 The distillation map — decided now, so archival is mechanical
+
+Each durable fact this plan carries already has a home. Nothing here is knowledge that exists *only* in
+this plan; what the plan adds is the register and the model, and those are what get archived.
+
+| Fact (from §1.4 / §4) | Durable home | Written when |
+|---|---|---|
+| Test-run seed is one relation per segment; `liveInbound` follows any present rel | `okf/backend/engine/pipeline-test-run.md` (the walk section) | `WB-08` ships |
+| One "has a schema" predicate; `segments{}` is a schema source; `/validate` calls the gate's predicate (`D7`) | `okf/backend/pipeline-graph/pipeline-config-keys.md` (arming rules) | `WB-03` ships |
+| `rejected_files` / `rejected_rows` semantics; input = parsed + rejected (`D2`) | the consignment audit concept (batch CSV section) and `step-catalog.md:91,127` (the *never silently dropped* promise, now true for ingest) | `WB-09` ships |
+| Reference refusal is one code on all three paths | `okf/backend/pipeline-graph/editable-round-trip.md` (DRYRUN-1 section) | `WB-05` ships |
+| The projection carries `links.roundTrip` (`D9`) | `pipeline-authoring.md` pointer-table row for `PipelineLift.lift` | `WB-18` ships |
+| `config/<id>/` is the write location for created Pipelines (`D3`) | `pipeline-authoring.md` (the 2026-09-06 id/paths decision) + `pipeline-editor.md` (`pipelineScaffold`) | `WB-15` ships |
+| Formatting churn accepted; verbatim = decoded map (`D4`) | `editable-round-trip.md` (one sentence beside the sweep test) | `WB-19` — can be written **today**; it is a decision, not code |
+| *Ran* badge is a third source, not a readiness opinion (`D6`) | `pipeline-editor.md` beside `:693/:701` | `WB-11` ships |
+| The orphan-drop decline is reopened; selected-node insert (`D8`) | `pipeline-editor.md:336` (amend the decline in place) | `WB-14` ships — or the moment `D8` is signed, whichever first |
+| The Recipe view no longer exists | `pipeline-editor.md:550` | ✅ **already written** (this change) |
+| The round-trip guard goes through the HTTP route, and why | `okf/backend/build-run/guard-coverage.md` | `WB-01` ships |
+| Which surfaces disagreed and why that is the defect shape (§1.5) | `pipeline-authoring.md` §*Corrections* | at archival, as one paragraph |
+
+Rule: **a signed decision is written into its durable home the day it is signed**, not when its item
+ships — a decision is a fact the moment the operator signs it, and the enterprise-scale-out plan's
+`✅ SIGNED` rows show what happens otherwise (the plan becomes the only record).
+
+### 8.3 What this document must never accumulate
+
+- **No as-built facts that are not also in an OKF page or a BACKLOG row.** §1.4 is a *citation table*,
+  not a home; every row points at source. If a fact appears here first, its durable home is written in
+  the same change.
+- **No second model.** §2 is one principle and one ladder. A change of model is a `D`-entry and, if
+  accepted, a rewrite — not a §2.8.
+- **No item without a gate.** Every `WB-nn` has a `G-*` row that says what refutes it. An item added
+  without one is not on the register.
+- **Size.** If this document passes ~600 lines, something in it belongs in a concept page or a row, and
+  the excess moves there before anything else is added.
 
 ## References
 
