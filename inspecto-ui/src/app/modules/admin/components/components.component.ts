@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,6 +16,7 @@ import { ComponentFormDialog, ComponentFormResult } from './component-form.dialo
 import { MappingEditorDialog } from './mapping-editor.dialog';
 import { SchemaEditorData, SchemaEditorDialog } from './schema-editor.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoSectionTabsComponent, SectionTab } from 'app/inspecto/components/section-tabs.component';
 
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
@@ -27,6 +28,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
     standalone: true,
     imports: [
         InspectoPageHeaderComponent,
+        InspectoSectionTabsComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,
@@ -45,6 +47,15 @@ export class ComponentsComponent implements OnInit {
     private confirm = inject(InspectoConfirmService);
 
     readonly types = COMPONENT_TYPES;
+
+    /**
+     * One tab per component kind, with how many of each exist (UI-11). The pane used to stack all five
+     * sections down the page, each with its own heading, its own New button and its own empty state —
+     * on a fresh install that is a full screen of empty boxes, and the one kind that has anything in it
+     * is below the fold. The count pill answers "which of these has anything?" without scrolling.
+     */
+    readonly tabs = computed<SectionTab[]>(() => this.types.map((t) => ({ id: t, label: t, count: this.countFor(t) })));
+    readonly activeType = signal<ComponentType>(this.types[0]);
     readonly byType = signal<Record<string, ComponentDef[]>>({});
     readonly loading = signal(false);
     /** Flipped true once a mutate (create/update/delete) returns 503 — hides the mutate actions. */
