@@ -387,14 +387,20 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   read-only in the `types` section's columns table — ⅋ never a "Column metadata list", which left Parse
 entirely with the metadata grid (D2) — (it IS an output column, stamped at write
   time) — never as a fake `schemaSeed` row, which risks being written back as authored.
-- ✅ **A created Pipeline lands in `config/<id>/`, not at the space config root (D3, signed
-  2026-09-22).** Measured 2026-09-22: *New pipeline* wrote `spaces/demo/config/<name>.toon` while all
-  eight existing Pipelines in that space live in a per-Pipeline directory. The scaffold itself was
-  sound — `active: false`, `id` stamped, all nine `dirs` leaves derived from the name,
-  `duplicate_check` on, `parsing.frontend` from the chosen format — only its home was wrong. ⚠ **The
-  path is chosen server-side in the write handler**, because the client sends none; every
-  SATELLITE-WRITE-1 call site (schema, grammar, config-definition) passes the same subdir, or the
-  satellite orphans at the root. Tracked as `WB-15`; row `UI-CREATED-PIPELINE-FLAT-HOME-1`.
+- ⛔ **A created Pipeline stays FLAT at the space config root — `config/<id>/` was REFUSED (D3,
+  signed 2026-09-22, 🔴 REVERSED 2026-09-23).** The scaffold writes `<name>_pipeline.toon` beside its
+  satellites at the root, and that is deliberate. The decision was signed on the premise that *every
+  shipped Pipeline lives in a per-Pipeline directory*; counted on disk that is false —
+  `config/orders/` holds THREE Pipelines and the directory names are DOMAIN words, not ids
+  (`config/postmed/` → `postmed_xdr`). Nesting by id would have added a THIRD layout.
+  ✅ What the complaint cared about already holds: **the Pipeline and its satellites land together**,
+  and an author who wants a domain home passes `subdir:`, which works today.
+  ⚠ It was implemented and reverted TWICE. The second attempt found the cost: a bare
+  `schema_file: <name>.toon` resolves BESIDE ITS OWN CONFIG, so nesting the Pipeline without moving
+  its schema separates them and the save warns its own schema does not resolve.
+  ✅ One durable gain survives: `ConfigFileSupport.resolveConfigFile` now finds a config in
+  `<dir>/<name>/` even when nothing has registered it, so the per-DOMAIN homes every shipped Pipeline
+  actually uses are reachable to read/patch/delete. Row: `UI-CREATED-PIPELINE-FLAT-HOME-1` (closed).
 - **Partitioning** (`<inspecto-schema-partitions-editor>`, `inspecto/schema/`; **rendered on the Sink
   pane since 2026-09-04**, which reads/writes the SAME companion schema toon's `partitions[]` key directly;
   ⚠ the Parse pane still seeds `partitions[]` on load and carries it through its `overwrite: true` write, so
