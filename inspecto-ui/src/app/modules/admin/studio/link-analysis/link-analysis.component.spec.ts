@@ -83,7 +83,16 @@ function create(
             },
             {
                 provide: ActivatedRoute,
-                useValue: { snapshot: { queryParamMap: convertToParamMap(opts.queryParams ?? {}) } },
+                // 🔴 BOTH halves, because a real ActivatedRoute has both and the component uses each for a
+                // different reason: `snapshot.queryParamMap` is the one-shot read the pivot handshake makes,
+                // while `queryParamMap` is the live observable behind the `?case=` deep link, which must
+                // survive a reload. A stub carrying only the snapshot made every test in this file die in the
+                // CONSTRUCTOR on `undefined.pipe(...)` — 28 of 28, none of them on an assertion, so the file
+                // stopped guarding anything the day the deep link was added.
+                useValue: {
+                    snapshot: { queryParamMap: convertToParamMap(opts.queryParams ?? {}) },
+                    queryParamMap: of(convertToParamMap(opts.queryParams ?? {})),
+                },
             },
         ],
     });
