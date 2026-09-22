@@ -1087,6 +1087,15 @@ The **Data Browser** pane (a per-space DB client) browses these stores live. Bac
 [`archived-documents/plans-archive/db-browser-design.md`](../../../archived-documents/plans-archive/db-browser-design.md).
 
 - **Business-data stores** (§1) read via an ephemeral DuckDB sandbox (`read_parquet`/`read_csv`).
+- **A store id may itself be path-like** (e.g. a pipeline's `<name>/database` output dir) without being
+  a smuggled file reference. `SqlGuard.check(sql)`'s `PATH_LIKE` rule can't tell the two apart from the
+  SQL text alone, so `POST /db/query` calls the two-arg `SqlGuard.check(sql, trustedRelation)` overload
+  (2026-09-22) with the request's own `table` param — but only once that name is proven to sit inside
+  this space's data root (`DbBrowserRoutes.isJailedStore`, the same jail `browseStore` enforces). A
+  relation ref matching that exact, already-jailed name is exempt from `PATH_LIKE`; anything else —
+  a mismatched name, a string literal, an unrelated path — still gets rejected exactly as before. This
+  closed a real gap: Link Analysis's own SQL editor couldn't query a dataset whose registered name
+  contained a slash (`"mule_transfers/database"`), because the guard rejected its own FROM target.
 - **Operational tables** (§3) browse through each store's own `ConnectionSource` via
   [`util/BrowsableStore.java`](../../../../inspecto-util/src/main/java/com/gamma/util/BrowsableStore.java) —
   a browse read borrows like any other operation and appears only when that capability runs on
