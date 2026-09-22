@@ -1572,7 +1572,30 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 - **a11y gate** — `expectNoA11yViolations(el)` (`inspecto/testing/a11y.ts`, axe-core) in component specs; runs in
   CI. Manual WCAG: `docs/ui/accessibility-audit.md`.
 - **Shared design system**: `status-badge` / `empty-state` / `skeleton` / `grid` (+ `noRowsOverlay`) /
-  `connectivity-banner` / `ai-assist`. Living gallery at `/design`.
+  `connectivity-banner` / `ai-assist`. Living gallery at `/design`. **Since 2026-09-22 it also owns the page
+  chrome** — `page-header` / `filter-bar` / `stat-tile` / `section-tabs` / `bulk-actions` (UI consolidation
+  plan). A routed pane renders its title, subtitle, help affordance and actions through
+  `<inspecto-page-header>`; it owns the page's ONLY `<h1>`, at the shared `text-title` size (22 px).
+- 🔴 **An absent optional module is `isFeatureAbsent(err)`, not an error** (2026-09-22, `api-base.ts`):
+  status `0/404/502/503/504` means "not deployed here", so the pane explains it in place with an info
+  `<inspecto-alert>` and stays silent. Home, Learning and Autonomy each toasted red over a panel that
+  already explained the absence. ⚠ The helper is **duck-typed on `status`**, because an `instanceof
+  HttpErrorResponse` gate answers "not absent" for any caller holding a plain error object and silently
+  puts the toast back. ⚠ `502` is the one every hand-rolled guard missed — behind `proxy.conf.json` a
+  stopped backend arrives as a gateway error, not as `0`.
+- 🔴 **A `MatTabGroup` whose `[selectedIndex]` is bound to a getter over the selected id SPRINGS BACK**
+  (2026-09-22). Material decides whether to emit `selectedIndexChange` in `ngAfterContentChecked` by
+  comparing the clicked index against the value its input carries, so a derived binding re-asserts the old
+  index in the same pass, the emit never happens and the tab silently reverts. Hold the index in the
+  component (`<inspecto-section-tabs>` does) and reconcile the id into it.
+- ⚠ **A synthetic click cannot drive a Material tab in jsdom at all** (measured 2026-09-22): the FIRST
+  dispatched click is swallowed whichever element it targets — the `.mat-mdc-tab` wrapper, the inner
+  `.mdc-tab__content`, or the label — and later ones alternate, so the result depends on attempt order,
+  not on behaviour. A tab spec must drive the component's own handler and assert the rendered active tab;
+  the real click is proven in the preview.
+- ⚠ **ag-Grid CLIPS a header it cannot fit, it does not wrap.** Five panes shipped with "Sev…",
+  "Collec…", "What's sch…". `wrapHeaderText` + `autoHeaderHeight` in `INSPECTO_DEFAULT_COL_DEF` fix them
+  all at once — and `headerHeight` must then come OUT of the theme params, or the wrapped row cannot grow.
 - **`<inspecto-ai-assist>`** (`inspecto/ai-assist/`, AGT-6a) is the ONE inline AI authoring surface —
   panes **adopt** it, never fork it. The pane names a non-mutating agent tool, passes its own context as
   `[args]`, and applies the returned draft through **its own** validated route (the surface has no write
