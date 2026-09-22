@@ -11,7 +11,7 @@
 
 | | |
 |---|---|
-| Status | ACTIVE PLAN — **approved 2026-09-22; decisions D1–D8 delegated to the implementer and taken as recommended (§6)**; **phase 1 SHIPPED**; **phase 2 PART-SHIPPED** — **10 of 11 rows**, 2026-09-22 (§4 marks each); only `UI-13` open |
+| Status | ACTIVE PLAN — **approved 2026-09-22; decisions D1–D8 delegated to the implementer and taken as recommended (§6)**; **phase 1 SHIPPED**; **phase 2 and phase 3 SHIPPED** for every row but the editor panes, 2026-09-22 (§4 marks each) |
 | Raised by | Operator, 2026-09-22: *functionality is growing and interface complexity with it — consolidate the UI before implementing the Link Analysis backlog* |
 | Method | Every nav target driven in the preview at 1440×900, dark scheme (the app's default), plus header flyouts and the New-job dialog. Findings are what was **seen**, cited to the pane; nothing here is inferred from code alone |
 | Binding rules | `.claude/skills/angular-ui/SKILL.md` (design system, a11y, no hardcoded colours, option-picker, schema-form), `docs/GLOSSARY.md` (canonical words in every label) |
@@ -142,14 +142,15 @@ a synthetic click cannot drive a Material tab in jsdom (first one swallowed, lat
 
 ### Phase 2 — adopt on every pane (mechanical, one commit per group)
 
-⇒ **Shipped 2026-09-22:** `UI-05`–`UI-12`, `UI-14`, `UI-15` — 40 panes on the shared header (34 by
-codemod, 6 by hand), the Signal Ledger filter bar, the degrade rule, Components' tabs, the Incidents and
-Cases bulk actions, wrapping grid headers, empty charts that say why, and the retired entity word gone
-from operator-facing text. **Open:** `UI-13` (the `mat-select` sweep), plus **13 panes** the codemod still
-refuses — the four editors (`config`, `pipeline-editor`, `dashboard-editor`, `dataset-editor`,
-`explore`), the three bounded editor panes below, and the remaining interpolated-title list panes
-(`jobs`, `home`, `object-mail`, `object-detail`, `recon-board`, `reconciliation-detail`,
-`connection-workbench`, `kpi-reports`).
+⇒ **Shipped 2026-09-22:** every phase-2 row and phase 3 — **48 panes** on the shared header (34 by
+codemod, 14 by hand), the Signal Ledger filter bar, the degrade rule, Components' tabs, the Incidents and
+Cases bulk actions, wrapping grid headers, empty charts that say why, the retired entity word gone, the
+D8-scoped picker sweep (Geo Map, the Link Analysis dock, Assistant), Jobs and Overview named after their nav
+items, and the shell cleanup. **Still open — the editor panes only:** `config`, `pipeline-editor`,
+`dashboard-editor`, `dataset-editor`, `explore`, and the three bounded IDE panes (Link Analysis, Geo Map,
+Pipelines list). Each has bespoke chrome inside a bounded row that a full-bleed header breaks; they need a
+**compact** header mode designed for them, not a conversion. Follow-on BACKLOG rows: the remaining
+`mat-select`s (23 templates + the Shortest-path toolbox From/To) and the four editor panes.
 
 🔴 **Three findings from doing the sweep, each of which would have bitten the remaining rows:**
 1. **The editor panes cannot take a full-bleed header.** Link Analysis, Geo Map and Pipelines were
@@ -173,7 +174,7 @@ refuses — the four editors (`config`, `pipeline-editor`, `dashboard-editor`, `
 | ~~**UI-10**~~ ✅ | Degrade unification: optional-module 503 → info alert only | S | Learning, Autonomy, Home (recent runs), Diagnoses | zero red toasts on a Personal-core backend across all four panes |
 | ~~**UI-11**~~ ✅ *(Components; Autonomy/Settings open)* | Stacked sections → tabs: Components (5 sections → 5 tabs with counts); Autonomy (policy + actions as two tabs under the kill switch); Settings menu → icon + title rows, description shown only for the selected row | M | Components, Autonomy, Settings | Components fits one screen empty |
 | ~~**UI-12**~~ ✅ | Bulk actions → `<inspecto-bulk-actions>` | S | Incidents, Cases | no pill row on load; count chip + menu appear on selection |
-| **UI-13** | `mat-select` → `<inspecto-option-picker>` sweep (27 templates; table cells and grid toolbars stay dropdowns per the skill); Geo Map's 8-field row becomes a `<inspecto-schema-form>` with Latitude/Longitude required and the four optional columns under one disclosure | L | Geo Map, Link Analysis query dock, Events, Assistant, + 23 others | zero `<mat-select>` outside the two exempt categories; Geo Map query fits one row + one disclosure |
+| ~~**UI-13**~~ ✅ *(D8 scope; the Shortest-path toolbox From/To and the other 23 templates are the BACKLOG follow-on)* | `mat-select` → `<inspecto-option-picker>` sweep (27 templates; table cells and grid toolbars stay dropdowns per the skill); Geo Map's 8-field row becomes a `<inspecto-schema-form>` with Latitude/Longitude required and the four optional columns under one disclosure | L | Geo Map, Link Analysis query dock, Events, Assistant, + 23 others | zero `<mat-select>` outside the two exempt categories; Geo Map query fits one row + one disclosure |
 | ~~**UI-14**~~ ✅ | Grid header legibility: `minWidth` per column, `headerTooltip` on every `ColDef`, `[pinActions]` wherever an actions column exists, `suppressHorizontalScroll` on empty grids | S | all data-table hosts (shared default in `INSPECTO_DEFAULT_COL_DEF`) | no truncated header at 1440 px on Alerts, Events, Collectors, Jobs |
 | ~~**UI-15**~~ ✅ *(vocabulary half only — the D3 title-vs-nav half is OPEN, see `UI-17`)* | Vocabulary sweep in UI text: Batch → Consignment (Overview ×3, Diagnoses, Processing Status, Assistant placeholder); page titles match nav labels (Jobs, Overview) or the nav is changed — operator call D3 | S | 6 templates + `navigation-data.ts` | grep for `[Bb]atch` in `src/app/modules/**/*.html` returns only the grouping sense |
 
@@ -181,8 +182,8 @@ refuses — the four editors (`config`, `pipeline-editor`, `dashboard-editor`, `
 
 | Id | Item | Size | Proof |
 |---|---|---|---|
-| **UI-17** | **Page titles follow their nav label (D3), which is NOT done**: the nav says *Jobs* and the pane says *Scheduler*; the nav says *Overview* and the pane says *Dashboard*. ⚠ Decide per pair which name is right — the glossary governs, and "Scheduler" may be the better word, in which case the NAV changes and `ACCESS_ACTION_NODES` must be re-homed with it (a nav edit is three edits, not one) | S | D3 |
-| **UI-16** | Nav: auto-expand the group holding the active route on deep link; remove the unmounted `settings-drawer` component and its dead links (D2); delete the four orphaned `*.routes.ts` (D4). ~~Wildcard `**` route + Home's dead link~~ ✅ **SHIPPED 2026-09-22** | S | deep-link to `/overview` shows Business expanded; `/catalog-onboard` shows a not-found pane, not the splash |
+| ~~**UI-17**~~ ✅ | **Page titles follow their nav label (D3)** — Jobs (was "Scheduler") and Overview (was "Dashboard", a colliding glossary concept) renamed 2026-09-22: the nav says *Jobs* and the pane says *Scheduler*; the nav says *Overview* and the pane says *Dashboard*. ⚠ Decide per pair which name is right — the glossary governs, and "Scheduler" may be the better word, in which case the NAV changes and `ACCESS_ACTION_NODES` must be re-homed with it (a nav edit is three edits, not one) | S | D3 |
+| ~~**UI-16**~~ ✅ | **Shell. Shipped 2026-09-22:** the unmounted `settings-drawer` component is deleted (zero references outside its own folder); the four orphaned `*.routes.ts` are deleted (D4); `/connections`, `/config`, `/spaces`, `/design` and `/notification-center` now REDIRECT into `/settings/<section>` so bookmarks survive (D2) — ⚠ `/connections/:id` (the Connection workbench) is kept and only the exact list path redirects; the `**` not-found route and Home's dead link shipped earlier. **Refuted, not owed:** "auto-expand the nav group on deep link" — the items that looked collapsed (`op-overview`, `processing-status`, `audit`, `diagnoses`, `cases`, …) are HIDDEN under the Builder lens by the Access Profile filter in `classic.component.ts`, by design; there was nothing to expand. | S | — |
 
 ---
 
@@ -199,16 +200,16 @@ Logged while walking. **None is in scope of this plan unless its row says so.** 
 | ~~UIB-04~~ ✅ | Autonomy | error-tinted alert **and** red toast "Autonomy policy is not available" | degrade (F6) | fix in UI-10 |
 | UIB-05 | Backend, `inspecto-geolink*` launch configs | with `-Dspaces.root=..\spaces` from `inspecto-deploy/`, every demo pipeline fails to load: `schema_file` relative paths resolve against the **CWD** (`inspecto-deploy\spaces\demo\…`) instead of the space root, so Pipelines, Runs and Processing Status are empty | backend path resolution | **BACKLOG** — `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`; not a UI defect but it blanks half the UI in this launch mode |
 | UIB-06 | Backend | `HEAD /` throws `IOException: stream closed` in `ApiContext.respondJson` on every preview probe (content length sent on a HEAD) | backend | BACKLOG, low |
-| UIB-07 | `layout/common/settings-drawer` | component exists with its own settings link list (`/config`, `/notification-center`, `/spaces`, `/design`, …) but is **mounted nowhere**; its unique targets `/config` and `/notification-center` are reachable only through the Settings page drawers | dead component | remove in UI-16 (D2) |
-| UIB-08 | `modules/admin/{icon-settings,map-settings,model-settings,transfer}/*.routes.ts` | four route files imported by nothing; the components mount only via `SettingsComponent`'s `NgComponentOutlet` | dead code | delete in UI-16 (D4) |
+| ~~UIB-07~~ ✅ | `layout/common/settings-drawer` | component exists with its own settings link list (`/config`, `/notification-center`, `/spaces`, `/design`, …) but is **mounted nowhere**; its unique targets `/config` and `/notification-center` are reachable only through the Settings page drawers | dead component | remove in UI-16 (D2) |
+| ~~UIB-08~~ ✅ | `modules/admin/{icon-settings,map-settings,model-settings,transfer}/*.routes.ts` | four route files imported by nothing; the components mount only via `SettingsComponent`'s `NgComponentOutlet` | dead code | delete in UI-16 (D4) |
 | UIB-09 | `modules/admin/jobs/job-runs.dialog.ts` | `JobRunsDialog` has **no opener** — only its own spec references it | dead dialog | BACKLOG — decide retain-as-test-vehicle or delete |
-| UIB-10 | `/connections` | routed, no nav item, no flyout; the only in-app link is a `routerLink` inside `collector-detail.dialog.ts:57`; the same component is a Settings drawer section | reachability | accept: Settings ▸ Connections is the home; drop the standalone route or leave as deep link — D2 |
+| ~~UIB-10~~ ✅ *(redirects into Settings, D2)* | `/connections` | routed, no nav item, no flyout; the only in-app link is a `routerLink` inside `collector-detail.dialog.ts:57`; the same component is a Settings drawer section | reachability | accept: Settings ▸ Connections is the home; drop the standalone route or leave as deep link — D2 |
 | UIB-11 | Overview ▸ Recent activity | raw WARN log lines rendered unwrapped, clipped at the card edge | presentation | fix in UI-05 (wrap + monospace + 3-line clamp) |
-| UIB-12 | Data Browser | store list of 30+ items with no filter box and no scroll container; runs off the bottom of the page | presentation | fix in UI-06 (filter input + `max-h` scroll) |
+| ~~UIB-12~~ ✅ | Data Browser | store list of 30+ items with no filter box and no scroll container; runs off the bottom of the page | presentation | fix in UI-06 (filter input + `max-h` scroll) |
 | UIB-13 | Incidents, Cases | horizontal scrollbar rendered on an **empty** grid; grid does not use the full pane width | grid | fix in UI-14 |
 | ~~UIB-14~~ ✅ | Jobs | Actions column clips its third icon at 1440 px | grid | fix in UI-14 |
-| UIB-15 | Header | after closing the Notifications flyout with Esc, its tooltip "Notifications" stays on screen over the search bar | tooltip stuck | BACKLOG, low — reproduce and check `matTooltip` hide on blur |
-| UIB-16 | Header ▸ lens switcher | clicking *Builder* rendered no visible menu in the preview screenshot one second later | **unverified** — may be animation timing; re-drive before filing | verify in UI-16 |
+| ~~UIB-15~~ | Header | **NOT REPRODUCED 2026-09-22** (no stray tooltip after Esc). What DID reproduce is `UIB-24` below: Esc did not close the panel at all | tooltip stuck | BACKLOG, low — reproduce and check `matTooltip` hide on blur |
+| ~~UIB-16~~ ✅ **REFUTED** | Header ▸ lens switcher | re-driven 2026-09-22: the trigger reports `aria-expanded="true"` and the menu lists Business · Builder · Ops. The first probe was a pane-resize artefact | not a defect | verify in UI-16 |
 | ~~UIB-17~~ ✅ | Collectors, Overview | Chart.js renders an empty 0–1.0 axis with a legend when the series is empty | presentation (F5) | fix in UI-09 |
 | ~~UIB-18~~ ✅ | Diagnoses, Overview, Processing Status, Assistant | "Batch" in labels after the Consignment rename | vocabulary (F10) | fix in UI-15 |
 
@@ -228,6 +229,13 @@ only made it uniform enough to see. Fixed by letting the shell drop to an eyebro
 ⚠ The same dual-hosting means any future Settings section must expect its own header to BE the page's
 heading. `UIB-23` — a series of explicit zeros is indistinguishable from "nothing has run yet", so
 `<inspecto-chart>` cannot decide emptiness alone; the pane passes `[empty]`.
+
+⇒ **Added 2026-09-22, third batch:** `UIB-24` — 🔴 **the Notifications panel could not be closed from the
+keyboard.** Its content `<div>` did `(keydown)="$event.stopPropagation()"` so MatMenu's type-ahead would
+not hijack the buttons inside it — and that swallowed **Escape**, the key that closes a `mat-menu`. Fixed:
+every key but Escape stays inside. ⚠ Any overlay that stops keydown propagation for its own controls has
+this hole. `UIB-25` — the `/design` gallery's live page-header example rendered a SECOND `<h1>`; the header
+gained `[headingLevel]="2"` for exactly the "this header is not the page" case.
 
 Nav group auto-expansion: deep links to `/overview`, `/kpi-reports`, `/diagnoses`, `/events` rendered with their group **collapsed** while `/alerts`, `/jobs`, `/studio/*` rendered expanded. Logged as part of UI-16 rather than as a defect row; the cause (lens filtering vs. group state) is a hypothesis until read.
 

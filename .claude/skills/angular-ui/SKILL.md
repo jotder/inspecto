@@ -135,6 +135,9 @@ src/app/
     are declared, and slots `[badge]`, `[actions]`, `[tabs]`. Rules it exists to enforce: one `<h1>` per
     page, ONE filled primary action at the right end (everything else an icon button or a `⋯` menu), and
     refresh is always an icon button. ⚠ Put the essay in the explain dialog, not the subtitle.
+    `[headingLevel]="2"` is for the ONE case the header is not the page — the `/design` live example, or a
+    section mounted inside a pane that already owns the `<h1>` (Settings sections are dual-hosted this
+    way; the Settings shell itself steps down to an eyebrow once a section is open, UIB-22).
   - **`<inspecto-stat-tile label [value] [hint] [absentReason]>`** — the KPI tile. Tabular numerals so a
     row lines up; 🔴 an **absent** value (`null`/`undefined`/`''`) renders as an em dash carrying
     `absentReason`, never as a `0` nobody measured — `0` itself still renders as `0`.
@@ -157,6 +160,9 @@ src/app/
   dispatched click is swallowed whichever element it targets (`.mat-mdc-tab`, `.mdc-tab__content`, the
   label), and later ones alternate — so a click-based tab spec passes or fails on attempt order. Drive
   the component's own handler and assert the rendered active tab; prove the click in the preview.
+  ⚠ **An overlay that stops `keydown` propagation for its own controls swallows Escape too** (UIB-24,
+  2026-09-22): the Notifications panel could not be closed from the keyboard. Let Escape through
+  (`if (e.key !== 'Escape') e.stopPropagation()`) — it is the key `mat-menu` closes on.
 - **Authoring an enrichment → `<inspecto-enrichment-editor>`** (`inspecto/enrichment/`, W4b 2026-08-01).
   ONE shared references+transform editor for the companion `*_enrich.toon`; adopters: the Onboarding
   Enrichment stage and the Pipelines `enrichment` config pane (drawer since canvas-UX S2) — never fork it. Hosts own everything
