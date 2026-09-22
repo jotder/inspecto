@@ -29,6 +29,17 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
   fail-fast that one failure leaves ~13 later modules SKIPPED — i.e. unverified, not passing. ⚠ It fails in
   `inspecto-processor`, nowhere near the route you added, so the failure does not look like yours.
   Entries are grouped by `// XxxRoutes` in rough alphabetical order — add the group, not just the line.
+- 🔴 **EVERY live route MUST have an operation in `docs/api/openapi-v1.json`.**
+  `OpenApiPathsContractTest.everyLiveRouteHasAnOperationInTheContract` fails the build otherwise, naming
+  the routes it could not find. Regenerate rather than hand-editing:
+  `mvn -o -pl inspecto -am test -Dtest=OpenApiPathsContractTest -Dopenapi.paths.write=true -Dsurefire.failIfNoSpecifiedTests=false -Pedition-professional`
+  — it writes the skeleton itself; fill in schemas by hand afterwards if the route deserves them.
+  ⚠ **This has the same shape as the `CapabilityManifest` trap above and bites the same way:** it fails in
+  `inspecto-processor`, far from your route, and because the reactor is fail-fast it leaves ~13 later
+  modules **SKIPPED — unverified, not passing**. ⛔ **A targeted `-Dtest=` run of your own new test class
+  will NOT catch it** (measured 2026-09-22: a new settings route passed its own 4 tests and every guard,
+  and still took the whole reactor red). The route checklist is: register → `CapabilityManifest` if gated
+  → **openapi-v1.json** → `tools/route-gating-report.mjs` if mutating.
 - Register the route in `ControlApi` following the surrounding pattern (JDK HttpServer, manual DI).
 - **Real-HTTP test class covering every gate**, modeled on `ControlApiConfigWriteTest`
   (ephemeral port, actual requests, one test per gate + the happy path).
