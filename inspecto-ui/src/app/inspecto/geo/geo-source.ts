@@ -23,6 +23,11 @@ export interface GeoProjection {
     lonCol: string;
     /** Column whose value labels the point (the located entity). */
     entityCol?: string;
+    /**
+     * Column carrying the entity's STABLE key (D-U3) — what Geo ↔ Link brushing matches on. Distinct from
+     * `entityCol`, which is the display label: a label collides and a point's `id` is positional.
+     */
+    entityIdCol?: string;
     /** Column whose value kinds the point (drives icon/colour). */
     kindCol?: string;
     /** Column carrying the event time (epoch millis or a parseable date string). */

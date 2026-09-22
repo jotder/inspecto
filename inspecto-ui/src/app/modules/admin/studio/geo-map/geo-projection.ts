@@ -49,7 +49,7 @@ export function isGeoProjectionError(v: ProjectedGeo | GeoProjectionError): v is
 /** Pure rows→points fold. Rows with an invalid or missing coordinate are skipped and counted. */
 export function projectPoints(rows: Record<string, unknown>[], p: GeoProjection): ProjectedGeo | GeoProjectionError {
     if (!p.latCol || !p.lonCol) return { error: 'The mapping needs a latitude and a longitude column.' };
-    for (const col of [p.latCol, p.lonCol, p.entityCol, p.kindCol, p.timeCol]) {
+    for (const col of [p.latCol, p.lonCol, p.entityCol, p.entityIdCol, p.kindCol, p.timeCol]) {
         if (col && rows.length && !(col in rows[0])) return { error: `Column '${col}' is not in the dataset.` };
     }
 
@@ -71,6 +71,8 @@ export function projectPoints(rows: Record<string, unknown>[], p: GeoProjection)
             break;
         }
         const label = p.entityCol ? String(row[p.entityCol] ?? '').trim() : '';
+        // The stable key (D-U3), trimmed but NOT normalised: normalising here would quietly answer D-S4.
+        const key = p.entityIdCol ? String(row[p.entityIdCol] ?? '').trim() : '';
         const time = p.timeCol ? parseTime(row[p.timeCol]) : undefined;
         points.push({
             id: `pt:${i}`,
@@ -78,6 +80,7 @@ export function projectPoints(rows: Record<string, unknown>[], p: GeoProjection)
             lon,
             kind: (p.kindCol ? String(row[p.kindCol] ?? '').trim() : '') || 'point',
             label: label || undefined,
+            key: key || undefined,
             time,
             attrs: row,
         });
@@ -163,6 +166,7 @@ function foldServerResult(res: GeoProjectionResult): ProjectedGeo {
             lon: p.lon,
             kind: p.kind,
             label: p.label,
+            key: p.key,
             time: p.time,
             attrs: p.attrs,
         })),
@@ -198,6 +202,7 @@ export class DatasetGeoSource implements GeoSource {
                 latCol: p.latCol,
                 lonCol: p.lonCol,
                 entityCol: p.entityCol || undefined,
+                entityIdCol: p.entityIdCol || undefined,
                 kindCol: p.kindCol || undefined,
                 timeCol: p.timeCol || undefined,
             }),

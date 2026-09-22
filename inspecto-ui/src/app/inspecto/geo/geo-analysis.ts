@@ -309,8 +309,17 @@ export function frequentLocations(points: readonly GeoPoint[], radiusM: number, 
 
 /** Two entities seen together: within `radiusM` of each other inside a `windowMs` time window. */
 export interface CoLocation {
+    /** DISPLAY names, order-independent. Not identity — see `aId`/`bId`. */
     a: string;
     b: string;
+    /**
+     * The IDENTITIES the pair was folded on (D-U3): a point's `key` when its projection maps one, else its
+     * label. 🔴 Kept separate from `a`/`b` because a display string is not an identity — two spellings of
+     * one entity would otherwise fold as two, and a graph node minted from a label need not match the
+     * projection's own node ids, which is how a selection isolates the wrong nodes.
+     */
+    aId: string;
+    bId: string;
     /** Distinct meeting events folded in. */
     count: number;
     /** Where they first met (one of a's points). */
@@ -327,15 +336,19 @@ export interface CoLocation {
 export function coLocations(points: readonly GeoPoint[], radiusM: number, windowMs: number): CoLocation[] {
     const pts = points.slice(0, ANALYSIS_POINT_CAP).filter((p) => p.label && p.time !== undefined);
     const byPair = new Map<string, CoLocation>();
+    // A point's identity is its mapped key, falling back to the display label when none is mapped — which
+    // keeps the pre-D-U3 behaviour exactly for every projection that maps no key column.
+    const idOf = (pt: GeoPoint) => pt.key ?? pt.label!;
     for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
             const p = pts[i],
                 q = pts[j];
-            if (p.label === q.label) continue;
+            if (idOf(p) === idOf(q)) continue;
             if (Math.abs(p.time! - q.time!) > windowMs) continue;
             if (haversineMeters(p.lat, p.lon, q.lat, q.lon) > radiusM) continue;
-            const [a, b] = [p.label!, q.label!].sort();
-            const key = `${a}\0${b}`;
+            const [aId, bId] = [idOf(p), idOf(q)].sort();
+            const [a, b] = aId === idOf(p) ? [p.label!, q.label!] : [q.label!, p.label!];
+            const key = `${aId}\0${bId}`;
             const at = Math.min(p.time!, q.time!);
             const hit = byPair.get(key);
             if (hit) {
@@ -347,7 +360,17 @@ export function coLocations(points: readonly GeoPoint[], radiusM: number, window
                     hit.lon = p.lon;
                 }
             } else {
-                byPair.set(key, { a, b, count: 1, lat: p.lat, lon: p.lon, firstAt: at, pointIds: [p.id, q.id] });
+                byPair.set(key, {
+                    a,
+                    b,
+                    aId,
+                    bId,
+                    count: 1,
+                    lat: p.lat,
+                    lon: p.lon,
+                    firstAt: at,
+                    pointIds: [p.id, q.id],
+                });
             }
         }
     }
@@ -362,9 +385,15 @@ export function coLocations(points: readonly GeoPoint[], radiusM: number, window
 export function coLocationGraph(pairs: readonly CoLocation[]): G6GraphData {
     const nodes = new Map<string, { id: string; data: { label: string; kind: string } }>();
     for (const p of pairs) {
-        for (const name of [p.a, p.b]) {
-            const id = `entity:${name}`;
-            if (!nodes.has(id)) nodes.set(id, { id, data: { label: name, kind: 'entity' } });
+        // 🔴 The id comes from the IDENTITY, the label from the display name. Before D-U3 both came from
+        // the label, so a node id was a re-derived display string that could collide and need not match the
+        // projection's own `entity:<value>` ids — the register's reason for refusing that key by default.
+        for (const [id, name] of [
+            [p.aId, p.a],
+            [p.bId, p.b],
+        ] as const) {
+            const nodeId = `entity:${id}`;
+            if (!nodes.has(nodeId)) nodes.set(nodeId, { id: nodeId, data: { label: name, kind: 'entity' } });
         }
     }
     return {

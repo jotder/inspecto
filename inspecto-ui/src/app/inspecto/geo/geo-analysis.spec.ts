@@ -235,4 +235,44 @@ describe('geo-analysis', () => {
         expect(g.edges).toHaveLength(1);
         expect(g.edges[0].data.kind).toBe('co-located · 2');
     });
+
+    /**
+     * D-U3: a point's identity is its mapped `key`, not its display label. Before this, `coLocations` folded
+     * on the label and `coLocationGraph` minted `entity:<label>` — so two spellings of one entity folded as
+     * TWO, and the node id was a re-derived display string that need not match the projection's own ids.
+     */
+    it('folds on the mapped key, so two spellings of one entity are one node', () => {
+        const at = (h: number) => h * HOUR;
+        const pts: GeoPoint[] = [
+            // Same entity, two spellings, one key — plus a genuine counterparty nearby in space and time.
+            { id: 'p0', lat: 23.81, lon: 90.41, kind: 'point', label: 'ACME Ltd', key: 'ACC-1', time: at(1) },
+            { id: 'p1', lat: 23.81, lon: 90.41, kind: 'point', label: 'acme ltd.', key: 'ACC-1', time: at(10) },
+            { id: 'p2', lat: 23.8101, lon: 90.4101, kind: 'point', label: 'Beta', key: 'ACC-2', time: at(1.5) },
+            { id: 'p3', lat: 23.8101, lon: 90.4101, kind: 'point', label: 'Beta', key: 'ACC-2', time: at(10.5) },
+        ];
+
+        const pairs = coLocations(pts, 300, HOUR);
+
+        expect(pairs).toHaveLength(1);
+        expect([pairs[0].aId, pairs[0].bId]).toEqual(['ACC-1', 'ACC-2']);
+        expect(pairs[0].count).toBe(2);
+
+        const g = coLocationGraph(pairs);
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:ACC-1', 'entity:ACC-2']);
+        // the display name survives on the node, it just is not the identity
+        expect(g.nodes.find((n) => n.id === 'entity:ACC-1')?.data.label).toBeTruthy();
+    });
+
+    // And the fallback: a projection that maps no key behaves exactly as before.
+    it('falls back to the label when no key is mapped', () => {
+        const at = (h: number) => h * HOUR;
+        const pts: GeoPoint[] = [
+            { id: 'p0', lat: 23.81, lon: 90.41, kind: 'point', label: 'A', time: at(1) },
+            { id: 'p1', lat: 23.8101, lon: 90.4101, kind: 'point', label: 'B', time: at(1.2) },
+        ];
+
+        const g = coLocationGraph(coLocations(pts, 300, HOUR));
+
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:A', 'entity:B']);
+    });
 });

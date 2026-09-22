@@ -72,6 +72,11 @@ public final class GeoRoutes implements RouteModule {
         Ctx c = context(api, body);
         String lat = ident(body, "latCol", true), lon = ident(body, "lonCol", true);
         String entity = ident(body, "entityCol", false);
+        // 🔴 D-U3: the STABLE key, distinct from the display label. `entityCol` is what a human reads and
+        // `id` below is `pt:<row index>` — a positional decoy that is regenerated every projection run and
+        // must never be treated as identity. Geo ↔ Link brushing (LA-22) needs a key that means the same
+        // thing on both canvases, and the only honest source is a column the caller names.
+        String entityId = ident(body, "entityIdCol", false);
         String kind = ident(body, "kindCol", false);
         String time = ident(body, "timeCol", false);
         List<String> attrCols = attrCols(body);
@@ -83,6 +88,7 @@ public final class GeoRoutes implements RouteModule {
                 .append(", TRY_CAST(").append(q(lon)).append(" AS DOUBLE) AS lon");
         if (kind != null) sel.append(", CAST(").append(q(kind)).append(" AS VARCHAR) AS kind");
         if (entity != null) sel.append(", CAST(").append(q(entity)).append(" AS VARCHAR) AS label");
+        if (entityId != null) sel.append(", CAST(").append(q(entityId)).append(" AS VARCHAR) AS entity_key");
         if (time != null) {
             // epoch millis from a timestamp/date, else a numeric epoch as-is, else NULL (client parseTime parity).
             sel.append(", COALESCE(epoch_ms(TRY_CAST(").append(q(time)).append(" AS TIMESTAMP)), TRY_CAST(")
@@ -103,6 +109,9 @@ public final class GeoRoutes implements RouteModule {
             pt.put("lon", row.get("lon"));
             pt.put("kind", nonBlankOr(kind != null ? row.get("kind") : null, "point"));
             if (entity != null) pt.put("label", row.get("label"));
+            // Absent when unmapped — an absent key is honest; a fabricated one would let brushing isolate
+            // the wrong nodes, which in an investigative tool is a wrong answer wearing the shape of a finding.
+            if (entityId != null) pt.put("key", row.get("entity_key"));
             if (time != null) pt.put("time", row.get("time"));
             if (!attrCols.isEmpty()) {
                 Map<String, Object> attrs = new LinkedHashMap<>();

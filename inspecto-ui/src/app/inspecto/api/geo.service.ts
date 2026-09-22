@@ -9,6 +9,8 @@ export interface GeoProjectionRequest {
     latCol: string;
     lonCol: string;
     entityCol?: string;
+    /** The stable key column (D-U3) — the server returns it as `key` on each point. */
+    entityIdCol?: string;
     kindCol?: string;
     timeCol?: string;
     attrCols?: string[];
@@ -21,6 +23,8 @@ export interface GeoPointRow {
     lon: number;
     kind: string;
     label?: string;
+    /** Present only when `entityIdCol` was mapped; absent is honest, see GeoPoint.key. */
+    key?: string;
     time?: number;
     attrs?: Record<string, unknown>;
 }
