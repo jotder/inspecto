@@ -351,6 +351,38 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   complete finding. `expandNode` now carries it onto the signal, monotonically — only a fresh `run()`
   resets it.
 
+* **A saved view says what it is on every surface that offers one** (decision D-S1). A view stores the
+  QUERY and its presentation, never result rows, and no backend read is version-addressable — so reopening
+  re-projects against whatever the Dataset holds now. One exported constant, `SAVED_VIEW_NOT_EVIDENCE`,
+  is stated in the saved-views menu (before the analyst picks one), on the dashboard widget, and alongside
+  the pre-existing wording in the Attach-to-Case dialog. 🔴 **The dashboard tile was the surface that
+  most needed it and the one nobody had listed** — a tile reads as a fixed report and is in fact a live
+  re-projection on every render. ⚠ This is a LABEL, not a guarantee: making a view reproducible is LA-03,
+  and needs a durable snapshot store that does not exist yet.
+* **The projection reports the identities it has SPLIT** (`splitIdentityGroups`, decision D-S4). Entity ids
+  are value-projected — `entityId` mints them from the trimmed raw value with no case fold and no alias
+  resolution — so `ACME Ltd` and `acme ltd.` are two nodes carrying two degree counts, two community
+  memberships and two rows in every ranking. The working set now counts the collisions and names them, in
+  both the expanded panel and the minimized pill, so the signal is not lost by minimizing.
+  ⛔ **It reports and never merges.** Whether ids should be normalised at all is D-S4 itself, and merging
+  here would answer it silently — the worst way, because two spellings genuinely can be two entities.
+  ⚠ Comparison is scoped: `entity:person:bob` and `entity:account:bob` are two entities by construction,
+  and super-node stand-ins are skipped because their label is a count, not a name.
+  🔴 **There are THREE id mint sites, not the two D-S4 named** — `geo-analysis.ts`'s `coLocationGraph`
+  is a third and does not even `trim()`, so any normalisation answer touching only the named pair stays
+  half-fixed.
+* ⛔ **The analysis cap's refusal was already graceful; only its NUMBER is open** (D-S3). `requireUnderCap`
+  throws, but all ten sites catch it, clear the stale result, and render the message in a warning alert
+  naming the algorithm, the cap and the actual size. Converting the ten to an outcome value was **refused
+  as churn** — it changes nothing the analyst can see.
+* **A recursive CTE survives `QueryExecutor`'s derived-table wrap** (`QueryExecutorRecursiveCteTest`,
+  the empirical check D-S2 demanded before LA-11 could be costed). Bounded multi-hop traversal over an
+  edge relation is expressible in the shape LA-11 would compile. 🔴 **But the executor's `LIMIT n+1` is
+  applied OUTSIDE the derived table, so it does not bound the recursion** — it truncates an answer the
+  walk has already paid for. A traversal fence must live INSIDE the recursion; on a cyclic graph the
+  in-recursion depth predicate is the only thing preventing an unbounded walk. ⚠ The test pins a
+  capability of the seam, not a shipped feature — nothing emits a recursive CTE today.
+
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
 §7 (schema-relationship model, now shipped) ·
