@@ -4,17 +4,12 @@
 @if (mode() === 'topology') {
     <div class="flex min-w-0 flex-auto flex-col">
         <!-- Header -->
-        <div
-            class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+        <inspecto-page-header
+            title="Pipelines"
+            subtitle="One or many pipelines as a node graph, joined at their shared stores — read-only"
+            [terms]="['Pipeline', 'Step', 'Trigger']"
         >
-            <div>
-                <h1 class="text-3xl font-extrabold leading-none tracking-tight">Pipelines</h1>
-                <div class="text-secondary mt-1.5">
-                    One or many pipelines as a node graph, joined at their shared stores — read-only
-                </div>
-            </div>
-            <div class="mt-4 flex items-center gap-3 sm:mt-0">
-                <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+            <ng-container actions>
                 <ng-container *ngTemplateOutlet="modeToggle"></ng-container>
                 <inspecto-transfer-menu
                     [items]="transferItems()"
@@ -25,8 +20,8 @@
                 <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh pipelines">
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
-            </div>
-        </div>
+            </ng-container>
+        </inspecto-page-header>
 
         <!-- Main -->
         <div class="flex flex-auto flex-col p-6 sm:p-10">

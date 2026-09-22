@@ -76,6 +76,7 @@ const NOTE_ACCENT = ICON_COLOR_SWATCHES[3];
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { GeoMapService, GeoMapView } from './geo-map.service';
 import { GeoAnalysisFocus, GeoAnalysisToolboxComponent } from './geo-analysis-toolbox.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** Investigation pivot (ui-design-review R8): recognize an Incident/Case reference on a point's row,
  *  by convention — `caseId`/`incidentId`, or `objectId` (+ optional `objectType`). Most geo layers
@@ -117,6 +118,7 @@ interface PointRow {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoPageHeaderComponent,
         DecimalPipe,
         FormsModule,
         ReactiveFormsModule,

@@ -26,6 +26,7 @@ import {
     nodeDisplayLabel,
     toCombinedG6Data,
 } from './pipeline-graph';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Which lens the Pipelines pane shows.
@@ -49,6 +50,7 @@ export type PipelinesViewMode = 'view' | 'editor' | 'topology';
     selector: 'app-pipelines',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         AiExplainComponent,
         NgTemplateOutlet,
         MatButtonModule,

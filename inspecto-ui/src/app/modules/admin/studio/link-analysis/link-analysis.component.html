@@ -1,29 +1,30 @@
 <div #studioRoot class="flex h-full min-h-0 min-w-0 flex-auto flex-col p-4">
     <!-- ── compact header (the canvas gets the space) ── -->
-    <div class="flex flex-wrap items-center gap-2">
-        <h1 class="text-2xl font-semibold tracking-tight">Link Analysis</h1>
-        <span class="text-secondary hidden text-sm md:inline">
-            project a Dataset — or the lineage / component / pipeline planes — into an Entity/Link graph, then analyze
-            it.
-        </span>
-        <button
-            mat-icon-button
-            class="ml-auto"
-            (click)="toggleCanvasMaximized()"
-            [matTooltip]="
-                canvasMaximized()
-                    ? 'Show the query and toolbox panels'
-                    : 'Hide the query and toolbox panels (more room for the canvas)'
-            "
-            [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
-        >
-            <mat-icon
-                [svgIcon]="
-                    canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
+    <inspecto-page-header
+        compact
+        title="Link Analysis"
+        subtitle="Project a Dataset — or the lineage, component or pipeline planes — into an Entity/Link graph, then analyze it."
+        [terms]="['Entity', 'Link', 'Dataset', 'Pipeline']"
+    >
+        <ng-container actions>
+            <button
+                mat-icon-button
+                (click)="toggleCanvasMaximized()"
+                [matTooltip]="
+                    canvasMaximized()
+                        ? 'Show the query and toolbox panels'
+                        : 'Hide the query and toolbox panels (more room for the canvas)'
                 "
-            ></mat-icon>
-        </button>
-    </div>
+                [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
+            >
+                <mat-icon
+                    [svgIcon]="
+                        canvasMaximized() ? 'heroicons_outline:view-columns' : 'heroicons_outline:arrows-pointing-out'
+                    "
+                ></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
 
     <div class="mt-3 flex min-h-0 flex-auto flex-col gap-2">
         @if (loadError()) {

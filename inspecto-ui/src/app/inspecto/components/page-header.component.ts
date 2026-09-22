@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, Input, booleanAttribute, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -30,71 +31,115 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 @Component({
     selector: 'inspecto-page-header',
     standalone: true,
-    imports: [RouterLink, MatIconModule, MatTooltipModule, AiExplainComponent],
+    imports: [NgTemplateOutlet, RouterLink, MatIconModule, MatTooltipModule, AiExplainComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block' },
     template: `
-        <header
-            class="flex flex-col border-b pt-4"
-            [class.px-6]="inset"
-            [class.sm:px-10]="inset"
-            [class.pb-4]="!hasTabs"
-            [class.pb-0]="hasTabs"
-        >
-            <div class="flex min-w-0 items-start gap-4">
-                <div class="min-w-0 flex-auto">
-                    @if (backLink) {
-                        <a
-                            [routerLink]="backLink"
-                            class="text-secondary hover:text-primary -ml-1 mb-1 inline-flex items-center gap-1 text-sm"
-                        >
-                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-left"></mat-icon>
-                            <span>{{ backLabel || 'Back' }}</span>
-                        </a>
-                    }
-                    @if (eyebrow) {
-                        <div class="text-secondary text-xs font-semibold uppercase tracking-wider">{{ eyebrow }}</div>
-                    }
-                    <div class="flex min-w-0 items-center gap-2">
-                        @if (headingLevel === 1) {
-                            <h1
-                                class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
-                                [class.font-mono]="mono"
+        <!-- 🔴 Projected content is assigned to the FIRST matching <ng-content> in the template, and a slot
+             inside an un-rendered @if branch swallows it. With one <ng-content select="[actions]"> per
+             branch, every standard-mode pane lost its action row the moment the compact branch was added
+             (caught by the spec, 2026-09-22). So each slot is captured ONCE here and stamped into whichever
+             branch renders. -->
+        <ng-template #actionsTpl><ng-content select="[actions]"></ng-content></ng-template>
+        <ng-template #badgeTpl><ng-content select="[badge]"></ng-content></ng-template>
+        @if (compact) {
+            <!-- Compact: ONE row for bounded editor panes (Link Analysis, Geo Map, the Pipelines editor)
+                 where the canvas gets the space. Same <h1>, same terms, same actions slot — no padding,
+                 no border, subtitle inline and hidden below md. -->
+            <header class="flex min-w-0 flex-wrap items-center gap-2">
+                @if (headingLevel === 1) {
+                    <h1
+                        class="min-w-0 truncate text-lg font-semibold leading-7 tracking-tight"
+                        [class.font-mono]="mono"
+                    >
+                        {{ title }}
+                    </h1>
+                } @else {
+                    <h2
+                        class="min-w-0 truncate text-lg font-semibold leading-7 tracking-tight"
+                        [class.font-mono]="mono"
+                    >
+                        {{ title }}
+                    </h2>
+                }
+                @if (terms?.length) {
+                    <inspecto-ai-explain [screen]="title" [terms]="terms!" />
+                }
+                <ng-container *ngTemplateOutlet="badgeTpl"></ng-container>
+                @if (subtitle) {
+                    <span class="text-secondary hidden min-w-0 truncate text-sm md:inline" [title]="subtitle">
+                        {{ subtitle }}
+                    </span>
+                }
+                <div class="ml-auto flex shrink-0 items-center gap-2">
+                    <ng-container *ngTemplateOutlet="actionsTpl"></ng-container>
+                </div>
+            </header>
+        } @else {
+            <header
+                class="flex flex-col border-b pt-4"
+                [class.px-6]="inset"
+                [class.sm:px-10]="inset"
+                [class.pb-4]="!hasTabs"
+                [class.pb-0]="hasTabs"
+            >
+                <div class="flex min-w-0 items-start gap-4">
+                    <div class="min-w-0 flex-auto">
+                        @if (backLink) {
+                            <a
+                                [routerLink]="backLink"
+                                class="text-secondary hover:text-primary -ml-1 mb-1 inline-flex items-center gap-1 text-sm"
                             >
-                                {{ title }}
-                            </h1>
-                        } @else {
-                            <h2
-                                class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
-                                [class.font-mono]="mono"
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-left"></mat-icon>
+                                <span>{{ backLabel || 'Back' }}</span>
+                            </a>
+                        }
+                        @if (eyebrow) {
+                            <div class="text-secondary text-xs font-semibold uppercase tracking-wider">
+                                {{ eyebrow }}
+                            </div>
+                        }
+                        <div class="flex min-w-0 items-center gap-2">
+                            @if (headingLevel === 1) {
+                                <h1
+                                    class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
+                                    [class.font-mono]="mono"
+                                >
+                                    {{ title }}
+                                </h1>
+                            } @else {
+                                <h2
+                                    class="text-title min-w-0 truncate font-semibold leading-8 tracking-tight"
+                                    [class.font-mono]="mono"
+                                >
+                                    {{ title }}
+                                </h2>
+                            }
+                            @if (terms?.length) {
+                                <inspecto-ai-explain [screen]="title" [terms]="terms!" />
+                            }
+                            <ng-container *ngTemplateOutlet="badgeTpl"></ng-container>
+                        </div>
+                        @if (subtitle) {
+                            <button
+                                type="button"
+                                class="text-secondary mt-0.5 block max-w-full text-left text-sm leading-5 focus-visible:ring-primary rounded focus-visible:outline-none focus-visible:ring-2"
+                                [class.truncate]="!expanded()"
+                                [attr.aria-expanded]="expanded()"
+                                [matTooltip]="expanded() ? '' : 'Show the full description'"
+                                (click)="expanded.set(!expanded())"
                             >
-                                {{ title }}
-                            </h2>
+                                {{ subtitle }}
+                            </button>
                         }
-                        @if (terms?.length) {
-                            <inspecto-ai-explain [screen]="title" [terms]="terms!" />
-                        }
-                        <ng-content select="[badge]"></ng-content>
                     </div>
-                    @if (subtitle) {
-                        <button
-                            type="button"
-                            class="text-secondary mt-0.5 block max-w-full text-left text-sm leading-5 focus-visible:ring-primary rounded focus-visible:outline-none focus-visible:ring-2"
-                            [class.truncate]="!expanded()"
-                            [attr.aria-expanded]="expanded()"
-                            [matTooltip]="expanded() ? '' : 'Show the full description'"
-                            (click)="expanded.set(!expanded())"
-                        >
-                            {{ subtitle }}
-                        </button>
-                    }
+                    <div class="flex shrink-0 items-center gap-2 pt-0.5">
+                        <ng-container *ngTemplateOutlet="actionsTpl"></ng-container>
+                    </div>
                 </div>
-                <div class="flex shrink-0 items-center gap-2 pt-0.5">
-                    <ng-content select="[actions]"></ng-content>
-                </div>
-            </div>
-            <ng-content select="[tabs]"></ng-content>
-        </header>
+                <ng-content select="[tabs]"></ng-content>
+            </header>
+        }
     `,
 })
 export class InspectoPageHeaderComponent {
@@ -129,6 +174,15 @@ export class InspectoPageHeaderComponent {
      * heading — so the document keeps exactly one `<h1>` (WCAG; the sweep's own rule).
      */
     @Input() headingLevel: 1 | 2 = 1;
+
+    /**
+     * One-row variant for the bounded IDE panes — Link Analysis, Geo Map, the Pipelines editor — whose
+     * canvas must get the vertical space and whose row is width-bounded. 🔴 The standard header BROKE
+     * these panes (2026-09-22): Link Analysis overflowed its row to 1591 px in an 886 px viewport with
+     * the title pushed off screen. Compact renders no padding and no border, the subtitle inline and
+     * hidden below `md`, and the actions at the row's end.
+     */
+    @Input({ transform: booleanAttribute }) compact = false;
 
     readonly expanded = signal(false);
 }

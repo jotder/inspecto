@@ -128,6 +128,7 @@ import { LinkAnalysisService, LinkAnalysisView, LinkAnalysisViewOptions } from '
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** Level of detail: displayed-node count above which labels are dropped (they are unreadable there anyway). */
 export const LOD_LABEL_CAP = 300;
@@ -170,6 +171,7 @@ interface PresentationSnapshot {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoPageHeaderComponent,
         ChipComponent,
         FormsModule,
         ReactiveFormsModule,
