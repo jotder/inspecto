@@ -1374,8 +1374,7 @@ Grouped by area. A row with lettered items keeps the letters of its source doc s
   glossary now defines both senses and says which keeps the word: `ObjectType.CASE` (groups Incidents — the pane, the
   user guide and the controls matrix all use it) stays `Case`; the Assistant's `com.gamma.intelligence.investigation.Case`
   — one RCA playbook run against one Incident, and the **only** type in the repo actually named `Case` — becomes
-  `Investigation`. The code's own package is already `…intelligence.investigation`, so the rename moves toward the
-  code's naming rather than away from it. ⚠ **Four published routes are in scope** (`/agent/cases*`), so this needs an
+  **`TriageRun`**. 🔴 **RETARGETED 2026-09-22 (operator, decision `D-E1`): this sense becomes **Triage** / **Triage Run**, NOT *Investigation*.** *Investigation* was claimed by the Link Analysis enquiry object, which had the stronger claim on it — the routes are `/inv/*`, the capability is `INV-1` and `InvRoutes` spells it out. This side moved because its rename is unstarted. ⚠ **And its stated gate premise did not survive verification:** the row is RELEASE-GATED because it "renames four published routes", but `v3.11.0` contains no `AgentRoutes` and no `/agent/cases` at all — "published" there means *registered in the control API*, not *shipped*, so the breakage set is empty. ⛔ Re-gating is an operator call and is NOT made here; only the target noun is. ⚠ **Four published routes are in scope** (`/agent/cases*`), so this needs an
   alias or a deprecation window, not a silent flip — that is why 7.3 filed it instead of applying it. Touchpoint list in
   `GLOSSARY.md` §13. ⛔ Do **not** also rename `mode: case` (route branching) or `caseType` (line of business): different
   words that merely look alike, and `caseType` feeds RBAC data scopes.

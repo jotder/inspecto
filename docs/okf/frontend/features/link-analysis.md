@@ -371,7 +371,7 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   🔴 **There are THREE id mint sites, not the two D-S4 named** — `geo-analysis.ts`'s `coLocationGraph`
   is a third and does not even `trim()`, so any normalisation answer touching only the named pair stays
   half-fixed.
-* ⛔ **The analysis cap's refusal was already graceful; only its NUMBER is open** (D-S3). `requireUnderCap`
+* ⛔ **The analysis cap's refusal was already graceful, and its NUMBER is now answered** (D-S3: keep 500 / 2 000, and give suspicion score its own 750 — see below). `requireUnderCap`
   throws, but all ten sites catch it, clear the stale result, and render the message in a warning alert
   naming the algorithm, the cap and the actual size. Converting the ten to an outcome value was **refused
   as churn** — it changes nothing the analyst can see.
@@ -382,6 +382,17 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   walk has already paid for. A traversal fence must live INSIDE the recursion; on a cyclic graph the
   in-recursion depth predicate is the only thing preventing an unbounded walk. ⚠ The test pins a
   capability of the seam, not a shipped feature — nothing emits a recursive CTE today.
+
+* **Suspicion score carries its OWN cap, lower than the shared one** (D-S3, 750 by default, a third
+  per-space setting beside the projection and analysis caps). Sizing one limit for 27 algorithms forces
+  a bad trade: 25 of them finish under 60 ms at 2 000 nodes, and suspicion score takes ~7 s there.
+  🔴 **The number is measured and the curve is QUADRATIC** — 250 → 103 ms, 500 → 402 ms, 750 → 972 ms,
+  1 000 → 1 608 ms, 2 000 → 7 277 ms, because betweenness dominates the blend. Doubling the nodes costs
+  ~4.5× the time, so halving the cap cuts the work to about a quarter, not a half. 750 is the last
+  measured point under a second; the interpolated crossing is ~760, and a default should be a number
+  someone observed. ⚠ Like the other two it is a DEFAULT, not a truth, and it fails closed on nonsense
+  (a cap of 0 or NaN is ignored and the previous value stands). The refusal names THIS cap, so an
+  analyst who can run every other tool at 2 000 nodes is told why this one stopped sooner.
 
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
