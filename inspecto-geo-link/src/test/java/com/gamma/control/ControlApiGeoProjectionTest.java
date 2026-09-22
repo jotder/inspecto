@@ -3,6 +3,9 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -19,6 +22,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -195,6 +200,59 @@ class ControlApiGeoProjectionTest {
 
             assertTrue(new ComponentStore(c.root.resolve("registry")).get("geo-map-view", "dhaka-map").isPresent(),
                     "saved geo view lands in the real component store");
+        }
+    }
+
+    /** Collect every event emitted while {@code body} runs (LA-04 audit assertions). */
+    private static List<Event> captureEvents(ThrowingRunnable body) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        Consumer<Event> sub = seen::add;
+        EventLog.current().addSubscriber(sub);
+        try {
+            body.run();
+        } finally {
+            EventLog.current().removeSubscriber(sub);
+        }
+        return seen;
+    }
+
+    private interface ThrowingRunnable { void run() throws Exception; }
+
+    private static Event ofType(List<Event> events, String type) {
+        return events.stream().filter(e -> type.equals(e.type())).findFirst()
+                .orElseThrow(() -> new AssertionError("no " + type + " event in " + events));
+    }
+
+    /**
+     * LA-04: a geo projection is audited, and the audit carries the partial-result flag — an analyst
+     * looking at a truncated map must be visible as such in the trail.
+     */
+    @Test
+    void projectionEmitsAnAuditedAnalyticEvent(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedPoints(c);
+            List<Event> events = captureEvents(() -> assertEquals(200, post(c.port, "geo/projection", """
+                    {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","limit":1}""").statusCode()));
+            Event e = ofType(events, EventType.GEO_PROJECTED);
+            assertEquals("geo.projected", e.attributes().get("action"));
+            assertEquals("sights_ds", e.attributes().get("dataset"));
+            assertEquals("1", e.attributes().get("points"));
+            assertEquals("true", e.attributes().get("truncated"), "the partial result is carried: " + e.attributes());
+        }
+    }
+
+    /** LA-04: the route projection is its own analytic act, with its own type and result size. */
+    @Test
+    void routesEmitsItsOwnAnalyticEvent(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedRoutes(c);
+            List<Event> events = captureEvents(() -> assertEquals(200, post(c.port, "geo/routes", """
+                    {"dataset":"trips_ds","fromLatCol":"alat","fromLonCol":"alon","toLatCol":"blat","toLonCol":"blon"}""").statusCode()));
+            Event e = ofType(events, EventType.GEO_ROUTES_PROJECTED);
+            assertEquals("geo.routes.projected", e.attributes().get("action"));
+            assertEquals("trips_ds", e.attributes().get("dataset"));
+            assertEquals("false", e.attributes().get("truncated"));
+            assertNotNull(e.attributes().get("routes"), "the result size is carried: " + e.attributes());
         }
     }
 

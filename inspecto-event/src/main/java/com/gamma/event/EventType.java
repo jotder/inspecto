@@ -134,6 +134,26 @@ public final class EventType {
      *  {@code version}/{@code rows} attributes carry the refresh. Consumers can gate their own jobs on it. */
     public static final String EXCHANGE_REFRESHED = "EXCHANGE_REFRESHED";
 
+    // ── link analysis + geo studio (what an analyst looked at) ─────────────────────
+    /** An Entity Projection was served over a Dataset ({@code POST /inv/projection}). {@code dataset},
+     *  {@code rows} and {@code truncated} carry what the analyst actually saw — a projection cut short
+     *  by the limit is a partial picture, and an audit that cannot say so is worthless. */
+    public static final String LINK_PROJECTED = "LINK_PROJECTED";
+    /** An analyst expanded one entity's one-hop neighborhood onto the canvas
+     *  ({@code POST /inv/projection/neighbors}) — a different analytic act from the initial projection.
+     *  Adds the expanded {@code value} to {@link #LINK_PROJECTED}'s attributes. */
+    public static final String LINK_EXPANDED = "LINK_EXPANDED";
+    /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
+     *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
+     *  it spans every Dataset, so it names no single one and cannot truncate. */
+    public static final String LINK_SCHEMA_INSPECTED = "LINK_SCHEMA_INSPECTED";
+    /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
+     *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
+    public static final String GEO_PROJECTED = "GEO_PROJECTED";
+    /** A Geo origin→destination route projection was served ({@code POST /geo/routes}); as
+     *  {@link #GEO_PROJECTED} but with {@code routes} as the result size. */
+    public static final String GEO_ROUTES_PROJECTED = "GEO_ROUTES_PROJECTED";
+
     // ── operational-object bridge (Phase 2 ties back to here) ───────────────────────
     public static final String ALERT_FIRED     = "ALERT_FIRED";
     /** A fired Alert Rule's condition RECOVERED (DUCKLE-C1) — the all-clear. ⛔ Never cooldown-held:

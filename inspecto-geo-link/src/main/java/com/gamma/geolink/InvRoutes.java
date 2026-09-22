@@ -5,9 +5,13 @@ import com.gamma.control.ApiException;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
@@ -28,7 +32,7 @@ import java.util.regex.Pattern;
  * fold the Link Analysis studio's mock-first {@code entity-projection} GraphSource was designed against
  * ({@code docs/superpower/link-analysis-and-graphsource.md} §7).
  *
- * <p>{@code POST /inv/projection} — body {@code {dataset, sourceCol, targetCol, linkKindCol?, attrCols?, limit?}}
+ * <p>{@code POST /inv/projection} — body {@code {dataset, sourceCol, targetCol, linkKindCol?, attrCols?, limit?, filter?}}
  * → {@code {rows:[{source,target,kind,count,attrs?}], truncated}}: distinct {@code (source, target[, kind]
  * [, ...attrCols])} tuples with folded row counts, heaviest first. When {@code attrCols} is given, each
  * column joins the fold key — a folded edge with differing attribute values across rows becomes separate
@@ -66,7 +70,7 @@ public final class InvRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.post("/inv/projection", (e, m) -> project(api, e, api.body(e), null));
         api.post("/inv/projection/neighbors", (e, m) -> neighbors(api, e, api.body(e)));
-        api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api));
+        api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api, e));
     }
 
     /**
@@ -80,7 +84,7 @@ public final class InvRoutes implements RouteModule {
      * hierarchies are a legitimate entity-projection use case. Best-effort: a Dataset whose relation
      * can't be probed (unbound, bad view) is silently skipped, never fails the whole call.
      */
-    private Object schemaRelationships(ApiContext api) throws IOException {
+    private Object schemaRelationships(ApiContext api, HttpExchange ex) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "schema relationship inference");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         ViewStore views = new ViewStore(writeRoot.resolve("views"));
@@ -128,6 +132,19 @@ public final class InvRoutes implements RouteModule {
             if (c != 0) return c;
             return ((String) a.get("fromColumn")).compareTo((String) b.get("fromColumn"));
         });
+
+        try {
+            EventLog.current().emit(Event.builder(EventType.LINK_SCHEMA_INSPECTED).source("inv")
+                    .message("link.schema.inspected — " + relationships.size() + " relationships over "
+                            + columnsByDataset.size() + " datasets")
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action("link.schema.inspected").actionCategory("analysis")
+                    .attr("datasetsScanned", columnsByDataset.size())
+                    .attr("datasetsSkipped", skipped)
+                    .attr("relationships", relationships.size()));
+        } catch (RuntimeException ignore) {
+            // best effort — the audit must never fail the analyst's query
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("relationships", relationships);
@@ -190,6 +207,11 @@ public final class InvRoutes implements RouteModule {
             throw new ApiException(422, bad.getMessage());
         }
 
+        // LA-01: the optional condition tree is validated against the relation's REAL columns and
+        // rendered BEFORE a single character of the statement is assembled below — an identifier the
+        // relation does not have cannot reach SQL, because the render never happens.
+        String filterSql = filterSql(body.get("filter"), datasetId, relationSql);
+
         // Server-built from validated identifiers only; one extra row detects truncation.
         String src = q(sourceCol), tgt = q(targetCol);
         String kindSel = kindCol != null ? ", CAST(" + q(kindCol) + " AS VARCHAR) AS kind" : "";
@@ -211,6 +233,7 @@ public final class InvRoutes implements RouteModule {
         String sql = "SELECT CAST(" + src + " AS VARCHAR) AS source, CAST(" + tgt + " AS VARCHAR) AS target"
                 + kindSel + attrSel + ", COUNT(*) AS cnt FROM " + q(datasetId)
                 + " WHERE " + src + " IS NOT NULL AND " + tgt + " IS NOT NULL" + neighborFilter
+                + " AND (" + filterSql + ")"
                 + " " + groupBy
                 + " ORDER BY cnt DESC, source, target";
 
@@ -234,10 +257,90 @@ public final class InvRoutes implements RouteModule {
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("rows", rows);
             out.put("truncated", r.truncated());
+            audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
             return out;
         } catch (SQLException e) {
             throw new ApiException(422, "projection failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Best-effort audit of one analytic act (LA-04): a projection, or — when {@code neighborsOf} is set —
+     * an expansion, which is a different act and gets its own type. Emitted only after the rows are built,
+     * so {@code rows}/{@code truncated} describe what the analyst actually saw; a partial result the trail
+     * cannot show as partial is worth nothing to an investigator.
+     */
+    private static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated) {
+        try {
+            boolean expand = neighborsOf != null;
+            String action = expand ? "link.expanded" : "link.projected";
+            Event.Builder b = Event.builder(expand ? EventType.LINK_EXPANDED : EventType.LINK_PROJECTED)
+                    .source("inv")
+                    .message(action + " " + datasetId + " — " + rows + " rows" + (truncated ? " (truncated)" : ""))
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action(action).actionCategory("analysis")
+                    .target("dataset", datasetId)
+                    .attr("dataset", datasetId).attr("rows", rows).attr("truncated", truncated);
+            if (expand) b.attr("value", neighborsOf);
+            EventLog.current().emit(b);
+        } catch (RuntimeException ignore) {
+            // best effort — the audit must never fail the analyst's query
+        }
+    }
+
+    /**
+     * Optional {@code filter} (LA-01, contract §5.1): the {@code query-types.ts} condition tree the SPA
+     * already builds, sent verbatim, pushed into the {@code WHERE} <b>ahead of the {@code GROUP BY}</b> so
+     * {@code count} folds over the surviving rows rather than being filtered after the fold.
+     *
+     * <p><b>D-S5(a) — field validation is the safeguard.</b> The tree is rendered by the shared
+     * {@link ConditionSql} (which quote-escapes every literal, the tested contract for authored config),
+     * and every leaf {@code field} is first checked against the relation's <em>actual</em> columns: an
+     * unknown identifier is a 422 naming the field, and the renderer is never reached. A bind-emitting
+     * renderer is a deliberate follow-on, not this item.
+     *
+     * <p>Absent tree, or one that constrains nothing (empty group, only incomplete leaves) → {@code TRUE},
+     * a no-op — parity with {@code ConditionSql}/{@code ConditionTree}'s "an empty group matches every row".
+     */
+    private static String filterSql(Object filter, String datasetId, String relationSql) {
+        if (filter == null) return "TRUE";
+        List<String> columns = relationColumns(datasetId, relationSql);
+        checkFilterFields(filter, columns, datasetId);
+        return ConditionSql.predicate(filter);
+    }
+
+    /** The relation's column names, probed with a zero-row SELECT — the same technique {@link #schemaRelationships} uses. */
+    private static List<String> relationColumns(String datasetId, String relationSql) {
+        try {
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                    datasetId, relationSql, "SELECT * FROM " + q(datasetId), 0, 0, List.of(), List.of()));
+            return r.columns().stream().map(ResultSetDescriptor.Column::name).toList();
+        } catch (Exception unusable) {
+            throw new ApiException(422, "cannot read the columns of dataset '" + datasetId
+                    + "' to validate 'filter': " + unusable.getMessage());
+        }
+    }
+
+    /**
+     * Walk the tree exactly as {@link ConditionSql} does (a node is a group when {@code kind=group} or it
+     * carries {@code items}/{@code conditions}) and reject any leaf naming a column the relation has not
+     * got. A blank {@code field} is left alone: the renderer treats such a leaf as incomplete and emits
+     * nothing for it, so there is no identifier to protect.
+     */
+    private static void checkFilterFields(Object node, List<String> columns, String datasetId) {
+        if (!(node instanceof Map<?, ?> m)) return;
+        Object rawItems = m.get("items") != null ? m.get("items") : m.get("conditions");
+        if ("group".equals(m.get("kind")) || (!"condition".equals(m.get("kind")) && rawItems != null)) {
+            if (rawItems instanceof List<?> items)
+                for (Object it : items) checkFilterFields(it, columns, datasetId);
+            return;
+        }
+        Object raw = m.get("field");
+        String field = raw == null ? "" : String.valueOf(raw);
+        if (field.isEmpty()) return;
+        if (!containsIgnoreCase(columns, field))
+            throw new ApiException(422, "unknown filter field '" + field + "' — not a column of dataset '"
+                    + datasetId + "'");
     }
 
     /** Optional {@code attrCols: string[]} — each validated as a safe identifier. */

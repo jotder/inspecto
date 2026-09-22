@@ -3,6 +3,9 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
@@ -19,6 +22,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -289,6 +294,220 @@ class ControlApiInvProjectionTest {
             ComponentStore store = new ComponentStore(c.root.resolve("registry"));
             assertTrue(store.get("link-analysis-view", "fraud-ring").isPresent(),
                     "saved view lands in the real component store (INV-1 mock-store retirement)");
+        }
+    }
+
+    /** Collect every event emitted while {@code body} runs (LA-04 audit assertions). */
+    private static List<Event> captureEvents(ThrowingRunnable body) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        Consumer<Event> sub = seen::add;
+        EventLog.current().addSubscriber(sub);
+        try {
+            body.run();
+        } finally {
+            EventLog.current().removeSubscriber(sub);
+        }
+        return seen;
+    }
+
+    private interface ThrowingRunnable { void run() throws Exception; }
+
+    private static Event ofType(List<Event> events, String type) {
+        return events.stream().filter(e -> type.equals(e.type())).findFirst()
+                .orElseThrow(() -> new AssertionError("no " + type + " event in " + events));
+    }
+
+    /**
+     * LA-04: a projection is audited, and the audit carries the partial-result flag — an analyst looking
+     * at a truncated graph must be visible as such in the trail.
+     */
+    @Test
+    void projectionEmitsAnAuditedAnalyticEvent(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedCalls(c);
+            List<Event> events = captureEvents(() -> assertEquals(200, project(c.port, """
+                    {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","limit":1}""").statusCode()));
+            Event e = ofType(events, EventType.LINK_PROJECTED);
+            assertEquals("link.projected", e.attributes().get("action"));
+            assertEquals("calls_ds", e.attributes().get("dataset"));
+            assertEquals("1", e.attributes().get("rows"));
+            assertEquals("true", e.attributes().get("truncated"), "the partial result is carried: " + e.attributes());
+        }
+    }
+
+    /** LA-04: an expansion is a different analytic act from the projection it grew from, so it gets its own type. */
+    @Test
+    void neighborsEmitsAnExpansionEventDistinctFromProjection(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedCalls(c);
+            List<Event> events = captureEvents(() -> assertEquals(200, neighbors(c.port, """
+                    {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","value":"bob"}""").statusCode()));
+            Event e = ofType(events, EventType.LINK_EXPANDED);
+            assertEquals("link.expanded", e.attributes().get("action"));
+            assertEquals("calls_ds", e.attributes().get("dataset"));
+            assertEquals("bob", e.attributes().get("value"));
+            assertEquals("false", e.attributes().get("truncated"));
+            assertTrue(events.stream().noneMatch(x -> EventType.LINK_PROJECTED.equals(x.type())),
+                    "an expansion is not logged as a fresh projection: " + events);
+        }
+    }
+
+    /** LA-04: the cross-Dataset schema sweep is audited too, with the reach it actually had. */
+    @Test
+    void schemaRelationshipsEmitsAnInspectionEvent(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOrdersAndCustomers(c);
+            List<Event> events = captureEvents(
+                    () -> assertEquals(200, schemaRelationships(c.port).statusCode()));
+            Event e = ofType(events, EventType.LINK_SCHEMA_INSPECTED);
+            assertEquals("link.schema.inspected", e.attributes().get("action"));
+            assertEquals("2", e.attributes().get("datasetsScanned"));
+        }
+    }
+
+    // ── LA-01: the pushed-down `filter` (contract §5.1) ─────────────────────────────
+
+    /**
+     * Five transactions over the contract's shape: two channels for one pair so a filter can change the
+     * fold's {@code count}, and {@code alice} present as payer AND payee so the either-endpoint OR group
+     * has something to prove. Unfiltered this projects 3 rows: alice→bob (3), erin→alice (1), carol→dave (1).
+     */
+    private void seedTxns(Ctx c) throws Exception {
+        new ViewStore(c.root.resolve("views")).write(new ViewDefinition("txns_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES "
+                        + "('alice','bob','sms','2026-01-05'),"
+                        + "('alice','bob','sms','2026-02-05'),"
+                        + "('alice','bob','wire','2026-03-05'),"
+                        + "('erin','alice','wire','2026-06-05'),"
+                        + "('carol','dave','crypto','2026-05-05')"
+                        + ") AS t(payer,payee,channel,booked_at)",
+                "2026-07-08T00:00:00Z"));
+        new ComponentStore(c.root.resolve("registry")).write("dataset", "txns_ds", Map.of("view", "txns_view"));
+    }
+
+    /**
+     * The filter narrows the projection AND the surviving edge's {@code count} drops from 3 to 2 — proof
+     * the predicate lands ahead of the GROUP BY, not after it. A post-fold filter would have kept count 3.
+     */
+    @Test
+    void filterNarrowsRowsBeforeTheFold(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            assertEquals(3, json(project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee"}""").body())
+                    .at("/rows").size(), "baseline, unfiltered");
+
+            HttpResponse<String> r = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"condition","field":"channel","operator":"in","value":"sms,crypto"}]}}""");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode rows = json(r.body()).at("/rows");
+            assertEquals(2, rows.size(), "the wire-only erin->alice edge is gone: " + rows);
+            assertEquals("alice", rows.get(0).get("source").asText());
+            assertEquals("bob", rows.get(0).get("target").asText());
+            assertEquals(2, rows.get(0).get("count").asInt(), "count folds over the FILTERED rows: " + rows);
+            assertEquals("carol", rows.get(1).get("source").asText());
+        }
+    }
+
+    /** G-R1's time window: a `between` on a date column, the contract's own example operator. */
+    @Test
+    void aTimeWindowFilterChangesTheFoldedCount(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            HttpResponse<String> r = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"condition","field":"booked_at","operator":"between",
+                        "value":"2026-01-01","value2":"2026-02-28"}]}}""");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode rows = json(r.body()).at("/rows");
+            assertEquals(1, rows.size(), "only the two January/February transactions survive: " + rows);
+            assertEquals(2, rows.get(0).get("count").asInt());
+        }
+    }
+
+    /** The contract's canonical "node present as either endpoint": a nested OR group inside the AND. */
+    @Test
+    void aNestedOrGroupSelectsANodeAtEitherEndpoint(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            HttpResponse<String> r = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"group","op":"OR","items":[
+                         {"kind":"condition","field":"payer","operator":"=","value":"alice"},
+                         {"kind":"condition","field":"payee","operator":"=","value":"alice"}]}]}}""");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode rows = json(r.body()).at("/rows");
+            assertEquals(2, rows.size(), "alice as payer and as payee, carol->dave excluded: " + rows);
+            assertEquals(3, rows.get(0).get("count").asInt());
+            assertEquals("erin", rows.get(1).get("source").asText());
+            assertEquals("alice", rows.get(1).get("target").asText());
+        }
+    }
+
+    /**
+     * The security property of LA-01: a leaf naming a column the relation has not got is refused before
+     * anything is rendered, and the refusal names the offending field. Nothing from the tree reaches SQL.
+     */
+    @Test
+    void anUnknownFilterFieldIs422NamingTheField(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            HttpResponse<String> r = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"condition","field":"ghost_col","operator":"=","value":"x"}]}}""");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("ghost_col"), "the refusal names the field: " + r.body());
+            assertEquals("CONFIG_VALIDATION_FAILED",
+                    JSON.readTree(r.body()).at("/error/errorCode").asText(), r.body());
+
+            HttpResponse<String> nested = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"condition","field":"channel","operator":"=","value":"sms"},
+                       {"kind":"group","op":"OR","items":[
+                         {"kind":"condition","field":"payer","operator":"=","value":"alice"},
+                         {"kind":"condition","field":"1=1) OR (1","operator":"=","value":"x"}]}]}}""");
+            assertEquals(422, nested.statusCode(), "a nested leaf is validated too: " + nested.body());
+            assertTrue(nested.body().contains("1=1"), nested.body());
+        }
+    }
+
+    /** An empty group constrains nothing — a no-op, not an error (parity with ConditionSql/ConditionTree). */
+    @Test
+    void anEmptyFilterGroupIsANoOp(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            HttpResponse<String> r = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[]}}""");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(3, json(r.body()).at("/rows").size(), "same as the unfiltered projection");
+        }
+    }
+
+    /** /neighbors delegates to the projection, so it inherits the filter with no separate code path. */
+    @Test
+    void theFilterSurvivesThroughNeighbors(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            assertEquals(2, json(neighbors(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee","value":"alice"}""").body())
+                    .at("/rows").size(), "baseline: both alice edges");
+
+            HttpResponse<String> r = neighbors(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee","value":"alice",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"condition","field":"channel","operator":"=","value":"sms"}]}}""");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode rows = json(r.body()).at("/rows");
+            assertEquals(1, rows.size(), "the wire edge erin->alice is filtered out: " + rows);
+            assertEquals("bob", rows.get(0).get("target").asText());
+            assertEquals(2, rows.get(0).get("count").asInt(), "the neighbor bind and the filter compose");
         }
     }
 

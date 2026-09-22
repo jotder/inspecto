@@ -5,6 +5,9 @@ import com.gamma.control.ApiException;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
@@ -12,6 +15,8 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 
 import com.gamma.util.SqlIdent;
+import com.sun.net.httpserver.HttpExchange;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -58,12 +63,12 @@ public final class GeoRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.post("/geo/projection", (e, m) -> projection(api, api.body(e)));
-        api.post("/geo/routes", (e, m) -> routes(api, api.body(e)));
+        api.post("/geo/projection", (e, m) -> projection(api, e, api.body(e)));
+        api.post("/geo/routes", (e, m) -> routes(api, e, api.body(e)));
     }
 
     // ── POST /geo/projection ────────────────────────────────────────────────────
-    private Object projection(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object projection(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Ctx c = context(api, body);
         String lat = ident(body, "latCol", true), lon = ident(body, "lonCol", true);
         String entity = ident(body, "entityCol", false);
@@ -111,12 +116,15 @@ public final class GeoRoutes implements RouteModule {
         out.put("points", points);
         out.put("routes", List.of());
         out.put("truncated", r.truncated());
-        out.put("skipped", skipped(c, valid));
+        long skipped = skipped(c, valid);
+        out.put("skipped", skipped);
+        audit(ex, EventType.GEO_PROJECTED, "geo.projected", c.datasetId, "points", points.size(),
+                r.truncated(), skipped);
         return out;
     }
 
     // ── POST /geo/routes ──────────────────────────────────────────────────────────
-    private Object routes(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object routes(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Ctx c = context(api, body);
         String fromLat = ident(body, "fromLatCol", true), fromLon = ident(body, "fromLonCol", true);
         String toLat = ident(body, "toLatCol", true), toLon = ident(body, "toLonCol", true);
@@ -164,8 +172,32 @@ public final class GeoRoutes implements RouteModule {
         out.put("points", new ArrayList<>(points.values()));
         out.put("routes", routeList);
         out.put("truncated", r.truncated());
-        out.put("skipped", skipped(c, rCte + " SELECT * FROM r WHERE ", valid));
+        long skipped = skipped(c, rCte + " SELECT * FROM r WHERE ", valid);
+        out.put("skipped", skipped);
+        audit(ex, EventType.GEO_ROUTES_PROJECTED, "geo.routes.projected", c.datasetId, "routes",
+                routeList.size(), r.truncated(), skipped);
         return out;
+    }
+
+    /**
+     * Best-effort audit of one analytic act (LA-04). Emitted only after the result is built, so
+     * {@code sizeKey}/{@code truncated} describe what the analyst actually saw — a projection cut short
+     * by the limit is a partial picture, and an audit that cannot say so is worthless.
+     */
+    private static void audit(HttpExchange ex, String type, String action, String datasetId,
+                              String sizeKey, int size, boolean truncated, long skipped) {
+        try {
+            EventLog.current().emit(Event.builder(type).source("geo")
+                    .message(action + " " + datasetId + " — " + size + " " + sizeKey
+                            + (truncated ? " (truncated)" : ""))
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action(action).actionCategory("analysis")
+                    .target("dataset", datasetId)
+                    .attr("dataset", datasetId).attr(sizeKey, size)
+                    .attr("truncated", truncated).attr("skipped", skipped));
+        } catch (RuntimeException ignore) {
+            // best effort — the audit must never fail the analyst's query
+        }
     }
 
     /** Fold an endpoint into the shared points map (id {@code ep:<label>}); returns the point id. */
