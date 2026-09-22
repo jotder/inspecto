@@ -241,12 +241,16 @@ class InspectoToolsTest {
                 statusDir.resolve(name + "_status_TEST.csv").toString(),
                 statusDir.resolve(name + "_batches_TEST.csv").toString(),
                 statusDir.resolve(name + "_lineage_TEST.csv").toString());
+        // ⚠ `rejectedRows` was inserted after `rejectedFiles` by the ledger change (a1ddef80) and these two
+        // call sites were not updated, which stopped inspecto-intelligence test-compiling and took the whole
+        // reactor red. Values chosen to leave every assertion below unchanged: rowCount is totalOutputRows
+        // (100 then 40, delta -60) and nothing asserts on rejectedRows.
         w.flush(new ConsignmentAuditWriter.ConsignmentRow("B1", name, "mini", "",
                 "2026-06-09 08:00:00", "2026-06-09 08:00:02", "SUCCESS",
-                1, 0, 100, 100, 1, 120L, 2000, ""), List.of(), List.of());
+                1, 0, 0L, 100, 100, 1, 120L, 2000, ""), List.of(), List.of());
         w.flush(new ConsignmentAuditWriter.ConsignmentRow("B2", name, "mini", "",
                 "2026-06-09 09:00:00", "2026-06-09 09:00:05", "FAILED",
-                1, 0, 100, 40, 1, 120L, 5000, "boom"), List.of(), List.of());
+                1, 0, 60L, 100, 40, 1, 120L, 5000, "boom"), List.of(), List.of());
 
         Tool diff = tool(InspectoTools.tools(svc, null, List::of), "diff_batches");
         Map<String, Object> out = invoke(diff,
