@@ -1,0 +1,81 @@
+partitionKey: EVENT_DATE
+raw:
+  name: PMXDR
+  format: CSV
+  fields[18]{name,selector,type}:
+    REC_SEQ,"0",VARCHAR
+    MED_FILE_ID,"1",VARCHAR
+    SWITCH_ID,"2",VARCHAR
+    REC_TYPE,"3",VARCHAR
+    IMSI,"4",VARCHAR
+    MSISDN,"5",VARCHAR
+    OTHER_PARTY,"6",VARCHAR
+    CELL_ID,"7",VARCHAR
+    APN,"8",VARCHAR
+    START_AT,"9",TIMESTAMP
+    EVENT_DATE,"10",DATE
+    DURATION_SEC,"11",INTEGER
+    BYTES_UP,"12",BIGINT
+    BYTES_DOWN,"13",BIGINT
+    RATED_AMOUNT,"14",DOUBLE
+    CURRENCY,"15",VARCHAR
+    ROAM_FLAG,"16",VARCHAR
+    MED_STATUS,"17",VARCHAR
+mapping:
+  canonicalName: postmed_xdr
+  rawName: PMXDR
+  fields[18]:
+    - name: REC_SEQ
+      from: REC_SEQ
+      fn: keep
+    - name: MED_FILE_ID
+      from: MED_FILE_ID
+      fn: keep
+    - name: SWITCH_ID
+      from: SWITCH_ID
+      fn: keep
+    - name: REC_TYPE
+      from: REC_TYPE
+      fn: keep
+    - name: IMSI
+      from: IMSI
+      fn: keep
+    - name: MSISDN
+      from: MSISDN
+      fn: keep
+    - name: OTHER_PARTY
+      from: OTHER_PARTY
+      fn: keep
+    - name: CELL_ID
+      from: CELL_ID
+      fn: keep
+    - name: APN
+      from: APN
+      fn: keep
+    - name: START_AT
+      from: START_AT
+      fn: keep
+    - name: EVENT_DATE
+      from: EVENT_DATE
+      fn: keep
+    - name: DURATION_SEC
+      from: DURATION_SEC
+      fn: keep
+    - name: BYTES_UP
+      from: BYTES_UP
+      fn: keep
+    - name: BYTES_DOWN
+      from: BYTES_DOWN
+      fn: keep
+    - name: RATED_AMOUNT
+      from: RATED_AMOUNT
+      fn: keep
+    - name: CURRENCY
+      from: CURRENCY
+      fn: keep
+    - name: ROAM_FLAG
+      from: ROAM_FLAG
+      fn: keep
+    - name: MED_STATUS
+      from: MED_STATUS
+      fn: keep

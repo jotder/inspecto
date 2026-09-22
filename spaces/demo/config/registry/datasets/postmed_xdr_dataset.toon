@@ -1,0 +1,2 @@
+physicalRef: postmed_xdr/database
+description: "Post-mediated xDR usage records (voice/SMS/data) loaded from the mediation inbox. Synthetic."

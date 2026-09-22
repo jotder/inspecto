@@ -1,0 +1,39 @@
+name: postmed_xdr
+active: true
+description: "Post-mediated xDR stream — voice/SMS/data usage records normalised and rated by the mediation platform, dropped into a local inbox one file per collection interval. Synthetic; regenerate with data/samples/gen-postmed-xdr.py."
+
+dirs:
+  poll:       spaces/demo/data/inbox/postmed_xdr
+  database:   spaces/demo/data/postmed_xdr/database
+  backup:     spaces/demo/data/postmed_xdr/backup
+  temp:       spaces/demo/data/postmed_xdr/temp
+  errors:     spaces/demo/data/postmed_xdr/errors
+  quarantine: spaces/demo/data/postmed_xdr/quarantine
+  markers:    spaces/demo/data/postmed_xdr/markers
+  status_dir: spaces/demo/data/postmed_xdr/status
+  log_dir:    spaces/demo/data/postmed_xdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.psv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/demo/config/postmed/postmed_xdr_schema.toon
+  csv_settings:
+    delimiter: "|"
+    has_header: true
+    comment: "#"
+    null_strings[2]: "NULL", "N/A"
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
+  include[1]: "glob:**/PMXDR_*.psv"
