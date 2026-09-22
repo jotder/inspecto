@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **70<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 35<!--count:backlog-p2--> × P2 · 35<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open), ⬆ **56 → 60 with the four UI-consolidation rows filed 2026-09-22**, ⬆ **60 → 70 with the ten `postmed_xdr` pipeline-build findings filed 2026-09-22** (3 × P2, 7 × P3 — see *Filed from the postmed_xdr pipeline build* in §4).
+> **71<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 36<!--count:backlog-p2--> × P2 · 35<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open), ⬆ **56 → 60 with the four UI-consolidation rows filed 2026-09-22**, ⬆ **60 → 70 with the ten `postmed_xdr` pipeline-build findings filed 2026-09-22** (3 × P2, 7 × P3 — see *Filed from the postmed_xdr pipeline build* in §4). ⬆ **70 → 71 with `DOC-GUARDS-SCAN-IGNORED-SOURCES-1` filed the same day** (P2; found by the push that published the ten).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 35<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 36<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
 > someone asks by name"** — so those 35<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 70<!--count:backlog-rows--> as pending work overstates what is owed by roughly half.
+> backlog to burn down. Reading all 71<!--count:backlog-rows--> as pending work overstates what is owed by roughly half.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -4484,6 +4484,8 @@ by a control** rather than filed, are in the owning document.
   never tell you this** — both read `0.9.53`.
 
 
+
+- **P2** · **`DOC-GUARDS-SCAN-IGNORED-SOURCES-1` — three doc guards read UNTRACKED, GITIGNORED markdown as a subject, so another session's local note can block your push.** `git push` on `master` was refused 2026-09-22 by the pre-push citation guard over `SESSION_STATUS.local.md:20` — a file that is untracked and gitignored (`.gitignore:124`, `*.local.md`), rewritten by a stop hook on every session, and owned by a peer working something unrelated. Measured with a gitignored `PROBE.local.md` at the repo root: **`check-doc-citations.mjs`, `check-doc-links.mjs` and `check-doc-counts.mjs` all name it and exit 1**, while `check-vocabulary.mjs` (`git ls-files` only) and `check-secrets.mjs` / `check-nul-bytes.mjs` (tracked-only, by design) do not. Root cause is the subject side, not the target side: `tracked-paths.mjs` already moved path RESOLUTION to `git ls-files` for exactly this reason (`LINKGUARD-CASE-1`, 2026-09-14, whose header names `.claude/sessions/snapshot.md` as the same file class), but `check-doc-citations.mjs:227` still collects its markdown with `readdirSync` + a `SKIP_DIRS` deny-list that cannot exclude what git would not hand you. ⛔ Two consequences: such a guard is **not reproducible between shifts** — red for one session and green for another on the same commit, the property a gate exists to deny — and it is **unfixable by its own rules**, since editing the offending line does not survive the hook (verified: the correction that unblocked this push was gone within the hour). Remedy: derive the subject set from `git ls-files` like `check-vocabulary.mjs` already does. The rule is already written down — *guard-coverage.md* §*A fourth shape* says to prefer `git ls-files` over `readdirSync`; this is that rule not yet applied to the subject half. → `okf/backend/build-run/guard-coverage.md`.
 
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 

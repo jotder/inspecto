@@ -318,6 +318,50 @@ scratch and worktree roots (`.claude/`) explicitly, and prefer deriving the file
 `git ls-files` — what the repository *is* — over `readdirSync`, which reports what a working copy
 *happens to contain*.
 
+## Instance, 2026-09-22: a GITIGNORED session note blocked a push (`DOC-GUARDS-SCAN-IGNORED-SOURCES-1`)
+
+The fourth shape again, and this time against the rule this page already states. `git push` on `master`
+was refused by the pre-push citation guard:
+
+```
+SESSION_STATUS.local.md:20  path does not resolve:  inspecto-event/EventType.java
+```
+
+`SESSION_STATUS.local.md` is **untracked and gitignored** (`.gitignore:124`, `*.local.md`) and is
+rewritten by a stop hook on every session, so it exists in every working tree and in no checkout — the
+same file class as `.claude/sessions/snapshot.md`, which does not exist in a fresh checkout and which
+`tools/tracked-paths.mjs`'s own header already names. A peer's in-flight note, about work unrelated to the push, blocked the push.
+
+**The rule had already been applied to half of each guard.** `tracked-paths.mjs` (`LINKGUARD-CASE-1`,
+2026-09-14) moved the **target** side to `git ls-files` precisely because "the working tree is not the
+artifact". The **subject** side — the set of markdown files the guard reads *from* — still walks the
+tree: `check-doc-citations.mjs:227` uses `readdirSync` with a `SKIP_DIRS` deny-list, and nothing in that
+list excludes files git would not hand you.
+
+Measured 2026-09-22 by writing a gitignored `PROBE.local.md` at the repo root and running each guard:
+
+| Guard | Reads untracked/ignored markdown as a subject? |
+|---|---|
+| `check-doc-citations.mjs` | **YES** — named the file, exit 1 (the incident above) |
+| `check-doc-links.mjs` | **YES** — named the file, exit 1 |
+| `check-doc-counts.mjs` | **YES** — named the file, exit 1 |
+| `check-vocabulary.mjs` | no — `git ls-files` only, exit 0 |
+| `check-secrets.mjs`, `check-nul-bytes.mjs` | no — tracked files only, by design |
+
+⚠ **The first probe of this was INVALID and reported a clean pass.** It cited
+`inspecto-nope/DoesNotExist.java`, whose first segment is not a real directory, so the guard never
+treated the token as a repository path at all — every guard exited 0 and the hole looked absent. Only a
+probe whose first segment exists reproduces — `inspecto-event/NopeDoesNotExist.java` never existed,
+but `inspecto-event/` does, which is the whole difference — and the same
+citation in a **tracked** doc failing is what proves the probe valid rather than the guard broken. ⇒ A
+negative result from a probe that could not have succeeded is not evidence.
+
+⛔ **Two consequences worth stating.** A guard that reads what the working copy *happens to contain* is
+**not reproducible between shifts** — it can be red for one session and green for another on the same
+commit, which is the property a gate exists to deny. And it is **unfixable by its own rules**: editing
+the offending line does not last, because the hook regenerates the file (verified — the correction made
+to unblock this push was gone within the hour).
+
 ## Instance, 2026-09-16: three unrelated defects behind ONE red gate
 
 `master` CI was red all day — at least six runs from 08:33 onward — and every one read as the same
