@@ -141,8 +141,26 @@ describe('LinkAnalysisAttachCaseDialog', () => {
         expect(fixture.componentInstance.cases()).toEqual([{ id: 'CASE-9', title: 'Real case' }]);
     });
 
-    it('falls back to placeholders when the objects call fails', () => {
-        const { fixture } = create(true, () => throwError(() => new Error('down')) as never);
-        expect(fixture.componentInstance.cases().length).toBe(2);
+    it('surfaces an errored Case lookup and offers NO attachable case', async () => {
+        const { fixture, close, store, snapshot } = create(true, () => throwError(() => new Error('down')) as never);
+        const c = fixture.componentInstance;
+        const el: HTMLElement = fixture.nativeElement;
+
+        // The error state is honest: nothing attachable, and no placeholder leaked in as a real Case.
+        expect(c.cases()).toEqual([]);
+        expect(c.caseOptions()).toEqual([]);
+        expect(c.loadError()).not.toBe('');
+        for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
+        expect(el.querySelector('inspecto-alert [role="alert"]')?.textContent).toContain('could not be loaded');
+        expect(el.querySelector('inspecto-option-picker')).toBeNull();
+        expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+
+        // Even a caseId forced onto the form cannot be attached while the lookup is errored.
+        c.form.patchValue({ caseId: store.mockCases[0].id });
+        c.attach();
+        expect(close).not.toHaveBeenCalled();
+        expect(store.snapshots()[0].attachedTo).toEqual([]);
+        expect(snapshot.attachedTo).toEqual([]);
+        await expectNoA11yViolations(el);
     });
 });

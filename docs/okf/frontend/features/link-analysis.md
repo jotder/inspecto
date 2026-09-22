@@ -359,6 +359,17 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   most needed it and the one nobody had listed** — a tile reads as a fixed report and is in fact a live
   re-projection on every render. ⚠ This is a LABEL, not a guarantee: making a view reproducible is LA-03,
   and needs a durable snapshot store that does not exist yet.
+* **"The ops module is absent" and "the Case lookup failed" are two states, and Attach-to-Case now says
+  which** (found 2026-09-22 while grounding D-S1). The dialog fills its Case picker from
+  `GET /objects?type=CASE` and used to fall back to `LinkAnalysisSnapshotsService.mockCases` on ANY error,
+  so an ops service that was down, unauthorised or unreachable rendered exactly like an edition that
+  simply has no ops module — two placeholder Cases, offered as attachable targets, in the one dialog whose
+  purpose is attaching EVIDENCE. 🔴 **Attaching evidence to a fabricated Case id is a silent wrong answer
+  in an investigative tool**, and nothing downstream would have caught it. The placeholders survive on the
+  ops-absent path (a deployment fact the analyst can act on); a real error now clears the list, renders an
+  `<inspecto-alert variant="error">` in the picker's place and disables Attach — `attach()` refuses too,
+  so a caseId forced onto the form cannot get through. ⚠ The whole snapshot/attach flow is still
+  client-side (LA-03 unbuilt), so this is about the UI's honesty, not about persistence.
 * **The projection reports the identities it has SPLIT** (`splitIdentityGroups`, decision D-S4). Entity ids
   are value-projected — `entityId` mints them from the trimmed raw value with no case fold and no alias
   resolution — so `ACME Ltd` and `acme ltd.` are two nodes carrying two degree counts, two community

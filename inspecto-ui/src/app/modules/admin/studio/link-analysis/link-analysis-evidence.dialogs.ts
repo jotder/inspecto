@@ -5,7 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
-import { SessionService } from 'app/inspecto/api';
+import { SessionService, apiErrorMessage } from 'app/inspecto/api';
 import { ObjectsService } from 'app/inspecto/api/objects.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
@@ -149,6 +149,10 @@ export interface AttachCaseDialogData {
  * **Attach to Case** (plan S1.3). Picks a Case and records the snapshot against it. With the ops module
  * present the Cases come from `GET /objects?type=CASE`; without it, placeholder Cases let the flow be
  * exercised UI-first. The "saved view only" option is deliberately labelled *not evidence*.
+ *
+ * ⚠ Those two states must never be confused. "The ops module is not installed" is a deployment fact and
+ * may offer placeholders; a Case lookup that FAILED is an error, and the dialog then offers nothing —
+ * attaching evidence to a placeholder id the analyst believes is a real Case is a silent wrong answer.
  */
 @Component({
     standalone: true,
@@ -167,14 +171,20 @@ export interface AttachCaseDialogData {
         <h2 mat-dialog-title>Attach to Case</h2>
         <form [formGroup]="form" (ngSubmit)="attach()">
             <mat-dialog-content class="flex flex-col gap-3">
-                <inspecto-option-picker
-                    label="Case"
-                    formControlName="caseId"
-                    [options]="caseOptions()"
-                    [help]="casesHelp()"
-                ></inspecto-option-picker>
-                @if (form.controls.caseId.touched && form.controls.caseId.invalid) {
-                    <p class="text-warn text-xs" role="alert">Pick a Case.</p>
+                @if (loadError()) {
+                    <inspecto-alert variant="error" title="Cases could not be loaded">
+                        {{ loadError() }} — no Case can be offered until the lookup succeeds.
+                    </inspecto-alert>
+                } @else {
+                    <inspecto-option-picker
+                        label="Case"
+                        formControlName="caseId"
+                        [options]="caseOptions()"
+                        [help]="casesHelp()"
+                    ></inspecto-option-picker>
+                    @if (form.controls.caseId.touched && form.controls.caseId.invalid) {
+                        <p class="text-warn text-xs" role="alert">Pick a Case.</p>
+                    }
                 }
                 <div class="rounded-lg border p-3 text-sm">
                     <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
@@ -202,7 +212,7 @@ export interface AttachCaseDialogData {
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
-                <button mat-flat-button color="primary" type="submit">Attach</button>
+                <button mat-flat-button color="primary" type="submit" [disabled]="loadError() !== ''">Attach</button>
             </mat-dialog-actions>
         </form>
     `,
@@ -218,6 +228,8 @@ export class LinkAnalysisAttachCaseDialog implements OnInit {
     private readonly fb = inject(FormBuilder);
 
     readonly cases = signal<CaseRef[]>([]);
+    /** Non-empty once the Case lookup FAILED — distinct from the ops-absent path, which has placeholders. */
+    readonly loadError = signal('');
     readonly caseOptions = computed(() => this.cases().map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` })));
     readonly casesHelp = computed(() =>
         this.opsEnabled()
@@ -238,11 +250,15 @@ export class LinkAnalysisAttachCaseDialog implements OnInit {
         }
         this.objects.list({ type: 'CASE' }).subscribe({
             next: (rows) => this.cases.set(rows.map((o) => ({ id: o.id, title: o.title }))),
-            error: () => this.cases.set([...this.store.mockCases]),
+            error: (err) => {
+                this.cases.set([]);
+                this.loadError.set(apiErrorMessage(err, 'The Cases lookup failed.'));
+            },
         });
     }
 
     attach(): void {
+        if (this.loadError()) return;
         this.form.markAllAsTouched();
         if (this.form.invalid) return;
         const { caseId, what } = this.form.getRawValue();
