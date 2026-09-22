@@ -260,24 +260,24 @@ code. To exercise §4, copy `postmed_xdr/PMXDR_20260904_001.psv.defect` into the
 
 ## 7. What is left
 
-Nothing is owed for the Pipeline itself — it is built, run and verified. The open items are the
-findings, and they are **not yet filed as BACKLOG rows**: `BACKLOG.md` is a shared file and a peer is
-working `master`, so filing them by hand here risks sweeping their edits (the staging hazard this repo
-has already been bitten by). They should be filed as rows in the next change that legitimately touches
-that file:
+Nothing is owed for the Pipeline itself — it is built, run and verified. The ten findings were
+**filed as `BACKLOG.md` rows on 2026-09-22** under *Filed from the postmed_xdr pipeline build*, and
+this page is the home each row points at — so the identifiers below are load-bearing:
+`tools/check-backlog-homes.mjs` requires the row's id to appear verbatim in its target, and this is
+that target.
 
-| # | Finding | Shape |
-|---|---|---|
-| F2 | batch audit reports `rejected_count=0` and an input count excluding a dropped row | bug — audit correctness |
-| F4 | errors CSV emits one row per missing column | quality |
-| F3 | `duplicate_check` is file-grain; record-grain duplicates pass | docs |
-| W3 | node "not yet tested" ignores `/provenance` run history | product |
-| W4 | dry-run cannot seed from the inbox, and cannot exercise parse config | product — the biggest builder gap |
-| W5 | palette add drops an orphan; no insert-on-edge | product |
-| W6 | `/graph` read shape ≠ `/graph` write shape | API |
-| W7 | workbench save reformats the whole file (semantically lossless) | quality |
-| W8 | created Pipeline lands flat at the space config root, not a per-Pipeline directory | consistency |
-| W9 | read-only lens renders 36 enabled add controls | a11y |
+| # | Backlog id | Finding | Priority |
+|---|---|---|---|
+| F2 | `INGEST-REJECT-ACCOUNTING-1` | batch audit reports `rejected_count=0` and an input count excluding a dropped row | **P2** |
+| W3 | `PIPELINE-NODE-TEST-STATE-STALE-1` | node "not yet tested" ignores `/provenance` run history | **P2** |
+| W4 | `DRYRUN-SEEDS-AFTER-PARSE-1` | dry-run cannot seed from the inbox, and cannot exercise parse config | **P2** — the biggest builder gap |
+| F4 | `INGEST-ERRORS-CSV-PER-COLUMN-1` | errors CSV emits one row per missing column | P3 |
+| F3 | `DUPLICATE-CHECK-GRAIN-UNSTATED-1` | `duplicate_check` is file-grain; record-grain duplicates pass | P3 |
+| W5 | `PALETTE-ADD-DROPS-ORPHAN-1` | palette add drops an orphan; no insert-on-edge | P3 |
+| W6 | `GRAPH-READ-SHAPE-NOT-WRITE-SHAPE-1` | `/graph` read shape ≠ `/graph` write shape | P3 |
+| W7 | `GRAPH-SAVE-REFORMATS-CONFIG-1` | workbench save reformats the whole file (semantically lossless) | P3 |
+| W8 | `UI-CREATED-PIPELINE-FLAT-HOME-1` | created Pipeline lands flat at the space config root | P3 |
+| W9 | `READONLY-LENS-PALETTE-ENABLED-1` | read-only lens renders 36 enabled add controls | P3 |
 
 ## References
 
