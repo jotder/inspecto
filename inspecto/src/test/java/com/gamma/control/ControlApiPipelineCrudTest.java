@@ -170,39 +170,11 @@ class ControlApiPipelineCrudTest {
     }
 
     /**
-     * WB-15 / D3 — a NEW pipeline lands in its own {@code config/<id>/} directory, chosen server-side.
+     * An EXISTING pipeline keeps its own home, wherever its author put it.
      *
-     * <p>🔴 The scaffold used to write flat at the space config root while every shipped Pipeline lives
-     * in a per-Pipeline directory, and a {@code <id>_schema.toon} satellite would land at the root too —
-     * two layouts, one of which had to go ({@code UI-CREATED-PIPELINE-FLAT-HOME-1}). ⚠ The client sends no
-     * path, so the choice is the server's.
-     */
-    @Test
-    void aCreatedPipelineLandsInItsOwnDirectory(@TempDir Path dir) throws Exception {
-        Path wr = dir.resolve("wr");
-        try (Ctx c = open(dir, wr)) {
-            String b = dir.toString().replace('\\', '/');
-            // Every required dirs.* leaf — the spec gate refuses a partial draft before the path choice
-            // this test is about is ever reached.
-            String body = """
-                    {"type":"pipeline","overwrite":true,
-                     "config":{"id":"brand_new","name":"brand_new","active":false,
-                               "dirs":{"poll":"%s/in","database":"%s/db","backup":"%s/bk","temp":"%s/tmp",
-                                       "errors":"%s/err","quarantine":"%s/q","markers":"%s/mk",
-                                       "status_dir":"%s/st","log_dir":"%s/log"}}}"""
-                    .formatted(b, b, b, b, b, b, b, b, b);
-            HttpResponse<String> r = send(c.port, "POST", "/config/write", body);
-            assertEquals(200, r.statusCode(), r.body());
-
-            assertTrue(Files.exists(wr.resolve("brand_new").resolve("brand_new_pipeline.toon")),
-                    "a created Pipeline belongs in config/<id>/: " + r.body());
-            assertFalse(Files.exists(wr.resolve("brand_new_pipeline.toon")),
-                    "and NOT flat at the config root, where its satellites would orphan beside it");
-        }
-    }
-
-    /**
-     * WB-15 — the subdir default binds LATE: an EXISTING pipeline keeps its own home.
+     * <p>⛔ Kept as the guard for whoever re-attempts {@code D3} ({@code config/<id>/} for a created
+     * Pipeline). That redirect was implemented and reverted on 2026-09-22 because it made a fresh
+     * config unreachable to read/patch/delete; when it returns, THIS is the case it must not break.
      *
      * <p>⛔ Several shipped Pipelines live in a per-DOMAIN directory
      * ({@code config/postmed/postmed_xdr_pipeline.toon}), not one named for the id. Redirecting an EDIT

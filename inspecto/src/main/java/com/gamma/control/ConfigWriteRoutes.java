@@ -151,30 +151,15 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
-        // \U0001f534 A NEW pipeline lands in its OWN directory: config/<id>/ (D3, signed 2026-09-22; WB-15).
-        //
-        // The workbench scaffold used to write flat at the space config root while every shipped Pipeline
-        // lives in a per-Pipeline directory, and a `<id>_schema.toon` satellite would land at the root
-        // too — two layouts, one of which had to go (UI-CREATED-PIPELINE-FLAT-HOME-1). The 2026-09-06
-        // "one identity for id, file and directories" decision already pointed here.
-        //
-        // \u26d4 **Bound LATE, and only for a file that does not exist yet.** It runs AFTER the legacy-name
-        // adoption above and is gated on `!Files.exists(target)`, because an existing Pipeline may live
-        // anywhere the author put it — several shipped ones sit in a per-DOMAIN directory
-        // (`config/postmed/postmed_xdr_pipeline.toon`), not one named for the id. Redirecting an EDIT
-        // would fork a shadow config beside the real one, which is the exact failure the adoption block
-        // above exists to prevent.
-        //
-        // \u26a0 And it defers to an explicit `subdir:` — a caller that names a home means it (that is how
-        // every SATELLITE-WRITE-1 call site puts a schema/grammar beside its Pipeline).
-        // \u26a0 BEFORE schemaFileFindings below, which resolves config-relative against `target.getParent()`
-        // — a redirect after it would check the wrong directory.
-        if ("pipeline".equals(type) && (subdir == null || subdir.isBlank()) && !Files.exists(target)) {
-            target = WriteGates.jail(writeRoot,
-                    writeRoot.resolve(safeIdentity)
-                            .resolve(ConfigFileSupport.fileBase(type, safeIdentity) + ".toon"),
-                    "resolved path");
-        }
+        // ⛔ WB-15 (config/<id>/ for a created Pipeline, D3) was implemented here on 2026-09-22 and
+        // REVERTED the same day. 🔴 It made a freshly-written config UNREACHABLE: an unregistered
+        // config is resolved at the write ROOT, and only a REGISTERED pipeline is found wherever its
+        // file actually sits (`resolveRegisteredConfigFile`). So a create that nested the file left
+        // read, patch and delete answering 404 for it — 23 tests across
+        // ControlApiConfig{Write,Patch,Delete,IfMatch}Test, ControlApiDeadPropertyTest and
+        // ControlApiDedupWindowArmingTest caught exactly that.
+        // ⚠ D3 still stands as a DECISION. Landing it needs the READ path to resolve `config/<id>/`
+        // too, which is the larger change the row did not name. Row: UI-CREATED-PIPELINE-FLAT-HOME-1.
 
         // Warning only: the save still succeeds (the schema file may be created afterwards), but
         // the operator learns now that Register would fail on this host.
