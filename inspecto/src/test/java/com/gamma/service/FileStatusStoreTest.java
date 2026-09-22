@@ -42,7 +42,7 @@ class FileStatusStoreTest {
                 "a.csv", "SUCCESS", 2, 0, List.of(winPath), List.of(120L), 1000, "", "B1");
         var batchRow = new ConsignmentAuditWriter.ConsignmentRow("B1", name, "mini", "",
                 "2026-06-09 08:00:00", "2026-06-09 08:00:02", "SUCCESS",
-                1, 0, 2, 2, 1, 120L, 2000, "");
+                1, 0, 0L, 2, 2, 1, 120L, 2000, "");
         var lineage = List.of(new LineageRow("B1", 0, "a.csv", winPath, "year=2020/month=04/day=03", 2));
 
         w.flush(batchRow, List.of(fileRow), lineage);

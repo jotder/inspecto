@@ -45,7 +45,7 @@ class PipelineConsignmentSignalTest {
             var fileRows = List.of(new ConsignmentAuditWriter.FileRow("t0", "t1", "good.csv", "SUCCESS",
                     5, 0, List.of("/db/out.csv"), List.of(10L), 5, "", batchId));
             var batchRow = new ConsignmentAuditWriter.ConsignmentRow(batchId, "sig_pipeline", "mini", "",
-                    "t0", "t2", "SUCCESS", 1, 0, 5, 5, 1, 10L, 20, "");
+                    "t0", "t2", "SUCCESS", 1, 0, 0L, 5, 5, 1, 10L, 20, "");
             var lineage = List.of(new LineageRow(batchId, 0, "good.csv", "/db/out.csv", "year=2026", 5));
 
             w.flush(batchRow, fileRows, lineage);

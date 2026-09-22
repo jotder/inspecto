@@ -335,7 +335,9 @@ public final class DrainCommand {
         audit.flush(new ConsignmentAuditWriter.ConsignmentRow(
                 batch.batchId(), cfg.identity().pipelineName(), m.schemaName, m.outputTable,
                 start.format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT), "SUCCESS",
-                m.members.size(), 0, 0L, rows, writer.outputs().size(), bytes,
+                // rejected_files, rejected_rows, total_input_rows (D2, 2026-09-22): a drain replays
+                // already-parsed rows, so nothing is rejected here and input == output.
+                m.members.size(), 0, 0L, rows, rows, writer.outputs().size(), bytes,
                 java.time.Duration.between(start, end).toMillis(), null),
                 List.of(), writer.lineage());
     }

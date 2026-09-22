@@ -80,9 +80,31 @@ pre-token spelling until Phase 7. Rejects are scratch unless the author **wires 
 outlet** — the designed pattern ("the user never wires these, only tunes where they rest").
 `ConservationCheck` alerts on an unexplained in/out imbalance either way.
 
-### Rejects are counted in TWO columns, files and rows (D2, signed 2026-09-22)
+### Rejects are counted in TWO columns, files and rows (D2 — AS-BUILT 2026-09-22)
 
-✅ **Decision (operator, 2026-09-22):** `rejected_count` is **split, not redefined** — `rejected_files`
+✅ **SHIPPED 2026-09-22 (`WB-09`).** The batches ledger header is
+`…,member_count,rejected_files,rejected_rows,total_input_rows,…`, and `total_input_rows` counts what
+ARRIVED. ⚠ **A wholly-rejected member counts in `rejected_files` and NOT in `rejected_rows`** — its rows
+were never parsed, so counting them as rows would double-count the file as rows it never had.
+
+🔴 **The header has SEVEN construction/mirror sites, not the four the plan listed.** Beyond
+`ConsignmentAuditWriter`'s header string, its `batchLine` codec, `ConsignmentRow` and
+`OperationalTables.BATCHES`, the compiler found `DrainCommand` and four test fixtures across three
+modules. ✅ That is the case for the typed record over the string header: **a stale string mirror
+mis-reads silently; a stale constructor does not compile.**
+
+⚠ **`error_rate` changed meaning, deliberately.** The alert measure is
+`1 - sum(total_output_rows)/sum(total_input_rows)`; with the old input count excluding dropped rows, a
+file that lost a record reported **0%**. It now reports the real rate, so thresholds tuned against the
+old always-reconciling numerator may fire where they used to stay quiet. ✅ The alert measure was
+already NAMED `rejected_files` while reading a column called `rejected_count`; the rename ends that
+mismatch too.
+
+Pinned by `ConsignmentAuditWriterTest.theBatchLedgerCountsRejectedFilesAndRejectedRowsSeparately`,
+which asserts the two columns by POSITION as well as by name — readers parse by header name, so a codec
+emitting them in the wrong order would swap files and rows with every column still present.
+
+*(The decision, for provenance:)* `rejected_count` is **split, not redefined** — `rejected_files`
 (today's value: members not `SUCCESS`) **and** `rejected_rows` (the sum of `IngestResult.errorRows`), with
 `total_input_rows` = parsed + rejected rows so the ledger reconciles to the file on disk. Renaming rather
 than overloading is what the ledger needs: one number that meant both was the ambiguity. ✅ Breaking the

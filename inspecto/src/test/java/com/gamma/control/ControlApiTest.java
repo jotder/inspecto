@@ -501,10 +501,12 @@ class ControlApiTest {
         try (Ctx c = open(dir)) {
             Path status = dir.resolve("status");
             Files.createDirectories(status.resolve("manifests"));
+            // ⚠ A hand-written mirror of ConsignmentAuditWriter's batches header — one of five. It is
+            // parsed BY HEADER NAME, so a stale copy here does not fail loudly; it mis-reads silently.
             String header = "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status,"
-                    + "member_count,rejected_count,total_input_rows,total_output_rows,"
+                    + "member_count,rejected_files,rejected_rows,total_input_rows,total_output_rows,"
                     + "output_file_count,total_output_bytes,duration_ms,error,cast_failures\n";
-            String row = "%s,test_etl,mini,mini,2026-09-02T00:00:00,2026-09-02T00:00:01,%s,1,0,3,3,0,0,10,,0\n";
+            String row = "%s,test_etl,mini,mini,2026-09-02T00:00:00,2026-09-02T00:00:01,%s,1,0,0,3,3,0,0,10,,0\n";
             Files.writeString(status.resolve("test_etl_batches_20260902000000.csv"),
                     header + row.formatted("parked_01", "PARKED") + row.formatted("orphan_02", "PARKED")
                             + row.formatted("done_03", "SUCCESS"));

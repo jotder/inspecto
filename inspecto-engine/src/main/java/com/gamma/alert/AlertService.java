@@ -520,7 +520,9 @@ public final class AlertService {
         return switch (metric) {
             case "failed_batches" -> rows.stream()
                     .filter(r -> "FAILED".equalsIgnoreCase(r.getOrDefault("status", ""))).count();
-            case "rejected_files" -> rows.stream().mapToLong(r -> asLong(r.get("rejected_count"))).sum();
+            // \u2705 The measure was ALREADY called rejected_files; D2 (2026-09-22) renamed the column to
+            // match, so the two finally agree. The rows half has its own column now (rejected_rows).
+            case "rejected_files" -> rows.stream().mapToLong(r -> asLong(r.get("rejected_files"))).sum();
             case "duration_ms" -> rows.stream().mapToLong(r -> asLong(r.get("duration_ms")))
                     .average().orElse(0);
             case "error_rate" -> {

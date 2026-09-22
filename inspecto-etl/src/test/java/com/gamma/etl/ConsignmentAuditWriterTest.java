@@ -25,7 +25,7 @@ class ConsignmentAuditWriterTest {
                         "bad.csv", "QUARANTINED_MISMATCH", 0, 3, List.of(), List.of(), 50, "0 valid rows", "B1"));
         var batchRow = new ConsignmentAuditWriter.ConsignmentRow("B1", "mini_etl", "mini", "",
                 "2026-05-27 10:30:00", "2026-05-27 10:30:02", "SUCCESS",
-                2, 1, 2, 2, 1, 120L, 2000, "");
+                2, 1, 0L, 2, 2, 1, 120L, 2000, "");
         var lineage = List.of(new LineageRow("B1", 0, "a.csv", "/db/B1_out.csv", "year=2020/month=04/day=03", 2));
 
         w.flush(batchRow, fileRows, lineage);
@@ -47,6 +47,56 @@ class ConsignmentAuditWriterTest {
         String lin = Files.readString(Path.of(lineageCsv));
         assertTrue(lin.startsWith("consignment_id,src_id,input_file,output_file,partition,row_count"));
         assertTrue(lin.contains("year=2020/month=04/day=03"));
+    }
+
+    /**
+     * WB-09 / D2 — the batch ledger counts rejected FILES and rejected ROWS in two columns, and the
+     * header and the codec agree about which is which.
+     *
+     * <p>🔴 One number meant both, and it lied: a 20-row file with one record truncated mid-write
+     * reported {@code rejected_count=0} with {@code total_input_rows=19} against
+     * {@code total_output_rows=19} — the counters RECONCILED while a record was missing, so an operator
+     * reconciling mediation output by this ledger concluded nothing was lost
+     * ({@code INGEST-REJECT-ACCOUNTING-1}).
+     *
+     * <p>⚠ This asserts the two columns by POSITION as well as by name, because the batches header has
+     * FIVE mirrors ({@code ConsignmentAuditWriter}'s header string, its {@code batchLine} codec,
+     * {@code ConsignmentRow}, {@code OperationalTables.BATCHES}, and a hand-written copy in
+     * {@code ControlApiTest}) and readers parse BY HEADER NAME — so a codec that emitted the two values
+     * in the wrong ORDER would swap files and rows silently, with every column still present.
+     */
+    @Test
+    void theBatchLedgerCountsRejectedFilesAndRejectedRowsSeparately(@TempDir Path dir) throws Exception {
+        String statusCsv  = dir.resolve("p_status_TS.csv").toString();
+        String batchesCsv = dir.resolve("p_batches_TS.csv").toString();
+        String lineageCsv = dir.resolve("p_lineage_TS.csv").toString();
+        var w = new ConsignmentAuditWriter(statusCsv, batchesCsv, lineageCsv);
+        // Two members, ONE of them wholly rejected, and SEVEN rows lost from the accepted ones.
+        var batchRow = new ConsignmentAuditWriter.ConsignmentRow("B2", "mini_etl", "mini", "",
+                "t0", "t1", "SUCCESS", 2, 1, 7L, 20, 13, 1, 100L, 500, "");
+        w.flush(batchRow, List.of(), List.of());
+
+        List<String> lines = Files.readAllLines(Path.of(batchesCsv));
+        List<String> header = List.of(lines.get(0).split(","));
+        List<String> row = List.of(lines.get(1).split(","));
+
+        int files = header.indexOf("rejected_files");
+        int rows = header.indexOf("rejected_rows");
+        assertTrue(files >= 0 && rows >= 0, "both columns must exist: " + lines.get(0));
+        assertEquals(files + 1, rows, "rejected_rows follows rejected_files: " + lines.get(0));
+        assertEquals(-1, header.indexOf("rejected_count"),
+                "the ambiguous single column is gone, not kept alongside: " + lines.get(0));
+
+        assertEquals("1", row.get(files), "one member was rejected outright: " + lines.get(1));
+        assertEquals("7", row.get(rows), "seven ROWS were lost from accepted members: " + lines.get(1));
+
+        // The invariant the split buys, and the reason total_input_rows changed meaning: what ARRIVED
+        // is what survived plus what was rejected.
+        int in = header.indexOf("total_input_rows");
+        int out = header.indexOf("total_output_rows");
+        assertEquals(Long.parseLong(row.get(in)),
+                Long.parseLong(row.get(out)) + Long.parseLong(row.get(rows)),
+                "total_input_rows = total_output_rows + rejected_rows when no Step drops rows: " + lines.get(1));
     }
 
     /**
@@ -77,7 +127,7 @@ class ConsignmentAuditWriterTest {
                 new ConsignmentAuditWriter.FileRow("t0", "t1", "d.csv", "SUCCESS", 1, 0,
                         List.of(), List.of(), 10, "", "B1"));
         w.flush(new ConsignmentAuditWriter.ConsignmentRow("B1", "p", "s", "", "t0", "t1", "SUCCESS",
-                4, 0, 5, 5, 1, 1L, 20, ""), rows, List.of());
+                4, 0, 0L, 5, 5, 1, 1L, 20, ""), rows, List.of());
 
         List<String> lines = Files.readAllLines(Path.of(statusCsv));
         assertTrue(lines.get(0).endsWith(",origin,logical_name"),
@@ -152,7 +202,7 @@ class ConsignmentAuditWriterTest {
                             "/db/" + id + "_out.csv", "", 1));
                 }
                 w.flush(new ConsignmentAuditWriter.ConsignmentRow(id, "p", "s", "", "t0", "t2", "SUCCESS",
-                        filesPerBatch, 0, filesPerBatch, filesPerBatch, 1, 1L, 1, ""), rows, lineage);
+                        filesPerBatch, 0, 0L, filesPerBatch, filesPerBatch, 1, 1L, 1, ""), rows, lineage);
             }));
         }
         for (var f : futures) f.get();
@@ -201,7 +251,7 @@ class ConsignmentAuditWriterTest {
                 new ConsignmentAuditWriter.FileRow("t0", "t1", "bad.csv", "QUARANTINED_MISMATCH",
                         0, 3, List.of(), List.of(), 5, "schema selector mismatch", "B9"));
         var batchRow = new ConsignmentAuditWriter.ConsignmentRow("B9", "mini_etl", "mini", "",
-                "t0", "t2", "FAILED", 2, 1, 2, 0, 0, 0L, 20, "batch failed: schema selector mismatch");
+                "t0", "t2", "FAILED", 2, 1, 0L, 2, 0, 0, 0L, 20, "batch failed: schema selector mismatch");
 
         w.flush(batchRow, fileRows, List.of());
 

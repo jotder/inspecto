@@ -34,7 +34,9 @@ final class OperationalTables {
 
     static final List<String> BATCHES = List.of(
             "consignment_id", "pipeline", "schema_name", "output_table", "start_time", "end_time", "status",
-            "member_count", "rejected_count", "total_input_rows", "total_output_rows",
+            // rejected_count SPLIT into files + rows (D2, 2026-09-22): one number meant both, and a
+            // file that LOST rows reported 0 while its counters reconciled (INGEST-REJECT-ACCOUNTING-1).
+            "member_count", "rejected_files", "rejected_rows", "total_input_rows", "total_output_rows",
             "output_file_count", "total_output_bytes", "duration_ms", "error",
             // Values a declared type coercion silently nulled (row KEPT). Blank = not measured, which
             // is why the candidate SQL must not read a blank as 0.

@@ -128,6 +128,50 @@ class DuckDbCsvIngesterTest {
         }
     }
 
+    /**
+     * WB-10 / {@code INGEST-ERRORS-CSV-PER-COLUMN-1} — ONE errors row per bad LINE, not one per
+     * offending column, and the returned {@code errorRows()} counts LINES.
+     *
+     * <p>🔴 DuckDB's {@code reject_errors} emits one row per (line, column), so a line missing two
+     * columns used to produce TWO errors rows, each repeating the whole raw line with an identical
+     * reason — nine rows for one record in the measured case. ⚠ The same count feeds
+     * {@code IngestResult.errorRows()} and, through it, the batch ledger's rejected-row accounting, so it
+     * was also counting column-errors where it claimed rows ({@code INGEST-REJECT-ACCOUNTING-1}). One bad
+     * line is one rejected row, in the report and in the ledger.
+     */
+    @Test
+    void oneErrorsRowPerBadLineNamingTheColumnRange(@TempDir Path dir) throws Exception {
+        File csv = dir.resolve("short.csv").toFile();
+        // Exactly one bad line, missing TWO columns — the smallest case that distinguishes
+        // "one row per line" from "one row per missing column".
+        Files.writeString(csv.toPath(), String.join("\n",
+                "ID,AMT,TXN_DATE",
+                "1,10.5,2020-04-01",
+                "2") + "\n");
+
+        File db = DuckDbUtil.tempDbFile("dt_");
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            IngestResult r = DuckDbCsvIngester.ingest(csv, conn, schema(), cfg(dir, "duckdb"), "raw_f0");
+
+            Path errCsv = dir.resolve("errors").resolve("short_errors.csv");
+            assertTrue(Files.exists(errCsv), "an errors report must be written for the short line");
+            List<String> lines = Files.readAllLines(errCsv);
+
+            assertEquals("line_number,columns,reason,raw_line", lines.get(0),
+                    "the header names COLUMNS (a range), not a single column");
+            assertEquals(2, lines.size(),
+                    "ONE data row for ONE bad line — a row per missing column is the defect this fixes. Got:\n"
+                            + String.join("\n", lines));
+            assertEquals(1, r.errorRows(),
+                    "errorRows() must count bad LINES; counting column-errors inflates the ledger's "
+                            + "rejected_rows by the number of missing columns. Got " + r.errorRows());
+            assertTrue(lines.get(1).contains(".."),
+                    "two missing columns must be named as a range: " + lines.get(1));
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     /** usesDuckDb routing: auto on clean config = native; messy knobs = java. */
     @Test
     void engineRoutingPolicy(@TempDir Path dir) throws Exception {

@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -731,6 +732,26 @@ public final class DuckDbCsvIngester {
      * The reject tables only exist once {@code store_rejects} has fired at least
      * once on the connection, so failures here are swallowed (no rejects → no file).
      */
+    /**
+     * One errors-CSV row for one bad input line: the offending columns as a RANGE, the distinct
+     * reasons, and the raw line once.
+     *
+     * <p>\u26a0 The range is rendered {@code first..last (N)} rather than a list, because the shape that
+     * motivated this was 9 consecutive columns of one truncated record; a list would reproduce the
+     * duplication the row was filed about. A single column renders as itself \u2014 no range, no count.
+     * \u26d4 Column names are NOT assumed to be {@code c<N>}: the ends of the encounter order are used
+     * verbatim, so a header-named column reads correctly too.
+     */
+    private static void writeRejectLine(PrintWriter errOut, long line, List<String> columns,
+                                        LinkedHashSet<String> reasons, String raw) {
+        String cols = columns.size() == 1
+                ? columns.get(0)
+                : columns.get(0) + ".." + columns.get(columns.size() - 1) + " (" + columns.size() + ")";
+        errOut.printf("%d,\"%s\",\"%s\",\"%s\"%n",
+                line, cols, String.join("; ", reasons),
+                raw == null ? "" : raw.replace("\"", "'"));
+    }
+
     private static long writeRejects(Connection conn, File file, String filePath,
                                      PipelineConfig cfg) {
         // ⚠ The names must be the CONFIGURED ones: `rejects_table`/`rejects_scan` rename the tables
@@ -746,22 +767,48 @@ public final class DuckDbCsvIngester {
         Path errorFilePath = ParserSpec.errorFile(file, cfg);
         Path errorDir      = errorFilePath.getParent();
 
+        // 🔴 ONE ROW PER BAD LINE, not one per offending COLUMN (WB-10, 2026-09-22).
+        //
+        // DuckDB's `reject_errors` emits one row per (line, column), so a line truncated to 9 of 18
+        // fields produced NINE rows \u2014 c9\u2026c17 \u2014 each repeating the entire raw line, with an identical
+        // reason. A file of short rows yielded an errors report that was mostly duplicated payload
+        // (INGEST-ERRORS-CSV-PER-COLUMN-1).
+        //
+        // \u26a0 The count returned here is `IngestResult.errorRows()`, which feeds the batch ledger's
+        // rejected-row accounting. So this was ALSO counting column-errors where it claimed rows, and
+        // WB-09's `rejected_rows` would have inherited the same 9\u00d7 inflation had this not landed first
+        // (INGEST-REJECT-ACCOUNTING-1). One bad line is one rejected row, here and in the ledger.
+        //
+        // The query is `ORDER BY e.line`, so a line's errors arrive together and the grouping streams \u2014
+        // nothing is buffered beyond the current line.
         long count = 0;
         PrintWriter errOut = null;
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
+            long line = -1;
+            String raw = null;
+            List<String> columns = new ArrayList<>();
+            LinkedHashSet<String> reasons = new LinkedHashSet<>();
             while (rs.next()) {
                 if (errOut == null) {
                     Files.createDirectories(errorDir);
                     errOut = new PrintWriter(Files.newBufferedWriter(errorFilePath));
-                    errOut.println("line_number,column,reason,raw_line");
+                    errOut.println("line_number,columns,reason,raw_line");
                 }
-                String raw = rs.getString("csv_line");
-                errOut.printf("%d,%s,\"%s\",\"%s\"%n",
-                        rs.getLong("line"),
-                        nz(rs.getString("column_name")),
-                        nz(rs.getString("error_type")),
-                        raw == null ? "" : raw.replace("\"", "'"));
+                long thisLine = rs.getLong("line");
+                if (thisLine != line && !columns.isEmpty()) {
+                    writeRejectLine(errOut, line, columns, reasons, raw);
+                    count++;
+                    columns = new ArrayList<>();
+                    reasons = new LinkedHashSet<>();
+                }
+                line = thisLine;
+                raw = rs.getString("csv_line");
+                columns.add(nz(rs.getString("column_name")));
+                reasons.add(nz(rs.getString("error_type")));
+            }
+            if (!columns.isEmpty()) {
+                writeRejectLine(errOut, line, columns, reasons, raw);
                 count++;
             }
         } catch (Exception e) {

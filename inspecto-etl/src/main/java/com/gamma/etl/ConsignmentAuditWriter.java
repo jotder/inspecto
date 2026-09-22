@@ -50,8 +50,16 @@ public final class ConsignmentAuditWriter {
                         "output_paths,output_sizes_bytes,duration_ms,error,consignment_id,origin,logical_name",
                 ConsignmentAuditWriter::statusLine);
         this.batches = batchesPath == null ? null : new CsvLedger<>(batchesPath,
+                // \U0001f534 rejected_count SPLIT into rejected_files + rejected_rows (D2, signed 2026-09-22).
+                // One number meant both, and the two answered differently: a 20-row file that lost one
+                // truncated record reported rejected_count=0 with total_input_rows=19 and
+                // total_output_rows=19 \u2014 the counters RECONCILED while a record was missing, so an
+                // operator reconciling by this ledger concluded nothing was lost
+                // (INGEST-REJECT-ACCOUNTING-1). total_input_rows now includes the rejected rows.
+                // \u26a0 Breaking the header is deliberate and free (nothing after 3.x shipped); readers parse
+                // BY HEADER NAME per file, so old ledger files still read.
                 "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status," +
-                        "member_count,rejected_count,total_input_rows,total_output_rows," +
+                        "member_count,rejected_files,rejected_rows,total_input_rows,total_output_rows," +
                         "output_file_count,total_output_bytes,duration_ms,error,cast_failures",
                 ConsignmentAuditWriter::batchLine);
         this.lineage = lineagePath == null ? null : new CsvLedger<>(lineagePath,
@@ -146,19 +154,19 @@ public final class ConsignmentAuditWriter {
      */
     public record ConsignmentRow(String batchId, String pipeline, String schemaName, String outputTable,
                            String startTime, String endTime, String status,
-                           int memberCount, int rejectedCount, long totalInputRows,
+                           int memberCount, int rejectedFiles, long rejectedRows, long totalInputRows,
                            long totalOutputRows, int outputFileCount, long totalOutputBytes,
                            long durationMs, String error, long castFailures) {
 
         /** Unmeasured form — {@code castFailures} defaults to {@code -1} ("not measured"). */
         public ConsignmentRow(String batchId, String pipeline, String schemaName, String outputTable,
                         String startTime, String endTime, String status,
-                        int memberCount, int rejectedCount, long totalInputRows,
+                        int memberCount, int rejectedFiles, long rejectedRows, long totalInputRows,
                         long totalOutputRows, int outputFileCount, long totalOutputBytes,
                         long durationMs, String error) {
             this(batchId, pipeline, schemaName, outputTable, startTime, endTime, status, memberCount,
-                    rejectedCount, totalInputRows, totalOutputRows, outputFileCount, totalOutputBytes,
-                    durationMs, error, -1);
+                    rejectedFiles, rejectedRows, totalInputRows, totalOutputRows, outputFileCount,
+                    totalOutputBytes, durationMs, error, -1);
         }
     }
 
@@ -201,7 +209,7 @@ public final class ConsignmentAuditWriter {
             long errorRows = files.stream().mapToLong(FileRow::errorRows).sum();
             ConsignmentEvent event = new ConsignmentEvent(
                     batch.pipeline(), batch.batchId(), batch.status(),
-                    partitions, batch.totalOutputRows(), batch.durationMs(), batch.rejectedCount(),
+                    partitions, batch.totalOutputRows(), batch.durationMs(), batch.rejectedFiles(),
                     batch.error(), offendingFile, errorRows, dryRun);
             if (commitListener != null) commitListener.accept(event);
             if (terminalBatchSink != null) terminalBatchSink.accept(event);
@@ -224,11 +232,12 @@ public final class ConsignmentAuditWriter {
     }
 
     private static String batchLine(ConsignmentRow b) {
-        return String.format("%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,\"%s\",%s",
+        return String.format("%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,\"%s\",%s",
                 b.batchId(), b.pipeline(), b.schemaName(),
                 b.outputTable() == null ? "" : b.outputTable(),
                 b.startTime(), b.endTime(), b.status(),
-                b.memberCount(), b.rejectedCount(), b.totalInputRows(), b.totalOutputRows(),
+                b.memberCount(), b.rejectedFiles(), b.rejectedRows(),
+                b.totalInputRows(), b.totalOutputRows(),
                 b.outputFileCount(), b.totalOutputBytes(), b.durationMs(),
                 CsvLedger.q(b.error()),
                 // blank, not -1: an unmeasured coercion count must not read as a clean batch

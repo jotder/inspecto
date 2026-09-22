@@ -768,10 +768,31 @@ public final class ConsignmentIngestor {
         long totalOutputRows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();
         long totalOutputBytes = outputs.stream().mapToLong(PartitionOutput::bytes).sum();
 
+        // \U0001f534 Rejected ROWS, counted separately from rejected FILES (D2, signed 2026-09-22).
+        //
+        // `rejected` above counts members whose status is not SUCCESS — whole files. It says nothing
+        // about a file that was accepted while LOSING rows, which is the case that made this ledger lie:
+        // a 20-row file with one record truncated mid-write reported rejected_count=0 and
+        // total_input_rows=19 against total_output_rows=19, so the counters reconciled while a record
+        // was missing. The drop was recorded only in <dirs.errors>/<file>_errors.csv, which nothing in
+        // this row points at (INGEST-REJECT-ACCOUNTING-1).
+        //
+        // ⚠ Same expression the consignment EVENT already used (ConsignmentAuditWriter.flush sums
+        // FileRow::errorRows) — the event carried the truth all along; the ledger did not.
+        // ⚠ A wholly-rejected member contributes to rejected_files and NOT to rejected_rows: its rows
+        // were never parsed, so counting them here would double-count the file as rows it never had.
+        long rejectedRows = outcome.memberAudits().stream().mapToLong(MemberAudit::errorRows).sum();
+
+        // The input count is what ARRIVED, not what survived: parsed + rejected. This is the half that
+        // makes `total_input_rows = total_output_rows + rejected_rows` hold when no Step drops rows, and
+        // the half that makes the `error_rate` alert measure (1 - out/in) tell the truth about a lost
+        // record instead of reading 0%.
+        long totalInputRows = outcome.totalInputRows() + rejectedRows;
+
         ConsignmentAuditWriter.ConsignmentRow batchRow = new ConsignmentAuditWriter.ConsignmentRow(
                 batch.batchId(), cfg.identity().pipelineName(), outcome.schemaLabel(), batch.table(),
                 outcome.batchStart().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT), status,
-                batch.members().size(), rejected, outcome.totalInputRows(), totalOutputRows,
+                batch.members().size(), rejected, rejectedRows, totalInputRows, totalOutputRows,
                 outputs.size(), totalOutputBytes,
                 Duration.between(outcome.batchStart(), end).toMillis(), error,
                 outcome.castFailures());

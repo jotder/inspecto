@@ -53,7 +53,12 @@ import java.util.Set;
  * <ul>
  *   <li>{@code error_rate} — {@code 1 - sum(total_output_rows)/sum(total_input_rows)} (0 when no input)</li>
  *   <li>{@code failed_batches} — count of {@code status == FAILED}</li>
- *   <li>{@code rejected_files} — {@code sum(rejected_count)}</li>
+ *   <li>{@code rejected_files} — {@code sum(rejected_files)} (the column was renamed from
+ *       {@code rejected_count} by D2, 2026-09-22, to match this measure's long-standing name)</li>
+ *   <li>\u26a0 {@code error_rate} now tells the truth about a LOST row: {@code total_input_rows} counts
+ *       what ARRIVED (parsed + rejected), so a file that silently dropped a record no longer reports
+ *       0% error. Alert thresholds tuned against the old, always-reconciling numerator may fire where
+ *       they used to stay quiet — that is the defect being corrected, not a regression.</li>
  *   <li>{@code duration_ms} — average {@code duration_ms}</li>
  * </ul>
  */

@@ -258,7 +258,7 @@ public final class ReportService implements ReportRunner {
             else if (!status.isBlank()) failed++;
             inRows   += asLong(r.get("total_input_rows"));
             outRows  += asLong(r.get("total_output_rows"));
-            rejected += asLong(r.get("rejected_count"));
+            rejected += asLong(r.get("rejected_files"));   // renamed by D2; rows are counted separately
             outFiles += asLong(r.get("output_file_count"));
             outBytes += asLong(r.get("total_output_bytes"));
             long dur = asLong(r.get("duration_ms"));
