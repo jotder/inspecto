@@ -122,6 +122,40 @@ Safety ✅: no free-text SQL — identifiers must match `SAFE_IDENT` (`InvRoutes
 `?` (`:204-210`), quote-safety pinned by test; fails closed (503 no write root · 404 unknown Dataset · 422 bad
 identifier). `ControlApiInvProjectionTest` (10 tests) pins that edge `count` equals the row count per pair.
 
+### 1.7 Measured limits (2026-09-22, post-LA-05, Chromium on the dev host)
+
+Synthetic scale-free-ish graphs (hubs + pendants, ~3 edges per node) driven through the real component and
+the real layout, timed to `graph.rendered`.
+
+🔴 **One host, one browser, one synthetic shape — so the NUMBERS DO NOT TRANSFER** (operator, 2026-09-22).
+An analyst's laptop, a dense graph, or a different edge-to-node ratio all move them. ⇒ **The finding is the
+SHAPE of the curve, and the conclusion is that the limit must be CONFIGURABLE with a measured default —
+not a constant compiled into the SPA.** A single hardcoded 500 encodes the machine it was measured on.
+
+**Layout — the binding constraint.** Default layered layout (`dagre`):
+
+| Nodes | Edges | Time to rendered |
+|---|---|---|
+| 500 | 1 498 | **0.9 s** |
+| 750 | 2 247 | **10.7 s** |
+| 1 000 | 2 999 | **16.2 s** |
+
+🔴 **That is a cliff between 500 and 750, not a slope** — 12× the time for 1.5× the nodes. The force
+layout costs ~2.4× the layered one at 500 (2.1 s). ⇒ `PROJECTION_NODE_CAP = 500` is **well chosen**, and
+raising it without changing the default layout would put the studio over ten seconds on a routine query.
+
+**Analysis — not the constraint, with one exception.** At **1 999 nodes / 5 993 edges** (just under
+`ANALYSIS_NODE_CAP`): centrality **2 ms** · communities **58 ms** · cut points **14 ms** · similarity **0 ms**
+· link prediction **352 ms** · spanning forest **5 ms** · connected components **4 ms**.
+
+🔴 **Suspicion score is the sole outlier: 6.7 s at 1 999 nodes**, on the main thread — 324 ms at 500 and
+1 070 ms at 1 000. It, not the other 26, is what `ANALYSIS_NODE_CAP` should be sized for.
+
+⚠ **The plan asks for the cap to be "enforced gracefully, never an exception"; today it THROWS.** That half
+of D-S3 is unmet regardless of which number is chosen.
+
+---
+
 ### 1.6 Structural consequences
 
 1. **Re-projection on every call** — cost scales with usage; two analysts on one Dataset pay twice; and a
@@ -383,27 +417,50 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 
 ## 4. Decision register — owed operator calls
 
-⛔ None may be answered by an implementer in passing. Ids: D-S* inherited from the spec, D-E* from the
-Enquiry model.
+⛔ **None may be answered by an implementer in passing.** Ids: D-S* inherited from the spec, D-E* from the
+Enquiry model, D-U* raised during build.
 
-| Id | Decision | Blocks | Notes / recommendation |
+✅ **GROUNDED 2026-09-22 — every row below now carries evidence, not just a question.** The grounding is
+the implementer's half: what is TRUE in the code today, which options the evidence **rules out**, and what
+each survivor costs. ⛔ **The choice itself is still owed and NONE is marked answered.** Where a row says
+*Recommended*, that is a reading of the evidence, not a decision.
+
+🔴 **Three premises in the pre-grounding register did NOT survive verification.** They are struck
+in place rather than quietly corrected, because a register that silently repairs itself teaches nobody:
+
+1. The naming decision was believed to be constrained by the canonical-vocabulary guard. **It is not** —
+   `tools/check-vocabulary.mjs` has eleven rules and none touches these words. D-E1 is a GLOSSARY-policy
+   call enforced by review, not a CI gate.
+2. `GLOSSARY-CASE-1` reserves *Investigation* on the stated grounds that it "renames four published
+   routes". **`v3.11.0` contains no `AgentRoutes` and no `/agent/cases` at all** — "published" there means
+   *registered in the control API*, not *shipped*. The gate's breakage set is empty.
+3. §1.2 described the projected node id as `entity:<value>` with the type merely namespacing. **A
+   type-scoped form `entity:<entityType>:<value>` already ships** for multi-mapping merges. §1.7 now
+   carries the measured limits that replace the guessed ones.
+
+| Id | Decision | Blocks | Grounding — what is true, what is ruled out, what each option costs |
 |---|---|---|---|
-| **D-S1** | Is a saved view evidence? | LA-03 | If yes, snapshotting needs a store; if no, the UI must say so. The SPA already labels the saved-view option *not evidence*. |
-| **D-S2** | Where does multi-hop traversal run? | LA-11 | Filtering is settled server-side (LA-01). Open: recursive CTE vs worker + raised cap. |
-| **D-S3** | What is the supported graph size? | LA-07, LA-06 | A published number, enforced gracefully, never an exception. Must target `PROJECTION_NODE_CAP` (500) first. |
-| **D-S4** | First-class node model, or stay value-projected? | LA-08, LA-17 | Blocks identity, attribute-rich analysis and persistent exclusion lists. |
-| ~~**D-S5**~~ | ~~Bind or escape the pushed-down predicate?~~ | ~~LA-01~~ | ✅ **ANSWERED 2026-09-22 (operator): (a)** — reuse `ConditionSql` and validate every `field` against the relation's actual columns. Shipped that way; an unknown field is 422 before the renderer is called. The bind-emitting variant (b) stays an explicit follow-on, not built. |
-| **D-E1** | What is the object called? | every LA-10+ touchpoint | `Investigation` reserved by `GLOSSARY-CASE-1`; `Case` is `ObjectType.CASE`; `Enquiry` is the placeholder. Decide first. |
-| **D-E2** | Where does a Working Set live? | LA-03, LA-10 | In-memory per session, DuckDB temp relation, or durable store. Durability is what makes replay and evidence possible. |
-| **D-E3** | Dataset version pinned at creation, or per op? | LA-10, LA-20, G-E11 | Incompatible options. Pin-at-creation matches evidence. One decision with §2.7's "reproducible from the queries". |
-| **D-E4** | Re-ordering the log invalidates Artifacts, or forks the Enquiry? | LA-10 | Forking is safer and costs a branching model. |
-| **D-E6** | Saved Widget frozen or live by default; may a live one leave the Space? | LA-21 | §2.7 recommends frozen. |
-| **D-E7** | Who may evaluate an Enquiry's derived relation? | LA-20 | Must inherit the **Case's** scope, not the Space's Dataset permissions — 🔴 otherwise a Dashboard tile is a side channel around scope binding. |
-| **D-E8** | Does an Enquiry Template carry its exclusion lists? | LA-17, LA-23 | Likely: named reference lists travel; analyst-judgement sets do not. |
-| **D-U1** | Rendering item: own item (LA-06) or fold into LA-07? | LA-06 | Raised 2026-09-20 at the mockup review; this plan lists it separately pending the call. ⚠ LA-06's row claimed no gate until 2026-09-22 — corrected. |
-| **D-U2** | Extend `postmed_xdr` into the call-records Dataset, or build a fourth feed beside it? | LA-16 (and LA-14b, LA-11 through it) | `postmed_xdr` (landed 2026-09-22, after this plan's grounding) already has A-party, B-party, start, duration, cell and kind; it lacks device, explicit direction, a timezone contract, `seed-inbox.{ps1,sh}` entries and a planted investigative story. ⇒ **Recommended: extend it** — a fourth feed duplicates ~80 % and splits the demo. ⚠ A peer worktree is mid-build on `postmed_xdr`; reconcile with that work first. |
-| **D-U3** | What identity ties a `GeoPoint` to a Link Analysis node? | LA-22 | There is none today. `coLocationGraph` keys on `` `entity:${label}` `` — a DISPLAY string, which can collide and need not match the projection's node ids. ⛔ Do not adopt that key by default; it would silently isolate the wrong nodes. Needs a real entity identity, which is also what D-S4/LA-17 decide ⇒ consider sequencing LA-22 behind LA-17. |
-| **D-U4** | Add a map box-select dependency? | LA-22 | MapLibre GL JS has no built-in rectangle draw; today's map offers measure/radius/polygon/note only. A box-select means a new library (e.g. terra-draw / mapbox-gl-draw) or a hand-rolled overlay. A dependency addition is an operator call, and it also touches `tools/dependencies.lock`. |
+| **D-S1** | Is a saved view evidence? | LA-03 | ✅ **The evidence settles the factual half.** A saved view stores the **query**, never the result (`link-analysis.service.ts:14-28`, codec `:61-72`: `query` + presentation only, no nodes/edges/metrics), and **no version pinning exists anywhere in the backend** (zero hits for as-of/time-travel; `DatasetRelation` takes no version). ⇒ reopening re-runs the projection against live data, so ⛔ **"yes, a saved view is evidence" is ruled out by the stored shape** — it would require materialising results (a different object) or version-addressable reads (which do not exist). The SPA already says so on screen: *"Saved view only · **not evidence** — re-projects live, may change"* (`link-analysis-evidence.dialogs.ts:188-191`). ⚠ But that label lives **only** in the Attach-to-Case dialog — nothing warns on the saved-view list, on load or on reopen. ⇒ The real question left is not *yes/no* but **what LA-03 must build**: a durable snapshot store, since `LinkAnalysisSnapshotsService` is a bare in-memory `signal<GraphSnapshot[]>`, lost on reload. |
+| **D-S2** | Where does multi-hop traversal run? | LA-11 | Today: **server does one hop only** (`/inv/projection/neighbors`, one `GROUP BY` per call); all multi-hop is browser-side. ⛔ **"Worker + raised cap" does not answer this question** — it relocates client compute and leaves traversal bounded by `PROJECTION_NODE_CAP` 500 and one tab; it is a D-S3/LA-07 answer. **Recursive CTE is not blocked** by the engine (DuckDB 1.5.2.1), by `SqlGuard` (`ACCEPT_START` admits `with`), or by the call shape (`QueryExecutor.Request` already carries SQL + binds). Its real costs are two things LA-10/D-E2 need anyway: **fences** (max depth, timeout, max edge yield have **no equivalent today** — only `LIMIT n+1`) and **connection lifetime** (every `run` opens a fresh sandbox, so each rung re-pays setup). ⚠ **One untested seam:** `QueryExecutor.wrap()` puts the caller's SQL inside `SELECT … FROM (<sql>) AS "__q"`, so a `WITH RECURSIVE` body lands in a derived table — DuckDB should accept it, but nothing here exercises it. **Require that one-hour empirical check before treating this option as free.** |
+| **D-S3** | What is the supported graph size? | LA-07, LA-06 | ✅ **MEASURED — see §1.7.** The constraint is **layout, not analysis**: default layered layout is **0.9 s at 500 nodes but 10.7 s at 750** (a cliff, 12× for 1.5× the nodes) and 16.2 s at 1 000. Meanwhile **25 of 27 algorithms stay under 60 ms even at 1 999 nodes**; the sole outlier is **suspicion score at 6.7 s**. ⇒ `PROJECTION_NODE_CAP` **500 is well chosen** and cannot rise without changing the default layout; `ANALYSIS_NODE_CAP` **2 000 is sized for the wrong algorithm**. ⚠ **The "enforced gracefully, never an exception" half is unmet whichever number wins** — `requireUnderCap` **throws** (`graph-analysis.ts:985-988`), applied across eight algorithms plus two inline copies. ✅ **The CONFIGURABILITY half is SHIPPED 2026-09-22** — both caps are now per-space settings (`GET|PUT /settings/link-analysis`), the measured values are the defaults, `null` inherits, a bad persisted value is a 422 naming the field and range, and the client setters ignore nonsense so a misconfiguration cannot switch the toolbox off. ⇒ **What is still owed is only the NUMBER and the graceful-refusal behaviour.** 🔴 Why it had to be configurable (operator, 2026-09-22): the measurement is a property of the host and of the data's shape, so any single value is someone else's wrong answer. *Recommended reading: ship the measured numbers as DEFAULTS, make them settable, replace the throw with a named refusal, and give suspicion score its own lower default.* |
+| **D-S4** | First-class node model, or stay value-projected? | LA-08, LA-17 | ⛔ **"The id scheme is too entrenched to change" is ruled out.** Only **two** production sites mint an entity id (`entity-projection.ts:41` and, separately, `geo-analysis.ts:366`), and **zero** parse or destructure it — `G6Node.id` is opaque to every consumer. Per the repo's no-back-compat rule the id is cheap to change. ✅ **The cost of staying value-projected is concrete, not theoretical**: the id is the trimmed raw string with no case fold, alias or normalisation, so `ACME Ltd` and `Acme Ltd.` are **two nodes with two degree counts and two community memberships** — and **nothing in the UI warns** (verified: the only analysis messages are outcome strings). Compounding: the projection truncates at 500 **before** any centrality runs, so a ranking is computed over a top-500 sample of a possibly-split identity space. ⇒ **Staying value-projected is coherent only if paired with a stated warning**; without one it is a silent correctness claim. Building the model is genuinely L and mostly net-new (no entity registry exists; `objectRef` + the Catalog `MetadataNode` shape are the only seams to inherit). ⚠ **D-S4, D-U3 and LA-17's exclusion lists are the same missing object** — decide them together or sequence them. |
+| ~~**D-S5**~~ | ~~Bind or escape the pushed-down predicate?~~ | ~~LA-01~~ | ✅ **ANSWERED 2026-09-22 (operator): (a)** — reuse `ConditionSql` and validate every `field` against the relation's actual columns. Shipped; an unknown field is 422 before the renderer is called. The bind-emitting variant stays an explicit follow-on. |
+| **D-E1** | What is the object called? | every LA-10+ touchpoint — **all of Phase 2** | 🔴 **The guard does not constrain this** (see premise 1 above); the binding constraint is GLOSSARY §0 rules 1–3, enforced by review. ⛔ **Ruled out by evidence:** `Case` (taken twice — `ObjectType.CASE` and `com.gamma.intelligence.investigation.Case` — and §2.1 makes the new object a *child* of a Case), `Dossier` (allocated by §2.7 to the LA-12 narrative), `Working Set` (it is object #2 of three, with shipped code), `Report` (refused by §2.7), `Analysis` (the toolbox and both studios already carry the word). ✅ **Genuinely open:** **Enquiry** (zero code symbols; already the placeholder in five docs and the §5.5 route names; compounds as *Enquiry Template*) · **Inquiry** (free; US spelling — picking it means the glossary bans the other) · **Investigation** (free as an identifier, and the code already implies it: routes are `/inv/*`, the capability is `INV-1`, `InvRoutes.java:32` spells it out, and an `inspecto-ui/.../investigation/` folder exists — but the *namespace* is taken in two trees and the word is reserved by `GLOSSARY-CASE-1`, whose premise fails verification per above) · **Study** (free). ⚠ **Cost is near zero whichever wins**: LA-10 is unbuilt, so there are **no existing symbols to rename** — a new component kind is ~3 registry lines plus the hand-mirrored SPA unions. ⚠ **The answer must be a Type/Instance PAIR** (§2.7 needs *X Template* and *X*), not a single noun. |
+| **D-E2** | Where does a Working Set live? | LA-03, LA-10 | ⛔ **"DuckDB temp relation" is RULED OUT on evidence.** `QueryExecutor.run` opens `SqlSandbox` in try-with-resources and closes it at the end of that one call — **no connection survives an HTTP request**, so a temp relation cannot persist across the ops that build a Working Set. ✅ Surviving options are **in-memory per session** (what the SPA mock does today) and **a durable store**, and the plan's own "durability is what makes replay and evidence possible" points at the latter. ⚠ **"Artifact" is aspirational** — no general Artifact store exists; the only concrete one is the package-private, run-scoped `RunArtifactStore` (append-only JSONL under `<space>/audit/artifacts/`), keyed by runId not `opSeq`. The closest reusable *shape* is `DbFileStageStore` (DuckDB-JDBC, insert-only, unique-key + `ON CONFLICT DO NOTHING`) — a log, which is what an op sequence is, unlike `ComponentStore`'s single overwritable document. |
+| **D-E3** | Dataset version pinned at creation, or per op? | LA-10, LA-20, G-E11 | ⚠ **Entangled with D-S1 and blocked by the same absence**: there is **no version-addressable read anywhere in the backend**, so *neither* option is implementable today without first building one. ⇒ Until then, "sealing" evidence necessarily means **materialising the subgraph** — which is exactly what the client-side `GraphSnapshot` already does. Decide D-S1/LA-03's store first; this decision is downstream of it, not parallel to it. |
+| **D-E4** | Re-ordering the log invalidates Artifacts, or forks the Enquiry? | LA-10 | Not code-grounded — nothing exists to ground against (LA-10 unbuilt). The plan's reading stands: forking is safer and costs a branching model. ⚠ Depends on D-E1 only for naming, and on D-E2 for where the forked log would live. |
+| **D-E6** | Saved Widget frozen or live by default; may a live one leave the Space? | LA-21 | Not code-grounded. §2.7 recommends frozen. ⚠ The "may it leave the Space" half is **not** a Widget question — it is D-E7's scope question wearing different clothes; answer them together. |
+| **D-E7** | Who may evaluate an Enquiry's derived relation? | LA-20 | 🔴 **The premise is worse than the plan states.** "The Case's scope" is **not a thing the query path consults at all**: `QueryExecutor.run` takes no Subject and is identity-blind, and the dashboard tile path (`BiRoutes.biQuery`) checks only `ComponentAccess.canView(ex, dataset)` — dataset sharing, never row or Case scope. Row-level scoping **does** exist (`RowScope.visible` + the `AccessDecider` SPI) but is opt-in per route and is wired **only** into Ops object CRUD, never into BI. ⇒ the side channel the plan fears is not hypothetical; it is the default. ✅ **Reuse, do not invent**: `inspecto-policy`'s `PolicyEngine` is a real ABAC PDP (deny-overrides, fail-closed, seeded space isolation) and is the natural mechanism. ⚠ **But it is Enterprise-only** — on Personal/Standard `AccessDeciders.active()` is empty and `RowScope.visible` returns `true` always, so reusing it means **no Case-scope enforcement below Enterprise**. If Link Analysis ships below Enterprise, that is the decision. |
+| **D-E8** | Does an Enquiry Template carry its exclusion lists? | LA-17, LA-23 | Not code-grounded — neither templates nor reference lists exist. Plan's reading: named reference lists travel, analyst-judgement sets do not. ⚠ Depends on D-S4: a *persistent* exclusion list needs stable entity identity, which value-projected ids do not provide. |
+| **D-U1** | Rendering item: own item (LA-06) or fold into LA-07? | LA-06 | ⚠ **Largely moot since 2026-09-22.** LA-06 was disposed clause by clause: super-node aggregation **shipped**, viewport culling and progressive load **refused as premature** (with reasons, §3.2), and the published render limit **was already shipped**. ⇒ there is **no unbuilt LA-06 work left to file either way**, except the limit's *number*, which is D-S3's. *Recommended reading: close it, or keep it only as a placeholder should the cap ever rise.* |
+| **D-U2** | Extend `postmed_xdr` into the call-records Dataset, or build a fourth feed? | LA-16 — and LA-14b, LA-11 through it | `postmed_xdr` landed 2026-09-22, **after** this plan's grounding, and already carries A-party, B-party, start, duration, cell and kind; it lacks device, explicit direction, a timezone contract, `seed-inbox.{ps1,sh}` entries (**both** files — they come in a POSIX/PowerShell pair) and a planted investigative story. ⇒ **Recommended: extend it** — a fourth feed duplicates ~80 % and splits the demo. ⚠ **A peer worktree is mid-build on `postmed_xdr`** (run output timestamped the same day); reconcile with that work before touching it. ⚠ Committed sample data **is** permitted here — `.gitignore` carves out `!/spaces/*/data/samples/**` — and both existing generators state the invariant: every value invented, nothing trimmed from a capture. |
+| **D-U3** | What identity ties a `GeoPoint` to a Link Analysis node? | LA-22 | **There is none today.** The one bridge (`coLocationGraph`) re-derives `` `entity:${name}` `` from a **display string**, which can collide and need not match the projection's node ids. ⛔ **Do not adopt that key by default** — it would silently isolate the wrong nodes, which in an investigative tool is a wrong answer presented as a finding. ⇒ This is **the same missing object as D-S4**; sequencing LA-22 behind LA-17 costs nothing and removes the question. |
+| **D-U4** | Add a map box-select dependency? | LA-22 | MapLibre GL JS has **no built-in rectangle draw**; today's map offers measure/radius/polygon/note only. A box-select means a new library (terra-draw, mapbox-gl-draw) or a hand-rolled overlay. ⚠ A dependency addition is an operator call and also touches `tools/dependencies.lock`, which CI diffs. |
+
+⚠ **Sequencing that falls out of the grounding, offered as a reading and not a decision:** **D-E1** unblocks
+the most (all of Phase 2) and costs least (nothing is built yet). **D-S1 → D-E3** are one thread, both
+waiting on the same absent version-addressable read. **D-S4 → D-U3 → D-E8** are one missing object.
+**D-E6's second half is D-E7.** That is fifteen questions resting on about five real choices.
 
 ---
 
