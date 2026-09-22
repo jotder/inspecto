@@ -113,7 +113,8 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
                     }
                 </div>
                 <inspecto-alert variant="warning">
-                    UI-first: snapshots are kept for this browser session only until the backend snapshot store lands.
+                    UI-first: analyses are kept for this browser session only until this pane is wired to the sealed
+                    snapshot store.
                 </inspecto-alert>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
@@ -225,8 +226,8 @@ export interface AttachCaseDialogData {
                     <textarea matInput formControlName="note" rows="2"></textarea>
                 </mat-form-field>
                 <inspecto-alert variant="warning">
-                    UI-first: the attachment is recorded in this browser session only until the Case evidence route
-                    lands.
+                    UI-first: the attachment is recorded in this browser session only until this pane is wired to the
+                    sealed snapshot store.
                 </inspecto-alert>
             </mat-dialog-content>
             <mat-dialog-actions align="end">

@@ -369,8 +369,9 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   ops-absent path (a deployment fact the analyst can act on); a real error clears the list and renders an
   `<inspecto-alert variant="error">` in the picker's place. The three states live in ONE place,
   `LinkAnalysisCaseFieldComponent`, so the two dialogs that ask for a Case cannot drift on them.
-  ⚠ The whole snapshot/attach flow is still client-side (LA-03 unbuilt), so this is about the UI's
-  honesty, not about persistence.
+  ⚠ The snapshot/attach flow is still client-side in the SPA, so this is about the UI's honesty, not
+  about persistence. (LA-03's BACKEND half shipped 2026-09-22 — `SnapshotStore`, `POST /inv/snapshots`
+  + `/attach` — but nothing in the SPA calls it yet.)
 * **Saving the analysis and attaching it to a Case are ONE action, and the Case half is optional**
   (decision 2026-09-22, operator). The snapshot dialog and the attach dialog merged into **Save this
   analysis**: name, description, the frozen-content summary, and an *optional* Case. 🔴 **This reversed
@@ -394,7 +395,8 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   `object-create.dialog.ts:224`): *a case CONTAINS its members*. Link Analysis holds graph **nodes**,
   which are value-projected entity ids and not operational objects, so there is no legal link target on
   this screen. Creating one anyway would also mean a durable Case with a session-only attachment — an
-  empty Case that looks like it holds evidence. Revisit when LA-03 lands.
+  empty Case that looks like it holds evidence. Tracked as `LA-CASE-CREATE-IN-PLACE-1`; revisit once the
+  SPA is wired to the sealed snapshot store.
 * **The projection reports the identities it has SPLIT** (`splitIdentityGroups`, decision D-S4). Entity ids
   are value-projected — `entityId` mints them from the trimmed raw value with no case fold and no alias
   resolution — so `ACME Ltd` and `acme ltd.` are two nodes carrying two degree counts, two community
