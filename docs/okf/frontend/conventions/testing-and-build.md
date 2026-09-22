@@ -15,6 +15,22 @@ timestamp: 2026-06-28T00:00:00Z
 * `npm run build` — production build: AOT type-check + budgets (initial ≤ 3mb warn / 5mb error). New CommonJS deps must be added to `allowedCommonJsDependencies` in `angular.json` (e.g. `alasql`).
 * `npm run test:ci` — vitest (jsdom) + `TestBed`; **add `expectNoA11yViolations` to new component specs** (see [accessibility](accessibility.md)).
 
+⚠ **A git worktree has no `node_modules`, so every command above fails there.** `npm ci` has only ever run in
+the main checkout, and npm reports the absence as `could not determine executable to run` — which reads like a
+broken script, not a missing dependency tree. ⛔ Don't install a second copy: it is **293 MB** per worktree
+(measured 2026-09-22) and a copy installed once goes stale the moment a `package-lock.json` change lands on
+`master`, so the worktree then tests against different dependency versions than CI does — silently. Point the
+worktree at the main checkout's tree with a **directory junction** instead (`node_modules` is gitignored, so
+the junction never appears in `git status`):
+
+```powershell
+New-Item -ItemType Junction -Path '<worktree>\inspecto-ui\node_modules' -Target 'C:\sandbox\inspecto-clean\inspecto-ui\node_modules'
+```
+
+⚠ Use PowerShell's `New-Item`, not `cmd /c mklink /J` — invoked through the POSIX shell that hosts most tooling
+here, `mklink` receives a mangled path and fails with `Invalid switch`, which looks like a quoting bug in your
+command rather than a shell mismatch.
+
 ## Testing notes
 
 * Signal inputs are set with `fixture.componentRef.setInput('name', value)`.
