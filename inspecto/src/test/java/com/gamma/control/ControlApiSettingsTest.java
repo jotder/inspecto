@@ -15,6 +15,8 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -199,6 +201,61 @@ class ControlApiSettingsTest {
             assertEquals(900, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null))
                     .get("analysisNodeCap").asInt());
         }
+    }
+
+    /**
+     * The capability gate on the settings writes, exercised with an ARMED Authenticator.
+     *
+     * 🔴 <b>Why this exists.</b> `withCapability` is a NO-OP unless a {@link Subject} is attached, and no test
+     * attaches one unless it installs a fake authenticator. Every other test in this class runs
+     * Personal-shaped, so they pass identically whether or not these routes are gated at all — adding or
+     * removing the gate would change no assertion here. `tools/check-authgate-coverage.mjs` flagged
+     * `PUT /settings/link-analysis` for exactly that on 2026-09-22, taking the ratchet from 79 to 80.
+     *
+     * ⚠ Three statuses on purpose: 401 is authentication, <b>403 is the GATE</b> — a present Subject LACKING
+     * the capability — and only the 403 distinguishes a gated route from one that merely needs a login.
+     */
+    @Test
+    void settingsWritesRequireCanAuthorWorkbench(@TempDir Path root) throws Exception {
+        Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")))
+                : "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("nobody", Set.of()))
+                : Optional.empty());
+        try (Ctx c = open(root)) {
+            // ⚠ The setup call needs a credential too. Installing a fake Authenticator makes EVERY route
+            // outside ControlApi.PUBLIC_PATHS demand one, and /spaces is not in that set — so a credential-less
+            // setup call 401s before the test reaches what it means to assert. (Being exempt from the
+            // canAdminister CAPABILITY while no space exists is a different gate, and does not waive AuthN.)
+            assertEquals(200, sendAs(c.port, "POST", "/spaces", "{\"id\":\"acme\"}", "Bearer valid").statusCode());
+            String body = "{\"projectionNodeCap\":600}";
+
+            assertEquals(401, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", body).statusCode(),
+                    "no credential is a clean 401, never a 500");
+
+            HttpResponse<String> denied = sendAs(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    body, "Bearer plain");
+            assertEquals(403, denied.statusCode(), "a Subject WITHOUT the capability is refused: " + denied.body());
+            assertTrue(denied.body().contains("canAuthorWorkbench"), "the refusal names the capability");
+
+            assertEquals(200, sendAs(c.port, "GET", "/spaces/acme/settings/link-analysis", null, "Bearer plain")
+                    .statusCode(), "reads stay open by policy: the same capability-less Subject may READ");
+
+            HttpResponse<String> allowed = sendAs(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    body, "Bearer valid");
+            assertEquals(200, allowed.statusCode(), "a Subject WITH the capability is allowed: " + allowed.body());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> sendAs(int port, String method, String path, String body, String auth)
+            throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
+        if (auth != null) b.header("Authorization", auth);
+        if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
+        else b.method(method, BodyPublishers.noBody());
+        return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
