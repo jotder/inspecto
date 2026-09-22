@@ -19,6 +19,14 @@ export interface G6Node {
         /** The Incident/Case this node represents, when the source could resolve one — lights the
          *  detail dialog's "Open record" pivot (ui-design-review R8). Structurally = `ElementObjectRef`. */
         objectRef?: { id: string; type: 'INCIDENT' | 'CASE' };
+        /**
+         * LA-06: the real node ids this one STANDS IN FOR. Present only on a synthetic super-node
+         * ({@link SUPER_NODE_KIND}) produced by `aggregateSuperNodes`; absent on every real node.
+         * ⛔ A node carrying this is NOT an entity — it must never carry an `objectRef`, because an
+         * analyst who could "open the record" of a stand-in for 200 accounts would be opening one real
+         * account while believing it represented all of them.
+         */
+        superMembers?: string[];
     };
 }
 

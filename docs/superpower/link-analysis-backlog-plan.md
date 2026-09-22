@@ -130,11 +130,18 @@ identifier). `ControlApiInvProjectionTest` (10 tests) pins that edge `count` equ
 2. **All analysis is client-side** — supported graph size is bounded by one browser tab.
 3. **Nodes have no identity** — centrality and community results are only as meaningful as raw column
    values, and nothing warns the analyst.
-4. **The actual slowness is not G6.** `rebuild()` (`graph-view.component.ts:362-489`) unconditionally
-   `graph.destroy()` → `new Graph` → `render()` on **any** `@Input` change, and every bound input is a
-   `computed()` returning a new reference — so toggling labels or nudging the timeline reruns the whole
-   layout synchronously (`force` / `force-cluster` / `mds` rerun the full simulation). Zero uses of
-   `setData` / `updateNodeData` / `changeData`. Bug-shaped, not architecture-shaped (→ **LA-05**).
+4. ~~**The actual slowness is not G6.**~~ ✅ **FIXED 2026-09-22 by LA-05 — this paragraph described a
+   defect that no longer exists.** It read: `rebuild()` unconditionally `graph.destroy()` → `new Graph`
+   → `render()` on **any** `@Input` change, every bound input being a `computed()` returning a new
+   reference, so toggling labels reran the whole layout synchronously; zero uses of `setData`.
+   `GraphViewComponent` now classifies the change by VALUE and repaints without touching layout —
+   measured at **0 of 170 nodes moved** on a label toggle, same G6 instance.
+   🔴 **This has a consequence for LA-06.** The culling and progressive-load clauses were queued against
+   *this* diagnosis, which named LA-05 as the cause and explicitly said the canvas was **not** the
+   bottleneck. With the named cause removed, those clauses rest on no measurement at all. ⇒ **Re-measure
+   before building either** — CLAUDE.md §2 forbids speculative work, and an optimisation with no profile
+   behind it is exactly that. The super-node-aggregation clause is a different animal: it is a
+   *legibility* feature (a hairball reads as nothing), not a performance one, and does not depend on this.
 
 ---
 
@@ -290,6 +297,38 @@ smaller than the register claimed:
   picked up as free work** — the *Blocks* column is the one to trust, because it is where a decision is
   written down.
 
+✅ **`LA-06` is now disposed of clause by clause (2026-09-22)** — it was never one item:
+
+| Clause | Verdict |
+|---|---|
+| Viewport culling | ⛔ **REFUSED — premature.** `PROJECTION_NODE_CAP` is **500**; culling is a technique for 10–100k elements. G6 v5.1.1 has **no** built-in cull (no `cull`/`visible`/`viewport` style option anywhere in the typings), so it would be hand-rolled, and 🔴 the obvious implementation — filtering `this.data` — re-introduces the exact LA-05 regression: `stableKey` would read it as a data change and run a full layout **on every pan**. |
+| Progressive load ("heaviest edges first") | ⛔ **REFUSED — already true, and the rest is pointless.** The server sorts `ORDER BY cnt DESC` and every downstream transform is an order-preserving `filter`, so the edge array reaching the canvas **is already in weight order** — which is also why truncation keeps the heaviest pairs and the footer's "top-N by count" is accurate. What remains is chunking a ≤500-node `setData`, a single-digit-millisecond call. No chunking pattern exists in the SPA to copy; it would be net-new work for no measurable gain. |
+| Super-node aggregation | ✅ **SHIPPED.** See below. |
+| Published render limit in the footer | ✅ **ALREADY SHIPPED** — `caps = {projection, analysis}` is printed in the footer. Only the *number* awaits **D-S3**. |
+
+🔴 **Why the two refusals are the honest answer:** §1.6(4) diagnosed the slowness as the
+rebuild-on-any-input and said in terms that the canvas was **not** the bottleneck. **LA-05 removed that
+cause on 2026-09-22.** So both clauses now rest on no measurement at all, and CLAUDE.md §2 forbids
+speculative work. The remaining real ceiling is **compute, not render**: all 27 algorithms run on the
+browser main thread and `ANALYSIS_NODE_CAP` *throws* above 2 000 rather than degrading (that is LA-07/D-S3).
+⚠ If LA-06 is ever reopened, two **registered** G6 built-ins cost one line each and are the cheap
+starting point: `optimize-viewport-transform` (hides non-node shapes during pan/zoom) and
+`auto-adapt-label` (viewport-aware, degree-sorted labels — strictly better than today's all-or-nothing
+`LOD_LABEL_CAP`). Neither is free work today: both sit under D-U1, and the second under D-S3.
+
+**Super-node aggregation, as shipped.** A hub's **pendant** leaves — nodes whose only link is to that hub
+— fold into one stand-in labelled with the count, once there are at least the threshold. It is a
+**legibility** transform, not a performance one: two hundred accounts each touching a single hub draw as a
+hairball, and the one fact worth reading (*this hub has two hundred one-hop counterparties*) is exactly
+what the hairball hides. Opt-in and off by default, because it changes what the canvas MEANS.
+⛔ **Only true pendants fold**, so no path through the graph is ever removed.
+🔴 **A stand-in never carries an `objectRef`** — otherwise an analyst could "open the record" of a
+stand-in for 200 accounts and be shown one real account. Pinned by a spec that goes red when the
+transform is mutated to inherit a member's reference.
+⚠ It is excluded from the legend and kind tallies (it has no real kind), and the working-set tiles are
+measured on the **pre-aggregation** graph — measured live: canvas 159 marks, tiles **170 entities**. The
+tiles answer "how much am I looking at", never "how many shapes are on the canvas".
+
 ⚠ **`LA-14` is split.** `LA-14a` (temporal ordering on the existing linear matcher) shipped; `LA-14b`
 (branching runtime + SQL compiler + structuring pack) is the unavoidably large half and is blocked in
 practice by `LA-16`, because a timestamp attribute column joins the projection's `GROUP BY` fold key and
@@ -312,7 +351,7 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 | **LA-03** | `POST /inv/snapshots` + `POST /cases/{id}/evidence/graph` | ⬜ backend · ✅ SPA mock store | M | D-S1, D-E2 | Serialise sub-graph, scores, positions, viewport, annotations, predicate, origin, pinned Dataset version; persist as an Artifact anchored to `opSeq`; swap `LinkAnalysisSnapshotsService.add/attach`. Contract §5.4. |
 | **LA-07** | Web Worker computation (`graph-worker.ts`, `GraphAnalysisClient`) | ⬜ | M | D-S3 | Move the 27 algorithms off the main thread; zero-copy `ArrayBuffer` transfer; `PROGRESS` messages; `AbortController` cancellation. ⚠ Fixes responsiveness only — the cap stays until D-S3 states a graceful published number. |
 | **LA-08** | `POST /inv/projection/multi` | ⬜ | M | D-S4 | Node mappings + edge projections across Datasets in one call; unified DuckDB union views; `__provenance_dataset` tagging. Contract §5.2. |
-| **LA-06** | Rendering at scale | 🟡 LOD labels only | M | **D-U1** · partly D-S3 | Viewport culling, progressive load (heaviest edges first), super-node aggregation of low-degree leaves above a threshold, published render limit in the footer. **WebGL renderer only after measuring** — `package.json:33` installs `@antv/g6` alone, no `g6-plugin-webgl` / `layout-gpu`, and §1.6(4) says the canvas is not the bottleneck. |
+| **LA-06** | Rendering at scale — **disposed clause by clause, see below** | ✅ clause 3 SHIPPED · ⛔ clauses 1–2 REFUSED · ✅ clause 4 already shipped | M | D-S3 (clause 4's number only) | Viewport culling, progressive load (heaviest edges first), super-node aggregation of low-degree leaves above a threshold, published render limit in the footer. **WebGL renderer only after measuring** — `package.json:33` installs `@antv/g6` alone, no `g6-plugin-webgl` / `layout-gpu`, and §1.6(4) says the canvas is not the bottleneck. |
 | **LA-09** | View toolbox completions | ✅ **SHIPPED 2026-09-22** (5 of 12; 4 refused, 3 gated — see below) | S | — | Add Fruchterman, combo force, fishbone, dendrogram layouts; remaining G6 v5 plugins (timebar, bubble sets, combos, edge bundling, context menu, snapline, history, watermark). Each is a G6 id, not an engine. |
 
 ### 3.3 Phase 2 — the object, the ladder, the clock (Sprint 10)

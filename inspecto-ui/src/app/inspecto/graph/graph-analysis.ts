@@ -1,5 +1,5 @@
 import type { GraphDirection } from 'app/inspecto/api';
-import type { G6Edge, G6GraphData } from './graph-types';
+import type { G6Edge, G6GraphData, G6Node } from './graph-types';
 
 /**
  * Pure, source-agnostic graph analysis over the shared {@link G6GraphData} shape — the Link Analysis
@@ -703,6 +703,89 @@ export function collapseBranches(g: G6GraphData, collapsedRoots: string[]): G6Gr
     const nodes = g.nodes.filter((n) => !hidden.has(n.id));
     const edges = g.edges.filter((e) => !hidden.has(e.source) && !hidden.has(e.target));
     return { nodes, edges };
+}
+
+/**
+ * The `kind` every synthetic super-node carries. Deliberately NOT a real entity kind: the legend, the
+ * kind filter and the node tables all tally by `kind`, and a stand-in counted as an account would
+ * misstate how many accounts the analyst is looking at.
+ */
+export const SUPER_NODE_KIND = '__super__';
+
+/** The id of the super-node standing in for `hubId`'s pendant leaves. */
+export function superNodeId(hubId: string): string {
+    return `__super__:${hubId}`;
+}
+
+/**
+ * LA-06 — fold a hub's **pendant leaves** (nodes whose only link is to that hub) into one synthetic
+ * super-node labelled with the count, when there are at least `threshold` of them.
+ *
+ * <p>This is a **legibility** transform, not a performance one: two hundred accounts that each touch a
+ * single hub draw as a hairball that says nothing, and the one fact worth reading — *this hub has two
+ * hundred one-hop counterparties* — is exactly the fact the hairball hides.
+ *
+ * <p>Only true pendants are folded (degree exactly 1), so no path through the graph is ever removed and
+ * no structure is lost: a leaf with a second link stays, because folding it would hide a route. `hubs`
+ * names hubs the analyst has expanded, which are left alone.
+ *
+ * <p>⛔ A super-node carries {@link SUPER_NODE_KIND} and its member ids, and **never an `objectRef`** —
+ * see {@link G6Node}. `threshold` below 2 is meaningless (a "group" of one is just the node) and
+ * disables the transform, as does an empty graph.
+ */
+export function aggregateSuperNodes(g: G6GraphData, threshold: number, expandedHubs: string[] = []): G6GraphData {
+    if (!Number.isFinite(threshold) || threshold < 2 || !g.nodes.length) return g;
+
+    // One pass for degree; reuse the same counting `degreeCentrality` does rather than a third map.
+    const degree = new Map<string, number>();
+    for (const n of g.nodes) degree.set(n.id, 0);
+    for (const e of g.edges) {
+        degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
+        degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
+    }
+
+    // hub -> its pendant leaves. A self-loop is not a pendant relationship.
+    const kept = new Set(expandedHubs);
+    const pendants = new Map<string, string[]>();
+    for (const e of g.edges) {
+        if (e.source === e.target) continue;
+        for (const [leaf, hub] of [
+            [e.source, e.target],
+            [e.target, e.source],
+        ] as const) {
+            if (degree.get(leaf) !== 1 || kept.has(hub)) continue;
+            pendants.set(hub, [...(pendants.get(hub) ?? []), leaf]);
+        }
+    }
+
+    const folded = new Map<string, string[]>();
+    for (const [hub, leaves] of pendants) if (leaves.length >= threshold) folded.set(hub, leaves);
+    if (!folded.size) return g;
+
+    const hidden = new Set<string>();
+    for (const leaves of folded.values()) for (const id of leaves) hidden.add(id);
+
+    const nodes: G6Node[] = g.nodes.filter((n) => !hidden.has(n.id));
+    const edges: G6Edge[] = g.edges.filter((e) => !hidden.has(e.source) && !hidden.has(e.target));
+    for (const [hub, leaves] of folded) {
+        const id = superNodeId(hub);
+        nodes.push({
+            id,
+            data: {
+                label: `${leaves.length} more`,
+                kind: SUPER_NODE_KIND as G6Node['data']['kind'],
+                superMembers: [...leaves],
+                // ⛔ no objectRef, deliberately — a stand-in is not a record.
+            },
+        });
+        edges.push({ id: `${hub}->${id}`, source: hub, target: id, data: { kind: SUPER_NODE_KIND } });
+    }
+    return { nodes, edges };
+}
+
+/** The real node ids a super-node stands in for, or `[]` for any real node. */
+export function superMembersOf(g: G6GraphData, nodeId: string): string[] {
+    return g.nodes.find((n) => n.id === nodeId)?.data.superMembers ?? [];
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════

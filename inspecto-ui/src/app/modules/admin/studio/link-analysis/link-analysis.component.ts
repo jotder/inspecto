@@ -79,6 +79,8 @@ import {
     hasConditions,
     markStranded,
     predicateColumns,
+    aggregateSuperNodes,
+    SUPER_NODE_KIND,
 } from 'app/inspecto/graph';
 import { ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import { LinkAnalysisFilterComponent, LocalMatch } from './link-analysis-filter.component';
@@ -486,10 +488,45 @@ export class LinkAnalysisComponent implements OnInit {
         return { matched, total: g.edges.length };
     });
     readonly strandedCount = computed(() => this.graph()?.nodes.filter((n) => n.data.missing).length ?? 0);
-    readonly displayed = computed<G6GraphData | null>(() => {
+    /**
+     * LA-06 clause 3 — fold a hub's pendant leaves into one super-node once there are at least this
+     * many. `0` is off, and off is the default: the transform changes what the canvas MEANS, so it is
+     * the analyst's call, not a silent optimisation. ⚠ Only true pendants fold, so no path is ever lost.
+     */
+    readonly superNodeThreshold = signal(0);
+    /** Hubs the analyst has expanded again; their leaves stay individual. */
+    readonly expandedSuperHubs = signal<string[]>([]);
+    /** The collapsed graph BEFORE super-node folding — what the analyst actually has in hand. */
+    private readonly collapsedGraph = computed<G6GraphData | null>(() => {
         const g = this.baseGraph();
         return g ? collapseBranches(g, this.collapsedRoots()) : null;
     });
+    readonly displayed = computed<G6GraphData | null>(() => {
+        const g = this.collapsedGraph();
+        if (!g) return null;
+        const threshold = this.superNodeThreshold();
+        return threshold >= 2 ? aggregateSuperNodes(g, threshold, this.expandedSuperHubs()) : g;
+    });
+    /** True while any super-node is on the canvas — the footer says so, since counts then differ. */
+    readonly hasSuperNodes = computed(
+        () => this.displayed()?.nodes.some((n) => n.data.kind === SUPER_NODE_KIND) ?? false,
+    );
+
+    /**
+     * Turn grouping on or off. Re-enabling CLEARS the expanded set, which is the analyst's way back:
+     * once a group is opened its stand-in is gone from the canvas, so there is nothing left to click to
+     * re-fold it. Off-then-on is the reset.
+     */
+    setSuperNodeGrouping(on: boolean): void {
+        this.expandedSuperHubs.set([]);
+        this.superNodeThreshold.set(on ? 10 : 0);
+    }
+
+    /** Expand one super-node back into its members (or re-fold an expanded hub). */
+    toggleSuperNode(nodeId: string): void {
+        const hub = nodeId.startsWith('__super__:') ? nodeId.slice('__super__:'.length) : nodeId;
+        this.expandedSuperHubs.update((h) => (h.includes(hub) ? h.filter((x) => x !== hub) : [...h, hub]));
+    }
 
     // ── display options (persisted with a saved view; applied on load) ──
     readonly nodeLabels = signal(true);
@@ -556,7 +593,12 @@ export class LinkAnalysisComponent implements OnInit {
         const g = this.displayed();
         if (!g) return [];
         const counts = new Map<string, number>();
-        for (const n of g.nodes) counts.set(n.data.kind, (counts.get(n.data.kind) ?? 0) + 1);
+        // A super-node is a stand-in, not an entity: counting it as a kind would misstate how many of
+        // that kind the analyst is looking at, and it has no real kind to be counted under anyway.
+        for (const n of g.nodes) {
+            if (n.data.kind === SUPER_NODE_KIND) continue;
+            counts.set(n.data.kind, (counts.get(n.data.kind) ?? 0) + 1);
+        }
         const colors = this.nodeColors();
         return [...counts.entries()]
             .sort((a, b) => b[1] - a[1])
@@ -569,7 +611,10 @@ export class LinkAnalysisComponent implements OnInit {
     readonly profile = computed(() => domainProfile(this.profileId()));
     readonly workingSet = computed(() => {
         const g = this.graph();
-        return workingSetStats(this.displayed(), g, g ? workingSetOptionsFor(this.profile(), attrColumns(g)) : {});
+        // ⚠ Measured on the PRE-aggregation graph on purpose. A super-node folds N real entities into one
+        // mark, so counting the displayed graph would report "43 nodes" for a working set of 240 — the
+        // tiles answer "how much am I looking at", never "how many shapes are on the canvas".
+        return workingSetStats(this.collapsedGraph(), g, g ? workingSetOptionsFor(this.profile(), attrColumns(g)) : {});
     });
     /** The displayed graph as rows — search-narrowed, so canvas and table show the same result. */
     readonly tableRows = computed<Record<string, unknown>[]>(() => {
@@ -1033,6 +1078,12 @@ export class LinkAnalysisComponent implements OnInit {
     // ── element details (canvas click → full-detail popup) ──
 
     onNodeClick(id: string): void {
+        // A super-node exists only in `displayed()`, so the lookup below would miss it and the click
+        // would do nothing at all. Clicking a stand-in means "show me what you are standing in for".
+        if (this.displayed()?.nodes.find((n) => n.id === id)?.data.kind === SUPER_NODE_KIND) {
+            this.toggleSuperNode(id);
+            return;
+        }
         const g = this.baseGraph();
         const node = g?.nodes.find((n) => n.id === id);
         if (!g || !node) return;

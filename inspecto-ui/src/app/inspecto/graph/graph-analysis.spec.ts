@@ -38,6 +38,9 @@ import {
     triangleCount,
     weightedShortestPath,
     patternNeedsTime,
+    aggregateSuperNodes,
+    SUPER_NODE_KIND,
+    superNodeId,
 } from './graph-analysis';
 
 const node = (id: string, kind = 'entity', label = id): G6GraphData['nodes'][0] => ({ id, data: { label, kind } });
@@ -699,5 +702,86 @@ describe('matchPattern temporal ordering (LA-14a)', () => {
         const plain = [{}, { direction: 'out' as const }, { direction: 'out' as const }];
         expect(matchPattern(backwards, plain)).toHaveLength(1);
         expect(matchPattern(backwards, plain, { timeAttr: 'AT' })).toHaveLength(1);
+    });
+});
+
+// ── LA-06 clause 3: super-node aggregation. A legibility transform, not a performance one. ──
+describe('aggregateSuperNodes', () => {
+    /** One hub with `n` pendant leaves, plus a second real neighbour that is NOT a pendant. */
+    function hubWithLeaves(n: number): G6GraphData {
+        const nodes: G6GraphData['nodes'] = [
+            { id: 'hub', data: { label: 'Hub', kind: 'acct' } },
+            { id: 'peer', data: { label: 'Peer', kind: 'acct' } },
+        ] as G6GraphData['nodes'];
+        const edges: G6GraphData['edges'] = [
+            { id: 'hub->peer', source: 'hub', target: 'peer', data: { kind: 'pays' } },
+            { id: 'peer->x', source: 'peer', target: 'hub', data: { kind: 'pays' } },
+        ] as G6GraphData['edges'];
+        for (let i = 0; i < n; i++) {
+            nodes.push({ id: 'leaf' + i, data: { label: 'Leaf ' + i, kind: 'acct' } } as G6GraphData['nodes'][number]);
+            edges.push({
+                id: 'hub->leaf' + i,
+                source: 'hub',
+                target: 'leaf' + i,
+                data: { kind: 'pays' },
+            } as G6GraphData['edges'][number]);
+        }
+        return { nodes, edges };
+    }
+
+    it("folds a hub's pendant leaves into one stand-in once the threshold is met", () => {
+        const g = aggregateSuperNodes(hubWithLeaves(5), 5);
+        const ids = g.nodes.map((n) => n.id).sort();
+        expect(ids).toEqual(['__super__:hub', 'hub', 'peer']);
+        const sup = g.nodes.find((n) => n.id === superNodeId('hub'))!;
+        expect(sup.data.kind).toBe(SUPER_NODE_KIND);
+        expect(sup.data.label).toBe('5 more');
+        expect(sup.data.superMembers).toHaveLength(5);
+    });
+
+    it('⛔ never gives a stand-in an objectRef — it is not a record and must not open like one', () => {
+        const g = hubWithLeaves(5);
+        // even when every member carries one, the stand-in must not
+        for (const n of g.nodes) if (n.id.startsWith('leaf')) n.data.objectRef = { id: 'CASE-1', type: 'CASE' };
+        const out = aggregateSuperNodes(g, 5);
+        expect(out.nodes.find((n) => n.id === superNodeId('hub'))!.data.objectRef).toBeUndefined();
+    });
+
+    it('leaves the graph alone below the threshold, and when disabled', () => {
+        expect(aggregateSuperNodes(hubWithLeaves(4), 5).nodes).toHaveLength(6);
+        expect(aggregateSuperNodes(hubWithLeaves(9), 0).nodes).toHaveLength(11);
+        expect(aggregateSuperNodes(hubWithLeaves(9), 1).nodes).toHaveLength(11); // a group of one is not a group
+    });
+
+    it('NEVER folds a node that carries a second link — no path may be hidden', () => {
+        const g = hubWithLeaves(5);
+        // give one leaf a second link; it must survive as itself
+        g.edges.push({ id: 'leaf0->peer', source: 'leaf0', target: 'peer', data: { kind: 'pays' } } as never);
+        const out = aggregateSuperNodes(g, 5);
+        expect(out.nodes.map((n) => n.id)).toContain('leaf0');
+        // the remaining four are now below the threshold, so nothing folds at all
+        expect(out.nodes.some((n) => n.data.kind === SUPER_NODE_KIND)).toBe(false);
+    });
+
+    it('drops the folded members and their edges, and links the stand-in to its hub', () => {
+        const g = aggregateSuperNodes(hubWithLeaves(5), 5);
+        expect(g.nodes.some((n) => n.id.startsWith('leaf'))).toBe(false);
+        expect(g.edges.some((e) => e.target.startsWith('leaf'))).toBe(false);
+        const link = g.edges.find((e) => e.target === superNodeId('hub'))!;
+        expect(link.source).toBe('hub');
+    });
+
+    it('leaves an expanded hub un-folded, which is how the analyst opens one', () => {
+        const g = aggregateSuperNodes(hubWithLeaves(5), 5, ['hub']);
+        expect(g.nodes.some((n) => n.data.kind === SUPER_NODE_KIND)).toBe(false);
+        expect(g.nodes.filter((n) => n.id.startsWith('leaf'))).toHaveLength(5);
+    });
+
+    it('does not treat a self-loop as a pendant relationship', () => {
+        const g: G6GraphData = {
+            nodes: [{ id: 'a', data: { label: 'A', kind: 'acct' } }] as G6GraphData['nodes'],
+            edges: [{ id: 'a->a', source: 'a', target: 'a', data: { kind: 'pays' } }] as G6GraphData['edges'],
+        };
+        expect(aggregateSuperNodes(g, 2)).toEqual(g);
     });
 });

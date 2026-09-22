@@ -891,6 +891,19 @@
                                     Community hulls
                                     <span class="text-secondary text-xs">(Louvain)</span>
                                 </mat-checkbox>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <mat-checkbox
+                                        [checked]="superNodeThreshold() > 0"
+                                        (change)="setSuperNodeGrouping($event.checked)"
+                                    >
+                                        Group lone counterparties
+                                    </mat-checkbox>
+                                    @if (superNodeThreshold() > 0) {
+                                        <span class="text-secondary text-xs">
+                                            {{ superNodeThreshold() }}+ per hub &middot; click a group to open it
+                                        </span>
+                                    }
+                                </div>
                                 <mat-checkbox
                                     [checked]="!!viewOptions().bubbleSets"
                                     [disabled]="!viewOptions().hulls"

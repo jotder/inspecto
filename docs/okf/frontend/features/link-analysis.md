@@ -288,6 +288,19 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   * Two more are not drop-ins at all: **`combo-force` is not a real G6 v5 id** (the nearest built-in is
     `combo-combined`), and **"combos" is a data-model change**, not a plugin — it needs `comboId` on the
     graph data.
+* **A hub's pendant leaves can fold into one stand-in** (LA-06): opt-in, off by default, labelled with
+  the count. Only nodes whose ONLY link is to that hub fold, so no path is ever hidden. Clicking a
+  stand-in opens it; turning the control off and on again is the way back, because once opened there is
+  no stand-in left to click.
+* 🔴 **A stand-in is not a record and must never carry an `objectRef`.** It would let an analyst open
+  one real account's detail page believing it represented the two hundred the stand-in folds. It also
+  carries its own `kind`, so it is excluded from the legend and kind tallies rather than counted as an
+  entity, and the working-set tiles are measured **before** aggregation — live on the demo graph, the
+  canvas draws 159 marks while the tiles correctly report 170 entities.
+* ⛔ **Viewport culling and progressive edge loading were REFUSED as premature** — the projection cap is
+  500 nodes, the edge array is already weight-ordered from the server, and the bottleneck those clauses
+  targeted was the pre-LA-05 rebuild, which no longer exists. 🔴 A culling pass that filtered the
+  canvas's `data` would re-introduce the LA-05 regression, running a full layout on every pan.
 * **A pattern can require its hops to be in TIME ORDER** (LA-14a). A step marked `afterPrevious` must
   carry an event time strictly later than the previous step's, optionally within `maxGapHours`; the time
   comes from an edge attribute column chosen in the pane, parsed with `Date.parse` exactly as the time
