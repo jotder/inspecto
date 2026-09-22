@@ -170,6 +170,46 @@ class ControlApiPipelineCrudTest {
     }
 
     /**
+     * A config in the per-config subdirectory is READABLE even when nothing has registered it — the half
+     * of {@code D3} that landed 2026-09-23.
+     *
+     * <p>🔴 It was not. An unregistered config was resolved at the write ROOT only, and
+     * {@link ConfigFileSupport#resolveRegisteredConfigFile} can ask the running service where a
+     * REGISTERED pipeline lives — an unregistered draft has nobody to ask. So a config sitting in
+     * {@code config/<name>/}, which is where every shipped Pipeline in this repo lives and where {@code D3}
+     * sends a created one, answered <b>404</b> to read, patch and delete. That is what made the first
+     * attempt at {@code WB-15} break 23 tests: it taught the WRITE path to nest without teaching the read
+     * path to look.
+     *
+     * <p>⛔ The flat forms still win when they exist, so nothing is relocated and no existing caller
+     * changes answer — asserted below by reading a flat config in the same space.
+     */
+    @Test
+    void aConfigInItsOwnSubdirectoryIsReadableWithoutBeingRegistered(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            // Nested, and deliberately NOT registered with the service.
+            Path nestedDir = wr.resolve("tucked_away");
+            Files.createDirectories(nestedDir);
+            Files.writeString(nestedDir.resolve("tucked_away_pipeline.toon"),
+                    "name: tucked_away\nactive: false\ndirs:\n  poll: in\n");
+
+            HttpResponse<String> r =
+                    send(c.port, "GET", "/config/pipeline/tucked_away", null);
+            assertEquals(200, r.statusCode(),
+                    "a config in config/<name>/ must be readable without the registry's help: " + r.body());
+            assertTrue(r.body().contains("tucked_away"), r.body());
+
+            // A flat config is unaffected — the subdir lookup is a FALLBACK, never a relocation.
+            Files.writeString(wr.resolve("flat_one_pipeline.toon"),
+                    "name: flat_one\nactive: false\ndirs:\n  poll: in\n");
+            assertEquals(200,
+                    send(c.port, "GET", "/config/pipeline/flat_one", null).statusCode(),
+                    "the flat form must keep resolving exactly as before");
+        }
+    }
+
+    /**
      * An EXISTING pipeline keeps its own home, wherever its author put it.
      *
      * <p>⛔ Kept as the guard for whoever re-attempts {@code D3} ({@code config/<id>/} for a created

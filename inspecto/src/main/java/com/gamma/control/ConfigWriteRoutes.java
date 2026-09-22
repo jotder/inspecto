@@ -151,15 +151,22 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
-        // ⛔ WB-15 (config/<id>/ for a created Pipeline, D3) was implemented here on 2026-09-22 and
-        // REVERTED the same day. 🔴 It made a freshly-written config UNREACHABLE: an unregistered
-        // config is resolved at the write ROOT, and only a REGISTERED pipeline is found wherever its
-        // file actually sits (`resolveRegisteredConfigFile`). So a create that nested the file left
-        // read, patch and delete answering 404 for it — 23 tests across
-        // ControlApiConfig{Write,Patch,Delete,IfMatch}Test, ControlApiDeadPropertyTest and
-        // ControlApiDedupWindowArmingTest caught exactly that.
-        // ⚠ D3 still stands as a DECISION. Landing it needs the READ path to resolve `config/<id>/`
-        // too, which is the larger change the row did not name. Row: UI-CREATED-PIPELINE-FLAT-HOME-1.
+        // ⛔ D3 (a created Pipeline lands in config/<id>/) is SIGNED and still unlanded. Two attempts,
+        // each of which taught the next one something:
+        //
+        // 1. 2026-09-22 — redirected the write alone. A freshly-written config became UNREACHABLE: an
+        //    unregistered config was resolved at the write ROOT, so read/patch/delete answered 404.
+        //    ✅ FIXED: ConfigFileSupport.resolveConfigFile now falls back to <dir>/<name>/.
+        // 2. 2026-09-23 — redirected the write again on top of that fix. Better (23 failures → 15), and
+        //    it surfaced the REAL coupling: 🔴 a Pipeline's bare `schema_file: <name>.toon` resolves
+        //    BESIDE ITS OWN CONFIG. Nesting the Pipeline while its schema is still written flat
+        //    separates the two, and the save warns that its own schema does not resolve
+        //    (ControlApiConfigWriteTest.aPortableSchemaReferenceBesideTheConfigIsNotWarnedAbout).
+        //
+        // ⚠ So D3 needs SATELLITE writes to follow the Pipeline into its subdir — its own text says so
+        // ("satellites get the subdir too"), and that is the part no row has scoped. A /config/write for
+        // a schema with no `subdir:` still lands flat. Landing the Pipeline half alone orphans the
+        // reference it was supposed to keep together. Row: UI-CREATED-PIPELINE-FLAT-HOME-1.
 
         // Warning only: the save still succeeds (the schema file may be created afterwards), but
         // the operator learns now that Register would fail on this host.

@@ -38,11 +38,31 @@ final class ConfigFileSupport {
         return safeName;
     }
 
-    /** Resolve a config's file: the suffixed convention first, then the bare name (back-compat). */
+    /**
+     * Resolve a config's file: the suffixed convention first, then the bare name (back-compat), then the
+     * per-config subdirectory {@code <dir>/<name>/<name>_<type>.toon}.
+     *
+     * <p>🔴 <b>The subdirectory form is not a nicety — it is where every shipped Pipeline in this
+     * repository lives</b> ({@code config/postmed/postmed_xdr_pipeline.toon}) and where {@code D3} sends a
+     * newly created one. Without it here, a config that is nested is reachable ONLY once the registry has
+     * indexed it: {@link #resolveRegisteredConfigFile} asks the running service, but an unregistered draft
+     * has nobody to ask, so read, patch and delete all answer <b>404</b> for a file that plainly exists.
+     * That is exactly how the first attempt at {@code WB-15} broke 23 tests — it taught the WRITE path to
+     * nest without teaching this one to look.
+     *
+     * <p>⛔ <b>Ordered last, and only consulted when neither flat form exists.</b> A config already sitting
+     * flat keeps winning, so nothing is relocated and no existing caller changes answer. When nothing
+     * exists at all the bare flat path is still what comes back, so "not found" is unchanged.
+     */
     static Path resolveConfigFile(Path writeRoot, Path dir, String type, String safeName) {
         Path suffixed = WriteGates.jail(writeRoot, dir.resolve(fileBase(type, safeName) + ".toon"), "resolved path");
         if (Files.isRegularFile(suffixed)) return suffixed;
-        return WriteGates.jail(writeRoot, dir.resolve(safeName + ".toon"), "resolved path");
+        Path bare = WriteGates.jail(writeRoot, dir.resolve(safeName + ".toon"), "resolved path");
+        if (Files.isRegularFile(bare)) return bare;
+        Path nested = WriteGates.jail(writeRoot,
+                dir.resolve(safeName).resolve(fileBase(type, safeName) + ".toon"), "resolved path");
+        if (Files.isRegularFile(nested)) return nested;
+        return bare;
     }
 
     /**
