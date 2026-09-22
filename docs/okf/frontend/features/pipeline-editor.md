@@ -574,7 +574,7 @@ database; the lift rebuilds pairing from the stamp.
 `onRecipeInsert`. The paragraph below is kept as the record of what it was, because a decision rested on it
 (the orphan-drop decline above assumed insert-between lived here). Today there is **no one-gesture insert
 anywhere** — `insertNode` is a bare `addNodeToModel` — which is what `WB-14` / `D8` in
-`superpower/workbench-trust-plan.md` reopen.
+`archived-documents/plans-archive/workbench-trust-plan.md` reopen.
 
 ~~`<app-pipeline-step-cards>` (hosted in `pipeline-editor.component.html`) **is** the ordered `steps:`
 chain editor — cards in chain order, insert-between, remove, move up/down, nested `route` branches,

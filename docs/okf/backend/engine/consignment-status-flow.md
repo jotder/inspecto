@@ -119,7 +119,7 @@ reconciling output against the store by these counters concludes nothing was los
 ⚠ The invariant the split buys: `total_input_rows = total_output_rows + rejected_rows` when no Step drops
 rows; a Step that drops rows is the other, already-honest half (see
 [`step-catalog.md`](../pipeline-graph/step-catalog.md)'s counted reject relation). Tracked as `WB-09` in
-`superpower/workbench-trust-plan.md`; row `INGEST-REJECT-ACCOUNTING-1`.
+`archived-documents/plans-archive/workbench-trust-plan.md`; row `INGEST-REJECT-ACCOUNTING-1`.
 
 ⚠ **The batches-ledger header has FIVE mirrors** — `ConsignmentAuditWriter`'s header string, its
 `batchLine()` codec, `ConsignmentRow`, and `OperationalTables.BATCHES` (the agent's SQL surface, which
