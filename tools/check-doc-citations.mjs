@@ -275,6 +275,37 @@ const anyOldName = new RegExp('\\b(' + oldNames.join('|') + ')\\b', 'g');
 const files = [];
 for (const root of ROOTS) if (existsSync(root)) collect(root, files);
 
+/*
+ * ⛔ A document this checkout does not TRACK is not a "current doc", and it must not be able to refuse
+ * everyone's push.
+ *
+ * This guard already says the right thing about the other half of its job — `trackedPaths()` above uses
+ * `git ls-files` rather than a walk because "the question is what the repository CONTAINS, and a walk
+ * would also see build output and this machine's untracked scratch." That reasoning was applied to what
+ * a citation may point AT, and never to which files are READ. So the sources were still a filesystem
+ * walk, and it swept up exactly the untracked scratch the comment names.
+ *
+ * Measured 2026-09-22: a peer session's `SESSION_STATUS.pipelines.local.md` — untracked, and gitignored
+ * by `*.local.md` — cited a path that does not exist, and the guard refused an unrelated push from a
+ * different lane in a shared checkout. The fix is the sibling guards' idiom: `check-nul-bytes` states
+ * "untracked files are out of scope because the subject is what a search over the repository sees", and
+ * `check-secrets` was moved off a filesystem walk onto `git ls-files` for the same reason.
+ *
+ * ⚠ This NARROWS the guard, so it is worth being exact about what is given up: a brand-new doc is
+ * unchecked until it is `git add`ed. That is the same condition the doc-LINK guard already has, it is
+ * one `git add` away, and the alternative is a guard that any peer's scratch file can weaponise.
+ */
+const trackedSet = new Set(trackedPaths().map(slash));
+const skippedUntracked = [];
+const trackedFiles = files.filter((f) => {
+    const rel = slash(f);
+    if (trackedSet.has(rel)) return true;
+    skippedUntracked.push(rel);
+    return false;
+});
+files.length = 0;
+files.push(...trackedFiles);
+
 if (files.length < MIN_FILES) {
     fail(
         `only ${files.length} markdown file(s) found, below the floor of ${MIN_FILES}. Either the repo ` +
@@ -375,7 +406,12 @@ if (pathCitations < MIN_PATH_CITATIONS) {
 
 // The exemptions are stated on every run, pass or fail. An unprinted scope is an unaudited one.
 const scopeNote =
-    `scope: ${files.length} markdown file(s) — the WHOLE repo minus ` +
+    `scope: ${files.length} TRACKED markdown file(s)` +
+    (skippedUntracked.length
+        ? ` (+${skippedUntracked.length} untracked/ignored file(s) NOT read: ${skippedUntracked.slice(0, 3).join(', ')}` +
+          `${skippedUntracked.length > 3 ? ', …' : ''} — an untracked doc is not a current doc)`
+        : '') +
+    ` — the WHOLE repo minus ` +
     `${[...SKIP_DIRS].join('/')}, MINUS ` +
     `${EXEMPT_TIERS.join(' and ')} as sources (never-maintained / in-flight tiers — citations pointing ` +
     `INTO them are still checked); ${pathCitations} path citation(s), of which ${recordedAbsences} ` +
