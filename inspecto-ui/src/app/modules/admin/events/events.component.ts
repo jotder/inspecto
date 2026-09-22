@@ -32,6 +32,7 @@ import {
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { FilterField, FilterValues, InspectoFilterBarComponent } from 'app/inspecto/components/filter-bar.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
@@ -65,6 +66,7 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
         MatSlideToggleModule,
         MatTooltipModule,
         ChipComponent,
+        InspectoFilterBarComponent,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         DataTableComponent,
@@ -90,6 +92,55 @@ export class EventsComponent implements OnInit, OnDestroy {
     readonly levels = EVENT_LEVELS;
     readonly types = EVENT_TYPES;
     readonly limitOptions = [50, 100, 250, 500, 1000];
+
+    /**
+     * The pane's filters, as one declaration for `<inspecto-filter-bar>` (UI-08). This screen used to
+     * show five outlined fields, a Search and a Reset button, a second row of Views / Export CSV and a
+     * third with the grid toolbar — three toolbars before the first row of data. The bar collapses all
+     * of it to one row of chips, and the fields open only when asked for.
+     */
+    readonly filterFields: FilterField[] = [
+        {
+            key: 'level',
+            label: 'Min level',
+            type: 'select',
+            defaultValue: '',
+            width: 'w-36',
+            options: [{ value: '', label: 'All' }, ...EVENT_LEVELS.map((l) => ({ value: l, label: l }))],
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            type: 'select',
+            defaultValue: '',
+            width: 'w-52',
+            options: [{ value: '', label: 'All types' }, ...EVENT_TYPES.map((t) => ({ value: t, label: t }))],
+        },
+        { key: 'pipeline', label: 'Pipeline', type: 'text', placeholder: 'exact name', width: 'w-44' },
+        { key: 'q', label: 'Search', type: 'text', placeholder: 'message or source contains…', width: 'w-64' },
+        {
+            key: 'limit',
+            label: 'Limit',
+            type: 'select',
+            defaultValue: 100,
+            width: 'w-28',
+            options: [50, 100, 250, 500, 1000].map((n) => ({ value: n, label: String(n) })),
+        },
+    ];
+
+    /** The bar reads the pane's existing state; the fields below stay the source of truth. */
+    get filterValue(): FilterValues {
+        return { level: this.fLevel, type: this.fType(), pipeline: this.fPipeline, q: this.fq, limit: this.fLimit };
+    }
+
+    /** …and writes back into it, so saved views, the correlation chip and Reset keep working unchanged. */
+    onFilters(v: FilterValues): void {
+        this.fLevel = String(v['level'] ?? '');
+        this.fType.set(String(v['type'] ?? ''));
+        this.fPipeline = String(v['pipeline'] ?? '');
+        this.fq = String(v['q'] ?? '');
+        this.fLimit = Number(v['limit'] ?? 100) || 100;
+    }
 
     readonly events = signal<EventRow[]>([]);
     readonly loading = signal(false);

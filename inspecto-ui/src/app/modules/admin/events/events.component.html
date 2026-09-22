@@ -75,76 +75,43 @@
                 </div>
             </inspecto-alert>
         } @else {
-            <!-- Filter toolbar -->
-            <div class="mb-4 flex flex-wrap items-center gap-3">
-                <mat-form-field class="gamma-mat-dense w-32" subscriptSizing="dynamic">
-                    <mat-label>Min level</mat-label>
-                    <mat-select [(ngModel)]="fLevel">
-                        <mat-option value="">All</mat-option>
-                        @for (l of levels; track l) {
-                            <mat-option [value]="l">{{ l }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-
-                <mat-form-field class="gamma-mat-dense w-52" subscriptSizing="dynamic">
-                    <mat-label>Type</mat-label>
-                    <mat-select [(ngModel)]="fType">
-                        <mat-option value="">All types</mat-option>
-                        @for (t of types; track t) {
-                            <mat-option [value]="t">{{ t }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-
-                <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
-                    <mat-label>Pipeline</mat-label>
-                    <input matInput [(ngModel)]="fPipeline" placeholder="exact name" (keyup.enter)="load()" />
-                </mat-form-field>
-
-                <mat-form-field class="gamma-mat-dense w-64" subscriptSizing="dynamic">
-                    <mat-label>Search</mat-label>
-                    <input matInput [(ngModel)]="fq" placeholder="message or source contains…" (keyup.enter)="load()" />
-                </mat-form-field>
-
-                <mat-form-field class="gamma-mat-dense w-28" subscriptSizing="dynamic">
-                    <mat-label>Limit</mat-label>
-                    <mat-select [(ngModel)]="fLimit">
-                        @for (n of limitOptions; track n) {
-                            <mat-option [value]="n">{{ n }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-
-                <button mat-flat-button color="primary" (click)="load()">
-                    <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
-                    <span class="ml-2">Search</span>
-                </button>
-                <button mat-button (click)="resetFilters()">Reset</button>
-
-                <span class="flex-auto"></span>
-
-                <button mat-stroked-button [matMenuTriggerFor]="viewsMenu" matTooltip="Saved views">
-                    <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
-                    <span class="ml-2">Views</span>
-                </button>
-                <button mat-stroked-button (click)="exportCsv()" matTooltip="Download matching events as CSV">
-                    <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
-                    <span class="ml-2">Export CSV</span>
-                </button>
-
-                @if (fCorrelation()) {
-                    <inspecto-chip
-                        variant="soft"
-                        tone="primary"
-                        removable
-                        removeLabel="Clear correlation filter"
-                        (removed)="clearCorrelation()"
+            <inspecto-filter-bar
+                class="mb-4 block"
+                [fields]="filterFields"
+                [value]="filterValue"
+                (valueChange)="onFilters($event)"
+                (apply)="load()"
+            >
+                <ng-container end>
+                    @if (fCorrelation()) {
+                        <inspecto-chip
+                            variant="soft"
+                            tone="primary"
+                            removable
+                            removeLabel="Clear correlation filter"
+                            (removed)="clearCorrelation()"
+                        >
+                            correlation: <span class="font-mono">{{ fCorrelation() }}</span>
+                        </inspecto-chip>
+                    }
+                    <button
+                        mat-icon-button
+                        [matMenuTriggerFor]="viewsMenu"
+                        matTooltip="Saved views"
+                        aria-label="Saved views"
                     >
-                        correlation: <span class="font-mono">{{ fCorrelation() }}</span>
-                    </inspecto-chip>
-                }
-            </div>
+                        <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        (click)="exportCsv()"
+                        matTooltip="Download matching events as CSV"
+                        aria-label="Export CSV"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    </button>
+                </ng-container>
+            </inspecto-filter-bar>
 
             <!-- Saved-views menu (collapses the former second toolbar row) -->
             <mat-menu #viewsMenu="matMenu">
