@@ -1,3 +1,5 @@
+<!-- ARCHIVED 2026-09-22 — consolidated into docs/superpower/link-analysis-backlog-plan.md. Provenance only; never read for current state. -->
+
 ---
 type: Plan
 title: Link Analysis Advancement Plan — Scalable Graph Engine, Web Worker Offload, and Forensic Case Integration
@@ -20,6 +22,13 @@ This plan details the grounded state of Link Analysis, enumerates the 7 core arc
 ⇒ **What the target state looks like** is sketched in
 [`link-analysis-ui-mockup.html`](link-analysis-ui-mockup.html) (2026-09-20, dummy data) — one scenario tab
 per work item S1.1–S3.2; a design reference for the SPA changes, not product code.
+
+⇒ **What an investigation IS** — a goal and an ordered operation log rather than a query — is
+modelled in [`link-analysis-enquiry-model-plan.md`](link-analysis-enquiry-model-plan.md)
+(2026-09-22). It reuses this plan's S1.2 / S1.3 / S2.1 / S2.2 / S3.2 endpoints rather than
+inventing parallel ones, and 🔴 records that the canvas is **not** the performance bottleneck:
+`rebuild()` destroys and recreates the whole G6 graph on any input change, and
+`PROJECTION_NODE_CAP = 500` truncates before either the analysis cap or the server limit bites.
 
 ---
 

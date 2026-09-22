@@ -219,6 +219,31 @@ operator still presses Run and Save, so the human stays the actor.
   a model problem. `projection_author` joins the shared `{kind,id,clean,findings,draft}` branch.
 * ⚠ **The tool count in `InspectoPackTest` is hard-coded** (21 → 22). Any new belt tool trips it.
 
+## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
+
+Durable as-built facts distilled from the archived `link-analysis-spec.md`. Open work against them is
+tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link-analysis-backlog-plan.md).
+
+| Limit | Value | Where | Behaviour at the edge |
+|---|---|---|---|
+| `PROJECTION_NODE_CAP` | **500** | `entity-projection.ts:32`, applied `:99,:150` | truncates the fetch — the real governor |
+| `ANALYSIS_NODE_CAP` | 2 000 | `graph-analysis.ts:11`, `requireUnderCap` `:836-840` | ⚠ **throws** on the super-linear algorithms |
+| `DEFAULT_LIMIT` / `MAX_LIMIT` | 2 000 / 20 000 | `InvRoutes.java:62-63,178-179` | clamps, sets `truncated: true` |
+| Render | none | `graph-view.component.ts` | no virtualisation, culling or WebGL |
+
+* **An edge is a folded aggregate** (`GROUP BY`, carrying `count`), nodes are implied endpoints with no
+  identity service, and **nothing is persisted server-side** — every call re-runs the aggregation. So
+  🔴 **a saved view is not evidence**: reopened after the Dataset changed it silently shows a different graph.
+* **All 27 algorithms run in the browser, on the main thread.** The backend does SQL fold and filter only
+  (`InvRoutes.java:36-39`, deliberate). Supported graph size is therefore bounded by one tab.
+* **Safety is narrowness:** identifiers must match `SAFE_IDENT` (`InvRoutes.java:61`), values bind as JDBC
+  `?`; 503 without a write root, 404 unknown Dataset, 422 bad identifier.
+* 🔴 **The canvas is not the performance bottleneck.** `rebuild()` (`graph-view.component.ts:362-489`)
+  destroys and recreates the whole G6 graph on ANY `@Input` change, and every bound input is a `computed()`
+  yielding a new reference — a cosmetic toggle reruns the full layout synchronously.
+* **The two-stage filter loop's stage 2 is a no-op today**: the SPA sends `query.filter`, `InvRoutes.project()`
+  never reads it, and the panel says so on screen rather than pretending.
+
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
 §7 (schema-relationship model, now shipped) ·

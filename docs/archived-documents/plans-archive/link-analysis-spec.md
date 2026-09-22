@@ -1,3 +1,5 @@
+<!-- ARCHIVED 2026-09-22 — consolidated into docs/superpower/link-analysis-backlog-plan.md. Provenance only; never read for current state. -->
+
 ---
 type: Spec
 title: Link Analysis — Functional Specification (`INV-1` / `CP-09`)
@@ -365,3 +367,6 @@ reader does not re-derive them:
   `inspecto-ui/src/app/inspecto/graph/graph-analysis.ts`
 - Edition gating: [`../EDITIONS.md`](../EDITIONS.md) §CP-09
 - Roadmap: [`link-analysis-advancement-plan.md`](link-analysis-advancement-plan.md)
+- Investigation model: [`link-analysis-enquiry-model-plan.md`](link-analysis-enquiry-model-plan.md)
+  — the investigation as a first-class ordered object. Depends on §7 decisions 2 and 4, and adds
+  three of its own; consult it before answering either.
