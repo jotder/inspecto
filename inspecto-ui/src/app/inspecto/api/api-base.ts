@@ -36,6 +36,28 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
 }
 
 /**
+ * True when a call failed because the thing it asked for **is not deployed here**, rather than because
+ * something broke (UI consolidation plan UI-10, 2026-09-22).
+ *
+ * An optional module's route answers `503 not installed`; a route that a bundle omits entirely answers
+ * `404`; and when the backend is not reachable at all the failure arrives as `0` (no response) or as the
+ * dev proxy's `502`/`504`. 🔴 None of those is an error the operator can act on, so a pane must render an
+ * explained in-place `<inspecto-alert variant="info">` for them and **never** toast — a red toast over an
+ * absent module teaches the operator that something is broken when nothing is. Connectivity itself stays
+ * the banner's job. Everything else IS a real failure and still toasts through {@link apiErrorMessage}.
+ *
+ * ⚠ `502`/`504` matter in dev: behind `proxy.conf.json` a stopped backend surfaces as `502`, which is why
+ * the Home pane's hand-rolled `404/503/0` guard still toasted "Failed to load recent runs".
+ */
+export function isFeatureAbsent(err: unknown): boolean {
+    // Duck-typed on `status`, not `instanceof HttpErrorResponse`: panes already test `err?.status`,
+    // and an `instanceof` gate silently answers "not absent" for anything that is not the real class —
+    // which would put the red toast back for every caller holding a plain error object.
+    const status = (err as { status?: unknown } | null | undefined)?.status;
+    return typeof status === 'number' && [0, 404, 502, 503, 504].includes(status);
+}
+
+/**
  * True when a failed write was refused because the resource changed since it was read — the
  * `409 CONFLICT_STALE_VERSION` an `If-Match` precondition produces (`CLIENT-HALVES-1` (a)).
  *

@@ -114,12 +114,23 @@ describe('AutonomyComponent', () => {
         });
     });
 
-    it('degrades to an unavailable state + toast when the policy read fails', async () => {
+    it('degrades to an explained unavailable state and does NOT toast when the module is absent', async () => {
         const { fixture, toastr } = await create({ policy: () => throwError(() => ({ status: 503 })) });
         const c = fixture.componentInstance;
         expect(c.unavailable()).toBe(true);
         expect(c.policy()).toBeNull();
-        expect(toastr.error).toHaveBeenCalledWith('Autonomy policy is not available');
+        // UI-10: an absent optional module is a deployment fact the pane states in place. A red toast
+        // here taught the operator that something was broken when nothing was.
+        expect(toastr.error).not.toHaveBeenCalled();
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('inspecto-alert');
+        expect(alert?.textContent).toContain('not available here');
+        expect(alert?.querySelector('div[role]')?.getAttribute('role')).toBe('status');
+    });
+
+    it('still toasts a GENUINE failure', async () => {
+        const { toastr } = await create({ policy: () => throwError(() => ({ status: 500 })) });
+        expect(toastr.error).toHaveBeenCalled();
     });
 
     it('renders the loaded state with no a11y violations', async () => {

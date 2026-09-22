@@ -19,10 +19,10 @@
     </div>
 
     @if (unavailable()) {
-        <div class="mt-6 rounded-lg border border-warn-200 bg-warn-50 p-4 text-secondary">
-            The autonomy policy is unavailable — the intelligence module may be absent or its L3 tier is not configured.
-            The controls below are disabled.
-        </div>
+        <inspecto-alert class="mt-6 block" variant="info" title="Autonomy policy is not available here">
+            The policy is provided by the optional intelligence module (Professional edition and above), or its L3 tier
+            is not configured. The controls below stay disabled; nothing is broken.
+        </inspecto-alert>
     }
 
     <!-- Kill switch -->

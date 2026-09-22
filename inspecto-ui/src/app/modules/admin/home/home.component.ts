@@ -16,6 +16,7 @@ import {
     SessionService,
     SpacesService,
     apiErrorMessage,
+    isFeatureAbsent,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -199,8 +200,11 @@ export class HomeComponent implements OnInit {
                 this.runs.set([]);
                 this.runsUnavailable.set(true);
                 this.loading.set(false);
-                if (err?.status !== 404 && err?.status !== 503 && err?.status !== 0) {
-                    this.toastr.error(apiErrorMessage(err, 'Failed to load recent runs'));
+                // ⚠ The hand-rolled 404/503/0 test missed 502 — behind the dev proxy a stopped
+                // backend surfaces as a gateway error, and the pane toasted red over a panel that
+                // already explained itself. One shared rule now (UI-10).
+                if (!isFeatureAbsent(err)) {
+                    this.toastr.error(apiErrorMessage(err, 'Could not load recent runs'));
                 }
             },
         });

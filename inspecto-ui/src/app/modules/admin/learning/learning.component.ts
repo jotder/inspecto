@@ -4,6 +4,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
+import { apiErrorMessage, isFeatureAbsent } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { CaseFeedback, LearningService } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -18,7 +20,7 @@ import { fmtDateTime } from 'app/inspecto/grid';
 @Component({
     selector: 'app-learning',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent],
+    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent, InspectoAlertComponent],
     templateUrl: './learning.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
@@ -29,6 +31,8 @@ export class LearningComponent implements OnInit {
 
     readonly feedback = signal<CaseFeedback[]>([]);
     readonly loading = signal(false);
+    /** The intelligence module is not deployed here — an expected state, explained in place (UI-10). */
+    readonly unavailable = signal(false);
 
     readonly columnDefs: ColDef<CaseFeedback>[] = [
         {
@@ -84,10 +88,15 @@ export class LearningComponent implements OnInit {
                 this.feedback.set(f);
                 this.loading.set(false);
             },
-            error: () => {
+            error: (err) => {
                 this.feedback.set([]);
                 this.loading.set(false);
-                this.toastr.error('Failed to load feedback');
+                // An absent module is a deployment fact, not a failure: explain it where the grid
+                // would be and stay silent. Only a genuine error is worth a toast (UI-10).
+                this.unavailable.set(isFeatureAbsent(err));
+                if (!isFeatureAbsent(err)) {
+                    this.toastr.error(apiErrorMessage(err, 'Could not load feedback'));
+                }
             },
         });
     }

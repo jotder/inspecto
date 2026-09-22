@@ -5,8 +5,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     apiErrorMessage,
+    isFeatureAbsent,
     AutonomyAction,
     AutonomyMode,
     AutonomyPolicy,
@@ -40,7 +42,14 @@ const PILOT_CLASSES = ['batch_rerun', 'alert_triage'];
 @Component({
     selector: 'app-autonomy',
     standalone: true,
-    imports: [FormsModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent],
+    imports: [
+        FormsModule,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        DataTableComponent,
+        InspectoAlertComponent,
+    ],
     templateUrl: './autonomy.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
@@ -118,13 +127,16 @@ export class AutonomyComponent implements OnInit {
                 this.rows.set(this.buildRows(p));
                 this.loading.set(false);
             },
-            error: () => {
+            error: (err) => {
                 // 503 (module absent) or connectivity — the editors disable and read as unavailable.
                 this.policy.set(null);
                 this.unavailable.set(true);
                 this.rows.set([]);
                 this.loading.set(false);
-                this.toastr.error('Autonomy policy is not available');
+                // Absent module / unconfigured tier: the pane already says so in place (UI-10).
+                if (!isFeatureAbsent(err)) {
+                    this.toastr.error(apiErrorMessage(err, 'Could not load the autonomy policy'));
+                }
             },
         });
         this.api.actions(100).subscribe({

@@ -59,11 +59,21 @@ describe('LearningComponent', () => {
         expect(fixture.componentInstance.total).toBe(0);
     });
 
-    it('degrades to an empty state + toast when the load fails', async () => {
+    it('explains an absent module in place and does NOT toast', async () => {
         const { fixture, toastr } = await create({ feedback: () => throwError(() => ({ status: 503 })) });
         expect(fixture.componentInstance.feedback()).toEqual([]);
         expect(fixture.componentInstance.loading()).toBe(false);
-        expect(toastr.error).toHaveBeenCalledWith('Failed to load feedback');
+        expect(fixture.componentInstance.unavailable()).toBe(true);
+        // UI-10: absence is explained where the grid would be, never toasted.
+        expect(toastr.error).not.toHaveBeenCalled();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-alert')?.textContent).toContain('not available here');
+    });
+
+    it('still toasts a GENUINE failure', async () => {
+        const { fixture, toastr } = await create({ feedback: () => throwError(() => ({ status: 500 })) });
+        expect(fixture.componentInstance.unavailable()).toBe(false);
+        expect(toastr.error).toHaveBeenCalled();
     });
 
     it('renders with no a11y violations', async () => {
