@@ -1487,6 +1487,51 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   ungreppable ones. **Requiring an id on every row is the outstanding structural fix.**
 
 
+### A mechanism that reports on a VIEW of reality certifies only what it can see (2026-09-23)
+
+Four separate guards and one spec file were all reporting confidently about things they could not see. The
+shape repeats often enough to be worth naming: **every check has a scope, and its scope is where its silent
+exemptions live.** State the scope on every run, or the check quietly certifies a subset.
+
+* **`tools/check-authgate-coverage.mjs` scanned one module of five.** It reported 95 gated routes; there are
+  **121**. Twenty-six in `inspecto-ops`/`inspecto-exchange`/`inspecto-events`/`inspecto-geo-link` were never
+  checked for an armed test — and an armed test written in one of those modules could not move its verdict.
+  `CapabilityManifestTest` was widened to every sibling module on 2026-09-07; this never was. It also
+  under-credited what it COULD see: a space-scoped route is registered bare (`/settings/link-analysis`) but
+  SERVED under `/spaces/{id}/…`, which is the URL a real test must write, so the end-to-end anchored match
+  missed four routes that had armed coverage all along. ⇒ widened, matcher fixed, **scope roster printed on
+  every run**, baseline re-derived 79 → 94.
+* 🔴 **`AbsentGeoLinkRoutes.SURFACE` is a hand-kept mirror, and it drifted by four routes.** The core declares
+  no dependency on the optional `inspecto-geo-link` module, so that table is the ONLY view the core has —
+  and **two** mechanisms read it: the 503 "not installed" stubs a Personal build serves, and the OpenAPI
+  skeleton generator. One omission, two silent failures: the paths **404ed instead of 503ing**, and were
+  **absent from `openapi-v1.json` while the contract guard stayed green**. Its javadoc had asked since
+  2026-09-07 that both lists be kept in sync. ⇒ `GeoLinkAbsentSurfaceParityTest` now asserts both directions,
+  and a THIRD copy of the same list (in `NoGeoLinkShipsInThePersonalBuildTest`) was removed — it had been
+  passing by never touching the drifted routes.
+* 🔴 **A spec file dying in the CONSTRUCTOR reports N failures that read as ONE broken thing.**
+  `link-analysis.component.spec.ts` was **28/28 red** because its `ActivatedRoute` stub carried only
+  `snapshot.queryParamMap` while a new `?case=` deep link reads the live observable. None was an assertion
+  failure. The file went dead the day that field landed, taking the workspace/dock behaviour, query-failure
+  handling, undo/redo and the evidence flow with it — **and an evidence-flow rewrite shipped the same day
+  with its only integration test already dead.** ⇒ fix the TEST DOUBLE, not the component: hardening a field
+  initializer so a partial fake stops throwing trades a loud failure for a quiet one.
+
+⚠ **Corollary for numbers:** do not subtract one tool's total from another's. `check-authgate-coverage.mjs`
+and `route-gating-report.mjs` scan identically (121 registrations each, verified) but REPORT different
+populations — the latter covers MUTATING routes and omits gated GETs, hence 118. Subtracting produced a
+confident wrong figure ("23 invisible") that was repeated before it was checked.
+
+⚠ **A DI change is invisible to type-checking.** Removing public methods from an injectable compiles clean;
+only running the specs finds a caller doing `new Service()` outside an injector (NG0203).
+
+⚠ **A measurement is a DEFAULT, never a truth, and a zero needs a positive control.** Decision D-S4's
+split-identity risk measured **exactly zero** across 24 candidate entity columns — because the generator emits
+every entity from a canonical literal, so the failure was *structurally possible and empirically
+unobservable*, the worst state for a decision to rest in. The zero was only trustworthy because known-bad
+values were run through the same probe and it fired. ⇒ a deliberately dirty fixture now carries the risk, and
+`tools/check-split-identity-fixture.mjs` keeps a regeneration from quietly removing it.
+
 ## 5. Engine seams & performance (durable; current in `inspecto/`)
 
 - **Single ingestion SPI:** `StreamingFileIngester` (emit-based) is the **only** ingestion SPI. Per-batch the
