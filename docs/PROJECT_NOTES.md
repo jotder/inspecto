@@ -1487,6 +1487,29 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   ungreppable ones. **Requiring an id on every row is the outstanding structural fix.**
 
 
+### A per-feature timing table hides a per-option cliff (2026-09-23)
+
+A performance sweep timed **"centrality"** once, using that control's DEFAULT metric — `degreeCentrality`,
+**2 ms** at 1 999 nodes. The same dropdown offers seven algorithms, and one of them,
+`betweennessCentrality`, takes **9 757 ms at 2 000 nodes**. Measured per component:
+
+| | 500 | 1 000 | 2 000 |
+|---|---|---|---|
+| **betweennessCentrality** | 425 ms | 2 930 ms | **9 757 ms** |
+| pageRank + kCore + triangleCount + degreeCentrality | — | — | **129 ms combined** |
+
+🔴 **That single number propagated into a decision and left a real defect in place for a day.** It made
+`suspicionScore` look like "the sole outlier" (it is only slow because it CALLS betweenness), so the
+low cap was applied to the **caller** while the **cause** stayed on the shared 2 000 ceiling — and an
+analyst choosing *Betweenness* from the list froze the main thread for about ten seconds, which is
+precisely the freeze the decision was answering.
+
+⛔ It also made a whole backlog item incoherent: "move the 27 algorithms to a Web Worker" is the wrong
+shape when 26 of them cost 129 ms combined and a worker boundary serialises a 500-node graph each way.
+
+**Rule: time every option a control offers, not the control.** And when a benchmark reports one figure for
+a feature that dispatches to N implementations, treat the figure as measuring the default and nothing else.
+
 ### A mechanism that reports on a VIEW of reality certifies only what it can see (2026-09-23)
 
 Four separate guards and one spec file were all reporting confidently about things they could not see. The
