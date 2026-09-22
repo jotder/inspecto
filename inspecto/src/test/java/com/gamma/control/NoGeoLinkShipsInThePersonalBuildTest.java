@@ -60,12 +60,11 @@ class NoGeoLinkShipsInThePersonalBuildTest {
     @Test
     void everyGeoLinkPathAnswers503NotInstalledOnThePersonalBuild(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            String[][] surface = {
-                    {"POST", "/geo/projection"}, {"POST", "/geo/routes"},
-                    {"POST", "/inv/projection"}, {"POST", "/inv/projection/neighbors"},
-                    {"GET", "/inv/schema/relationships"},
-            };
-            for (String[] r : surface) {
+            // 🔴 Reads AbsentGeoLinkRoutes.SURFACE rather than repeating it. This test used to carry its
+            // own five-entry copy, and on 2026-09-22 that copy was found two routes behind the stub table and
+            // four behind the module: it passed by never touching the paths that had drifted. A test with a
+            // private copy of the list it is checking cannot detect the drift it exists to detect.
+            for (String[] r : AbsentGeoLinkRoutes.SURFACE) {
                 HttpResponse<String> res = send(c.port, r[0], r[1], "{}");
                 assertEquals(503, res.statusCode(), r[0] + " " + r[1] + " -> " + res.body());
                 JsonNode err = V1Body.of(res.body()).get("error");

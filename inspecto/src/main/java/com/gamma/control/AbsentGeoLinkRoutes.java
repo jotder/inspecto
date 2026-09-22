@@ -15,22 +15,36 @@ package com.gamma.control;
  * claimed — otherwise it would either shadow the module (registered before it) or trip the duplicate guard
  * (registered after it). {@code hasRoute} is the exact-string question that makes the skip precise.
  *
- * <p>⚠ The five {@code (method, pattern)} pairs below are the module's public surface, kept in step by
+ * <p>⚠ The {@code (method, pattern)} pairs below are the module's public surface, kept in step by
  * {@code NoGeoLinkShipsInThePersonalBuildTest} (they must 503 on the default build) and by the module's own
  * HTTP tests (they must 200 with the module present). A path added to the module and not here 404s on
- * Personal instead of 503ing — the test that catches that is the module's, so keep both lists in sync.
+ * Personal instead of 503ing.
+ *
+ * <p>🔴 <b>That warning used to be the only safeguard, and it did not hold.</b> Four routes drifted:
+ * {@code /inv/schema/overlap-profile} (LA-15) and the three {@code /inv/snapshots*} (LA-03) were added to the
+ * module and not here, so on Personal they 404ed instead of 503ing — and, because the OpenAPI generator
+ * derives its skeleton from THIS list (the core cannot see the optional module's own classes), they were
+ * missing from {@code docs/api/openapi-v1.json} too, with the contract guard reporting green throughout. One
+ * omission, two silent failures. {@code GeoLinkAbsentSurfaceParityTest} in the module now asserts both
+ * directions of this list against the live registrations, because a comment asking two lists to be kept in
+ * sync is not a mechanism.
  */
 final class AbsentGeoLinkRoutes implements RouteModule {
 
     static final String MESSAGE = "Geo map and link analysis are not installed in this bundle - they are "
             + "provided by the optional inspecto-geo-link module (Professional edition and above).";
 
-    private static final String[][] SURFACE = {
+    /** Package-private so the module's own parity test can compare it against the real registrations. */
+    static final String[][] SURFACE = {
             {"POST", "/geo/projection"},
             {"POST", "/geo/routes"},
             {"POST", "/inv/projection"},
             {"POST", "/inv/projection/neighbors"},
             {"GET",  "/inv/schema/relationships"},
+            {"POST", "/inv/schema/overlap-profile"},
+            {"POST", "/inv/snapshots"},
+            {"GET",  "/inv/snapshots"},
+            {"POST", "/inv/snapshots/attach"},
     };
 
     @Override

@@ -39,7 +39,22 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
   modules **SKIPPED — unverified, not passing**. ⛔ **A targeted `-Dtest=` run of your own new test class
   will NOT catch it** (measured 2026-09-22: a new settings route passed its own 4 tests and every guard,
   and still took the whole reactor red). The route checklist is: register → `CapabilityManifest` if gated
-  → **openapi-v1.json** → `tools/route-gating-report.mjs` if mutating.
+  → **the absent-module stub if the route lives in an OPTIONAL module** → **openapi-v1.json** →
+  `tools/route-gating-report.mjs` if mutating.
+- 🔴 **A route in an OPTIONAL edition module must ALSO be listed in that module's absent-module stub**
+  (`AbsentGeoLinkRoutes.SURFACE` for `inspecto-geo-link`). The core declares no dependency on these
+  modules — deliberately, since Personal must not ship them — so **that hand-kept table is the ONLY
+  thing the core can see**, and TWO mechanisms read it: the 503 "not installed" stubs a Personal build
+  serves, and the OpenAPI skeleton generator. ⛔ **Omit it and you get two silent failures from one
+  mistake**: the path **404s instead of 503ing** on Personal (a 404 reads as "wrong URL" and sends the
+  operator hunting a typo), and it is **missing from `openapi-v1.json` while the contract guard still
+  reports GREEN** — that guard enforces "every LIVE route has an operation" where *live* means *what it
+  can see*. Measured 2026-09-22: four routes had drifted this way — `/inv/schema/overlap-profile`
+  (LA-15) and the three `/inv/snapshots*` (LA-03) — despite the stub class's javadoc having asked since
+  2026-09-07 that both lists be "kept in sync". ⚠ `GeoLinkAbsentSurfaceParityTest` now asserts that
+  table against the live registrations in BOTH directions, because a comment asking two lists to agree
+  is not a mechanism. **Check for a third copy too** — `NoGeoLinkShipsInThePersonalBuildTest` carried its
+  own private duplicate of the same list and passed by never touching the routes that had drifted.
 - Register the route in `ControlApi` following the surrounding pattern (JDK HttpServer, manual DI).
 - **Real-HTTP test class covering every gate**, modeled on `ControlApiConfigWriteTest`
   (ephemeral port, actual requests, one test per gate + the happy path).

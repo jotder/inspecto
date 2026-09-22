@@ -7046,6 +7046,64 @@
         },
         "x-generated" : true
       }
+    },
+    "/inv/schema/overlap-profile" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/schema/overlap-profile (generated skeleton)",
+        "operationId" : "postInvSchemaOverlapProfile",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/snapshots" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/snapshots (generated skeleton)",
+        "operationId" : "postInvSnapshots",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/snapshots (generated skeleton)",
+        "operationId" : "getInvSnapshots",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/snapshots/attach" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/snapshots/attach (generated skeleton)",
+        "operationId" : "postInvSnapshotsAttach",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
     }
   },
   "components" : {
