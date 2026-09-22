@@ -1,10 +1,11 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
-    <header class="mb-4">
-        <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Data Browser</h1>
-        <p class="text-secondary mt-1 text-sm">
-            Browse the raw tables and data in this space, and run read-only SQL — like a database client.
-        </p>
-    </header>
+    <inspecto-page-header
+        class="mb-4 block"
+        title="Data Browser"
+        subtitle="Browse the raw tables and data in this space, and run read-only SQL — like a database client."
+        [terms]="['Dataset', 'Stream', 'Reference']"
+        [inset]="false"
+    />
 
     <!-- Master/detail split: resizable at lg via the shared inspectoSplit handle (R7); stacks below lg. -->
     <div class="flex flex-col gap-4 lg:flex-row" [style.--db-nav]="navSplit.width() + 'px'">

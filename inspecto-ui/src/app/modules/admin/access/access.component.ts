@@ -23,6 +23,7 @@ import { TreeNode } from 'app/inspecto/tree-table/tree-types';
 import { AccessCellState, AccessGrantCell } from './access-grant-cell.component';
 import { AccessPoliciesComponent } from './access-policies.component';
 import { AccessRolesComponent } from './access-roles.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** Per-lens working grants (lens id → sparse nodeId → allow|deny). */
 type GrantsBySubject = Record<string, Record<string, AccessGrant>>;
@@ -40,6 +41,7 @@ type GrantsBySubject = Record<string, Record<string, AccessGrant>>;
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,

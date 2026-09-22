@@ -38,6 +38,7 @@ import { FmtPercentPipe } from 'app/inspecto/format';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { BatchDetailDialog } from './batch-detail.dialog';
 import { RejectedRowsDialog } from './rejected-rows.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 type TabKey = 'batches' | 'files' | 'lineage' | 'quarantine' | 'commits' | 'report';
 type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
@@ -56,6 +57,7 @@ type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
     selector: 'app-run-detail',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatDatepickerModule,

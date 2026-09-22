@@ -9,6 +9,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Data Browser — a per-space "database client": browse the raw stores (business Parquet/CSV + operational
@@ -22,6 +23,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoPageHeaderComponent,
         DataTableComponent,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,

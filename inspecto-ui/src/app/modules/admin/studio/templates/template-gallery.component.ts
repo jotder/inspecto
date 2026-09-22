@@ -8,6 +8,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { DatasetsService } from '../datasets/datasets.service';
 import { ApplyTemplateDialog, ApplyTemplateResult } from './apply-template.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * The curated template gallery (BI-8): browse starter widget/dashboard sets and apply one to a Dataset.
@@ -19,7 +20,7 @@ import { ApplyTemplateDialog, ApplyTemplateResult } from './apply-template.dialo
     selector: 'app-template-gallery',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, InspectoEmptyStateComponent, InspectoSkeletonComponent],
+    imports: [InspectoPageHeaderComponent, MatButtonModule, InspectoEmptyStateComponent, InspectoSkeletonComponent],
     templateUrl: './template-gallery.component.html',
 })
 export class TemplateGalleryComponent implements OnInit {

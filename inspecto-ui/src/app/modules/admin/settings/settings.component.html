@@ -1,11 +1,16 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
-    <!-- Header -->
-    <div>
-        <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Settings</h1>
-        <div class="text-secondary mt-1">
-            Every platform configuration option. Pick one from the menu to configure it.
-        </div>
-    </div>
+    <!-- Header. 🔴 The mounted section component renders its OWN page header, so this shell must not
+         also claim the page's <h1> once a section is open — /settings/<section> shipped with TWO of them
+         (pre-dates the 2026-09-22 sweep; UIB-22). With nothing selected this IS the page, so it keeps one. -->
+    @if (selected()) {
+        <div class="text-secondary text-xs font-semibold uppercase tracking-wider">Settings</div>
+    } @else {
+        <inspecto-page-header
+            title="Settings"
+            subtitle="Every platform configuration option. Pick one from the menu to configure it."
+            [inset]="false"
+        />
+    }
 
     <!-- Master (menu) + detail (common panel) -->
     <div class="mt-6 flex max-w-320 flex-col gap-6 md:flex-row md:items-start">

@@ -18,6 +18,7 @@ import { OperationalDbComponent } from './operational-db.component';
 import { SchedulerSettingsComponent } from './scheduler.component';
 import { SpacesComponent } from 'app/modules/admin/spaces/spaces.component';
 import { TransferComponent } from 'app/modules/admin/transfer/transfer.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 interface SettingsDrawer {
     readonly id: string;
@@ -38,7 +39,7 @@ interface SettingsDrawer {
     selector: 'app-settings',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [NgComponentOutlet, MatIconModule, InspectoEmptyStateComponent],
+    imports: [InspectoPageHeaderComponent, NgComponentOutlet, MatIconModule, InspectoEmptyStateComponent],
     templateUrl: './settings.component.html',
     encapsulation: ViewEncapsulation.None,
 })

@@ -32,49 +32,45 @@
     } @else {
         <!-- Header (full-page mode only — the embedded panel has its compact header above) -->
         @if (!embedded()) {
-            <div class="bg-card flex flex-col gap-4 border-b p-6 sm:px-10 sm:py-8 dark:bg-transparent">
-                <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0">
-                        <nav class="text-secondary mb-1 flex items-center gap-1 text-sm" aria-label="Breadcrumb">
-                            <a routerLink="/jobs" class="hover:underline">Scheduler</a>
-                            <span class="px-1">/</span>
-                            <span class="truncate font-mono">{{ job()!.name }}</span>
-                        </nav>
-                        <div class="flex items-center gap-3">
-                            <h1 class="text-3xl font-extrabold leading-none tracking-tight">{{ job()!.name }}</h1>
-                            <inspecto-status-badge [value]="job()!.enabled ? 'enabled' : 'disabled'" />
-                        </div>
-                        <div class="text-secondary mt-1.5">{{ whatScheduled() }} · {{ scheduleSummary() }}</div>
-                    </div>
-                    <div class="flex flex-shrink-0 flex-wrap items-center gap-2">
-                        <button mat-stroked-button (click)="runNow()">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon
-                            ><span class="ml-1">Run now</span>
-                        </button>
-                        <button mat-stroked-button (click)="edit(true)">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:calendar-days"></mat-icon
-                            ><span class="ml-1">Reschedule</span>
-                        </button>
-                        <button mat-stroked-button (click)="edit(false)">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon
-                            ><span class="ml-1">Edit</span>
-                        </button>
-                        <button mat-stroked-button (click)="toggleEnabled()">
-                            <mat-icon
-                                class="icon-size-5"
-                                [svgIcon]="
-                                    job()!.enabled ? 'heroicons_outline:pause-circle' : 'heroicons_outline:play-circle'
-                                "
-                            ></mat-icon>
-                            <span class="ml-1">{{ job()!.enabled ? 'Disable' : 'Enable' }}</span>
-                        </button>
-                        <button mat-stroked-button (click)="remove()" aria-label="Delete job">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon
-                            ><span class="ml-1">Delete</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <inspecto-page-header
+                [title]="job()!.name"
+                mono
+                [subtitle]="whatScheduled() + ' · ' + scheduleSummary()"
+                backLink="/jobs"
+                backLabel="Jobs"
+                [terms]="['Job', 'Trigger', 'Run']"
+            >
+                <ng-container badge>
+                    <inspecto-status-badge [value]="job()!.enabled ? 'enabled' : 'disabled'" />
+                </ng-container>
+                <ng-container actions>
+                    <button mat-stroked-button (click)="runNow()">
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon
+                        ><span class="ml-1">Run now</span>
+                    </button>
+                    <button mat-stroked-button (click)="edit(true)">
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:calendar-days"></mat-icon
+                        ><span class="ml-1">Reschedule</span>
+                    </button>
+                    <button mat-stroked-button (click)="edit(false)">
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon
+                        ><span class="ml-1">Edit</span>
+                    </button>
+                    <button mat-stroked-button (click)="toggleEnabled()">
+                        <mat-icon
+                            class="icon-size-5"
+                            [svgIcon]="
+                                job()!.enabled ? 'heroicons_outline:pause-circle' : 'heroicons_outline:play-circle'
+                            "
+                        ></mat-icon>
+                        <span class="ml-1">{{ job()!.enabled ? 'Disable' : 'Enable' }}</span>
+                    </button>
+                    <button mat-stroked-button (click)="remove()" aria-label="Delete job">
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon
+                        ><span class="ml-1">Delete</span>
+                    </button>
+                </ng-container>
+            </inspecto-page-header>
         }
 
         <!-- Tabs -->

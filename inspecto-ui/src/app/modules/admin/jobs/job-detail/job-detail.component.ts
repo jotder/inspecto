@@ -36,6 +36,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { fmtDuration, scheduleSummary, whatScheduled } from '../job-display';
 import { JobFormDialog } from '../job-form.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 const LIVE_TAIL_MS = 5000;
 
@@ -53,6 +54,7 @@ const LIVE_TAIL_MS = 5000;
     selector: 'app-job-detail',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

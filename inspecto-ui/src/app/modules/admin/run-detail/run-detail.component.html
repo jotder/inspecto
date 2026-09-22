@@ -14,22 +14,14 @@
         </div>
     } @else {
         <!-- Header -->
-        <div class="bg-card flex items-center gap-3 border-b p-6 sm:px-10 sm:py-8 dark:bg-transparent">
-            <button mat-icon-button aria-label="Back" (click)="back()" matTooltip="Back to runs">
-                <mat-icon svgIcon="heroicons_outline:arrow-left"></mat-icon>
-            </button>
-            <div class="min-w-0">
-                <nav class="text-secondary mb-1 flex items-center gap-1 text-xs" aria-label="Breadcrumb">
-                    <a class="hover:underline" [routerLink]="['/runs']">Runs</a>
-                    <span>/</span>
-                    <span class="truncate font-mono">{{ name }}</span>
-                </nav>
-                <h1 class="text-3xl font-extrabold leading-none tracking-tight">{{ name }}</h1>
-                <div class="text-secondary mt-1.5">
-                    Audit: Consignments, files, lineage, quarantine, commits, report
-                </div>
-            </div>
-        </div>
+        <inspecto-page-header
+            [title]="name"
+            mono
+            subtitle="Audit: Consignments, files, lineage, quarantine, commits, report"
+            backLink="/runs"
+            backLabel="Runs"
+            [terms]="['Run', 'Consignment', 'File']"
+        />
     }
 
     <!-- Main -->
