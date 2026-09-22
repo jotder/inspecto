@@ -15,6 +15,7 @@ import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
+import com.gamma.util.JsonAttributes;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -82,6 +83,151 @@ public final class InvRoutes implements RouteModule {
         api.post("/inv/projection/neighbors", (e, m) -> neighbors(api, e, api.body(e)));
         api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api, e));
         api.post("/inv/schema/overlap-profile", (e, m) -> overlapProfile(api, e, api.body(e)));
+        // ⛔ The two POSTs genuinely PERSIST, so unlike the projection routes above they cannot take the
+        // "read-shaped" exemption — that exemption says "persists nothing", and claiming it here would be a
+        // false declaration in the file whose whole job is to say what each route is gated on. They are gated
+        // on canManageIncidents, the same capability as POST /objects: sealing evidence and attaching it to a
+        // Case is Case work. ⚠ The GET stays ungated like this module's other reads, and returns ids only.
+        // ⚠ The capability is written as a string LITERAL on purpose, not as the constant, and that is
+        // not a style slip: CapabilityManifestTest scans these registration sites with a regex matching
+        // only a literal argument, so a constant reference reads to it as "declared but not registered"
+        // and takes the build red. Every other withCapability site in the repo uses the literal too.
+        api.post("/inv/snapshots", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> createSnapshot(api, e, api.body(e))));
+        api.get("/inv/snapshots", (e, m) -> listSnapshots(api, e));
+        api.post("/inv/snapshots/attach", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> attachSnapshot(api, e, api.body(e))));
+    }
+
+    private static final int SNAPSHOT_LIST_DEFAULT = 100;
+    private static final int SNAPSHOT_LIST_MAX = 1000;
+
+    /**
+     * {@code POST /inv/snapshots} (LA-03) — seal one Link Analysis evidence snapshot.
+     *
+     * <p>The body is the SPA's {@code GraphSnapshot} verbatim: full {@code nodes} and {@code edges}
+     * ("frozen content"), {@code metrics}, {@code predicate}, {@code origin}, {@code annotations} and the
+     * {@code manifestHash} fingerprint. ⚠ It is stored as given — the route neither re-shapes nor narrows it,
+     * because storing id references instead of content would hand the sealed record the very defect that makes
+     * a saved view not-evidence (plan §5.4, corrected 2026-09-22). Key ORDER is not preserved and need not be:
+     * the SPA canonicalises (sorts keys) before hashing, so {@code manifestHash} survives a re-serialisation.
+     *
+     * <p>Gates, fail-closed in order: write root unset → 503; a missing or unsafe {@code id}, or an absent
+     * {@code manifestHash} → 422; a resolved path escaping the snapshot directory → 403; an id that already
+     * exists → <b>409</b>. 🔴 The 409 is the object's whole point, not a technicality — evidence that can be
+     * silently replaced is not evidence.
+     *
+     * <p>⛔ One more fail-closed step that is easy to miss: {@link JsonAttributes#toPayloadJson} is deliberately
+     * TOTAL and answers {@code "{}"} on any serialisation failure. Sealing that would store an EMPTY snapshot
+     * under a real id and report success — a false negative wearing the costume of evidence. A non-empty body
+     * that serialises to {@code "{}"} is therefore refused (500) rather than written.
+     */
+    private Object createSnapshot(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis snapshot write");
+        String id = str(body.get("id"));
+        if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches())
+            throw new ApiException(422, "id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + id + "'");
+        if (str(body.get("manifestHash")) == null)
+            throw new ApiException(422, "manifestHash is required — an unfingerprinted snapshot cannot be verified");
+
+        String json = JsonAttributes.toPayloadJson(body);
+        if (!body.isEmpty() && "{}".equals(json))
+            throw new ApiException(500, "snapshot could not be serialised — refusing to seal an empty record");
+
+        SnapshotStore store = new SnapshotStore(writeRoot);
+        Path target = store.directory().resolve(id + ".json").normalize();
+        if (!target.startsWith(store.directory().normalize()))
+            throw new ApiException(403, "snapshot id escapes the snapshot directory");
+
+        if (!store.create(id, json))
+            throw new ApiException(409, "snapshot '" + id + "' already exists — a sealed snapshot is never replaced");
+
+        emitSnapshotEvent(ex, EventType.LINK_SNAPSHOT_SEALED, "link.snapshot.sealed",
+                "link.snapshot.sealed — " + sizeOf(body.get("nodes")) + " nodes, "
+                        + sizeOf(body.get("edges")) + " edges",
+                b -> b.attr("snapshotId", id).attr("nodes", sizeOf(body.get("nodes")))
+                        .attr("edges", sizeOf(body.get("edges"))));
+        return Map.of("id", id, "sealed", true);
+    }
+
+    /**
+     * {@code GET /inv/snapshots?limit=n} — sealed snapshot ids, newest first. Bounded like every other
+     * diagnostic read here: {@code limit} defaults to {@value #SNAPSHOT_LIST_DEFAULT}, clamps to
+     * {@value #SNAPSHOT_LIST_MAX}, and the TRUE total ships alongside so a bounded read never reads as a
+     * complete one.
+     */
+    private Object listSnapshots(ApiContext api, HttpExchange ex) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis snapshot list");
+        int limit = SNAPSHOT_LIST_DEFAULT;
+        String raw = ApiContext.query(ex, "limit");
+        if (raw != null && !raw.isBlank()) {
+            try {
+                limit = Integer.parseInt(raw.trim());
+            } catch (NumberFormatException e) {
+                throw new ApiException(422, "limit must be an integer, got '" + raw + "'");
+            }
+        }
+        limit = Math.min(Math.max(limit, 1), SNAPSHOT_LIST_MAX);
+        SnapshotStore store = new SnapshotStore(writeRoot);
+        int[] total = new int[1];
+        List<String> ids = store.list(limit, total);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ids", ids);
+        out.put("total", total[0]);
+        out.put("truncated", total[0] > ids.size());
+        return out;
+    }
+
+    /**
+     * {@code POST /inv/snapshots/attach} — body {@code {snapshotId, caseId}} — record that a sealed snapshot
+     * was attached to a Case.
+     *
+     * <p>🔴 <b>This never reopens the snapshot.</b> Attachment is a relationship, not part of the sealed
+     * content; writing it into the record would mutate a sealed object and invalidate the fingerprint that
+     * makes it evidence. It appends to a separate log instead. ⚠ The Case id is deliberately NOT verified to
+     * exist: the ops module owns Cases and is absent in some editions, so a hard dependency would make
+     * evidence capture fail wherever Case management is not installed.
+     */
+    private Object attachSnapshot(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis snapshot attach");
+        String snapshotId = str(body.get("snapshotId"));
+        String caseId = str(body.get("caseId"));
+        if (snapshotId == null || !SnapshotStore.SAFE_ID.matcher(snapshotId).matches())
+            throw new ApiException(422, "snapshotId must match " + SnapshotStore.SAFE_ID.pattern());
+        if (caseId == null || caseId.isBlank()) throw new ApiException(422, "caseId is required");
+
+        SnapshotStore store = new SnapshotStore(writeRoot);
+        if (store.read(snapshotId) == null) throw new ApiException(404, "no sealed snapshot '" + snapshotId + "'");
+        store.attach(snapshotId, caseId, java.time.Instant.now().toString());
+        emitSnapshotEvent(ex, EventType.LINK_SNAPSHOT_ATTACHED, "link.snapshot.attached",
+                "link.snapshot.attached — " + snapshotId + " → " + caseId,
+                b -> b.attr("snapshotId", snapshotId).attr("caseId", caseId));
+        return Map.of("snapshotId", snapshotId, "attachedTo", store.attachmentsOf(snapshotId));
+    }
+
+    /**
+     * Audit one snapshot act. Best effort, exactly like the projection events (LA-04): an audit failure must
+     * never fail the analyst's call — but note the ordering, which is deliberate. The event is emitted AFTER
+     * the write succeeds, so the trail never claims a seal that did not happen.
+     */
+    private static void emitSnapshotEvent(HttpExchange ex, String type, String action, String message,
+                                          java.util.function.UnaryOperator<Event.Builder> attrs) {
+        try {
+            Event.Builder b = Event.builder(type).source("inv").message(message)
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action(action).actionCategory("analysis");
+            EventLog.current().emit(attrs.apply(b));
+        } catch (RuntimeException ignored) {
+            // audit is best effort; the snapshot is already sealed and that is what matters
+        }
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private static int sizeOf(Object v) {
+        return v instanceof List<?> l ? l.size() : 0;
     }
 
     /**

@@ -154,6 +154,17 @@ public final class EventType {
      *  expensive data read. {@code columnsProfiled}/{@code pairsProfiled}/{@code pairsConsidered} and
      *  {@code truncated} carry the sweep's reach and whether the pair budget cut it short. */
     public static final String LINK_OVERLAP_PROFILED = "LINK_OVERLAP_PROFILED";
+    /** A Link Analysis evidence snapshot was SEALED ({@code POST /inv/snapshots}, LA-03).
+     *  {@code snapshotId}, {@code nodes} and {@code edges} carry what was frozen. A distinct act from
+     *  {@link #LINK_PROJECTED}: that one records what an analyst LOOKED AT, this one records what they
+     *  committed to as evidence — the record is immutable from this moment, and a re-POST of the same id
+     *  is refused rather than replacing it, so this event has no "updated" counterpart by design. */
+    public static final String LINK_SNAPSHOT_SEALED = "LINK_SNAPSHOT_SEALED";
+    /** A sealed snapshot was attached to a Case ({@code POST /inv/snapshots/attach}, LA-03).
+     *  ⚠ Separate from {@link #LINK_SNAPSHOT_SEALED} because attaching does NOT reopen the sealed record —
+     *  it is a relationship, and writing it into the snapshot would invalidate the fingerprint that makes
+     *  the snapshot evidence. {@code snapshotId} and {@code caseId} carry the link. */
+    public static final String LINK_SNAPSHOT_ATTACHED = "LINK_SNAPSHOT_ATTACHED";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

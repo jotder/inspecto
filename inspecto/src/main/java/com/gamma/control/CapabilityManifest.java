@@ -24,6 +24,10 @@ final class CapabilityManifest {
             // Incident creation (operator, 2026-09-16) — one act, one capability, two routes
             new Entry("POST", "/recon/promote", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/objects", Roles.CAN_MANAGE_INCIDENTS),
+            // InvRoutes (LA-03) — sealing evidence and attaching it to a Case is Case work. The other
+            // /inv/* POSTs are exempted as read-shaped; these two persist, so they are gated instead.
+            new Entry("POST", "/inv/snapshots", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/snapshots/attach", Roles.CAN_MANAGE_INCIDENTS),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),
