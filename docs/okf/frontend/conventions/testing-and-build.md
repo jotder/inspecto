@@ -37,6 +37,12 @@ command rather than a shell mismatch.
 * A component containing a **`@defer`** block requires `await TestBed.compileComponents()` before `createComponent` (e.g. the [data-table](../design-system/data-table.md), whose SQL editor is deferred).
 * **G6** can't instantiate in jsdom — unit-test graph hosts on the empty/no-graph path.
 * Framework-free logic (the data-table `core/`/`sql/`, [query](../design-system/query.md)) is unit-tested directly without `TestBed`.
+* ⚠ **`role="alert"` is not unique on a screen that shows more than one `<inspecto-alert>`** — the shared
+  component gives BOTH `warning` and `error` that role (info/success get `status`). So
+  `querySelector('inspecto-alert [role="alert"]')` really asserts *whichever alert comes first*, and the
+  spec then depends on document order rather than on what it means. Find the alert by its **title**, then
+  assert its body. Found 2026-09-22 in the Link Analysis Attach-to-Case dialog, and only visible in the
+  browser preview, where both alerts render at once — in the unit test the two orderings agreed.
 
 ## Definition of Done (run before claiming completion)
 
