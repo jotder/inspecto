@@ -10,6 +10,7 @@ import {
     OnChanges,
     OnDestroy,
     Output,
+    SimpleChanges,
     ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -224,6 +225,19 @@ export function baseEdgeKind(kind: unknown): string {
 const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
+ * Value signature used by the change classifier (LA-05). The Studio binds `[data]`, `[display]`,
+ * `[emphasis]` and `[plugins]` from `computed()`s that yield a FRESH object on every evaluation, so
+ * an identity check would classify every cosmetic toggle as a structural change. `Map` and `Set` are
+ * spelled out because `JSON.stringify` renders both as `{}` — `emphasis.groups` is a `Map`, and
+ * `plugins.hulls` is a `Map` of community member lists.
+ */
+export function stableKey(value: unknown): string {
+    return JSON.stringify(value, (_k, v) =>
+        v instanceof Map ? { __map: [...v] } : v instanceof Set ? { __set: [...v] } : v,
+    );
+}
+
+/**
  * Read-only AntV G6 host for the catalog metadata graph: layered (dagre) layout,
  * pan/zoom, per-kind shapes/outline colours, node-click emits the node id.
  * Recreated when the data or the gamma colour scheme changes.
@@ -262,6 +276,23 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private resizeObserver: ResizeObserver | null = null;
     private destroyRef = inject(DestroyRef);
 
+    // -- LA-05 incremental update: what the live graph was last built/drawn from --
+    private prevLayoutKey = '';
+    private prevPluginKey = '';
+    private prevDataKey = '';
+    private prevStyleKey = '';
+    private renderedNodeIds = new Set<string>();
+    // Style state, refreshed before every draw and read LIVE by the element mappers below. Held on the
+    // instance rather than captured in `create()`'s closure precisely so `draw()` repaints with the
+    // current emphasis/display/theme without constructing a new `Graph`.
+    private styleFg = '';
+    private styleNodeFill = '';
+    private styleEdgeColor = '';
+    private emNodes: Set<string> | null = null;
+    private emEdges: Set<string> | null = null;
+    private emGroups: Map<string, string> | null = null;
+    private groupSwatch = new Map<string, string>();
+
     constructor() {
         inject(GammaConfigService)
             .config$.pipe(takeUntilDestroyed(this.destroyRef))
@@ -269,13 +300,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 this.dark =
                     config?.scheme === 'dark' ||
                     (config?.scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (this.ready) this.rebuild();
+                if (!this.ready) return;
+                // The scheme is COSMETIC (LA-05): the canvas colours are read live by the element
+                // mappers, so a light/dark flip repaints in place instead of tearing the graph down.
+                if (this.graph) this.redraw(this.prevStyleKey);
+                else this.create();
             });
     }
 
     ngAfterViewInit(): void {
         this.ready = true;
-        this.rebuild();
+        this.create();
         // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
             this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
@@ -303,8 +338,45 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         });
     }
 
-    ngOnChanges(): void {
-        if (this.ready) this.rebuild();
+    /**
+     * Classify the change and do the SMALLEST thing that satisfies it (LA-05). A full rebuild is the
+     * last resort: G6 fixes the layout, behaviors, plugins and tooltip wiring at construction, so only
+     * those force a recreate. A data change is applied onto the live graph, and a purely cosmetic
+     * change (emphasis, display overrides, theme) is a redraw that never runs layout — which is what
+     * keeps node positions under the analyst's cursor mid-investigation.
+     *
+     * Every comparison is BY VALUE ({@link stableKey}), never by the reference `changes` carries.
+     */
+    ngOnChanges(changes: SimpleChanges): void {
+        if (!this.ready) return;
+        if (!this.graph) {
+            this.create();
+            return;
+        }
+        // `tooltips` and `fill` are read once, at construction and on the host class binding.
+        if (changes['tooltips'] || changes['fill']) {
+            this.create();
+            return;
+        }
+        if (changes['layout'] || changes['plugins']) {
+            const layoutKey = stableKey(this.layout ?? null);
+            const pluginKey = stableKey(this.plugins ?? null);
+            if (layoutKey !== this.prevLayoutKey || pluginKey !== this.prevPluginKey) {
+                this.create();
+                return;
+            }
+        }
+        if (changes['data']) {
+            const dataKey = stableKey(this.data ?? null);
+            if (dataKey !== this.prevDataKey) {
+                this.applyData(dataKey);
+                return;
+            }
+        }
+        if (changes['emphasis'] || changes['display']) {
+            const styleKey = this.styleKey();
+            if (styleKey !== this.prevStyleKey) this.redraw(styleKey);
+        }
     }
 
     ngOnDestroy(): void {
@@ -313,7 +385,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         host?.removeEventListener('pointerleave', this.hideStaleTooltipBound);
         host?.removeEventListener('pointerdown', this.hideStaleTooltipBound);
         host?.removeEventListener('wheel', this.hideStaleTooltipBound);
-        this.graph?.destroy();
+        this.destroyGraph();
     }
 
     /** The rendered canvas as a PNG data-URI (Link Analysis export), or `null` before the first render. */
@@ -359,37 +431,138 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}`;
     }
 
-    private rebuild(): void {
+    /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */
+    private destroyGraph(): void {
         this.graph?.destroy();
         this.graph = null;
-        // Defensive: `ngOnChanges` rebuilds on ANY input change, including an `[emphasis]` recompute
-        // mid-hover, which can tear the G6 tooltip plugin down while its card is showing. `destroy()`
-        // above is expected to remove it, but observed live it sometimes leaves the card's DOM node
-        // behind (orphaned, no longer owned by any Graph instance) — sweep our own container so a
-        // stale tooltip never survives a rebuild, regardless of why the plugin's own cleanup missed it.
+        // `destroy()` is expected to remove the G6 tooltip plugin's card, but observed live it sometimes
+        // leaves the DOM node behind (orphaned, no longer owned by any Graph instance) - sweep our own
+        // container so a stale tooltip never survives, regardless of why the plugin's cleanup missed it.
         this.hostEl?.nativeElement.querySelectorAll('.tooltip').forEach((el) => el.remove());
-        if (!this.data?.nodes.length) return;
-        const { fg, surface: nodeFill, edge } = canvasTheme(this.dark);
-        const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
-        const iconOf = (d: NodeData): string | undefined => (d.data as { iconSrc?: string }).iconSrc;
+    }
+
+    /** Signature of the inputs that affect PAINT ONLY. */
+    private styleKey(): string {
+        return stableKey([this.emphasis ?? null, this.display ?? null]);
+    }
+
+    /** Record what the live graph now reflects, so the next `ngOnChanges` can classify against it. */
+    private snapshotKeys(): void {
+        this.prevLayoutKey = stableKey(this.layout ?? null);
+        this.prevPluginKey = stableKey(this.plugins ?? null);
+        this.prevDataKey = stableKey(this.data ?? null);
+        this.prevStyleKey = this.styleKey();
+        this.renderedNodeIds = new Set((this.data?.nodes ?? []).map((n) => String(n.id)));
+    }
+
+    /** Recompute the live style state the element mappers read. Cheap; runs before every draw. */
+    private refreshStyleState(): void {
+        const { fg, surface, edge } = canvasTheme(this.dark);
+        this.styleFg = fg;
+        this.styleNodeFill = surface;
+        this.styleEdgeColor = edge;
         // Emphasis overlay: swatch per distinct group key; non-listed elements dim.
         const em = this.emphasis;
-        const emNodes = em ? new Set(em.nodeIds) : null;
-        const emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
-        const groupSwatch = new Map<string, string>();
-        for (const g of em?.groups?.values() ?? []) {
-            if (!groupSwatch.has(g))
-                groupSwatch.set(g, ICON_COLOR_SWATCHES[groupSwatch.size % ICON_COLOR_SWATCHES.length]);
+        this.emNodes = em ? new Set(em.nodeIds) : null;
+        this.emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
+        this.emGroups = em?.groups ?? null;
+        this.groupSwatch = new Map<string, string>();
+        for (const g of this.emGroups?.values() ?? []) {
+            if (!this.groupSwatch.has(g))
+                this.groupSwatch.set(g, ICON_COLOR_SWATCHES[this.groupSwatch.size % ICON_COLOR_SWATCHES.length]);
         }
-        const nodeDim = (id: string): boolean => !!emNodes && !emNodes.has(id) && !em?.groups?.has(id);
-        const display = this.display;
-        const colorOf = (d: NodeData): string => {
-            const group = em?.groups?.get(d.id as string);
-            if (group) return groupSwatch.get(group)!; // analysis overlay wins over styling
-            return display?.nodeColors[kindOf(d)] ?? (d.data as { color?: string }).color ?? nodeColor(kindOf(d));
-        };
-        const edgeColorOf = (d: EdgeData): string =>
-            display?.edgeColors[baseEdgeKind((d.data as { kind?: string }).kind)] ?? edge;
+    }
+
+    private nodeDim(id: string): boolean {
+        return !!this.emNodes && !this.emNodes.has(id) && !this.emGroups?.has(id);
+    }
+
+    private nodeColorOf(d: NodeData): string {
+        const group = this.emGroups?.get(d.id as string);
+        if (group) return this.groupSwatch.get(group)!; // analysis overlay wins over styling
+        const kind = (d.data as { kind: NodeKind }).kind;
+        return this.display?.nodeColors[kind] ?? (d.data as { color?: string }).color ?? nodeColor(kind);
+    }
+
+    private edgeColorOf(d: EdgeData): string {
+        return this.display?.edgeColors[baseEdgeKind((d.data as { kind?: string }).kind)] ?? this.styleEdgeColor;
+    }
+
+    /**
+     * Repaint the live graph from the current emphasis/display/theme. No layout runs and no element is
+     * added or removed, so every node keeps the position the analyst last saw it in - the whole point of
+     * LA-05. The element mappers read `this.*`, so a plain `draw()` picks the new values up.
+     */
+    private redraw(styleKey: string): void {
+        this.refreshStyleState();
+        this.prevStyleKey = styleKey;
+        const graph = this.graph;
+        if (!graph) return;
+        // ⚠ `draw()` ALONE DOES NOT REPAINT. G6 re-evaluates the element style mappers only when the
+        // data is (re)set, so a bare `draw()` leaves the old paint on the canvas — measured in the
+        // preview: toggling node labels off left every label showing. Re-setting the SAME data object
+        // re-runs the mappers and does NOT re-run layout, so positions are untouched.
+        graph.setData(this.data as unknown as GraphData);
+        void graph.draw();
+    }
+
+    /**
+     * Apply a data change onto the LIVE graph. Surviving nodes carry their current canvas position onto
+     * the incoming data, and layout re-runs only when a node was ADDED - a node that does not exist yet
+     * is the only one that needs a position computed for it. A removal (the analyst excluding a branch)
+     * or an attribute-only change therefore redraws exactly in place.
+     */
+    private applyData(dataKey: string): void {
+        const graph = this.graph;
+        if (!graph) {
+            this.create();
+            return;
+        }
+        if (!this.data?.nodes.length) {
+            this.destroyGraph();
+            this.snapshotKeys();
+            return;
+        }
+        const next = this.data.nodes.map((n) => String(n.id));
+        const added = next.some((id) => !this.renderedNodeIds.has(id));
+        const seeded = { nodes: this.data.nodes.map((n) => this.seedPosition(n)), edges: this.data.edges };
+        graph.setData(seeded as unknown as GraphData);
+        this.refreshStyleState();
+        this.prevDataKey = dataKey;
+        this.prevStyleKey = this.styleKey();
+        this.renderedNodeIds = new Set(next);
+        void (added ? graph.render() : graph.draw());
+    }
+
+    /**
+     * The node with its current canvas position pinned onto it, or unchanged if it has none yet.
+     * Returns the loose G6 shape rather than the app's `G6Node`, because `style.x`/`style.y` is a G6
+     * wire concern the catalog's own node type deliberately does not model.
+     */
+    private seedPosition(node: G6GraphData['nodes'][number]): Record<string, unknown> {
+        let point: ArrayLike<number> | null;
+        try {
+            point = this.graph?.getElementPosition(String(node.id)) ?? null;
+        } catch {
+            return node as unknown as Record<string, unknown>; // not yet rendered - let the layout place it
+        }
+        if (!point || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) {
+            return node as unknown as Record<string, unknown>;
+        }
+        const style = (node as { style?: Record<string, unknown> }).style ?? {};
+        return { ...node, style: { ...style, x: point[0], y: point[1] } };
+    }
+
+    /** Build a brand-new G6 instance. The last resort - see {@link ngOnChanges}. */
+    private create(): void {
+        this.destroyGraph();
+        if (!this.data?.nodes.length) {
+            this.snapshotKeys();
+            return;
+        }
+        this.refreshStyleState();
+        const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
+        const iconOf = (d: NodeData): string | undefined => (d.data as { iconSrc?: string }).iconSrc;
         const graph = new Graph({
             container: this.hostEl.nativeElement,
             data: this.data as unknown as GraphData,
@@ -406,12 +579,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             node: {
                 // Icon tile (rounded rect + glyph) when the data carries a resolved icon (pipeline views);
                 // otherwise the per-kind shape (the catalog metadata graph).
-                type: (d) => (iconOf(d) ? 'rect' : (display?.nodeShapes[kindOf(d)] ?? nodeShape(kindOf(d)))),
+                type: (d) => (iconOf(d) ? 'rect' : (this.display?.nodeShapes[kindOf(d)] ?? nodeShape(kindOf(d)))),
                 style: {
                     size: (d) => (iconOf(d) ? [46, 34] : 32),
                     radius: 8,
-                    fill: nodeFill,
-                    stroke: (d) => colorOf(d),
+                    fill: () => this.styleNodeFill,
+                    stroke: (d) => this.nodeColorOf(d),
                     lineWidth: 2,
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
@@ -419,40 +592,43 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     iconSrc: (d) => iconOf(d),
                     iconWidth: 22,
                     iconHeight: 22,
-                    labelText:
-                        display?.nodeLabels === false ? undefined : (d): string => (d.data as { label: string }).label,
-                    labelFill: fg,
+                    // `label` is G6's own on/off switch for the label shape. A `labelText` mapper that
+                    // returns `undefined` does NOT clear a label: G6 reads that as "no change" and the
+                    // previous text stays on the canvas, so turning labels off left them showing.
+                    label: () => this.display?.nodeLabels !== false,
+                    labelText: (d): string => (d.data as { label: string }).label,
+                    labelFill: () => this.styleFg,
                     labelFontSize: 11,
                     labelPlacement: 'bottom',
                     cursor: 'pointer',
                     opacity: (d) =>
-                        nodeDim(d.id as string) ? 0.25 : (d.data as { missing?: boolean }).missing ? 0.45 : 1,
-                    labelOpacity: (d) => (nodeDim(d.id as string) ? 0.35 : 1),
+                        this.nodeDim(d.id as string) ? 0.25 : (d.data as { missing?: boolean }).missing ? 0.45 : 1,
+                    labelOpacity: (d) => (this.nodeDim(d.id as string) ? 0.35 : 1),
                 },
             },
             edge: {
                 type: 'line',
                 style: {
-                    stroke: (d) => edgeColorOf(d),
-                    opacity: (d) => (emEdges ? (emEdges.has(d.id as string) ? 1 : 0.2) : 1),
+                    stroke: (d) => this.edgeColorOf(d),
+                    opacity: (d) => (this.emEdges ? (this.emEdges.has(d.id as string) ? 1 : 0.2) : 1),
                     endArrow: true,
                     // A dry-run's provenance rows (PIPELINE-DRYRUN-1) paint their edge dashed regardless of
                     // the Display-menu pattern override, so a simulated run stays visually distinct.
                     lineDash: (d) =>
                         (d.data as { simulated?: boolean }).simulated
                             ? edgeDash('dashed')
-                            : edgeDash(display?.edgePatterns[baseEdgeKind((d.data as { kind?: string }).kind)]),
+                            : edgeDash(this.display?.edgePatterns[baseEdgeKind((d.data as { kind?: string }).kind)]),
                     // Per-kind size override wins; else the optional data-plane weight (T22 provenance
                     // overlay) scales the line width log-style; else the default (catalog/combined views).
                     lineWidth: (d) => {
-                        const override = display?.edgeSizes[baseEdgeKind((d.data as { kind?: string }).kind)];
+                        const override = this.display?.edgeSizes[baseEdgeKind((d.data as { kind?: string }).kind)];
                         if (override) return override;
                         const w = (d.data as { weight?: number }).weight;
                         return w && w > 0 ? Math.min(12, 1.5 + Math.log2(w + 1)) : 1.5;
                     },
-                    labelText:
-                        display?.edgeLabels === false ? undefined : (d): string => (d.data as { kind: string }).kind,
-                    labelFill: fg,
+                    label: () => this.display?.edgeLabels !== false,
+                    labelText: (d): string => (d.data as { kind: string }).kind,
+                    labelFill: () => this.styleFg,
                     labelFontSize: 9,
                     labelBackground: false,
                 },
@@ -485,7 +661,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             const id = (e as unknown as { target?: { id?: string } }).target?.id;
             if (id) this.edgeClick.emit(id);
         });
-        graph.render();
+        void graph.render();
         this.graph = graph;
+        this.snapshotKeys();
     }
 }

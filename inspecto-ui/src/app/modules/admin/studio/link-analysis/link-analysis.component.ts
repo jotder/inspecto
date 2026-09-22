@@ -116,6 +116,7 @@ import {
     GraphViewComponent,
     GraphViewPlugins,
     baseEdgeKind,
+    stableKey,
 } from 'app/modules/admin/catalog/graph-view.component';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
@@ -267,10 +268,15 @@ export class LinkAnalysisComponent implements OnInit {
         minimap: true,
         behaviors: ['hover-activate'],
     });
-    readonly canvasPlugins = computed<GraphViewPlugins>(() => {
-        const o = this.viewOptions();
-        return { ...o, hulls: o.hulls ? this.communityHulls() : null };
-    });
+    readonly canvasPlugins = computed<GraphViewPlugins>(
+        () => {
+            const o = this.viewOptions();
+            return { ...o, hulls: o.hulls ? this.communityHulls() : null };
+        },
+        // LA-05: both this and `displayOptions` build a fresh object on every evaluation, so without a
+        // value comparator the canvas host sees a changed `@Input` whenever any unrelated signal moves.
+        { equal: (a, b) => stableKey(a) === stableKey(b) },
+    );
     /** Louvain communities of the displayed graph as hull member lists; empty above the analysis cap. */
     private readonly communityHulls = computed<Map<string, string[]>>(() => {
         const g = this.displayed();
@@ -495,15 +501,18 @@ export class LinkAnalysisComponent implements OnInit {
     /** The published size limits the footer states — the server-side projection cap and the browser analysis cap. */
     readonly caps = { projection: PROJECTION_NODE_CAP, analysis: ANALYSIS_NODE_CAP };
 
-    readonly displayOptions = computed<GraphDisplayOptions>(() => ({
-        nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
-        edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
-        nodeColors: this.nodeColors(),
-        edgeColors: this.edgeColors(),
-        nodeShapes: this.nodeShapes(),
-        edgePatterns: this.edgePatterns(),
-        edgeSizes: this.edgeSizes(),
-    }));
+    readonly displayOptions = computed<GraphDisplayOptions>(
+        () => ({
+            nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
+            edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
+            nodeColors: this.nodeColors(),
+            edgeColors: this.edgeColors(),
+            nodeShapes: this.nodeShapes(),
+            edgePatterns: this.edgePatterns(),
+            edgeSizes: this.edgeSizes(),
+        }),
+        { equal: (a, b) => stableKey(a) === stableKey(b) },
+    );
     readonly swatches = ICON_COLOR_SWATCHES;
     readonly shapeOptions = GRAPH_NODE_SHAPES;
     readonly patternOptions = GRAPH_EDGE_PATTERNS;
