@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { G6GraphData } from 'app/inspecto/graph';
 import { splitIdentityGroups } from './entity-projection';
 
