@@ -53,6 +53,11 @@ import java.util.regex.Pattern;
  * <p>{@code GET /inv/schema/relationships} — the schema-relationship model (INV-1 V1's last open item):
  * naming-convention FK suggestions across every Dataset, so the Studio can pre-fill multi-mapping
  * projections instead of requiring every column pair to be hand-picked. See {@link #schemaRelationships}.
+ *
+ * <p>{@code POST /inv/schema/overlap-profile} (LA-15) — the <em>empirical</em> half of the same question:
+ * cardinality and Jaccard overlap across candidate key columns, so an implicit foreign key naming never
+ * reveals still surfaces, and a name match whose values never meet can be discounted. Body
+ * {@code {datasets?, columns?, limit?}}; see {@link #overlapProfile} for why that is the whole body.
  */
 /*
  * ⚠ Relocated from com.gamma.control (inspecto) on 2026-09-07, EDG-01 cell 3b — EDITIONS CP-09 is "not for
@@ -65,12 +70,18 @@ public final class InvRoutes implements RouteModule {
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final int DEFAULT_LIMIT = 2_000;
     private static final int MAX_LIMIT = 20_000;
+    /** LA-15 pair budget: one DuckDB query per measured pair, so the cap is a query-count cap. */
+    private static final int DEFAULT_PAIRS = 100;
+    private static final int MAX_PAIRS = 500;
+    /** The synthetic relation name a pair's {@code A UNION ALL B} is registered under (LA-15). */
+    private static final String PAIR_RELATION = "__overlap_pair";
 
     @Override
     public void register(ApiContext api) {
         api.post("/inv/projection", (e, m) -> project(api, e, api.body(e), null));
         api.post("/inv/projection/neighbors", (e, m) -> neighbors(api, e, api.body(e)));
         api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api, e));
+        api.post("/inv/schema/overlap-profile", (e, m) -> overlapProfile(api, e, api.body(e)));
     }
 
     /**
@@ -170,6 +181,232 @@ public final class InvRoutes implements RouteModule {
     private static boolean containsIgnoreCase(List<String> cols, String target) {
         for (String c : cols) if (c.equalsIgnoreCase(target)) return true;
         return false;
+    }
+
+    /** One column's cardinality profile — the left/right operand of a Jaccard pair. */
+    private record ColumnStats(String dataset, String column, String relationSql,
+                               long rows, long distinct, long nulls) {}
+
+    /**
+     * {@code POST /inv/schema/overlap-profile} (LA-15) — the <b>empirical</b> counterpart to
+     * {@link #schemaRelationships}, which infers foreign keys from naming alone. This one measures how much
+     * two columns' value sets actually overlap, so a real implicit join that naming never reveals surfaces,
+     * and a name match whose values never meet scores ~0 and can be discounted.
+     *
+     * <p><b>Body</b> {@code {datasets?: string[], columns?: string[], limit?: number}} — deliberately the
+     * smallest body that does the job. The only input the computation needs is <em>which columns are in
+     * scope</em>: absent {@code datasets} profiles every registered Dataset, absent {@code columns} profiles
+     * every column of each, and the two lists together are how an analyst narrows a large registry to the
+     * candidate keys they care about. {@code limit} caps the measured column PAIRS — the one axis that grows
+     * quadratically. Nothing is per-pair-configurable on purpose: a profile the caller has to parameterise
+     * per pair is just {@code /inv/projection} with extra steps.
+     *
+     * <p><b>Response</b>, in {@link #schemaRelationships}' envelope style:
+     * {@code {columns:[{dataset,column,rows,distinct,nulls}],
+     * pairs:[{fromDataset,fromColumn,toDataset,toColumn,distinctFrom,distinctTo,intersection,jaccard}],
+     * datasetsScanned, datasetsSkipped, pairsConsidered, truncated}} — strongest overlap first.
+     *
+     * <p><b>How the intersection is estimated.</b> {@code APPROX_COUNT_DISTINCT} is a cardinality function,
+     * not a set, so the intersection comes from inclusion–exclusion over one extra aggregate:
+     * {@code |A ∩ B| = |A| + |B| − |A ∪ B|}, the union measured by counting distinct values over
+     * {@code A UNION ALL B}. That is <b>one query per pair</b> plus one per Dataset for the per-column
+     * stats — never a cross join, and no values are transferred to the JVM. Both sides are cast to VARCHAR
+     * so an INTEGER key still meets its VARCHAR twin, and so the per-column counts and the union count are
+     * measured over the same domain. The estimate is clamped to {@code [0, min(|A|,|B|)]}: approximation
+     * error on either side can otherwise push it outside the range a set size can occupy.
+     *
+     * <p><b>Bounded.</b> Only <em>cross-Dataset</em> pairs are measured (a column against another column of
+     * its own Dataset is not an implicit foreign key), in a deterministic order, capped at {@code limit}
+     * (default {@value #DEFAULT_PAIRS}, max {@value #MAX_PAIRS}) with {@code pairsConsidered} reporting the
+     * TRUE total and {@code truncated} saying the cap bit.
+     *
+     * <p><b>Fail closed.</b> Every caller-supplied column name is a validated identifier AND must be a real
+     * column of a profiled relation — an unknown one is a 422 naming it, so it never reaches SQL. Dataset
+     * ids are not caller-supplied identifiers: a {@code datasets} entry selects a registered Dataset by
+     * name (unknown → 404) and only the registry's own name is quoted into SQL, as
+     * {@link #schemaRelationships} already does. A Dataset that cannot be probed is skipped and counted,
+     * exactly as {@link #schemaRelationships} does — never a 500.
+     */
+    private Object overlapProfile(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "column overlap profiling");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        ViewStore views = new ViewStore(writeRoot.resolve("views"));
+        List<String> wantDatasets = nameList(body, "datasets", false);
+        List<String> wantColumns = nameList(body, "columns", true);
+        int maxPairs = body.get("limit") instanceof Number n
+                ? Math.max(1, Math.min(MAX_PAIRS, n.intValue())) : DEFAULT_PAIRS;
+
+        List<ColumnStats> columns = new ArrayList<>();
+        List<String> seenColumns = new ArrayList<>();
+        List<String> seenDatasets = new ArrayList<>();
+        int scanned = 0, skipped = 0;
+        for (ComponentRegistry.Component c : store.list("dataset")) {
+            if (!wantDatasets.isEmpty() && !containsIgnoreCase(wantDatasets, c.name())) continue;
+            seenDatasets.add(c.name());
+            try {
+                String relationSql = DatasetRelation.relationSql(c.content(), api.dataRoot(), views);
+                List<String> inScope = new ArrayList<>();
+                for (String col : relationColumns(c.name(), relationSql)) {
+                    seenColumns.add(col);
+                    if (wantColumns.isEmpty() || containsIgnoreCase(wantColumns, col)) inScope.add(col);
+                }
+                if (!inScope.isEmpty()) columns.addAll(columnStats(c.name(), relationSql, inScope));
+                scanned++;
+            } catch (Exception unusable) {
+                skipped++;   // unbound dataset, bad view, etc. — degrade, don't fail the call
+            }
+        }
+        for (String want : wantDatasets)
+            if (!containsIgnoreCase(seenDatasets, want)) throw new ApiException(404, "no dataset '" + want + "'");
+        for (String want : wantColumns)
+            if (!containsIgnoreCase(seenColumns, want))
+                throw new ApiException(422, "unknown column '" + want + "' — not a column of any profiled dataset");
+
+        List<Map<String, Object>> pairs = new ArrayList<>();
+        int considered = 0;
+        for (int i = 0; i < columns.size(); i++) {
+            for (int j = i + 1; j < columns.size(); j++) {
+                ColumnStats a = columns.get(i), b = columns.get(j);
+                if (a.dataset().equals(b.dataset())) continue;
+                considered++;
+                if (pairs.size() >= maxPairs) continue;   // keep counting to report the TRUE total
+                try {
+                    pairs.add(pair(a, b));
+                } catch (Exception unusable) {
+                    // a pair that will not measure is dropped, not fatal — same posture as a skipped Dataset
+                }
+            }
+        }
+        pairs.sort((x, y) -> {
+            int c = Double.compare((Double) y.get("jaccard"), (Double) x.get("jaccard"));
+            if (c != 0) return c;
+            c = ((String) x.get("fromDataset")).compareTo((String) y.get("fromDataset"));
+            return c != 0 ? c : ((String) x.get("fromColumn")).compareTo((String) y.get("fromColumn"));
+        });
+
+        List<Map<String, Object>> profiles = new ArrayList<>(columns.size());
+        for (ColumnStats s : columns) {
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("dataset", s.dataset());
+            p.put("column", s.column());
+            p.put("rows", s.rows());
+            p.put("distinct", s.distinct());
+            p.put("nulls", s.nulls());
+            profiles.add(p);
+        }
+
+        try {
+            EventLog.current().emit(Event.builder(EventType.LINK_OVERLAP_PROFILED).source("inv")
+                    .message("link.overlap.profiled — " + pairs.size() + " pairs over " + profiles.size()
+                            + " columns in " + scanned + " datasets")
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action("link.overlap.profiled").actionCategory("analysis")
+                    .attr("datasetsScanned", scanned)
+                    .attr("datasetsSkipped", skipped)
+                    .attr("columnsProfiled", profiles.size())
+                    .attr("pairsProfiled", pairs.size())
+                    .attr("pairsConsidered", considered)
+                    .attr("truncated", considered > pairs.size()));
+        } catch (RuntimeException ignore) {
+            // best effort — the audit must never fail the analyst's query
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("columns", profiles);
+        out.put("pairs", pairs);
+        out.put("datasetsScanned", scanned);
+        out.put("datasetsSkipped", skipped);
+        out.put("pairsConsidered", considered);
+        out.put("truncated", considered > pairs.size());
+        return out;
+    }
+
+    /**
+     * One aggregate query per Dataset covering every in-scope column: row count, approximate distinct
+     * cardinality and NULL count. The distinct count is taken over {@code CAST(col AS VARCHAR)} so it is
+     * measured in the same domain as the union count in {@link #pair} — comparing a raw-typed cardinality
+     * against a VARCHAR union would make inclusion–exclusion meaningless across mismatched column types.
+     */
+    private static List<ColumnStats> columnStats(String dataset, String relationSql, List<String> cols)
+            throws SQLException, IOException {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS row_count");
+        for (int i = 0; i < cols.size(); i++) {
+            String c = q(cols.get(i));
+            sql.append(", APPROX_COUNT_DISTINCT(CAST(").append(c).append(" AS VARCHAR)) AS d_").append(i)
+               .append(", COUNT(").append(c).append(") AS n_").append(i);
+        }
+        sql.append(" FROM ").append(q(dataset));
+        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                dataset, relationSql, sql.toString(), 1, 0, List.of(), List.of()));
+        Map<String, Object> row = r.rows().get(0);
+        long rows = num(row.get("row_count"));
+        List<ColumnStats> out = new ArrayList<>(cols.size());
+        for (int i = 0; i < cols.size(); i++) {
+            long nonNull = num(row.get("n_" + i));
+            out.add(new ColumnStats(dataset, cols.get(i), relationSql,
+                    rows, num(row.get("d_" + i)), rows - nonNull));
+        }
+        return out;
+    }
+
+    /**
+     * The Jaccard estimate for one cross-Dataset column pair: one query for {@code |A ∪ B|} over
+     * {@code A UNION ALL B}, then {@code |A ∩ B| = |A| + |B| − |A ∪ B|} clamped into the range a set size
+     * can actually occupy. NULLs are excluded on both sides — a NULL is not a value two columns can share.
+     *
+     * <p>⛔ The two-relation union is passed as the <b>relation</b>, not folded into the query text.
+     * {@code QueryExecutor} registers the relation before it seals the sandbox, and that registration is the
+     * only place file-reading SQL may run — a Dataset backed by Parquet would be refused outright if its
+     * relation reached the sealed statement instead.
+     */
+    private static Map<String, Object> pair(ColumnStats a, ColumnStats b) throws SQLException, IOException {
+        String relation = valueSelect(a) + " UNION ALL " + valueSelect(b);
+        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                PAIR_RELATION, relation,
+                "SELECT APPROX_COUNT_DISTINCT(v) AS union_distinct FROM " + q(PAIR_RELATION),
+                1, 0, List.of(), List.of()));
+        long union = num(r.rows().get(0).get("union_distinct"));
+        long intersection = Math.max(0, Math.min(Math.min(a.distinct(), b.distinct()),
+                a.distinct() + b.distinct() - union));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("fromDataset", a.dataset());
+        out.put("fromColumn", a.column());
+        out.put("toDataset", b.dataset());
+        out.put("toColumn", b.column());
+        out.put("distinctFrom", a.distinct());
+        out.put("distinctTo", b.distinct());
+        out.put("intersection", intersection);
+        out.put("jaccard", union == 0 ? 0.0 : (double) intersection / union);
+        return out;
+    }
+
+    /** One side of the union: the column's non-NULL values as VARCHAR, over that Dataset's own relation. */
+    private static String valueSelect(ColumnStats s) {
+        String c = q(s.column());
+        return "SELECT CAST(" + c + " AS VARCHAR) AS v FROM (" + s.relationSql() + ") AS __r"
+                + " WHERE " + c + " IS NOT NULL";
+    }
+
+    private static long num(Object v) {
+        return v instanceof Number n ? n.longValue() : 0L;
+    }
+
+    /**
+     * An optional {@code string[]} body field. {@code identifiers} marks a list whose entries become SQL
+     * identifiers on the caller's say-so ({@code columns}) and are therefore SAFE_IDENT-validated; a
+     * {@code datasets} entry only selects from the registry, so it is taken verbatim and matched there.
+     */
+    private static List<String> nameList(Map<String, Object> body, String key, boolean identifiers) {
+        Object raw = body.get(key);
+        if (!(raw instanceof List<?> list)) return List.of();
+        List<String> out = new ArrayList<>(list.size());
+        for (Object o : list) {
+            String v = String.valueOf(o);
+            if (identifiers && !SAFE_IDENT.matcher(v).matches())
+                throw new ApiException(422, "unsafe column identifier '" + v + "' for " + key);
+            out.add(v);
+        }
+        return out;
     }
 
     /**

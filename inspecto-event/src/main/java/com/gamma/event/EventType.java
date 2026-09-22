@@ -147,6 +147,13 @@ public final class EventType {
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */
     public static final String LINK_SCHEMA_INSPECTED = "LINK_SCHEMA_INSPECTED";
+    /** Candidate key columns were profiled for cardinality and value overlap
+     *  ({@code POST /inv/schema/overlap-profile}, LA-15). A separate act from
+     *  {@link #LINK_SCHEMA_INSPECTED}: that one reads names, this one reads VALUES — it runs aggregates
+     *  over every Dataset in scope, so the trail must be able to tell the cheap schema read from the
+     *  expensive data read. {@code columnsProfiled}/{@code pairsProfiled}/{@code pairsConsidered} and
+     *  {@code truncated} carry the sweep's reach and whether the pair budget cut it short. */
+    public static final String LINK_OVERLAP_PROFILED = "LINK_OVERLAP_PROFILED";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

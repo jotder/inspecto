@@ -286,6 +286,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/geo/routes", "read-shaped", "computes routes from the body"),
             new Exemption("POST", "/inv/projection", "read-shaped", "computes a projection from the body"),
             new Exemption("POST", "/inv/projection/neighbors", "read-shaped", "computes neighbours from the body"),
+            new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),

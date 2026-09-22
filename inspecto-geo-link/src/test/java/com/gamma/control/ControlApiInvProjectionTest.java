@@ -280,6 +280,139 @@ class ControlApiInvProjectionTest {
         }
     }
 
+    private HttpResponse<String> overlapProfile(int port, String body) throws Exception {
+        return client.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/v1/inv/schema/overlap-profile"))
+                .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
+    /**
+     * LA-15 fixture. Two Datasets sharing BOTH column names, but only one column actually shares values:
+     * {@code acct} overlaps on 2 of 4 distinct values (Jaccard 0.5), while {@code code} is a pure name
+     * collision with disjoint values (Jaccard 0).
+     */
+    private void seedOverlap(Ctx c) throws Exception {
+        ViewStore views = new ViewStore(c.root.resolve("views"));
+        ComponentStore store = new ComponentStore(c.root.resolve("registry"));
+        views.write(new ViewDefinition("left_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES ('a1','z'),('a2','z'),('a3','z')) AS t(acct,code)",
+                "2026-07-08T00:00:00Z"));
+        store.write("dataset", "left_ds", Map.of("view", "left_view"));
+        views.write(new ViewDefinition("right_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES ('a2','p'),('a3','p'),('a9','p')) AS t(acct,code)",
+                "2026-07-08T00:00:00Z"));
+        store.write("dataset", "right_ds", Map.of("view", "right_view"));
+    }
+
+    /** LA-15: a real implicit join is measured, not guessed — |A ∩ B| = 2 over |A ∪ B| = 4. */
+    @Test
+    void overlapProfileMeasuresARealValueOverlap(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOverlap(c);
+            HttpResponse<String> r = overlapProfile(c.port, """
+                    {"datasets":["left_ds","right_ds"],"columns":["acct"]}""");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode data = json(r.body());
+            assertEquals(2, data.get("datasetsScanned").asInt());
+            assertEquals(2, data.get("columns").size(), "only the requested column is profiled: " + data);
+            assertEquals(3, data.get("columns").get(0).get("rows").asInt());
+            assertEquals(3, data.get("columns").get(0).get("distinct").asInt());
+            assertEquals(0, data.get("columns").get(0).get("nulls").asInt());
+            JsonNode pairs = data.get("pairs");
+            assertEquals(1, pairs.size(), "one cross-dataset pair: " + pairs);
+            JsonNode p = pairs.get(0);
+            assertEquals("acct", p.get("fromColumn").asText());
+            assertEquals("acct", p.get("toColumn").asText());
+            assertEquals(2, p.get("intersection").asInt(), "a2 and a3 are shared: " + p);
+            assertEquals(0.5, p.get("jaccard").asDouble(), 0.01, "2 shared over 4 distinct: " + p);
+            assertFalse(data.get("truncated").asBoolean());
+        }
+    }
+
+    /**
+     * LA-15's whole point: {@code code} matches by NAME on both Datasets — exactly what
+     * {@code /inv/schema/relationships} reasons from — but the values are disjoint, so the empirical
+     * profile scores it 0 and the analyst can discount it.
+     */
+    @Test
+    void overlapProfileScoresANameMatchWithNoSharedValuesAtZero(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOverlap(c);
+            HttpResponse<String> r = overlapProfile(c.port, """
+                    {"datasets":["left_ds","right_ds"],"columns":["code"]}""");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode p = json(r.body()).get("pairs").get(0);
+            assertEquals("code", p.get("fromColumn").asText());
+            assertEquals("code", p.get("toColumn").asText());
+            assertEquals(1, p.get("distinctFrom").asInt());
+            assertEquals(1, p.get("distinctTo").asInt());
+            assertEquals(0, p.get("intersection").asInt(), "'z' and 'p' never meet: " + p);
+            assertEquals(0.0, p.get("jaccard").asDouble(), 0.0001, "a pure name collision scores 0: " + p);
+        }
+    }
+
+    /** Strongest overlap first, so the name collision sorts below the real join in one unfiltered sweep. */
+    @Test
+    void overlapProfileRanksTheRealJoinAboveTheNameCollision(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOverlap(c);
+            JsonNode data = json(overlapProfile(c.port, "{}").body());
+            JsonNode pairs = data.get("pairs");
+            assertEquals(4, pairs.size(), "every cross-dataset pair, no same-dataset pair: " + pairs);
+            assertEquals(4, data.get("pairsConsidered").asInt());
+            assertEquals("acct", pairs.get(0).get("fromColumn").asText(), "ranked by jaccard: " + pairs);
+            assertEquals("acct", pairs.get(0).get("toColumn").asText());
+            assertEquals(0.0, pairs.get(3).get("jaccard").asDouble(), 0.0001);
+        }
+    }
+
+    /** Fail closed on identifiers: neither an unknown column nor an unsafe one reaches SQL. */
+    @Test
+    void overlapProfileRefusesAnUnknownOrUnsafeColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOverlap(c);
+            HttpResponse<String> unknown = overlapProfile(c.port, """
+                    {"columns":["nope"]}""");
+            assertEquals(422, unknown.statusCode(), unknown.body());
+            assertTrue(unknown.body().contains("nope"), unknown.body());
+
+            HttpResponse<String> unsafe = overlapProfile(c.port, """
+                    {"columns":["acct\\"; DROP TABLE t; --"]}""");
+            assertEquals(422, unsafe.statusCode(), unsafe.body());
+        }
+    }
+
+    /** A Dataset that cannot be probed is skipped and counted, never a 500 — as schemaRelationships does. */
+    @Test
+    void overlapProfileSkipsUnusableDatasetsWithoutFailing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOverlap(c);
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "ghost_ds", Map.of());   // unbound
+            HttpResponse<String> r = overlapProfile(c.port, "{}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode data = json(r.body());
+            assertEquals(2, data.get("datasetsScanned").asInt());
+            assertEquals(1, data.get("datasetsSkipped").asInt());
+        }
+    }
+
+    /** LA-15 audit: profiling reads VALUES, so it is its own act — not the schema read's event type. */
+    @Test
+    void overlapProfileEmitsItsOwnAuditEvent(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOverlap(c);
+            List<Event> events = captureEvents(() ->
+                    assertEquals(200, overlapProfile(c.port, "{}").statusCode()));
+            Event e = ofType(events, EventType.LINK_OVERLAP_PROFILED);
+            assertEquals("link.overlap.profiled", e.attributes().get("action"));
+            assertEquals("4", e.attributes().get("columnsProfiled"));
+            assertEquals("4", e.attributes().get("pairsProfiled"));
+            assertEquals("false", e.attributes().get("truncated"));
+            assertTrue(events.stream().noneMatch(x -> EventType.LINK_SCHEMA_INSPECTED.equals(x.type())),
+                    "a value profile is not a schema read: " + events);
+        }
+    }
+
     @Test
     void savedLinkAnalysisViewsPersistViaComponents(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
