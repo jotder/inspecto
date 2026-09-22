@@ -200,6 +200,7 @@ final class CapabilityManifest {
             // SettingsRoutes
             new Entry("PUT", "/settings/branding", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/geo", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("PUT", "/settings/link-analysis", Roles.CAN_AUTHOR_WORKBENCH),
             // SchedulerRoutes — tuning the live Consignment concurrency caps is runtime operation,
             // not workbench authoring.
             new Entry("PUT", "/system/scheduler", Roles.CAN_OPERATE_RUNS),

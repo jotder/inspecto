@@ -153,7 +153,7 @@ class ControlApiMetadataV1Test {
     @Test
     void configDocumentsAreConditionalGets(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            for (String path : List.of("/nav/menus", "/settings/branding", "/settings/geo", "/config/icon-map",
+            for (String path : List.of("/nav/menus", "/settings/branding", "/settings/geo", "/settings/link-analysis", "/config/icon-map",
                     "/access/roles", "/access/policies", "/access/catalog", "/access/profiles")) {
                 HttpResponse<String> got = client.send(req(c.port, "" + path).GET().build(),
                         BodyHandlers.ofString());

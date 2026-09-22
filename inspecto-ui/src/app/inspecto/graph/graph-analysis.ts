@@ -4,11 +4,45 @@ import type { G6Edge, G6GraphData, G6Node } from './graph-types';
 /**
  * Pure, source-agnostic graph analysis over the shared {@link G6GraphData} shape — the Link Analysis
  * Studio's algorithm library (plan §3 P1). Framework-free; every function returns new data and never
- * mutates its input. Guarded by {@link ANALYSIS_NODE_CAP} where the algorithm is super-linear.
+ * mutates its input. Guarded by {@link analysisNodeCapValue} where the algorithm is super-linear.
  */
 
 /** Above this node count the super-linear analyses (betweenness) refuse to run. */
-export const ANALYSIS_NODE_CAP = 2000;
+/**
+ * DEFAULT ceiling for the browser-side algorithms, in nodes.
+ *
+ * ⚠ This is a **default, not a truth**. It was measured on one host, one browser and one synthetic graph
+ * shape (2026-09-22, plan §1.7): 25 of the 27 algorithms stay under 60 ms even at ~2 000 nodes, while
+ * suspicion score alone takes 6.7 s there. An analyst's laptop, a denser graph or a different
+ * edge-to-node ratio all move that. ⇒ deployments override it via {@link configureGraphLimits}; the
+ * server publishes the value at `/bootstrap` (`limits.analysisNodeCap`).
+ */
+export const ANALYSIS_NODE_CAP_DEFAULT = 2000;
+
+let analysisNodeCap = ANALYSIS_NODE_CAP_DEFAULT;
+
+/** The ceiling currently in force. Read it — never cache it — so a deployment override takes effect. */
+export function analysisNodeCapValue(): number {
+    return analysisNodeCap;
+}
+
+/**
+ * Apply a deployment's tuning limits, normally once at startup from `/bootstrap`.
+ *
+ * ⛔ **Fails closed on nonsense rather than applying it.** A cap that is not a finite number ≥ 1 is
+ * REFUSED and the previous value stands: a cap of 0 or NaN would make every graph "over the limit" and
+ * turn the whole analysis toolbox off, which is a far worse outcome than ignoring a bad setting. Passing
+ * `undefined` leaves the value alone, so a partial payload is safe.
+ */
+export function configureGraphLimits(limits: { analysisNodeCap?: number } | null | undefined): void {
+    const v = limits?.analysisNodeCap;
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 1) analysisNodeCap = Math.floor(v);
+}
+
+/** Restore the measured default — for tests, and for a deployment that clears its override. */
+export function resetGraphLimits(): void {
+    analysisNodeCap = ANALYSIS_NODE_CAP_DEFAULT;
+}
 
 /** A highlightable analysis result: the node/edge ids to emphasize on the canvas. */
 export interface GraphSelection {
@@ -198,11 +232,12 @@ export function degreeCentrality(g: G6GraphData): NodeScore[] {
 
 /**
  * Betweenness centrality (Brandes, unweighted, treating the graph as undirected), descending.
- * Throws above {@link ANALYSIS_NODE_CAP} — callers surface that as a typed message.
+ * Throws above {@link analysisNodeCapValue} — callers surface that as a typed message.
  */
 export function betweennessCentrality(g: G6GraphData): NodeScore[] {
-    if (g.nodes.length > ANALYSIS_NODE_CAP) {
-        throw new Error(`Betweenness is capped at ${ANALYSIS_NODE_CAP} nodes (graph has ${g.nodes.length}).`);
+    const cap = analysisNodeCapValue();
+    if (g.nodes.length > cap) {
+        throw new Error(`Betweenness is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
     const adj = adjacency(g);
     const bc = new Map<string, number>(g.nodes.map((n) => [n.id, 0]));
@@ -318,11 +353,12 @@ export function detectCommunities(g: G6GraphData, maxIterations = 20): Map<strin
  * level nodes visited in id order, moves only on a strict modularity gain). Local-moving +
  * community aggregation to convergence. Returns nodeId → communityId (id = the community's smallest
  * member), matching the {@link detectCommunities} contract so the UI shares the list + emphasis code.
- * Throws above {@link ANALYSIS_NODE_CAP} — callers surface that as a typed message.
+ * Throws above {@link analysisNodeCapValue} — callers surface that as a typed message.
  */
 export function louvainCommunities(g: G6GraphData): Map<string, string> {
-    if (g.nodes.length > ANALYSIS_NODE_CAP) {
-        throw new Error(`Community detection is capped at ${ANALYSIS_NODE_CAP} nodes (graph has ${g.nodes.length}).`);
+    const cap = analysisNodeCapValue();
+    if (g.nodes.length > cap) {
+        throw new Error(`Community detection is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
     const ids = g.nodes.map((n) => n.id).sort();
     const n = ids.length;
@@ -983,8 +1019,9 @@ export function egoNetwork(g: G6GraphData, nodeId: string, direction: GraphDirec
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 
 function requireUnderCap(g: G6GraphData, what: string): void {
-    if (g.nodes.length > ANALYSIS_NODE_CAP) {
-        throw new Error(`${what} is capped at ${ANALYSIS_NODE_CAP} nodes (graph has ${g.nodes.length}).`);
+    const cap = analysisNodeCapValue();
+    if (g.nodes.length > cap) {
+        throw new Error(`${what} is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }
 }
 
@@ -1031,7 +1068,7 @@ export function pageRank(g: G6GraphData, opts: { damping?: number; iterations?: 
 
 /**
  * Closeness centrality (undirected, Wasserman–Faust normalization for disconnected graphs),
- * descending — high for nodes with short paths to many others. Throws above {@link ANALYSIS_NODE_CAP}.
+ * descending — high for nodes with short paths to many others. Throws above {@link analysisNodeCapValue}.
  */
 export function closenessCentrality(g: G6GraphData): NodeScore[] {
     requireUnderCap(g, 'Closeness');
@@ -1079,7 +1116,7 @@ function powerIterate(
     return x;
 }
 
-/** Eigenvector centrality (undirected, power iteration), descending. Throws above {@link ANALYSIS_NODE_CAP}. */
+/** Eigenvector centrality (undirected, power iteration), descending. Throws above {@link analysisNodeCapValue}. */
 export function eigenvectorCentrality(g: G6GraphData, iterations = 100): NodeScore[] {
     requireUnderCap(g, 'Eigenvector centrality');
     const adj = adjacency(g);
@@ -1122,7 +1159,7 @@ export function katzCentrality(
     return scored(g, x);
 }
 
-/** Hub and authority scores (HITS, directed, power iteration). Throws above {@link ANALYSIS_NODE_CAP}. */
+/** Hub and authority scores (HITS, directed, power iteration). Throws above {@link analysisNodeCapValue}. */
 export interface HitsResult {
     hubs: NodeScore[];
     authorities: NodeScore[];
@@ -1210,7 +1247,7 @@ export function triangleCount(g: G6GraphData): NodeScore[] {
 
 /**
  * Maximal cliques (undirected, Bron–Kerbosch with pivoting) of size ≥ `minSize` (default 3), largest
- * first — fully-interconnected groups, the tightest form of a ring. Throws above {@link ANALYSIS_NODE_CAP}.
+ * first — fully-interconnected groups, the tightest form of a ring. Throws above {@link analysisNodeCapValue}.
  */
 export function cliques(g: G6GraphData, opts: { minSize?: number } = {}): string[][] {
     requireUnderCap(g, 'Clique detection');
@@ -1255,7 +1292,7 @@ export interface MaxFlowResult {
 /**
  * Maximum flow from `sourceId` to `sinkId` (Edmonds–Karp) with edge capacity = {@link edgeWeight},
  * and the resulting min-cut. Directed. Returns `{ value: 0, minCut: empty }` when either endpoint is
- * absent. Throws above {@link ANALYSIS_NODE_CAP}.
+ * absent. Throws above {@link analysisNodeCapValue}.
  */
 export function maxFlow(g: G6GraphData, sourceId: string, sinkId: string): MaxFlowResult {
     requireUnderCap(g, 'Max-flow');
@@ -1395,7 +1432,7 @@ export interface PredictedLink {
  * Link prediction over non-adjacent node pairs (undirected), top `limit` (default 20) by score.
  * `method`: `common-neighbors` (raw shared-neighbor count) or `adamic-adar` (shared neighbors
  * weighted by `1/log(degree)`, the default — rarer common associates count for more). Throws above
- * {@link ANALYSIS_NODE_CAP}.
+ * {@link analysisNodeCapValue}.
  */
 export function linkPrediction(
     g: G6GraphData,
@@ -1464,7 +1501,7 @@ function normalize(scores: NodeScore[]): Map<string, number> {
  * signals — degree, betweenness, PageRank, k-core, and triangle participation — that surface the
  * over-connected brokers and dense-cluster members an investigator should look at first. Weights are
  * tunable (default 1 each); the per-node `factors` breakdown drives risk sizing/colouring on the
- * canvas and an explainable ranking. Throws above {@link ANALYSIS_NODE_CAP} (betweenness dominates).
+ * canvas and an explainable ranking. Throws above {@link analysisNodeCapValue} (betweenness dominates).
  */
 export function suspicionScore(g: G6GraphData, weights: SuspicionWeights = {}): SuspicionScore[] {
     requireUnderCap(g, 'Suspicion scoring');

@@ -4,12 +4,15 @@ import { SAMPLE_SOURCES } from 'app/inspecto/fixtures/sample-sources';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import {
     EntityProjectionGraphSource,
-    PROJECTION_NODE_CAP,
     ProjectedGraph,
     isProjectionError,
     mergeProjectedGraphs,
     projectEntities,
     projectTriples,
+    PROJECTION_NODE_CAP_DEFAULT,
+    configureProjectionLimits,
+    projectionNodeCapValue,
+    resetProjectionLimits,
 } from './entity-projection';
 
 const rows = [
@@ -54,9 +57,9 @@ describe('projectEntities', () => {
     });
 
     it('truncates at the node cap and says so', () => {
-        const many = Array.from({ length: PROJECTION_NODE_CAP + 50 }, (_, i) => ({ a: `s${i}`, b: `t${i}` }));
+        const many = Array.from({ length: projectionNodeCapValue() + 50 }, (_, i) => ({ a: `s${i}`, b: `t${i}` }));
         const g = projectEntities(many, { datasetId: 'd', sourceCol: 'a', targetCol: 'b' }) as ProjectedGraph;
-        expect(g.nodes).toHaveLength(PROJECTION_NODE_CAP);
+        expect(g.nodes).toHaveLength(projectionNodeCapValue());
         expect(g.truncated).toBe(true);
     });
 
@@ -267,14 +270,14 @@ describe('projectTriples', () => {
     });
 
     it('caps nodes and carries server truncation through', () => {
-        const many = Array.from({ length: PROJECTION_NODE_CAP + 50 }, (_, i) => ({
+        const many = Array.from({ length: projectionNodeCapValue() + 50 }, (_, i) => ({
             source: `s${i}`,
             target: `t${i}`,
             kind: null,
             count: 1,
         }));
         const capped = projectTriples(many, false);
-        expect(capped.nodes.length).toBeLessThanOrEqual(PROJECTION_NODE_CAP);
+        expect(capped.nodes.length).toBeLessThanOrEqual(projectionNodeCapValue());
         expect(capped.truncated).toBe(true);
 
         expect(projectTriples([{ source: 'a', target: 'b', kind: null, count: 1 }], true).truncated).toBe(true);
@@ -319,5 +322,41 @@ describe('mergeProjectedGraphs', () => {
         expect(merged.nodes.find((n) => n.id === 'entity:x')!.data.label).toBe('x'); // first mapping wins
         expect(merged.edges.map((e) => e.id)).toEqual(['e1', 'e2']);
         expect(merged.truncated).toBe(true);
+    });
+});
+
+describe('projection limit is configurable (D-S3)', () => {
+    afterEach(() => resetProjectionLimits());
+
+    it('starts at the measured default', () => {
+        expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
+    });
+
+    it('a deployment override takes effect', () => {
+        configureProjectionLimits({ projectionNodeCap: 25 });
+        expect(projectionNodeCapValue()).toBe(25);
+    });
+
+    it('⛔ REFUSES a nonsense cap and keeps the previous value', () => {
+        // A cap of 0 would yield an empty graph for every query, which reads as "no data" rather than
+        // "misconfigured" — the worst possible failure for an investigative tool.
+        configureProjectionLimits({ projectionNodeCap: 25 });
+        for (const bad of [0, -5, Number.NaN]) {
+            configureProjectionLimits({ projectionNodeCap: bad });
+            expect(projectionNodeCapValue(), `cap ${bad} must be refused`).toBe(25);
+        }
+    });
+
+    it('ignores an absent field, so a partial response is safe', () => {
+        configureProjectionLimits({ projectionNodeCap: 33 });
+        configureProjectionLimits({});
+        configureProjectionLimits(null);
+        expect(projectionNodeCapValue()).toBe(33);
+    });
+
+    it('reset restores the shipped default', () => {
+        configureProjectionLimits({ projectionNodeCap: 9 });
+        resetProjectionLimits();
+        expect(projectionNodeCapValue()).toBe(PROJECTION_NODE_CAP_DEFAULT);
     });
 });

@@ -7020,6 +7020,32 @@
         },
         "x-generated" : true
       }
+    },
+    "/settings/link-analysis" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "GET /settings/link-analysis (generated skeleton)",
+        "operationId" : "getSettingsLinkAnalysis",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "PUT /settings/link-analysis (generated skeleton)",
+        "operationId" : "putSettingsLinkAnalysis",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

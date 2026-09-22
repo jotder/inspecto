@@ -52,7 +52,7 @@ import {
     G6GraphData,
     GraphSourceId,
     GraphSourceQuery,
-    ANALYSIS_NODE_CAP,
+    analysisNodeCapValue,
     HistoryStack,
     collapseBranches,
     louvainCommunities,
@@ -120,10 +120,11 @@ import {
     baseEdgeKind,
     stableKey,
 } from 'app/modules/admin/catalog/graph-view.component';
+import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { PROJECTION_NODE_CAP, ProjectedGraph } from './entity-projection';
+import { ProjectedGraph, projectionNodeCapValue } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
@@ -235,6 +236,12 @@ export class LinkAnalysisComponent implements OnInit {
     private readonly exchangeEnabled = inject(SessionService).exchangeEnabled;
     readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
     private datasetsService = inject(DatasetsService);
+    /**
+     * Injected for its side effect, not for a value: constructing it applies the active space's tuning
+     * limits to the two pure graph modules. Without an injector asking for it, a `providedIn: 'root'`
+     * service is never constructed and the caps would silently stay at the shipped defaults.
+     */
+    private readonly limits = inject(LinkAnalysisSettingsService);
     private pipelinesService = inject(PipelinesService);
     private viewsService = inject(LinkAnalysisService);
     /** Evidence snapshots (UI-first, session-scoped — see the service). */
@@ -544,7 +551,14 @@ export class LinkAnalysisComponent implements OnInit {
         () => this.levelOfDetail() && (this.displayed()?.nodes.length ?? 0) > LOD_LABEL_CAP,
     );
     /** The published size limits the footer states — the server-side projection cap and the browser analysis cap. */
-    readonly caps = { projection: PROJECTION_NODE_CAP, analysis: ANALYSIS_NODE_CAP };
+    /**
+     * The limits currently IN FORCE, read live rather than captured, so a deployment's override reaches
+     * the footer. A getter and not a `computed()` on purpose: these are set once from settings at
+     * startup, not signals, and a computed would never see the change.
+     */
+    get caps(): { projection: number; analysis: number } {
+        return { projection: projectionNodeCapValue(), analysis: analysisNodeCapValue() };
+    }
 
     readonly displayOptions = computed<GraphDisplayOptions>(
         () => ({

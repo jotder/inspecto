@@ -12,13 +12,15 @@ import java.util.Map;
  *   PUT /settings/branding   replace the space's branding (write-root gated, capability-gated)         [v4.10.0]
  *   GET /settings/geo        the space's {tileServerUrl} (null = no self-hosted tile server)
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
+ *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap} (nulls = shipped defaults)
+ *   PUT /settings/link-analysis   replace the space's Link Analysis caps (same gates as branding)
  *   GET /config/icon-map     the space's processor-icon map { "&lt;type&gt;": {glyph,color}, … } ({} = none) [v5.0.0]
  *   PUT /config/icon-map     replace the space's icon map (same gates as branding)                          [v5.0.0]
  * </pre>
  *
  * <p>Space-scoped through the standard {@code /spaces/{id}/…} request seam: the UI calls the bare
  * {@code /settings/branding} for the active space, or {@code /spaces/{id}/settings/branding} to edit any
- * space. Stored as {@code branding.toon} / {@code geo.toon} / {@code icon-map.toon} in the bound space's
+ * space. Stored as {@code branding.toon} / {@code geo.toon} / {@code link-analysis.toon} / {@code icon-map.toon} in the bound space's
  * config tree ({@link ApiContext#writeRoot()}), so settings writes share the same read-only ({@code 503}) gate
  * as config writes. ({@code /config/icon-map} keeps the UI's existing {@code IconMapService} path; it is a
  * per-space preference document like branding/geo, not a runnable-config route — hence its home here.)
@@ -28,6 +30,12 @@ final class SettingsRoutes implements RouteModule {
     private static final String BRANDING_FILE = "branding.toon";
     private static final String GEO_FILE = "geo.toon";
     private static final String ICON_MAP_FILE = "icon-map.toon";
+    /** Sanity ceiling for a Link Analysis node cap — far above any graph a browser can lay out (the
+     *  shipped defaults are in the hundreds/low thousands), small enough to catch a unit mistake
+     *  (someone writing an edge count, a byte count or a millisecond budget into a node slot). Mirrors
+     *  {@code SchedulerRoutes.MAX_CAP}'s reasoning. A bad value is refused (422), never clamped: this is
+     *  a persisted setting an operator explicitly typed, so it must come back for them to fix. */
+    private static final int MAX_NODE_CAP = 100_000;
     /** Reject an over-large inline logo (defence-in-depth; the UI already caps ~200 KB). */
     private static final int MAX_LOGO_CHARS = 512 * 1024;
 
@@ -39,6 +47,9 @@ final class SettingsRoutes implements RouteModule {
         api.get("/settings/geo", (e, m) -> ETags.respond(e, readGeo(api)));
         api.put("/settings/geo", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeGeo(api, api.body(e))));
+        api.get("/settings/link-analysis", (e, m) -> ETags.respond(e, readLinkAnalysis(api)));
+        api.put("/settings/link-analysis", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> writeLinkAnalysis(api, api.body(e))));
         api.get("/config/icon-map", (e, m) -> ETags.respond(e, readIconMap(api)));
         api.put("/config/icon-map", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeIconMap(api, api.body(e))));
@@ -87,6 +98,45 @@ final class SettingsRoutes implements RouteModule {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("tileServerUrl", g.tileServerUrl());
         return m;
+    }
+
+    private Object readLinkAnalysis(ApiContext api) {
+        Path root = api.writeRoot();
+        LinkAnalysisSettings s = root == null ? LinkAnalysisSettings.EMPTY
+                : LinkAnalysisSettings.read(root.resolve(LinkAnalysisSettings.FILE));
+        return linkAnalysisShape(s);
+    }
+
+    private Object writeLinkAnalysis(ApiContext api, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
+        LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
+                nodeCap(body, "analysisNodeCap"));
+        s.write(root.resolve(LinkAnalysisSettings.FILE));
+        return linkAnalysisShape(s);
+    }
+
+    /** The wire shape the UI's Link Analysis settings expect — null means "inherit the shipped default". */
+    private static Map<String, Object> linkAnalysisShape(LinkAnalysisSettings s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("projectionNodeCap", s.projectionNodeCap());
+        m.put("analysisNodeCap", s.analysisNodeCap());
+        return m;
+    }
+
+    /** A stated node cap: {@code null}/absent = inherit the shipped default; otherwise an int in
+     *  {@code 1..MAX_NODE_CAP} or the write is refused (422), never silently clamped. */
+    private static Integer nodeCap(Map<String, Object> body, String key) {
+        Object raw = body.get(key);
+        if (raw == null) return null;
+        int v;
+        try {
+            v = Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            throw new ApiException(422, key + " must be an integer, got '" + raw + "'");
+        }
+        if (v < 1 || v > MAX_NODE_CAP)
+            throw new ApiException(422, key + " must be 1.." + MAX_NODE_CAP + ", got " + v);
+        return v;
     }
 
     private Object readIconMap(ApiContext api) {

@@ -288,6 +288,23 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   * Two more are not drop-ins at all: **`combo-force` is not a real G6 v5 id** (the nearest built-in is
     `combo-combined`), and **"combos" is a data-model change**, not a plugin — it needs `comboId` on the
     graph data.
+* **The two graph caps are per-space SETTINGS, not constants** — `GET|PUT /settings/link-analysis`
+  (`link-analysis.toon`, `canAuthorWorkbench`, the same shape as branding and geo). `null` on either
+  field means **inherit the shipped default**, never *unbounded*. The shipped values (500 projection,
+  2 000 analysis) are **measurements, not truths**: they came from one host, one browser and one
+  synthetic graph shape, and a denser graph or a slower laptop moves them.
+* ⛔ **A persisted cap is refused, not clamped.** A non-integer or anything outside `1..100000` is a
+  **422 naming the field and the range** — because an operator typed it and deserves to be told. A silent
+  clamp is the pattern for a per-request parameter, not for a stored setting.
+* ⛔ **The client-side setters fail closed too.** A cap that is not a finite integer ≥ 1 is ignored and
+  the previous value stands: a cap of `0` or `NaN` would put every graph over the limit and switch the
+  whole analysis toolbox off, which is far worse than ignoring a bad setting. Pinned by a spec that goes
+  red when the guard is mutated away.
+* ⚠ **The graph modules are pure libraries with no dependency injection**, so limits are PUSHED into
+  them (`configureGraphLimits`, `configureProjectionLimits`) rather than read out, and the enforcement
+  sites read the live value instead of capturing it. 🔴 A space change RESETS to the defaults before
+  applying the new space's values — otherwise an absent field would silently mean "keep the previous
+  space's override", which is one space tuned by another's settings.
 * **A hub's pendant leaves can fold into one stand-in** (LA-06): opt-in, off by default, labelled with
   the count. Only nodes whose ONLY link is to that hub fold, so no path is ever hidden. Clicking a
   stand-in opens it; turning the control off and on again is the way back, because once opened there is

@@ -19,7 +19,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@code SettingsRoutes} per-space branding over real HTTP: defaults before any save, a PUT round-trip that
+ * {@code SettingsRoutes} per-space branding, geo, Link Analysis caps and icon map over real HTTP: defaults before any save, a PUT round-trip that
  * persists {@code branding.toon} in the space's config tree, blank-folds-to-null, per-space isolation via the
  * {@code /spaces/{id}/settings/branding} seam, and the over-large-logo 422 guard. Drives a discover-mode
  * ControlApi so each space has a real (writable) config root.
@@ -128,6 +128,64 @@ class ControlApiSettingsTest {
             // a malformed entry (missing color) → 422
             assertEquals(422, send(c.port, "PUT", "/spaces/acme/config/icon-map",
                     "{\"parser.json\":{\"glyph\":\"braces\"}}").statusCode());
+        }
+    }
+
+    @Test
+    void linkAnalysisCapsRoundTripAndRefuseBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
+
+            // absent document reads as both-null (inherit the shipped defaults), not a failure
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertTrue(def.get("projectionNodeCap").isNull() && def.get("analysisNodeCap").isNull(),
+                    "no document yet ⇒ inherit both");
+
+            // PUT round-trip of both values, persisted as link-analysis.toon in the space's config tree
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"projectionNodeCap\":1200,\"analysisNodeCap\":4000}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(1200, json(put).get("projectionNodeCap").asInt());
+            assertEquals(4000, json(put).get("analysisNodeCap").asInt());
+            assertTrue(Files.exists(root.resolve("acme").resolve("config").resolve("link-analysis.toon")));
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertEquals(1200, got.get("projectionNodeCap").asInt());
+            assertEquals(4000, got.get("analysisNodeCap").asInt());
+
+            // per-space isolation: 'beta' still inherits
+            assertTrue(json(send(c.port, "GET", "/spaces/beta/settings/link-analysis", null))
+                    .get("projectionNodeCap").isNull());
+
+            // null round-trips as null — an omitted/null cap means "inherit", never "unbounded"
+            HttpResponse<String> cleared = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"projectionNodeCap\":null,\"analysisNodeCap\":900}");
+            assertEquals(200, cleared.statusCode(), cleared.body());
+            assertTrue(json(cleared).get("projectionNodeCap").isNull(), "null ⇒ inherit the shipped default");
+            assertEquals(900, json(cleared).get("analysisNodeCap").asInt());
+            assertTrue(json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null))
+                    .get("projectionNodeCap").isNull(), "cleared on disk too");
+
+            // fail closed, never a silent clamp: 0, a non-integer, and above the sanity ceiling are all 422
+            HttpResponse<String> zero = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"projectionNodeCap\":0}");
+            assertEquals(422, zero.statusCode(), zero.body());
+            assertTrue(zero.body().contains("projectionNodeCap") && zero.body().contains("1..100000"),
+                    "the 422 names the field and the allowed range: " + zero.body());
+
+            HttpResponse<String> nan = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"analysisNodeCap\":\"lots\"}");
+            assertEquals(422, nan.statusCode(), nan.body());
+            assertTrue(nan.body().contains("analysisNodeCap"), nan.body());
+
+            HttpResponse<String> huge = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"analysisNodeCap\":100001}");
+            assertEquals(422, huge.statusCode(), huge.body());
+            assertTrue(huge.body().contains("analysisNodeCap") && huge.body().contains("1..100000"), huge.body());
+
+            // a refused write left the last good values standing
+            assertEquals(900, json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null))
+                    .get("analysisNodeCap").asInt());
         }
     }
 
