@@ -42,6 +42,7 @@ import {
     shortestPath,
     suspicionScore,
     triangleCount,
+    patternNeedsTime,
     weightedShortestPath,
 } from 'app/inspecto/graph';
 import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
@@ -168,6 +169,11 @@ export class LinkAnalysisToolboxComponent {
     readonly suggested = input<string[]>([]);
     /** Node-id → label lookup, supplied by the host (its full-graph labels). */
     readonly labelOf = input<(id: string) => string>((id) => id);
+    /**
+     * LA-14a: the edge attribute column carrying the event time, as chosen in the pane's time control.
+     * A motif with an ordering constraint cannot be evaluated without it — see {@link runPattern}.
+     */
+    readonly timeAttr = input<string>('');
 
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
@@ -479,7 +485,20 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
-        const matches = matchPattern(g, this.patternSteps());
+        const steps = this.patternSteps();
+        const timeAttr = this.timeAttr();
+        // LA-14a: say WHY nothing can be found. `matchPattern` fails closed on a temporal motif with no
+        // time column, and "No matches" is the same sentence a genuinely empty result produces - which
+        // would tell the analyst the chain is absent when in fact it was never looked for.
+        if (patternNeedsTime(steps) && !timeAttr) {
+            this.patternMatches.set([]);
+            this.emphasisChange.emit(null);
+            this.analysisError.set(
+                'This pattern requires the hops to be in time order — choose a time column in the Query panel first.',
+            );
+            return;
+        }
+        const matches = matchPattern(g, steps, { timeAttr });
         this.patternMatches.set(matches);
         if (!matches.length) {
             this.emphasisChange.emit(null);

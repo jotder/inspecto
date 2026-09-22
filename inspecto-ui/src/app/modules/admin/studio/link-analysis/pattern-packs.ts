@@ -32,6 +32,21 @@ function kindOf(value: unknown, key: 'nodeKind' | 'edgeKind'): Partial<PatternSt
 }
 
 /**
+ * LA-14a temporal fields off one authored step. A tabular TOON array must give EVERY row a value for
+ * every declared column, so the un-ordered rows spell their flag as `false` and their gap as `0` — and
+ * `0` must therefore mean "no ceiling", never "a ceiling of zero hours", which would match nothing at
+ * all while looking authored. Anything non-positive or unparseable is treated as absent, and a gap is
+ * only carried when the step is actually ordered.
+ */
+function temporalOf(step: Record<string, unknown>): Partial<PatternStep> {
+    const ordered = step['afterPrevious'] === true || step['afterPrevious'] === 'true';
+    if (!ordered) return {};
+    const raw = step['maxGapHours'];
+    const gap = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw) : Number.NaN;
+    return Number.isFinite(gap) && gap > 0 ? { afterPrevious: true, maxGapHours: gap } : { afterPrevious: true };
+}
+
+/**
  * Map an authored `pattern-pack` component's content onto a {@link PatternPack}, or `null` when it is not
  * usable. Deliberately defensive: pack content is free-form TOON (no backend `validateKind` branch), so a
  * hand-edited file must be skipped rather than drawn as a broken option.
@@ -62,6 +77,11 @@ export function patternPackFromContent(content: Record<string, unknown>): Patter
             ...(DIRECTIONS.has(direction as NonNullable<PatternStep['direction']>)
                 ? { direction: direction as PatternStep['direction'] }
                 : {}), // blank / unknown ⇒ wildcard, the start node's shape
+            // LA-14a. TOON has no boolean-in-a-list problem here, but an authored pack may spell the
+            // flag as a string; accept both and treat anything else as absent. Dropping these silently
+            // is the same class of bug the kind fields hit above — the motif would still draw with the
+            // right arrows and quietly match unordered paths.
+            ...temporalOf(step),
         };
     });
     const tool = content['tool'] as NonNullable<PatternPack['tool']>;
@@ -81,16 +101,28 @@ export const PATTERN_PACKS: PatternPack[] = [
         label: 'Layering chain',
         category: 'money',
         description:
-            'Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering.',
-        steps: [{}, { direction: 'out' }, { direction: 'out' }, { direction: 'out' }],
+            'Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering. Each hop must come after the one before it, within 48 hours.',
+        steps: [
+            {},
+            { direction: 'out' },
+            // LA-14a: a layering chain is a FLOW claim. Without ordering, A→B→C matched even when B
+            // paid C long before A ever paid B, which is a topology claim wearing the same words.
+            { direction: 'out', afterPrevious: true, maxGapHours: 48 },
+            { direction: 'out', afterPrevious: true, maxGapHours: 48 },
+        ],
     },
     {
         id: 'pass-through',
         label: 'Pass-through intermediary',
         category: 'money',
         description:
-            'A single intermediary that receives then forwards (A → M → B). Inspect the middle node — it is the mule/shell to scrutinize.',
-        steps: [{}, { direction: 'out' }, { direction: 'out' }],
+            'A single intermediary that receives then forwards (A → M → B), the forward coming after the receipt and within 48 hours. Inspect the middle node — it is the mule/shell to scrutinize.',
+        steps: [
+            {},
+            { direction: 'out' },
+            // "receives THEN forwards" is the whole pattern — it was not being checked.
+            { direction: 'out', afterPrevious: true, maxGapHours: 48 },
+        ],
     },
     {
         id: 'inbound-collector',

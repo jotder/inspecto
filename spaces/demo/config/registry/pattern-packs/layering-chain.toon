@@ -1,9 +1,9 @@
 name: layering-chain
 label: Layering chain
 category: money
-description: Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering.
-steps[4]{direction}:
-  ""
-  out
-  out
-  out
+description: Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering. Each hop must come after the one before it, within 48 hours.
+steps[4]{direction,afterPrevious,maxGapHours}:
+  "",false,0
+  out,false,0
+  out,true,48
+  out,true,48

@@ -37,6 +37,7 @@ import {
     suspicionScore,
     triangleCount,
     weightedShortestPath,
+    patternNeedsTime,
 } from './graph-analysis';
 
 const node = (id: string, kind = 'entity', label = id): G6GraphData['nodes'][0] => ({ id, data: { label, kind } });
@@ -606,5 +607,97 @@ describe('suspicionScore', () => {
             edges: [],
         };
         expect(() => suspicionScore(big)).toThrow(/capped/);
+    });
+});
+
+// ── LA-14a: temporal ordering. Without it `A→B→C` matched even when B paid C long before A paid B —
+// a topology claim in the language of a flow claim. Gate G-R5's "out-of-order timestamps rejected".
+describe('matchPattern temporal ordering (LA-14a)', () => {
+    /** a→b→c where the SECOND hop happens after the first — a genuine forwarding chain. */
+    const ordered: G6GraphData = {
+        nodes: ['a', 'b', 'c'].map((id) => ({ id, data: { label: id, kind: 'acct' } })) as G6GraphData['nodes'],
+        edges: [
+            { id: 'a->b', source: 'a', target: 'b', data: { kind: 'pays', attrs: { AT: '2026-09-01 10:00:00' } } },
+            { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: '2026-09-01 12:00:00' } } },
+        ],
+    } as G6GraphData;
+
+    /** The SAME topology with the hops reversed in time — b paid c BEFORE a ever paid b. */
+    const backwards: G6GraphData = {
+        nodes: ordered.nodes,
+        edges: [
+            { id: 'a->b', source: 'a', target: 'b', data: { kind: 'pays', attrs: { AT: '2026-09-01 12:00:00' } } },
+            { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: '2026-09-01 10:00:00' } } },
+        ],
+    } as G6GraphData;
+
+    const chain = [{}, { direction: 'out' as const }, { direction: 'out' as const, afterPrevious: true }];
+
+    it('patternNeedsTime is true only when a later step asks for ordering', () => {
+        expect(patternNeedsTime([{}, { direction: 'out' }])).toBe(false);
+        expect(patternNeedsTime(chain)).toBe(true);
+        // step 0 has no previous edge, so a flag there is not a temporal requirement
+        expect(patternNeedsTime([{ afterPrevious: true }, { direction: 'out' }])).toBe(false);
+    });
+
+    it('matches a chain whose hops are in time order', () => {
+        expect(matchPattern(ordered, chain, { timeAttr: 'AT' })).toHaveLength(1);
+    });
+
+    it('REJECTS the same chain when the timestamps run backwards', () => {
+        // The topology is identical - only the times differ. Before LA-14a this matched.
+        expect(matchPattern(backwards, chain, { timeAttr: 'AT' })).toHaveLength(0);
+        // ...and the proof that the shape itself is matchable: drop the constraint and it comes back.
+        expect(matchPattern(backwards, [{}, { direction: 'out' }, { direction: 'out' }])).toHaveLength(1);
+    });
+
+    it('rejects a hop that is simultaneous — a forwarding must be strictly later', () => {
+        const same = {
+            nodes: ordered.nodes,
+            edges: ordered.edges.map((e) => ({ ...e, data: { ...e.data, attrs: { AT: '2026-09-01 10:00:00' } } })),
+        } as G6GraphData;
+        expect(matchPattern(same, chain, { timeAttr: 'AT' })).toHaveLength(0);
+    });
+
+    it('FAILS CLOSED when a temporal motif is run with no time column', () => {
+        // Silently dropping the constraint would reproduce exactly the defect this change removes.
+        expect(matchPattern(ordered, chain)).toHaveLength(0);
+        expect(matchPattern(ordered, chain, { timeAttr: '' })).toHaveLength(0);
+    });
+
+    it('rejects an edge whose time is missing or unparseable, mirroring filterByTime', () => {
+        const noTime = {
+            nodes: ordered.nodes,
+            edges: [
+                ordered.edges[0],
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: 'not a date' } } },
+            ],
+        } as G6GraphData;
+        expect(matchPattern(noTime, chain, { timeAttr: 'AT' })).toHaveLength(0);
+    });
+
+    it('honours maxGapHours — an ordered hop far in the future is not a forwarding', () => {
+        const within = [
+            {},
+            { direction: 'out' as const },
+            { direction: 'out' as const, afterPrevious: true, maxGapHours: 48 },
+        ];
+        expect(matchPattern(ordered, within, { timeAttr: 'AT' })).toHaveLength(1); // 2h gap
+
+        const late = {
+            nodes: ordered.nodes,
+            edges: [
+                ordered.edges[0],
+                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'pays', attrs: { AT: '2026-10-01 12:00:00' } } },
+            ],
+        } as G6GraphData;
+        expect(matchPattern(late, within, { timeAttr: 'AT' })).toHaveLength(0); // a month later
+        expect(matchPattern(late, chain, { timeAttr: 'AT' })).toHaveLength(1); // still ORDERED, just not close
+    });
+
+    it('leaves an untemporal motif behaving exactly as before, with or without a time column', () => {
+        const plain = [{}, { direction: 'out' as const }, { direction: 'out' as const }];
+        expect(matchPattern(backwards, plain)).toHaveLength(1);
+        expect(matchPattern(backwards, plain, { timeAttr: 'AT' })).toHaveLength(1);
     });
 });

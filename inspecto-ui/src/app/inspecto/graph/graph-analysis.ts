@@ -519,6 +519,38 @@ export interface PatternStep {
     edgeKind?: string;
     /** The traversal direction from the previous step into this one; defaults to `out`. */
     direction?: GraphDirection;
+    /**
+     * LA-14a — this step's edge must have happened strictly AFTER the previous step's edge.
+     * Ignored on step 0 (there is no previous edge). Requires {@link MatchPatternOptions.timeAttr};
+     * without it the motif cannot be evaluated and {@link matchPattern} refuses (see {@link patternNeedsTime}).
+     */
+    afterPrevious?: boolean;
+    /**
+     * Optional upper bound on the gap to the previous step's edge, in hours. Only meaningful together
+     * with {@link afterPrevious} — an ordering with no ceiling matches a hop made a year later, which
+     * is an ordering claim but not an investigative one.
+     */
+    maxGapHours?: number;
+}
+
+/** Options for {@link matchPattern}. */
+export interface MatchPatternOptions {
+    limit?: number;
+    /**
+     * The edge attribute column holding the event time, as chosen in the pane's time control. Parsed
+     * with `Date.parse`, exactly as {@link filterByTime} does, because the projection stringifies every
+     * attribute (`CAST(col AS VARCHAR)`) and no typed timestamp survives it.
+     */
+    timeAttr?: string;
+}
+
+/**
+ * Whether a motif carries any temporal constraint — i.e. whether it needs a `timeAttr` to mean anything.
+ * A caller uses this to TELL the analyst a time column is required, rather than running the motif and
+ * presenting "no matches", which is the same answer a genuinely empty result gives.
+ */
+export function patternNeedsTime(steps: PatternStep[]): boolean {
+    return steps.some((st, i) => i > 0 && !!st.afterPrevious);
 }
 
 /** Base relationship kind — the folded-count suffix (`calls · 2`) stripped, mirroring the canvas. */
@@ -531,18 +563,43 @@ function baseKind(kind: unknown): string {
  * subgraph isomorphism — the deliberate MVP shape). Step 0 constrains the start node; each later step
  * traverses one edge (matching `edgeKind`/`direction`) to a node matching `nodeKind`. No node repeats
  * within a match. Returns one {@link GraphSelection} per match, capped at `limit` (default 200).
+ *
+ * <p><b>Temporal ordering (LA-14a).</b> A step marked {@link PatternStep.afterPrevious} additionally
+ * requires its edge to have happened strictly after the previous step's, optionally within
+ * {@link PatternStep.maxGapHours}. Without this, `A→B→C` matched whether B forwarded to C a day after
+ * or a year before receiving from A — a pass-through match was a topology claim wearing the language
+ * of a flow claim.
+ *
+ * <p>⛔ <b>Fails closed.</b> If any step asks for ordering and no `timeAttr` is supplied, NOTHING is
+ * returned — the constraint is not quietly dropped, because a silently-ignored temporal constraint
+ * reproduces the exact defect this change exists to remove. Callers should ask
+ * {@link patternNeedsTime} first and tell the analyst a time column is required. An edge whose time is
+ * missing or unparseable is likewise rejected, mirroring {@link filterByTime}.
  */
-export function matchPattern(g: G6GraphData, steps: PatternStep[], opts: { limit?: number } = {}): GraphSelection[] {
-    const { limit = 200 } = opts;
+export function matchPattern(g: G6GraphData, steps: PatternStep[], opts: MatchPatternOptions = {}): GraphSelection[] {
+    const { limit = 200, timeAttr } = opts;
     if (!steps.length) return [];
+    if (patternNeedsTime(steps) && !timeAttr) return [];
     const adj = adjacency(g);
     const nodeKind = new Map(g.nodes.map((nd) => [nd.id, nd.data.kind]));
     const edgeKind = new Map(g.edges.map((e) => [e.id, baseKind(e.data.kind)]));
     const nodeOk = (id: string, k?: string): boolean => !k || nodeKind.get(id) === k;
+    // Edge id → event time. Same parse rule as `filterByTime`: the projection stringifies attributes,
+    // so this is the only place a time exists, and an unparseable one is absent rather than zero.
+    const edgeTime = new Map<string, number>();
+    if (timeAttr) {
+        for (const e of g.edges) {
+            const raw = e.data.attrs?.[timeAttr];
+            if (raw == null) continue;
+            const t = Date.parse(raw);
+            if (Number.isFinite(t)) edgeTime.set(e.id, t);
+        }
+    }
 
     const results: GraphSelection[] = [];
     const nodePath: string[] = [];
     const edgePath: string[] = [];
+    const timePath: number[] = [];
     const onPath = new Set<string>();
     const walk = (stepIdx: number): void => {
         if (results.length >= limit) return;
@@ -556,13 +613,22 @@ export function matchPattern(g: G6GraphData, steps: PatternStep[], opts: { limit
             if (onPath.has(next)) continue;
             if (step.edgeKind && edgeKind.get(edgeId) !== step.edgeKind) continue;
             if (!nodeOk(next, step.nodeKind)) continue;
+            const t = edgeTime.get(edgeId);
+            if (step.afterPrevious) {
+                const prev = timePath[timePath.length - 1];
+                if (t === undefined || prev === undefined) continue; // unknown time cannot be ordered
+                if (t <= prev) continue; // strictly after — a simultaneous hop is not a forwarding
+                if (step.maxGapHours !== undefined && t - prev > step.maxGapHours * 3_600_000) continue;
+            }
             onPath.add(next);
             nodePath.push(next);
             edgePath.push(edgeId);
+            timePath.push(t ?? Number.NaN);
             walk(stepIdx + 1);
             onPath.delete(next);
             nodePath.pop();
             edgePath.pop();
+            timePath.pop();
             if (results.length >= limit) return;
         }
     };
