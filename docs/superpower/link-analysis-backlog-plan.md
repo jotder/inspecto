@@ -385,7 +385,7 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **LA-03** | `POST|GET /inv/snapshots` + `POST /inv/snapshots/attach` | ✅ **BACKEND SHIPPED 2026-09-22** · ⏸ SPA swap deferred | S–M | — | Serialise sub-graph, scores, positions, viewport, annotations, predicate, origin, pinned Dataset version; persist as an Artifact anchored to `opSeq`; swap `LinkAnalysisSnapshotsService.add/attach`. Contract §5.4. |
+| **LA-03** | `POST|GET /inv/snapshots` + `POST /inv/snapshots/attach` | ✅ **SHIPPED 2026-09-23 — backend AND SPA** | S–M | — | Serialise sub-graph, scores, positions, viewport, annotations, predicate, origin, pinned Dataset version; persist as an Artifact anchored to `opSeq`; swap `LinkAnalysisSnapshotsService.add/attach`. Contract §5.4. |
 | **LA-07** | Web Worker computation (`graph-worker.ts`, `GraphAnalysisClient`) | ⬜ **UNBLOCKED 2026-09-22** | M | — (D-S3 answered) | Move the 27 algorithms off the main thread; zero-copy `ArrayBuffer` transfer; `PROGRESS` messages; `AbortController` cancellation. ⚠ Fixes responsiveness only — the cap stays until D-S3 states a graceful published number. |
 | **LA-08** | `POST /inv/projection/multi` | ⬜ | M | D-S4 | Node mappings + edge projections across Datasets in one call; unified DuckDB union views; `__provenance_dataset` tagging. Contract §5.2. |
 | ~~**LA-06**~~ | ~~Rendering at scale~~ — **CLOSED 2026-09-22 (D-U1)** | ✅ clause 3 SHIPPED · ⛔ clauses 1–2 REFUSED · ✅ clause 4 already shipped | M | — (D-S3 answered) | Viewport culling, progressive load (heaviest edges first), super-node aggregation of low-degree leaves above a threshold, published render limit in the footer. **WebGL renderer only after measuring** — `package.json:33` installs `@antv/g6` alone, no `g6-plugin-webgl` / `layout-gpu`, and §1.6(4) says the canvas is not the bottleneck. |
@@ -401,7 +401,7 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 | **LA-14a** | Temporal ordering on the linear matcher | ✅ **SHIPPED 2026-09-22** | S | — |
 | **LA-14b** | Branching pattern runtime (`BranchingPatternEngine.ts` + `PatternQueryCompiler.java`) + the structuring pack | ⬜ | L | LA-16 in practice | `BranchingPatternEngine.ts` + `PatternQueryCompiler.java`; JSON motif schema (multi-branch, attribute constraints, `t₂ > t₁`, `DELTA ≤ 48h`); fix `layering-chain` / `pass-through` to require temporal order; ship structuring / layering / circular-financing packs. |
 | **LA-15** | `POST /inv/schema/overlap-profile` | ✅ **SHIPPED 2026-09-22** | M | — | Cardinality and Jaccard across candidate key columns via `APPROX_COUNT_DISTINCT`; surfaces implicit foreign keys. |
-| **LA-16** | Synthetic call-records Dataset | ⬜ **NOT STARTED — newly gated** | S | **D-U2** | ⚠ No call-records Dataset exists — `roaming_tap` is operator↔operator, `mule_transfers` account↔account; neither carries A/B-party, duration, device or cell. Prerequisite for every §6.3 gate. |
+| **LA-16** | Synthetic call-records Dataset | ✅ **SHIPPED 2026-09-23** — `postmed_xdr` extended, not a fourth feed | S | — (D-U2 answered) | ⚠ No call-records Dataset exists — `roaming_tap` is operator↔operator, `mule_transfers` account↔account; neither carries A/B-party, duration, device or cell. Prerequisite for every §6.3 gate. |
 
 ### 3.4 Phase 3 — identity, value, evidence, detection (Sprint 11+)
 
@@ -590,11 +590,24 @@ id under `<space>/audit/snapshots/`, written with `CREATE_NEW`.
 2. **No 503 write-root test.** The harness always sets a write root, so that gate is unreachable from this
    test shape — as it is for the sibling `ControlApiInvProjectionTest`.
 
-⏸ **The SPA swap is deliberately NOT done.** `LinkAnalysisSnapshotsService.add/attach` are SYNCHRONOUS
-(`void` / `GraphSnapshot | undefined`), so persisting behind them means either an optimistic update whose
-failed save has nowhere to surface — a snapshot that looks saved and is not, in an EVIDENCE store — or a
-signature change reaching the dialogs. Doing it honestly needs a failure affordance in the dialog, which is
-the right next step.
+✅ **SPA swap SHIPPED 2026-09-23.** `add`/`attach` are **removed**, not kept alongside — leaving them would
+leave a silent non-persisting path identical at the call site. `save`/`attachTo` return Observables and the
+signal updates **only after the server confirms**; there is no optimistic path.
+
+* ⛔ **A refused seal leaves the dialog OPEN**, with the title, description and Case choice still on screen
+  and the reason rendered in place. Closing would discard the analyst's work while nothing was written.
+* ⚠ **A failed ATTACHMENT deliberately does not fail the save** — by then the snapshot is sealed on disk, so
+  reporting "not saved" would be a lie about evidence that exists. It closes with `attachedTo: []`. The
+  attach-ONLY dialog does stay open, because there the attachment is the whole action.
+* Two alerts promising "UI-first: kept for this browser session only" are gone; this change made them false.
+* 🔴 **The compiler caught none of it.** Removing public methods from an injectable compiled clean; only
+  running the specs found a caller doing `new LinkAnalysisSnapshotsService()` outside DI, which now throws
+  NG0203 because the service injects `HttpClient`. **A DI change is invisible to type-checking.**
+
+⚠ **Uncovered by the one spec that exercises this flow end to end.** `link-analysis.component.spec.ts` —
+which contains *"evidence: snapshot freezes the displayed graph … and Attach to Case snapshots first"* — is
+**28/28 RED on master** and was so before this change (verified by stashing). Every regression that file
+guards is currently uncaught.
 
 ### 5.5 Enquiry routes — LA-10
 

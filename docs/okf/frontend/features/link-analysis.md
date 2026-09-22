@@ -433,6 +433,27 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (a cap of 0 or NaN is ignored and the previous value stands). The refusal names THIS cap, so an
   analyst who can run every other tool at 2 000 nodes is told why this one stopped sooner.
 
+* **An evidence snapshot is SEALED by the server, and a failed save does not look like a saved one**
+  (LA-03, shipped 2026-09-23). `POST /inv/snapshots` writes one immutable file per id and answers **409 on
+  a re-POST**; `POST /inv/snapshots/attach` appends to a separate log and **never reopens the sealed
+  record**, because rewriting it would change its bytes and invalidate the `manifestHash` that makes it
+  evidence. ⛔ The client signal updates **only after the server confirms** — the previous `add()` was a
+  synchronous mutation that could not fail, so the dialog always closed and the analyst always believed the
+  analysis was kept. A refused seal now leaves the dialog open with the work intact. ⚠ A failed ATTACHMENT
+  does not fail the save: the snapshot is already sealed, and saying otherwise would be a lie about
+  evidence that exists. 🔴 Removing the old methods compiled clean — **a DI change is invisible to
+  type-checking**, and only the specs found a caller constructing the service outside an injector.
+* **`postmed_xdr` is the call-records feed** (LA-16 / D-U2, extended rather than duplicated). It gained
+  `IMEI` (deliberately unusable as a real identifier: no allocated TAC prefix, no valid Luhn digit), an
+  explicit `DIRECTION` (without which A→B versus B→A is unrecoverable from the row), and a **UTC contract
+  stated where a machine reads it** — `raw.fields[].timezone`, not prose — which compiles to a value
+  identity and defends against DuckDB's session TimeZone being the host's. ⚠ DATA rows keep
+  `OTHER_PARTY='N/A'` deliberately: a packet session's far end is the APN the row already carries, and
+  inventing a peer would manufacture edges no real feed produces. 🔴 **It drew a fresh subscriber PER ROW,
+  so its graph was ~1 200 disconnected edges** — useless for the analysis it was built to feed. A fixed
+  population plus four planted stories (burner rotation, a one-way hub, a daily repeating pair, a SIM moved
+  between handsets) makes it **873 edges over 174 nodes**.
+
 Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
 · [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
 §7 (schema-relationship model, now shipped) ·
