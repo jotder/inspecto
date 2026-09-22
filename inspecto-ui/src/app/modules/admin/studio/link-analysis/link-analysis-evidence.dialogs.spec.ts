@@ -151,7 +151,14 @@ describe('LinkAnalysisAttachCaseDialog', () => {
         expect(c.caseOptions()).toEqual([]);
         expect(c.loadError()).not.toBe('');
         for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
-        expect(el.querySelector('inspecto-alert [role="alert"]')?.textContent).toContain('could not be loaded');
+        // Pick the alert by its TITLE, not by document order: the dialog's pre-existing "UI-first"
+        // notice is also an `<inspecto-alert>` carrying role="alert" (the component gives warning and
+        // error the same role), so a positional query silently depends on which one comes first.
+        const errorAlert = Array.from(el.querySelectorAll('inspecto-alert')).find((a) =>
+            a.textContent?.includes('Cases could not be loaded'),
+        );
+        expect(errorAlert).toBeTruthy();
+        expect(errorAlert?.querySelector('[role="alert"]')?.textContent).toContain('no Case can be offered');
         expect(el.querySelector('inspecto-option-picker')).toBeNull();
         expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
 
