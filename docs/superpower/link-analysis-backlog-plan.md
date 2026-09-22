@@ -148,8 +148,35 @@ raising it without changing the default layout would put the studio over ten sec
 `ANALYSIS_NODE_CAP`): centrality **2 ms** · communities **58 ms** · cut points **14 ms** · similarity **0 ms**
 · link prediction **352 ms** · spanning forest **5 ms** · connected components **4 ms**.
 
-🔴 **Suspicion score is the sole outlier: 6.7 s at 1 999 nodes**, on the main thread — 324 ms at 500 and
-1 070 ms at 1 000. It, not the other 26, is what `ANALYSIS_NODE_CAP` should be sized for.
+~~🔴 **Suspicion score is the sole outlier: 6.7 s at 1 999 nodes**… It, not the other 26, is what
+`ANALYSIS_NODE_CAP` should be sized for.~~
+
+🔴 **CORRECTED 2026-09-23 — THE OUTLIER IS BETWEENNESS, AND THIS SWEEP NEVER MEASURED IT.** The row above
+reads *centrality 2 ms*, but "centrality" was timed with the **default metric (degree)**; the toolbox's
+dropdown offers seven, and `betweennessCentrality` sits behind the same control. Measured per COMPONENT,
+median of 3, ~3 edges per node:
+
+| algorithm | 500 | 1 000 | 2 000 |
+|---|---|---|---|
+| **betweennessCentrality** | **425 ms** | **2 930 ms** | **9 757 ms** |
+| pageRank | 13 ms | 39 ms | 61 ms |
+| kCore | 6 ms | 17 ms | 60 ms |
+| triangleCount | 2 ms | 4 ms | 6 ms |
+| degreeCentrality | 0.8 ms | 1.0 ms | 2.1 ms |
+| *suspicionScore (the blend)* | *492 ms* | *2 286 ms* | *9 359 ms* |
+
+⇒ **Suspicion score is betweenness plus noise** — the other four components together cost **129 ms at
+2 000 nodes**. It was never the outlier; it was the only thing measured that HAPPENED TO CALL the outlier,
+so betweenness's cost hid inside the blend and a decision was taken on the wrong number.
+
+⛔ **The consequence was user-facing, not academic.** D-S3 gave *suspicion score* the lower cap while
+`betweennessCentrality` kept the shared 2 000 ceiling — so choosing **"Betweenness"** from the centrality
+list on a 2 000-node graph froze the main thread for about **ten seconds**, which is the exact freeze D-S3
+believed it had removed. **The cap was guarding the caller, not the cause.** Fixed 2026-09-23: betweenness
+now guards with the low cap, pinned by a spec.
+
+⚠ **The lesson for every future sweep here:** a control that offers seven algorithms must be timed for
+each of them, not once with its default. A per-feature timing table hides a per-option cliff.
 
 ⚠ **The plan asks for the cap to be "enforced gracefully, never an exception"; today it THROWS.** That half
 of D-S3 is unmet regardless of which number is chosen.
@@ -386,7 +413,7 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
 | **LA-03** | `POST|GET /inv/snapshots` + `POST /inv/snapshots/attach` | ✅ **SHIPPED 2026-09-23 — backend AND SPA** | S–M | — | Serialise sub-graph, scores, positions, viewport, annotations, predicate, origin, pinned Dataset version; persist as an Artifact anchored to `opSeq`; swap `LinkAnalysisSnapshotsService.add/attach`. Contract §5.4. |
-| **LA-07** | Web Worker computation (`graph-worker.ts`, `GraphAnalysisClient`) | ⬜ **UNBLOCKED 2026-09-22** | M | — (D-S3 answered) | Move the 27 algorithms off the main thread; zero-copy `ArrayBuffer` transfer; `PROGRESS` messages; `AbortController` cancellation. ⚠ Fixes responsiveness only — the cap stays until D-S3 states a graceful published number. |
+| **LA-07** | Web Worker computation (`graph-worker.ts`, `GraphAnalysisClient`) | ⬜ **RE-SCOPE OR CLOSE — the premise fell 2026-09-23** | M → **S at most** | — (D-S3 answered) | 🔴 **“Move the 27 algorithms off the main thread” is the wrong shape: ONE is slow.** Measured per component, betweenness is 9 757 ms at 2 000 nodes and every other algorithm combined is **129 ms**. A worker boundary costs a serialised 500-node graph each way, so routing 26 sub-60 ms functions through it is a net LOSS. ⚠ And the case has shrunk further: betweenness now respects the 750 cap (**425 ms measured**), so the freeze LA-07 was drafted against no longer exists. What remains is ~400 ms of responsiveness against net-new build config (`tsconfig.worker.json`, `webWorkerTsConfig`), a message protocol and cancellation. *Recommended reading: close it, or re-scope to betweenness alone and only if an operator reports the 425 ms as felt.* | Move the 27 algorithms off the main thread; zero-copy `ArrayBuffer` transfer; `PROGRESS` messages; `AbortController` cancellation. ⚠ Fixes responsiveness only — the cap stays until D-S3 states a graceful published number. |
 | **LA-08** | `POST /inv/projection/multi` | ⬜ | M | D-S4 | Node mappings + edge projections across Datasets in one call; unified DuckDB union views; `__provenance_dataset` tagging. Contract §5.2. |
 | ~~**LA-06**~~ | ~~Rendering at scale~~ — **CLOSED 2026-09-22 (D-U1)** | ✅ clause 3 SHIPPED · ⛔ clauses 1–2 REFUSED · ✅ clause 4 already shipped | M | — (D-S3 answered) | Viewport culling, progressive load (heaviest edges first), super-node aggregation of low-degree leaves above a threshold, published render limit in the footer. **WebGL renderer only after measuring** — `package.json:33` installs `@antv/g6` alone, no `g6-plugin-webgl` / `layout-gpu`, and §1.6(4) says the canvas is not the bottleneck. |
 | **LA-09** | View toolbox completions | ✅ **SHIPPED 2026-09-22** (5 of 12; 4 refused, 3 gated — see below) | S | — | Add Fruchterman, combo force, fishbone, dendrogram layouts; remaining G6 v5 plugins (timebar, bubble sets, combos, edge bundling, context menu, snapline, history, watermark). Each is a G6 id, not an engine. |

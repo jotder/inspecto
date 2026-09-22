@@ -443,6 +443,25 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   does not fail the save: the snapshot is already sealed, and saying otherwise would be a lie about
   evidence that exists. 🔴 Removing the old methods compiled clean — **a DI change is invisible to
   type-checking**, and only the specs found a caller constructing the service outside an injector.
+* ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
+  across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
+  reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as
+  VARCHAR (no numeric coercion), and the 352 `DIRECTION='NA'` rows are exactly the 352 with a NULL
+  counterparty. The planted stories survive the round trip — one IMEI on 5 IMSIs, one IMSI on 3 IMEIs, the
+  45-row hub.
+* 🔴 **The UTC declaration is CORRECT but currently UNFALSIFIABLE.** The host session zone is UTC+5:30 and
+  no value shifted — `13:08:53` landed as `13:08:53`, and a host-zone shift would have produced `07:38:53`
+  and a spurious `day=08-31` partition. ⛔ But `SourceZones.toNaiveUtc` compiles a declared zone to
+  `timezone('UTC', timezone(Z, …))`, which **with `Z = 'UTC'` is an identity — and so is the
+  no-declaration path**. So this run proves the VALUES are right while proving nothing about whether the
+  declaration was applied or ignored; both emit byte-identical output. The declaration only becomes
+  load-bearing against a later `TIMESTAMPTZ` cast (`SourceZones.toInstant`). **Pinning it needs a
+  NON-UTC zone in a fixture** — a probe that would otherwise succeed.
+* ⚠ **The `.psv.defect` fixture is INERT.** It is excluded by FILENAME (`glob:**/PMXDR_*.psv` never matches
+  `.psv.defect`), not rejected: the collector never opens it, `quarantine/` and `errors/` stay empty and
+  `rejected_files=0`. Its five planted defects — a non-numeric duration, an impossible date, a duplicate
+  `REC_SEQ`, a truncated row, a `SUSPENSE` status — are therefore **never exercised**. Safe, but it tests
+  nothing; renaming it to `.psv` is what would make it prove the quarantine path.
 * **`postmed_xdr` is the call-records feed** (LA-16 / D-U2, extended rather than duplicated). It gained
   `IMEI` (deliberately unusable as a real identifier: no allocated TAC prefix, no valid Luhn digit), an
   explicit `DIRECTION` (without which A→B versus B→A is unrecoverable from the row), and a **UTC contract
