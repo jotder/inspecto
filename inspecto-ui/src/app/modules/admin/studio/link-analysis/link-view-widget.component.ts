@@ -3,7 +3,7 @@ import { G6GraphData } from 'app/inspecto/graph';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
-import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
+import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 import { GraphSourcesService } from './graph-sources';
 
 /**
@@ -30,6 +30,9 @@ import { GraphSourcesService } from './graph-sources';
                     [layout]="view()?.layout ?? null"
                     [fill]="true"
                 />
+                <p class="text-secondary m-0 shrink-0 pt-1 text-[10px] leading-snug" [title]="savedViewNotice">
+                    <span class="text-warn font-semibold">Not evidence</span> — re-projects live
+                </p>
             } @else if (loaded()) {
                 <inspecto-empty-state
                     icon="heroicons_outline:share"
@@ -42,6 +45,8 @@ import { GraphSourcesService } from './graph-sources';
     `,
 })
 export class LinkViewWidgetComponent {
+    /** A tile reads as a fixed report; it is a live re-projection, and must say so (D-S1). */
+    readonly savedViewNotice = SAVED_VIEW_NOT_EVIDENCE;
     private linkAnalysisApi = inject(LinkAnalysisService);
     private graphSources = inject(GraphSourcesService);
 

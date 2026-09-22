@@ -120,6 +120,11 @@ export class LinkAnalysisLegendComponent {
                         </div>
                     }
                 </dl>
+                @if (splitIdentityCount(); as n) {
+                    <p class="text-warn m-0 mt-1 text-[11px] leading-snug" [title]="splitIdentityHint()">
+                        {{ n }} possible split {{ n === 1 ? 'identity' : 'identities' }}
+                    </p>
+                }
                 @if (customizable()) {
                     <button type="button" class="text-primary mt-1 text-[11px] underline" (click)="customize.emit()">
                         Customize statistics
@@ -139,6 +144,9 @@ export class LinkAnalysisLegendComponent {
                 @if (truncated()) {
                     <span class="text-warn">· truncated</span>
                 }
+                @if (splitIdentityCount()) {
+                    <span class="text-warn" [title]="splitIdentityHint()">· split ids</span>
+                }
             </button>
         }
     `,
@@ -146,6 +154,13 @@ export class LinkAnalysisLegendComponent {
 export class LinkAnalysisWorkingSetComponent {
     readonly stats = input<WorkingSetStat[]>([]);
     readonly truncated = input(false);
+    /**
+     * How many identities the value-projected id scheme appears to have SPLIT (D-S4). Reported, never
+     * merged: a ranking computed over a divided identity space is wrong in a way no tile would show.
+     */
+    readonly splitIdentityCount = input(0);
+    /** Names the colliding spellings, so the analyst can judge whether they are one entity or two. */
+    readonly splitIdentityHint = input('');
     /** Short label for how the set was sampled, e.g. "top-N by count". */
     readonly mode = input('');
     readonly customizable = input(false);

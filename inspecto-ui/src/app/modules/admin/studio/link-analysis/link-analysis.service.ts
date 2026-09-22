@@ -11,6 +11,15 @@ import { GraphDisplayOptions, GraphLayoutId, GraphViewPlugins } from 'app/module
  * `link-analysis-view` is in `ComponentStore.WRITABLE_TYPES` with generic `/components` CRUD +
  * version history, so views persist through the real backend as well as the offline mock store.
  */
+/**
+ * What a saved view IS, stated wherever one is offered, loaded or rendered. A view stores the QUERY and
+ * its presentation, never the result rows, and no read anywhere in the backend is version-addressable
+ * (decision D-S1, grounded 2026-09-22) — so reopening re-runs the projection against whatever the Dataset
+ * holds now. 🔴 An analyst who reads a reopened view as the graph they saved is reading a different graph
+ * with the same name; in investigative use that is a false finding, not a stale cache.
+ */
+export const SAVED_VIEW_NOT_EVIDENCE = 'Saved views re-project live data — a reopened view may differ from the one you saved.';
+
 export interface LinkAnalysisView {
     id: string;
     name: string;

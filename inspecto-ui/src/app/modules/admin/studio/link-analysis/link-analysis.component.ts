@@ -124,11 +124,16 @@ import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-sett
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { ProjectedGraph, projectionNodeCapValue } from './entity-projection';
+import { ProjectedGraph, projectionNodeCapValue, splitIdentityGroups } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
-import { LinkAnalysisService, LinkAnalysisView, LinkAnalysisViewOptions } from './link-analysis.service';
+import {
+    LinkAnalysisService,
+    LinkAnalysisView,
+    LinkAnalysisViewOptions,
+    SAVED_VIEW_NOT_EVIDENCE,
+} from './link-analysis.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -630,6 +635,24 @@ export class LinkAnalysisComponent implements OnInit {
         // tiles answer "how much am I looking at", never "how many shapes are on the canvas".
         return workingSetStats(this.collapsedGraph(), g, g ? workingSetOptionsFor(this.profile(), attrColumns(g)) : {});
     });
+    /**
+     * Identities the value-projected id scheme appears to have SPLIT (D-S4). Measured on the same
+     * pre-aggregation graph as the tiles, and REPORTED only — merging spellings is the decision itself.
+     */
+    readonly splitIdentities = computed(() => splitIdentityGroups(this.graph()));
+    readonly splitIdentityHint = computed(() => {
+        const groups = this.splitIdentities();
+        if (!groups.length) return '';
+        const shown = groups.slice(0, 3).map((g) => g.ids.join(' / '));
+        const rest = groups.length - shown.length;
+        return (
+            'These ids differ only by case, spacing or trailing punctuation, so each counts as a separate ' +
+            'entity in degree, communities and every ranking: ' +
+            shown.join('; ') +
+            (rest > 0 ? `; and ${rest} more` : '')
+        );
+    });
+
     /** The displayed graph as rows — search-narrowed, so canvas and table show the same result. */
     readonly tableRows = computed<Record<string, unknown>[]>(() => {
         const g = this.displayed();
@@ -670,6 +693,8 @@ export class LinkAnalysisComponent implements OnInit {
 
     // ── saved views ──
     readonly views = signal<LinkAnalysisView[]>([]);
+    /** Stated in the saved-views menu, so the analyst reads it before choosing one (D-S1). */
+    readonly savedViewNotice = SAVED_VIEW_NOT_EVIDENCE;
 
     /** The saved Link Analysis views as transfer references — what the export/import menu offers. */
     readonly transferItems = computed(() =>

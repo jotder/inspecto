@@ -243,6 +243,10 @@
             </button>
             <mat-menu #viewsMenu="matMenu">
                 @if (views().length) {
+                    <div class="text-secondary max-w-64 px-4 py-2 text-xs leading-snug">
+                        <span class="text-warn font-semibold">Not evidence</span>
+                        — {{ savedViewNotice }}
+                    </div>
                     @for (v of views(); track v.id) {
                         <button
                             mat-menu-item
@@ -745,6 +749,8 @@
                             class="absolute right-2 top-2 z-10"
                             [stats]="workingSet()"
                             [truncated]="truncated()"
+                            [splitIdentityCount]="splitIdentities().length"
+                            [splitIdentityHint]="splitIdentityHint()"
                             [mode]="strandedCount() ? strandedCount() + ' stranded' : 'top-N by count'"
                             [open]="workingSetOpen()"
                             (openChange)="workingSetOpen.set($event)"

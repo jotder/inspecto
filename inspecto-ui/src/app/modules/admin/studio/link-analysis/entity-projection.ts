@@ -266,3 +266,69 @@ export class EntityProjectionGraphSource implements GraphSource {
         return projectTriples(res.rows, res.truncated, p);
     }
 }
+
+/**
+ * A group of node ids that are almost certainly the SAME real-world entity, split apart by the
+ * value-projected id scheme (decision D-S4). {@link entityId} mints an id from the trimmed raw column
+ * value with no case fold and no alias resolution, so `ACME Ltd` and `acme ltd.` are two nodes -- with
+ * two degree counts, two community memberships and two rows in every centrality ranking.
+ */
+export interface SplitIdentityGroup {
+    /** The entity-type scope these ids share; empty for the unscoped single-mapping path. */
+    scope: string;
+    /** The shared normalised value, for a stable `track` and for tests. */
+    key: string;
+    /** The node ids that collapsed onto `key` -- always 2 or more. */
+    ids: string[];
+    /** One member's label, to name the group without implying which spelling is canonical. */
+    sample: string;
+}
+
+/**
+ * The comparison key: case-folded, whitespace-collapsed and stripped of trailing punctuation
+ * (`ACME Ltd.` -> `acme ltd`). Deliberately conservative -- it RAISES A QUESTION, it never merges.
+ */
+function identityKey(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/[.,;:]+$/, '')
+        .trim();
+}
+
+/**
+ * Detect identities the projection has split, so the analyst is told rather than left to trust a
+ * ranking computed over a divided identity space.
+ *
+ * (!) **This reports; it never merges.** Whether entity ids should be normalised at all is decision
+ * D-S4, and merging here would answer it in passing -- and silently, which is worse, because two
+ * spellings genuinely CAN be two entities (`J Smith` the person vs `J Smith` the account).
+ *
+ * Type-scoped ids are compared only within their own scope, so `entity:person:bob` and
+ * `entity:account:bob` are two entities by construction, not a split identity. Super-node stand-ins
+ * are skipped -- their label is a count, not a name.
+ */
+export function splitIdentityGroups(graph: G6GraphData | null | undefined): SplitIdentityGroup[] {
+    if (!graph) return [];
+    const byScope = new Map<string, Map<string, { ids: string[]; sample: string }>>();
+    for (const n of graph.nodes) {
+        if (n.data.superMembers) continue;
+        const raw = n.id.startsWith('entity:') ? n.id.slice('entity:'.length) : n.id;
+        // A type-scoped id is `<entityType>:<value>`; keep the scope apart so types never merge.
+        const cut = raw.indexOf(':');
+        const scope = cut >= 0 ? raw.slice(0, cut) : '';
+        const key = identityKey(cut >= 0 ? raw.slice(cut + 1) : raw);
+        let bucket = byScope.get(scope);
+        if (!bucket) byScope.set(scope, (bucket = new Map()));
+        const hit = bucket.get(key);
+        if (hit) hit.ids.push(n.id);
+        else bucket.set(key, { ids: [n.id], sample: n.data.label });
+    }
+    const groups: SplitIdentityGroup[] = [];
+    for (const [scope, bucket] of byScope) {
+        for (const [key, v] of bucket) {
+            if (v.ids.length > 1) groups.push({ scope, key, ids: v.ids, sample: v.sample });
+        }
+    }
+    return groups;
+}
