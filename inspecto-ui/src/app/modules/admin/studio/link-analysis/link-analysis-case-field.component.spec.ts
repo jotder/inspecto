@@ -25,7 +25,15 @@ class Host {
 }
 
 function create(opsEnabled: boolean, list: () => unknown) {
-    const store = new LinkAnalysisSnapshotsService();
+    // ⚠ NOT `new LinkAnalysisSnapshotsService()`: since LA-03 the service injects HttpClient, so
+    // constructing it outside an injector throws NG0203. This component only reads `mockCases`, so a
+    // literal stand-in is both sufficient and honest about what is under test.
+    const store = {
+        mockCases: [
+            { id: 'CASE-2026-0318', title: 'Suspected layering network (placeholder Case)' },
+            { id: 'CASE-2026-0322', title: 'Burner rotation cluster (placeholder Case)' },
+        ],
+    } as unknown as LinkAnalysisSnapshotsService;
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [

@@ -112,14 +112,17 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
                         </p>
                     }
                 </div>
-                <inspecto-alert variant="warning">
-                    UI-first: analyses are kept for this browser session only until this pane is wired to the sealed
-                    snapshot store.
-                </inspecto-alert>
+                @if (saveError(); as message) {
+                    <inspecto-alert variant="error" title="The analysis was not saved">
+                        {{ message }} — nothing has been sealed, so this dialog stays open with your work intact.
+                    </inspecto-alert>
+                }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
-                <button mat-flat-button color="primary" type="submit">Save analysis</button>
+                <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                    {{ saving() ? 'Saving…' : 'Save analysis' }}
+                </button>
             </mat-dialog-actions>
         </form>
     `,
@@ -130,6 +133,10 @@ export class LinkAnalysisSnapshotDialog {
     private readonly confirm = inject(InspectoConfirmService);
     private readonly store = inject(LinkAnalysisSnapshotsService);
     private readonly fb = inject(FormBuilder);
+
+    /** Non-empty when the seal failed — rendered in place, and the dialog stays open. */
+    readonly saveError = signal('');
+    readonly saving = signal(false);
 
     readonly form = this.fb.nonNullable.group({
         title: [this.data.suggestedTitle, Validators.required],
@@ -148,9 +155,20 @@ export class LinkAnalysisSnapshotDialog {
         return this.data.graph.edges.filter((e) => keep.has(e.source) && keep.has(e.target)).length;
     });
 
+    /**
+     * Seal the analysis, then optionally attach it to a Case.
+     *
+     * ⛔ <b>The dialog does NOT close on failure.</b> Closing would discard the analyst's title, description
+     * and Case choice while nothing was written — the work would look saved and be gone. On an error the
+     * message is shown in place and everything typed stays on screen.
+     *
+     * ⚠ Attachment is a SECOND, optional step on the same action, and it is deliberately not allowed to
+     * fail the save: the snapshot is already sealed by then, and reporting "not saved" because a Case link
+     * failed would be a lie. A failed attach says so, and the seal stands.
+     */
     save(): void {
         this.form.markAllAsTouched();
-        if (this.form.invalid) return;
+        if (this.form.invalid || this.saving()) return;
         const { title, description, caseId } = this.form.getRawValue();
         const snap = snapshotGraph({
             title: title.trim(),
@@ -160,10 +178,34 @@ export class LinkAnalysisSnapshotDialog {
             origin: this.data.origin,
             viewport: { layout: this.data.layout },
         });
-        this.store.add(snap);
-        // The attachment is a second, optional step on the SAME action — a Case that was never offered
-        // (lookup failed) simply leaves the saved analysis unattached.
-        this.ref.close(caseId ? (this.store.attach(snap.id, caseId) ?? snap) : snap);
+        this.saveError.set('');
+        this.saving.set(true);
+        this.store.save(snap).subscribe({
+            next: () => {
+                if (!caseId) {
+                    this.saving.set(false);
+                    this.ref.close(snap);
+                    return;
+                }
+                this.store.attachTo(snap.id, caseId).subscribe({
+                    next: (attachedTo) => {
+                        this.saving.set(false);
+                        this.ref.close({ ...snap, attachedTo });
+                    },
+                    error: (e: unknown) => {
+                        // Sealed, but not linked. Closing is right — the evidence exists — and the caller is
+                        // told the attachment did not take, rather than being shown a false success.
+                        this.saving.set(false);
+                        this.ref.close({ ...snap, attachedTo: [] });
+                        console.warn('snapshot sealed but attach failed', e);
+                    },
+                });
+            },
+            error: (e: unknown) => {
+                this.saving.set(false);
+                this.saveError.set(e instanceof Error ? e.message : 'The analysis could not be saved.');
+            },
+        });
     }
 }
 
@@ -225,15 +267,21 @@ export interface AttachCaseDialogData {
                     <mat-label>Note for the Case ledger</mat-label>
                     <textarea matInput formControlName="note" rows="2"></textarea>
                 </mat-form-field>
-                <inspecto-alert variant="warning">
-                    UI-first: the attachment is recorded in this browser session only until this pane is wired to the
-                    sealed snapshot store.
-                </inspecto-alert>
+                @if (attachError(); as message) {
+                    <inspecto-alert variant="error" title="The attachment was not recorded">
+                        {{ message }} — the snapshot itself is untouched; nothing links it to this Case yet.
+                    </inspecto-alert>
+                }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
-                <button mat-flat-button color="primary" type="submit" [disabled]="caseField.loadError() !== ''">
-                    Attach
+                <button
+                    mat-flat-button
+                    color="primary"
+                    type="submit"
+                    [disabled]="caseField.loadError() !== '' || attaching()"
+                >
+                    {{ attaching() ? 'Attaching…' : 'Attach' }}
                 </button>
             </mat-dialog-actions>
         </form>
@@ -255,16 +303,41 @@ export class LinkAnalysisAttachCaseDialog {
         what: ['snapshot' as 'snapshot' | 'view'],
         note: [''],
     });
+    /** Non-empty when the attachment was refused — shown in place; the dialog stays open. */
+    readonly attachError = signal('');
+    readonly attaching = signal(false);
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
+    /**
+     * ⛔ Like the save dialog, this does NOT close on failure. An attachment that silently failed would
+     * leave an analyst believing a piece of evidence is linked to a Case when the record says otherwise —
+     * and the whole point of the attachment log is that it can be trusted later.
+     *
+     * ⚠ Attaching the VIEW is still local: a saved view is not evidence (D-S1), so there is nothing sealed
+     * to record server-side, and the close simply reports the chosen Case.
+     */
     attach(): void {
         // A caseId reaching the form while the lookup is errored (a deep link, a stale patch) is still
         // not attachable — nothing offered it, so nothing vouches that the Case exists.
         if (this.caseFieldRef()?.loadError()) return;
         this.form.markAllAsTouched();
-        if (this.form.invalid) return;
+        if (this.form.invalid || this.attaching()) return;
         const { caseId, what } = this.form.getRawValue();
-        if (what === 'snapshot') this.store.attach(this.data.snapshot.id, caseId);
-        this.ref.close({ caseId });
+        if (what !== 'snapshot') {
+            this.ref.close({ caseId });
+            return;
+        }
+        this.attachError.set('');
+        this.attaching.set(true);
+        this.store.attachTo(this.data.snapshot.id, caseId).subscribe({
+            next: () => {
+                this.attaching.set(false);
+                this.ref.close({ caseId });
+            },
+            error: (e: unknown) => {
+                this.attaching.set(false);
+                this.attachError.set(e instanceof Error ? e.message : 'The attachment was not recorded.');
+            },
+        });
     }
 }

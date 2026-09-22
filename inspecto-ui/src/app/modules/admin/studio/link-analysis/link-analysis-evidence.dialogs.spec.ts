@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -13,6 +14,39 @@ import {
     describePredicate,
 } from './link-analysis-evidence.dialogs';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
+
+/**
+ * A stand-in for the snapshot store with the real one's OBSERVABLE contract (LA-03): `save`/`attachTo`
+ * return Observables and the signal updates only after they emit, exactly as the service does after the
+ * server confirms. The real service injects HttpClient, so constructing it here would need the HTTP
+ * testing harness for tests that are about the DIALOG, not about transport.
+ *
+ * ⚠ `save` and `attachTo` are overridable so a spec can make one FAIL — the dialog's behaviour on a
+ * failed seal (stay open, show the error, keep the analyst's work) is the point of wiring it at all.
+ */
+function fakeSnapshots(over: Partial<Record<'save' | 'attachTo', unknown>> = {}) {
+    const snapshots = signal<GraphSnapshot[]>([]);
+    return {
+        snapshots,
+        count: () => snapshots().length,
+        // The real service's placeholders, verbatim: a spec indexes mockCases[0], and a fake that
+        // answers an EMPTY list fails with 'cannot read id of undefined' — a fake must mimic the
+        // shape it stands in for, not just its method names.
+        mockCases: [
+            { id: 'CASE-2026-0318', title: 'Suspected layering network (placeholder Case)' },
+            { id: 'CASE-2026-0322', title: 'Burner rotation cluster (placeholder Case)' },
+        ],
+        save: (s: GraphSnapshot) => {
+            snapshots.update((all) => [s, ...all.filter((x) => x.id !== s.id)]);
+            return of(s);
+        },
+        attachTo: (id: string, caseId: string) => {
+            snapshots.update((all) => all.map((x) => (x.id === id ? { ...x, attachedTo: [caseId] } : x)));
+            return of([caseId]);
+        },
+        ...over,
+    } as unknown as LinkAnalysisSnapshotsService;
+}
 
 const G: G6GraphData = {
     nodes: [
@@ -56,6 +90,7 @@ describe('LinkAnalysisSnapshotDialog', () => {
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
                 provideNoopAnimations(),
+                { provide: LinkAnalysisSnapshotsService, useValue: fakeSnapshots() },
                 { provide: SessionService, useValue: { opsEnabled: () => true } },
                 { provide: ObjectsService, useValue: { list: () => of([{ id: 'CASE-9', title: 'Real case' }]) } },
                 { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
@@ -95,7 +130,7 @@ describe('LinkAnalysisSnapshotDialog', () => {
 describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
     function create(list: () => unknown, caseId = '') {
         const close = vi.fn();
-        const store = new LinkAnalysisSnapshotsService();
+        const store = fakeSnapshots();
         TestBed.configureTestingModule({
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
@@ -172,14 +207,14 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
 describe('LinkAnalysisAttachCaseDialog', () => {
     function create(opsEnabled: boolean, list = () => of([{ id: 'CASE-9', title: 'Real case' }])) {
         const close = vi.fn();
-        const store = new LinkAnalysisSnapshotsService();
+        const store = fakeSnapshots();
         const snapshot = {
             id: 's1',
             title: 'T',
             manifestHash: 'abcdef0123456789',
             attachedTo: [],
         } as unknown as GraphSnapshot;
-        store.add(snapshot);
+        store.snapshots.set([snapshot]);
         TestBed.configureTestingModule({
             imports: [LinkAnalysisAttachCaseDialog],
             providers: [
@@ -248,5 +283,103 @@ describe('LinkAnalysisAttachCaseDialog', () => {
         expect(store.snapshots()[0].attachedTo).toEqual([]);
         expect(snapshot.attachedTo).toEqual([]);
         await expectNoA11yViolations(el);
+    });
+});
+
+/**
+ * The reason LA-03's SPA half was worth doing at all: a save that fails must not look like one that
+ * worked. Before this, `add()` was a synchronous signal mutation that could not fail, so the dialog
+ * always closed and the analyst always believed the analysis was kept.
+ */
+describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen', () => {
+    function create(save: unknown) {
+        const close = vi.fn();
+        const store = fakeSnapshots({ save });
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisSnapshotDialog],
+            providers: [
+                provideNoopAnimations(),
+                { provide: LinkAnalysisSnapshotsService, useValue: store },
+                { provide: SessionService, useValue: { opsEnabled: () => true } },
+                { provide: ObjectsService, useValue: { list: () => of([{ id: 'CASE-9', title: 'Real case' }]) } },
+                { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
+                {
+                    provide: MAT_DIALOG_DATA,
+                    useValue: {
+                        graph: G,
+                        predicate: null,
+                        origin: { sourceId: 'entity-projection', dataset: 'tx', query: {} },
+                        layout: 'dagre',
+                        suggestedTitle: 'Chain',
+                    },
+                },
+            ],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisSnapshotDialog);
+        fixture.detectChanges();
+        return { fixture, close };
+    }
+
+    it('does not close, and says why, when the seal is refused', () => {
+        const { fixture, close } = create(() => throwError(() => new Error('snapshot already exists')));
+        fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });
+
+        fixture.componentInstance.save();
+        fixture.detectChanges();
+
+        expect(close).not.toHaveBeenCalled();
+        expect(fixture.componentInstance.saveError()).toContain('already exists');
+        // Content-based lookup, never positional: several alerts in this dialog carry role="alert".
+        const alerts = [...(fixture.nativeElement as HTMLElement).querySelectorAll('inspecto-alert')];
+        expect(alerts.some((a) => a.textContent?.includes('already exists'))).toBe(true);
+    });
+
+    it('keeps the analyst’s typed work when the seal is refused', () => {
+        const { fixture } = create(() => throwError(() => new Error('write root unavailable')));
+        fixture.componentInstance.form.setValue({ title: 'Layering chain', description: 'notes', caseId: '' });
+
+        fixture.componentInstance.save();
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.form.getRawValue().title).toBe('Layering chain');
+        expect(fixture.componentInstance.form.getRawValue().description).toBe('notes');
+        expect(fixture.componentInstance.saving()).toBe(false);
+    });
+
+    // The seal succeeded; only the Case link failed. Reporting "not saved" would be a lie about evidence
+    // that demonstrably exists on disk.
+    it('closes when the snapshot sealed but the attachment failed', () => {
+        const close = vi.fn();
+        const store = fakeSnapshots({ attachTo: () => throwError(() => new Error('ops unavailable')) });
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisSnapshotDialog],
+            providers: [
+                provideNoopAnimations(),
+                { provide: LinkAnalysisSnapshotsService, useValue: store },
+                { provide: SessionService, useValue: { opsEnabled: () => true } },
+                { provide: ObjectsService, useValue: { list: () => of([{ id: 'CASE-9', title: 'Real case' }]) } },
+                { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
+                {
+                    provide: MAT_DIALOG_DATA,
+                    useValue: {
+                        graph: G,
+                        predicate: null,
+                        origin: { sourceId: 'entity-projection', dataset: 'tx', query: {} },
+                        layout: 'dagre',
+                        suggestedTitle: 'Chain',
+                    },
+                },
+            ],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisSnapshotDialog);
+        fixture.detectChanges();
+        fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: 'CASE-9' });
+
+        fixture.componentInstance.save();
+
+        expect(close).toHaveBeenCalledTimes(1);
+        const closed = close.mock.calls[0][0] as GraphSnapshot;
+        expect(closed.attachedTo).toEqual([]);
+        expect(fixture.componentInstance.saveError()).toBe('');
     });
 });
