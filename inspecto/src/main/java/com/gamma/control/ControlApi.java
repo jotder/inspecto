@@ -1119,11 +1119,31 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
+    /**
+     * The request body as a JSON object.
+     *
+     * <p>🔴 <b>A body that is not a JSON object is a CLIENT error (400), not a server error (500).</b>
+     * Until 2026-09-22 Jackson's {@code MismatchedInputException} escaped this seam and every route
+     * answered {@code 500 Cannot deserialize value of type java.util.LinkedHashMap…} — a stack-trace
+     * shape that tells the caller nothing and reads as "the server is broken" when the caller simply
+     * posted the wrong shape. It was found on the dry-run route, where {@code [{…}]} is the natural first
+     * guess for "sample rows" against a contract of {@code {sampleRows:[…]}}
+     * ({@code DRYRUN-MALFORMED-BODY-500-1}), but the seam is shared, so the defect was every POST route's.
+     *
+     * <p>⚠ Fixed HERE rather than in the one route that surfaced it: a per-route catch would have left
+     * the same 500 on every other route and invited one more copy at the next report. Routes that want to
+     * name their own expected shape still do so in their own 400 once the body parses.
+     */
     @Override
     public Map<String, Object> body(HttpExchange ex) throws IOException {
         byte[] raw = rawBody(ex);
         if (raw.length == 0) return Map.of();
-        return json.readValue(raw, new TypeReference<Map<String, Object>>() {});
+        try {
+            return json.readValue(raw, new TypeReference<Map<String, Object>>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException bad) {
+            throw new ApiException(400, "request body must be a JSON object (a '{\"key\": \u2026}' map); "
+                    + "a bare array, string or number is not a request body");
+        }
     }
 
     @Override

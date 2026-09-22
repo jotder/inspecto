@@ -119,16 +119,26 @@ and its plugin twin — **counts as a schema source** wherever the code asks *�
 a schema?”*, alongside `processing.schema_file`, `processing.schemas[]` and a plugin ingester. It is the only
 schema source a segment-routed frontend has.
 
-🔴 **The two surfaces disagree today, and that is the defect the decision settles.** Measured across the
-corpus 2026-09-22: `POST /validate` returns no ERROR for `asn1_example`, while `PUT …/graph` with the
-editor's own lossless payload refuses **422 `ERR_ARMED_WITHOUT_SCHEMA`**. Net effect: a shipped, active,
-working ASN.1 Pipeline can be **opened but never saved** from the workbench. ✅ It fails closed
-(`written:false`, file byte-identical), so nothing is corrupted — it is simply unauthorable.
+✅ **AS-BUILT since 2026-09-22 (`WB-03`).** The one predicate is **`ConfigRoutes.hasSchemaSource`**, called
+by the write gate (`ConfigRoutes.armedWithoutSchemaFindings`, and through it every write path) and by
+`POST /validate` (`ConfigPreviewRoutes`, both its `configPath` and its draft branch). ⛔ Do not add a
+second implementation that merely agrees with it: two gates answering differently about one config is the
+defect this closed.
 
-⚠ The remedy is **one predicate called by both call sites**, never two agreeing implementations:
-`ConfigRoutes.armedWithoutSchemaFindings` learns the source, the predicate is extracted, and
-`ConfigPreviewRoutes` (`/validate`) calls it. Tracked as `WB-03` in
-`superpower/workbench-trust-plan.md`; row `SAVE-GATE-VS-VALIDATE-DISAGREE-1`.
+⚠ **The predicate scans every `parsing.*` sub-block for a non-empty `segments{}`**, rather than matching
+frontend NAMES — keying on names is exactly how `asn1` came to be missed, and a new segment-routed
+frontend is covered the day it is added. An EMPTY `segments{}` is still no schema: the check is on
+content, not shape.
+
+🔴 **What it was:** measured across the corpus 2026-09-22, `POST /validate` returned no ERROR for
+`asn1_example` while `PUT …/graph` with the editor's own lossless payload refused **422
+`ERR_ARMED_WITHOUT_SCHEMA`** — a shipped, active, working ASN.1 Pipeline could be **opened but never
+saved**. ✅ It failed closed throughout (`written:false`, file byte-identical), so nothing was corrupted;
+it was simply unauthorable. ⚠ The gap was TWICE what the row described: the predicate ignored
+`segments{}` **and** `/validate` never called the arming check in either branch, so an active draft with
+no schema at all also validated clean. Both halves landed together. Pinned by
+`ControlApiSprintAContractsTest` and by the 26-of-26 HTTP round-trip sweep
+(`ControlApiPipelineGraphRoundTripSweepTest`); row `SAVE-GATE-VS-VALIDATE-DISAGREE-1`.
 | `processing.ingester_config` | free-form map handed to the plugin ingester | hand-authored only |
 | `processing.mapping_file` | `RowShaper` — a *declared* mapping reference; authored `processing.map.columns` beside it refuses `MAPPING_CONFLICT` | hand-authored only |
 

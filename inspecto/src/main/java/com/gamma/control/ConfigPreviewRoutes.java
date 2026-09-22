@@ -132,8 +132,14 @@ final class ConfigPreviewRoutes implements RouteModule {
         if (configPath != null) {
             PipelineConfig cfg = PipelineConfig.load(configPath);
             List<String> warnings = ConfigValidator.validate(cfg);
-            List<Finding> findings = ConfigLoader.filesystem()
-                    .validate(ConfigSpecs.pipeline(), ConfigLoader.filesystem().decode(configPath));
+            Map<String, Object> decoded = ConfigLoader.filesystem().decode(configPath);
+            List<Finding> findings =
+                    new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), decoded));
+            // The SAME arming predicate the write gate uses (WB-03). Until 2026-09-22 neither branch of
+            // this route ran it at all, so an active pipeline the gate would refuse validated with no
+            // ERROR — one config, two answers (SAVE-GATE-VS-VALIDATE-DISAGREE-1). Calling the gate's own
+            // method, not a copy of its rules, is the point: a copy drifts.
+            findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", decoded));
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("pipeline", cfg.identity().pipelineName());
             r.put("warnings", warnings);     // legacy string form (back-compat)
@@ -163,6 +169,8 @@ final class ConfigPreviewRoutes implements RouteModule {
         // Pre-flight: a route: block that would refuse to arm. Reported here so the editor can show
         // it while the operator is still authoring, rather than at the next run.
         findings.addAll(ConfigRoutes.routeArmingFindings(type, draft));
+        // The write gate's arming check, on the draft branch too — see the configPath branch above.
+        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
         findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         findings.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
         // Opt-in hard-fail safety gate (R6): merged in only when the caller asks, so the default

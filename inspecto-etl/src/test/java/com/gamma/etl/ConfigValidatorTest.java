@@ -197,6 +197,50 @@ class ConfigValidatorTest {
         return schema;
     }
 
+    /**
+     * WB-04 / {@code VALIDATE-CSV-RULE-FRONTEND-BLIND-1} — the three {@code csv_settings} rules apply to a
+     * DELIMITED pipeline and to nothing else.
+     *
+     * <p>🔴 They used to fire unconditionally, so 6 of 26 shipped Pipelines carrying no
+     * {@code csv_settings} block at all — JSON, Excel, ASN.1, fixed-width, XML and the parquet re-ingest —
+     * were each born {@code clean:false} for a rule that cannot apply to them. A warning that is always
+     * wrong for a whole class of configs trains authors to skip warnings, including the real ones this
+     * same routine emits.
+     */
+    @Test
+    void theCsvSettingsRulesDoNotFireOnANonDelimitedPipeline(@TempDir Path dir) throws Exception {
+        Path schema = writeMinimalSchema(dir);
+        Path pipeline = dir.resolve("json_pipeline.toon");
+        // A JSON frontend with NO csv_settings block — the shape every non-delimited Pipeline authors.
+        Files.writeString(pipeline, basePipeline(dir, schema.toString().replace("\\", "/"))
+                .replaceAll("(?s)  csv_settings:.*", "")
+                + "parsing:\n  frontend: json\n  json:\n    records_path: $\n");
+
+        PipelineConfig cfg = PipelineConfig.load(pipeline.toString());
+        List<String> warnings = ConfigValidator.validate(cfg);
+
+        assertTrue(warnings.stream().noneMatch(w -> w.contains("csv_settings")),
+                "a pipeline with no csv_settings block and a non-delimited frontend must not be told its "
+                        + "csv_settings are wrong. Got: " + warnings);
+    }
+
+    /** The same rules must STILL fire for a delimited pipeline — the gate narrows the scope, not the rule. */
+    @Test
+    void theCsvSettingsRulesStillFireOnADelimitedPipeline(@TempDir Path dir) throws Exception {
+        Path schema = writeMinimalSchema(dir);
+        Path pipeline = dir.resolve("delimited_pipeline.toon");
+        Files.writeString(pipeline, basePipeline(dir, schema.toString().replace("\\", "/"))
+                .replace("date_formats[1]: \"%Y-%m-%d\"", "")
+                .replace("timestamp_formats[1]: \"%Y-%m-%d\"", ""));
+
+        PipelineConfig cfg = PipelineConfig.load(pipeline.toString());
+        List<String> warnings = ConfigValidator.validate(cfg);
+
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("date_formats is empty")),
+                "WB-04 must not have silenced the rule where it DOES apply — that would trade a false "
+                        + "positive for a false negative. Got: " + warnings);
+    }
+
     private static String basePipeline(Path dir, String schemaPath) {
         return """
                 name: VALIDATOR_ETL

@@ -91,24 +91,52 @@ final class ConfigRoutes {
         if (!"pipeline".equals(type)) return List.of();
         if (!Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false"))))
             return List.of();
+        if (hasSchemaSource(draft)) return List.of();
+        // The message says what is WRONG (naming the schema sources checked); guidance says what to
+        // DO — split, not duplicated, per R1's diagnostic contract.
+        return List.of(new Finding(Severity.ERROR, "active",
+                "active: true but no schema is configured (processing.schema_file, "
+                        + "processing.schemas[], a plugin ingester, or a parsing.<frontend>.segments{} map)",
+                FindingCodes.ERR_ARMED_WITHOUT_SCHEMA,
+                "keep the draft inactive until its schema is attached"));
+    }
+
+    /**
+     * Does this draft name a schema <em>at all</em> — the ONE predicate behind every "armed without a
+     * schema" answer, called by the write gate and by {@code POST /validate} alike.
+     *
+     * <p>🔴 <b>It exists because the two disagreed.</b> {@code asn1_example} — shipped, active and
+     * working — validated with no ERROR while {@code PUT …/graph} refused it
+     * {@code ERR_ARMED_WITHOUT_SCHEMA}, so it could be opened in the workbench and never saved
+     * ({@code SAVE-GATE-VS-VALIDATE-DISAGREE-1}). Two gates answering differently about one config is
+     * the defect; a second implementation that merely agrees today would be the same defect deferred.
+     *
+     * <p><b>{@code parsing.<frontend>.segments{}} IS a schema source</b> (D7, signed 2026-09-22): for a
+     * segment-routed frontend — ASN.1 BER, and the plugin ingester over XML — the segment→schema map is
+     * the ONLY schema it has. ⚠ Checked across every {@code parsing.*} sub-block rather than against a
+     * list of frontend names, so a new segment-routed frontend is covered the day it is added; keying on
+     * names is how {@code asn1} came to be missed in the first place.
+     */
+    static boolean hasSchemaSource(Map<String, Object> draft) {
         Object procObj = draft.get("processing");
         Map<?, ?> proc = procObj instanceof Map<?, ?> m ? m : Map.of();
         Object parsingObj = draft.get("parsing");
         Map<?, ?> parsing = parsingObj instanceof Map<?, ?> m ? m : Map.of();
         Object plugin = parsing.get("plugin") instanceof Map<?, ?> pm ? pm.get("ingester") : null;
-        boolean hasSchema =
-                (proc.get("schema_file") instanceof String s && !s.isBlank())
+        return (proc.get("schema_file") instanceof String s && !s.isBlank())
                 || (proc.get("schemas") instanceof List<?> l && !l.isEmpty())
                 || (proc.get("ingester") instanceof String i && !i.isBlank())
-                || (plugin instanceof String p && !p.isBlank());
-        if (hasSchema) return List.of();
-        // The message says what is WRONG (naming the schema sources checked); guidance says what to
-        // DO — split, not duplicated, per R1's diagnostic contract.
-        return List.of(new Finding(Severity.ERROR, "active",
-                "active: true but no schema is configured (processing.schema_file, "
-                        + "processing.schemas[], or a plugin ingester)",
-                FindingCodes.ERR_ARMED_WITHOUT_SCHEMA,
-                "keep the draft inactive until its schema is attached"));
+                || (plugin instanceof String p && !p.isBlank())
+                || hasSegmentSchemas(parsing);
+    }
+
+    /** A non-empty {@code segments{}} map under ANY {@code parsing.*} sub-block. */
+    private static boolean hasSegmentSchemas(Map<?, ?> parsing) {
+        for (Object block : parsing.values()) {
+            if (block instanceof Map<?, ?> b
+                    && b.get("segments") instanceof Map<?, ?> seg && !seg.isEmpty()) return true;
+        }
+        return false;
     }
 
     /**

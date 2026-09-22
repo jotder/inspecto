@@ -45,14 +45,15 @@ import static org.junit.jupiter.api.Assertions.fail;
  * corpus already has (key set preserved, node configs preserved) — a writer that started dropping a key,
  * coercing a value or reordering a node would fail here and nowhere else.
  *
- * <p>🔴 <b>{@code asn1_example} is EXPECTED TO REFUSE, and that expectation is pinned below.</b> The
- * arming gate does not count {@code parsing.asn1.segments{}} as a schema while {@code POST /validate}
- * does, so a shipped, active, working ASN.1 Pipeline can be opened but never saved
- * ({@code SAVE-GATE-VS-VALIDATE-DISAGREE-1}, 422 {@code ERR_ARMED_WITHOUT_SCHEMA}). {@code D7} is signed
- * — {@code segments{}} IS a schema source — so {@code WB-03} will make that fixture savable. ⚠ When it
- * does, this test FAILS on the pin, deliberately: move the fixture out of {@link #REFUSES_UNTIL_WB_03}
- * in the same change. A guard whose known-broken list silently absorbs a fix is a guard that stops
- * proving the fix happened.
+ * <p>✅ <b>The pin is EMPTY, and that is a result.</b> When this guard first ran (2026-09-22) it pinned
+ * {@code asn1_example} as a known refusal: the arming gate did not count {@code parsing.asn1.segments}
+ * as a schema while {@code POST /validate} did, so a shipped, active, working ASN.1 Pipeline could be
+ * opened and never saved ({@code SAVE-GATE-VS-VALIDATE-DISAGREE-1}, 422
+ * {@code ERR_ARMED_WITHOUT_SCHEMA}). {@code WB-03} fixed it the same day — ONE predicate,
+ * {@code ConfigRoutes.hasSchemaSource}, called by the write gate and by {@code POST /validate} alike —
+ * and the pin was dropped in that same change, which is what turned this guard from red back to green.
+ * ⚠ Keep the map: the next known-and-decided refusal goes here WITH its reason and its work item, never
+ * as a quietly skipped fixture. ⛔ A guard whose known-broken list silently absorbs a fix proves nothing.
  *
  * <p><b>Why the fixtures are copied and rewritten rather than driven in place.</b> Two reasons, and
  * neither is incidental:
@@ -76,11 +77,7 @@ class ControlApiPipelineGraphRoundTripSweepTest {
      * Fixtures the save route refuses today, with the reason. Each is a KNOWN defect with a signed
      * decision and a work item — never a fixture that is simply awkward to test.
      */
-    private static final Map<String, String> REFUSES_UNTIL_WB_03 = Map.of(
-            "asn1_example",
-            "ERR_ARMED_WITHOUT_SCHEMA — the arming gate does not count parsing.asn1.segments{} as a schema "
-                    + "while /validate does (SAVE-GATE-VS-VALIDATE-DISAGREE-1). D7 signed 2026-09-22: it IS a "
-                    + "schema source. WB-03 makes this fixture savable — drop it from this map in that change.");
+    private static final Map<String, String> REFUSES_UNTIL_WB_03 = Map.of();
 
     /** The repo's {@code spaces/} tree, relative to the surefire CWD (the {@code inspecto} module dir). */
     private static Path spacesRoot() {
@@ -136,30 +133,58 @@ class ControlApiPipelineGraphRoundTripSweepTest {
         List<Path> fixtures = fixtures();
         assertFalse(fixtures.isEmpty(),
                 "found no *_pipeline.toon under " + spacesRoot().toAbsolutePath()
-                        + " — a sweep over nothing passes vacuously, which is the one way this guard could lie");
+                        + " \u2014 a sweep over nothing passes vacuously, which is the one way this guard could lie");
+
+        // Stage every fixture first, then boot ONCE over all of them (see class javadoc).
+        List<Path> staged = new ArrayList<>();
+        Map<Path, String> idOf = new LinkedHashMap<>();
+        int n = 0;
+        for (Path fixture : fixtures) {
+            Path copy = stage(fixture, tmp.resolve("f" + (++n)));
+            staged.add(copy);
+            idOf.put(copy, fixture.getFileName().toString().replace("_pipeline.toon", ""));
+        }
 
         List<String> failures = new ArrayList<>();
         List<String> census = new ArrayList<>();
-        int round = 0;
         int refused = 0;
 
-        for (Path fixture : fixtures) {
-            String id = fixture.getFileName().toString().replace("_pipeline.toon", "");
-            int before = failures.size();
-            try {
-                if (roundTrip(fixture, id, tmp.resolve("f" + (++round)), failures)) {
+        CollectorService svc = new CollectorService(staged, 3600, 1);
+        String priorRoots = System.getProperty("assist.safety.roots");
+        String priorWrite = System.getProperty("assist.write.root");
+        System.setProperty("assist.safety.roots", tmp.toAbsolutePath().toString());
+        System.setProperty("assist.write.root", tmp.toAbsolutePath().toString());
+        ControlApi api = null;
+        try {
+            api = new ControlApi(svc, 0);
+            api.start();
+            int port = api.port();
+
+            JsonNode listed = json(send(port, "GET", "/pipelines", null));
+            assertTrue(listed.isArray() && !listed.isEmpty(),
+                    "the staged copies registered no pipeline at all \u2014 GET /pipelines served: " + listed);
+
+            for (JsonNode p : listed) {
+                String name = p.get("name").asText();
+                int before = failures.size();
+                if (roundTrip(port, name, failures)) {
                     refused++;
-                    census.add(id + " → REFUSED (pinned)");
+                    census.add(name + " \u2192 REFUSED (pinned)");
                 } else {
-                    census.add(id + (failures.size() > before ? " → FAILED" : " → saved losslessly"));
+                    census.add(name + (failures.size() > before ? " \u2192 FAILED" : " \u2192 saved losslessly"));
                 }
-            } catch (Exception e) {
-                failures.add(id + ": threw " + e.getClass().getSimpleName() + " — " + e.getMessage());
-                census.add(id + " → THREW");
             }
+            assertEquals(fixtures.size(), listed.size(),
+                    "every staged fixture must register, or the sweep silently covers fewer than it claims;"
+                            + " registered:\n  - " + String.join("\n  - ", census));
+        } finally {
+            if (api != null) api.close();
+            svc.close();
+            restore("assist.write.root", priorWrite);
+            restore("assist.safety.roots", priorRoots);
         }
 
-        // ⚠ The census goes FIRST. The pin is bookkeeping; what the write path DID is the finding, and a
+        // \u26a0 The census goes FIRST. The pin is bookkeeping; what the write path DID is the finding, and a
         // run that reports only the bookkeeping is a run spent to learn nothing.
         if (!failures.isEmpty()) {
             fail("the workbench write path is not lossless for " + failures.size() + " of " + fixtures.size()
@@ -168,77 +193,56 @@ class ControlApiPipelineGraphRoundTripSweepTest {
         }
         assertEquals(REFUSES_UNTIL_WB_03.size(), refused,
                 "the pinned-refusal list and the fixtures that actually refuse must match exactly; "
-                        + "a fixture that started saving is WB-03 landing — drop it from REFUSES_UNTIL_WB_03."
+                        + "a fixture that started saving is its fix landing \u2014 drop it from REFUSES_UNTIL_WB_03."
                         + "\ncensus of all " + fixtures.size() + ":\n  - " + String.join("\n  - ", census));
     }
 
-    /** Drive one fixture. Returns true when the save was refused AND that refusal is pinned. */
-    private boolean roundTrip(Path fixture, String id, Path work, List<String> failures) throws Exception {
-        Path toon = stage(fixture, work);
-        CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
-        String priorRoots = System.getProperty("assist.safety.roots");
-        System.setProperty("assist.safety.roots", work.toAbsolutePath().toString());
-        System.setProperty("assist.write.root", work.toAbsolutePath().toString());
-        ControlApi api = null;
-        try {
-            api = new ControlApi(svc, 0);
-            api.start();
-            int port = api.port();
+    private static void restore(String key, String prior) {
+        if (prior != null) System.setProperty(key, prior);
+        else System.clearProperty(key);
+    }
 
-            JsonNode listed = json(send(port, "GET", "/pipelines", null));
-            if (!listed.isArray() || listed.isEmpty()) {
-                failures.add(id + ": the staged copy registered no pipeline at all (GET /pipelines was empty)");
-                return false;
-            }
-            String name = listed.get(0).get("name").asText();
-
-            HttpResponse<String> first = send(port, "GET", "/pipelines/" + name + "/graph/raw", null);
-            if (first.statusCode() != 200) {
-                failures.add(id + ": GET .../graph/raw answered " + first.statusCode() + " — " + brief(first));
-                return false;
-            }
-            JsonNode before = json(first);
-
-            HttpResponse<String> put =
-                    send(port, "PUT", "/pipelines/" + name + "/graph", JSON.writeValueAsString(before));
-
-            if (put.statusCode() != 200) {
-                String pin = REFUSES_UNTIL_WB_03.get(id);
-                if (pin != null) return true;   // a known, decided refusal — counted, not failed
-                failures.add(id + ": PUT .../graph answered " + put.statusCode()
-                        + " for the body its own GET .../graph/raw served — " + brief(put));
-                return false;
-            }
-            if (REFUSES_UNTIL_WB_03.containsKey(id)) {
-                failures.add(id + ": is pinned as refusing but SAVED — if WB-03 landed, drop it from "
-                        + "REFUSES_UNTIL_WB_03 in that change; the pin exists to make the fix visible");
-                return false;
-            }
-
-            JsonNode wrote = json(put);
-            if (!wrote.path("written").asBoolean(false)) {
-                failures.add(id + ": PUT answered 200 but written:false — " + brief(put));
-                return false;
-            }
-
-            HttpResponse<String> second = send(port, "GET", "/pipelines/" + name + "/graph/raw", null);
-            if (second.statusCode() != 200) {
-                failures.add(id + ": the re-read after a successful save answered " + second.statusCode());
-                return false;
-            }
-            JsonNode after = json(second);
-            if (!before.equals(after)) {
-                failures.add(id + ": the editable graph changed across a save that reported written:true — "
-                        + firstDifference(before, after));
-            }
+    /** Drive one registered pipeline. Returns true when the save was refused AND that refusal is pinned. */
+    private boolean roundTrip(int port, String name, List<String> failures) throws Exception {
+        HttpResponse<String> first = send(port, "GET", "/pipelines/" + name + "/graph/raw", null);
+        if (first.statusCode() != 200) {
+            failures.add(name + ": GET .../graph/raw answered " + first.statusCode() + " \u2014 " + brief(first));
             return false;
-        } finally {
-            if (api != null) api.close();
-            svc.close();
-            System.clearProperty("assist.write.root");
-            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
-            else System.clearProperty("assist.safety.roots");
         }
+        JsonNode before = json(first);
+
+        HttpResponse<String> put =
+                send(port, "PUT", "/pipelines/" + name + "/graph", JSON.writeValueAsString(before));
+
+        if (put.statusCode() != 200) {
+            if (REFUSES_UNTIL_WB_03.containsKey(name)) return true;   // known, decided \u2014 counted, not failed
+            failures.add(name + ": PUT .../graph answered " + put.statusCode()
+                    + " for the body its own GET .../graph/raw served \u2014 " + brief(put));
+            return false;
+        }
+        if (REFUSES_UNTIL_WB_03.containsKey(name)) {
+            failures.add(name + ": is pinned as refusing but SAVED \u2014 if its fix landed, drop it from "
+                    + "REFUSES_UNTIL_WB_03 in that change; the pin exists to make the fix visible");
+            return false;
+        }
+
+        JsonNode wrote = json(put);
+        if (!wrote.path("written").asBoolean(false)) {
+            failures.add(name + ": PUT answered 200 but written:false \u2014 " + brief(put));
+            return false;
+        }
+
+        HttpResponse<String> second = send(port, "GET", "/pipelines/" + name + "/graph/raw", null);
+        if (second.statusCode() != 200) {
+            failures.add(name + ": the re-read after a successful save answered " + second.statusCode());
+            return false;
+        }
+        JsonNode after = json(second);
+        if (!before.equals(after)) {
+            failures.add(name + ": the editable graph changed across a save that reported written:true \u2014 "
+                    + firstDifference(before, after));
+        }
+        return false;
     }
 
     /**

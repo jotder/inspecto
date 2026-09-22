@@ -581,6 +581,16 @@ final class PipelineGraphRoutes implements RouteModule {
      * something surprising.
      */
     private Path testRunRoot(ApiContext api, PipelineConfig cfg) {
+        // 🔴 A Dataset-fed Pipeline has no inbox to pick files from, and must SAY so (WB-07, 2026-09-22).
+        // orders_by_region_feed (collector: dataset) used to answer a {files:[…]} test run with 200 and
+        // "no rows were parsed from the chosen file(s)" — an empty SUCCESS for a request that can never
+        // succeed, which reads as "your file is bad" rather than "this instrument does not apply here"
+        // (TESTRUN-DATASET-COLLECTOR-SILENT-1). The connection branch below already refuses non-local
+        // connectors 501; a Dataset feed is not local either, so it gets the same answer in the same words.
+        if (cfg.collector().hasDataset())
+            throw new ApiException(501, "run-to-here supports file-shaped sources only; this pipeline is fed "
+                    + "by the Dataset '" + cfg.collector().dataset() + "' — there is no inbox file to pick. "
+                    + "Preview the Dataset, or dry-run the Steps over sample rows.");
         if (!cfg.collector().hasConnection())
             return Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String connId = cfg.collector().connection();
@@ -682,8 +692,19 @@ final class PipelineGraphRoutes implements RouteModule {
                         + unresolvable.getMessage());
             }
             String view = DRYRUN_REF_VIEW_PREFIX + "_" + reference.replaceAll("[^A-Za-z0-9._-]", "_");
+            // 🔴 The view creation is INSIDE the guard (WB-05, 2026-09-22). A reference that parses but
+            // whose file is not there fails HERE, and the raw DuckDB text used to reach the author:
+            // "Invalid Input Error: Attempting to execute an unsuccessful or closed pending query result".
+            // The SAVE path names the identical condition JOIN_REFERENCE_MISSING. One condition must not
+            // have two vocabularies, and the engine-internal one is not actionable by an author
+            // (TESTRUN-REFERENCE-REFUSAL-UNNAMED-1). The resolved target is carried, because "which file
+            // did you actually look for" is the next question every time.
             try (java.sql.Statement st = conn.createStatement()) {
                 st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+            } catch (java.sql.SQLException missing) {
+                throw new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING,
+                        "reference '" + reference + "' could not be read — resolved to " + sql
+                                + ". Seed the reference file, or point the node at one that exists.");
             }
             return view;
         };

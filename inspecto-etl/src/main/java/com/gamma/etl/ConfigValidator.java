@@ -72,16 +72,33 @@ public final class ConfigValidator {
             }
         }
 
-        // Delimiter: blank explicitly is suspicious (silently falls back to ",")
-        if (cfg.csv().delimiter() == null || cfg.csv().delimiter().isEmpty())
-            warn(warnings, "csv_settings.delimiter is blank — using fallback ','. " +
-                    "Set an explicit value to silence this warning.");
+        // 🔴 The three csv_settings rules apply ONLY to a delimited Pipeline (WB-04, 2026-09-22).
+        //
+        // They used to fire unconditionally, so 6 of 26 shipped Pipelines carrying NO csv_settings block at
+        // all — json_example, excel_example, asn1_example, fixedwidth_example, xml_example and the parquet
+        // re-ingest orders_by_region_feed — were each born clean:false for a rule that cannot apply to them
+        // (VALIDATE-CSV-RULE-FRONTEND-BLIND-1). A warning that is always wrong for a whole class of configs
+        // trains authors to skip warnings, including the real ones this same routine emits.
+        //
+        // ⚠ PipelineConfig does not retain the `frontend:` token; it retains the resolved SHAPE as a set of
+        // nullable per-frontend records, and cfg.csv() is never null (it doubles as shared dialect state the
+        // json and text_regex frontends read). So "delimited" is the negative of the other shapes — the same
+        // idiom this file already uses at the fixed-width and json/text_regex rules below.
+        boolean delimited = cfg.fixedWidth() == null && cfg.json() == null && cfg.xlsx() == null
+                && cfg.parquet() == null && cfg.textRegex() == null
+                && cfg.schemas().ingesterClass() == null;   // asn1 + plugin route through the ingester
+        if (delimited) {
+            // Delimiter: blank explicitly is suspicious (silently falls back to ",")
+            if (cfg.csv().delimiter() == null || cfg.csv().delimiter().isEmpty())
+                warn(warnings, "csv_settings.delimiter is blank — using fallback ','. " +
+                        "Set an explicit value to silence this warning.");
 
-        // Date formats: empty list means TRY_STRPTIME will always return NULL → DATE casts fail.
-        if (cfg.csv().dateFormats() == null || cfg.csv().dateFormats().isEmpty())
-            warn(warnings, "csv_settings.date_formats is empty — TRY_STRPTIME will return NULL for any DATE column.");
-        if (cfg.csv().tsFormats() == null || cfg.csv().tsFormats().isEmpty())
-            warn(warnings, "csv_settings.timestamp_formats is empty — TRY_STRPTIME will return NULL for any TIMESTAMP column.");
+            // Date formats: empty list means TRY_STRPTIME will always return NULL → DATE casts fail.
+            if (cfg.csv().dateFormats() == null || cfg.csv().dateFormats().isEmpty())
+                warn(warnings, "csv_settings.date_formats is empty — TRY_STRPTIME will return NULL for any DATE column.");
+            if (cfg.csv().tsFormats() == null || cfg.csv().tsFormats().isEmpty())
+                warn(warnings, "csv_settings.timestamp_formats is empty — TRY_STRPTIME will return NULL for any TIMESTAMP column.");
+        }
 
         // Marker retention: 0 or negative makes the cleanup delete every marker on first run.
         if (cfg.processing().duplicateCheckEnabled() && cfg.processing().retentionDays() <= 0)

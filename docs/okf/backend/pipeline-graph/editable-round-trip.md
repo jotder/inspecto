@@ -271,6 +271,15 @@ spec 6/6, production build clean, no regression in `pipeline-editor.component.sp
 
 ## 18. Dry-run grows reference context and an honest empty answer (2026-08-13)
 
+✅ **One condition, ONE name, on all three paths (`WB-05`, 2026-09-22).** A reference that parses but
+whose file is not there now refuses **422 `JOIN_REFERENCE_MISSING`** from the dry-run and the test run,
+carrying the RESOLVED target — the same code the save path already raised. 🔴 Before this, the save path
+named the condition while the two test paths leaked the DuckDB internal *“Invalid Input Error:
+Attempting to execute an unsuccessful or closed pending query result”*, which is not actionable by an
+author. The `CREATE OR REPLACE VIEW` sat OUTSIDE the guard; it is inside it now. Row:
+`TESTRUN-REFERENCE-REFUSAL-UNNAMED-1`.
+
+
 Two §6 findings from driving the UI end-to-end, both closed in one change because they meet at the same
 route and the same result record.
 
