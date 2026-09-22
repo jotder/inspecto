@@ -2,29 +2,31 @@ partitionKey: EVENT_DATE
 raw:
   name: PMXDR
   format: CSV
-  fields[18]{name,selector,type}:
-    REC_SEQ,"0",VARCHAR
-    MED_FILE_ID,"1",VARCHAR
-    SWITCH_ID,"2",VARCHAR
-    REC_TYPE,"3",VARCHAR
-    IMSI,"4",VARCHAR
-    MSISDN,"5",VARCHAR
-    OTHER_PARTY,"6",VARCHAR
-    CELL_ID,"7",VARCHAR
-    APN,"8",VARCHAR
-    START_AT,"9",TIMESTAMP
-    EVENT_DATE,"10",DATE
-    DURATION_SEC,"11",INTEGER
-    BYTES_UP,"12",BIGINT
-    BYTES_DOWN,"13",BIGINT
-    RATED_AMOUNT,"14",DOUBLE
-    CURRENCY,"15",VARCHAR
-    ROAM_FLAG,"16",VARCHAR
-    MED_STATUS,"17",VARCHAR
+  fields[20]{name,selector,type,timezone,description}:
+    REC_SEQ,"0",VARCHAR,"",""
+    MED_FILE_ID,"1",VARCHAR,"",""
+    SWITCH_ID,"2",VARCHAR,"",""
+    REC_TYPE,"3",VARCHAR,"",""
+    IMSI,"4",VARCHAR,"","SUBSCRIBER identity (the SIM). Not a handset - see IMEI."
+    MSISDN,"5",VARCHAR,"","A-party number of this record."
+    OTHER_PARTY,"6",VARCHAR,"","B-party number. 'N/A' on DATA records: a packet session has no second party, so those rows are deliberately not graph edges."
+    CELL_ID,"7",VARCHAR,"",""
+    APN,"8",VARCHAR,"",""
+    START_AT,"9",TIMESTAMP,"UTC","Record start time. UTC wall clock, no offset in the text; the declared timezone makes that explicit so it is never resolved against the host session zone."
+    EVENT_DATE,"10",DATE,"","UTC calendar date of START_AT - the partition key."
+    DURATION_SEC,"11",INTEGER,"",""
+    BYTES_UP,"12",BIGINT,"",""
+    BYTES_DOWN,"13",BIGINT,"",""
+    RATED_AMOUNT,"14",DOUBLE,"",""
+    CURRENCY,"15",VARCHAR,"",""
+    ROAM_FLAG,"16",VARCHAR,"",""
+    MED_STATUS,"17",VARCHAR,"",""
+    IMEI,"18",VARCHAR,"","DEVICE identity (the handset). Distinct from IMSI, so one device on several SIMs, or one SIM on several devices, is expressible."
+    DIRECTION,"19",VARCHAR,"","MOC = MSISDN -> OTHER_PARTY, MTC = OTHER_PARTY -> MSISDN, NA = no second party (DATA). Without it the edge has no direction."
 mapping:
   canonicalName: postmed_xdr
   rawName: PMXDR
-  fields[18]:
+  fields[20]:
     - name: REC_SEQ
       from: REC_SEQ
       fn: keep
@@ -78,4 +80,10 @@ mapping:
       fn: keep
     - name: MED_STATUS
       from: MED_STATUS
+      fn: keep
+    - name: IMEI
+      from: IMEI
+      fn: keep
+    - name: DIRECTION
+      from: DIRECTION
       fn: keep
