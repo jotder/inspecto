@@ -150,7 +150,14 @@ final class DbBrowserRoutes implements RouteModule {
         String sql = ApiContext.str(body, "sql");
         if (sql == null) throw new ApiException(422, "missing 'sql'");
 
-        List<Finding> findings = SqlGuard.check(sql);
+        // A store id may itself contain path-like characters (e.g. "mule_transfers/database") without
+        // being a smuggled file reference — SqlGuard's PATH_LIKE check can't tell those apart from the
+        // SQL text alone. Grant that one exemption only once `tableName` is proven to be a real store
+        // under this space's data root (the same jail browseStore enforces below); a name that fails
+        // this check is not trusted, so the ordinary PATH_LIKE rejection still applies to it.
+        String trustedRelation = STORES_GROUP.equals(group) && tableName != null && isJailedStore(api, tableName)
+                ? tableName : null;
+        List<Finding> findings = SqlGuard.check(sql, trustedRelation);
         if (!findings.isEmpty())
             return ApiContext.respondJson(ex, 422, Map.of(
                     "error", "SQL failed the read-only safety check", "findings", findings));
@@ -173,6 +180,18 @@ final class DbBrowserRoutes implements RouteModule {
      * generated {@code SELECT *} (browse) or the caller's already-{@code SqlGuard}-checked SQL (ad-hoc)
      * over it in the sandbox.
      */
+    /** Same jail {@link #browseStore} enforces, checked early so a path-like-but-legitimate store id
+     *  (e.g. {@code "mule_transfers/database"}) can be trusted by {@link SqlGuard} before it runs. */
+    private static boolean isJailedStore(ApiContext api, String storeName) {
+        Path dataRoot = api.dataRoot();
+        if (dataRoot == null) return false;
+        Path root = dataRoot.normalize();
+        Path storeDir = root.resolve(storeName).normalize();
+        if (!storeDir.startsWith(root)) return false;
+        Path browseDir = pipelineDatabaseDir(api, storeName).orElse(storeDir);
+        return Files.isDirectory(browseDir);
+    }
+
     private Object browseStore(ApiContext api, String storeName, String userSql,
                                int limit, int offset, List<QueryExecutor.Sort> sort) {
         Path dataRoot = api.dataRoot();

@@ -2201,7 +2201,10 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         // truncated to "Dialect | Typ…" with scroll arrows while the schema toolbar stacked — the pane
         // only breathed after a maximize. Ask for room, transiently: a wider stored preference wins and
         // nothing is persisted, so the operator's own width survives the visit.
-        if (isParseNodeType(node.type)) this.inspectorSplitRef?.ensureAtLeast(TABBED_PANE_WIDTH);
+        // The Record Transformer's field-mapping grid (FIELD NAME/FROM/WHAT TO DO/COMES OUT AS/SAMPLE)
+        // has the same problem at 300px — field names like "ORDER_ID" truncate to 1-2 characters.
+        if (isParseNodeType(node.type) || node.type === 'transform.sql')
+            this.inspectorSplitRef?.ensureAtLeast(TABBED_PANE_WIDTH);
     }
 
     /**

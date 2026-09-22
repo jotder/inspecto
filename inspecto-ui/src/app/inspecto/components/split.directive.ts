@@ -60,6 +60,11 @@ export class InspectoSplitDirective {
 
     startResize(e: PointerEvent): void {
         e.preventDefault();
+        // preventDefault above suppresses the browser's implicit focus-on-pointerdown for this
+        // tabindex=0 element, so a mouse drag would otherwise leave focus on whatever was focused
+        // before — the documented "drag, then nudge with arrow keys" follow-up silently doesn't
+        // work until the user Tabs here separately. Focus explicitly so drag and keyboard compose.
+        (e.currentTarget as HTMLElement)?.focus();
         const startX = e.clientX;
         const startW = this.width();
         const dir = this.pane() === 'left' ? 1 : -1;

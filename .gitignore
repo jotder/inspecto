@@ -138,3 +138,7 @@ inspecto-dedup-ledger.db*
 
 # Generated deliverables: regenerate with scripts/generate_whitepaper_docx.py, never commit the binary
 docs/stakeholders/*.docx
+
+# tools/local-only-auth-bypass/build-and-run.ps1 regenerates these on every run — source only ships
+tools/local-only-auth-bypass/build/
+tools/local-only-auth-bypass/fake-auth.jar

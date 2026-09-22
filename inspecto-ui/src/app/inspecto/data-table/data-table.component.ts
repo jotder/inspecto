@@ -210,6 +210,10 @@ export class DataTableComponent {
     readonly ruleSaved = output<RuleTemplate>();
     /** Emitted when "Run on server" is pressed — the SQL to execute against the host's backend. */
     readonly runOnServer = output<string>();
+    /** Emitted right before either Run path (local or server) starts — a host holding its own error
+     *  banner alongside this table's (e.g. the Advanced Search dialog) clears it here, so a fresh
+     *  attempt never leaves a stale error from the OTHER run path stacked on screen. */
+    readonly queryStarted = output<void>();
     /** Server paging: emitted when "Load more" is pressed — the host fetches the next offset page and appends. */
     readonly loadMore = output<void>();
 
@@ -398,6 +402,8 @@ export class DataTableComponent {
     /** "Run on server": clear any client-run overlay (so the host's fresh rows show) and emit the SQL. */
     onRunSqlBackend(sql: string): void {
         this.proResult.set(null);
+        this.proError.set(null);
+        this.queryStarted.emit();
         this.runOnServer.emit(sql);
     }
 
@@ -405,6 +411,7 @@ export class DataTableComponent {
     onRunSql(sql: string): void {
         this.running.set(true);
         this.proError.set(null);
+        this.queryStarted.emit();
         runSql(sql, this.sourceName(), this.rowsRec()).then((res) => {
             this.running.set(false);
             if (res.ok) {

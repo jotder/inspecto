@@ -231,7 +231,7 @@ const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => `
 @Component({
     selector: 'inspecto-graph-view',
     standalone: true,
-    template: '<div #host class="h-full w-full"></div>',
+    template: '<div #host class="relative h-full w-full"></div>',
     // Default: viewport-dynamic height for scrolling pages. `fill` mode instead grows into the
     // remaining space of a flex-column studio (Link Analysis); autoFit:'view' scales the graph.
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -281,6 +281,26 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
             this.resizeObserver.observe(this.hostEl.nativeElement);
         }
+        // G6's tooltip plugin (`[tooltips]`) is meant to hide itself on pointer-leave/pan/zoom, but
+        // observed live it can leave its card showing indefinitely — through a pan, a zoom, even
+        // closing the node it described — with no further app interaction able to clear it. Rather
+        // than depend on the plugin's own (evidently unreliable) hide triggers, force it closed
+        // ourselves on the same gestures a real analyst uses to move on: leaving the canvas, panning
+        // (pointerdown = drag start), or zooming (wheel). Plain add/removeEventListener, not an
+        // AbortSignal — jsdom's AbortSignal isn't a real EventTarget under zone.js, so `{signal}`
+        // throws in the component test harness.
+        const host = this.hostEl.nativeElement;
+        host.addEventListener('pointerleave', this.hideStaleTooltipBound, { passive: true });
+        host.addEventListener('pointerdown', this.hideStaleTooltipBound, { passive: true });
+        host.addEventListener('wheel', this.hideStaleTooltipBound, { passive: true });
+    }
+
+    private readonly hideStaleTooltipBound = (): void => this.hideStaleTooltip();
+
+    private hideStaleTooltip(): void {
+        this.hostEl?.nativeElement.querySelectorAll<HTMLElement>('.tooltip').forEach((el) => {
+            el.style.visibility = 'hidden';
+        });
     }
 
     ngOnChanges(): void {
@@ -289,6 +309,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     ngOnDestroy(): void {
         this.resizeObserver?.disconnect();
+        const host = this.hostEl?.nativeElement;
+        host?.removeEventListener('pointerleave', this.hideStaleTooltipBound);
+        host?.removeEventListener('pointerdown', this.hideStaleTooltipBound);
+        host?.removeEventListener('wheel', this.hideStaleTooltipBound);
         this.graph?.destroy();
     }
 
@@ -338,6 +362,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     private rebuild(): void {
         this.graph?.destroy();
         this.graph = null;
+        // Defensive: `ngOnChanges` rebuilds on ANY input change, including an `[emphasis]` recompute
+        // mid-hover, which can tear the G6 tooltip plugin down while its card is showing. `destroy()`
+        // above is expected to remove it, but observed live it sometimes leaves the card's DOM node
+        // behind (orphaned, no longer owned by any Graph instance) — sweep our own container so a
+        // stale tooltip never survives a rebuild, regardless of why the plugin's own cleanup missed it.
+        this.hostEl?.nativeElement.querySelectorAll('.tooltip').forEach((el) => el.remove());
         if (!this.data?.nodes.length) return;
         const { fg, surface: nodeFill, edge } = canvasTheme(this.dark);
         const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
@@ -428,7 +458,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 },
             },
             layout: layoutConfig(this.layout) as LayoutOptions,
-            behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element', ...(this.plugins?.behaviors ?? [])],
+            behaviors: [
+                'drag-canvas',
+                { type: 'zoom-canvas', minZoom: 0.1, maxZoom: 4 },
+                'drag-element',
+                ...(this.plugins?.behaviors ?? []),
+            ],
             plugins: [
                 ...(this.tooltips
                     ? [

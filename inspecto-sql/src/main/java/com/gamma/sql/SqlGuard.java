@@ -80,6 +80,21 @@ public final class SqlGuard {
      * surface. Never throws.
      */
     public static List<Finding> check(String sql) {
+        return check(sql, null);
+    }
+
+    /**
+     * Like {@link #check(String)}, but a relation reference that matches {@code trustedRelation}
+     * exactly (case-sensitive, quotes stripped) is exempt from the {@link #PATH_LIKE} rejection even
+     * though its name contains path-like characters (e.g. a store id such as
+     * {@code "mule_transfers/database"}). Pass the caller's already path-jailed store/table name — the
+     * one it is about to {@code CREATE VIEW <trustedRelation> AS …} before running this SQL — never a
+     * name taken from the SQL text itself or from unvalidated user input; anything else still runs the
+     * literal-file / arbitrary-path check as before. A string literal in the relation position is
+     * always rejected regardless — {@code trustedRelation} only widens what a quoted identifier may
+     * name, never a file/URL literal.
+     */
+    public static List<Finding> check(String sql, String trustedRelation) {
         List<Finding> out = new ArrayList<>();
         if (sql == null || sql.isBlank()) {
             out.add(Finding.error("sql", "the SQL query is empty"));
@@ -128,7 +143,8 @@ public final class SqlGuard {
             String ref = rm.group(2);
             boolean literal = ref.startsWith("'");
             String bare = (literal || ref.startsWith("\"")) ? ref.substring(1, ref.length() - 1) : ref;
-            if (literal || PATH_LIKE.matcher(bare).find()) {
+            boolean trusted = !literal && trustedRelation != null && trustedRelation.equals(bare);
+            if (!trusted && (literal || PATH_LIKE.matcher(bare).find())) {
                 out.add(Finding.error("sql", "'" + bare + "' after " + rm.group(1).toUpperCase()
                         + " names a file or URL, not a table — DuckDB would read it directly (replacement scan); "
                         + "only catalog tables and views may be queried"));

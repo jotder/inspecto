@@ -80,6 +80,7 @@ export interface LinkAnalysisAdvancedSearchData {
                 [sourceName]="data.dataset.sourceName"
                 [serverRun]="true"
                 (runOnServer)="runOnServer($event)"
+                (queryStarted)="error.set('')"
                 height="22rem"
                 [pageSize]="10"
                 exportName="link-analysis-advanced-search"

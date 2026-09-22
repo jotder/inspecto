@@ -45,7 +45,13 @@ export async function runSql(sql: string, source: string, rows: Record<string, u
 
     try {
         const db = new alasql.Database();
-        const table = (source || 'data').replace(/[^A-Za-z0-9_]/g, '_') || 'data';
+        // Register the table under the SAME identifier `compileSql`'s FROM clause quotes (doubled
+        // backticks, mirroring `quoteIdent`'s doubled double-quotes) — not a sanitized stand-in. A
+        // sanitized name here used to silently diverge from the generated `FROM "<source>"` whenever
+        // `source` held non-identifier characters (e.g. a dataset's `sourceName` mirroring its storage
+        // path, `"mule_transfers/database"`), so the editor's own default query failed with "Table
+        // does not exist" against its own default FROM target.
+        const table = (source || 'data').replace(/`/g, '``') || 'data';
         db.exec('CREATE TABLE `' + table + '`');
         db.tables[table].data = rows;
         const result = db.exec(toAlaSqlDialect(trimmed));
