@@ -368,6 +368,7 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   here would answer it silently — the worst way, because two spellings genuinely can be two entities.
   ⚠ Comparison is scoped: `entity:person:bob` and `entity:account:bob` are two entities by construction,
   and super-node stand-ins are skipped because their label is a count, not a name.
+  🔴 **It reads ZERO on every dataset this repo ships, and that is CORRECT** — measured 2026-09-22 across 24 candidate entity columns in 4 spaces, including all five configured projection columns: distinct-raw equals distinct-normalised exactly, with zero untrimmed values, zero double-spaces and zero trailing punctuation. `gen-link-analysis-demos.py` emits every entity from a canonical literal list, so a variant spelling is impossible by construction. ⛔ **Do not read a zero as a broken detector** — a positive control collapses 6 spellings of `ACME Ltd` to 2. It is a guard against dirty data the demo corpus does not contain.
   🔴 **There are THREE id mint sites, not the two D-S4 named** — `geo-analysis.ts`'s `coLocationGraph`
   is a third and does not even `trim()`, so any normalisation answer touching only the named pair stays
   half-fixed.
