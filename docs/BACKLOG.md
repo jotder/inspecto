@@ -15,7 +15,7 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 `docs/superpower/`, and the last handoff's next steps.
 
 > **Where the board stands — recounted 2026-09-16 (FIFTH pass, re-derived from the rows themselves) and now PINNED by `tools/check-doc-counts.mjs`.** Every number in this block and in the "queued work" paragraph below carries a `<!--count:backlog-*-->` marker; the guard derives each one from the rows themselves (§0's patterns, over the `## 3.`–`## 6.` slice) and FAILS the build if a stated figure drifts from them again — including when only ONE of the two sites is updated, which is how this very commit found the header and the paragraph below disagreeing.
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 30<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
+> **60<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 32<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** — ⬇ 59 → 54 across two passes that day, ⬆ **54 → 55 with `CI-JACOCO-JDK27-1` filed 2026-09-18**, ⬆ **55 → 56 with `CODEGRAPH-AFFECTED-UNUSABLE-1` filed 2026-09-19** (P3; its repo-side half shipped in the same commit, only the third-party defect is open).
 > ✅ **The second pass wrote NO code: it audited six rows for work that was ALREADY DONE** and found two that were
 > only open as bookkeeping. That is the cheapest kind of progress available and it had not been tried. — ⬇ **DOWN 62 → 59, the first net
 > decrease in five board commits**, and the shape of the decrease is the point: five rows closed, ONE filed.
@@ -168,9 +168,9 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 30<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 25<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
-> backlog to burn down. Reading all 55<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
+> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 32<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
+> someone asks by name"** — so those 28<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
+> backlog to burn down. Reading all 60<!--count:backlog-rows--> as pending work overstates what is owed by roughly 40%.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
 > had done three times. 🔴 **It caught its author within hours:** this shift filed rows after the pin
@@ -2745,6 +2745,14 @@ fixes — that is the point, and it is Sprint 3 of `archived-documents/plans-arc
   against disk (diffed for `ConfigSafetyValidator.java` lines 52–58 / 70–78), so the Read-equivalence
   rule in `CLAUDE.md` is sound; and the SPA **is** indexed — a single call returned Java and TypeScript
   together, and a UI-only query returned `status-badge.component.ts` with 30 accurate callers.
+
+### Filed from the UI consolidation, 2026-09-22
+
+- **P2** · **`SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` — a pipeline's `schema_file` relative path resolves against the process CWD, not the space root.** Found driving the UI against the auth-free Professional bundle launched from `inspecto-deploy/` with `-Dspaces.root=..\spaces` (`.claude/launch.json` → `inspecto-geolink*`): every demo pipeline fails to load (`ConfigRegistry` WARN "path 'spaces\demo\config\…schema.toon' … resolves to `inspecto-deploy\spaces\…`, outside the root"), so Pipelines, Runs and Processing Status render empty and the WARNs flood the Signal Ledger. ⚠ Not a UI defect — it blanks half the UI in that launch mode. Remedy hypothesis: resolve `schema_file` against the config file's own directory (the satellite convention the UI editor already assumes, SATELLITE-WRITE-1). → `archived-documents/plans-archive/ui-consolidation-plan.md` §5 `UIB-05`.
+- **P2** · **`MAT-SELECT-SWEEP-1` — 23 templates still ask for a single choice with `mat-select`.** The angular-ui skill names `<inspecto-option-picker>` as the ONE single-choice control; decision D8 of the UI consolidation scoped the 2026-09-22 sweep to Geo Map, the Link Analysis dock and toolbox, and Assistant (27 pickers). The rest is mechanical: bind the picker where the select was, keep table cells, grid toolbars and genuine multi-selects as dropdowns by rule. → `okf/frontend/conventions/page-chrome.md`.
+- **P3** · **`EMPTY-GRID-HSCROLL-1` — Incidents and Cases draw a horizontal scrollbar on an EMPTY grid.** Their column minimum widths exceed the pane at narrower widths, so the empty state sits over a scrollbar with nothing to scroll. Give the grid `suppressHorizontalScroll` while `rows.length === 0`, or flex-size the columns. → `okf/frontend/conventions/page-chrome.md`.
+- **P3** · **`JOB-RUNS-DIALOG-DEAD-1` — `modules/admin/jobs/job-runs.dialog.ts` has no opener.** Only its own spec references `JobRunsDialog`. Decide retain-as-test-vehicle (the `MOCK-DEAD-COMPUTE-1` precedent) or delete; do not leave it looking like a live surface. → `okf/frontend/conventions/page-chrome.md`.
+- **P3** · **`HEAD-RESPONSE-STREAM-CLOSED-1` — `HEAD /` logs `IOException: stream closed` on every probe.** `ApiContext.respondJson` writes a body with a content length on a HEAD request (`ControlApi.respond` → `routeDispatch`); the JDK server warns and the write throws. Answer HEAD with headers only. → `archived-documents/plans-archive/ui-consolidation-plan.md` §5 `UIB-06`.
 
 ## 5. Docs & hygiene
 

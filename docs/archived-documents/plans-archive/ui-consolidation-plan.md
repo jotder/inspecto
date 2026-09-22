@@ -1,3 +1,5 @@
+<!-- ARCHIVED 2026-09-22 — the work SHIPPED the same day it was planned. Durable facts: docs/okf/frontend/conventions/page-chrome.md; open rows: docs/BACKLOG.md §4 "Filed from the UI consolidation". Provenance only; never read for current state. -->
+
 <!--
   ACTIVE PLAN — docs/superpower/
   Created 2026-09-22 from a full drive of the SPA in the preview (40 routed panes, 4 header flyouts,
@@ -11,7 +13,7 @@
 
 | | |
 |---|---|
-| Status | ACTIVE PLAN — **approved 2026-09-22; decisions D1–D8 delegated to the implementer and taken as recommended (§6)**; **phase 1 SHIPPED**; **phase 2 and phase 3 SHIPPED** for every row but the editor panes, 2026-09-22 (§4 marks each) |
+| Status | **SHIPPED and ARCHIVED 2026-09-22** — every routed pane on the shared header (48), every phase-2 and phase-3 row done; the five items still open moved to `docs/BACKLOG.md` §4 *Filed from the UI consolidation* |
 | Raised by | Operator, 2026-09-22: *functionality is growing and interface complexity with it — consolidate the UI before implementing the Link Analysis backlog* |
 | Method | Every nav target driven in the preview at 1440×900, dark scheme (the app's default), plus header flyouts and the New-job dialog. Findings are what was **seen**, cited to the pane; nothing here is inferred from code alone |
 | Binding rules | `.claude/skills/angular-ui/SKILL.md` (design system, a11y, no hardcoded colours, option-picker, schema-form), `docs/GLOSSARY.md` (canonical words in every label) |
@@ -199,15 +201,15 @@ Logged while walking. **None is in scope of this plan unless its row says so.** 
 | ~~UIB-02~~ ✅ | Home | red toast "Failed to load recent runs" while the panel already explains the missing jobs backend | degrade (F6) | fix in UI-10 |
 | ~~UIB-03~~ ✅ | Learning | red toast "Failed to load feedback" on a deployment without the intelligence module | degrade (F6) | fix in UI-10 |
 | ~~UIB-04~~ ✅ | Autonomy | error-tinted alert **and** red toast "Autonomy policy is not available" | degrade (F6) | fix in UI-10 |
-| UIB-05 | Backend, `inspecto-geolink*` launch configs | with `-Dspaces.root=..\spaces` from `inspecto-deploy/`, every demo pipeline fails to load: `schema_file` relative paths resolve against the **CWD** (`inspecto-deploy\spaces\demo\…`) instead of the space root, so Pipelines, Runs and Processing Status are empty | backend path resolution | **BACKLOG** — `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`; not a UI defect but it blanks half the UI in this launch mode |
-| UIB-06 | Backend | `HEAD /` throws `IOException: stream closed` in `ApiContext.respondJson` on every preview probe (content length sent on a HEAD) | backend | BACKLOG, low |
+| UIB-05 → BACKLOG `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` | Backend, `inspecto-geolink*` launch configs | with `-Dspaces.root=..\spaces` from `inspecto-deploy/`, every demo pipeline fails to load: `schema_file` relative paths resolve against the **CWD** (`inspecto-deploy\spaces\demo\…`) instead of the space root, so Pipelines, Runs and Processing Status are empty | backend path resolution | **BACKLOG** — `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`; not a UI defect but it blanks half the UI in this launch mode |
+| UIB-06 → BACKLOG `HEAD-RESPONSE-STREAM-CLOSED-1` | Backend | `HEAD /` throws `IOException: stream closed` in `ApiContext.respondJson` on every preview probe (content length sent on a HEAD) | backend | BACKLOG, low |
 | ~~UIB-07~~ ✅ | `layout/common/settings-drawer` | component exists with its own settings link list (`/config`, `/notification-center`, `/spaces`, `/design`, …) but is **mounted nowhere**; its unique targets `/config` and `/notification-center` are reachable only through the Settings page drawers | dead component | remove in UI-16 (D2) |
 | ~~UIB-08~~ ✅ | `modules/admin/{icon-settings,map-settings,model-settings,transfer}/*.routes.ts` | four route files imported by nothing; the components mount only via `SettingsComponent`'s `NgComponentOutlet` | dead code | delete in UI-16 (D4) |
-| UIB-09 | `modules/admin/jobs/job-runs.dialog.ts` | `JobRunsDialog` has **no opener** — only its own spec references it | dead dialog | BACKLOG — decide retain-as-test-vehicle or delete |
+| UIB-09 → BACKLOG `JOB-RUNS-DIALOG-DEAD-1` | `modules/admin/jobs/job-runs.dialog.ts` | `JobRunsDialog` has **no opener** — only its own spec references it | dead dialog | BACKLOG — decide retain-as-test-vehicle or delete |
 | ~~UIB-10~~ ✅ *(redirects into Settings, D2)* | `/connections` | routed, no nav item, no flyout; the only in-app link is a `routerLink` inside `collector-detail.dialog.ts:57`; the same component is a Settings drawer section | reachability | accept: Settings ▸ Connections is the home; drop the standalone route or leave as deep link — D2 |
-| UIB-11 | Overview ▸ Recent activity | raw WARN log lines rendered unwrapped, clipped at the card edge | presentation | fix in UI-05 (wrap + monospace + 3-line clamp) |
+| ~~UIB-11~~ ✅ | Overview ▸ Recent activity | raw WARN log lines rendered unwrapped, clipped at the card edge | presentation | fix in UI-05 (wrap + monospace + 3-line clamp) |
 | ~~UIB-12~~ ✅ | Data Browser | store list of 30+ items with no filter box and no scroll container; runs off the bottom of the page | presentation | fix in UI-06 (filter input + `max-h` scroll) |
-| UIB-13 | Incidents, Cases | horizontal scrollbar rendered on an **empty** grid; grid does not use the full pane width | grid | fix in UI-14 |
+| UIB-13 → BACKLOG `EMPTY-GRID-HSCROLL-1` | Incidents, Cases | horizontal scrollbar rendered on an **empty** grid; grid does not use the full pane width | grid | fix in UI-14 |
 | ~~UIB-14~~ ✅ | Jobs | Actions column clips its third icon at 1440 px | grid | fix in UI-14 |
 | ~~UIB-15~~ | Header | **NOT REPRODUCED 2026-09-22** (no stray tooltip after Esc). What DID reproduce is `UIB-24` below: Esc did not close the panel at all | tooltip stuck | BACKLOG, low — reproduce and check `matTooltip` hide on blur |
 | ~~UIB-16~~ ✅ **REFUTED** | Header ▸ lens switcher | re-driven 2026-09-22: the trigger reports `aria-expanded="true"` and the menu lists Business · Builder · Ops. The first probe was a pane-resize artefact | not a defect | verify in UI-16 |
