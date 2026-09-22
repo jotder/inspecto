@@ -465,128 +465,133 @@
             <form
                 [formGroup]="queryForm"
                 (ngSubmit)="run()"
-                class="bg-card flex flex-wrap items-start gap-3 rounded-2xl p-4 shadow"
+                class="bg-card flex flex-col gap-2 rounded-2xl p-4 shadow"
                 aria-label="Geo query"
             >
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Source</mat-label>
-                    <mat-select [value]="sourceId()" (valueChange)="sourceId.set($event)" aria-label="Geo source">
-                        @for (s of sources; track s.id) {
-                            <mat-option [value]="s.id">{{ s.label }}</mat-option>
+                <!-- required fields first: Source · Dataset · the coordinate columns the source needs -->
+                <div class="flex flex-wrap items-start gap-x-6 gap-y-2">
+                    <inspecto-option-picker
+                        class="w-56"
+                        label="Source"
+                        [options]="sourceOptions"
+                        [ngModel]="sourceId()"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="sourceId.set($event)"
+                    ></inspecto-option-picker>
+                    <div class="flex w-56 flex-col">
+                        <inspecto-option-picker
+                            label="Dataset"
+                            formControlName="datasetId"
+                            [options]="datasetOptions()"
+                        ></inspecto-option-picker>
+                        <!-- The picker's own error line only fires on its own interaction, so a submit that
+                             marks the control touched renders this line instead (angular-ui skill §4). -->
+                        @if (
+                            queryForm.controls.datasetId.hasError('required') && queryForm.controls.datasetId.touched
+                        ) {
+                            <p class="text-warn m-0 text-xs" role="alert">Pick a dataset.</p>
                         }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>Dataset</mat-label>
-                    <mat-select formControlName="datasetId">
-                        @for (d of datasets(); track d.id) {
-                            <mat-option [value]="d.id">{{ d.name }}</mat-option>
-                        }
-                    </mat-select>
-                    @if (queryForm.controls.datasetId.hasError('required') && queryForm.controls.datasetId.touched) {
-                        <mat-error>Pick a dataset.</mat-error>
+                    </div>
+                    @if (sourceId() === 'dataset') {
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Latitude column"
+                            formControlName="latCol"
+                            [options]="columnOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Longitude column"
+                            formControlName="lonCol"
+                            [options]="columnOptions()"
+                        ></inspecto-option-picker>
+                    } @else {
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Origin latitude"
+                            formControlName="fromLatCol"
+                            [options]="columnOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Origin longitude"
+                            formControlName="fromLonCol"
+                            [options]="columnOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Destination latitude"
+                            formControlName="toLatCol"
+                            [options]="columnOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Destination longitude"
+                            formControlName="toLonCol"
+                            [options]="columnOptions()"
+                        ></inspecto-option-picker>
                     }
-                </mat-form-field>
-                @if (sourceId() === 'dataset') {
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Latitude column</mat-label>
-                        <mat-select formControlName="latCol">
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Longitude column</mat-label>
-                        <mat-select formControlName="lonCol">
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Entity column (optional)</mat-label>
-                        <mat-select formControlName="entityCol">
-                            <mat-option value="">—</mat-option>
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                } @else {
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Origin latitude</mat-label>
-                        <mat-select formControlName="fromLatCol">
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Origin longitude</mat-label>
-                        <mat-select formControlName="fromLonCol">
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Destination latitude</mat-label>
-                        <mat-select formControlName="toLatCol">
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Destination longitude</mat-label>
-                        <mat-select formControlName="toLonCol">
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Origin name (optional)</mat-label>
-                        <mat-select formControlName="fromCol">
-                            <mat-option value="">—</mat-option>
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>Destination name (optional)</mat-label>
-                        <mat-select formControlName="toCol">
-                            <mat-option value="">—</mat-option>
-                            @for (c of datasetColumns(); track c) {
-                                <mat-option [value]="c">{{ c }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
+                </div>
+
+                <!-- optional columns: ONE collapsed disclosure (plan UI-13) -->
+                <div class="flex flex-wrap items-start gap-x-6 gap-y-2">
+                    <button
+                        type="button"
+                        class="text-secondary hover:text-primary flex items-center gap-1 text-sm"
+                        [attr.aria-expanded]="optionalOpen()"
+                        aria-controls="geo-optional-columns"
+                        (click)="optionalOpen.update((v) => !v)"
+                    >
+                        <mat-icon
+                            class="icon-size-4"
+                            [svgIcon]="
+                                optionalOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                            "
+                        ></mat-icon>
+                        Optional columns
+                    </button>
+                    <button mat-flat-button color="primary" type="submit" class="ml-auto" [disabled]="loading()">
+                        <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
+                        Run
+                    </button>
+                </div>
+                @if (optionalOpen()) {
+                    <div id="geo-optional-columns" class="flex flex-wrap items-start gap-x-6 gap-y-2">
+                        @if (sourceId() === 'dataset') {
+                            <inspecto-option-picker
+                                class="w-56"
+                                label="Entity column"
+                                formControlName="entityCol"
+                                [options]="optionalColumnOptions()"
+                            ></inspecto-option-picker>
+                        } @else {
+                            <inspecto-option-picker
+                                class="w-56"
+                                label="Origin name"
+                                formControlName="fromCol"
+                                [options]="optionalColumnOptions()"
+                            ></inspecto-option-picker>
+                            <inspecto-option-picker
+                                class="w-56"
+                                label="Destination name"
+                                formControlName="toCol"
+                                [options]="optionalColumnOptions()"
+                            ></inspecto-option-picker>
+                        }
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Type column"
+                            formControlName="kindCol"
+                            [options]="optionalColumnOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Time column"
+                            formControlName="timeCol"
+                            [options]="optionalColumnOptions()"
+                        ></inspecto-option-picker>
+                    </div>
                 }
-                <mat-form-field subscriptSizing="dynamic" class="w-44">
-                    <mat-label>Type column (optional)</mat-label>
-                    <mat-select formControlName="kindCol">
-                        <mat-option value="">—</mat-option>
-                        @for (c of datasetColumns(); track c) {
-                            <mat-option [value]="c">{{ c }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic" class="w-44">
-                    <mat-label>Time column (optional)</mat-label>
-                    <mat-select formControlName="timeCol">
-                        <mat-option value="">—</mat-option>
-                        @for (c of datasetColumns(); track c) {
-                            <mat-option [value]="c">{{ c }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <button mat-flat-button color="primary" type="submit" class="mt-1" [disabled]="loading()">
-                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
-                    Run
-                </button>
             </form>
         }
 

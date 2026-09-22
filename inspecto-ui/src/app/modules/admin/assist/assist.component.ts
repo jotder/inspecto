@@ -1,9 +1,8 @@
 import { Component, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
 import { AssistIntent } from 'app/inspecto/api';
 import { AssistPanelComponent } from 'app/inspecto/components/assist-panel.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 interface IntentMeta {
     id: AssistIntent;
@@ -57,7 +56,7 @@ const INTENTS: IntentMeta[] = [
 @Component({
     selector: 'app-assist',
     standalone: true,
-    imports: [FormsModule, MatFormFieldModule, MatSelectModule, AssistPanelComponent],
+    imports: [FormsModule, InspectoOptionPickerComponent, AssistPanelComponent],
     template: `
         <div class="flex min-w-0 flex-auto flex-col">
             <div
@@ -67,14 +66,13 @@ const INTENTS: IntentMeta[] = [
                     <h1 class="text-3xl font-extrabold leading-none tracking-tight">Assistant</h1>
                     <div class="text-secondary mt-1.5">Draft-only AI assist skills</div>
                 </div>
-                <mat-form-field class="gamma-mat-dense mt-4 w-72 sm:mt-0" subscriptSizing="dynamic">
-                    <mat-label>Assist skill</mat-label>
-                    <mat-select [(ngModel)]="selected">
-                        @for (m of intents; track m.id) {
-                            <mat-option [value]="m">{{ m.label }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="mt-4 w-72 sm:mt-0"
+                    label="Assist skill"
+                    [options]="intentOptions"
+                    [ngModel]="selected.id"
+                    (ngModelChange)="selectIntent($event)"
+                ></inspecto-option-picker>
             </div>
 
             <div class="flex flex-auto flex-col p-6 sm:p-10">
@@ -90,5 +88,11 @@ const INTENTS: IntentMeta[] = [
 })
 export class AssistComponent {
     readonly intents = INTENTS;
+    /** The picker carries string values, so it binds the intent id and `selectIntent` resolves the meta. */
+    readonly intentOptions: PickerOption[] = INTENTS.map((m) => ({ value: m.id, label: m.label }));
     selected: IntentMeta = INTENTS[0];
+
+    selectIntent(id: string): void {
+        this.selected = INTENTS.find((m) => m.id === id) ?? this.selected;
+    }
 }

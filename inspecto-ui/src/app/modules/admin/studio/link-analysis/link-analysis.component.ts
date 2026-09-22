@@ -11,6 +11,7 @@ import {
 import {
     FormBuilder,
     FormControl,
+    FormsModule,
     ReactiveFormsModule,
     Validators,
     AbstractControl,
@@ -25,7 +26,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -94,7 +94,7 @@ import {
 } from './link-analysis-evidence.dialogs';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 import { GraphSnapshot } from 'app/inspecto/graph';
-import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { NodeKind } from 'app/inspecto/api';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { nodeColor } from 'app/modules/admin/catalog/catalog-graph';
@@ -171,6 +171,7 @@ interface PresentationSnapshot {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ChipComponent,
+        FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
@@ -180,7 +181,6 @@ interface PresentationSnapshot {
         MatIconModule,
         MatInputModule,
         MatMenuModule,
-        MatSelectModule,
         MatSliderModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -409,6 +409,11 @@ export class LinkAnalysisComponent implements OnInit {
     // ── timeline filter (BACKLOG V2 §3: a time slider filtering edges by a temporal `attrs` column) ──
     /** The `attrs` column to filter on; '' = timeline off. */
     readonly timeColumn = signal('');
+    /** The timeline picker's choices — a blank-valued 'Off' is the named no-column choice, not unset. */
+    readonly timeColumnOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Off' },
+        ...this.attrColumns().map((c) => ({ value: c, label: c })),
+    ]);
     /** Cutoff (epoch millis) — edges dated after this are hidden; `null` until the slider is touched. */
     readonly timeCutoff = signal<number | null>(null);
     /** Every edge-`attrs` key present anywhere in the loaded graph — the column picker's options. */

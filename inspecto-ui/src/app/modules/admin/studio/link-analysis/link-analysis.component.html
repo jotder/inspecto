@@ -137,15 +137,12 @@
                             (click)="$event.stopPropagation()"
                             aria-label="Timeline filter"
                         >
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Time column</mat-label>
-                                <mat-select [value]="timeColumn()" (selectionChange)="setTimeColumn($event.value)">
-                                    <mat-option value="">Off</mat-option>
-                                    @for (c of attrColumns(); track c) {
-                                        <mat-option [value]="c">{{ c }}</mat-option>
-                                    }
-                                </mat-select>
-                            </mat-form-field>
+                            <inspecto-option-picker
+                                label="Time column"
+                                [options]="timeColumnOptions()"
+                                [ngModel]="timeColumn()"
+                                (ngModelChange)="setTimeColumn($event)"
+                            ></inspecto-option-picker>
                             @if (timeColumn() && timeExtent(); as ext) {
                                 <span class="text-secondary text-xs"
                                     >Up to {{ timeLabel(timeCutoff() ?? ext[1]) }}</span

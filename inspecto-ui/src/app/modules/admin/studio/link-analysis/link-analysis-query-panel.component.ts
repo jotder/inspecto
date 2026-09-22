@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, input, output, signal } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { PipelineSummary } from 'app/inspecto/api';
 import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from 'app/inspecto/graph';
@@ -33,6 +34,7 @@ export interface QuerySummaryItem {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
@@ -41,6 +43,7 @@ export interface QuerySummaryItem {
         MatInputModule,
         MatSelectModule,
         AiAssistComponent,
+        InspectoOptionPickerComponent,
     ],
     templateUrl: './link-analysis-query-panel.component.html',
 })
@@ -93,6 +96,32 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     readonly extraMappings = this.fb.array<FormGroup>([]);
     /** Column choices per extra-mapping row, indexed like `extraMappings.controls`. */
     readonly extraMappingColumns = signal<string[][]>([]);
+
+    // Picker option lists — the single-choice selects are `<inspecto-option-picker>`s over {value,label};
+    // `attrCols` / `extraPipelines` stay `mat-select multiple` (the picker is single-choice).
+    readonly sourceOptions = computed<PickerOption[]>(() =>
+        this.sources().map((s) => ({ value: s.id, label: s.label })),
+    );
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.name })),
+    );
+    readonly pipelineOptions = computed<PickerOption[]>(() =>
+        this.pipelines().map((p) => ({ value: p.name, label: p.name })),
+    );
+    readonly columnOptions = computed<PickerOption[]>(() => this.datasetColumns().map((c) => ({ value: c, label: c })));
+    /** A blank-valued option is the real "none" choice — the picker shows its label, not the placeholder. */
+    readonly optionalColumnOptions = computed<PickerOption[]>(() => [
+        { value: '', label: '—' },
+        ...this.columnOptions(),
+    ]);
+    readonly extraMappingColumnOptions = computed<PickerOption[][]>(() =>
+        this.extraMappingColumns().map((cols) => cols.map((c) => ({ value: c, label: c }))),
+    );
+    readonly directionOptions: PickerOption[] = [
+        { value: 'both', label: 'Both' },
+        { value: 'out', label: 'Downstream' },
+        { value: 'in', label: 'Upstream' },
+    ];
 
     ngOnInit(): void {
         this.queryForm.controls.datasetId.valueChanges.subscribe((id) => this.onDatasetPicked(id));

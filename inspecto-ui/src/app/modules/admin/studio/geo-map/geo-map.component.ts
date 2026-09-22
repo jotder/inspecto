@@ -9,7 +9,7 @@ import {
     signal,
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -18,7 +18,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -27,6 +26,7 @@ import { ToastrService } from 'ngx-toastr';
 
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
@@ -118,6 +118,7 @@ interface PointRow {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         DecimalPipe,
+        FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
@@ -127,11 +128,11 @@ interface PointRow {
         MatIconModule,
         MatInputModule,
         MatMenuModule,
-        MatSelectModule,
         MatSliderModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
+        InspectoOptionPickerComponent,
         InspectoSkeletonComponent,
         MapViewComponent,
         DataTableComponent,
@@ -180,6 +181,19 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     readonly datasetColumns = signal<string[]>([]);
     /** Full query form vs its collapsed summary (auto-collapses after a run). */
     readonly queryOpen = signal(true);
+    /** The Entity/Type/Time (and route-name) columns sit under ONE collapsed disclosure (plan UI-13). */
+    readonly optionalOpen = signal(false);
+    // Picker option lists — the pickers take {value,label}, the state stays the ids/column names above.
+    readonly sourceOptions: PickerOption[] = this.sources.map((s) => ({ value: s.id, label: s.label }));
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.name })),
+    );
+    readonly columnOptions = computed<PickerOption[]>(() => this.datasetColumns().map((c) => ({ value: c, label: c })));
+    /** A blank-valued option is the real "none" choice — the picker shows its label, not the placeholder. */
+    readonly optionalColumnOptions = computed<PickerOption[]>(() => [
+        { value: '', label: '—' },
+        ...this.columnOptions(),
+    ]);
     // Column presence is validated by the projection folds (typed errors → the banner), so only
     // the dataset itself is form-required — the fields differ per source.
     readonly queryForm = this.fb.nonNullable.group({
