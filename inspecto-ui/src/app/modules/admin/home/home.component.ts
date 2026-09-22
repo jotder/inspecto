@@ -23,6 +23,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { ToastrService } from 'ngx-toastr';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
 interface AttentionRow {
@@ -62,6 +63,7 @@ const NOTICE_DISMISSED = 'inspecto.home.bindNoticeDismissed';
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './home.component.html',
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         RouterLink,

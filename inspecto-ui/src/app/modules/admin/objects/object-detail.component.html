@@ -8,27 +8,19 @@
 } @else {
     <div class="flex min-w-0 flex-auto flex-col">
         <!-- Header -->
-        <div
-            class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+        <inspecto-page-header
+            [title]="obj()?.title || id()"
+            [eyebrow]="id()"
+            [subtitle]="obj()?.objectType + ' · ' + obj()?.status"
+            [backLink]="['/' + listBase]"
+            [backLabel]="listLabel"
         >
-            <div class="flex min-w-0 items-center gap-3">
-                <button mat-icon-button aria-label="Back" (click)="back()">
-                    <mat-icon svgIcon="heroicons_outline:arrow-left"></mat-icon>
-                </button>
-                <div class="min-w-0">
-                    <inspecto-breadcrumb [listLink]="['/' + listBase]" [listLabel]="listLabel" [current]="id()" />
-                    <h1 class="truncate text-2xl font-extrabold leading-none tracking-tight">
-                        {{ obj()?.title || id() }}
-                    </h1>
-                    <div class="text-secondary mt-1.5">
-                        {{ obj()?.objectType }} · {{ obj()?.status }}
-                        @if (obj()?.severity) {
-                            · {{ obj()?.severity }}
-                        }
-                    </div>
-                </div>
-            </div>
-            <div class="mt-4 flex flex-wrap items-center gap-2 sm:mt-0">
+            <ng-container badge>
+                @if (obj()?.severity) {
+                    <inspecto-status-badge [value]="obj()!.severity!" />
+                }
+            </ng-container>
+            <ng-container actions>
                 <!-- "Why is this red" (AGT-6a A4-status) — only when the Incident/Case carries a correlation
                  id: that is the only thing here the timeline can be addressed by, and without it the
                  dialog would have nothing to reconstruct. -->
@@ -50,8 +42,8 @@
                     <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
                     <span class="ml-2">Apply RCA</span>
                 </button>
-            </div>
-        </div>
+            </ng-container>
+        </inspecto-page-header>
 
         <!-- Tabs -->
         <div class="flex flex-auto flex-col p-6 sm:p-10">

@@ -64,7 +64,7 @@ import { PostmortemPanelComponent } from './postmortem-panel.component';
 import { ResolveDialog } from './resolve.dialog';
 import { TagChange, TagDialog } from './tag.dialog';
 import { TagRulesDialog } from './tag-rules.dialog';
-import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 const NAV_COLLAPSED_KEY = 'inspecto.mail.navCollapsed';
 
@@ -101,7 +101,7 @@ function mailDate(ms: number | undefined): string {
     imports: [
         InspectoAlertComponent,
         InspectoBulkActionsComponent,
-        AiExplainComponent,
+        InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatFormFieldModule,

@@ -1,42 +1,33 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 sm:p-8">
-    <!-- Breadcrumb + header -->
-    <nav class="text-secondary mb-1 text-sm" aria-label="Breadcrumb">
-        <a routerLink="/reconciliation" class="hover:underline">Reconciliation</a>
-        <span class="px-1">/</span>
-        <span>{{ recon()?.name ?? '…' }}</span>
-    </nav>
-
     @if (recon(); as r) {
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight">{{ r.name }}</h1>
-                <div class="text-secondary mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    <span
-                        >A <span class="font-mono">{{ r.leftDataset }}</span></span
-                    >
-                    <mat-icon
-                        svgIcon="heroicons_outline:arrows-right-left"
-                        class="icon-size-4"
-                        aria-hidden="true"
-                    ></mat-icon>
-                    <span
-                        >B <span class="font-mono">{{ r.rightDataset }}</span></span
-                    >
-                    <span aria-hidden="true">·</span>
-                    <span
-                        >tree <span class="font-mono">{{ r.keyColumns.join(' › ') }}</span></span
-                    >
-                    <span aria-hidden="true">·</span>
-                    <span
-                        >bands ok &lt; {{ bands().warnPct }}% · warn {{ bands().warnPct }}–{{ bands().breachPct }}% ·
-                        breach &gt; {{ bands().breachPct }}%</span
-                    >
-                </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <button mat-stroked-button (click)="edit()">
+        <!-- Header -->
+        <inspecto-page-header
+            [title]="r.name"
+            [subtitle]="
+                'A ' +
+                r.leftDataset +
+                ' ⇄ B ' +
+                r.rightDataset +
+                ' · tree ' +
+                r.keyColumns.join(' › ') +
+                ' · bands ok < ' +
+                bands().warnPct +
+                '% · warn ' +
+                bands().warnPct +
+                '–' +
+                bands().breachPct +
+                '% · breach > ' +
+                bands().breachPct +
+                '%'
+            "
+            backLink="/reconciliation"
+            backLabel="Reconciliation"
+            [terms]="['Reconciliation', 'Dataset', 'Measure']"
+            [inset]="false"
+        >
+            <ng-container actions>
+                <button mat-icon-button (click)="edit()" matTooltip="Edit" aria-label="Edit">
                     <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
-                    <span class="ml-1">Edit</span>
                 </button>
                 <button mat-flat-button color="primary" (click)="run()" [disabled]="running() || loading()">
                     @if (running()) {
@@ -45,8 +36,8 @@
                     <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                     <span class="ml-1">Run</span>
                 </button>
-            </div>
-        </div>
+            </ng-container>
+        </inspecto-page-header>
 
         @if (ageBuckets().length) {
             <!-- BREAK-AGING-1: open breaks by age, from the persisted first-seen stamps. Counts OPEN

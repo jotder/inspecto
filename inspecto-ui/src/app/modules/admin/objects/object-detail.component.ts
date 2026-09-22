@@ -33,7 +33,7 @@ import {
     OperationalObject,
 } from 'app/inspecto/api';
 import { AiStatusComponent } from 'app/inspecto/ai-assist/ai-status.component';
-import { InspectoBreadcrumbComponent } from 'app/inspecto/components/breadcrumb.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -74,7 +74,7 @@ interface MemberTimelineEntry {
         ReactiveFormsModule,
         AiStatusComponent,
         GraphViewComponent,
-        InspectoBreadcrumbComponent,
+        InspectoPageHeaderComponent,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
@@ -414,10 +414,6 @@ export class ObjectDetailComponent implements OnInit {
     get listLabel(): string {
         const b = this.listBase;
         return b.charAt(0).toUpperCase() + b.slice(1);
-    }
-
-    back(): void {
-        this.router.navigate(['/' + this.listBase]);
     }
 
     private toG6(g: ObjectGraph): G6GraphData {

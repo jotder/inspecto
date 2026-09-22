@@ -1,35 +1,20 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 sm:p-8">
-    <!-- Breadcrumb + header -->
-    <nav class="text-secondary mb-1 text-sm" aria-label="Breadcrumb">
-        <a routerLink="/reconciliation" class="hover:underline">Reconciliation</a>
-        <span class="px-1">/</span>
-        @if (recon(); as r) {
-            <a [routerLink]="['/reconciliation', r.id]" class="hover:underline">{{ r.name }}</a>
-        } @else {
-            <span>…</span>
-        }
-        <span class="px-1">/</span>
-        <span>Breaks</span>
-    </nav>
-
     @if (recon(); as r) {
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight">Breaks — {{ r.name }}</h1>
-                <div class="text-secondary mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    <span
-                        >A <span class="font-mono">{{ r.leftDataset }}</span></span
-                    >
-                    <span aria-hidden="true">vs</span>
-                    <span
-                        >B <span class="font-mono">{{ r.rightDataset }}</span></span
-                    >
-                    @for (p of pathEntries(); track p[0]) {
-                        <inspecto-chip>{{ p[0] }} = {{ p[1] }}</inspecto-chip>
-                    }
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
+        <!-- Header -->
+        <inspecto-page-header
+            [title]="'Breaks — ' + r.name"
+            [subtitle]="'A ' + r.leftDataset + ' vs B ' + r.rightDataset"
+            [backLink]="['/reconciliation', r.id]"
+            [backLabel]="r.name"
+            [terms]="['Reconciliation', 'Break']"
+            [inset]="false"
+        >
+            <ng-container badge>
+                @for (p of pathEntries(); track p[0]) {
+                    <inspecto-chip>{{ p[0] }} = {{ p[1] }}</inspecto-chip>
+                }
+            </ng-container>
+            <ng-container actions>
                 @if (threeWay()) {
                     <!-- ⚠ Disabled while a compute runs, exactly as Refresh is. Switching mid-compute
                          re-labelled the headers to the new side while `liveBreaks()` still held the old
@@ -55,15 +40,20 @@
                     <mat-button-toggle value="tables">Tables</mat-button-toggle>
                     <mat-button-toggle value="grouped">Grouped</mat-button-toggle>
                 </mat-button-toggle-group>
-                <button mat-stroked-button (click)="compute()" [disabled]="computing()">
-                    @if (computing()) {
-                        <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
-                    }
+                @if (computing()) {
+                    <mat-progress-spinner diameter="16" mode="indeterminate" />
+                }
+                <button
+                    mat-icon-button
+                    (click)="compute()"
+                    [disabled]="computing()"
+                    matTooltip="Refresh"
+                    aria-label="Refresh"
+                >
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                    <span class="ml-1">Refresh</span>
                 </button>
-            </div>
-        </div>
+            </ng-container>
+        </inspecto-page-header>
 
         <!-- Execution & Health Status Banner -->
         <div

@@ -14,23 +14,19 @@
         </inspecto-alert>
     }
 
-    <!-- Greeting + the Lens card, whose primary action is this Lens's landing route (plan D1). -->
-    <div class="flex flex-col gap-6 lg:flex-row lg:items-stretch">
-        <div class="flex flex-1 flex-col justify-center gap-2">
-            @if (spaceName(); as space) {
-                <span class="text-secondary text-sm font-semibold uppercase tracking-wide">{{ space }}</span>
-            }
-            <h1 class="text-4xl font-bold leading-tight tracking-tight">{{ greeting() }}</h1>
-            @if (firstRun()) {
-                <p class="text-secondary max-w-2xl text-lg">
-                    Nothing has been onboarded yet. Three steps take a file in a folder to a Dataset you can query, with
-                    every Run and every Expectation on record.
-                </p>
-            } @else {
-                <p class="text-secondary max-w-2xl text-lg">{{ subtitle() }}</p>
-            }
-        </div>
+    <!-- Greeting (the shared header) + the Lens card, whose primary action is this Lens's landing route (plan D1). -->
+    <inspecto-page-header
+        [title]="greeting()"
+        [eyebrow]="spaceName() ?? ''"
+        [subtitle]="
+            firstRun()
+                ? 'Nothing has been onboarded yet. Three steps take a file in a folder to a Dataset you can query, with every Run and every Expectation on record.'
+                : subtitle()
+        "
+        [inset]="false"
+    />
 
+    <div class="flex flex-col gap-6 lg:flex-row lg:items-stretch">
         <div class="bg-card flex w-full flex-col gap-3 rounded-2xl p-6 shadow lg:w-96">
             <div class="flex items-center gap-3">
                 <mat-icon class="text-primary icon-size-6" [svgIcon]="lensIcon()"></mat-icon>

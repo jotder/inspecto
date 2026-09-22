@@ -127,16 +127,14 @@
 
         <!-- Center: toolbar + list -->
         <section class="flex h-full min-h-0 min-w-0 flex-auto flex-col">
-            <div class="flex flex-col gap-3 border-b p-4 sm:px-6" style="border-color: var(--gamma-border)">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 class="text-2xl font-extrabold leading-none tracking-tight">{{ title }}</h1>
-                        <div class="text-secondary mt-1 text-sm">
-                            {{ activeLabel() }} · {{ rows().length }} item{{ rows().length === 1 ? '' : 's' }}
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <inspecto-ai-explain [screen]="title" [terms]="explainTerms" />
+            <div class="flex flex-col gap-3 px-4 sm:px-6">
+                <inspecto-page-header
+                    [title]="title"
+                    [subtitle]="activeLabel() + ' · ' + rows().length + (rows().length === 1 ? ' item' : ' items')"
+                    [terms]="explainTerms"
+                    [inset]="false"
+                >
+                    <ng-container actions>
                         @if (!isIncident) {
                             <button
                                 mat-icon-button
@@ -162,8 +160,8 @@
                             <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                             <span class="ml-2">New {{ createLabel }}</span>
                         </button>
-                    </div>
-                </div>
+                    </ng-container>
+                </inspecto-page-header>
 
                 <!-- Bulk actions: nothing renders until rows are selected (UI-12) -->
                 <inspecto-bulk-actions

@@ -14,6 +14,7 @@ import { fmtDateTime } from 'app/inspecto/grid';
 import { Dashboard } from '../studio/dashboards/dashboard-types';
 import { DashboardsService } from '../studio/dashboards/dashboards.service';
 import { ScheduleExportData, ScheduleExportDialog, ScheduleExportResult } from './schedule-export.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** A `type:'report'` job's dashboard-export params (C6) — no new entity, params carry the shape. */
 interface ReportJobParams {
@@ -31,6 +32,7 @@ interface ReportJobParams {
 @Component({
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatTooltipModule,

@@ -47,7 +47,7 @@ import { fmtDuration, scheduleSummary, whatScheduled } from './job-display';
 import { JobDetailComponent } from './job-detail/job-detail.component';
 import { JobFormDialog } from './job-form.dialog';
 import { JobRunDetailDialog } from './job-run-detail.dialog';
-import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** Which lens the Jobs pane shows: the schedule registry, or execution reporting over the run history. */
 export type JobsViewMode = 'schedules' | 'reporting';
@@ -73,7 +73,7 @@ export { fmtDuration };
     selector: 'app-jobs',
     standalone: true,
     imports: [
-        AiExplainComponent,
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatButtonToggleModule,

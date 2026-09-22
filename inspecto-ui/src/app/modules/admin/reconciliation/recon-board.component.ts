@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -35,6 +35,7 @@ import {
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { ReconExecService } from './recon-exec.service';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One measure line of the pinned TOTAL strip. */
 interface TotalLine {
@@ -57,7 +58,7 @@ interface TotalLine {
     selector: 'app-recon-board',
     standalone: true,
     imports: [
-        RouterLink,
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

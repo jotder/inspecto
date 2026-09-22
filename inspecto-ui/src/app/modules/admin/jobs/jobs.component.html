@@ -2,24 +2,16 @@
     <!-- Left: the scheduler list (survives opening a detail — R5) -->
     <div class="flex h-full min-w-0 flex-auto flex-col overflow-y-auto">
         <!-- Header -->
-        <div
-            class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+        <inspecto-page-header
+            title="Jobs"
+            [subtitle]="
+                mode() === 'reporting'
+                    ? 'Execution reporting over the durable run history'
+                    : 'All configured scheduled jobs — cron, event-driven, and manual'
+            "
+            [terms]="['Scheduler', 'Job', 'Trigger', 'Executable', 'Run']"
         >
-            <div>
-                <h1 class="text-3xl font-extrabold leading-none tracking-tight">Scheduler</h1>
-                <div class="text-secondary mt-1.5">
-                    {{
-                        mode() === 'reporting'
-                            ? 'Execution reporting over the durable run history'
-                            : 'All configured scheduled jobs() — cron, event-driven, and manual'
-                    }}
-                </div>
-            </div>
-            <div class="mt-4 flex flex-wrap items-center gap-3 sm:mt-0">
-                <inspecto-ai-explain
-                    screen="the Scheduler"
-                    [terms]="['Scheduler', 'Job', 'Trigger', 'Executable', 'Run']"
-                />
+            <ng-container actions>
                 <mat-button-toggle-group
                     [value]="mode()"
                     (change)="setMode($event.value)"
@@ -55,8 +47,8 @@
                         <span class="ml-2">New job</span>
                     </button>
                 }
-            </div>
-        </div>
+            </ng-container>
+        </inspecto-page-header>
 
         <!-- Main -->
         <div class="flex flex-auto flex-col p-6 sm:p-10">

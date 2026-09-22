@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -31,6 +31,7 @@ import {
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Breaks page (`/reconciliation/:id/breaks?path=…`) — the record sets behind one Board cell: three
@@ -45,7 +46,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
     standalone: true,
     imports: [
         ChipComponent,
-        RouterLink,
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatButtonToggleModule,
         MatIconModule,

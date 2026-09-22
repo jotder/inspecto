@@ -1,8 +1,11 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 sm:p-8">
-    <div class="mb-6 flex items-center gap-3">
-        <mat-icon class="text-primary icon-size-8" svgIcon="heroicons_outline:document-chart-bar"></mat-icon>
-        <h1 class="text-2xl font-semibold tracking-tight">KPI & Reports</h1>
-    </div>
+    <inspecto-page-header
+        title="KPI & Reports"
+        subtitle="Every saved Dashboard, with its scheduled exports — open one, run an export now, or schedule a new one."
+        [terms]="['Dashboard', 'Widget', 'Measure']"
+        [inset]="false"
+        class="mb-6"
+    />
 
     @if (loading()) {
         <inspecto-skeleton [lines]="3" height="4rem" />

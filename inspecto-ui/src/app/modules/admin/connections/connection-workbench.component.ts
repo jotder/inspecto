@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,6 +23,8 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { ConnectionTreeComponent } from './connection-tree.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 /**
  * Connection workbench — the four-verb detail view for one connection profile (connect · explore · test ·
@@ -34,7 +36,8 @@ import { ConnectionTreeComponent } from './connection-tree.component';
     selector: 'app-connection-workbench',
     standalone: true,
     imports: [
-        RouterLink,
+        InspectoPageHeaderComponent,
+        ChipComponent,
         MatButtonModule,
         MatButtonToggleModule,
         MatIconModule,
