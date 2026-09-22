@@ -1573,8 +1573,10 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   CI. Manual WCAG: `docs/ui/accessibility-audit.md`.
 - **Shared design system**: `status-badge` / `empty-state` / `skeleton` / `grid` (+ `noRowsOverlay`) /
   `connectivity-banner` / `ai-assist`. Living gallery at `/design`. **Since 2026-09-22 it also owns the page
-  chrome** — `page-header` / `filter-bar` / `stat-tile` / `section-tabs` / `bulk-actions` (UI consolidation
-  plan). A routed pane renders its title, subtitle, help affordance and actions through
+  chrome** — `page-header` / `filter-bar` / `stat-tile` / `section-tabs` / `bulk-actions`. The programme
+  shipped and was archived 2026-09-22; its as-built facts and measured traps are
+  [`okf/frontend/conventions/page-chrome.md`](okf/frontend/conventions/page-chrome.md) — read that, not the
+  bullets below, when the two disagree. A routed pane renders its title, subtitle, help affordance and actions through
   `<inspecto-page-header>`; it owns the page's ONLY `<h1>`, at the shared `text-title` size (22 px).
 - 🔴 **An absent optional module is `isFeatureAbsent(err)`, not an error** (2026-09-22, `api-base.ts`):
   status `0/404/502/503/504` means "not deployed here", so the pane explains it in place with an info
