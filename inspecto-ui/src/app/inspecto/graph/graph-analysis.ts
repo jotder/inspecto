@@ -48,13 +48,25 @@ export function configureGraphLimits(
 }
 
 /**
- * The ceiling for **suspicion score alone** (decision D-S3, operator 2026-09-22). It gets its own,
- * lower default because the shared {@link ANALYSIS_NODE_CAP_DEFAULT} is sized for the other 26
- * algorithms, which are trivial at 2 000 nodes; this one is not, and one slow algorithm should not
- * drag the cap down for the 25 that finish in under 60 ms.
+ * The ceiling for the **betweenness-bearing** algorithms — `betweennessCentrality` and `suspicionScore`,
+ * which is slow only because it calls it (decision D-S3, operator 2026-09-22).
  *
- * Measured on the dev host, median of 3, ~3 edges per node:
+ * 🔴 **Corrected 2026-09-23.** This was applied to suspicion score alone, on the plan's §1.7 claim that
+ * "25 of 27 algorithms stay under 60 ms at 1 999 nodes" with suspicion score the sole outlier. That claim
+ * was wrong: betweenness had never been isolated, and its cost hid inside the blend. Measured per
+ * component at 2 000 nodes — **betweenness 9 757 ms**, pageRank 61, kCore 60, triangleCount 6,
+ * degreeCentrality 2. The blend is betweenness plus noise. ⛔ So the cap had been guarding the CALLER
+ * while the CAUSE stayed on the shared 2 000 ceiling, and an analyst selecting "Betweenness" from the
+ * centrality list froze the main thread for about ten seconds.
+ *
+ * ⚠ The persisted setting is still keyed `suspicionNodeCap` (`GET|PUT /settings/link-analysis`). That name
+ * is now narrower than what it governs; renaming a setting shipped the day before is an operator call and
+ * is deliberately NOT taken here.
+ *
+ * Measured on the dev host, median of 3, ~3 edges per node — suspicion score end to end:
  * 250 → 103 ms · 500 → 402 ms · **750 → 972 ms** · 1 000 → 1 608 ms · 1 500 → 3 774 ms · 2 000 → 7 277 ms.
+ * And betweenness alone, which accounts for essentially all of it: 500 → 425 ms · 1 000 → 2 930 ms ·
+ * 2 000 → 9 757 ms.
  *
  * 🔴 **The curve is quadratic** — betweenness dominates, and doubling the nodes costs ~4.5× the time,
  * so this cap is far more sensitive than a linear one: halving it from 2 000 to 1 000 cuts the work to
@@ -269,7 +281,13 @@ export function degreeCentrality(g: G6GraphData): NodeScore[] {
  * Throws above {@link analysisNodeCapValue} — callers surface that as a typed message.
  */
 export function betweennessCentrality(g: G6GraphData): NodeScore[] {
-    const cap = analysisNodeCapValue();
+    // 🔴 The LOW cap, not the shared one. Measured 2026-09-23: betweenness is 425 ms at 500 nodes,
+    // 2.9 s at 1 000 and 9.8 s at 2 000 — it is THE slow algorithm in this library, and every other
+    // component of suspicion score together costs under 130 ms at 2 000. Guarding it with the shared
+    // 2 000 cap meant an analyst choosing "Betweenness" from the centrality list froze the main thread
+    // for about ten seconds. D-S3 capped suspicion score at 750 believing IT was the outlier; suspicion
+    // score is only slow because it calls this, so the cap belonged here all along.
+    const cap = suspicionNodeCapValue();
     if (g.nodes.length > cap) {
         throw new Error(`Betweenness is capped at ${cap} nodes (graph has ${g.nodes.length}).`);
     }

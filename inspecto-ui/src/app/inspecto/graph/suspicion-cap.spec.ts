@@ -5,6 +5,7 @@ import {
     SUSPICION_NODE_CAP_DEFAULT,
     analysisNodeCapValue,
     configureGraphLimits,
+    betweennessCentrality,
     degreeCentrality,
     resetGraphLimits,
     suspicionNodeCapValue,
@@ -83,5 +84,27 @@ describe('suspicion score has its own cap (D-S3)', () => {
         resetGraphLimits();
 
         expect(suspicionNodeCapValue()).toBe(SUSPICION_NODE_CAP_DEFAULT);
+    });
+
+    /**
+     * 🔴 The cap belongs to BETWEENNESS, not to its caller. D-S3 set it on `suspicionScore` believing that
+     * was the outlier; measured 2026-09-23, suspicion score is slow ONLY because it calls betweenness
+     * (9 757 ms of a 9 359 ms blend at 2 000 nodes, every other component under 130 ms combined). While
+     * betweenness sat behind the shared 2 000 cap, choosing "Betweenness" from the centrality list froze
+     * the main thread for about ten seconds — the exact freeze D-S3 believed it had removed.
+     */
+    it('caps betweenness with the LOW ceiling, not the shared analysis cap', () => {
+        configureGraphLimits({ analysisNodeCap: 2000, suspicionNodeCap: 100 });
+        const g = ring(150);
+
+        expect(() => betweennessCentrality(g)).toThrow(/capped at 100 nodes/);
+        // its cheap siblings stay on the shared cap and keep working at this size
+        expect(() => degreeCentrality(g)).not.toThrow();
+    });
+
+    it('lets betweenness run under its own ceiling', () => {
+        configureGraphLimits({ suspicionNodeCap: 900 });
+
+        expect(betweennessCentrality(ring(40)).length).toBe(40);
     });
 });

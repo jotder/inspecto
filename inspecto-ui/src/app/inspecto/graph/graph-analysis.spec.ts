@@ -809,20 +809,32 @@ describe('graph limits are configurable (D-S3)', () => {
         expect(analysisNodeCapValue()).toBe(ANALYSIS_NODE_CAP_DEFAULT);
     });
 
+    // ⚠ These use closeness, not betweenness. Betweenness was the vehicle until 2026-09-23, when it moved
+    // onto the LOWER `suspicionNodeCap` — it is the one genuinely slow algorithm (9.8 s at 2 000 nodes,
+    // against 129 ms for every other component combined), so the shared cap never governed it well. The
+    // subject here is the SHARED cap being configurable, so the vehicle must be an algorithm still on it.
     it('a deployment override takes effect, and the refusal names the NEW limit not the old one', () => {
         configureGraphLimits({ analysisNodeCap: 10 });
         expect(analysisNodeCapValue()).toBe(10);
-        expect(() => betweennessCentrality(ring(20))).toThrowError(/capped at 10 nodes/);
+        expect(() => closenessCentrality(ring(20))).toThrowError(/capped at 10 nodes/);
         // ...and a graph under the new limit still runs
-        expect(() => betweennessCentrality(ring(5))).not.toThrow();
+        expect(() => closenessCentrality(ring(5))).not.toThrow();
     });
 
     it('raising the cap lets a graph through that the default would have refused', () => {
         const g = ring(30);
         configureGraphLimits({ analysisNodeCap: 10 });
-        expect(() => betweennessCentrality(g)).toThrow();
+        expect(() => closenessCentrality(g)).toThrow();
         configureGraphLimits({ analysisNodeCap: 100 });
-        expect(() => betweennessCentrality(g)).not.toThrow();
+        expect(() => closenessCentrality(g)).not.toThrow();
+    });
+
+    // And the counterpart: the shared cap must NOT govern betweenness any more.
+    it('the shared cap does not gate betweenness, which has its own lower ceiling', () => {
+        configureGraphLimits({ analysisNodeCap: 10, suspicionNodeCap: 1000 });
+
+        expect(() => closenessCentrality(ring(20))).toThrow();
+        expect(() => betweennessCentrality(ring(20))).not.toThrow();
     });
 
     it('⛔ REFUSES a nonsense cap and keeps the previous value', () => {
