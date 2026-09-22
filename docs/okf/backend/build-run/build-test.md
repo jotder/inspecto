@@ -34,6 +34,40 @@ Every JVM launch (engine, tests, serve scripts) **must** pass:
 It's wired into the root `pom.xml` Surefire config as `<argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>`
 (the `@{argLine}` prefix lets JaCoCo prepend its agent). Omitting it fails DuckDB's native init.
 
+## Seeding a fresh checkout — `tools/seed-samples.mjs`
+
+```
+node tools/seed-samples.mjs [<space> | --all] [--dry-run]
+```
+
+🔴 **A fresh clone cannot run a single Pipeline until this runs.** `.gitignore` ignores everything
+under `spaces/<space>/data/` and force-tracks `data/samples/**` only, so the samples are present and
+every **inbox**, every **`data/ref/`** and all eight per-Pipeline working directories are absent.
+`PipelineConfig.prepare()` creates only the status dir, so the rest must exist on disk before a run.
+The visible symptom of skipping it is the two reference-join examples (`join_step`,
+`orders_enriched_rollup`) failing **422** with a leaked DuckDB internal — *“No files found that match
+the pattern”* — on both the test run and the dry-run, which reads as an engine defect and is not one.
+
+⚠ **It derives the work from each Pipeline's own `dirs.poll`**, never a hand-kept list: it reads every
+`<space>/config/**` file ending `_pipeline.toon`, creates each `dirs.*` leaf, copies
+`data/samples/<pipeline>/` (recursively) into that Pipeline's inbox, and copies `data/samples/ref/*`
+into `data/ref/`. A Pipeline with **no** same-named sample directory is **reported**, not skipped in
+silence — that line is how `lookup_step`, which ships no sample at all, stays visible
+(`DEMO-CORPUS-FORMAT-COVERAGE-1`).
+
+It is **idempotent and not a sync**: it creates and overwrites, it never deletes, so re-running after
+the engine has consumed an inbox re-seeds it and a file you dropped in by hand survives.
+
+Wired into the four space-serving launchers in `.claude/launch.json` and step 2 of the `smoke` skill,
+so the ordinary paths seed themselves.
+
+⚠ **The per-space `data/samples/seed-inbox.sh` / `.ps1` still exist and still work**, but each carries a
+HAND-WRITTEN pipeline name list in two files, so a Pipeline added to a space is silently unseeded
+until someone edits both. Prefer the derived tool; reach for the shell scripts only to seed one space
+without Node. *(Shipped 2026-09-22 as `WB-16`; row `REFERENCE-EXAMPLES-NEED-UNRUN-SEED-1`, whose
+stated cause — “nothing copies it” — was refuted while building this: the shell scripts do copy the
+reference, and nothing ran them.)*
+
 ## Packaging — `package.ps1`
 
 `inspecto/package.ps1` emits the deployment bundle. Switches: `-NoBuild` (reuse `target/`), `-NoUi` (skip the
