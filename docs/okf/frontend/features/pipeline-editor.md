@@ -547,9 +547,16 @@ database; the lift rebuilds pairing from the stamp.
 
 ## The Recipe view and the step cards
 
-`<app-pipeline-step-cards>` (hosted in `pipeline-editor.component.html`) **is** the ordered `steps:`
+🔴 **STALE — corrected 2026-09-22.** `<app-pipeline-step-cards>` **no longer exists**: it was deleted in
+`6d3c68fa` (2026-09-18, *"pipelines canvas consolidation"*), and `inspecto-ui/src` has no Recipe view and no
+`onRecipeInsert`. The paragraph below is kept as the record of what it was, because a decision rested on it
+(the orphan-drop decline above assumed insert-between lived here). Today there is **no one-gesture insert
+anywhere** — `insertNode` is a bare `addNodeToModel` — which is what `WB-14` / `D8` in
+`superpower/workbench-trust-plan.md` reopen.
+
+~~`<app-pipeline-step-cards>` (hosted in `pipeline-editor.component.html`) **is** the ordered `steps:`
 chain editor — cards in chain order, insert-between, remove, move up/down, nested `route` branches,
-wired with `[editable]`.
+wired with `[editable]`.~~
 
 - ⚠ **Never key anything on `verb`** — `GET /pipelines/step-types` publishes entries where
   `transform` appears twice (filter, join); `type` is the unique key (duplicate `@for` track keys
