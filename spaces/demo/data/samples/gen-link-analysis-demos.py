@@ -38,6 +38,27 @@ OPERATORS = [  # (name, plmn, country) — synthetic; 001 is the ITU test MCC
     ("Northwind Mobile", "00116", "NM"), ("Quartz Mobile", "00119", "QM"),
 ]
 BY_NAME = {o[0]: o for o in OPERATORS}
+
+# Story (e): partners do not agree on how to spell one operator's name. Real interconnect feeds are like
+# this — the PLMN is the contract key and the name is free text typed by whoever built the file. Only the
+# NAME varies; 00103 is always 00103, so the ground truth stays recoverable.
+SPELLING_VARIANTS = {
+    "Cinder Wireless": [
+        ("Cinder Wireless", 60),    # canonical
+        ("CINDER WIRELESS", 20),    # a partner that upper-cases every name field
+        ("Cinder Wireless.", 12),   # a trailing period from a legal-name field
+        ("Cinder  Wireless", 8),    # a double space nobody ever noticed
+    ],
+}
+_variant_rng = random.Random(20260903)
+
+
+def spell(name: str) -> str:
+    """How this operator's name is WRITTEN in a given record — canonical unless it is the story-(e) one."""
+    variants = SPELLING_VARIANTS.get(name)
+    if not variants:
+        return name
+    return _variant_rng.choices([v for v, _ in variants], weights=[w for _, w in variants])[0]
 # event type → (unit label, base SDR per unit, typical units range)
 EVENTS = {
     "MOC": (60, 0.42, (1, 40)),        # mobile-originated call, units = minutes
@@ -63,6 +84,12 @@ AGREEMENTS = [
 #  (b) Kestrel Telecom's TAP files are REJECTED ~40 % of the time → a settlement-status filter isolates it.
 #  (c) Quartz↔Fjord carry half of all traffic → the backbone/cut-point tools find the dependency.
 #  (d) IMSI 001010000000042 appears on FOUR visited networks in 3 days → an impossible-travel roamer.
+#  (e) Cinder Wireless is SPELLED FOUR WAYS across partners — its PLMN (00103) never varies. Projecting
+#      on SENDER_NAME/RECIPIENT_NAME splits one partner into four nodes with four degree counts and four
+#      community memberships; projecting on SENDER_PLMN does not. This is decision D-S4's risk made
+#      visible: the display string is not an identity, and the feed itself proves it by carrying the key
+#      alongside. Before this, every entity in the corpus came from a canonical literal, so the split
+#      could not occur at all and the Link Analysis split-identity notice always read zero.
 imsi_pool = {home: [f"{BY_NAME[home][1]}{n:010d}" for n in range(1, 16)] for home, _, _ in AGREEMENTS}
 TRAVELLER = "001010000000042"
 weights = [w for _, _, w in AGREEMENTS]
@@ -87,13 +114,15 @@ for day in DAYS:
         imsi = rng.choice(imsi_pool[home])
         tap_seq += 1
         rows.append([
-            f"{fid_base}-{tap_seq:05d}", BY_NAME[visited][1], visited, BY_NAME[home][1], home, ev, imsi,
+            f"{fid_base}-{tap_seq:05d}", BY_NAME[visited][1], spell(visited), BY_NAME[home][1], spell(home),
+            ev, imsi,
             str(units), f"{charge:.4f}", f"{charge * 0.15:.4f}", day.strftime("%Y-%m-%d"), fmt(ts(day)), status,
         ])
     for visited in ["Northwind Mobile", "Ivory Cellular", "Juniper Mobile", "Quartz Mobile"][: 2 if day == DAYS[0] else 1]:
         tap_seq += 1                                           # story (d): the impossible traveller
         rows.append([
-            f"{fid_base}-{tap_seq:05d}", BY_NAME[visited][1], visited, "00101", "Aurora Telecom", "MOC", TRAVELLER,
+            f"{fid_base}-{tap_seq:05d}", BY_NAME[visited][1], spell(visited), "00101", "Aurora Telecom",
+            "MOC", TRAVELLER,
             "12", "5.0400", "0.7560", day.strftime("%Y-%m-%d"), fmt(ts(day, 8, 20)), "ACCEPTED",
         ])
     tap_rows[f"TAP_{day:%Y%m%d}.csv"] = rows

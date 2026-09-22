@@ -264,6 +264,19 @@ if ! run_guard tools/check-nul-bytes.mjs "NUL-byte guard" \
   exit 1
 fi
 
+# The Link Analysis demo corpus must keep DEMONSTRATING decision D-S4's risk. Measured 2026-09-22, the
+# split count across 24 candidate entity columns was exactly ZERO: every entity came from a canonical
+# literal, so the failure was structurally possible and empirically unobservable — and the split-identity
+# notice shipped that morning read zero everywhere, which is indistinguishable from a broken feature.
+# Story (e) plants it (one operator spelled four ways, its PLMN constant). Falsified before wiring: the
+# pre-fixture corpus fails with SPLIT 0 naming both columns, and the corpus with story (e) passes.
+if ! run_guard tools/check-split-identity-fixture.mjs "split-identity fixture guard"      "A regenerated corpus that lost story (e) takes D-S4's evidence with it, silently."; then
+  echo "pre-push: refusing to push — the demo corpus no longer demonstrates a split identity (above)." >&2
+  echo "          Restore story (e) in spaces/demo/data/samples/gen-link-analysis-demos.py and re-run it." >&2
+  echo "          The split is DELIBERATE: the operator name varies, the PLMN key does not." >&2
+  exit 1
+fi
+
 echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
 echo "          merge-forward set is EMPTY (BRANCHING.md §0-A; 4.x was deleted 2026-08-17)." >&2
 echo "          When the next major is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2
