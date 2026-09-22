@@ -13,6 +13,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { SpaceFormDialog } from './space-form.dialog';
 import { SpaceTemplateGalleryData, SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Spaces admin — manage the projects this server hosts: list every space, create empty ones or onboard
@@ -24,6 +25,7 @@ import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
     selector: 'app-spaces',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatMenuModule,

@@ -11,6 +11,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { buildReconciliation, Reconciliation, ReconciliationsService } from 'app/inspecto/reconciliation';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Reconciliation (C9) — the list of Dataset-vs-Dataset reconciliations; open one to run it and drill its
@@ -19,7 +20,13 @@ import { ReconciliationFormDialog, ReconciliationFormResult } from './reconcilia
 @Component({
     selector: 'app-reconciliations',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, DataTableComponent, InspectoEmptyStateComponent],
+    imports: [
+        InspectoPageHeaderComponent,
+        MatButtonModule,
+        MatIconModule,
+        DataTableComponent,
+        InspectoEmptyStateComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './reconciliations.component.html',
 })

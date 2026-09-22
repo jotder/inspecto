@@ -18,6 +18,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One storage axis row derived from the latest storage_report Run Artifacts (MNT-3 series). */
 interface StorageAxis {
@@ -38,6 +39,7 @@ interface StorageAxis {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         StatusBadgeComponent,

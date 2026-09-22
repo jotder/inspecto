@@ -38,6 +38,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { ToastrService } from 'ngx-toastr';
 import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { EventDetailDialog, EventDrilldown } from './event-detail.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** Selectable live-tail poll cadences (seconds) — polling pauses while the tab is hidden via {@link visibleInterval}. */
 const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
@@ -53,6 +54,7 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
     selector: 'app-events',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatFormFieldModule,

@@ -13,6 +13,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** `-1` means "not carried by the source row" — render blank, never a misleading 0. */
 function blankIfUnknown(p: { value: number | null | undefined }): string {
@@ -41,6 +42,7 @@ interface MetricCard {
     selector: 'app-processing-status',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         DecimalPipe,
         MatButtonModule,
         MatIconModule,

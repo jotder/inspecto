@@ -1,15 +1,12 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
     <!-- Header -->
-    <div class="flex items-center justify-between gap-3">
-        <div>
-            <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Query Library</h1>
-            <div class="text-secondary mt-1">
-                Reusable queries — a source dataset, SQL with runtime <span class="font-mono">$</span>-parameters,
-                previewed offline. One saved query can be bound by many widgets.
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
-            <inspecto-ai-explain screen="the Query Library" [terms]="['Dataset', 'View', 'Measure', 'Widget']" />
+    <inspecto-page-header
+        title="Query Library"
+        subtitle="Reusable queries — a source dataset, SQL with runtime $-parameters, previewed offline. One saved query can be bound by many widgets."
+        [terms]="['Dataset', 'View', 'Measure', 'Widget']"
+        [inset]="false"
+    >
+        <ng-container actions>
             @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
@@ -22,8 +19,8 @@
                     <span class="ml-2">New query</span>
                 </button>
             }
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     @if (writesDisabled()) {
         <inspecto-alert class="mt-4 block" variant="warning" icon="heroicons_outline:lock-closed">

@@ -1,16 +1,10 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div
-        class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+    <inspecto-page-header
+        title="Signal Ledger"
+        subtitle="The unified signal stream — every run, job, alert, expectation and operator action, with its emitting source and severity"
     >
-        <div>
-            <h1 class="text-3xl font-extrabold leading-none tracking-tight">Signal Ledger</h1>
-            <div class="text-secondary mt-1.5">
-                The unified signal stream — every run, job, alert, expectation and operator action, with its emitting
-                source and severity
-            </div>
-        </div>
-        <div class="mt-4 flex items-center gap-3 sm:mt-0">
+        <ng-container actions>
             <!-- ⛔ No live-tail controls when the events module is absent: neither transport can run,
                  and an affordance that can only answer "nothing" is worse than none. The pane already
                  explains the absence where the grid would be. -->
@@ -59,8 +53,8 @@
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
             }
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
@@ -70,9 +64,9 @@
                  never 503-toast, and use @if/@else so no empty ag-grid is left mounted (axe
                  aria-required-children). -->
             <inspecto-alert variant="info" title="Events feed not installed">
-                The operational events feed is provided by the optional events module (Professional edition and above), so
-                there is nothing to browse in this bundle. Events are still recorded — the audit trail remains available
-                on the Audit log screen.
+                The operational events feed is provided by the optional events module (Professional edition and above),
+                so there is nothing to browse in this bundle. Events are still recorded — the audit trail remains
+                available on the Audit log screen.
                 <div class="mt-3">
                     <a mat-stroked-button href="/audit">
                         <mat-icon svgIcon="heroicons_outline:shield-check"></mat-icon>

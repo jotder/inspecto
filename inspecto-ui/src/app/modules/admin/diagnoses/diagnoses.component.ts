@@ -13,6 +13,7 @@ import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component'
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { DiagnosisDetailDialog } from './diagnosis-detail.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Diagnoses — recent failure root-cause analyses (GET /assist/diagnoses), on the gamma shell:
@@ -22,6 +23,7 @@ import { DiagnosisDetailDialog } from './diagnosis-detail.dialog';
     selector: 'app-diagnoses',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatFormFieldModule,

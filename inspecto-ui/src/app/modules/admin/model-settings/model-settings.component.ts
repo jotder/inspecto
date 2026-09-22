@@ -16,6 +16,7 @@ import {
     AssistSettingsUpdate,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** Display names for the provider dropdown. */
 const PROVIDER_LABELS: Record<string, string> = {
@@ -40,6 +41,7 @@ const TIERS = ['small', 'medium', 'large'] as const;
     selector: 'app-model-settings',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatFormFieldModule,

@@ -1,8 +1,8 @@
 @if (!opsEnabled()) {
     <div class="p-6 md:p-8">
         <inspecto-alert variant="info" title="Operational objects not installed">
-            This Incident/Case view is provided by the optional operational-objects module (Professional edition and above),
-            so it cannot be shown in this bundle.
+            This Incident/Case view is provided by the optional operational-objects module (Professional edition and
+            above), so it cannot be shown in this bundle.
         </inspecto-alert>
     </div>
 } @else {
@@ -204,9 +204,9 @@
                             <!-- EDG-01 cell 6: the feed is the optional inspecto-events module. Explained, not
                              an empty state — "no events" would misreport a feed we cannot read at all. -->
                             <inspecto-alert variant="info" title="Events feed not installed">
-                                The operational events feed is provided by the optional events module (Professional edition
-                                and above), so this timeline cannot be shown in this bundle. Events are still recorded —
-                                the audit trail remains available on the Audit log screen.
+                                The operational events feed is provided by the optional events module (Professional
+                                edition and above), so this timeline cannot be shown in this bundle. Events are still
+                                recorded — the audit trail remains available on the Audit log screen.
                             </inspecto-alert>
                         } @else if (!obj()?.correlationId) {
                             <inspecto-empty-state

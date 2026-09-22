@@ -1,12 +1,10 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Viz Library</h1>
-            <div class="text-secondary mt-1">
-                Saved widgets — charts, tables, maps and link graphs — ready to view or place on a dashboard.
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
+    <inspecto-page-header
+        title="Viz Library"
+        subtitle="Saved widgets — charts, tables, maps and link graphs — ready to view or place on a dashboard."
+        [inset]="false"
+    >
+        <ng-container actions>
             @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
@@ -23,8 +21,8 @@
                 <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                 <span class="ml-2">New widget</span>
             </button>
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     <div class="relative mt-4 max-w-md">
         <mat-icon

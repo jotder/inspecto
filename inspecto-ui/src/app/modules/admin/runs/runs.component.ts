@@ -33,6 +33,7 @@ import { InspectoRowAction } from 'app/inspecto/grid';
 import { RunDetailComponent } from 'app/modules/admin/run-detail/run-detail.component';
 import { ReprocessDialog } from './reprocess.dialog';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Runs — every configured ingest run with lifecycle actions (trigger / pause / resume /
@@ -44,6 +45,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
     selector: 'app-runs',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         AiExplainComponent,
         FormsModule,
         MatButtonModule,

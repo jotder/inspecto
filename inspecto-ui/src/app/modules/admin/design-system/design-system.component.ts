@@ -15,7 +15,6 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoStatTileComponent } from 'app/inspecto/components/stat-tile.component';
 import { InspectoSectionTabsComponent, SectionTab } from 'app/inspecto/components/section-tabs.component';
 import { BulkAction, InspectoBulkActionsComponent } from 'app/inspecto/components/bulk-actions.component';
@@ -43,6 +42,7 @@ import {
     SchemaFieldRow,
 } from 'app/inspecto/schema';
 import { ResizeDemoDialog } from './resize-demo.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 interface DemoRow {
     pipeline: string;

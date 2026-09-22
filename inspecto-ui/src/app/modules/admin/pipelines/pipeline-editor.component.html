@@ -157,8 +157,6 @@
                 }
             </mat-menu>
 
-
-
             <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
             <button
                 mat-icon-button
@@ -570,11 +568,7 @@
                         </button>
                     </div>
 
-                    <div
-                        id="pipe-panel-right"
-                        class="min-h-0 flex-1 overflow-y-auto"
-                        [class.p-3]="!definitionNode()"
-                    >
+                    <div id="pipe-panel-right" class="min-h-0 flex-1 overflow-y-auto" [class.p-3]="!definitionNode()">
                         @if (definitionNode(); as dn) {
                             <!-- Definition drawer (definition-surface P1): the collector path is DEFINED
                                  here in the dock, not in a popup. Apply is an in-memory patch (D2);

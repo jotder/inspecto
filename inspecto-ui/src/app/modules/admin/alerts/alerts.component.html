@@ -1,15 +1,12 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Alerts</h1>
-            <div class="text-secondary mt-1">
-                Fired alert-rule breaches — an Alert Rule watches a Metric over the batch ledger, or a Measure over a
-                Dataset, against a threshold and fires when it crosses.
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
-            <inspecto-ai-explain screen="Alerts" [terms]="['Alert', 'Alert Rule', 'Notification', 'Incident']" />
+    <inspecto-page-header
+        title="Alerts"
+        subtitle="Fired alert-rule breaches — an Alert Rule watches a Metric over the batch ledger, or a Measure over a Dataset, against a threshold and fires when it crosses."
+        [terms]="['Alert', 'Alert Rule', 'Notification', 'Incident']"
+        [inset]="false"
+    >
+        <ng-container actions>
             @if (loading() || evaluating()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
@@ -19,8 +16,8 @@
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     <!-- Fired alerts grid -->
     <div class="mt-4 flex-auto">

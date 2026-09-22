@@ -12,6 +12,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { buildRequirement, Requirement, RequirementsService } from 'app/inspecto/requirement';
 import { RequirementFormDialog, RequirementFormResult } from './requirement-form.dialog';
 import { RequirementDecisionDialog, RequirementDecisionResult } from './requirement-decision.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Requirements intake (C1) — Business authors KPI/Report/Reconciliation/Rule requirements; Builder (and
@@ -22,7 +23,13 @@ import { RequirementDecisionDialog, RequirementDecisionResult } from './requirem
 @Component({
     selector: 'app-requirements',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, DataTableComponent, InspectoEmptyStateComponent],
+    imports: [
+        InspectoPageHeaderComponent,
+        MatButtonModule,
+        MatIconModule,
+        DataTableComponent,
+        InspectoEmptyStateComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './requirements.component.html',
 })

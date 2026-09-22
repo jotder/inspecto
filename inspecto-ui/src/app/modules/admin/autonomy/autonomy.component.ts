@@ -20,6 +20,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** An editable working-copy row for one action class. */
 interface ClassRow {
@@ -43,6 +44,7 @@ const PILOT_CLASSES = ['batch_rerun', 'alert_triage'];
     selector: 'app-autonomy',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatIconModule,

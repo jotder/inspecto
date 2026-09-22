@@ -22,6 +22,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { Condition, ConditionGroup } from 'app/inspecto/query/query-types';
 import { type Consequence, describeConsequence } from 'app/inspecto/decision';
 import { DecisionRuleFormData, DecisionRuleFormDialog, DecisionRuleFormResult } from './decision-rule-form.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One-line human summary of a condition tree, e.g. `tariff startsWith EMEA_ AND cost_usd > 100`. */
 export function summarizeWhen(g: ConditionGroup): string {
@@ -53,6 +54,7 @@ export function summarizeConsequences(r: DecisionRule): string {
     selector: 'app-decision-rules',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

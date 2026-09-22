@@ -1,7 +1,4 @@
-<div
-    #studioRoot
-    class="flex h-full min-h-0 min-w-0 flex-auto flex-col p-4"
->
+<div #studioRoot class="flex h-full min-h-0 min-w-0 flex-auto flex-col p-4">
     <!-- ── compact header (the canvas gets the space) ── -->
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-semibold tracking-tight">Link Analysis</h1>
@@ -13,7 +10,11 @@
             mat-icon-button
             class="ml-auto"
             (click)="toggleCanvasMaximized()"
-            [matTooltip]="canvasMaximized() ? 'Show the query and toolbox panels' : 'Hide the query and toolbox panels (more room for the canvas)'"
+            [matTooltip]="
+                canvasMaximized()
+                    ? 'Show the query and toolbox panels'
+                    : 'Hide the query and toolbox panels (more room for the canvas)'
+            "
             [attr.aria-label]="canvasMaximized() ? 'Show the side panels' : 'Hide the side panels'"
         >
             <mat-icon
@@ -538,7 +539,9 @@
                 <button
                     mat-icon-button
                     (click)="toggleFullscreen('graph')"
-                    [matTooltip]="fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen (browser-level, canvas only)'"
+                    [matTooltip]="
+                        fullscreen() === 'graph' ? 'Exit full screen' : 'Full screen (browser-level, canvas only)'
+                    "
                     [attr.aria-label]="
                         fullscreen() === 'graph' ? 'Exit graph full screen' : 'View the graph in full screen'
                     "

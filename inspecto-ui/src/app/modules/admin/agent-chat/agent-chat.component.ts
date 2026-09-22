@@ -12,6 +12,7 @@ import { A2uiRenderComponent } from 'app/inspecto/a2ui/a2ui-render.component';
 import { isNavigableTarget } from 'app/inspecto/a2ui/route-validation';
 import { AgentAskResult, AgentCitation, AgentService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** One transcript entry. Agent messages grow token-by-token while `streaming`. */
 interface ChatMessage {
@@ -40,6 +41,7 @@ interface ChatMessage {
     selector: 'app-agent-chat',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatFormFieldModule,

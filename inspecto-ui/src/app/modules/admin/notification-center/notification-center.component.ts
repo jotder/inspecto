@@ -21,6 +21,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { NotificationPreferencesComponent } from 'app/modules/admin/notification-preferences/notification-preferences.component';
 import { ChannelFormDialog, ChannelFormResult } from './channel-form.dialog';
 import { RuleFormDialog, RuleFormResult } from './rule-form.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Notification center (C4) — one Ops surface for the whole notification story: **Channels**
@@ -35,6 +36,7 @@ import { RuleFormDialog, RuleFormResult } from './rule-form.dialog';
     selector: 'app-notification-center',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatTabsModule,

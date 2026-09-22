@@ -593,8 +593,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             : null;
     });
 
-
-
     /** The selected node's last-run output (T17), or `null` when that run recorded nothing for it. */
     selectedNodeLastRun(): { rowCount: number; runTs: string } | null {
         return this.nodeLastRun(this.selectedNode());
@@ -618,7 +616,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             this.refsLoaded(),
         );
     }
-
 
     // ── guided mode (definition-surface P6-d): the wizard's stage rail as toolbar chips ──
 

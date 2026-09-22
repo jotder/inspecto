@@ -14,6 +14,7 @@ import {
     groupByCategory,
     resolveNodeIcon,
 } from 'app/modules/admin/pipelines/pipeline-graph';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Processor-icon settings — map each processor **type** (and per-**sub-type**) to a glyph + colour. A
@@ -25,6 +26,7 @@ import {
     selector: 'app-icon-settings',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         NgTemplateOutlet,
         MatButtonModule,
         MatFormFieldModule,

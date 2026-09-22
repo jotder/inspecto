@@ -447,7 +447,11 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
                     -->
                     @if (filenameColumnTarget(); as t) {
                         <div class="mb-3 mt-3">
-                            <mat-checkbox [checked]="!!t.value" [disabled]="readOnly()" (change)="onFilenameColumnToggle($event.checked)">
+                            <mat-checkbox
+                                [checked]="!!t.value"
+                                [disabled]="readOnly()"
+                                (change)="onFilenameColumnToggle($event.checked)"
+                            >
                                 Add a column with the source file name
                             </mat-checkbox>
                             <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">

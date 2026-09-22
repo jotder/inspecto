@@ -7,23 +7,19 @@
             is disabled until a reload succeeds — otherwise it would overwrite the stored map with these blanks.
         </inspecto-alert>
     }
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Processor Icons</h1>
-            <div class="text-secondary mt-1 max-w-2xl">
-                Choose the icon and colour for each processor type and sub-type. A sub-type overrides its category
-                default; an <em>inherit</em> row falls back to the category, then the built-in icon. Pipeline graphs
-                render these.
-            </div>
-        </div>
-        <div class="flex items-center gap-2">
+    <inspecto-page-header
+        title="Processor Icons"
+        subtitle="Choose the icon and colour for each processor type and sub-type. A sub-type overrides its category default; an inherit row falls back to the category, then the built-in icon. Pipeline graphs render these."
+        [inset]="false"
+    >
+        <ng-container actions>
             <button mat-stroked-button (click)="reset()" [disabled]="saving()">Reset</button>
             <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || loading() || loadFailed()">
                 <mat-icon svgIcon="heroicons_outline:check"></mat-icon>
                 <span class="ml-1">Save</span>
             </button>
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     @if (loading()) {
         <p class="text-secondary mt-8 text-sm">Loading…</p>

@@ -29,6 +29,7 @@ import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Dashboard } from '../dashboards/dashboard-types';
 import { DashboardsService } from '../dashboards/dashboards.service';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Studio **Viz Library** — the reusable widget library (the `widget` kind). A searchable gallery (text +
@@ -40,6 +41,7 @@ import { DashboardsService } from '../dashboards/dashboards.service';
     selector: 'app-widgets',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

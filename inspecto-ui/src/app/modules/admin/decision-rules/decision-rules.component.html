@@ -1,15 +1,10 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div class="bg-card flex items-center justify-between border-b p-6 sm:px-10 sm:py-8 dark:bg-transparent">
-        <div>
-            <h1 class="text-3xl font-extrabold leading-none tracking-tight">Decision Rules</h1>
-            <div class="text-secondary mt-1.5">
-                Condition → Consequence rules over Pipeline and Job records — when records match, route/tag/
-                quarantine/drop them, or run a platform action (emit a signal, raise an alert, start a job). Simulate
-                any rule as a dry run, or Apply to execute its consequences.
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
+    <inspecto-page-header
+        title="Decision Rules"
+        subtitle="Condition → Consequence rules over Pipeline and Job records — when records match, route/tag/ quarantine/drop them, or run a platform action (emit a signal, raise an alert, start a job). Simulate any rule as a dry run, or Apply to execute its consequences."
+    >
+        <ng-container actions>
             @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
@@ -30,8 +25,8 @@
                     <span class="ml-2">New decision rule</span>
                 </button>
             }
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">

@@ -25,6 +25,7 @@ import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { buildDataset, Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Studio **Datasets** — the data-source abstractions (physical / virtual / materialized) widgets build on.
@@ -35,6 +36,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
     selector: 'app-datasets',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         AiExplainComponent,
         MatButtonModule,
         MatIconModule,

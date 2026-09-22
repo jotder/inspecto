@@ -35,6 +35,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 import { onboardRedirect } from './onboard-redirect';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' | 'shared-with-me' | 'shared-by-me';
 
@@ -49,6 +50,7 @@ type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' |
 @Component({
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         AiExplainComponent,
         FormsModule,
         MatButtonModule,
@@ -137,9 +139,7 @@ export class CatalogComponent implements OnInit {
             headerName: 'Freshness',
             width: 130,
             cellRenderer: (p: { value?: string }) =>
-                p.value
-                    ? statusBadgeHtml(p.value)
-                    : '<span class="text-secondary font-mono text-xs">—</span>',
+                p.value ? statusBadgeHtml(p.value) : '<span class="text-secondary font-mono text-xs">—</span>',
         },
         {
             field: 'overlay.rowCount',

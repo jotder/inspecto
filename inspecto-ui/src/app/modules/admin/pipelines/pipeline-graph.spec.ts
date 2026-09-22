@@ -124,7 +124,7 @@ describe('toPipelineG6Data', () => {
         expect(edges[1].data).toEqual({ kind: 'route:emea' }); // no count for this rel
     });
 
-    it('marks a dry run\'s rows as simulated (label suffix + flag, PIPELINE-DRYRUN-1)', () => {
+    it("marks a dry run's rows as simulated (label suffix + flag, PIPELINE-DRYRUN-1)", () => {
         const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 1234, simulated: true }]);
         const { edges } = toPipelineG6Data(graph, counts);
         expect(edges[0].data).toEqual({ kind: 'data · 1,234 (simulated)', weight: 1234, simulated: true });

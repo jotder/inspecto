@@ -312,7 +312,9 @@ export function provenanceCounts(rows: ProvenanceCount[]): Map<string, Provenanc
 /** An edge's G6 `data`: label + weight, with a "(simulated)" suffix and flag for a dry-run's rows. */
 function edgeOverlayData(rel: string, overlay: ProvenanceOverlay): { kind: string; weight: number; simulated?: true } {
     const label = `${rel} · ${overlay.rowCount.toLocaleString()}${overlay.simulated ? ' (simulated)' : ''}`;
-    return overlay.simulated ? { kind: label, weight: overlay.rowCount, simulated: true } : { kind: label, weight: overlay.rowCount };
+    return overlay.simulated
+        ? { kind: label, weight: overlay.rowCount, simulated: true }
+        : { kind: label, weight: overlay.rowCount };
 }
 
 /**

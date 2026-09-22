@@ -10,6 +10,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Approvals Inbox (AGT-5 P3, autonomy L2) — the operator surface over the agent's approval gate. A
@@ -29,7 +30,14 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 @Component({
     selector: 'app-approvals',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent, InspectoAlertComponent],
+    imports: [
+        InspectoPageHeaderComponent,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        DataTableComponent,
+        InspectoAlertComponent,
+    ],
     templateUrl: './approvals.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,

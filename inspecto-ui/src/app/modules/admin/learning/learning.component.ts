@@ -10,6 +10,7 @@ import { CaseFeedback, LearningService } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Learning dashboard (AGT-5 P5) — how useful the agent's investigation Cases have been, aggregated from
@@ -20,7 +21,14 @@ import { fmtDateTime } from 'app/inspecto/grid';
 @Component({
     selector: 'app-learning',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, DataTableComponent, InspectoAlertComponent],
+    imports: [
+        InspectoPageHeaderComponent,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        DataTableComponent,
+        InspectoAlertComponent,
+    ],
     templateUrl: './learning.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,

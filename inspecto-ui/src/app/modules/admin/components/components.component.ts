@@ -15,6 +15,7 @@ import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/insp
 import { ComponentFormDialog, ComponentFormResult } from './component-form.dialog';
 import { MappingEditorDialog } from './mapping-editor.dialog';
 import { SchemaEditorData, SchemaEditorDialog } from './schema-editor.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
@@ -25,6 +26,7 @@ import { SchemaEditorData, SchemaEditorDialog } from './schema-editor.dialog';
     selector: 'app-components',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

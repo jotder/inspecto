@@ -66,19 +66,27 @@
         </div>
 
         <!-- Execution & Health Status Banner -->
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-card p-4 shadow-sm dark:border-gray-700">
+        <div
+            class="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-card p-4 shadow-sm dark:border-gray-700"
+        >
             <div class="flex items-center gap-3">
                 <inspecto-status-badge
                     [value]="drillBreaks().length === 0 ? 'success' : 'warning'"
-                    [label]="drillBreaks().length === 0 ? 'Balanced (0 Breaks)' : drillBreaks().length + ' Discrepancies'"
+                    [label]="
+                        drillBreaks().length === 0 ? 'Balanced (0 Breaks)' : drillBreaks().length + ' Discrepancies'
+                    "
                 />
                 <div class="flex flex-col">
                     <span class="text-sm font-medium">
-                        {{ drillBreaks().length === 0 ? 'All records matched within tolerance' : 'Discrepancies require investigation' }}
+                        {{
+                            drillBreaks().length === 0
+                                ? 'All records matched within tolerance'
+                                : 'Discrepancies require investigation'
+                        }}
                     </span>
                     <span class="text-xs text-secondary">
                         @if (lastEvaluated(); as dt) {
-                            Last evaluated: {{ dt | date:'mediumTime' }}
+                            Last evaluated: {{ dt | date: 'mediumTime' }}
                         } @else {
                             Evaluation status: Live
                         }
@@ -138,9 +146,9 @@
                  explain it in place and drop the action, never a red toast (the Approvals-inbox lesson). -->
             <div class="mt-6">
                 <inspecto-alert variant="info" title="Incidents are not installed">
-                    Promoting a break to an Incident needs the operational-objects module, which ships in the Professional
-                    edition and above, so there is nothing to promote into in this bundle. Breaks can still be resolved
-                    and re-opened here, and the reconciliation itself is unaffected.
+                    Promoting a break to an Incident needs the operational-objects module, which ships in the
+                    Professional edition and above, so there is nothing to promote into in this bundle. Breaks can still
+                    be resolved and re-opened here, and the reconciliation itself is unaffected.
                 </inspecto-alert>
             </div>
         }

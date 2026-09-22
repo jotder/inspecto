@@ -1,22 +1,19 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Approvals Inbox</h1>
-            <div class="text-secondary mt-1">
-                Mutating agent actions wait here for a human decision. Review each request's dry-run preview, then
-                approve to resume it or decline to deny — every outcome is audited.
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
+    <inspecto-page-header
+        title="Approvals Inbox"
+        subtitle="Mutating agent actions wait here for a human decision. Review each request's dry-run preview, then approve to resume it or decline to deny — every outcome is audited."
+        [inset]="false"
+    >
+        <ng-container actions>
             @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
-        </div>
-    </div>
+        </ng-container>
+    </inspecto-page-header>
 
     <!-- Module absent: an expected deployment state, explained in place — never an error toast. The
          grid is NOT mounted behind it (@if/@else, not [class.hidden]): an empty ag-grid kept in the

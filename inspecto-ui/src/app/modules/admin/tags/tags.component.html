@@ -9,24 +9,21 @@
 } @else {
     <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
         <!-- Header -->
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Tags</h1>
-                <div class="text-secondary mt-1">
-                    Labels shared across incidents, cases and saved views. Pick a tag to see everything carrying it —
-                    the list shows only targets you have access to, so counts are per-viewer.
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <inspecto-ai-explain screen="Tags" [terms]="['Tag', 'Tag Rule', 'Incident', 'Case']" />
+        <inspecto-page-header
+            title="Tags"
+            subtitle="Labels shared across incidents, cases and saved views. Pick a tag to see everything carrying it — the list shows only targets you have access to, so counts are per-viewer."
+            [terms]="['Tag', 'Tag Rule', 'Incident', 'Case']"
+            [inset]="false"
+        >
+            <ng-container actions>
                 @if (loadingTags() || loadingTargets()) {
                     <mat-spinner diameter="24"></mat-spinner>
                 }
                 <button mat-icon-button (click)="loadRegistry()" [disabled]="loadingTags()" aria-label="Refresh tags">
                     <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
                 </button>
-            </div>
-        </div>
+            </ng-container>
+        </inspecto-page-header>
 
         <div class="mt-6 flex min-h-0 flex-auto gap-6">
             <!-- Vocabulary -->

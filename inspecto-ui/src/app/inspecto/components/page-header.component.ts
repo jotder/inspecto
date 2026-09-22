@@ -34,7 +34,13 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block' },
     template: `
-        <header class="flex flex-col border-b px-5 pt-4" [class.pb-4]="!hasTabs" [class.pb-0]="hasTabs">
+        <header
+            class="flex flex-col border-b pt-4"
+            [class.px-6]="inset"
+            [class.sm:px-10]="inset"
+            [class.pb-4]="!hasTabs"
+            [class.pb-0]="hasTabs"
+        >
             <div class="flex min-w-0 items-start gap-4">
                 <div class="min-w-0 flex-auto">
                     @if (backLink) {
@@ -98,6 +104,15 @@ export class InspectoPageHeaderComponent {
     @Input({ transform: booleanAttribute }) mono = false;
     /** Set when a `[tabs]` slot is projected so the border sits under the tabs, not above them. */
     @Input({ transform: booleanAttribute }) hasTabs = false;
+
+    /**
+     * Whether the header supplies its own horizontal padding. The SPA has two pane layouts and this is
+     * the one knob between them: a **full-bleed** pane puts the header above its padded content area
+     * and keeps `inset` true, so the header pads itself and its bottom border spans the pane; a pane
+     * whose outer wrapper is already padded (`p-6 md:p-8`) passes `[inset]="false"` so the text does not
+     * end up double-indented.
+     */
+    @Input({ transform: booleanAttribute }) inset = true;
 
     readonly expanded = signal(false);
 }

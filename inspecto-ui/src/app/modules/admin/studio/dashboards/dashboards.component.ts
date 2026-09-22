@@ -12,6 +12,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { Dashboard } from './dashboard-types';
 import { DashboardsService } from './dashboards.service';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Studio **Dashboard Builder** — saved compositions of widgets (the `dashboard` composite kind). Lists dashboards with
@@ -21,6 +22,7 @@ import { DashboardsService } from './dashboards.service';
     selector: 'app-dashboards',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatDialogModule,
         MatIconModule,

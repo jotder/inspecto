@@ -16,6 +16,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { FmtPercentPipe } from 'app/inspecto/format';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { ToastrService } from 'ngx-toastr';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 type EnrTab = 'runs' | 'lineage' | 'report';
 
@@ -28,6 +29,7 @@ type EnrTab = 'runs' | 'lineage' | 'report';
     selector: 'app-enrichment',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatDatepickerModule,

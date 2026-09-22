@@ -27,6 +27,7 @@ import {
     planImport,
     targetIndex,
 } from 'app/inspecto/transfer';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /** An import-preview row + its post-apply outcome. */
 interface Row extends ImportRow {
@@ -47,6 +48,7 @@ interface Row extends ImportRow {
     selector: 'app-transfer',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatCheckboxModule,
         MatFormFieldModule,

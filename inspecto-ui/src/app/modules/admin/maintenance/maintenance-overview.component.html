@@ -1,17 +1,12 @@
 <div class="flex flex-col gap-6 p-6">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-semibold">System Maintenance — Overview</h1>
-            <p class="text-secondary mt-1">
-                Platform health, the maintenance job fleet, and storage — observation only; author jobs in Workbench →
-                Jobs.
-            </p>
-        </div>
-        <button mat-stroked-button aria-label="Refresh maintenance overview" (click)="refresh()">
-            <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-            Refresh
-        </button>
-    </div>
+    <inspecto-page-header title="System Maintenance — Overview" [inset]="false">
+        <ng-container actions>
+            <button mat-stroked-button aria-label="Refresh maintenance overview" (click)="refresh()">
+                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                Refresh
+            </button>
+        </ng-container>
+    </inspecto-page-header>
 
     <!-- Health (MNT-15) -->
     <section aria-labelledby="mnt-health">

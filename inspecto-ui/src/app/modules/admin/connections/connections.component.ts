@@ -19,6 +19,7 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connections/connection-form.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Connections — reusable remote-system connection profiles (Data Acquisition). Lists the profiles loaded
@@ -30,6 +31,7 @@ import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connect
     selector: 'app-connections',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

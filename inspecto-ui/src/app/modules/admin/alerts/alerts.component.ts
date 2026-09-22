@@ -15,6 +15,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { AlertRuleFormData, AlertRuleFormDialog, AlertRuleFormResult } from './alert-rule-form.dialog';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
+import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
  * Alerts — the core alert engine's surface (v4.1, B5): recent fired alerts (GET /alerts) over the
@@ -26,6 +27,7 @@ import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.d
     selector: 'app-alerts',
     standalone: true,
     imports: [
+        InspectoPageHeaderComponent,
         AiExplainComponent,
         FormsModule,
         InspectoEmptyStateComponent,
