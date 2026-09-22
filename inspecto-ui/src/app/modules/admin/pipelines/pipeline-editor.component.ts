@@ -2375,7 +2375,35 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             data: { pipelineId, node, connectionId },
         });
         ref.afterClosed().subscribe((r?: PipelineRunResult) => {
-            if (r) this.applyRunOutcomes(r);
+            if (!r) return;
+            this.applyRunOutcomes(r);
+            this.seedSampleThreadFromRun(r);
+        });
+    }
+
+    /**
+     * Seed the tab's sample thread from the run's OWN rows, so *"Use the captured sample"* is one click
+     * after a test run instead of a hand-typed JSON paste (WB-12, {@link DRYRUN-SEEDS-AFTER-PARSE-1}).
+     *
+     * <p>🔴 The two test instruments never handed off. *Run to here* parses REAL inbox bytes; the
+     * dry-run panel that shows per-node samples started from a textarea, and *"Use the captured sample"*
+     * only appeared once a Parse-drawer thread already existed — two hops away and invisible from the
+     * panel. One is the only source of real rows the other could want.
+     *
+     * <p>⚠ Seeds from the SEED relation — the rows as parsed — because that is what the dry-run panel
+     * replays the Steps over. A downstream relation's rows have already been through the Steps the panel
+     * is about to re-run.
+     */
+    private seedSampleThreadFromRun(r: PipelineRunResult): void {
+        const seeded = r.relations?.find((x) => x.node === r.seedNode) ?? r.relations?.[0];
+        const rows = seeded?.rows ?? [];
+        if (!rows.length) return;
+        this.sampleThread()?.parsePreview.set({
+            frontend: 'testrun',
+            columns: Object.keys(rows[0] ?? {}),
+            rowCount: rows.length,
+            rows,
+            rejectedRows: 0,
         });
     }
 
@@ -2512,8 +2540,41 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const id = uniqueNodeId(this.model(), type);
         const node: AuthoredNode = { id, type };
         this.captureUndo();
-        this.model.update((m) => (m ? addNodeToModel(m, node) : m));
+        this.model.update((m) => (m ? this.addAfterSelection(m, node) : m));
         return node;
+    }
+
+    /**
+     * Append the node, and — when a node is SELECTED — wire it in AFTER that node (D8, WB-14).
+     *
+     * <p>🔴 The decline this reopens (`pipeline-editor.md:336`, "an ordinary Step still lands unconnected
+     * on purpose") rested on the Recipe view's insert-between as the author's alternative.
+     * `<app-pipeline-step-cards>` was deleted in `6d3c68fa`, so there is no one-gesture insert anywhere
+     * and putting a Step mid-chain costs three graph operations (`PALETTE-ADD-DROPS-ORPHAN-1`).
+     *
+     * <p>⛔ NARROW on purpose: with nothing selected the bare add stands, because there is no anchor and
+     * guessing one is how an "add" silently rewires a graph the author was not editing. D8 declined
+     * auto-connecting without a selection explicitly.
+     *
+     * <p>⚠ Rewires the selected node's outgoing `data` edge THROUGH the new node — `sel → new → old` —
+     * so an insert is an insert, not an append that strands the rest of the chain. With no outgoing
+     * `data` edge (the selection is a tail) it simply connects `sel → new`.
+     * ⚠ Model-level only: `addEdgeToModel`/`removeEdgeFromModel`, no canvas calls, because the caller
+     * re-renders from the model — the canvas is reconciled once, not edge by edge.
+     */
+    private addAfterSelection(m: AuthoredPipeline, node: AuthoredNode): AuthoredPipeline {
+        const next = addNodeToModel(m, node);
+        const sel = this.selectedNode();
+        if (!sel || sel.id === node.id) return next;
+        // Only a `data` edge is rewired: `route:`/`reject:` outlets carry a branch meaning that an
+        // inserted Step has no business inheriting.
+        const downstream = next.edges.find((e) => e.from === sel.id && e.rel === 'data');
+        let out = addEdgeToModel(next, sel.id, node.id, 'data') ?? next;
+        if (downstream) {
+            out = removeEdgeFromModel(out, sel.id, downstream.to, 'data');
+            out = addEdgeToModel(out, node.id, downstream.to, 'data') ?? out;
+        }
+        return out;
     }
 
     /**

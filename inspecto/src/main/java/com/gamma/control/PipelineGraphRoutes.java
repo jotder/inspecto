@@ -71,7 +71,7 @@ final class PipelineGraphRoutes implements RouteModule {
         // NOT ".../run": that path is the editor's scratch-only run-to-here contract (POST …/run?to={nodeId},
         // pipelines.service.ts) and must never fire a production run.
         api.post("/pipelines/authored/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> runPipeline(api, e, ApiContext.name(m))));
-        api.get("/pipelines/([^/]+)/graph", (e, m) -> graphForPipeline(api, ApiContext.name(m)));
+        api.get("/pipelines/([^/]+)/graph", (e, m) -> graphForPipeline(api, e, ApiContext.name(m)));
         // The Pipeline Document (ELT amendment §5.1): a read-only Markdown projection of config for
         // business verification and sign-off. A read, not an authoring action — no capability gate.
         api.get("/pipelines/([^/]+)/document", (e, m) -> document(api, e, ApiContext.name(m)));
@@ -81,11 +81,33 @@ final class PipelineGraphRoutes implements RouteModule {
                 (e, m) -> saveGraph(api, e, ApiContext.name(m), api.body(e))));
     }
 
-    /** {@code GET /pipelines/{name}/graph} — lift one registered pipeline to its graph; 404 if no such pipeline. */
-    private Object graphForPipeline(ApiContext api, String name) {
+    /**
+     * {@code GET /pipelines/{name}/graph} — lift one registered pipeline to its graph; 404 if no such
+     * pipeline.
+     *
+     * <p>🔴 <b>This is the READ-ONLY projection, and the response now says so</b> (D9 / {@code WB-18},
+     * 2026-09-22). PUTting this body back is refused — measured across all 26 shipped Pipelines, always
+     * 422 and always {@code written:false}, so it fails closed — but it is the natural wrong guess for any
+     * client, and nothing at the route said otherwise ({@code GRAPH-READ-SHAPE-NOT-WRITE-SHAPE-1}). The
+     * authoring pair is {@code GET …/graph/raw} + {@code PUT …/graph}.
+     *
+     * <p>⛔ <b>Renaming it to {@code /graph/view} was considered and DECLINED</b> (D9): a rename breaks
+     * every client for a discoverability gain that a link provides.
+     *
+     * <p>⚠ The link is derived from the REQUEST path, never composed from a constant, because this route
+     * is also reached under the {@code /spaces/{id}} prefix — a hardcoded {@code /api/v1/pipelines/…}
+     * would hand a space-scoped caller a URL pointing outside its own space. ⚠ And the flag sits on the
+     * RESOURCE rather than under a {@code metadata} key as D9's text sketched: the v1 envelope already
+     * owns {@code metadata} and {@code links}, and shadowing them inside {@code data} would be two things
+     * with one name — the very defect this plan spent its Sprint A closing.
+     */
+    private Object graphForPipeline(ApiContext api, HttpExchange ex, String name) {
         PipelineConfig c = api.service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
-        return PipelineProjection.graph(PipelineLift.lift(c));
+        Map<String, Object> out = new LinkedHashMap<>(PipelineProjection.graph(PipelineLift.lift(c)));
+        out.put("readOnlyProjection", true);
+        out.put("links", Map.of("roundTrip", ex.getRequestURI().getPath() + "/raw"));
+        return out;
     }
 
     /**

@@ -162,7 +162,13 @@ export function validatePipeline(
                 message: `${name}: references a missing ${bindKindFor(cat)} (${n.use}).`,
             });
         } else if (status === 'configured') {
-            findings.push({ severity: 'info', nodeId: n.id, message: `${name}: not yet tested.` });
+            // ⚠ "in this session": the editor's test lane is a SESSION fact and deliberately does not read
+        // operate-lane provenance (D6, signed 2026-09-22 — a distinct 'last run' badge, never a second
+        // readiness opinion inside `tested`). Unqualified, this read as "never tested" on Pipelines with
+        // completed production runs, and a signal that is wrong for every armed Pipeline is one readers
+        // learn to ignore (PIPELINE-NODE-TEST-STATE-STALE-1). The run counts are shown beside it by
+        // `nodeLastRun()` in the inspector.
+        findings.push({ severity: 'info', nodeId: n.id, message: `${name}: not yet tested in this session.` });
         } else if (status === 'disabled') {
             findings.push({
                 severity: 'info',

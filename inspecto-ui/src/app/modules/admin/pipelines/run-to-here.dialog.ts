@@ -217,14 +217,22 @@ export interface RunToHereData {
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
-            <button type="button" mat-button mat-dialog-close>Close</button>
+            <!--
+              🔴 Closes WITH the run result, not bare. It was a plain \`mat-dialog-close\`, which resolves
+              \`afterClosed()\` to \`undefined\` — so the editor's \`if (r) applyRunOutcomes(r)\` never fired and
+              the canvas ✓ marks a test run is supposed to leave were UNREACHABLE. Nothing failed; the
+              outcome simply never arrived, which is why nodes kept reading "not yet tested" even in the
+              session that had just run them (PIPELINE-NODE-TEST-STATE-STALE-1, WB-12).
+            -->
+            <button type="button" mat-button (click)="ref.close(result())">Close</button>
         </mat-dialog-actions>
     `,
 })
 export class RunToHereDialog implements OnInit {
     private api = inject(PipelinesService);
     private probe = inject(ConnectionProbeService);
-    private ref = inject(MatDialogRef<RunToHereDialog>);
+    /** Public: the template closes WITH the result (see the Close button). */
+    readonly ref = inject(MatDialogRef<RunToHereDialog>);
     readonly data = inject<RunToHereData>(MAT_DIALOG_DATA);
 
     readonly exploring = signal(false);

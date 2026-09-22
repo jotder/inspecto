@@ -2857,6 +2857,37 @@ describe('PipelineEditorComponent', () => {
         });
     });
 
+    it('WB-14: an added Step is wired AFTER the selected node, rewiring its outgoing data edge', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+        c.selectedNode.set(c.model()!.nodes[0]); // 'src', whose outgoing data edge goes to 'flt'
+
+        c.addFromPalette('transform.filter');
+
+        const m = c.model()!;
+        const added = m.nodes.find((n) => n.id !== 'src' && n.id !== 'flt')!;
+        expect(added, 'a node was added').toBeTruthy();
+        // src → new → flt : an insert, not an append that strands the rest of the chain.
+        expect(m.edges).toContainEqual({ from: 'src', rel: 'data', to: added.id });
+        expect(m.edges).toContainEqual({ from: added.id, rel: 'data', to: 'flt' });
+        expect(m.edges.filter((e) => e.from === 'src' && e.to === 'flt')).toHaveLength(0);
+    });
+
+    it('WB-14: with NOTHING selected the bare add stands — no anchor is guessed', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+        c.selectedNode.set(null);
+
+        c.addFromPalette('transform.filter');
+
+        const m = c.model()!;
+        const added = m.nodes.find((n) => n.id !== 'src' && n.id !== 'flt')!;
+        // ⛔ D8 declined auto-connecting without a selection: guessing an anchor is how an "add" silently
+        // rewires a graph the author was not editing. Validation still catches the orphan.
+        expect(m.edges.filter((e) => e.from === added.id || e.to === added.id)).toHaveLength(0);
+        expect(m.edges).toContainEqual({ from: 'src', rel: 'data', to: 'flt' });
+    });
+
     it('hides New/Save/delete-selected in the Business (read-only) lens', () => {
         TestBed.inject(LensService).selectLens('business');
         const fixture = TestBed.createComponent(PipelineEditorComponent);
@@ -2865,6 +2896,27 @@ describe('PipelineEditorComponent', () => {
         expect(el.querySelector('[aria-label="New pipeline"]')).toBeNull();
         expect(el.querySelector('[aria-label="Save pipeline"]')).toBeNull();
         expect(el.querySelector('[aria-label="Delete the selected Step or edge"]')).toBeNull();
+    });
+
+    it('WB-13: the Business (read-only) lens renders NO enabled "Add …" palette control', () => {
+        TestBed.inject(LensService).selectLens('business');
+        const fixture = TestBed.createComponent(PipelineEditorComponent);
+        fixture.componentRef.setInput('openId', 'demo');
+        const c = fixture.componentInstance;
+        c.ngOnInit();
+        (c as unknown as { canvas: unknown }).canvas = canvasMock();
+        fixture.detectChanges();
+
+        // 🔴 The handler guard already refused the mutation (asserted below), so every one of these
+        // controls did nothing when clicked — while still rendering enabled. A keyboard or screen-reader
+        // user got no cue that the whole palette was inert (READONLY-LENS-PALETTE-ENABLED-1).
+        const adds = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+                'app-pipeline-palette button[aria-label^="Add "]',
+            ),
+        );
+        expect(adds.every((b) => b.disabled)).toBe(true);
+        expect(adds.filter((b) => !b.disabled)).toHaveLength(0);
     });
 
     it('the Business lens blocks model mutation even when called directly (defense-in-depth)', () => {

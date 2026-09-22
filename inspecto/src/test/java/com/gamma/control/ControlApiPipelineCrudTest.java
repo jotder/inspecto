@@ -169,6 +169,89 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /**
+     * WB-15 / D3 — a NEW pipeline lands in its own {@code config/<id>/} directory, chosen server-side.
+     *
+     * <p>🔴 The scaffold used to write flat at the space config root while every shipped Pipeline lives
+     * in a per-Pipeline directory, and a {@code <id>_schema.toon} satellite would land at the root too —
+     * two layouts, one of which had to go ({@code UI-CREATED-PIPELINE-FLAT-HOME-1}). ⚠ The client sends no
+     * path, so the choice is the server's.
+     */
+    @Test
+    void aCreatedPipelineLandsInItsOwnDirectory(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            String b = dir.toString().replace('\\', '/');
+            // Every required dirs.* leaf — the spec gate refuses a partial draft before the path choice
+            // this test is about is ever reached.
+            String body = """
+                    {"type":"pipeline","overwrite":true,
+                     "config":{"id":"brand_new","name":"brand_new","active":false,
+                               "dirs":{"poll":"%s/in","database":"%s/db","backup":"%s/bk","temp":"%s/tmp",
+                                       "errors":"%s/err","quarantine":"%s/q","markers":"%s/mk",
+                                       "status_dir":"%s/st","log_dir":"%s/log"}}}"""
+                    .formatted(b, b, b, b, b, b, b, b, b);
+            HttpResponse<String> r = send(c.port, "POST", "/config/write", body);
+            assertEquals(200, r.statusCode(), r.body());
+
+            assertTrue(Files.exists(wr.resolve("brand_new").resolve("brand_new_pipeline.toon")),
+                    "a created Pipeline belongs in config/<id>/: " + r.body());
+            assertFalse(Files.exists(wr.resolve("brand_new_pipeline.toon")),
+                    "and NOT flat at the config root, where its satellites would orphan beside it");
+        }
+    }
+
+    /**
+     * WB-15 — the subdir default binds LATE: an EXISTING pipeline keeps its own home.
+     *
+     * <p>⛔ Several shipped Pipelines live in a per-DOMAIN directory
+     * ({@code config/postmed/postmed_xdr_pipeline.toon}), not one named for the id. Redirecting an EDIT
+     * into {@code config/<id>/} would fork a shadow config beside the real one — the exact failure the
+     * legacy-name adoption in {@code ConfigWriteRoutes} exists to prevent, and the reason this default is
+     * gated on the target not existing.
+     */
+    @Test
+    void anExistingPipelineIsNotRelocatedByTheNewDefault(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Path domainDir = wr.resolve("postmed");
+        Path registered = TestConfigs.csv(domainDir, PipelineConfigBatchTest.miniSchema()).write();
+
+        try (Ctx c = open(dir, wr, registered)) {
+            String name = json(send(c.port, "GET", "/pipelines", null)).get(0).get("name").asText();
+            JsonNode g = json(send(c.port, "GET", "/pipelines/" + name + "/graph/raw", null));
+            ((ObjectNode) g).put("active", false);
+
+            HttpResponse<String> put = send(c.port, "PUT", "/pipelines/" + name + "/graph", g.toString());
+            assertEquals(200, put.statusCode(), put.body());
+
+            assertFalse(PipelineConfig.load(registered.toString()).active(),
+                    "the edit must land in the file the pipeline is bound to, wherever its author put it");
+            assertFalse(Files.exists(wr.resolve(name).resolve(name + "_pipeline.toon")),
+                    "the config/<id>/ default must NOT relocate an existing Pipeline into a shadow file");
+        }
+    }
+
+    /**
+     * WB-18 / D9 — the read-only projection says what it is, and points at the round trip.
+     *
+     * <p>🔴 PUTting this body back is refused on every shipped Pipeline — it fails closed — but it is
+     * the natural wrong guess for any client and nothing at the route said so
+     * ({@code GRAPH-READ-SHAPE-NOT-WRITE-SHAPE-1}). ⛔ Renaming it to {@code /graph/view} was DECLINED:
+     * a rename breaks every client for a gain a link provides.
+     */
+    @Test
+    void theReadOnlyProjectionNamesItselfAndLinksTheRoundTrip(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String name = json(send(c.port, "GET", "/pipelines", null)).get(0).get("name").asText();
+            JsonNode g = json(send(c.port, "GET", "/pipelines/" + name + "/graph", null));
+
+            assertTrue(g.path("readOnlyProjection").asBoolean(false),
+                    "the projection must declare itself read-only: " + g);
+            assertEquals("/api/v1/pipelines/" + name + "/graph/raw", g.path("links").path("roundTrip").asText(),
+                    "and point at the body that CAN be written back: " + g);
+        }
+    }
+
     @Test
     void unrepresentableTopologiesRefuseWithNamedCodes(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {

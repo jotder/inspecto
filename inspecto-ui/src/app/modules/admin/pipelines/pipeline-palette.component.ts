@@ -82,8 +82,9 @@ import {
                                 @if (p.addable && p.nodeType) {
                                     <button
                                         type="button"
-                                        class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10"
-                                        draggable="true"
+                                        class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-default disabled:opacity-40"
+                                        [draggable]="!readOnly()"
+                                        [disabled]="readOnly()"
                                         [matTooltip]="p.note || p.label"
                                         [attr.aria-label]="'Add ' + p.label"
                                         (click)="pick.emit(p.nodeType)"
@@ -153,11 +154,13 @@ import {
                         @if (isOpen(group.category)) {
                             @for (t of group.types; track t.type) {
                                 <!-- Hosts pass only lowerable types (the editor filters the catalog), so
-                                 every entry is addable — no disabled state to draw. -->
+                                 every entry is addable — the ONE disabled state is the read-only lens,
+                                 where the whole palette is inert and must say so (WB-13). -->
                                 <button
                                     type="button"
-                                    class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10"
-                                    draggable="true"
+                                    class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-default disabled:opacity-40"
+                                    [draggable]="!readOnly()"
+                                    [disabled]="readOnly()"
                                     [matTooltip]="t.description"
                                     [attr.aria-label]="'Add ' + t.label"
                                     (click)="pick.emit(t.type)"
@@ -191,6 +194,16 @@ export class PipelinePaletteComponent {
     readonly groups = input.required<NodeTypeGroup[]>();
     /** The served Step Processor taxonomy, grouped by family; `null` = not served (old server) → render `groups`. */
     readonly processors = input<ProcessorGroup[] | null>(null);
+    /**
+     * Read-only lens — every "Add …" control renders DISABLED.
+     *
+     * 🔴 The host's handler guard already refuses the mutation (`addFromPalette` checks
+     * `canAuthor()`), so clicking one changed nothing — but all 36 controls still rendered
+     * `disabled:false`, so a keyboard or screen-reader user got no cue that the palette was inert
+     * (READONLY-LENS-PALETTE-ENABLED-1). Presentation, not integrity — which is exactly why it stayed
+     * invisible until someone counted the enabled controls.
+     */
+    readonly readOnly = input<boolean>(false);
     /** A palette entry was clicked — add it at the canvas centre (the no-mouse path). */
     @Output() pick = new EventEmitter<string>();
 
