@@ -56,6 +56,8 @@ describe('LinkAnalysisSnapshotDialog', () => {
             imports: [LinkAnalysisSnapshotDialog],
             providers: [
                 provideNoopAnimations(),
+                { provide: SessionService, useValue: { opsEnabled: () => true } },
+                { provide: ObjectsService, useValue: { list: () => of([{ id: 'CASE-9', title: 'Real case' }]) } },
                 { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
                 {
                     provide: MAT_DIALOG_DATA,
@@ -80,13 +82,90 @@ describe('LinkAnalysisSnapshotDialog', () => {
         expect(close).not.toHaveBeenCalled();
         expect(el.querySelector('mat-error')?.textContent).toContain('title');
 
-        fixture.componentInstance.form.setValue({ title: 'Chain', description: '' });
+        fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });
         fixture.componentInstance.save();
         const snap = close.mock.calls[0][0] as GraphSnapshot;
         expect(snap.nodes.map((n) => n.id)).toEqual(['a', 'b']);
         expect(verifySnapshot(snap)).toBe(true);
         expect(TestBed.inject(LinkAnalysisSnapshotsService).snapshots()).toEqual([snap]);
         await expectNoA11yViolations(el);
+    });
+});
+
+describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
+    function create(list: () => unknown, caseId = '') {
+        const close = vi.fn();
+        const store = new LinkAnalysisSnapshotsService();
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisSnapshotDialog],
+            providers: [
+                provideNoopAnimations(),
+                { provide: LinkAnalysisSnapshotsService, useValue: store },
+                { provide: SessionService, useValue: { opsEnabled: () => true } },
+                { provide: ObjectsService, useValue: { list } },
+                { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
+                {
+                    provide: MAT_DIALOG_DATA,
+                    useValue: {
+                        graph: G,
+                        predicate: null,
+                        origin: { sourceId: 'entity-projection', dataset: 'tx', query: {} },
+                        layout: 'dagre',
+                        suggestedTitle: 'Chain',
+                        caseId,
+                    },
+                },
+            ],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisSnapshotDialog);
+        fixture.detectChanges();
+        return { fixture, close, store };
+    }
+
+    it('saves the analysis with no Case at all', () => {
+        const { fixture, close, store } = create(() => of([{ id: 'CASE-9', title: 'Real case' }]));
+        fixture.componentInstance.save();
+        const snap = close.mock.calls[0][0] as GraphSnapshot;
+        expect(verifySnapshot(snap)).toBe(true);
+        expect(snap.attachedTo).toEqual([]); // saved, unattached — a legitimate outcome
+        expect(store.snapshots()).toHaveLength(1);
+    });
+
+    it('attaches in the same action when a Case IS chosen', () => {
+        const { fixture, close, store } = create(() => of([{ id: 'CASE-9', title: 'Real case' }]));
+        fixture.componentInstance.form.patchValue({ caseId: 'CASE-9' });
+        fixture.componentInstance.save();
+        const snap = close.mock.calls[0][0] as GraphSnapshot;
+        expect(snap.attachedTo).toEqual(['CASE-9']);
+        expect(store.snapshots()[0].attachedTo).toEqual(['CASE-9']);
+    });
+
+    it('still SAVES when the Case lookup failed — the error costs the attachment, not the analysis', async () => {
+        const { fixture, close, store } = create(() => throwError(() => new Error('down')));
+        const el: HTMLElement = fixture.nativeElement;
+
+        // The Case cannot be offered, and is not faked...
+        const errorAlert = Array.from(el.querySelectorAll('inspecto-alert')).find((a) =>
+            a.textContent?.includes('Cases could not be loaded'),
+        );
+        expect(errorAlert).toBeTruthy();
+        expect(el.querySelector('inspecto-option-picker')).toBeNull();
+        for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
+
+        // ...but Save is NOT disabled, and the analysis is kept. This is the 2026-09-22 decision: the
+        // analysis stands on its own, so a failed Case lookup must never be a dead end.
+        expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
+        fixture.componentInstance.save();
+        const snap = close.mock.calls[0][0] as GraphSnapshot;
+        expect(verifySnapshot(snap)).toBe(true);
+        expect(snap.attachedTo).toEqual([]);
+        expect(store.snapshots()).toHaveLength(1);
+        await expectNoA11yViolations(el);
+    });
+
+    it('pre-selects the Case it was opened from (the ?case= deep link)', () => {
+        const { fixture } = create(() => of([{ id: 'CASE-9', title: 'Real case' }]), 'CASE-9');
+        expect(fixture.componentInstance.form.getRawValue().caseId).toBe('CASE-9');
     });
 });
 
@@ -120,25 +199,27 @@ describe('LinkAnalysisAttachCaseDialog', () => {
     it('offers placeholder Cases without the ops module, refuses without a pick, and records the attachment', async () => {
         const { fixture, close, store, snapshot } = create(false);
         const c = fixture.componentInstance;
-        expect(c.cases().map((x) => x.id)).toEqual(store.mockCases.map((x) => x.id));
-        expect(c.casesHelp()).toMatch(/Placeholder/);
+        const el: HTMLElement = fixture.nativeElement;
+        // The placeholder path still renders a picker to choose from (the field states it is a placeholder).
+        expect(el.querySelector('inspecto-option-picker')).not.toBeNull();
+        expect(el.textContent).toContain('ops module is not installed');
 
         c.attach();
         fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
-        expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Pick a Case');
+        expect(el.querySelector('p[role="alert"]')?.textContent).toContain('Pick a Case');
 
         c.form.patchValue({ caseId: store.mockCases[0].id });
         c.attach();
         expect(close).toHaveBeenCalledWith({ caseId: store.mockCases[0].id });
         expect(store.snapshots()[0].attachedTo).toEqual([store.mockCases[0].id]);
         expect(snapshot.attachedTo).toEqual([]); // the store replaced the entry rather than mutating it
-        await expectNoA11yViolations(fixture.nativeElement);
+        await expectNoA11yViolations(el);
     });
 
     it('lists real Cases with the ops module', () => {
         const { fixture } = create(true);
-        expect(fixture.componentInstance.cases()).toEqual([{ id: 'CASE-9', title: 'Real case' }]);
+        expect(fixture.nativeElement.textContent).toContain('Open Cases from the objects store');
     });
 
     it('surfaces an errored Case lookup and offers NO attachable case', async () => {
@@ -147,9 +228,6 @@ describe('LinkAnalysisAttachCaseDialog', () => {
         const el: HTMLElement = fixture.nativeElement;
 
         // The error state is honest: nothing attachable, and no placeholder leaked in as a real Case.
-        expect(c.cases()).toEqual([]);
-        expect(c.caseOptions()).toEqual([]);
-        expect(c.loadError()).not.toBe('');
         for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
         // Pick the alert by its TITLE, not by document order: the dialog's pre-existing "UI-first"
         // notice is also an `<inspecto-alert>` carrying role="alert" (the component gives warning and
@@ -162,7 +240,8 @@ describe('LinkAnalysisAttachCaseDialog', () => {
         expect(el.querySelector('inspecto-option-picker')).toBeNull();
         expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
 
-        // Even a caseId forced onto the form cannot be attached while the lookup is errored.
+        // Even a caseId forced onto the form cannot be attached while the lookup is errored: nothing
+        // offered it, so nothing vouches that the Case exists.
         c.form.patchValue({ caseId: store.mockCases[0].id });
         c.attach();
         expect(close).not.toHaveBeenCalled();

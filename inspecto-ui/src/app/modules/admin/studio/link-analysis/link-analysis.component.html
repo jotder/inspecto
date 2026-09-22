@@ -171,8 +171,8 @@
                 <button
                     mat-icon-button
                     (click)="openSnapshot()"
-                    matTooltip="Snapshot this graph as evidence"
-                    aria-label="Snapshot this graph as evidence"
+                    matTooltip="Save this analysis (optionally attaching it to a Case)"
+                    aria-label="Save this analysis"
                 >
                     <mat-icon svgIcon="heroicons_outline:camera"></mat-icon>
                 </button>
@@ -181,7 +181,9 @@
                     class="!min-h-0 !px-2 !py-1 text-xs"
                     (click)="openAttachToCase()"
                     [matTooltip]="
-                        latestSnapshot() ? 'Attach the latest snapshot to a Case' : 'Snapshot first, then attach'
+                        latestSnapshot()
+                            ? 'Attach the latest saved analysis to a Case'
+                            : 'Save the analysis first, then attach'
                     "
                     aria-label="Attach to Case"
                 >

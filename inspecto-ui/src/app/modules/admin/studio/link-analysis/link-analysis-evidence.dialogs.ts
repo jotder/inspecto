@@ -1,19 +1,17 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
-import { SessionService, apiErrorMessage } from 'app/inspecto/api';
-import { ObjectsService } from 'app/inspecto/api/objects.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { G6GraphData, GraphSnapshot, snapshotGraph } from 'app/inspecto/graph';
 import { ConditionGroup } from 'app/inspecto/query/query-types';
-import { CaseRef, LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
+import { LinkAnalysisCaseFieldComponent } from './link-analysis-case-field.component';
+import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 
 export interface SnapshotDialogData {
     graph: G6GraphData;
@@ -21,6 +19,8 @@ export interface SnapshotDialogData {
     origin: GraphSnapshot['origin'];
     layout: string;
     suggestedTitle: string;
+    /** Pre-selected Case, when Link Analysis was opened from one (`?case=<id>`). Empty otherwise. */
+    caseId?: string;
 }
 
 /** A predicate tree as one line, for the frozen-content summary. */
@@ -35,9 +35,14 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
 }
 
 /**
- * **Snapshot this graph as evidence** (spec §3.6 / plan S1.3, UI first). States the one distinction the
- * product must never blur: a saved view re-runs the question; a snapshot freezes the answer. Stranded nodes
- * are excluded, the predicate travels with it, and the manifest fingerprint is computed on save.
+ * **Save this analysis** (spec §3.6 / plan S1.3, UI first). States the one distinction the product must
+ * never blur: a saved view re-runs the question; a snapshot freezes the answer. Stranded nodes are
+ * excluded, the predicate travels with it, and the manifest fingerprint is computed on save.
+ *
+ * ⚠ **Attaching to a Case is OPTIONAL here** (decision 2026-09-22): the analysis is the thing being
+ * saved, and it stands on its own. So a Case that cannot be offered — the lookup failed — must never
+ * block the save; it costs the attachment, not the analyst's work. Attach-to-Case remains a separate
+ * action for attaching an analysis that was saved without one.
  */
 @Component({
     standalone: true,
@@ -49,9 +54,10 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
         MatFormFieldModule,
         MatInputModule,
         InspectoAlertComponent,
+        LinkAnalysisCaseFieldComponent,
     ],
     template: `
-        <h2 mat-dialog-title>Snapshot this graph as evidence</h2>
+        <h2 mat-dialog-title>Save this analysis</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <mat-dialog-content class="flex flex-col gap-3">
                 <inspecto-alert variant="info">
@@ -91,13 +97,28 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
                         the backend snapshot store)
                     </dd>
                 </dl>
+                <div class="rounded-lg border p-3">
+                    <div class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wide">
+                        Attach to a Case (optional)
+                    </div>
+                    <inspecto-link-analysis-case-field
+                        formControlName="caseId"
+                        placeholder="None — save without attaching"
+                    ></inspecto-link-analysis-case-field>
+                    @if (form.controls.caseId.value) {
+                        <p class="text-secondary mt-2 text-xs">
+                            The frozen snapshot is attached, not the live view — reopening a saved view re-runs the
+                            question and may show a different graph.
+                        </p>
+                    }
+                </div>
                 <inspecto-alert variant="warning">
                     UI-first: snapshots are kept for this browser session only until the backend snapshot store lands.
                 </inspecto-alert>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
-                <button mat-flat-button color="primary" type="submit">Save snapshot</button>
+                <button mat-flat-button color="primary" type="submit">Save analysis</button>
             </mat-dialog-actions>
         </form>
     `,
@@ -112,6 +133,9 @@ export class LinkAnalysisSnapshotDialog {
     readonly form = this.fb.nonNullable.group({
         title: [this.data.suggestedTitle, Validators.required],
         description: [''],
+        // Deliberately NOT required: the analysis stands on its own, and a Case that cannot be offered
+        // must cost the attachment rather than the save.
+        caseId: [this.data.caseId ?? ''],
     });
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
@@ -126,7 +150,7 @@ export class LinkAnalysisSnapshotDialog {
     save(): void {
         this.form.markAllAsTouched();
         if (this.form.invalid) return;
-        const { title, description } = this.form.getRawValue();
+        const { title, description, caseId } = this.form.getRawValue();
         const snap = snapshotGraph({
             title: title.trim(),
             description: description.trim() || undefined,
@@ -136,7 +160,9 @@ export class LinkAnalysisSnapshotDialog {
             viewport: { layout: this.data.layout },
         });
         this.store.add(snap);
-        this.ref.close(snap);
+        // The attachment is a second, optional step on the SAME action — a Case that was never offered
+        // (lookup failed) simply leaves the saved analysis unattached.
+        this.ref.close(caseId ? (this.store.attach(snap.id, caseId) ?? snap) : snap);
     }
 }
 
@@ -146,13 +172,13 @@ export interface AttachCaseDialogData {
 }
 
 /**
- * **Attach to Case** (plan S1.3). Picks a Case and records the snapshot against it. With the ops module
- * present the Cases come from `GET /objects?type=CASE`; without it, placeholder Cases let the flow be
- * exercised UI-first. The "saved view only" option is deliberately labelled *not evidence*.
+ * **Attach to Case** (plan S1.3). Attaches an analysis that was saved WITHOUT a Case — the save dialog
+ * asks for one optionally, so this is the second path rather than the only one. Here the Case genuinely
+ * is required: attaching to nothing is not an outcome this action has.
  *
- * ⚠ Those two states must never be confused. "The ops module is not installed" is a deployment fact and
- * may offer placeholders; a Case lookup that FAILED is an error, and the dialog then offers nothing —
- * attaching evidence to a placeholder id the analyst believes is a real Case is a silent wrong answer.
+ * The three Case states (ops present / ops absent / lookup failed) live in
+ * {@link LinkAnalysisCaseFieldComponent}, shared with the save dialog so they cannot drift.
+ * The "saved view only" option is deliberately labelled *not evidence*.
  */
 @Component({
     standalone: true,
@@ -165,26 +191,19 @@ export interface AttachCaseDialogData {
         MatInputModule,
         MatRadioModule,
         InspectoAlertComponent,
-        InspectoOptionPickerComponent,
+        LinkAnalysisCaseFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>Attach to Case</h2>
         <form [formGroup]="form" (ngSubmit)="attach()">
             <mat-dialog-content class="flex flex-col gap-3">
-                @if (loadError()) {
-                    <inspecto-alert variant="error" title="Cases could not be loaded">
-                        {{ loadError() }} — no Case can be offered until the lookup succeeds.
-                    </inspecto-alert>
-                } @else {
-                    <inspecto-option-picker
-                        label="Case"
-                        formControlName="caseId"
-                        [options]="caseOptions()"
-                        [help]="casesHelp()"
-                    ></inspecto-option-picker>
-                    @if (form.controls.caseId.touched && form.controls.caseId.invalid) {
-                        <p class="text-warn text-xs" role="alert">Pick a Case.</p>
-                    }
+                <inspecto-link-analysis-case-field
+                    #caseField
+                    formControlName="caseId"
+                    [required]="true"
+                ></inspecto-link-analysis-case-field>
+                @if (form.controls.caseId.touched && form.controls.caseId.invalid && !caseField.loadError()) {
+                    <p class="text-warn text-xs" role="alert">Pick a Case.</p>
                 }
                 <div class="rounded-lg border p-3 text-sm">
                     <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
@@ -212,30 +231,24 @@ export interface AttachCaseDialogData {
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
-                <button mat-flat-button color="primary" type="submit" [disabled]="loadError() !== ''">Attach</button>
+                <button mat-flat-button color="primary" type="submit" [disabled]="caseField.loadError() !== ''">
+                    Attach
+                </button>
             </mat-dialog-actions>
         </form>
     `,
 })
-export class LinkAnalysisAttachCaseDialog implements OnInit {
+export class LinkAnalysisAttachCaseDialog {
     readonly data = inject<AttachCaseDialogData>(MAT_DIALOG_DATA);
     private readonly ref =
         inject<MatDialogRef<LinkAnalysisAttachCaseDialog, { caseId: string } | undefined>>(MatDialogRef);
     private readonly confirm = inject(InspectoConfirmService);
     private readonly store = inject(LinkAnalysisSnapshotsService);
-    private readonly objects = inject(ObjectsService);
-    private readonly opsEnabled = inject(SessionService).opsEnabled;
     private readonly fb = inject(FormBuilder);
 
-    readonly cases = signal<CaseRef[]>([]);
-    /** Non-empty once the Case lookup FAILED — distinct from the ops-absent path, which has placeholders. */
-    readonly loadError = signal('');
-    readonly caseOptions = computed(() => this.cases().map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` })));
-    readonly casesHelp = computed(() =>
-        this.opsEnabled()
-            ? 'Open Cases from the objects store.'
-            : 'Placeholder Cases — the ops module is not installed.',
-    );
+    /** Read in TS only, for the submit guard — the template uses its own `#caseField` reference. */
+    private readonly caseFieldRef = viewChild(LinkAnalysisCaseFieldComponent);
+
     readonly form = this.fb.nonNullable.group({
         caseId: ['', Validators.required],
         what: ['snapshot' as 'snapshot' | 'view'],
@@ -243,22 +256,10 @@ export class LinkAnalysisAttachCaseDialog implements OnInit {
     });
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
-    ngOnInit(): void {
-        if (!this.opsEnabled()) {
-            this.cases.set([...this.store.mockCases]);
-            return;
-        }
-        this.objects.list({ type: 'CASE' }).subscribe({
-            next: (rows) => this.cases.set(rows.map((o) => ({ id: o.id, title: o.title }))),
-            error: (err) => {
-                this.cases.set([]);
-                this.loadError.set(apiErrorMessage(err, 'The Cases lookup failed.'));
-            },
-        });
-    }
-
     attach(): void {
-        if (this.loadError()) return;
+        // A caseId reaching the form while the lookup is errored (a deep link, a stale patch) is still
+        // not attachable — nothing offered it, so nothing vouches that the Case exists.
+        if (this.caseFieldRef()?.loadError()) return;
         this.form.markAllAsTouched();
         if (this.form.invalid) return;
         const { caseId, what } = this.form.getRawValue();

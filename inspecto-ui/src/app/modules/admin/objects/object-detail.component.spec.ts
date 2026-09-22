@@ -162,6 +162,27 @@ describe('ObjectDetailComponent', () => {
         expect(c.memberTimelineLoaded()).toBe(true);
     });
 
+    it('offers Link Analysis on a CASE, carrying the id so the analysis can be saved back onto it', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const link = Array.from(fixture.nativeElement.querySelectorAll('a,button')).find((e) =>
+            (e as HTMLElement).textContent?.includes('Link Analysis'),
+        ) as HTMLAnchorElement | undefined;
+        expect(link).toBeTruthy();
+        // The href is the contract the Case page and Link Analysis share: `?case=<id>`, which the pane
+        // reads and does NOT strip, so the deep link survives a reload and a bookmark.
+        expect(link!.getAttribute('href')).toBe('/studio/link-analysis?case=obj-9');
+    });
+
+    it('does NOT offer Link Analysis on an INCIDENT — there is no Case-scoped working set to open', () => {
+        const { fixture } = create({ get: () => of({ ...CASE, objectType: 'INCIDENT' }) });
+        fixture.detectChanges();
+        const link = Array.from(fixture.nativeElement.querySelectorAll('a,button')).find((e) =>
+            (e as HTMLElement).textContent?.includes('Link Analysis'),
+        );
+        expect(link).toBeUndefined();
+    });
+
     it('renders the overview with no a11y violations', async () => {
         const { fixture } = create();
         fixture.detectChanges();

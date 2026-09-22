@@ -31,6 +31,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
+import { map } from 'rxjs/operators';
 import {
     ExchangeService,
     LensService,
@@ -228,6 +229,15 @@ export class LinkAnalysisComponent implements OnInit {
     private dialog = inject(MatDialog);
     private router = inject(Router);
     private route = inject(ActivatedRoute);
+    /**
+     * The Case this analysis was opened from (`/studio/link-analysis?case=<id>`, the link on a Case page),
+     * pre-selected in the save dialog. ⚠ Deliberately NOT stripped after use: unlike the `?create=1`
+     * handshake this is the address of a Case-scoped investigation, so it has to survive a reload and a
+     * bookmark — the same rule the Pipelines `?open=` deep link follows.
+     */
+    readonly deepLinkedCaseId = toSignal(this.route.queryParamMap.pipe(map((p) => p.get('case') ?? '')), {
+        initialValue: '',
+    });
     private pivotService = inject(PivotService);
     private graphSources = inject(GraphSourcesService);
     private spaces = inject(SpacesService);
@@ -851,6 +861,7 @@ export class LinkAnalysisComponent implements OnInit {
             origin: { sourceId: run.sourceId, dataset: p?.datasetId, query: run.query },
             layout: this.layoutId(),
             suggestedTitle: `${this.sourceLabel()} — ${g.nodes.filter((n) => !n.data.missing).length} nodes`,
+            caseId: this.deepLinkedCaseId(),
         };
     }
 

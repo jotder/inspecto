@@ -366,10 +366,35 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   simply has no ops module — two placeholder Cases, offered as attachable targets, in the one dialog whose
   purpose is attaching EVIDENCE. 🔴 **Attaching evidence to a fabricated Case id is a silent wrong answer
   in an investigative tool**, and nothing downstream would have caught it. The placeholders survive on the
-  ops-absent path (a deployment fact the analyst can act on); a real error now clears the list, renders an
-  `<inspecto-alert variant="error">` in the picker's place and disables Attach — `attach()` refuses too,
-  so a caseId forced onto the form cannot get through. ⚠ The whole snapshot/attach flow is still
-  client-side (LA-03 unbuilt), so this is about the UI's honesty, not about persistence.
+  ops-absent path (a deployment fact the analyst can act on); a real error clears the list and renders an
+  `<inspecto-alert variant="error">` in the picker's place. The three states live in ONE place,
+  `LinkAnalysisCaseFieldComponent`, so the two dialogs that ask for a Case cannot drift on them.
+  ⚠ The whole snapshot/attach flow is still client-side (LA-03 unbuilt), so this is about the UI's
+  honesty, not about persistence.
+* **Saving the analysis and attaching it to a Case are ONE action, and the Case half is optional**
+  (decision 2026-09-22, operator). The snapshot dialog and the attach dialog merged into **Save this
+  analysis**: name, description, the frozen-content summary, and an *optional* Case. 🔴 **This reversed
+  the same day's first answer to the errored lookup, which disabled the submit button** — correct for
+  Attach-to-Case, where attaching to nothing is not an outcome, but wrong for saving: it made an ops
+  service being down cost the analyst their analysis, not merely the attachment. Save now stays enabled
+  when the lookup fails and the analysis is kept unattached. ⛔ The picker still offers nothing in that
+  state — an unattached analysis is honest, an analysis attached to a fabricated Case id is not.
+  **Attach-to-Case survives as a second action** for an analysis saved without a Case; there the Case is
+  genuinely required, and a `caseId` that reaches its form while the lookup is errored is still refused,
+  because nothing offered it and so nothing vouches that the Case exists.
+* **A Case page opens Link Analysis on itself** — an `<a>` (not a button: it navigates, so it carries a
+  real href) in `object-detail`'s header actions, rendered for `objectType === 'CASE'` only, pointing at
+  `/studio/link-analysis?case=<id>`. The pane reads that param and pre-selects the Case in the save
+  dialog, so an analysis started from a Case is saved straight back onto it. ⚠ The param is **deliberately
+  not stripped** (the `?open=` rule, not the `?create=1` one): it is the address of a Case-scoped
+  investigation and has to survive a reload and a bookmark.
+  ⛔ **"Create a new Case" was deliberately NOT built here.** `POST /objects` refuses a body without at
+  least one entry in `links` — for EVERY object type, measured 2026-09-22, so in a space with no objects
+  none can be created through the API at all — and the UI states it as a product decision (2026-07-22,
+  `object-create.dialog.ts:224`): *a case CONTAINS its members*. Link Analysis holds graph **nodes**,
+  which are value-projected entity ids and not operational objects, so there is no legal link target on
+  this screen. Creating one anyway would also mean a durable Case with a session-only attachment — an
+  empty Case that looks like it holds evidence. Revisit when LA-03 lands.
 * **The projection reports the identities it has SPLIT** (`splitIdentityGroups`, decision D-S4). Entity ids
   are value-projected — `entityId` mints them from the trimmed raw value with no case fold and no alias
   resolution — so `ACME Ltd` and `acme ltd.` are two nodes carrying two degree counts, two community

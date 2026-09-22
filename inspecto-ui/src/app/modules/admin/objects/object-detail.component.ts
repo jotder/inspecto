@@ -16,7 +16,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
@@ -65,6 +65,7 @@ interface MemberTimelineEntry {
     selector: 'app-object-detail',
     standalone: true,
     imports: [
+        RouterLink,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,

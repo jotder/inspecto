@@ -27,6 +27,20 @@
                 @if (obj()?.correlationId) {
                     <inspecto-ai-status [label]="id()" [correlationId]="obj()!.correlationId!" />
                 }
+                <!-- Investigate this Case's entities as a graph. CASE only: an Incident/Alert is a single
+                 event, so there is no Case-scoped working set for Link Analysis to open onto. The id
+                 rides as `?case=` so the analysis can be saved straight back onto this Case. -->
+                @if (obj()?.objectType === 'CASE') {
+                    <a
+                        mat-stroked-button
+                        [routerLink]="['/studio/link-analysis']"
+                        [queryParams]="{ case: id() }"
+                        matTooltip="Open Link Analysis with this Case pre-selected"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                        <span class="ml-2">Link Analysis</span>
+                    </a>
+                }
                 @for (a of actions; track a) {
                     <button mat-stroked-button (click)="transition(a)">
                         <mat-icon svgIcon="heroicons_outline:arrow-right-circle"></mat-icon>
