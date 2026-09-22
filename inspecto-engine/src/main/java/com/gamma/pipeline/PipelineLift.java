@@ -557,8 +557,15 @@ public final class PipelineLift {
         return fallback;
     }
 
-    /** Sanitise a table/segment name into a route-branch key; fall back to {@code schema_<i>}. */
-    static String routeKey(String name, int i) {
+    /**
+     * Sanitise a table/segment name into a route-branch key; fall back to {@code schema_<i>}.
+     *
+     * <p>⚠ PUBLIC since {@code WB-08}, because the test run must seed the parse node with the SAME branch
+     * keys the lift put on the edges — the walk matches a seed to an edge by exact relation string. A
+     * second copy of this sanitisation anywhere else would be a name that has to match exactly and is
+     * free to drift, which is precisely how the two surfaces in Sprint A came to disagree.
+     */
+    public static String routeKey(String name, int i) {
         if (name == null || name.isBlank()) return "schema_" + i;
         String k = name.trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "");
         return k.isEmpty() ? "schema_" + i : k;

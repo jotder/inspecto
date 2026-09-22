@@ -288,11 +288,34 @@ public final class PipelineExecutor {
      */
     public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId, String seedTable,
                                       RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
+        return dryRun(conn, g, seedNodeId, Map.of(PipelineRel.DATA, seedTable), references, stopAtNodeId);
+    }
+
+    /**
+     * As above, but seeding the seed node with <b>one relation per entry</b> of {@code seedRelations}
+     * ({@code rel → table}) rather than a single {@code data} table — {@code WB-08}.
+     *
+     * <p>🔴 <b>Why this overload exists.</b> A segment-routed frontend (ASN.1 BER, the plugin ingester
+     * over XML) lifts as {@code parse →(route:<segment>)→ map_<segment> → sink_<segment>}. The walk below
+     * follows an edge only when the upstream node's produced-map holds a key equal to the edge's
+     * {@code rel} ({@link #liveInbound}) — so a seed that only ever wrote {@code data} could never leave
+     * such a parser, and *Run to here* decoded records and then reported {@code relations: []} with an
+     * honest "nothing downstream consumed it" warning. Two of eight parse frontends, and every
+     * multi-record-type feed, had no test instrument past the decoder
+     * ({@code TESTRUN-SEGMENT-ROUTE-NO-FLOW-1}).
+     *
+     * <p>⛔ <b>The walker is NOT special-cased, and that is the design</b> (D5, signed 2026-09-22): the fix
+     * is the SEED SHAPE. A second traversal rule for {@code route:} is how a preview and a real run begin
+     * to disagree — the defect class this plan spent Sprints A and B closing.
+     */
+    public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId,
+                                      Map<String, String> seedRelations,
+                                      RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
         Set<String> bounds = ancestorsOf(g, stopAtNodeId, byId);
         Map<String, Map<String, String>> produced = new LinkedHashMap<>();
-        produced.put(seedNodeId, new LinkedHashMap<>(Map.of(PipelineRel.DATA, seedTable)));
+        produced.put(seedNodeId, new LinkedHashMap<>(seedRelations));
         Map<String, String> sinkInputs = new LinkedHashMap<>();
 
         for (String nodeId : topoOrder(g)) {

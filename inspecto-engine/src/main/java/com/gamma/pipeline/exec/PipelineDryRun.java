@@ -6,6 +6,7 @@ import com.gamma.pipeline.NodeCategory;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineNodeTypes;
+import com.gamma.pipeline.PipelineRel;
 import com.gamma.pipeline.PipelineStores;
 import com.gamma.util.DuckDbUtil;
 
@@ -93,15 +94,48 @@ public final class PipelineDryRun {
                              RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
         if (sampleRows == null || sampleRows.isEmpty())
             throw new IllegalArgumentException("at least one sample row is required");
+        return runSeeded(g, Map.of(PipelineRel.DATA, sampleRows), references, stopAtNodeId);
+    }
+
+    /**
+     * Dry-run {@code g} seeding the parse node with <b>one relation per segment</b> — {@code WB-08}.
+     *
+     * <p>A segment-routed frontend lifts as {@code parse →(route:<segment>)→ map_<segment> →
+     * sink_<segment>}, and the walk follows an edge only when the upstream node produced its {@code rel}.
+     * Seeding one {@code data} table could therefore never leave such a parser: *Run to here* decoded
+     * records and reported {@code relations: []} ({@code TESTRUN-SEGMENT-ROUTE-NO-FLOW-1}).
+     *
+     * <p>⚠ Keys are the caller's, and they must be the graph's own edge relations — build them with
+     * {@link PipelineRel#route(String)} over {@link com.gamma.pipeline.PipelineLift#routeKey}, the ONE
+     * definition of a branch key. Recomputing the sanitisation here would be a second implementation of
+     * a name that has to match exactly, which is how the two surfaces in Sprint A came to disagree.
+     *
+     * @param rowsByRelation {@code rel → rows}; an entry with no rows is skipped rather than seeding an
+     *                       empty table, so "this segment produced nothing" stays distinguishable from
+     *                       "this segment was never routed".
+     */
+    public static Result runSeeded(PipelineGraph g, Map<String, List<Map<String, Object>>> rowsByRelation,
+                                   RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
+        if (rowsByRelation == null || rowsByRelation.values().stream().allMatch(r -> r == null || r.isEmpty()))
+            throw new IllegalArgumentException("at least one sample row is required");
         g = withMappingContext(g);
         String seedNode = seedNodeOf(g);
-        List<String> columns = ScratchTables.columnsOf(sampleRows);
 
         File db = DuckDbUtil.tempDbFile("dryrun_");
         try (Connection conn = DuckDbUtil.openConnection(db)) {
-            ScratchTables.seed(conn, SEED, columns, sampleRows);
+            Map<String, String> seeds = new LinkedHashMap<>();
+            int i = 0;
+            for (Map.Entry<String, List<Map<String, Object>>> e : rowsByRelation.entrySet()) {
+                List<Map<String, Object>> rows = e.getValue();
+                if (rows == null || rows.isEmpty()) continue;
+                // One scratch table per relation. The single-relation case keeps the historic name, so a
+                // failure message about `dryrun_seed` still reads the way every existing test expects.
+                String table = seeds.isEmpty() && rowsByRelation.size() == 1 ? SEED : SEED + "_" + (i++);
+                ScratchTables.seed(conn, table, ScratchTables.columnsOf(rows), rows);
+                seeds.put(e.getKey(), table);
+            }
             PipelineExecutor.DryRunResult dr =
-                    PipelineExecutor.dryRun(conn, g, seedNode, SEED, references, stopAtNodeId);
+                    PipelineExecutor.dryRun(conn, g, seedNode, seeds, references, stopAtNodeId);
             Map<String, PipelineNode> byId = g.byId();
 
             List<NodeDryRun> nodes = new ArrayList<>();

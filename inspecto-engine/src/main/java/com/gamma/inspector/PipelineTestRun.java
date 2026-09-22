@@ -27,6 +27,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -83,8 +84,23 @@ public final class PipelineTestRun {
      * @param castFailures values a declared coercion silently nulled while keeping the row;
      *                     <b>{@code -1} means NOT MEASURED</b>, never "clean" (see {@code IngestOutcome})
      */
+    /**
+     * @param schemaByOutput output file → the SEGMENT that wrote it, for a segment-routed frontend
+     *        ({@code IngestOutcome.schemaByOutput}, which the union-mode ingester fills as it writes each
+     *        segment). Empty for a single-schema Pipeline — "all one schema", never "unknown".
+     *        ⚠ This is what makes {@code WB-08} a seed change rather than a plumbing exercise: the
+     *        attribution already existed at write time; nothing was carrying it out.
+     */
     public record Result(String status, int batches, List<FileResult> files, long totalInputRows,
-                         long rowsWritten, long castFailures, List<PartitionOutput> outputs, String error) {}
+                         long rowsWritten, long castFailures, List<PartitionOutput> outputs, String error,
+                         Map<String, String> schemaByOutput) {
+
+        /** Single-schema form — no per-segment attribution to carry. */
+        public Result(String status, int batches, List<FileResult> files, long totalInputRows,
+                      long rowsWritten, long castFailures, List<PartitionOutput> outputs, String error) {
+            this(status, batches, files, totalInputRows, rowsWritten, castFailures, outputs, error, Map.of());
+        }
+    }
 
     /**
      * Parse {@code pickedFiles} through the real ingest path into {@code scratchRoot}.
@@ -116,6 +132,7 @@ public final class PipelineTestRun {
 
         List<FileResult> files = new ArrayList<>();
         List<PartitionOutput> outputs = new ArrayList<>();
+        Map<String, String> schemaByOutput = new LinkedHashMap<>();
         long inputRows = 0, written = 0, casts = -1;
         boolean anyFailed = false, anyRows = false;
         String error = "";
@@ -141,6 +158,7 @@ public final class PipelineTestRun {
             for (MemberAudit m : outcome.memberAudits())
                 files.add(new FileResult(m.filename(), m.status().name(), m.parsedRows(), m.errorRows(), m.error()));
             outputs.addAll(outcome.outputs());
+            schemaByOutput.putAll(outcome.schemaByOutput());
             inputRows += outcome.totalInputRows();
             written += outcome.lineage().stream().mapToLong(LineageRow::rowCount).sum();
             if (outcome.castFailures() >= 0) casts = (casts < 0 ? 0 : casts) + outcome.castFailures();
@@ -156,7 +174,7 @@ public final class PipelineTestRun {
         log.info("Test run of pipeline {} over {} file(s): {} — {} row(s) in, {} written",
                 cfg.identity().pipelineName(), pickedFiles.size(), status, inputRows, written);
         return new Result(status, batches.size(), List.copyOf(files), inputRows, written, casts,
-                List.copyOf(outputs), error);
+                List.copyOf(outputs), error, Map.copyOf(schemaByOutput));
     }
 
     /**
@@ -190,6 +208,48 @@ public final class PipelineTestRun {
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
+    }
+
+    /**
+     * The run's parsed rows grouped by the SEGMENT that produced them — {@code WB-08}.
+     *
+     * <p>🔴 {@link #sampleRows} reads every output into ONE flat list, which is correct for a
+     * single-schema Pipeline and lossy for a segment-routed one: the graph preview then seeds a single
+     * {@code data} relation, the walk cannot leave a {@code parse →(route:<segment>)→ …} parser, and the
+     * run reports {@code relations: []} ({@code TESTRUN-SEGMENT-ROUTE-NO-FLOW-1}).
+     *
+     * <p>⚠ The grouping is not inferred from paths or names: it reads {@link Result#schemaByOutput},
+     * which the union-mode ingester fills as it writes each segment. ⛔ An output with no attribution is
+     * NOT guessed at — it lands under {@code null}, and the caller seeds it as plain {@code data}, which
+     * is exactly what a single-schema Pipeline is.
+     *
+     * @return segment key → rows, in the order the segments were written; empty when the run wrote
+     *         nothing. A segment that wrote no rows is absent rather than present-and-empty.
+     */
+    public static Map<String, List<Map<String, Object>>> sampleRowsBySegment(
+            Result result, String outputFormat, int limit) throws SQLException, IOException {
+        if (result.outputs().isEmpty() || limit <= 0) return Map.of();
+
+        Map<String, List<String>> pathsBySegment = new LinkedHashMap<>();
+        for (PartitionOutput o : result.outputs())
+            pathsBySegment.computeIfAbsent(result.schemaByOutput().get(o.outputFile()), k -> new ArrayList<>())
+                    .add(o.outputFile());
+
+        Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
+        File db = DuckDbUtil.tempDbFile("testrun_sample_");
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            for (Map.Entry<String, List<String>> e : pathsBySegment.entrySet()) {
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery("SELECT * FROM "
+                             + SqlViews.reader(outputFormat, e.getValue(), false) + " LIMIT " + limit)) {
+                    List<Map<String, Object>> rows = JdbcRows.toMaps(rs);
+                    if (!rows.isEmpty()) out.put(e.getKey(), rows);
+                }
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+        return out;
     }
 
     /**

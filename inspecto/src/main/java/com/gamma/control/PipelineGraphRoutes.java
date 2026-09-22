@@ -21,6 +21,7 @@ import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.RecipeConverter;
 import com.gamma.pipeline.PipelineLift;
+import com.gamma.pipeline.PipelineRel;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionWorkbench;
 import com.gamma.acquire.LocalConnectionWorkbench;
@@ -562,8 +563,16 @@ final class PipelineGraphRoutes implements RouteModule {
         }
         try {
             PipelineTestRun.Result parsed = PipelineTestRun.run(cfg, picked, scratch);
+            // \U0001f534 Grouped by SEGMENT (WB-08). A segment-routed frontend lifts as
+            // `parse →(route:<segment>)→ map_<segment> → sink_<segment>`, and the preview's walk follows an
+            // edge only when the parse node produced that edge's relation — so a single flat `data` seed
+            // could never leave the decoder, and the run reported `relations: []` with an honest
+            // "nothing downstream consumed it" (TESTRUN-SEGMENT-ROUTE-NO-FLOW-1).
+            Map<String, List<Map<String, Object>>> bySegment =
+                    PipelineTestRun.sampleRowsBySegment(parsed, cfg.output().format(), TEST_RUN_SEED_ROWS);
+            Map<String, List<Map<String, Object>>> seedRelations = seedRelations(bySegment);
             List<Map<String, Object>> seed =
-                    PipelineTestRun.sampleRows(parsed, cfg.output().format(), TEST_RUN_SEED_ROWS);
+                    seedRelations.values().stream().flatMap(List::stream).toList();
 
             List<String> warnings = new ArrayList<>();
             if (parsed.totalInputRows() > seed.size())
@@ -580,8 +589,8 @@ final class PipelineGraphRoutes implements RouteModule {
             }
             // `to` bounds the graph preview only: the picked files are always parsed in full, because the
             // parse is what seeds the walk. So a cutoff makes the answer narrower, never the work smaller.
-            PipelineDryRun.Result preview = PipelineDryRun.run(
-                    componentRegistry(api).effectiveGraph(g), seed, dryRunReferences(api),
+            PipelineDryRun.Result preview = PipelineDryRun.runSeeded(
+                    componentRegistry(api).effectiveGraph(g), seedRelations, dryRunReferences(api),
                     to == null || to.isBlank() ? null : to);
             warnings.addAll(preview.warnings());
             return runResult(preview, to, files, parsed, cfg, warnings);
@@ -624,6 +633,34 @@ final class PipelineGraphRoutes implements RouteModule {
         if (p.basePath() == null || p.basePath().isBlank())
             throw new ApiException(422, "connection '" + connId + "' has no base_path configured");
         return Paths.get(p.basePath().trim()).toAbsolutePath().normalize();
+    }
+
+    /**
+     * Turn {@code segment → rows} into {@code relation → rows}, using the graph's OWN branch-key rule.
+     *
+     * <p>⚠ The relation is {@link PipelineRel#route(String)} over {@link PipelineLift#routeKey} — the one
+     * definition the lift itself used when it built the edges. The walk matches a seed to an edge by
+     * exact string, so re-deriving the sanitisation here would be a name free to drift from the name it
+     * has to equal.
+     *
+     * <p>⛔ An un-attributed group (key {@code null}) stays plain {@code data}: that is a single-schema
+     * Pipeline, whose parse node has exactly one outgoing {@code data} edge. Guessing a branch for it
+     * would invent a topology the author never wrote.
+     */
+    private static Map<String, List<Map<String, Object>>> seedRelations(
+            Map<String, List<Map<String, Object>>> bySegment) {
+        Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Map<String, Object>>> e : bySegment.entrySet()) {
+            String rel = e.getKey() == null
+                    ? PipelineRel.DATA
+                    : PipelineRel.route(PipelineLift.routeKey(e.getKey(), 0));
+            out.merge(rel, e.getValue(), (a, b) -> {
+                List<Map<String, Object>> both = new ArrayList<>(a);
+                both.addAll(b);
+                return both;
+            });
+        }
+        return out;
     }
 
     /** The authored graph for a run-to-here: the stored pipeline, else the lifted config. 404 if neither. */
