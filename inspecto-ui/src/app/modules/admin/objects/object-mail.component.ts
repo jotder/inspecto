@@ -35,6 +35,7 @@ import {
     SessionService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { BulkAction, InspectoBulkActionsComponent } from 'app/inspecto/components/bulk-actions.component';
 import { STATUS_BADGE_BASE, statusBadgeClasses, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -99,6 +100,7 @@ function mailDate(ms: number | undefined): string {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         InspectoAlertComponent,
+        InspectoBulkActionsComponent,
         AiExplainComponent,
         ReactiveFormsModule,
         MatButtonModule,
@@ -232,6 +234,101 @@ export class ObjectMailComponent implements OnInit {
         () => this.isIncident && this.selected().some((o) => ['RESOLVED', 'ARCHIVED'].includes(displayStatus(o))),
     );
     readonly canEscalate = computed(() => this.isIncident && this.selected().length > 0);
+
+    /**
+     * The bulk actions, as data for `<inspecto-bulk-actions>` (UI-12). This toolbar used to render six
+     * or seven outlined buttons ABOVE AN EMPTY GRID, every one of them greyed out until a row was
+     * selected — a wall of disabled controls as the first thing the pane showed. They now live in one
+     * `Actions ▾` menu that appears only once something is selected.
+     *
+     * Priority is flattened to one entry per value rather than a nested submenu, and the dynamic Case
+     * verbs (C6 — a TOON-overridden lifecycle changes them with zero UI change) keep flowing through
+     * `caseActions()`.
+     */
+    readonly bulkActions = computed<BulkAction[]>(() => {
+        const n = this.selected().length;
+        const a: BulkAction[] = [];
+        if (this.isIncident) {
+            a.push({ id: 'accept', label: 'Accept', icon: 'heroicons_outline:check', disabled: !this.canAccept() });
+        }
+        for (const p of this.priorities) {
+            a.push({ id: 'prio:' + p, label: 'Set priority ' + p, icon: 'heroicons_outline:flag', disabled: !n });
+        }
+        a.push({ id: 'tag', label: 'Tag…', icon: 'heroicons_outline:tag', disabled: !n });
+        if (this.isIncident) {
+            a.push({
+                id: 'escalate',
+                label: this.escalateLabel(),
+                icon: 'heroicons_outline:arrow-trending-up',
+                disabled: !this.canEscalate(),
+            });
+            a.push({
+                id: 'resolve',
+                label: 'Resolve',
+                icon: 'heroicons_outline:paper-airplane',
+                disabled: !this.canResolve(),
+            });
+            a.push({
+                id: 'reopen',
+                label: 'Reopen',
+                icon: 'heroicons_outline:arrow-uturn-left',
+                disabled: !this.canReopen(),
+            });
+            a.push({
+                id: 'archive',
+                label: 'Archive',
+                icon: 'heroicons_outline:archive-box',
+                disabled: !this.canArchive(),
+                destructive: true,
+            });
+        } else {
+            for (const c of this.caseActions()) {
+                a.push({ id: 'case:' + c, label: this.stateLabel(c), disabled: !n });
+            }
+            a.push({
+                id: 'merge',
+                label: 'Merge…',
+                icon: 'heroicons_outline:arrows-pointing-in',
+                disabled: n < 2,
+            });
+        }
+        return a;
+    });
+
+    /** Dispatch one bulk action id onto the existing per-verb methods. */
+    runBulk(id: string): void {
+        if (id.startsWith('prio:')) {
+            this.prioritize(id.slice('prio:'.length));
+            return;
+        }
+        if (id.startsWith('case:')) {
+            void this.runCaseAction(id.slice('case:'.length));
+            return;
+        }
+        switch (id) {
+            case 'accept':
+                this.accept();
+                break;
+            case 'tag':
+                this.tagSelection();
+                break;
+            case 'escalate':
+                this.escalate();
+                break;
+            case 'resolve':
+                this.resolve();
+                break;
+            case 'reopen':
+                this.reopen();
+                break;
+            case 'archive':
+                this.archive();
+                break;
+            case 'merge':
+                this.mergeSelection();
+                break;
+        }
+    }
     readonly escalateLabel = computed(() =>
         this.isIncident && this.selected().length > 0 && this.selected().every(isEscalated)
             ? 'De-escalate'

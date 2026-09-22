@@ -165,91 +165,13 @@
                     </div>
                 </div>
 
-                <!-- Action toolbar (drives the checkbox selection) -->
-                <div class="flex flex-wrap items-center gap-2">
-                    @if (isIncident) {
-                        <button
-                            mat-stroked-button
-                            [disabled]="!canAccept()"
-                            (click)="accept()"
-                            matTooltip="Identified → Diagnosing (asks for the 3-layer category when missing)"
-                        >
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:check"></mat-icon>
-                            <span class="ml-1">Accept</span>
-                        </button>
-                    }
-                    <button
-                        mat-stroked-button
-                        [disabled]="!selected().length"
-                        [matMenuTriggerFor]="prioMenu"
-                        matTooltip="Set priority"
-                    >
-                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:flag"></mat-icon>
-                        <span class="ml-1">Prioritize</span>
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-down"></mat-icon>
-                    </button>
-                    <mat-menu #prioMenu="matMenu">
-                        @for (p of priorities; track p) {
-                            <button mat-menu-item (click)="prioritize(p)">{{ p }}</button>
-                        }
-                    </mat-menu>
-                    <button
-                        mat-stroked-button
-                        [disabled]="!selected().length"
-                        (click)="tagSelection()"
-                        matTooltip="Add or remove tags"
-                    >
-                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
-                        <span class="ml-1">Tag</span>
-                    </button>
-                    @if (isIncident) {
-                        <button mat-stroked-button [disabled]="!canEscalate()" (click)="escalate()">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-trending-up"></mat-icon>
-                            <span class="ml-1">{{ escalateLabel() }}</span>
-                        </button>
-                        <button
-                            mat-stroked-button
-                            [disabled]="!canResolve()"
-                            (click)="resolve()"
-                            matTooltip="Requires a resolution comment; warns when the resolution pattern is incomplete"
-                        >
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:paper-airplane"></mat-icon>
-                            <span class="ml-1">Resolve</span>
-                        </button>
-                        <button mat-stroked-button [disabled]="!canArchive()" (click)="archive()">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:archive-box"></mat-icon>
-                            <span class="ml-1">Archive</span>
-                        </button>
-                        <button mat-stroked-button [disabled]="!canReopen()" (click)="reopen()">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
-                            <span class="ml-1">Reopen</span>
-                        </button>
-                    } @else {
-                        <!-- C6: verbs derived from the effective workflow — a TOON-overridden lifecycle
-                         changes these buttons with zero UI change. -->
-                        @for (a of caseActions(); track a) {
-                            <button
-                                mat-stroked-button
-                                (click)="runCaseAction(a)"
-                                [matTooltip]="a === 'resolve' ? 'Requires a resolution comment' : ''"
-                            >
-                                <span>{{ stateLabel(a) }}</span>
-                            </button>
-                        }
-                        <button
-                            mat-stroked-button
-                            [disabled]="selected().length < 2"
-                            (click)="mergeSelection()"
-                            matTooltip="Combine the selected cases into one (pick the survivor)"
-                        >
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrows-pointing-in"></mat-icon>
-                            <span class="ml-1">Merge</span>
-                        </button>
-                    }
-                    @if (selected().length) {
-                        <span class="text-secondary ml-1 text-sm" role="status">{{ selected().length }} selected</span>
-                    }
-                </div>
+                <!-- Bulk actions: nothing renders until rows are selected (UI-12) -->
+                <inspecto-bulk-actions
+                    [count]="selected().length"
+                    [actions]="bulkActions()"
+                    (run)="runBulk($event)"
+                    (clear)="selected.set([])"
+                />
             </div>
 
             <div class="min-h-0 flex-auto overflow-y-auto p-4 sm:px-6">
