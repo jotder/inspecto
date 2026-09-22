@@ -124,17 +124,33 @@ An unknown `to=` throws → **400**, rather than silently widening to the whole 
 segment-routed frontends out of scope with a named 422 — was considered and declined, because it would
 leave 2 of 8 parse frontends, and every multi-record-type feed, with no test instrument past the decoder.
 
-🔴 **As-built until `WB-08` lands, the walk stops at the parser.** Measured 2026-09-22: `asn1_example`
-(BER) and `xml_example` (plugin) both lift as `parse →(route:<segment>)→ map_<segment> → sink_<segment>`
-plus `unmatched → quarantine`. *Run to here* decoded 3 records from each and returned `relations: []` with
-the honest DRYRUN-2 warning *“the sample reached no node past the seed 'parse' — nothing downstream
-consumed it”*. The warning is accurate; the coverage is not.
+✅ **AS-BUILT since 2026-09-22 (`WB-08`), verified live 2026-09-23.** The dry-run seeds the parse node
+with **one relation per segment** — `PipelineDryRun.runSeeded` takes `rel → rows`, materialises one
+scratch table each, and `PipelineExecutor.dryRun` accepts a `rel → table` seed map. `liveInbound` then
+follows the existing edges unchanged.
 
-⚠ **The fix is the seed shape, not the walker.** `PipelineDryRun.run` / `PipelineExecutor.dryRun` seed
-`produced` with **one relation per segment**, keyed exactly as production's multi-seed `execute` overload
-and `SchemaSelector` key them, plus `unmatched`. `liveInbound` then follows the existing edges unchanged.
-⛔ Do not special-case the walker for `route:` — a second traversal rule is how the preview and the run
-start disagreeing. Tracked as `WB-08`; row `TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`.
+⛔ **The walker is NOT special-cased, and must not become so.** A second traversal rule for `route:` is
+how a preview and a real run begin to disagree. The fix was the SEED SHAPE, which is what `D5` decided.
+
+⚠ **Seed keys are the graph's own edge relations**, built with `PipelineRel.route(...)` over
+**`PipelineLift.routeKey`** — made public for exactly this. ⛔ Never re-derive that sanitisation: it is a
+name that has to match the edge exactly, and a second copy is free to drift.
+
+⚠ **A segment that routed nothing is ABSENT from the result, not present with zero.** *Did not run* and
+*ran and produced nothing* are different answers and the canvas renders them differently, so an empty
+segment is never seeded with an empty table.
+
+**Measured live 2026-09-23** against a running control plane over real bytes: `asn1_example` (BER)
+returns `map_moCallRecord · data · 3 rows` carrying the decoded values and writes 3 rows under the
+`moCallRecord` partition; `xml_example` (plugin ingester) returns `map_order · data · 3 rows`.
+
+🔴 **What it was:** both returned `relations: []` with the honest DRYRUN-2 warning *“the sample reached
+no node past the seed 'parse' — nothing downstream consumed it”*. The seed only ever wrote `data`, so the
+walk could not leave a `parse →(route:<segment>)→ …` parser at all: two of eight parse frontends, and
+every multi-record-type feed, had no test instrument past the decoder. ⚠ The plan briefly recorded this
+as blocked on unrecoverable attribution — wrongly: `IngestOutcome.schemaByOutput` (output file → segment)
+had carried it since the union-mode ingester wrote it; nothing was reading it out. Pinned by
+`SegmentRoutedDryRunTest`; row `TESTRUN-SEGMENT-ROUTE-NO-FLOW-1`.
 
 ## Testing note worth keeping
 

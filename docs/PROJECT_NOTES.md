@@ -1532,6 +1532,24 @@ unobservable*, the worst state for a decision to rest in. The zero was only trus
 values were run through the same probe and it fired. ⇒ a deliberately dirty fixture now carries the risk, and
 `tools/check-split-identity-fixture.mjs` keeps a regeneration from quietly removing it.
 
+### A shared seam needs the MODULE suite — `-Dtest=` hides the failure in the direction that matters (2026-09-22/23)
+
+Twice in one shift a change passed its own targeted test class and broke the suite:
+
+- a new control-plane TEST booted one `ControlApi` per fixture — green alone, **37 other control-plane
+  tests** then failed `HTTP/1.1 header parser received no bytes` in the same surefire fork;
+- a PRODUCT change to `ConfigWriteRoutes` (nest a created Pipeline under `config/<id>/`) passed
+  `-Dtest=ControlApiPipelineCrudTest` 20/20, **was pushed**, and broke 23 tests — an unregistered config
+  is resolved at the write ROOT, so nesting it made read/patch/delete answer 404. `origin/master` was red
+  until the revert.
+
+⚠ The per-change unit-test rule (run the affected classes, move on) is right for a leaf change and
+**wrong for a shared seam** — a write path, a route table, a scratch-resource pattern. Green-alone /
+red-in-suite is invisible exactly where it costs most: the change looks verified.
+
+🔴 Writing the lesson down does not make it apply itself. The first instance was documented in
+`okf/backend/build-run/guard-coverage.md` hours before the second one shipped.
+
 ## 5. Engine seams & performance (durable; current in `inspecto/`)
 
 - **Single ingestion SPI:** `StreamingFileIngester` (emit-based) is the **only** ingestion SPI. Per-batch the

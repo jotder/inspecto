@@ -362,6 +362,36 @@ commit, which is the property a gate exists to deny. And it is **unfixable by it
 the offending line does not last, because the hook regenerates the file (verified — the correction made
 to unblock this push was gone within the hour).
 
+## Instance, 2026-09-22: a guard that passed ALONE and broke 37 tests in the suite (`WB-01`)
+
+`ControlApiPipelineGraphRoundTripSweepTest` drives every shipped Pipeline through the **real HTTP write
+path** — `GET …/graph/raw` → `PUT …/graph` → re-`GET`, asserting the editable graph is IDENTICAL.
+
+⚠ **Why it is not enough that `LiftLowerFixtureSweepTest` exists.** That sweep proves the same corpus
+survives the editable seam IN PROCESS. It never boots the control plane, so it cannot see what the write
+ROUTE adds: route defaults, `active` coercion, findings-driven rewrites, the spec + safety gate, the
+atomic write. Those are the layers a workbench save actually goes through.
+
+🔴 **The guard was GREEN alone and turned 37 OTHER control-plane tests red in the module suite**, all
+failing `HTTP/1.1 header parser received no bytes`. It booted one `ControlApi` + `CollectorService` per
+fixture — 26 servers and 26 DuckDB dedup ledgers in one surefire fork. It now boots **one** service over
+all 26 staged fixtures, which `CollectorService(List<Path>)` supports directly.
+
+⛔ **The rule this buys: a new control-plane test is verified by running the MODULE, never only by
+`-Dtest=`.** Green-alone/red-in-suite is invisible to the per-change unit-test rule, and it is invisible
+in the direction that matters — the guard looks like it works.
+
+🔴 **The same trap then bit a PRODUCT change in the same shift.** `WB-15` (a created Pipeline lands in
+`config/<id>/`) passed its targeted test class 20/20, was pushed, and broke 23 tests: an unregistered
+config is resolved at the write ROOT, so nesting a created file left read, patch and delete answering
+404. Reverted. **A change to a SHARED seam needs the module suite whether it is test code or product
+code** — writing the lesson down for the harness did not make it apply itself to the next commit.
+
+✅ **Falsification-probed, which is what makes it a guard rather than a green tick:** its pinned-refusal
+map starts empty, and removing a pin (or adding a fixture that refuses) turns it red. When `WB-03` fixed
+the arming gate, the pin had to be dropped in the same change — by design, so a fix cannot be absorbed
+silently.
+
 ## Instance, 2026-09-16: three unrelated defects behind ONE red gate
 
 `master` CI was red all day — at least six runs from 08:33 onward — and every one read as the same
