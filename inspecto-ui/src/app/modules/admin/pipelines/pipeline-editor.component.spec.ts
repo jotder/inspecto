@@ -2810,7 +2810,8 @@ describe('PipelineEditorComponent', () => {
                 (fixture.nativeElement as HTMLElement).querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
             return { fixture, c, btn };
         }
-        const RUN = 'Run the pipeline to the selected Step';
+        const RUN =
+            'Run to here: parse real inbox files up to the selected Step into a scratch root. Nothing is written.';
         const PREVIEW = "Preview the selected view's data";
         const CONNECT = 'Connect the selected Step to another';
         const DELETE = 'Delete the selected Step or edge';

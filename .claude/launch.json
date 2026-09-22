@@ -16,7 +16,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "cd inspecto-deploy && set PORT=%PORT% && set CONTROL_TOKEN=devtoken && call .\\serve.bat"
+        "node tools\\seed-samples.mjs --all && cd inspecto-deploy && set PORT=%PORT% && set CONTROL_TOKEN=devtoken && call .\\serve.bat"
       ],
       "autoPort": true,
       "port": 8090
@@ -26,7 +26,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "pwsh -NoProfile -File tools\\run-backend.ps1 -Port %PORT%"
+        "node tools\\seed-samples.mjs --all && pwsh -NoProfile -File tools\\run-backend.ps1 -Port %PORT%"
       ],
       "autoPort": true,
       "port": 8080
@@ -36,7 +36,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "cd inspecto-deploy && runtime\\bin\\java.exe --enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=..\\spaces -Dui.dir=./ui -Dduckdb.extension.dir=duckdb-extensions\\windows_amd64 -cp inspecto.jar;inspecto-connectors.jar;inspecto-notify-channels.jar;inspecto-backup.jar;inspecto-geo-link.jar;inspecto-exchange.jar;inspecto-metrics.jar;inspecto-events.jar;inspecto-ops.jar;inspecto-agent.jar com.gamma.control.ControlApi"
+        "node tools\\seed-samples.mjs --all && cd inspecto-deploy && runtime\\bin\\java.exe --enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=..\\spaces -Dui.dir=./ui -Dduckdb.extension.dir=duckdb-extensions\\windows_amd64 -cp inspecto.jar;inspecto-connectors.jar;inspecto-notify-channels.jar;inspecto-backup.jar;inspecto-geo-link.jar;inspecto-exchange.jar;inspecto-metrics.jar;inspecto-events.jar;inspecto-ops.jar;inspecto-agent.jar com.gamma.control.ControlApi"
       ],
       "autoPort": true,
       "port": 8090
@@ -46,7 +46,7 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "cd inspecto-deploy && runtime\\bin\\java.exe --enable-native-access=ALL-UNNAMED -Dcontrol.port=8080 -Dspaces.root=..\\spaces -Dui.dir=./ui -Dduckdb.extension.dir=duckdb-extensions\\windows_amd64 -cp inspecto.jar;inspecto-connectors.jar;inspecto-notify-channels.jar;inspecto-backup.jar;inspecto-geo-link.jar;inspecto-exchange.jar;inspecto-metrics.jar;inspecto-events.jar;inspecto-ops.jar;inspecto-agent.jar com.gamma.control.ControlApi"
+        "node tools\\seed-samples.mjs --all && cd inspecto-deploy && runtime\\bin\\java.exe --enable-native-access=ALL-UNNAMED -Dcontrol.port=8080 -Dspaces.root=..\\spaces -Dui.dir=./ui -Dduckdb.extension.dir=duckdb-extensions\\windows_amd64 -cp inspecto.jar;inspecto-connectors.jar;inspecto-notify-channels.jar;inspecto-backup.jar;inspecto-geo-link.jar;inspecto-exchange.jar;inspecto-metrics.jar;inspecto-events.jar;inspecto-ops.jar;inspecto-agent.jar com.gamma.control.ControlApi"
       ],
       "port": 8080
     }

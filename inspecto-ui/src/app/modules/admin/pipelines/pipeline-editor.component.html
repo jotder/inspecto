@@ -170,13 +170,18 @@
             <!-- Dry-run is BACK on the toolbar (operator ask 2026-08-23, reversing 2026-08-21's move
                  into the ⋮ menu — the second placement flip; confirm with the operator before moving it
                  again). One rendering only: the ⋮ menu item was removed with this, not kept alongside.
-                 Still outside the author gate — a rehearsal is a READ the Business lens keeps. -->
+                 Still outside the author gate — a rehearsal is a READ the Business lens keeps.
+                 ⚠ TWO test instruments, and the tooltips are the ONLY place a builder learns which is
+                 which (WB-02, 2026-09-22): dry-run seeds AFTER the parse by design and starts from
+                 sample rows; "Run to here" parses REAL inbox bytes through the real frontend. An
+                 evaluator drove the wrong one and filed the parse test as missing — do not shorten
+                 these back to one word. -->
             <button
                 mat-icon-button
                 [disabled]="!selectedId()"
                 (click)="toggleDryRun()"
-                matTooltip="Dry-run"
-                aria-label="Dry-run the pipeline over sample rows"
+                matTooltip="Dry-run — rehearse the Steps after the parser over sample rows (nothing is written)"
+                aria-label="Dry-run the Steps after the parser over sample rows. Nothing is written."
             >
                 <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
             </button>
@@ -217,8 +222,8 @@
                     mat-icon-button
                     [disabled]="!selectedNode()"
                     (click)="openRunToHere(selectedNode()!)"
-                    matTooltip="Run to here"
-                    aria-label="Run the pipeline to the selected Step"
+                    matTooltip="Run to here — parse real inbox files through this Pipeline up to the selected Step, into a scratch root (nothing is written)"
+                    aria-label="Run to here: parse real inbox files up to the selected Step into a scratch root. Nothing is written."
                 >
                     <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                 </button>
