@@ -136,12 +136,26 @@ for (const space of spaceNames) {
         }
 
         const sampleDir = join(samples, name);
-        if (!existsSync(sampleDir) || !statSync(sampleDir).isDirectory()) {
-            unseeded.push(`${space}/${name}`);
-            continue;
+        if (existsSync(sampleDir) && statSync(sampleDir).isDirectory()) {
+            copyTree(sampleDir, join(REPO, dirs.poll), plan);
+            seeded++;
         }
-        copyTree(sampleDir, join(REPO, dirs.poll), plan);
-        seeded++;
+
+        // ⚠ The question is whether the inbox HAS files, not whether a same-named sample directory
+        // exists — infer the first from the second and you get false alarms in both directions. Two
+        // Pipelines were reported unseeded and neither was: one is Dataset-fed (no inbox at all, and the
+        // test run refuses a file run for it by name, WB-07), the other SHARES the `orders` inbox, so
+        // the `orders` samples seed it. A warning that is wrong for a whole class of configs is the
+        // defect WB-04 removed from the validator; it does not belong here either.
+        const pollDir = join(REPO, dirs.poll);
+        const empty = dryRun
+            ? !existsSync(sampleDir) && !existsSync(pollDir)
+            : !existsSync(pollDir) || walk(pollDir).length === 0;
+        // ⛔ BOTH conditions, because each catches what the other misses. Emptiness alone passed here
+        // only because a stale parquet happened to sit in the Dataset-fed Pipeline's declared poll dir —
+        // on a fresh checkout it would have warned about a Pipeline that correctly has no inbox.
+        const datasetFed = /^\s*connector:\s*dataset\s*$/m.test(readFileSync(cfg, 'utf8'));
+        if (empty && !datasetFed) unseeded.push(`${space}/${name}`);
     }
 
     // The references every reference-join example resolves at run time.
@@ -161,8 +175,9 @@ console.log(
 );
 if (unseeded.length) {
     console.log(
-        `  ⚠ ${unseeded.length} Pipeline(s) have NO same-named sample directory, so nothing seeds their ` +
-            `inbox and they cannot be test-run as shipped: ${unseeded.join(', ')}`,
+        `  ⚠ ${unseeded.length} file-fed Pipeline(s) have an EMPTY inbox after seeding, so they cannot be ` +
+            `test-run ` +
+            `as shipped: ${unseeded.join(', ')}`,
     );
 }
 if (dryRun) for (const f of plan.files) console.log(`    ${f}`);
