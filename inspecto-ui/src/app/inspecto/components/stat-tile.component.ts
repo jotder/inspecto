@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { booleanAttribute, ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 /**
@@ -24,7 +24,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
             <div class="flex min-w-0 items-baseline gap-2">
                 @if (present) {
                     <span class="truncate text-xl font-semibold leading-7 tabular-nums">{{ value }}</span>
-                } @else {
+                } @else if (showAbsent) {
                     <span
                         class="text-secondary text-xl font-semibold leading-7"
                         [matTooltip]="absentReason"
@@ -48,8 +48,19 @@ export class InspectoStatTileComponent {
     @Input() hint = '';
     /** Why the value is absent; shown as the dash's tooltip. */
     @Input() absentReason = 'Not available';
+    /**
+     * Set when the figure is supplied as projected CONTENT — a status badge, say — rather than as
+     * `value`. Without it the tile draws its "not available" em dash beside that content, which reads
+     * as "unknown" next to a perfectly good answer.
+     */
+    @Input({ transform: booleanAttribute }) contentValue = false;
 
     get present(): boolean {
         return this.value !== null && this.value !== undefined && this.value !== '';
+    }
+
+    /** Draw the em dash only when nothing else is going to fill the value slot. */
+    get showAbsent(): boolean {
+        return !this.present && !this.contentValue;
     }
 }

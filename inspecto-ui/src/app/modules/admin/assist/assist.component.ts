@@ -15,7 +15,7 @@ const INTENTS: IntentMeta[] = [
     {
         id: 'kpi-to-sql',
         label: 'KPI → SQL',
-        placeholder: 'e.g. how many batches per status for MINI_ETL',
+        placeholder: 'e.g. how many Consignments per status for MINI_ETL',
     },
     {
         id: 'report-sql',

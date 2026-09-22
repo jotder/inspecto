@@ -3,7 +3,7 @@
     <inspecto-page-header
         title="Acquisition &amp; Collectors"
         subtitle="Configured acquisition collectors and collection metrics"
-        [terms]="['Collector', 'Connection', 'Batch', 'Stream']"
+        [terms]="['Collector', 'Connection', 'Consignment', 'Stream']"
     >
         <ng-container actions>
             <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
@@ -30,7 +30,12 @@
             <div class="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div class="bg-card rounded-2xl p-5 shadow">
                     <div class="mb-3 font-medium">Discovered vs downloaded vs failed</div>
-                    <inspecto-chart type="bar" [data]="discoveredData()"></inspecto-chart>
+                    <inspecto-chart
+                        type="bar"
+                        [data]="discoveredData()"
+                        [empty]="!anyAcquisition()"
+                        emptyMessage="No files have been discovered yet, so there is nothing to compare."
+                    ></inspecto-chart>
                 </div>
             </div>
         }

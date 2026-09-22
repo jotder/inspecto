@@ -35,6 +35,7 @@ import { fmtDateTime } from 'app/inspecto/grid';
 import { fmtBytes, fmtInt, fmtPercent } from 'app/inspecto/format';
 import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoStatTileComponent } from 'app/inspecto/components/stat-tile.component';
 
 /**
  * Inspector dashboard — service health, throughput and error-rate overview.
@@ -44,6 +45,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
     standalone: true,
     imports: [
         InspectoPageHeaderComponent,
+        InspectoStatTileComponent,
         FormsModule,
         RouterLink,
         MatButtonModule,

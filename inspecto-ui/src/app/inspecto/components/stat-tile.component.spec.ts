@@ -18,6 +18,14 @@ class HostComponent {
     reason = 'Not available';
 }
 
+@Component({
+    standalone: true,
+    imports: [InspectoStatTileComponent],
+    changeDetection: ChangeDetectionStrategy.Eager,
+    template: `<inspecto-stat-tile label="Service" contentValue><span>READY</span></inspecto-stat-tile>`,
+})
+class ContentHostComponent {}
+
 describe('InspectoStatTileComponent', () => {
     function create(inputs: Partial<HostComponent> = {}) {
         TestBed.configureTestingModule({ imports: [HostComponent], providers: [provideNoopAnimations()] });
@@ -41,6 +49,18 @@ describe('InspectoStatTileComponent', () => {
             expect(dash?.textContent?.trim()).toBe('—');
             expect(dash?.getAttribute('aria-label')).toBe('Jobs backend not configured');
         }
+    });
+
+    it('draws NO em dash when the value is projected content', () => {
+        // The Overview "Service" tile renders a status badge instead of a number; the dash beside it read
+        // as "unknown" next to a perfectly good answer.
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({ imports: [ContentHostComponent], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(ContentHostComponent);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).not.toContain('—');
+        expect(el.textContent).toContain('READY');
     });
 
     it('renders label and hint', () => {

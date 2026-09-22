@@ -4,7 +4,9 @@
         <div class="flex items-center gap-2 border-b p-4" style="border-color: var(--gamma-border)">
             <div class="min-w-0 flex-auto">
                 <h2 class="truncate font-mono text-lg font-bold" [matTooltip]="name">{{ name }}</h2>
-                <div class="text-secondary text-xs">Audit: batches, files, lineage, quarantine, commits, report</div>
+                <div class="text-secondary text-xs">
+                    Audit: Consignments, files, lineage, quarantine, commits, report
+                </div>
             </div>
             <button mat-icon-button (click)="closed.emit()" matTooltip="Close panel" aria-label="Close panel">
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:x-mark"></mat-icon>
@@ -23,7 +25,9 @@
                     <span class="truncate font-mono">{{ name }}</span>
                 </nav>
                 <h1 class="text-3xl font-extrabold leading-none tracking-tight">{{ name }}</h1>
-                <div class="text-secondary mt-1.5">Audit: batches, files, lineage, quarantine, commits, report</div>
+                <div class="text-secondary mt-1.5">
+                    Audit: Consignments, files, lineage, quarantine, commits, report
+                </div>
             </div>
         </div>
     }
@@ -47,7 +51,7 @@
         @if (activeTab === 'lineage') {
             <div class="mt-4 flex items-center gap-3">
                 <mat-form-field class="gamma-mat-dense w-72" subscriptSizing="dynamic">
-                    <mat-label>Batch id (optional)</mat-label>
+                    <mat-label>Consignment id (optional)</mat-label>
                     <input matInput [(ngModel)]="lineageBatchId" placeholder="filter by batch id" />
                 </mat-form-field>
                 <button mat-flat-button color="primary" (click)="loadTab()">Apply</button>
@@ -75,7 +79,7 @@
                 <table class="mt-6 w-fit text-sm [&_td]:px-3 [&_td]:py-1.5 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left">
                     <tbody>
                         <tr class="border-b">
-                            <th scope="row">Total batches</th>
+                            <th scope="row">Total Consignments</th>
                             <td>{{ report().totalBatches }}</td>
                             <th scope="row">Success</th>
                             <td>{{ report().success }}</td>

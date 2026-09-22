@@ -36,43 +36,28 @@
         @if (status() || ready()) {
             <!-- KPI tiles -->
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                <div class="bg-card rounded-2xl p-4 shadow">
-                    <div class="text-secondary text-sm">Service</div>
-                    <div class="mt-1">
-                        @if (ready()) {
-                            <inspecto-status-badge [value]="ready().status" />
-                        } @else {
-                            <span class="text-2xl font-bold">—</span>
-                        }
-                    </div>
-                </div>
-                <div class="bg-card rounded-2xl p-4 shadow">
-                    <div class="text-secondary text-sm">Pipelines</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status()?.pipelineCount ?? '—' }}</div>
-                </div>
-                <div class="bg-card rounded-2xl p-4 shadow" [class.text-amber-600]="(status()?.pausedCount || 0) > 0">
-                    <div class="text-secondary text-sm">Paused</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status()?.pausedCount ?? '—' }}</div>
-                </div>
-                <div class="bg-card rounded-2xl p-4 shadow">
-                    <div class="text-secondary text-sm">Committed batches</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status()?.totalCommittedBatches ?? '—' }}</div>
-                </div>
-                <div
-                    class="bg-card rounded-2xl p-4 shadow"
-                    [class.text-amber-600]="(status()?.totalQuarantineFiles || 0) > 0"
-                >
-                    <div class="text-secondary text-sm">Quarantine files</div>
-                    <div class="mt-1 text-2xl font-bold">{{ status()?.totalQuarantineFiles ?? '—' }}</div>
-                </div>
-                <div
-                    class="bg-card rounded-2xl p-4 shadow"
-                    [class.text-amber-600]="(report()?.errorRate || 0) > 0 && (report()?.errorRate || 0) < 0.1"
-                    [class.text-red-600]="(report()?.errorRate || 0) >= 0.1"
-                >
-                    <div class="text-secondary text-sm">Error rate</div>
-                    <div class="mt-1 text-2xl font-bold">{{ errorRatePct }}</div>
-                </div>
+                <inspecto-stat-tile label="Service" contentValue>
+                    @if (ready()) {
+                        <inspecto-status-badge [value]="ready().status" />
+                    }
+                </inspecto-stat-tile>
+                <inspecto-stat-tile label="Pipelines" [value]="status()?.pipelineCount" />
+                <inspecto-stat-tile label="Paused" [value]="status()?.pausedCount">
+                    @if ((status()?.pausedCount || 0) > 0) {
+                        <inspecto-status-badge value="paused" />
+                    }
+                </inspecto-stat-tile>
+                <inspecto-stat-tile label="Committed Consignments" [value]="status()?.totalCommittedBatches" />
+                <inspecto-stat-tile label="Quarantine files" [value]="status()?.totalQuarantineFiles">
+                    @if ((status()?.totalQuarantineFiles || 0) > 0) {
+                        <inspecto-status-badge value="quarantined" />
+                    }
+                </inspecto-stat-tile>
+                <inspecto-stat-tile label="Error rate" [value]="errorRatePct">
+                    @if ((report()?.errorRate || 0) > 0) {
+                        <inspecto-status-badge [value]="(report()?.errorRate || 0) >= 0.1 ? 'error' : 'warning'" />
+                    }
+                </inspecto-stat-tile>
             </div>
         }
 
@@ -100,12 +85,24 @@
             <!-- Charts -->
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div class="bg-card rounded-2xl p-6 shadow">
-                    <div class="font-semibold">Batch duration percentiles (ms)</div>
-                    <inspecto-chart class="mt-4" type="bar" [data]="latencyData()"></inspecto-chart>
+                    <div class="font-semibold">Consignment duration percentiles (ms)</div>
+                    <inspecto-chart
+                        class="mt-4"
+                        type="bar"
+                        [data]="latencyData()"
+                        [empty]="!report().totalBatches"
+                        emptyMessage="No Consignment has completed yet, so there are no durations to plot."
+                    ></inspecto-chart>
                 </div>
                 <div class="bg-card rounded-2xl p-6 shadow">
-                    <div class="font-semibold">Batch outcomes ({{ report().totalBatches }} total)</div>
-                    <inspecto-chart class="mt-4" type="doughnut" [data]="outcomeData()"></inspecto-chart>
+                    <div class="font-semibold">Consignment outcomes ({{ report().totalBatches }} total)</div>
+                    <inspecto-chart
+                        class="mt-4"
+                        type="doughnut"
+                        [data]="outcomeData()"
+                        [empty]="!report().totalBatches"
+                        emptyMessage="No Consignment has completed yet, so there are no outcomes to plot."
+                    ></inspecto-chart>
                 </div>
             </div>
         }

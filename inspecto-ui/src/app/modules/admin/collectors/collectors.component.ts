@@ -67,6 +67,12 @@ export class CollectorsComponent implements OnInit {
 
     readonly cards = signal<MetricCard[]>([]);
     readonly discoveredData = signal<ChartData | null>(null);
+    /**
+     * True once acquisition has actually done something. ⚠ The chart's three bars are all zero before
+     * the first poll, which Chart.js draws as a confident 0-to-1 axis — a measurement, when the truth is
+     * that nothing has been collected yet (UI-09).
+     */
+    readonly anyAcquisition = signal(false);
 
     readonly columnDefs: ColDef<CollectorView>[] = [
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
@@ -134,6 +140,7 @@ export class CollectorsComponent implements OnInit {
             error: () => {
                 this.cards.set([]);
                 this.discoveredData.set(null);
+                this.anyAcquisition.set(false);
             },
         });
     }
@@ -161,6 +168,7 @@ export class CollectorsComponent implements OnInit {
             { label: 'Active connections', value: fmtInt(active) },
         ]);
 
+        this.anyAcquisition.set(discovered + downloaded + failed > 0);
         this.discoveredData.set({
             labels: ['Discovered', 'Downloaded', 'Failed'],
             datasets: [
