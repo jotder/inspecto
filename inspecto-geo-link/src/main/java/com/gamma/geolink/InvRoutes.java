@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ComponentAccess;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
@@ -15,6 +16,7 @@ import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
+import com.gamma.sql.SqlGuard;
 import com.gamma.util.JsonAttributes;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
@@ -46,6 +48,9 @@ import java.util.regex.Pattern;
  * <p>{@code POST /inv/projection/neighbors} (Phase E, incremental expand) — same body plus a required
  * {@code value}: the one-hop neighborhood of that entity (rows where it's either endpoint), so the
  * Studio's "expand node" action can grow the canvas without re-fetching the whole relation.
+ *
+ * <p>{@code POST /inv/projection/multi} (LA-08) — node mappings and edge projections across several Datasets
+ * in one call, every row tagged with its {@code __provenance_dataset}. See {@link #projectMulti}.
  *
  * <p>Fail-closed like {@code BiRoutes}: write root unset → 503; unknown dataset → 404; a non-identifier
  * column or unusable dataset → 422. Column names are validated identifiers — no caller SQL text enters
@@ -81,6 +86,7 @@ public final class InvRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.post("/inv/projection", (e, m) -> project(api, e, api.body(e), null));
         api.post("/inv/projection/neighbors", (e, m) -> neighbors(api, e, api.body(e)));
+        api.post("/inv/projection/multi", (e, m) -> projectMulti(api, e, api.body(e)));
         api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api, e));
         api.post("/inv/schema/overlap-profile", (e, m) -> overlapProfile(api, e, api.body(e)));
         // ⛔ The two POSTs genuinely PERSIST, so unlike the projection routes above they cannot take the
@@ -567,6 +573,142 @@ public final class InvRoutes implements RouteModule {
         return project(api, ex, body, value);
     }
 
+    /** LA-08 bound on the query count: one DuckDB query per mapping. */
+    private static final int MAX_MAPPINGS = 16;
+    /** LA-08: the tag on every node and edge naming the Dataset that produced it (contract §5.2). */
+    private static final String PROVENANCE = "__provenance_dataset";
+
+    /** One validated LA-08 mapping, resolved and rendered before any query runs. */
+    private record Mapping(boolean node, String dataset, String relationSql, String sql, String kind,
+                           String category, List<String> attrs) {}
+
+    /**
+     * {@code POST /inv/projection/multi} (LA-08, contract §5.2) — node mappings and edge projections over
+     * several Datasets in one call, returned as one union: {@code {nodes:[{id,label,category,attrs?,
+     * __provenance_dataset}], edges:[{source,target,kind,count,attrs?,__provenance_dataset}],
+     * mappings:[{dataset,role,rows,truncated}], truncated}}.
+     *
+     * <p><b>Values stay raw</b> (operator decision D-S4, 2026-09-23: value-projected, the SPA normalises and
+     * warns). An entity appearing in two Datasets is two entries here, one per provenance; joining them is
+     * id equality on the client. Ids are cast to VARCHAR, so an INTEGER key still meets its VARCHAR twin.
+     *
+     * <p><b>Fail closed, whole call.</b> Every mapping is resolved through {@link #relationFor} — unknown or
+     * not viewable → 404, the same answer as absence — and every identifier and {@code filter} validated
+     * BEFORE the first query runs. A caller who cannot view ONE Dataset gets no rows from any of them: a
+     * partial union would silently read as the whole graph. The top-level {@code filter} applies to every
+     * edge mapping and must name columns each of them has; an edge mapping's own {@code filter} narrows only
+     * it. Each built statement also passes {@link SqlGuard} (defence in depth, as {@code BiRoutes} does).
+     * {@code limit} applies per mapping; {@code truncated} is true if any mapping hit it.
+     */
+    private Object projectMulti(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "multi-dataset entity projection");
+        List<Map<String, Object>> nodeSpecs = mappingList(body, "nodes");
+        List<Map<String, Object>> edgeSpecs = mappingList(body, "edges");
+        if (nodeSpecs.isEmpty() && edgeSpecs.isEmpty())
+            throw new ApiException(422, "body must include at least one of 'nodes' or 'edges'");
+        if (nodeSpecs.size() + edgeSpecs.size() > MAX_MAPPINGS)
+            throw new ApiException(422, "at most " + MAX_MAPPINGS + " mappings per call");
+        int limit = body.get("limit") instanceof Number n
+                ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
+
+        List<Mapping> plan = new ArrayList<>();
+        for (Map<String, Object> m : nodeSpecs) {
+            String ds = datasetOf(m, "nodes");
+            String relationSql = relationFor(api, ex, writeRoot, ds);
+            String idCol = ident(m, "idColumn", true), labelCol = ident(m, "labelColumn", false);
+            List<String> attrs = nameList(m, "attributes", true);
+            StringBuilder sql = new StringBuilder("SELECT DISTINCT CAST(" + q(idCol) + " AS VARCHAR) AS id, ")
+                    .append(labelCol != null ? "CAST(" + q(labelCol) + " AS VARCHAR)" : "NULL").append(" AS label");
+            for (int i = 0; i < attrs.size(); i++)
+                sql.append(", CAST(").append(q(attrs.get(i))).append(" AS VARCHAR) AS attr_").append(i);
+            sql.append(" FROM ").append(q(ds)).append(" WHERE ").append(q(idCol)).append(" IS NOT NULL ORDER BY 1, 2");
+            plan.add(new Mapping(true, ds, relationSql, guarded(sql.toString(), ds), null,
+                    ApiContext.str(m, "category"), attrs));
+        }
+        for (Map<String, Object> m : edgeSpecs) {
+            String ds = datasetOf(m, "edges");
+            String relationSql = relationFor(api, ex, writeRoot, ds);
+            String srcCol = ident(m, "sourceColumn", true), tgtCol = ident(m, "targetColumn", true);
+            List<String> attrs = nameList(m, "attributes", true);
+            String filterSql = "(" + filterSql(body.get("filter"), ds, relationSql) + ") AND ("
+                    + filterSql(m.get("filter"), ds, relationSql) + ")";
+            String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filterSql);
+            plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs));
+        }
+
+        List<Map<String, Object>> nodes = new ArrayList<>(), edges = new ArrayList<>(), mappings = new ArrayList<>();
+        boolean truncated = false;
+        for (Mapping mp : plan) {
+            QueryExecutor.Result r;
+            try {
+                r = QueryExecutor.run(new QueryExecutor.Request(mp.dataset(), mp.relationSql(), mp.sql(),
+                        limit, 0, List.of(), List.of()));
+            } catch (SQLException e) {
+                throw new ApiException(422, "projection of dataset '" + mp.dataset() + "' failed: " + e.getMessage());
+            }
+            for (Map<String, Object> row : r.rows()) {
+                Map<String, Object> out;
+                if (mp.node()) {
+                    out = new LinkedHashMap<>();
+                    out.put("id", row.get("id"));
+                    out.put("label", row.get("label"));
+                    out.put("category", mp.category());
+                    if (!mp.attrs().isEmpty()) {
+                        Map<String, Object> attrs = new LinkedHashMap<>();
+                        for (int i = 0; i < mp.attrs().size(); i++) attrs.put(mp.attrs().get(i), row.get("attr_" + i));
+                        out.put("attrs", attrs);
+                    }
+                } else {
+                    out = edgeRow(row, mp.kind(), mp.attrs());
+                }
+                out.put(PROVENANCE, mp.dataset());
+                (mp.node() ? nodes : edges).add(out);
+            }
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("dataset", mp.dataset());
+            summary.put("role", mp.node() ? "node" : "edge");
+            summary.put("rows", r.rows().size());
+            summary.put("truncated", r.truncated());
+            mappings.add(summary);
+            truncated |= r.truncated();
+            audit(ex, mp.dataset(), null, r.rows().size(), r.truncated());
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("nodes", nodes);
+        out.put("edges", edges);
+        out.put("mappings", mappings);
+        out.put("truncated", truncated);
+        return out;
+    }
+
+    /** An optional list of mapping objects; any non-object entry is a 422, never silently skipped. */
+    private static List<Map<String, Object>> mappingList(Map<String, Object> body, String key) {
+        Object raw = body.get(key);
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> list)) throw new ApiException(422, "'" + key + "' must be a list");
+        List<Map<String, Object>> out = new ArrayList<>(list.size());
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m)) throw new ApiException(422, "every '" + key + "' entry must be an object");
+            Map<String, Object> copy = new LinkedHashMap<>();
+            m.forEach((k, v) -> copy.put(String.valueOf(k), v));
+            out.add(copy);
+        }
+        return out;
+    }
+
+    private static String datasetOf(Map<String, Object> mapping, String key) {
+        String ds = ApiContext.str(mapping, "dataset");
+        if (ds == null) throw new ApiException(422, "every '" + key + "' entry must include 'dataset'");
+        return ds;
+    }
+
+    /** Defence in depth: a server-built statement still passes the caller-SQL guard, trusting only its own relation. */
+    private static String guarded(String sql, String datasetId) {
+        if (!SqlGuard.check(sql, datasetId).isEmpty())
+            throw new ApiException(422, "projection of dataset '" + datasetId + "' failed the SQL safety check");
+        return sql;
+    }
+
     private Object project(ApiContext api, HttpExchange ex, Map<String, Object> body, String neighborsOf) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
         String datasetId = ApiContext.str(body, "dataset");
@@ -578,24 +720,65 @@ public final class InvRoutes implements RouteModule {
         int limit = body.get("limit") instanceof Number n
                 ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
 
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        Map<String, Object> dataset = store.get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
-        String relationSql;
-        try {
-            relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),
-                    new ViewStore(writeRoot.resolve("views")));
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
-        }
+        String relationSql = relationFor(api, ex, writeRoot, datasetId);
 
         // LA-01: the optional condition tree is validated against the relation's REAL columns and
         // rendered BEFORE a single character of the statement is assembled below — an identifier the
         // relation does not have cannot reach SQL, because the render never happens.
         String filterSql = filterSql(body.get("filter"), datasetId, relationSql);
 
+        // The value is bound, not interpolated: `Request` gained `binds` and `QueryExecutor` a
+        // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
+        // source order — binds are positional, and `wrap()` adds none of its own. Column identifiers are
+        // still built from validated identifiers; JDBC cannot bind those.
+        String src = q(sourceCol), tgt = q(targetCol);
+        String neighborFilter = neighborsOf != null
+                ? " AND (CAST(" + src + " AS VARCHAR) = ? OR CAST(" + tgt + " AS VARCHAR) = ?)" : "";
+        List<String> binds = neighborsOf != null ? List.of(neighborsOf, neighborsOf) : List.of();
         // Server-built from validated identifiers only; one extra row detects truncation.
+        String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filterSql);
+
+        try {
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                    datasetId, relationSql, sql, limit, 0, List.of(), List.of(), binds));
+            List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
+            for (Map<String, Object> row : r.rows())
+                rows.add(edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols));
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("rows", rows);
+            out.put("truncated", r.truncated());
+            audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
+            return out;
+        } catch (SQLException e) {
+            throw new ApiException(422, "projection failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Resolve a Dataset id to its trusted relation SQL — the gate order every projection shares: unknown →
+     * 404; not viewable by this request's subject → the SAME 404 (R3: shared-away is indistinguishable from
+     * absence, exactly as {@code BiRoutes} answers); an unusable Dataset → 422.
+     */
+    private static String relationFor(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
+        Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
+                .map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
+        if (!ComponentAccess.canView(ex, dataset))
+            throw new ApiException(404, "no dataset '" + datasetId + "'");
+        try {
+            return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
+        }
+    }
+
+    /**
+     * The folded-edge statement: distinct {@code (source, target[, kind][, attr_i...])} with a row count,
+     * heaviest first, NULL endpoints excluded. Built from validated identifiers only; {@code extraWhere} is
+     * server-authored (a bound-parameter clause or empty) and {@code filterSql} is the LA-01 render.
+     */
+    private static String edgeSql(String datasetId, String sourceCol, String targetCol, String kindCol,
+                                  List<String> attrCols, String extraWhere, String filterSql) {
         String src = q(sourceCol), tgt = q(targetCol);
         String kindSel = kindCol != null ? ", CAST(" + q(kindCol) + " AS VARCHAR) AS kind" : "";
         StringBuilder attrSel = new StringBuilder();
@@ -606,45 +789,27 @@ public final class InvRoutes implements RouteModule {
         int nextGroupIdx = 3;
         if (kindCol != null) groupBy.append(", ").append(nextGroupIdx++);
         for (int i = 0; i < attrCols.size(); i++) groupBy.append(", ").append(nextGroupIdx++);
-        // The value is bound, not interpolated: `Request` gained `binds` and `QueryExecutor` a
-        // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
-        // source order — binds are positional, and `wrap()` adds none of its own. Column identifiers are
-        // still built above from validated identifiers; JDBC cannot bind those.
-        String neighborFilter = neighborsOf != null
-                ? " AND (CAST(" + src + " AS VARCHAR) = ? OR CAST(" + tgt + " AS VARCHAR) = ?)" : "";
-        List<String> binds = neighborsOf != null ? List.of(neighborsOf, neighborsOf) : List.of();
-        String sql = "SELECT CAST(" + src + " AS VARCHAR) AS source, CAST(" + tgt + " AS VARCHAR) AS target"
+        return "SELECT CAST(" + src + " AS VARCHAR) AS source, CAST(" + tgt + " AS VARCHAR) AS target"
                 + kindSel + attrSel + ", COUNT(*) AS cnt FROM " + q(datasetId)
-                + " WHERE " + src + " IS NOT NULL AND " + tgt + " IS NOT NULL" + neighborFilter
+                + " WHERE " + src + " IS NOT NULL AND " + tgt + " IS NOT NULL" + extraWhere
                 + " AND (" + filterSql + ")"
                 + " " + groupBy
                 + " ORDER BY cnt DESC, source, target";
+    }
 
-        try {
-            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                    datasetId, relationSql, sql, limit, 0, List.of(), List.of(), binds));
-            List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
-            for (Map<String, Object> row : r.rows()) {
-                Map<String, Object> out = new LinkedHashMap<>();
-                out.put("source", row.get("source"));
-                out.put("target", row.get("target"));
-                out.put("kind", kindCol != null ? row.get("kind") : null);
-                out.put("count", row.get("cnt"));
-                if (!attrCols.isEmpty()) {
-                    Map<String, Object> attrs = new LinkedHashMap<>();
-                    for (int i = 0; i < attrCols.size(); i++) attrs.put(attrCols.get(i), row.get("attr_" + i));
-                    out.put("attrs", attrs);
-                }
-                rows.add(out);
-            }
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("rows", rows);
-            out.put("truncated", r.truncated());
-            audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
-            return out;
-        } catch (SQLException e) {
-            throw new ApiException(422, "projection failed: " + e.getMessage());
+    /** One {@link #edgeSql} result row in the response shape {@code {source,target,kind,count,attrs?}}. */
+    private static Map<String, Object> edgeRow(Map<String, Object> row, Object kind, List<String> attrCols) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("source", row.get("source"));
+        out.put("target", row.get("target"));
+        out.put("kind", kind);
+        out.put("count", row.get("cnt"));
+        if (!attrCols.isEmpty()) {
+            Map<String, Object> attrs = new LinkedHashMap<>();
+            for (int i = 0; i < attrCols.size(); i++) attrs.put(attrCols.get(i), row.get("attr_" + i));
+            out.put("attrs", attrs);
         }
+        return out;
     }
 
     /**

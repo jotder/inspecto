@@ -61,7 +61,7 @@ public final class ComponentAccess {
     private static final int NONE = 0, VIEW = 1, EDIT = 2, OWN = 3;
 
     /** Whether this request may see {@code content} at all (list filtering + read routes). */
-    static boolean canView(HttpExchange ex, Map<String, Object> content) {
+    public static boolean canView(HttpExchange ex, Map<String, Object> content) {
         return level(ex, content) >= VIEW;
     }
 

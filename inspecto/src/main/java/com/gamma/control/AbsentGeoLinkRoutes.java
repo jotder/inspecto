@@ -40,6 +40,7 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             {"POST", "/geo/routes"},
             {"POST", "/inv/projection"},
             {"POST", "/inv/projection/neighbors"},
+            {"POST", "/inv/projection/multi"},
             {"GET",  "/inv/schema/relationships"},
             {"POST", "/inv/schema/overlap-profile"},
             {"POST", "/inv/snapshots"},
