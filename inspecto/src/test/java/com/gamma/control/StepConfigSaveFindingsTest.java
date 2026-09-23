@@ -112,6 +112,54 @@ class StepConfigSaveFindingsTest {
                 Map.of("filter", Map.of("where", "DOUBLED > 4"))))));
     }
 
+    /** The shipped filter_step schema: raw fields + a mapping with custom-derived REGION and GROSS. */
+    private static Path mappedSchemaFile(Path dir) throws Exception {
+        Path file = dir.resolve("filter_step_schema.toon");
+        Files.writeString(file, """
+                raw:
+                  name: ORDERS
+                  format: CSV
+                  fields[3]{name,selector,type}:
+                    QUANTITY,"0",INTEGER
+                    UNIT_PRICE,"1",DOUBLE
+                    STATUS,"2",VARCHAR
+                mapping:
+                  canonicalName: filter_step
+                  rawName: ORDERS
+                  fields[2]:
+                    - name: STATUS
+                      from: STATUS
+                      fn: keep
+                    - name: GROSS
+                      from: ""
+                      fn: custom
+                      args:
+                        expression: "ROUND(TRY_CAST(QUANTITY AS DOUBLE) * TRY_CAST(UNIT_PRICE AS DOUBLE), 2)"
+                """, StandardCharsets.UTF_8);
+        return file;
+    }
+
+    @Test
+    void aFilterOverAMappedDerivedColumnIsClean(@TempDir Path dir) throws Exception {
+        // Regression: the shipped filter_step pipeline, refused when only the RAW fields were known.
+        List<Finding> out = check(dir, pipeline(mappedSchemaFile(dir), true,
+                List.of(Map.of("filter", Map.of("where", "STATUS = 'SHIPPED' AND GROSS >= 30")))));
+        assertEquals(List.of(), out, () -> out.isEmpty() ? "" : out.get(0).message());
+    }
+
+    @Test
+    void aFilterOverAColumnNeitherRawNorMappedIsStillRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(mappedSchemaFile(dir), true,
+                List.of(Map.of("filter", Map.of("where", "NETT >= 30"))))), "steps[0].filter", "NETT");
+    }
+
+    @Test
+    void aFilterWhoseBindFailsForAnyOtherReasonFailsOpen(@TempDir Path dir) throws Exception {
+        // A type mismatch is not an unknown column; the save-time check must not guess about it.
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true,
+                List.of(Map.of("filter", Map.of("where", "no_such_function(QTY) > 0"))))));
+    }
+
     // ── route branch sub-chains ──────────────────────────────────────────────────
 
     private static Map<String, Object> routeStep(List<Object> branchSteps) {

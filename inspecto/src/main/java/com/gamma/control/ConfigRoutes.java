@@ -282,6 +282,7 @@ final class ConfigRoutes {
         if (!"pipeline".equals(type)) return List.of();
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
         List<TypeFlow.Column> known = new ArrayList<>(declaredColumns(draft, configDir));
+        if (!known.isEmpty()) addMappedColumns(draft, configDir, known);
         List<TypeFlow.Column> columns = known.isEmpty() ? null : known;   // null = the row's columns are unknown
         List<String> refusals = new ArrayList<>();
         List<String> fields = new ArrayList<>();
@@ -308,6 +309,46 @@ final class ConfigRoutes {
                     active ? FindingCodes.ERR_STEP_CONFIG_INVALID : FindingCodes.WARN_STEP_CONFIG_INVALID,
                     active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
         return out;
+    }
+
+    /**
+     * Adds the schema's {@code mapping.fields[]} output names to the raw columns: the steps see the MAPPED
+     * row, so a derived column (a {@code custom} expression such as the shipped filter_step's {@code GROSS})
+     * is a real column there. Kept as a union with the raw fields, so this can only make the checks quieter.
+     * A mapped name's type is its raw source's when it has one, else {@code VARCHAR}; a type-driven bind
+     * failure is not reported anyway (see {@link #isUnknownColumn}).
+     */
+    private static void addMappedColumns(Map<String, Object> draft, Path configDir, List<TypeFlow.Column> known) {
+        if (!(draft.get("processing") instanceof Map<?, ?> proc)
+                || !(proc.get("schema_file") instanceof String ref)) return;
+        Path file = resolvedPath(ref, configDir);
+        if (file == null) return;
+        Map<String, Object> schema;
+        try {
+            schema = ConfigLoader.filesystem().decode(file.toString());
+        } catch (Exception unreadable) {
+            return;
+        }
+        if (!(schema.get("mapping") instanceof Map<?, ?> mapping)
+                || !(mapping.get("fields") instanceof List<?> fields)) return;
+        for (Object f : fields) {
+            if (!(f instanceof Map<?, ?> m) || m.get("name") == null) continue;
+            String name = String.valueOf(m.get("name"));
+            if (known.stream().anyMatch(c -> c.name().equalsIgnoreCase(name))) continue;
+            String from = m.get("from") == null ? "" : String.valueOf(m.get("from"));
+            String type = known.stream().filter(c -> c.name().equalsIgnoreCase(from))
+                    .map(TypeFlow.Column::type).findFirst().orElse("VARCHAR");
+            known.add(new TypeFlow.Column(name, type));
+        }
+    }
+
+    /**
+     * Is this DuckDB bind failure a genuine unknown-column error? Only that is refused; any other failure
+     * (an unknown function, a type mismatch, the check's own mechanics) FAILS OPEN - a save-time check
+     * must never refuse a config that runs because of what it cannot model.
+     */
+    private static boolean isUnknownColumn(String message) {
+        return message != null && message.contains("Referenced column") && message.contains("not found");
     }
 
     /** Walks one {@code steps[]} chain at {@code prefix}; returns the columns known after it (null = unknown). */
@@ -366,9 +407,11 @@ final class ConfigRoutes {
                 try {
                     TypeFlow.describe(columns, probe);
                     return null;
-                } catch (IllegalArgumentException doesNotBind) {
-                    return "transform.filter: 'where' does not bind against the declared schema - "
-                            + doesNotBind.getMessage();
+                } catch (RuntimeException doesNotBind) {
+                    String msg = doesNotBind.getMessage();
+                    if (!isUnknownColumn(msg)) return null;   // fail open: not a column this check can judge
+                    return "transform.filter: 'where' references a column the declared schema does not carry - "
+                            + msg.substring(msg.indexOf("Referenced column"));
                 }
             }
             case PipelineConfig.Step.DEDUP -> {

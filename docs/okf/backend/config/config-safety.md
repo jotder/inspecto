@@ -439,7 +439,12 @@ nothing, as with the TypeFlow checks.
 copy of the columns known at the route point, and the same reshaping rule applies inside it. **The filter
 `where` column check reuses the route-predicate bind** of `routeColumnFindings`: `SqlGuard.check` on the
 assembled `SELECT * FROM "input" WHERE …` probe, then `TypeFlow.describe` against the known columns, so
-DuckDB's binder decides (no second predicate parser). The legacy `processing.filter` block is not
+DuckDB's binder decides (no second predicate parser). The known columns are the raw fields **plus the
+schema's `mapping.fields[]` names** (steps see the mapped row, so a `custom`-derived column like the shipped
+filter_step's `GROSS` is real). 🔴 Only a genuine `Referenced column … not found` binder error is refused;
+every other bind failure (unknown function, type mismatch, the probe's own mechanics) **fails open** — the
+first cut refused the shipped `filter_step` Pipeline because it knew only the raw fields, and DuckDB's JDBC
+wraps every bind error as "Attempting to execute an unsuccessful or closed pending query result". The legacy `processing.filter` block is not
 checked here. Pinned by `StepConfigSaveFindingsTest`.
 
 ## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
