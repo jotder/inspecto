@@ -64,6 +64,17 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- inspecto-geo-link (test scope): ControlApiInvestigationPolicyTest asserts that the real PolicyEngine
+             judges an Investigation's Working Set relation at the row PEP (LA-20, decision D-E7). Same direction
+             rule as inspecto-ops above: geo-link ships in Standard/Professional, where this module is absent, so
+             geo-link must never depend on policy; every Enterprise reactor also builds geo-link. No cycle. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-geo-link</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

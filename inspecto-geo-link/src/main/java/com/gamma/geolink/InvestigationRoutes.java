@@ -113,8 +113,8 @@ public final class InvestigationRoutes implements RouteModule {
         api.get("/inv/investigations/([^/]+)/log", (e, m) -> log(api, e, m.group(1)));
     }
 
-    /** One opened Investigation: its store, write root and parsed header. */
-    private record Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header) {
+    /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */
+    record Inv(SnapshotStore store, Path writeRoot, String id, Map<String, Object> header) {
         String dataset() { return String.valueOf(header.get("dataset")); }
         Path dir() { return store.investigationDir(id); }
     }
@@ -326,7 +326,7 @@ public final class InvestigationRoutes implements RouteModule {
         List<Map<String, Object>> drift = new ArrayList<>();
         boolean diverged = false;
         if (reread) {
-            Set<Integer> undone = InvestigationEvaluator.undone(log);
+            Set<Integer> undone = InvestigationEvaluator.undone(log.subList(0, hashes.size()));   // prefix semantics
             for (Map<String, Object> e : log.subList(0, hashes.size())) {
                 int step = ((Number) e.get("step")).intValue();
                 if (!"expand".equals(e.get("op")) || undone.contains(step)) continue;
@@ -591,7 +591,7 @@ public final class InvestigationRoutes implements RouteModule {
      * a Subject other than its owner asks (indistinguishable from absence), or when its bound Dataset exists but
      * the caller can no longer view it (R3).
      */
-    private static Inv open(ApiContext api, HttpExchange ex, String id) throws IOException {
+    static Inv open(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation");
         requireSafeId(id);
         SnapshotStore store = new SnapshotStore(writeRoot);

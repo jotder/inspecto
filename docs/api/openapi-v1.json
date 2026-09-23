@@ -7394,6 +7394,109 @@
         "description" : "Dedupe a retryable write: a repeat with the same key replays the first response (with Idempotency-Replayed: true) instead of re-running. ~10 min TTL. Applies to any POST/PUT/DELETE."
       }
     },
+    "/inv/investigations/{investigationId}/working-set" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/investigations/{investigationId}/working-set (generated skeleton)",
+        "operationId" : "getInvInvestigationsByInvestigationIdWorkingSet",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    }
+  },
+  "components" : {
+    "parameters" : {
+      "ConnectionId" : {
+        "name" : "id",
+        "in" : "path",
+        "required" : true,
+        "schema" : {
+          "type" : "string",
+          "pattern" : "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "description" : "Immutable Connection id (guideline 17: ids never change)."
+      },
+      "CorrelationId" : {
+        "name" : "Correlation-ID",
+        "in" : "header",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "description" : "Caller-supplied correlation id; the server issues one when absent and always echoes it as a response header. Propagates to events logged during the request."
+      },
+      "ComponentType" : {
+        "name" : "type",
+        "in" : "path",
+        "required" : true,
+        "schema" : {
+          "type" : "string",
+          "enum" : [ "grammar", "schema", "transform", "sink", "dataset", "widget", "dashboard" ]
+        },
+        "description" : "Writable component type (W3 widened the set with dataset/widget/dashboard)."
+      },
+      "ComponentId" : {
+        "name" : "id",
+        "in" : "path",
+        "required" : true,
+        "schema" : {
+          "type" : "string",
+          "pattern" : "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "description" : "Immutable component id."
+      },
+      "IfNoneMatch" : {
+        "name" : "If-None-Match",
+        "in" : "header",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "description" : "Conditional GET: when it holds the current ETag the server returns 304."
+      },
+      "IfMatch" : {
+        "name" : "If-Match",
+        "in" : "header",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "description" : "Optimistic-lock precondition on a write: a stale tag yields 409 CONFLICT_STALE_VERSION."
+      },
+      "QueryId" : {
+        "name" : "id",
+        "in" : "path",
+        "required" : true,
+        "schema" : {
+          "type" : "string",
+          "pattern" : "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "description" : "Immutable query component id."
+      },
+      "IdempotencyKey" : {
+        "name" : "Idempotency-Key",
+        "in" : "header",
+        "required" : false,
+        "schema" : {
+          "type" : "string"
+        },
+        "description" : "Dedupe a retryable write: a repeat with the same key replays the first response (with Idempotency-Replayed: true) instead of re-running. ~10 min TTL. Applies to any POST/PUT/DELETE."
+      }
+    },
     "headers" : {
       "Correlation-ID" : {
         "schema" : {

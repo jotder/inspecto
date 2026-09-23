@@ -455,7 +455,7 @@ caller-shaped SQL would not.
 | **LA-17** | Entity model + resolution + reference lists | ⬜ | L | D-S4, D-E8 | Typed Entities, cross-identifier resolution, enrichment attributes; named reference lists that persist across Enquiries. |
 | **LA-18** | Value measures as Decision Rules | 🟡 | M | LA-17 | §2.6 list; visible thresholds; structuring must survive the ≥ 5 000 filter trap. |
 | **LA-19** | Evidential controls | ⬜ | L | LA-10 | Scope binding, minimisation, four-eyes, retention/purge, per-entity annotation, **coverage indicator**. |
-| **LA-20** | Working Set as a log-defined derived relation + cache | ⬜ | L | D-E3, D-E7 | §2.7; the cache is a functional requirement (six tiles = six re-runs per view). |
+| **LA-20** | Working Set as a log-defined derived relation + cache | ✅ **BACKEND SHIPPED 2026-09-23** — `GET /inv/investigations/{id}/working-set` in a new `WorkingSetRoutes`: three relations (`entities` · `links` · `excluded`) with the §2.7 provenance columns, bounded + `truncated`; a cache keyed by the sealed log's hash (stale read impossible after op / undo / fork, mutation-checked); the D-E7 gate — owner-only below Enterprise, owner AND `PolicyEngine` row verdict on Enterprise (`ControlApiInvestigationWorkingSetTest` 5/5, `ControlApiInvestigationPolicyTest` 1/1). As-built + deferrals in §5.7. Not yet a BI relation (LA-21). Also FIXED here: replay after an undo (§5.5) | L | — (D-E3, D-E7 decided) | §2.7; the cache is a functional requirement (six tiles = six re-runs per view). |
 | **LA-21** | Evidence / Monitoring Widgets | ⬜ | M | LA-20, D-E6 | Pinned default; kind on the tile; drift line. |
 | **LA-12** | Dossier + three renderings + chain of custody | ✅ **BACKEND SHIPPED 2026-09-23** — `DossierRoutes` (`GET /inv/investigations/{id}/dossier`, `POST …/dossier/verify`) over a pure `GraphDossierBuilder`; `ControlApiDossierTest` 8/8, tamper detection mutation-checked twice. As-built + deferrals in §5.6 | L | LA-10 | `GraphDossierBuilder.java`: summary, topology, centrality/risk tables, chronological ledger, SHA-256 manifest (replaces the FNV-1a fingerprint); JSON / numbered steps / method statement; **negative space in all three**. |
 | **LA-22** | Synchronised Geo ↔ Link brushing | ✅ **SHIPPED 2026-09-23 (brush half)** — `geo-link-brush.ts` (`GeoLinkBrushService` + `nodeIdsForKeys`/`pointIdsForNodes`, joined only via `entityId()`); polygon/point on the map → node emphasis, node click → point emphasis; unkeyed points never brush. ⚠ **Re-grounded:** the ident param, SELECT column, wire types and `foldServerResult` had already shipped in `beb0170b`, so the remaining work was the emitter + consumers only. **Deferred:** split-pane mode, graph path → map route tracing. | ~~S–M~~ → **M** — 🔴 **I under-sized this and the correction matters.** The geometry half does ship, but `geo-projection.ts`'s own header records the projection as **backend-first since Phase 4**, so changing `projectPoints`/`coLocations` alone is **cosmetic in production** — `GeoRoutes.java` builds the points server-side and is the load-bearing half, needing a new ident param and SELECT column. ⚠ And the “selection event” is **net-new plumbing**: `geo-map.component.ts`'s displayed set has no `@Output` at all, so today the polygon is a DISPLAY FILTER that no other pane can hear. ~9 touchpoints (type, form, wire types, `foldServerResult`, Java route, `CoLocation`, the emitter). ⚠ `coLocations` also requires `p.label` truthy to participate, so a point with no entity column never co-locates — the same trap will apply to a key unless a fallback is decided. | — (D-U3 answered · D-U4 dissolved) | `GeoLinkSyncService.ts`: bounding-box on map isolates nodes; path on graph traces the route; split-pane mode. |
@@ -507,7 +507,7 @@ in place rather than quietly corrected, because a register that silently repairs
 ⇒ **This reframes D-E3's cost**: sealing and drift-detection are reachable without it; byte-identical replay is the single capability that requires building versioned Dataset reads — for which `ReferenceReader`'s SCD2 `asOf` is the in-repo precedent to copy. |
 | ~~**D-E4**~~ | ~~Re-ordering the log invalidates Artifacts, or forks the Enquiry?~~ | ~~LA-10~~ | ✅ **DECIDED 2026-09-23 (operator): FORK.** Re-ordering creates a new branch of the Investigation; Artifacts stay valid against the log they were derived from. The forked log lives in the D-E2 store. — *History:* Not code-grounded — nothing exists to ground against (LA-10 unbuilt). The plan's reading stands: forking is safer and costs a branching model. ⚠ Depends on D-E1 only for naming, and on D-E2 for where the forked log would live. |
 | ~~**D-E6**~~ | ~~Saved Widget frozen or live by default; may a live one leave the Space?~~ | ~~LA-21~~ (with LA-20) | ✅ **DECIDED 2026-09-23 (operator): FROZEN by default.** Live is opt-in, shows its kind on the tile and a drift line; a live Widget obeys the D-E7 rule and **cannot leave the Space**. — *History:* Not code-grounded. §2.7 recommends frozen. ⚠ The "may it leave the Space" half is **not** a Widget question — it is D-E7's scope question wearing different clothes; answer them together. |
-| ~~**D-E7**~~ | ~~Who may evaluate an Enquiry's derived relation?~~ | ~~LA-20~~ | ✅ **DECIDED 2026-09-23 (operator): PolicyEngine on Enterprise; OWNER-ONLY on Professional (fail closed).** Enterprise enforces Case scope through `inspecto-policy`'s ABAC PDP; where `AccessDeciders.active()` is empty, only the Investigation's owner may evaluate its derived relation — never the dataset-sharing fallback. To be stated in the edition matrix when LA-20 ships. — *History:* 🔴 **The premise is worse than the plan states.** "The Case's scope" is **not a thing the query path consults at all**: `QueryExecutor.run` takes no Subject and is identity-blind, and the dashboard tile path (`BiRoutes.biQuery`) checks only `ComponentAccess.canView(ex, dataset)` — dataset sharing, never row or Case scope. Row-level scoping **does** exist (`RowScope.visible` + the `AccessDecider` SPI) but is opt-in per route and is wired **only** into Ops object CRUD, never into BI. ⇒ the side channel the plan fears is not hypothetical; it is the default. ✅ **Reuse, do not invent**: `inspecto-policy`'s `PolicyEngine` is a real ABAC PDP (deny-overrides, fail-closed, seeded space isolation) and is the natural mechanism. ⚠ **But it is Enterprise-only** — on Personal/Standard `AccessDeciders.active()` is empty and `RowScope.visible` returns `true` always, so reusing it means **no Case-scope enforcement below Enterprise**. If Link Analysis ships below Enterprise, that is the decision. |
+| ~~**D-E7**~~ | ~~Who may evaluate an Enquiry's derived relation?~~ | ~~LA-20~~ | ✅ **DECIDED 2026-09-23 (operator): PolicyEngine on Enterprise; OWNER-ONLY on Professional (fail closed).** Enterprise enforces Case scope through `inspecto-policy`'s ABAC PDP; where `AccessDeciders.active()` is empty, only the Investigation's owner may evaluate its derived relation — never the dataset-sharing fallback. To be stated in the edition matrix when LA-20 ships — ✅ **stated 2026-09-23** (`EDITIONS.md` CP-09; as built in §5.7). — *History:* 🔴 **The premise is worse than the plan states.** "The Case's scope" is **not a thing the query path consults at all**: `QueryExecutor.run` takes no Subject and is identity-blind, and the dashboard tile path (`BiRoutes.biQuery`) checks only `ComponentAccess.canView(ex, dataset)` — dataset sharing, never row or Case scope. Row-level scoping **does** exist (`RowScope.visible` + the `AccessDecider` SPI) but is opt-in per route and is wired **only** into Ops object CRUD, never into BI. ⇒ the side channel the plan fears is not hypothetical; it is the default. ✅ **Reuse, do not invent**: `inspecto-policy`'s `PolicyEngine` is a real ABAC PDP (deny-overrides, fail-closed, seeded space isolation) and is the natural mechanism. ⚠ **But it is Enterprise-only** — on Personal/Standard `AccessDeciders.active()` is empty and `RowScope.visible` returns `true` always, so reusing it means **no Case-scope enforcement below Enterprise**. If Link Analysis ships below Enterprise, that is the decision. |
 | ~~**D-E8**~~ | ~~Does an Enquiry Template carry its exclusion lists?~~ | ~~LA-17, LA-23~~ | ✅ **ANSWERED 2026-09-22 (operator): named reference lists TRAVEL with the template; an analyst's ad-hoc exclusions DO NOT.** A curated watchlist is method and belongs to the template; a judgement call about one graph belongs to the one Investigation that made it. Consistent with gate `G-E12`. ⚠ **Wholly greenfield** — verified 2026-09-22 that no persisted named list exists anywhere, and that `exclude` does not exist as an operation at all (today's only affordance is *Collapse branch*, session-only UI state with no reason code). ⚠ A **persistent** named list still needs stable entity identity, so delivery sequences behind D-S4's remaining half. | ✅ **VERIFIED 2026-09-22 — the claim HOLDS, it is not an undercount.** No persisted named list of entity ids exists anywhere (the only `SuppressionList` is email-domain send suppression; the only "block-list" is a config mapping syntax). 🔴 **And `exclude` does not exist as an operation at all** — today's only affordance is *Collapse branch* (`link-analysis.component.ts:1101`), which hides downstream nodes as **session-only UI state** with no reason code and no persistence. So the §2.2 `exclude`/`excludeBy` vocabulary is wholly prospective: this decision is greenfield, and its cost is the whole feature, not an extension of one. Plan's reading: named reference lists travel, analyst-judgement sets do not. ⚠ Depends on D-S4: a *persistent* exclusion list needs stable entity identity, which value-projected ids do not provide. |
 | ~~**D-U1**~~ | ~~Rendering item: own item (LA-06) or fold into LA-07?~~ | ~~LA-06~~ | ✅ **CLOSED 2026-09-22 (operator).** LA-06 was disposed clause by clause — super-node folding shipped, viewport culling and progressive load refused as premature, the published render limit already shipped — so there was no unbuilt work left to file either way. ⚠ If the projection cap ever rises, the cheap starting point is still the two registered G6 built-ins named below. — original grounding follows: ⚠ **Largely moot since 2026-09-22.** LA-06 was disposed clause by clause: super-node aggregation **shipped**, viewport culling and progressive load **refused as premature** (with reasons, §3.2), and the published render limit **was already shipped**. ⇒ there is **no unbuilt LA-06 work left to file either way**, except the limit's *number*, which is D-S3's. *Recommended reading: close it, or keep it only as a placeholder should the cap ever rise.* |
 | **D-U2** | Extend `postmed_xdr` into the call-records Dataset, or build a fourth feed? | LA-16 — and LA-14b, LA-11 through it | `postmed_xdr` landed 2026-09-22, **after** this plan's grounding, and already carries A-party, B-party, start, duration, cell and kind; it lacks device, explicit direction, a timezone contract, `seed-inbox.{ps1,sh}` entries (**both** files — they come in a POSIX/PowerShell pair) and a planted investigative story. ⇒ **Recommended: extend it** — a fourth feed duplicates ~80 % and splits the demo. ~~⚠ **A peer worktree is mid-build on `postmed_xdr`**; reconcile with that work before touching it.~~ ✅ **STRUCK 2026-09-22 — it LANDED** (`7ab01e0d`, 8 files) and nothing has touched it since; the tree is clean for all of it, so the collision risk is gone.
@@ -686,7 +686,15 @@ guards is currently uncaught.
 * **Two evaluators, one spec — honestly scoped.** The append path evaluates the round-tripped log plus the
   new step and records that position's hash; `/replay` recomputes every position from step 1 and reports
   `equivalent` + the steps whose hash disagrees. The check is pinned to be able to FAIL (a tampered hash is
-  reported). ⚠ "Incremental" means the Dataset read is a one-hop delta; the in-memory fold itself is
+  reported). ✅ **FIXED 2026-09-23 (with LA-20): replay after an undo reported `equivalent:false` on an
+  UNTAMPERED log** (`seed, expand, exclude, hide, undo` → `mismatches:[4]`, found by the LA-12 dossier lane).
+  `InvestigationEvaluator.evaluate` resolved the undone steps across the WHOLE log before folding, so prefix k
+  skipped an op undone only later while k's recorded hash included it. Now PREFIX semantics — position k
+  honours only undo entries at positions ≤ k (ops fold incrementally; an undo re-folds its own prefix); the
+  `reread` drift loop uses the same prefix. Pinned by
+  `ControlApiInvestigationsTest.replayAfterAnUndoIsEquivalentBecauseAPrefixIgnoresLaterUndos` (red before the
+  fix; a no-re-fold mutant also dies). The full-log evaluation (append path, Working Set relation) was never
+  affected: for the whole log, whole-log and prefix semantics coincide. ⚠ "Incremental" means the Dataset read is a one-hop delta; the in-memory fold itself is
   re-run from the sealed log, which needs no Dataset access.
 * **Fork (D-E4).** `reorder` takes a permutation of the EFFECTIVE op steps, re-applies them in the new order,
   **re-reads** every `expand` (a new order means a new frontier, so the parent's sealed rows do not describe
@@ -761,7 +769,7 @@ guards is currently uncaught.
   the reader's held manifest. A stored, `opSeq`-anchored dossier Artifact is deferred. (4) `render()` and
   `open()` are copied from `InvestigationRoutes`, to be folded together once LA-20 lands. The dossier's
   `render` deliberately lists EVERY excluded id, never "and N more".
-* 🔴 **Found while grounding (LA-10 defect, not fixed here — the file is under a parallel lane):**
+* ✅ **FIXED by LA-20 (2026-09-23, prefix semantics — see §5.5).** ~~Found while grounding (LA-10 defect, not fixed here — the file is under a parallel lane):~~
   `POST /inv/investigations/{id}/replay` reports **`equivalent:false` after ANY undo** on an untampered log.
   `InvestigationEvaluator.evaluate` collects the undone steps across the WHOLE log before folding. So replay
   position *k* skips an op undone LATER, while the `workingSetHash` recorded at *k* includes it. Probe: seed,
@@ -769,6 +777,59 @@ guards is currently uncaught.
   check avoids this by evaluating prefixes. The fix is for `replay` to do the same.
 * ⏳ **Deferred:** SPA wiring (no Dossier UI yet) · the SPA SHA-256 swap · PDF/HTML renderings · a persisted
   Dossier Artifact · coverage (LA-19) · server-side centrality · snapshot dossiers without an Investigation.
+
+### 5.7 The Working Set as a derived relation — LA-20
+
+*(Numbered 5.7 because the parallel LA-12 dossier lane adds its own §5.6.)*
+
+✅ **AS BUILT 2026-09-23 (backend)** — `WorkingSetRoutes` in `inspecto-geo-link`, a separate `RouteModule` so the
+LA-10 classes changed only by two visibility modifiers (`InvestigationRoutes.Inv` and `open` are package-private
+now, reused so the owner + R3 gate is not duplicated):
+
+| Route | Gate | Notes |
+|---|---|---|
+| `GET /inv/investigations/{id}/working-set` | open read (no capability) + the D-E7 row gate | `?of=entities\|links\|excluded` (default `entities`), `?limit` (default 1 000, max 10 000), `?offset` → `{relation, columns, rows, total, offset, limit, truncated, head{step, workingSetHash}, key, cached}`; 422 on a bad `of`/`limit`/`offset` |
+
+* **Columns (§2.7 provenance).** `entities`: `entityId, type, hop, seedId, opSeq, hidden, kept` · `links`:
+  `source, target, kind, count, opSeq` · `excluded`: `entityId, opSeq, reason` — negative space is a relation of
+  its own, not a footnote. `opSeq` is the step that admitted (or excluded) the row. Rows are in a stable order
+  (by id), so a page is reproducible.
+* **Evaluated from the sealed log (D-E3)** by the same pure `InvestigationEvaluator` — no Dataset read, so the
+  relation cannot move when the data grows (G-E11) and needs no second access check on the Dataset.
+* **Cache.** Key = the Investigation's directory + SHA-256 of the log's **committed** bytes (up to the last
+  newline, so a line being appended is never half-read). The head step and every seal fingerprint are inside
+  those bytes, so the key IS "log head + seal fingerprints": an op or undo appends → new key; a fork is another
+  directory → another relation; a hand-edited log hashes differently. No invalidation hook in the write path
+  exists or is needed. Bounded LRU (32). The response's `cached` flag makes a hit observable. ⚠ The file is
+  still read per request; the saving is the JSON parse of every sealed row, the fold and the row building. ⛔ A
+  size/mtime key was rejected: it is correct only while nobody rewrites the file, which is the case replay's
+  equivalence check exists for.
+* **D-E7 gate — runs on EVERY request, BEFORE the cache**, so a cached relation cannot reach a caller the gate
+  refuses (pinned: an owner warms the cache, a non-owner still reads 404 with no rows in the body).
+  (1) `InvestigationRoutes.open` — owner-only (404 = absence) + the R3 Dataset gate. On Professional and below
+  (no `AccessDecider`) that is the whole rule, and there is **no fallback to `ComponentAccess` Dataset
+  sharing** — pinned with a non-owner who can view the Dataset and holds `canConfigureAccess`. (2)
+  `RowScope.visible(ex, "investigation", {id, owner, dataset, parent})` — on Enterprise the `PolicyEngine`
+  judges the resolved Investigation; DENY → 404 even for the owner (pinned end to end with an authored policy in
+  `inspecto-policy`, which gained a test-scope dependency on `inspecto-geo-link`, the same direction rule as its
+  `inspecto-ops` one). With no Subject (Personal) nothing is enforced, as everywhere.
+* **Not reachable through `/bi` or `/db`.** Grounded: the relation is never registered as a DuckDB view, a
+  Dataset or a registry component, so no name exists for `BiRoutes.biQuery` / `QueryExecutor.run` to address;
+  the sealed files under the write root are refused by `SqlGuard` (file-reading functions and path-shaped
+  identifiers). The Investigation-scoped route is the only way in — deliberately, for this slice.
+* **Why a GET with no capability.** Reads are open by policy (`compliance/evidence/route-gating.md`); the gate on
+  this read is ownership + the PDP, which a capability could not express. Hence no `CapabilityManifest` entry and
+  no route-gating row; pinned that an owner holding no capability at all reads it.
+* **Audit** — `LINK_INVESTIGATION_WORKING_SET_READ` per read (LA-04 shape: `relation`, `rows`, `total`,
+  `truncated`, `cached`, `key`), best-effort.
+* 🔴 **Plan vs code.** (1) D-E7 says Enterprise "enforces Case scope"; an Investigation has **no Case linkage**
+  yet (an LA-10 deferral), so there is no Case attribute for a policy to test — the PDP sees `id, owner, dataset,
+  parent`. (2) The `AccessDecider` contract says a policy ALLOW never widens an existing gate, so on Enterprise a
+  policy can only NARROW owner-only; letting a Case team read a colleague's Investigation would be a sharing
+  model, which D-E7 did not decide. (3) §2.7 says "a **Widget** binds to it" — no Widget binds yet (LA-21).
+* ⏳ **Deferred:** the relation as a BI-queryable source (`/bi/query`, Measures, Alert Rules — LA-21/LA-23; the
+  binding must carry this gate with it); Case linkage and Case-scoped sharing; `?at=<step>` (a relation at a past
+  head); a cross-JVM cache (the cache is per process, which is correct but cold after restart).
 
 ---
 

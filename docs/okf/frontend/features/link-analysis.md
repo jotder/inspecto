@@ -502,6 +502,8 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   required) · `hide` · `keep` and answers the Working Set **delta** + `truncated`; `/{id}/undo` is a real undo
   (a recorded log edit — the state after it is byte-identical to the state before the undone op);
   `/{id}/replay` re-evaluates the whole log and `GET /{id}/log` renders each step as a plain-language line.
+  ⚠ Replay uses PREFIX semantics — position k honours only the undos at or before k; until 2026-09-23 it
+  resolved undos across the whole log and reported an untampered log with an undo as not equivalent.
   ⛔ **Nothing is pinned** (D-E3): `datasetVersion` is always `null`; each `expand` instead SEALS the rows it
   read with a SHA-256 fingerprint, so replay cannot move when the data grows, and `replay {reread:true}`
   re-runs every recorded query and reports drift per step rather than serving it. ⛔ **Re-ordering forks**
@@ -533,6 +535,15 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). ⚠ The SPA still fingerprints snapshots with FNV-1a:
   swapping it to Web Crypto SHA-256 makes `snapshotGraph`/`verifySnapshot` async, which reaches the evidence
   dialog and its spec, so it was deferred.
+* **The Working Set is addressable as rows** (LA-20, backend shipped 2026-09-23; `WorkingSetRoutes`).
+  `GET /inv/investigations/{id}/working-set?of=entities|links|excluded&limit&offset` answers a relation with
+  fixed columns carrying provenance (`opSeq`, `seedId`, `hop`, and `reason` for exclusions), bounded with the
+  true `total` + `truncated`, evaluated from the sealed log alone. It is **cached** under the hash of the
+  committed log bytes, so an op, an undo or a fork can never be answered from a stale entry — and the access gate
+  runs before the cache on every read. **Who may read it (D-E7):** the owner only on Professional and below (a
+  non-owner reads 404; no fallback to Dataset sharing); on Enterprise additionally the `PolicyEngine`'s row
+  verdict for `resourceKind: investigation`, which can hide it even from its owner but never widens it. ⛔ It is
+  **not** a Dataset or DuckDB view — `/bi` and `/db` cannot reach it; binding it to a Widget is LA-21.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as

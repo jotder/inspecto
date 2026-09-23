@@ -157,16 +157,36 @@ final class InvestigationEvaluator {
      * Full evaluation of {@code log} up to and including step {@code at} (every step when {@code at < 0}).
      * {@code hashesOut}, when given, receives each position's Working Set hash in step order — the replay's
      * equivalence check compares them with the hashes recorded at append time.
+     *
+     * <p>⛔ PREFIX semantics: position k honours only the undo entries at positions ≤ k — exactly what the append
+     * path saw when it recorded k's hash. Resolving the undone set over the whole log first made every prefix skip
+     * an op that is only undone LATER, so an untampered log with an undo replayed as not equivalent. Ops fold
+     * incrementally; an undo re-folds its own prefix (it reverts the latest effective op, which an incremental
+     * state cannot pop).
      */
     static State evaluate(List<Map<String, Object>> log, int at, List<String> hashesOut) {
+        List<Map<String, Object>> prefix = new ArrayList<>();
+        for (Map<String, Object> e : log) {
+            if (at >= 0 && ((Number) e.get("step")).intValue() > at) break;
+            prefix.add(e);
+        }
+        if (hashesOut == null) return fold(prefix);
+        State s = new State();
+        for (int k = 0; k < prefix.size(); k++) {
+            Map<String, Object> e = prefix.get(k);
+            if ("op".equals(e.get("kind"))) apply(s, e);
+            else if ("undo".equals(e.get("kind"))) s = fold(prefix.subList(0, k + 1));
+            hashesOut.add(s.hash());
+        }
+        return s;
+    }
+
+    /** One whole log, its undos resolved within it. */
+    private static State fold(List<Map<String, Object>> log) {
         State s = new State();
         Set<Integer> undone = undone(log);
-        for (Map<String, Object> e : log) {
-            int step = ((Number) e.get("step")).intValue();
-            if (at >= 0 && step > at) break;
-            if ("op".equals(e.get("kind")) && !undone.contains(step)) apply(s, e);
-            if (hashesOut != null) hashesOut.add(s.hash());
-        }
+        for (Map<String, Object> e : log)
+            if ("op".equals(e.get("kind")) && !undone.contains(((Number) e.get("step")).intValue())) apply(s, e);
         return s;
     }
 

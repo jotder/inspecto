@@ -124,7 +124,8 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
 - **Enforcement (A3).** `AccessDecider` SPI (core) is consulted at two PEPs: the route-level **authorize
   stage** in `ControlApi.routeDispatch` (after authenticate; DENY → 403; skips public paths + subject-less
   exchanges) and the row-level **`RowScope`** filter (generalizes `ObjectRoutes`' SEC-7d filter — DENY hides
-  the row 404/filtered). `PolicyEngine` = deny-overrides → allow → ABSTAIN over `AccessPolicies.effective`;
+  the row 404/filtered; consumers: Ops objects, annotation targets, and — since LA-20 — an Investigation's
+  Working Set relation, `resourceKind: investigation` with `resource.{id,owner,dataset,parent}`). `PolicyEngine` = deny-overrides → allow → ABSTAIN over `AccessPolicies.effective`;
   context = `subject.{id,capabilities,dataScopes,roles}` + A1 claims, `env.{action,route,space}`,
   `resource.*` (row level, `resource.space` defaulting to the bound space). **A policy allow does NOT bypass
   capability gates** (defense in depth — the plan's §2 order was deliberately tightened); ABSTAIN falls

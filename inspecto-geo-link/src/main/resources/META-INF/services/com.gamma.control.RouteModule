@@ -2,3 +2,4 @@ com.gamma.geolink.GeoRoutes
 com.gamma.geolink.InvRoutes
 com.gamma.geolink.InvestigationRoutes
 com.gamma.geolink.DossierRoutes
+com.gamma.geolink.WorkingSetRoutes

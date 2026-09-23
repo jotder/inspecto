@@ -192,6 +192,11 @@ public final class EventType {
      *  LA-12). {@code verified}, {@code submittedRoot}, {@code currentRoot} and {@code changed} (artefacts whose
      *  bytes differ) carry the custody verdict. */
     public static final String LINK_DOSSIER_VERIFIED = "LINK_DOSSIER_VERIFIED";
+    /** An Investigation's Working Set was read as a derived relation ({@code GET /inv/investigations/{id}/working-set},
+     *  LA-20). {@code relation} (entities | links | excluded), {@code rows} served, {@code total},
+     *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04
+     *  query-audit shape, so a read of the relation is as visible as the projection it replaces. */
+    public static final String LINK_INVESTIGATION_WORKING_SET_READ = "LINK_INVESTIGATION_WORKING_SET_READ";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

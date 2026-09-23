@@ -311,6 +311,31 @@ class ControlApiInvestigationsTest {
         }
     }
 
+    /**
+     * An undo on an UNTAMPERED log must still replay as equivalent. 🔴 Regression (found by the LA-12 dossier lane):
+     * replay resolved the undone steps across the WHOLE log before folding, so replaying prefix 4 skipped the hide
+     * that step 5 undoes — while the hash recorded at step 4 includes it — and reported {@code mismatches:[4]}.
+     * Prefix k must honour only the undo entries at positions ≤ k.
+     */
+    @Test
+    void replayAfterAnUndoIsEquivalentBecauseAPrefixIgnoresLaterUndos(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(post(c.port, "/inv/investigations", CREATE));
+            op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"]}");
+            op(c, "case-a", "{\"op\":\"expand\"}");
+            op(c, "case-a", "{\"op\":\"exclude\",\"ids\":[\"bob\"],\"reason\":\"marketing\"}");
+            String hidden = op(c, "case-a", "{\"op\":\"hide\",\"ids\":[\"carol\"]}").at("/workingSet/hash").asText();
+            String head = data(post(c.port, "/inv/investigations/case-a/undo", "")).at("/workingSet/hash").asText();
+
+            JsonNode full = replay(c, "case-a", "{}");
+            assertTrue(full.get("equivalent").asBoolean(), full.toString());
+            assertEquals(0, full.get("mismatches").size(), full.toString());
+            assertEquals(head, full.at("/workingSet/hash").asText());
+            assertEquals(hidden, replay(c, "case-a", "{\"at\":4}").at("/workingSet/hash").asText(),
+                    "a replay to step 4 reproduces step 4 — the hide the LATER undo reverts is still in it");
+        }
+    }
+
     /** D-E3: the sealed read does not move when the data grows (G-E11), and a re-read reports it (G-E3). */
     @Test
     void theSealHoldsWhenDataGrowsAndRereadReportsTheDrift(@TempDir Path cfg, @TempDir Path root) throws Exception {
