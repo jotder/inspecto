@@ -18,6 +18,7 @@ import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandboxPolicy;
+import com.gamma.util.DuckDbUtil;
 import com.gamma.util.JsonAttributes;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
@@ -656,7 +657,7 @@ public final class InvRoutes implements RouteModule {
                 r = QueryExecutor.run(new QueryExecutor.Request(mp.dataset(), mp.relationSql(), mp.sql(),
                         limit, 0, List.of(), List.of()));
             } catch (SQLException e) {
-                throw new ApiException(422, "projection of dataset '" + mp.dataset() + "' failed: " + e.getMessage());
+                throw new ApiException(422, "projection of dataset '" + mp.dataset() + "' failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
             }
             for (Map<String, Object> row : r.rows()) {
                 Map<String, Object> out;
@@ -762,7 +763,7 @@ public final class InvRoutes implements RouteModule {
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "projection failed: " + e.getMessage());
+            throw new ApiException(422, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -955,7 +956,7 @@ public final class InvRoutes implements RouteModule {
             auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "traversal failed: " + e.getMessage());
+            throw new ApiException(422, "traversal failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 

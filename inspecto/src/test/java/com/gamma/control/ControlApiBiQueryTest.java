@@ -141,6 +141,21 @@ class ControlApiBiQueryTest {
         }
     }
 
+    /** A field the dataset lacks reads as the Binder Error, not DuckDB's pending-query preamble
+     *  ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentFieldIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedSales(c);
+            HttpResponse<String> r = biQuery(c.port,
+                    "{\"dataset\":\"sales_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"nope\"}]}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.of(r.body()).get("error").get("message").asText();
+            assertTrue(message.startsWith("BI query failed: Binder Error: "), message);
+        }
+    }
+
     @Test
     void failsClosed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

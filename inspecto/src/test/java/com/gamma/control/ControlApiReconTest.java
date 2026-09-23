@@ -165,6 +165,20 @@ class ControlApiReconTest {
         }
     }
 
+    /** A key column neither side has reads as the Binder Error, not DuckDB's pending-query preamble
+     *  ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentKeyColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = postJson(c.port, "/spaces/s1/recon/run",
+                    "{\"config\":{\"datasets\":[\"a_ds\",\"b_ds\"],\"keyColumns\":[\"nope\"],"
+                            + "\"compareColumns\":[{\"column\":\"amount\"}]}}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.envelope(r.body()).at("/error/message").asText();
+            assertTrue(message.startsWith("reconciliation failed: Binder Error: "), message);
+        }
+    }
+
     // ── POST /recon/breaks ─────────────────────────────────────────────────────────
 
     @Test

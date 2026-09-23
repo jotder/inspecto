@@ -148,6 +148,25 @@ class ControlApiExpectationCensusTest {
         }
     }
 
+    /**
+     * The count runs on a plain Statement, so a failure DuckDB finds while binding it arrives behind the
+     * driver's pending-query preamble; the author must read the real error first
+     * ({@code DUCKDB-PREAMBLE-OTHER-422S-1}).
+     */
+    @Test
+    void anEvaluationFailureIsReportedWithoutTheDriverPreamble(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            assertEquals(200, send(c.port, "POST", "/expectations",
+                    "{\"name\":\"e_gone\",\"kind\":\"non_null\",\"target\":\"no_such_store\",\"column\":\"ID\"}")
+                    .statusCode());
+            HttpResponse<String> r = send(c.port, "POST", "/expectations/e_gone/evaluate", null);
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.of(r.body()).get("error").get("message").asText();
+            assertFalse(message.contains("pending query result"), "the driver preamble leaked: " + message);
+            assertTrue(message.startsWith("expectation evaluation failed: IO Error: No files found"), message);
+        }
+    }
+
     private JsonNode list(int port) throws Exception {
         return V1Body.of(send(port, "GET", "/expectations", null).body());
     }

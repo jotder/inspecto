@@ -124,6 +124,24 @@ class ControlApiRuleTemplateTest {
         }
     }
 
+    /**
+     * A template with no holes runs on a plain Statement, whose bind failure DuckDB prefixes with its
+     * pending-query preamble; the author reads the Binder Error first ({@code DUCKDB-PREAMBLE-OTHER-422S-1}).
+     */
+    @Test
+    void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path cfg, @TempDir Path wr)
+            throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            saveTemplate(c.port, "typo", "{\"id\":\"typo\",\"name\":\"typo\","
+                    + "\"paramSql\":\"SELECT nope FROM (SELECT 1 AS n) t\",\"params\":[]}");
+
+            HttpResponse<String> res = send(c.port, "POST", "/rule-templates/typo/simulate", "{}");
+            assertEquals(422, res.statusCode(), res.body());
+            String message = V1Body.of(res.body()).get("error").get("message").asText();
+            assertTrue(message.startsWith("rule template failed: Binder Error: "), message);
+        }
+    }
+
     // ── plumbing ──────────────────────────────────────────────────────────────────
 
     // ⚠ Every route is served under `/api/v1` — a bare `/api` returns "unknown API version", which

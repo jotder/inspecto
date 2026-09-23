@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -55,7 +56,7 @@ public final class RouteErrors {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + e.getMessage());
+            throw new ApiException(422, "preview failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 

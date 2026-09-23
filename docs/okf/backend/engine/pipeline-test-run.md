@@ -160,6 +160,21 @@ Used by `testRun`, `dryRunFlow` and `POST /components/transform/describe` (which
 copy until now). `DuckDbPendingQueryPreambleTest` runs the real driver, so a DuckDB upgrade that rewords
 the preamble goes red instead of letting it silently back in. Row `TESTRUN-BINDER-ERROR-LEAKS-PREAMBLE-1`.
 
+**Every other 422 built from such a failure adopts the same seam (2026-09-23, `DUCKDB-PREAMBLE-OTHER-422S-1`).**
+Probed on the real driver: the preamble appears on **any plain `Statement`** — `execute(String)` AND
+`executeQuery(String)` — for a failure found while binding (Binder, Catalog, a table function's `IO Error:
+No files found`), and **never** on a `PreparedStatement`, a Parser Error or an execution-time error (e.g.
+Conversion Error). `QueryExecutor.run` registers the dataset view on a plain `Statement` and runs a query
+with no binds on `SqlSandbox.statement()`, so every route over it could carry it. Adopted at: `BiRoutes`
+(`/bi/query`), `QueryRoutes` (`/queries/{id}/run`), `ShareRoutes` (`/public/dashboards/{t}/query`),
+`RuleRoutes` (`/rule-templates/{id}/simulate`), `DbBrowserRoutes` (`/db/query` + `/db/table`, both the
+store and the `ops:` group — `BrowsableStore.exec` is a plain `Statement` too), `EnrichmentRoutes`
+(`/enrichment/preview`), `ExpectationRoutes` (`/expectations/{name}/evaluate`), `ReconRoutes` (all four),
+`ViewRoutes` (`/views/{name}/data`), `RouteErrors.mapPreviewErrors` (`/components/{transform,grammar}/…/preview|test`),
+and in `inspecto-geo-link` `GeoRoutes` (`/geo/projection|routes`, the `SQLException` arm only) and
+`InvRoutes` (projection, multi-projection, traversal). One real-HTTP test per route family asserts the
+message **starts with** the real error; each went red against the unstripped message before the fix.
+
 ⚠ **Not yet adopted elsewhere:** four more routes (`BiRoutes`, `DbBrowserRoutes`, `EnrichmentRoutes`,
 `ExpectationRoutes`) build a 422 from a raw DuckDB message and probably carry the same preamble —
 unverified, reproduce per route before adopting the seam. Row `DUCKDB-PREAMBLE-OTHER-422S-1`.
@@ -265,5 +280,6 @@ and when a probe leaves a test green, suspect the test, not the probe.
 - `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
 - `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`
 - `inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`
+- `inspecto-engine/…/query/QueryExecutor.java` — `run` (the plain-`Statement` view registration and no-bind query)
 - Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (7, real HTTP),
   `PipelineDryRunTest` (15, of which 5 pin the cutoff)

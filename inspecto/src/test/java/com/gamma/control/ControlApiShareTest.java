@@ -154,6 +154,23 @@ class ControlApiShareTest {
         }
     }
 
+    /** A field the shared dataset lacks reads as the Binder Error, not DuckDB's pending-query preamble
+     *  ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentFieldIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            String token = V1Body.of(post(c.port, "/dashboards/exec_board/share", null).body()).get("token").asText();
+            HttpResponse<String> r = post(c.port, "/public/dashboards/" + token + "/query",
+                    "{\"dataset\":\"sales_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"nope\"}]}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.envelope(r.body()).at("/error/message").asText();
+            assertTrue(message.startsWith("query failed: Binder Error: "), message);
+        }
+    }
+
     @Test
     void unknownDashboardShareIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         System.setProperty("bi.share.secret", "test-secret-0123456789");

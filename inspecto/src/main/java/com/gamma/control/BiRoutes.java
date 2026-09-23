@@ -9,6 +9,7 @@ import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
+import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -88,7 +89,7 @@ final class BiRoutes implements RouteModule {
         try {
             return response(QueryExecutor.run(req), sql);
         } catch (SQLException e) {
-            throw new ApiException(422, "BI query failed: " + e.getMessage());
+            throw new ApiException(422, "BI query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 

@@ -8,6 +8,7 @@ import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.BrowsableStore;
+import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -222,7 +223,7 @@ final class DbBrowserRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "query failed: " + e.getMessage());
+            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
         }
@@ -254,7 +255,7 @@ final class DbBrowserRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unknown table for this store
             throw new ApiException(404, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "query failed: " + e.getMessage());
+            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 

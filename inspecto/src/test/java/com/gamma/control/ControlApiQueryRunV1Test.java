@@ -130,6 +130,25 @@ class ControlApiQueryRunV1Test {
         }
     }
 
+    /** A plain Statement's bind failure reads as the Binder Error, not DuckDB's pending-query preamble
+     *  ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("sales_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES (1,'x',5.0)) AS t(id,label,amount)", "2026-07-06T00:00:00Z"));
+            registry(c).write("dataset", "sales_ds", Map.of("view", "sales_view"));
+            registry(c).write("query", "bad_q", Map.of(
+                    "type", "sql", "datasetId", "sales_ds", "text", "SELECT nope FROM sales_ds"));
+            HttpResponse<String> r = run(c.port, "bad_q", null);
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.of(r.body()).get("error").get("message").asText();
+            assertTrue(message.startsWith("query failed: Binder Error: "), message);
+            assertTrue(message.contains("Candidate bindings"), message);
+        }
+    }
+
     private String assertOk(HttpResponse<String> r) {
         assertEquals(200, r.statusCode(), r.body());
         return r.body();

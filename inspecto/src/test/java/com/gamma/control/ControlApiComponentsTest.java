@@ -377,6 +377,21 @@ class ControlApiComponentsTest {
         }
     }
 
+    /** An absent column reads as the Binder Error, not DuckDB's pending-query preamble
+     *  ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentColumnInAPreviewIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path dir)
+            throws Exception {
+        try (Ctx c = open(dir, null)) {
+            HttpResponse<String> t = send(c.port, "POST", "/components/transform/preview",
+                    "{\"config\":{\"type\":\"transform.filter\",\"where\":\"EVENT_TS IS NOT NULL\"},"
+                    + "\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"}]}");
+            assertEquals(422, t.statusCode(), t.body());
+            String message = V1Body.envelope(t.body()).at("/error/message").asText();
+            assertTrue(message.startsWith("preview failed: Binder Error: "), message);
+        }
+    }
+
     /** An inline preview reports the SAME result as the by-id arm — one code path, two ways in. */
     @Test
     void inlineAndRegisteredPreviewsAgree(@TempDir Path dir) throws Exception {

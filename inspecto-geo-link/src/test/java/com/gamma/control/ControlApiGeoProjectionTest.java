@@ -171,6 +171,21 @@ class ControlApiGeoProjectionTest {
         }
     }
 
+    /** A coordinate column the dataset lacks reads as the Binder Error, not DuckDB's pending-query
+     *  preamble ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedPoints(c);
+            HttpResponse<String> r = post(c.port, "geo/projection",
+                    "{\"dataset\":\"sights_ds\",\"latCol\":\"latitude\",\"lonCol\":\"lon\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = JSON.readTree(r.body()).at("/error/message").asText();
+            assertTrue(message.startsWith("projection failed: Binder Error: "), message);
+        }
+    }
+
     @Test
     void failsClosed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

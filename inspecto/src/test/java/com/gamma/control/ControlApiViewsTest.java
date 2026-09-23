@@ -126,6 +126,23 @@ class ControlApiViewsTest {
         }
     }
 
+    /**
+     * The view is registered on a plain Statement, so a derived SQL whose column is gone fails behind
+     * DuckDB's pending-query preamble; the Binder Error must come first ({@code DUCKDB-PREAMBLE-OTHER-422S-1}).
+     */
+    @Test
+    void aStaleDerivedSqlIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr)) {
+            new ViewStore(wr.resolve("views")).write(new ViewDefinition("stale_view", "stale_flow", List.of(),
+                    "SELECT nope FROM (SELECT 1 AS a) AS t", Instant.now().toString()));
+            HttpResponse<String> r = send(c.port, "GET", "/views/stale_view/data", null);
+            assertEquals(422, r.statusCode(), r.body());
+            String message = V1Body.of(r.body()).get("error").get("message").asText();
+            assertTrue(message.startsWith("view query failed: Binder Error: "), message);
+        }
+    }
+
     @Test
     void missingViewIs404AndViewWithoutDerivedSqlIs409(@TempDir Path dir) throws Exception {
         Path wr = dir.resolve("wr");

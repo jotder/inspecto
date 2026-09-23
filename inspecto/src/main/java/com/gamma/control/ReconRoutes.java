@@ -6,6 +6,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.ReconConfigLoader;
 import com.gamma.query.ReconService;
+import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -69,7 +70,7 @@ final class ReconRoutes implements RouteModule {
         try {
             return ReconService.columns(sides);
         } catch (SQLException e) {
-            throw new ApiException(422, "column inventory failed: " + e.getMessage());
+            throw new ApiException(422, "column inventory failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
         }
@@ -86,7 +87,7 @@ final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "reconciliation failed: " + e.getMessage());
+            throw new ApiException(422, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
         }
@@ -123,7 +124,7 @@ final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "reconciliation failed: " + e.getMessage());
+            throw new ApiException(422, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
         }
@@ -159,7 +160,7 @@ final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "reconciliation failed: " + e.getMessage());
+            throw new ApiException(422, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
         }

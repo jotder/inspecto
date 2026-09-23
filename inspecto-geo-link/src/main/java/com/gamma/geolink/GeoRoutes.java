@@ -14,6 +14,7 @@ import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 
+import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -249,7 +250,7 @@ public final class GeoRoutes implements RouteModule {
             return QueryExecutor.run(new QueryExecutor.Request(
                     c.datasetId, c.relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw new ApiException(422, "projection failed: " + e.getMessage());
+            throw new ApiException(422, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(422, "projection failed: " + e.getMessage());
         }

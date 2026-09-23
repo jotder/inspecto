@@ -235,6 +235,21 @@ class ControlApiInvProjectionTest {
     }
 
     /** Two datasets whose naming convention should be inferrable: orders.customer_id -> customers.id. */
+    /** An endpoint column the dataset lacks reads as the Binder Error, not DuckDB's pending-query
+     *  preamble ({@code DUCKDB-PREAMBLE-OTHER-422S-1}). */
+    @Test
+    void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedCalls(c);
+            HttpResponse<String> r = project(c.port,
+                    "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller_id\",\"targetCol\":\"callee\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = JSON.readTree(r.body()).at("/error/message").asText();
+            assertTrue(message.startsWith("projection failed: Binder Error: "), message);
+        }
+    }
+
     private void seedOrdersAndCustomers(Ctx c) throws Exception {
         new ViewStore(c.root.resolve("views")).write(new ViewDefinition("customers_view", "flow-x", List.of(),
                 "SELECT * FROM (VALUES (1,'Alice'),(2,'Bob')) AS t(id,name)", "2026-07-08T00:00:00Z"));

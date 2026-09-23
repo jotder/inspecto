@@ -8,6 +8,7 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.sql.SqlGuard;
+import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -132,7 +133,7 @@ final class ShareRoutes implements RouteModule {
             out.put("truncated", r.truncated());
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "query failed: " + e.getMessage());
+            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 

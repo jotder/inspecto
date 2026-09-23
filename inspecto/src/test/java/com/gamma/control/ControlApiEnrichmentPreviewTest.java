@@ -101,6 +101,9 @@ class ControlApiEnrichmentPreviewTest {
                     "SELECT no_such_column FROM input", "[{\"id\":\"c1\"}]"));
             assertEquals(422, resp.statusCode(), resp.body());
             assertTrue(resp.body().contains("preview failed"), resp.body());
+            // The Binder Error comes first, not DuckDB's pending-query preamble (DUCKDB-PREAMBLE-OTHER-422S-1).
+            String message = V1Body.of(resp.body()).get("error").get("message").asText();
+            assertTrue(message.startsWith("enrichment preview failed on the sample: Binder Error: "), message);
         }
     }
 }

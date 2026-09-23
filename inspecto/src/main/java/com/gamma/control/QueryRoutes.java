@@ -9,6 +9,7 @@ import com.gamma.query.Parameters;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
+import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -94,7 +95,7 @@ final class QueryRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, "query failed: " + sql.getMessage());
+            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
         } catch (IOException io) {
             throw new ApiException(503, "query sandbox unavailable: " + io.getMessage());
         }

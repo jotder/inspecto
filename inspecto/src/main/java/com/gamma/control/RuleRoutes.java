@@ -9,6 +9,7 @@ import com.gamma.query.Parameters;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.RuleTemplate;
 import com.gamma.sql.SqlGuard;
+import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -110,7 +111,7 @@ final class RuleRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, "rule template failed: " + sql.getMessage());
+            throw new ApiException(422, "rule template failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
         } catch (IOException io) {
             throw new ApiException(503, "query sandbox unavailable: " + io.getMessage());
         }

@@ -161,6 +161,27 @@ class ControlApiDbBrowserTest {
     }
 
     /**
+     * Both query paths run a plain Statement, whose bind failure DuckDB prefixes with its pending-query
+     * preamble; the author must read the Binder Error first ({@code DUCKDB-PREAMBLE-OTHER-422S-1}).
+     */
+    @Test
+    void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            HttpResponse<String> store = postJson(c.port, "/spaces/s1/db/query",
+                    "{\"table\":\"orders\",\"sql\":\"SELECT nope FROM \\\"orders\\\"\"}");
+            assertEquals(422, store.statusCode(), store.body());
+            String message = V1Body.envelope(store.body()).get("error").get("message").asText();
+            assertTrue(message.startsWith("query failed: Binder Error: "), message);
+
+            HttpResponse<String> ops = postJson(c.port, "/spaces/s1/db/query",
+                    "{\"group\":\"ops:status\",\"sql\":\"SELECT nope FROM (SELECT 1 AS a) AS t\"}");
+            assertEquals(422, ops.statusCode(), ops.body());
+            String opsMessage = V1Body.envelope(ops.body()).get("error").get("message").asText();
+            assertTrue(opsMessage.startsWith("query failed: Binder Error: "), opsMessage);
+        }
+    }
+
+    /**
      * A store named after a registered pipeline browses the pipeline's mapped output ({@code dirs.database}),
      * not the raw pre-mapping {@code backup/} copies colocated under {@code data/<name>} — the whole-tree
      * glob used to lock onto whichever file the directory walk hit first, hiding mapped-only columns.
