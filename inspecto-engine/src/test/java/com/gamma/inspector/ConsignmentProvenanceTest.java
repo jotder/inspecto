@@ -52,7 +52,7 @@ class ConsignmentProvenanceTest {
             // 13 rows parsed; 12 landed across two partition files (one row filtered en route)
             ConsignmentIngestor.recordProvenance("demo_etl", batch, outcome(batch, "SUCCESS", 13L, List.of(
                     new LineageRow(batch.batchId(), 0, "in.csv", "out1.parquet", "day=1", 7L),
-                    new LineageRow(batch.batchId(), 0, "in.csv", "out2.parquet", "day=2", 5L))), "SUCCESS");
+                    new LineageRow(batch.batchId(), 0, "in.csv", "out2.parquet", "day=2", 5L))), "SUCCESS", false);
 
             List<Map<String, Object>> rows = store.query("demo_etl", batch.batchId());
             assertEquals(2, rows.size(), rows.toString());
@@ -71,7 +71,7 @@ class ConsignmentProvenanceTest {
         try (DbProvenanceStore store = DbProvenanceStore.open("jdbc:duckdb:")) {
             ProvenanceStores.use(store);
             Consignment batch = batch(dir);
-            ConsignmentIngestor.recordProvenance("demo_etl", batch, outcome(batch, "FAILED", 13L, List.of()), "FAILED");
+            ConsignmentIngestor.recordProvenance("demo_etl", batch, outcome(batch, "FAILED", 13L, List.of()), "FAILED", false);
             assertTrue(store.query("demo_etl", batch.batchId()).isEmpty());
         }
     }
@@ -81,6 +81,6 @@ class ConsignmentProvenanceTest {
     void noRegisteredStoreIsANoOp(@TempDir Path dir) throws Exception {
         Consignment batch = batch(dir);
         assertDoesNotThrow(() -> ConsignmentIngestor.recordProvenance(
-                "demo_etl", batch, outcome(batch, "SUCCESS", 1L, List.of()), "SUCCESS"));
+                "demo_etl", batch, outcome(batch, "SUCCESS", 1L, List.of()), "SUCCESS", false));
     }
 }

@@ -772,9 +772,11 @@ Enrich → Publish — each with a status word and finding count, each click ope
   `GET /provenance/batches` carries a per-batch `simulated` (`bool_or` over the batch's rows), so the
   picker labels a dry-run entry *“· dry run”* before its counts are fetched; the inspector strip adds
   *“dry run — nothing landed”*; the canvas edge keeps its *“(simulated)”* label and is now **dashed**,
-  as in the Catalog Sankey. ⚠ Only the job/graph lane records a dry run's provenance — a flat-lane
-  `?dryRun=true` run still writes no row, so there is nothing to mark (half a, an open decision in
-  [pipeline execution](../../capabilities/pipeline-execution/pipeline-execution.md)).
+  as in the Catalog Sankey. Both lanes now record a dry run's provenance: since half a (operator
+  decision 2026-09-23) a flat-lane `?dryRun=true` run writes one `parse`/`sink` record flagged
+  `simulated` — its only write — so it appears in the picker marked. ⚠ Its counts are **zero** (the
+  flat-lane dry run skips parsing whole), so the overlay shows *that* it ran, not what it would have
+  moved ([pipeline execution](../../capabilities/pipeline-execution/pipeline-execution.md) §3.11).
 - ⛔ **The go-live readiness gate is guided-only**: `validatePipeline` does not require a parse
   Step; a hand-built collect→sink graph is legitimate. ⚠ Every stage resolves through the served
   catalog — unresolved catalog reads as five empty stages.

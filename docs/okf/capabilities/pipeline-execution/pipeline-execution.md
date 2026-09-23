@@ -456,9 +456,10 @@ fires. A hanging Job is a recorded gap, and the watchdog that exists covers only
 
 `POST /runs/{name}/trigger?dryRun=true` runs an entire cycle — acquisition **and** the flat ingest lane —
 and **lands nothing**, for **every** pipeline, with no per-pipeline caveats: no partition outputs, no
-quarantine or backup moves, no manifest, no markers, no audit or commit-log rows, no provenance row, no
-fingerprint/watermark ledger entries, no unpack scratch. Every suppressed mutation is logged
-`dry run: would …`, so the log *is* the report of what a real run would have done.
+quarantine or backup moves, no manifest, no markers, no audit or commit-log rows (not even the commit
+log's header file), no fingerprint/watermark ledger entries, no unpack scratch. Every suppressed mutation
+is logged `dry run: would …`, so the log *is* the report of what a real run would have done. 🔴 **The ONE
+durable write a dry run makes is a provenance record flagged `simulated`** (metadata only, below).
 
 **Two flags, deliberately distinct.** `?skipPostAction=true` means *acquisition fetches but never acks the
 remote original — the ingest write still happens for real*. `?dryRun=true` means *nothing happens*.
@@ -514,16 +515,22 @@ same discipline silently breaks it — when reviewing changes that touch acquisi
 for `DatasetWriteSignal.emit`, new `CollectorConnector.post` implementors, and new writers inside
 `strategy.ingest`.
 
-⚠ **Known residual — `DRYRUN-INVISIBLE-ON-FLAT-LANE-1` (BACKLOG §3).** Skipping the pass whole also
-skips `recordProvenance`, so a flat-lane dry run writes **no provenance row at all**, while the
-job/graph lane still records one marked `simulated`. Gate 4’s `simulated BOOLEAN` column and the
-Lineage/Sankey visibility it was built for are therefore reachable on one lane only — and not the one
-this feature shipped for. ✅ Half (b), the UI marking, **shipped 2026-09-23**: `GET /provenance/batches`
-carries a per-batch `simulated`, and the Pipeline editor's run overlay labels, dashes and annotates a
-dry-run batch ([pipeline editor](../../frontend/features/pipeline-editor.md)) — so a graph-lane dry run
-is no longer drawn as if real. ⛔ Do not read “a dry run is visible in the overlay” as true on the flat
-lane today: half (a) is still a decision (write one marked provenance row from the no-op, or retract
-the overlay promise for that lane).
+🔴 **The one deliberate exception: a flat-lane dry run records ONE provenance record, flagged
+`simulated` (`DRYRUN-INVISIBLE-ON-FLAT-LANE-1` a — operator decision 2026-09-23).** `ConsignmentIngestor`
+calls `recordProvenance(…, simulated = dryRun)` on both paths, so the no-op writes exactly the rows a real
+run writes — `parse` and `sink`, one per node, keyed by the batch id the marked `ConsignmentEvent`
+carries — through the same `ProvenanceStores` seam, marked the way the job/graph lane's
+`PipelineJobRunner` marks its own (`ProvenanceRow.simulated`). It is **metadata only and the only write**:
+no sink file, marker, status CSV, backup, quarantine — and no commit log (its constructor wrote the CSV
+header, so `CollectorProcessor.ingest` now passes it no commit-log path on a dry run). ⚠ **The counts are
+zeros, truthfully**: the strategy was skipped whole, so nothing was parsed and nothing landed — the row
+makes the dry run *visible*, it does not estimate it. With provenance disabled (no store registered, the
+`-Dprovenance.backend` default) nothing is written at all, the same as a real run. Half (b), the UI
+marking, shipped 2026-09-23 (`e02eeab2`): `GET /provenance/batches` carries a per-batch `simulated`, and
+the Pipeline editor's run overlay labels, dashes and annotates a dry-run batch
+([pipeline editor](../../frontend/features/pipeline-editor.md)) — so a dry run is now visible **and**
+marked on both lanes. Pinned by `FlatLaneDryRunTest` (a filesystem diff of the whole pipeline tree plus
+the store's `batches()` read, and its real-run control).
 
 **References.** Provenance: the archived plan
 [`archived-documents/plans-archive/pipeline-dryrun-design.md`](../../../archived-documents/plans-archive/pipeline-dryrun-design.md).
@@ -613,6 +620,7 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 | 2026-09-20 (**`PIPELINE-DRYRUN-1`**) | **A dry run skips `strategy.ingest` WHOLE rather than substituting its ~20 durable sites** — per-sink gating is the shape that misses one; skipping is true by construction. ⚖ Accepted cost: a dry run answers *what would this cycle touch*, **not** *would these files parse* (§3.11) | engineering |
 | 2026-09-20 (**`PIPELINE-DRYRUN-1`**) | **`?dryRun=true` IMPLIES `?skipPostAction=true`**, OR-ed in at two levels — a dry run that acked and deleted the customer remote file is the worst failure the feature can have, and must not depend on a caller remembering | engineering |
 | 2026-09-20 (**`PIPELINE-DRYRUN-1`**) | **The dry run PUBLISHES a MARKED `ConsignmentEvent`**, which narrowly overturns *cron/event/signal fires are always real* — safe only because there is exactly ONE fan-out, so the consumer set is closed and each was made to honour or refuse loudly (§3.11) | engineering |
+| 2026-09-23 (**`DRYRUN-INVISIBLE-ON-FLAT-LANE-1` a**) | **A flat-lane dry run writes ONE provenance record flagged `simulated`** — a deliberate exception to *skip the pass whole*, metadata only and the ONLY write a dry run makes (counts are the truthful zeros of a skipped pass), so the overlay promise holds on the lane the feature shipped for rather than being retracted (§3.11) | operator |
 
 ## 5. Not built
 

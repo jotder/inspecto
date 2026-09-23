@@ -72,9 +72,12 @@ public final class ConsignmentIngestor {
      * construction: <b>no write can be missed if no writer runs.</b> The cost — a dry run does not
      * re-validate parsing — is stated in the plan's as-built and is deliberate.
      *
-     * <p>The tail below (park / commit / audit / provenance / retry bookkeeping) is then gated site by site
+     * <p>The tail below (park / commit / audit / retry bookkeeping) is then gated site by site
      * so the log still reads as "what would have happened", and {@link ConsignmentAuditWriter#setDryRun}
-     * marks the published {@link ConsignmentEvent} so the chained Job inherits the flag.
+     * marks the published {@link ConsignmentEvent} so the chained Job inherits the flag. 🔴 <b>The one
+     * exception is provenance</b> (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 a, operator 2026-09-23): a dry run records
+     * its {@code parse}/{@code sink} rows marked {@code simulated} — metadata only, the ONLY durable write it
+     * makes — so it is visible in the editor's run overlay.
      */
     public static void process(Consignment batch, PipelineConfig cfg, ConsignmentAuditWriter audit,
                                String runId, boolean dryRun) {
@@ -110,8 +113,6 @@ public final class ConsignmentIngestor {
             log.info("dry run: would commit consignment {} — DuckLake register, manifest, §11.3 output "
                             + "registration, backup moves, markers, the fingerprint ledger and any DB-export "
                             + "watermark all skipped (run {})", batch.batchId(), runId);
-            log.info("dry run: would record provenance for consignment {} (parse/sink row counts)",
-                    batch.batchId());
             log.info("dry run: would clear the COMMIT-retry record for consignment {}", batch.batchId());
         } else if ("SUCCESS".equals(status)) {
             // Phase 4 S4b: the graph lane parked one or more disabled branch sinks — the batch is
@@ -147,8 +148,13 @@ public final class ConsignmentIngestor {
         } catch (Exception e) {
             log.error("Consignment {} failed during audit", batch.batchId(), e);
         }
+        // DRYRUN-INVISIBLE-ON-FLAT-LANE-1 (a), operator decision 2026-09-23: the ONE durable write a flat-lane
+        // dry run makes — the same parse/sink rows a real run records, marked simulated (as the graph lane's
+        // PipelineJobRunner marks its own), so the run picker and overlay show the dry run. The strategy was
+        // skipped whole, so the counts are the dry run's truthful zeros: nothing was parsed, nothing landed.
+        // A deliberate exception to "skip the pass whole" — metadata only, and a no-op when provenance is off.
+        recordProvenance(cfg.identity().pipelineName(), batch, outcome, status, dryRun);
         if (!dryRun) {
-            recordProvenance(cfg.identity().pipelineName(), batch, outcome, status);
             // X1: a FAILED Consignment's files stay in the inbox and re-encounter next cycle — that retry is
             // now BOUNDED (attempt record, backoff, exhaustion → quarantine + CRITICAL Signal). A committed
             // or parked one has spent its record. After the audit, so the attempt is on the record first.
@@ -165,17 +171,19 @@ public final class ConsignmentIngestor {
      * the editor's per-edge weights work for ingest pipelines too. Node ids match the editable lift
      * ({@code parse}/{@code sink}); a row's {@code (nodeId, rel)} paints the node's outgoing
      * {@code data} edge. Default-off (no store registered ⇒ a map lookup) and best-effort like every
-     * registry on this path. SUCCESS only — a failed batch wrote nothing durable to count.
+     * registry on this path. SUCCESS only — a failed batch wrote nothing durable to count. {@code simulated}
+     * marks a dry run's rows ({@link com.gamma.pipeline.exec.ProvenanceRow#simulated()}), exactly as the graph lane marks its own.
      */
-    static void recordProvenance(String pipeline, Consignment batch, IngestOutcome outcome, String status) {
+    static void recordProvenance(String pipeline, Consignment batch, IngestOutcome outcome, String status,
+                                 boolean simulated) {
         if (!"SUCCESS".equals(status) || com.gamma.pipeline.exec.ProvenanceStores.shared() == null) return;
         String ts = java.time.Instant.now().toString();
         long written = outcome.lineage().stream().mapToLong(LineageRow::rowCount).sum();
         com.gamma.pipeline.exec.ProvenanceStores.record(List.of(
                 new com.gamma.pipeline.exec.ProvenanceRow(
-                        pipeline, batch.batchId(), "parse", "data", outcome.totalInputRows(), ts),
+                        pipeline, batch.batchId(), "parse", "data", outcome.totalInputRows(), ts, simulated),
                 new com.gamma.pipeline.exec.ProvenanceRow(
-                        pipeline, batch.batchId(), "sink", "data", written, ts)));
+                        pipeline, batch.batchId(), "sink", "data", written, ts, simulated)));
     }
 
     // ── commit: register, manifest, markers, backup ────────────────────────────

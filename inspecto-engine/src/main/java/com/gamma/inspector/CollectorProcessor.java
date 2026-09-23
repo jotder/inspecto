@@ -206,7 +206,9 @@ public class CollectorProcessor {
         // ── process batches in parallel ────────────────────────────────────────
         ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath(),
-                cfg.dirs().commitLogPath());
+                // DRYRUN-INVISIBLE-ON-FLAT-LANE-1 (a): CommitLog's CONSTRUCTOR writes the CSV header, so a dry
+                // run gets no commit log at all — its one durable write is the simulated provenance row.
+                dryRun ? null : cfg.dirs().commitLogPath());
         if (onCommit != null) audit.setCommitListener(onCommit);
         // One guard covers all four of this writer's durable writes (the three audit CSVs + the commit
         // log) and marks the event it publishes, so the chained Job inherits the flag.
