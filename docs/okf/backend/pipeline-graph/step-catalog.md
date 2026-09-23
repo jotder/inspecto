@@ -452,6 +452,19 @@ enrichment node silently skipped by the dry run, and edition gating that differs
 Questionably delivered: `schema.drift`, circuit breaker/throttle, `constraint.check`/`alert.dispatch`/
 `sink.quarantine`, `sink.archive`, `db.jdbc`.
 
+✅ **Gap G7 (at-rest real-path tests) closed 2026-09-23.** `PipelineJobRunnerTest` now runs a flat file's
+`profile` step, its `lookup` step and a `webhook:` branch end to end through the job lane and asserts
+the written output: the profile's statistics row, the transcoded column with its `default`, and the
+POSTed batches with their `Idempotency-Key`. A rejected POST fails the branch and leaves the source
+unfinalised, and a re-run of the same batch re-sends under the same keys. `NodeConfigNameContractTest`
+now holds the profile round trip that `BuiltinNodeType.FlatHome` names as its guard, covering both a
+named column subset and the empty "profile every column" list. How the webhook tests reach a transport: a
+capturing `WebhookSinkTransport` is discovered through the real `ServiceLoader` lookup, from a scratch
+class loader set as the thread's context loader for one run. It is never registered in the engine's
+test resources, because `WebhookSinkTest.theEngineBundlesNoTransport` pins that the engine ships none.
+Profile `min_value`/`max_value` are aggregated in the column's own type and only then cast to VARCHAR,
+so a numeric column reports a numeric min/max (20 before 150), not a text one.
+
 
 ## Collectors & Ingestion (`ACQ`) — 4<!--count:processors-acq-delivered--> delivered · 5<!--count:processors-acq-partial--> partial · 11<!--count:processors-acq-planned--> planned
 

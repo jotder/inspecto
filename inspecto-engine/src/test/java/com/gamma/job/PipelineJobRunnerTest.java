@@ -1041,6 +1041,254 @@ class PipelineJobRunnerTest {
         assertTrue(e.getMessage().contains("nowhere"), e.getMessage());
     }
 
+    // ── PROCESSOR-RELEASE-READINESS-1 G7: at-rest real-path runs of Steps that were unit-tested only ──
+
+    /**
+     * A stored {@code kind: profile} step executes at rest: the written store holds ONE row per profiled
+     * column with the declared statistics — not the landed rows. {@code columns} names a subset, so the
+     * unrequested {@code id} column must not appear.
+     */
+    @Test
+    void runsAFlatConfigsProfileStepAndWritesOneStatisticsRowPerColumn() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("prof_pipeline.toon");
+        Files.writeString(flat, """
+                name: prof_etl
+                active: false
+                output_store: profiled
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - profile:
+                      columns[1]: amt
+                """);
+        seedParquet(dataDir, "prof_etl", "(1,150),(2,NULL),(3,150),(4,20)");
+
+        JobConfig cfg = new JobConfig("profiler", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        // 4 rows, 1 NULL, 2 distinct non-null values. min/max are aggregated in the column's OWN type and only
+        // then cast to VARCHAR (one output column holds every profiled column's values) — so 20 < 150 here,
+        // where a text comparison would have put '150' first.
+        assertEquals(List.of("amt|4|1|2|20|150"), queryStore(dataDir, "profiled",
+                "SELECT column_name, row_count, null_count, distinct_count, min_value, max_value FROM %s"),
+                "the store must hold the profile of amt, one row, not the landed rows");
+    }
+
+    /**
+     * A stored {@code kind: lookup} step executes at rest: {@code target} adds a transcoded column beside
+     * the source one, a mapped value takes its label, and an unmatched value takes {@code default}.
+     */
+    @Test
+    void runsAFlatConfigsLookupStepAndWritesTheTranscodedColumn() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = tmp.resolve("lk_pipeline.toon");
+        Files.writeString(flat, """
+                name: lk_etl
+                active: false
+                output_store: banded
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - lookup:
+                      column: amt
+                      target: band
+                      mappings[2]: "150=HIGH", "50=LOW"
+                      default: OTHER
+                """);
+        seedParquet(dataDir, "lk_etl", "(1,150),(2,50),(3,200)");
+
+        JobConfig cfg = new JobConfig("looker", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of(1, 2, 3), readIds(dataDir, "banded"), "a lookup changes values, never row counts");
+        assertEquals(List.of("150", "50", "200"), readColumn(dataDir, "banded", "amt"),
+                "with a target the source column is left as it was");
+        assertEquals(List.of("HIGH", "LOW", "OTHER"), readColumn(dataDir, "banded", "band"),
+                "mapped values take their label; the unmatched 200 takes the default");
+    }
+
+    /**
+     * A {@code webhook:} branch run end to end through the job lane: {@code PipelineLift.stageTwo} makes it a
+     * second branch beside {@code output_store:}, {@code PartitionSinkWriter} dispatches it to
+     * {@code WebhookSink}, and the edition's transport — here a capturing one, discovered through the real
+     * {@code ServiceLoader} lookup — receives {@code batch_size}-row POSTs keyed {@code <batch>:<sink>:<n>}.
+     */
+    @Test
+    void aWebhookBranchPostsTheLandedRowsInBatchesBesideThePersistentStore() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = writeWebhookPipeline("wh_etl", "sent");
+        seedParquet(dataDir, "wh_etl", "(1,150),(2,50),(3,200)");
+
+        JobConfig cfg = new JobConfig("hooker", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir, "batch_id", "wh-b1"));
+        JobResult res = withCapturingWebhookTransport(() ->
+                new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run());
+
+        assertTrue(res.success(), res.message());
+        List<CapturingWebhookTransport.Post> posts = CapturingWebhookTransport.POSTS;
+        assertEquals(2, posts.size(), "3 rows at batch_size 2 ⇒ 2 + 1");
+        assertEquals(java.net.URI.create("https://hooks.example.test:8443/ingest/orders"), posts.get(0).url());
+        assertEquals(List.of("wh-b1:webhook:1", "wh-b1:webhook:2"),
+                posts.stream().map(p -> p.headers().get(com.gamma.pipeline.exec.WebhookSink.IDEMPOTENCY_HEADER))
+                        .toList(), "the key is <consignment>:<sink>:<batch>, the consignment being the job's batch id");
+        List<Integer> sentIds = new ArrayList<>();
+        for (CapturingWebhookTransport.Post p : posts) {
+            Map<?, ?> body = WEBHOOK_JSON.readValue(p.body(), Map.class);
+            assertEquals("wh-b1", body.get("consignment"));
+            assertEquals(2, body.get("batches"));
+            for (Object row : (List<?>) body.get("rows")) sentIds.add(((Number) ((Map<?, ?>) row).get("id")).intValue());
+        }
+        sentIds.sort(null);
+        assertEquals(List.of(1, 2, 3), sentIds, "every landed row is POSTed exactly once");
+        assertEquals(List.of(1, 2, 3), readIds(dataDir, "sent"), "the output_store: branch still rests its rows");
+
+        var branches = new com.gamma.pipeline.exec.BranchCommitLog(branchLog(auditDir, "wh_etl", "wh-b1"));
+        assertEquals(java.util.Set.of("sink", "webhook"), branches.committedBranches("wh-b1"));
+        assertTrue(branches.isSourceFinalized("wh-b1"));
+    }
+
+    /**
+     * A rejected POST fails the webhook BRANCH, so the run fails and the source is NOT finalised — the
+     * delivery posture of the persistent sink, not a logged-past warning. A re-run of the same batch then
+     * re-sends under the SAME idempotency keys and finalises.
+     */
+    @Test
+    void aRejectedWebhookBatchFailsTheBranchAndLeavesTheSourceUnfinalised() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path flat = writeWebhookPipeline("whf_etl", "sent_f");
+        seedParquet(dataDir, "whf_etl", "(1,150),(2,50),(3,200)");
+        JobConfig cfg = new JobConfig("hookfail", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir, "batch_id", "wh-b2"));
+
+        CapturingWebhookTransport.reject = true;
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> withCapturingWebhookTransport(() ->
+                new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run()));
+        assertTrue(e.getMessage().contains("batch 1/2") && e.getMessage().contains("was not accepted"),
+                e.getMessage());
+        assertEquals(1, CapturingWebhookTransport.POSTS.size(), "batch 2 is never attempted once batch 1 failed");
+
+        var branches = new com.gamma.pipeline.exec.BranchCommitLog(branchLog(auditDir, "whf_etl", "wh-b2"));
+        assertFalse(branches.committedBranches("wh-b2").contains("webhook"), "the webhook branch is not committed");
+        assertFalse(branches.isSourceFinalized("wh-b2"), "a failed branch must leave the source unfinalised");
+
+        // the receiver recovers: the same batch re-sends under the same keys and now finalises
+        CapturingWebhookTransport.reject = false;
+        JobResult res = withCapturingWebhookTransport(() ->
+                new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run());
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("wh-b2:webhook:1", "wh-b2:webhook:2"),
+                CapturingWebhookTransport.POSTS.stream()
+                        .map(p -> p.headers().get(com.gamma.pipeline.exec.WebhookSink.IDEMPOTENCY_HEADER)).toList());
+        assertTrue(branches.isSourceFinalized("wh-b2"));
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper WEBHOOK_JSON =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * The webhook transport the job lane discovers. ⛔ It is registered through a SCRATCH class loader set as
+     * the thread's context loader for one run — never through {@code src/test/resources/META-INF/services}:
+     * {@code WebhookSinkTest.theEngineBundlesNoTransport} pins that the engine's classpath carries none.
+     * Must be public with a public no-arg constructor: {@code ServiceLoader} instantiates it.
+     */
+    public static final class CapturingWebhookTransport implements com.gamma.pipeline.exec.WebhookSinkTransport {
+        record Post(java.net.URI url, String body, Map<String, String> headers) {}
+        static final List<Post> POSTS = new CopyOnWriteArrayList<>();
+        static volatile boolean reject;
+
+        public CapturingWebhookTransport() {}
+
+        @Override public void post(java.net.URI url, String bearerToken, java.time.Duration timeout, String jsonBody,
+                                   Map<String, String> headers) {
+            POSTS.add(new Post(url, jsonBody, headers));
+            if (reject) throw new IllegalStateException("webhook returned HTTP 503");
+        }
+    }
+
+    /** Run {@code body} with {@link CapturingWebhookTransport} discoverable and the {@code hook} Connection registered. */
+    private <T> T withCapturingWebhookTransport(java.util.concurrent.Callable<T> body) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("wh-spi"));
+        Path svc = root.resolve("META-INF/services/" + com.gamma.pipeline.exec.WebhookSinkTransport.class.getName());
+        Files.createDirectories(svc.getParent());
+        Files.writeString(svc, CapturingWebhookTransport.class.getName() + "\n");
+        CapturingWebhookTransport.POSTS.clear();
+        com.gamma.acquire.ConnectionRegistry.register(new com.gamma.acquire.ConnectionProfile("hook", "https",
+                "hooks.example.test", 8443, null, "ingest/orders", null, null, Map.of(), null, null));
+        Thread t = Thread.currentThread();
+        ClassLoader prev = t.getContextClassLoader();
+        try (java.net.URLClassLoader spi = new java.net.URLClassLoader(new java.net.URL[]{root.toUri().toURL()}, prev)) {
+            t.setContextClassLoader(spi);
+            return body.call();
+        } finally {
+            t.setContextClassLoader(prev);
+            com.gamma.acquire.ConnectionRegistry.remove("hook");
+        }
+    }
+
+    @AfterEach
+    void resetWebhookTransport() {
+        CapturingWebhookTransport.reject = false;
+        CapturingWebhookTransport.POSTS.clear();
+    }
+
+    /** A webhook-only Stage-2 file: no steps, {@code output_store:} plus a {@code webhook:} at batch_size 2. */
+    private Path writeWebhookPipeline(String name, String store) throws Exception {
+        Path flat = tmp.resolve(name + "_pipeline.toon");
+        Files.writeString(flat, """
+                name: %s
+                active: false
+                output_store: %s
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                webhook:
+                  connection: hook
+                  batch_size: 2
+                """.formatted(name, store));
+        return flat;
+    }
+
+    /** The job lane's branch-commit log for {@code batchId} — the at-rest graph is named {@code <name>_stage2}. */
+    private static String branchLog(String auditDir, String name, String batchId) {
+        return Path.of(auditDir).resolve(name + "_stage2_branch_commit_" + batchId + ".csv").toString();
+    }
+
+    /** Rows of {@code selectFmt} (its {@code %s} = the store's Parquet reader), each row's values joined by {@code |}. */
+    private static List<String> queryStore(String dataDir, String store, String selectFmt) throws Exception {
+        String glob = dataDir.replace("\\", "/") + "/" + store + "/**/*.parquet";
+        File db = DuckDbUtil.tempDbFile("qs_");
+        try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery(selectFmt.formatted(SqlViews.reader("PARQUET", glob, true)))) {
+            List<String> out = new ArrayList<>();
+            int n = rs.getMetaData().getColumnCount();
+            while (rs.next()) {
+                List<String> vals = new ArrayList<>();
+                for (int i = 1; i <= n; i++) vals.add(rs.getString(i));
+                out.add(String.join("|", vals));
+            }
+            return out;
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     @Test
     void aJobCarryingBothGraphSourcesRefuses() throws Exception {
         String dataDir = tmp.resolve("data").toString();

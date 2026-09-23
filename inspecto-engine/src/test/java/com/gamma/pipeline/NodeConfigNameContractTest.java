@@ -459,6 +459,59 @@ class NodeConfigNameContractTest {
                 NodeAttributes.forType("sink.webhook").stream().map(NodeAttribute::key).toList());
     }
 
+    /**
+     * The profile node's contract — the round trip {@code BuiltinNodeType.FlatHome} names as the ONE guard on
+     * a declared home, and that {@code NodeAttributes.TRANSFORM_PROFILE} claimed as proof before it existed
+     * (PROCESSOR-RELEASE-READINESS-1 G7). Full real path: lift → edit → strict lower → {@code ConfigCodec.toToon}
+     * → {@code PipelineConfig.load}. Both spellings of {@code columns} must survive: a named subset, and the
+     * EMPTY list — the authored instruction "profile every column", which a lower that dropped empty values
+     * would turn into "no profile at all".
+     */
+    @Test
+    void profileAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        PipelineConfig.Profile named = profileSavedAs(dir, List.of("ID", "EVENT_DATE"));
+        assertNotNull(named, "the profile node did not survive a save to the flat config");
+        assertEquals(List.of("ID", "EVENT_DATE"), named.columns(),
+                "a profile edit typed in the editor must reach the engine");
+
+        PipelineConfig.Profile every = profileSavedAs(dir, List.of());
+        assertNotNull(every, "an EMPTY columns list (profile every column) was lowered as no profile at all");
+        assertEquals(List.of(), every.columns());
+
+        assertEquals(List.of("columns"),
+                NodeAttributes.forType("transform.profile").stream().map(NodeAttribute::key).toList(),
+                "the declared table is exactly the key this round trip proves");
+    }
+
+    /** Lift a fixture carrying {@code processing.profile}, set the node's {@code columns}, save, re-read. */
+    private static PipelineConfig.Profile profileSavedAs(Path dir, List<String> columns) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.put("profile", new LinkedHashMap<>(Map.of("columns", List.of("ID"))));
+        Path withProfile = dir.resolve("profile_pipeline.toon");
+        Files.writeString(withProfile, ConfigCodec.toToon(raw));
+        raw = decode(withProfile);
+        PipelineGraph g = liftEditable(withProfile);
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.profile".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            c.put("columns", columns);
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> "transform.profile".equals(n.type())).count(),
+                "the lift presents processing.profile as ONE transform.profile node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, true);
+
+        Path saved = dir.resolve("saved_pipeline.toon");
+        Files.writeString(saved, ConfigCodec.toToon(lowered));
+        return PipelineConfig.load(saved.toString()).profile();
+    }
+
     // ── the editor's real save path ────────────────────────────────────────────────
 
     /** Lift the fixture, set {@code cfgPath} on the {@code nodeType} node, lower, re-read as the engine does. */
