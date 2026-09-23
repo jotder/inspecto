@@ -1794,6 +1794,15 @@ public final class PipelineConfig {
     }
 
     /**
+     * {@link #fromMap(Map)} with relative schema references resolved against {@code configDir}, exactly as
+     * {@link #loadForValidation} resolves them for a file in that directory — for a caller holding a
+     * decoded config that is not (or no longer) the file on disk, e.g. a diff's pre-change content.
+     */
+    public static PipelineConfig fromMap(Map<String, Object> raw, java.nio.file.Path configDir) throws IOException {
+        return PipelineConfigParser.parse(raw, "<config>", configDir);
+    }
+
+    /**
      * Create the run's status directory — the single filesystem side-effect formerly performed
      * inline during {@code load}. A no-op when status is disabled or a literal {@code status_file}
      * was configured. Idempotent and safe to call more than once.

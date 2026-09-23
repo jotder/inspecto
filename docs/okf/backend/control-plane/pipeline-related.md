@@ -106,12 +106,61 @@ Propagation is breadth-first, so a chain is the shortest one, e.g.
 - **Uncertain, never resolved:** a Pipeline that does not load; a `collector.dataset` that is not a bare
   Dataset id (templated `${…}` or path-shaped `datasets/x`); a deleted Pipeline with no pre-change content
   (id taken from the file name).
-- **Entry point:** `AffectedPipelines.main <configRoot> <baseRev> [--fail-on-affected]` diffs `baseRev`
-  against the working tree with `git diff --name-status --no-renames` (a rename is a delete + an add) and
-  reads pre-change content with `git show`. Exit 1 only when asked and something is affected or uncertain.
-- ⛔ **Deferred:** the contract verdicts (breaking / possibly breaking / revalidate, by reader) — the
-  larger half of the row; non-Pipeline dependents (enrichment, job, Expectation, Widget) in the output;
-  enrichment `references.<n>.ref` and job `on_pipeline` as Pipeline-to-Pipeline edges; a CI wiring.
+- **Entry point:** `AffectedPipelines.main <configRoot> <baseRev> [--fail-on-affected] [--fail-on-breaking]`
+  diffs `baseRev` against the working tree with `git diff --name-status --no-renames` (a rename is a delete
+  + an add) and reads pre-change content with `git show`. Exit 1 only when asked: `--fail-on-affected` when
+  something is affected or uncertain, `--fail-on-breaking` when any verdict is BREAKING.
+- **`collector.dataset: datasets/<id>`** is the Dataset link, not uncertain: the check reads the parsed
+  `PipelineConfig.collector().dataset()`, which the parser has already stripped of that prefix
+  (`AffectedPipelinesTest.aDatasetsPrefixedReferenceIsTheDatasetLinkNotUncertain`).
+
+### Contract verdicts — judged by the reader (second slice, 2026-09-24)
+
+`com.gamma.service.ContractVerdicts` adds `Report.verdicts()`, rendered in the CLI output as one line per verdict prefixed by its tier.
+**Four tiers, never collapsed** — the middle two are the reason the check exists:
+
+| Tier | When |
+|---|---|
+| **BREAKING** | a removed or **retyped** column that a reader in config reads; every reader of a **deleted producer** or a **deleted Dataset** |
+| **POSSIBLY_BREAKING** | a removed or retyped column that **no reader in config reads** — never "compatible", because a reader outside config (a query, a BI tool, an export) may |
+| **REVALIDATE** | the producer's output or a reader's column use **cannot be determined** — a transform step, free SQL, a non-parquet consumer — and everything downstream of a reader that broke or cannot be judged |
+| **ADDITIVE** | a new column: stated explicitly, because it is not a contract break, not because it was left out |
+
+**Which Pipelines are judged.** Only a *directly* changed one (chain `file → pipeline`). Its output columns
+before and after are `TypeFlow.sinkColumns` — DuckDB `DESCRIBE` over the SELECT the engine runs, the
+written table's shape — so types are DuckDB's own, and names compare case-insensitively. The pre-change
+side is rebuilt, not assumed: a changed `*_pipeline.toon` is re-parsed from its `git show` content with
+`PipelineConfig.fromMap(raw, configDir)` (so a `threads:` edit has no verdict), and a changed schema file is
+substituted with its pre-change content — **only when it is the Pipeline's whole single schema** (equal
+to `schemas().single()`). A changed grammar, sibling structure/mapping file, a multi-schema Pipeline, a
+schema that does not compile, or a Pipeline that no longer loads cannot be diffed ⇒ its readers are
+REVALIDATE with that reason. A newly added Pipeline has no prior contract and gets no verdict.
+
+**Only `filter` / `dedup` / `lookup` steps keep the output known** (`lookup` adds its `target`) — the rule
+`ConfigRoutes.walkSteps` applies at save. Any other step (`sql`, `join`, `summarize`, `profile`, `route`)
+means there is no column lineage through it ⇒ REVALIDATE, not a guess.
+
+**Readers, and how their column use is known** (no SQL is parsed anywhere):
+
+| Reader (of a Dataset the producer feeds) | Column use | Undeterminable ⇒ REVALIDATE |
+|---|---|---|
+| consumer Pipeline (`collector.dataset`) | parquet frontend: `raw.fields[].selector` IS the parquet column name (`DuckDbCsvIngester.buildParquetReadSpec`) | any other frontend, a multi-schema consumer, one that does not load |
+| the Dataset itself | declared `columns[].name` (none declared = reads nothing by name) | it has `calculated` columns (free SQL) |
+| Widget (`datasetId`) | every `controls.*.field` | a `queryId` (saved query, free SQL), or no `controls` at all (shows the columns wholesale) |
+
+**Downstream.** A consumer that BREAKS, or cannot be judged, taints its own Datasets: every reader past it
+is REVALIDATE (*"column lineage past a consuming Pipeline is not traced"*). A consumer that provably reads
+none of the changed columns taints nothing.
+
+**Dataset definitions.** A deleted `registry/datasets/<id>.toon` is BREAKING for its consumers and Widgets;
+a modified one is REVALIDATE for them only when `physicalRef`, `sourceName`, `columns` or `calculated`
+changed (a description or tag edit has no verdict).
+
+- ⛔ **Deferred:** CI wiring (the entry point and exit flags exist; no pipeline runs them); Measures in
+  materialize / report jobs, saved queries, Expectations and Alert Rules as readers (a saved-query Widget
+  is REVALIDATE today); column lineage *through* a consumer (its downstream is REVALIDATE, never judged
+  column by column); diffing a multi-schema or plugin producer; non-Pipeline dependents in the affected
+  list; enrichment `references.<n>.ref` and job `on_pipeline` as Pipeline-to-Pipeline edges.
 
 ## Related
 

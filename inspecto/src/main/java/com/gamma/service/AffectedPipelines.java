@@ -43,7 +43,11 @@ import java.util.stream.Stream;
  * {@code collector.dataset} that is not a bare Dataset id (templated or path-shaped), or a deleted Pipeline
  * whose pre-change content is unavailable is listed as <b>UNCERTAIN</b>, never resolved.
  *
- * <p>⚠ Contract verdicts (breaking / possibly breaking / revalidate) are NOT in this slice.
+ * <p><b>Contract verdicts</b> ({@link Verdict}, computed by {@link ContractVerdicts}) judge each directly
+ * changed Pipeline's output columns against the readers config names, in exactly four tiers that are never
+ * collapsed: {@link Tier#BREAKING}, {@link Tier#POSSIBLY_BREAKING} (nobody in config reads it — never
+ * "compatible"), {@link Tier#REVALIDATE} (column use or output undeterminable — downstream of a transform) and
+ * {@link Tier#ADDITIVE} (a new column, not a contract break).
  */
 public final class AffectedPipelines {
 
@@ -80,7 +84,25 @@ public final class AffectedPipelines {
     public record Ignored(String file, String reason) {
     }
 
-    public record Report(List<Hit> affected, List<Uncertain> uncertain, List<Ignored> ignored) {
+    /** Contract verdict tiers — four, deliberately; the middle two are the honesty of the check. */
+    public enum Tier { BREAKING, POSSIBLY_BREAKING, REVALIDATE, ADDITIVE }
+
+    /**
+     * One contract verdict.
+     *
+     * @param subject what changed ({@code pipeline:<id>} for a producer, {@code dataset:<id>} for a Dataset definition)
+     * @param column  the column concerned (lower-cased), or {@code null} for a whole-subject verdict
+     * @param reader  who is judged ({@code pipeline:…} / {@code dataset:…} / {@code widget:…}), or {@code null}
+     *                when the verdict is about the column itself (possibly breaking, additive)
+     */
+    public record Verdict(Tier tier, String subject, String column, String reader, String reason) {
+    }
+
+    public record Report(List<Hit> affected, List<Uncertain> uncertain, List<Ignored> ignored,
+                         List<Verdict> verdicts) {
+        public boolean breaking() {
+            return verdicts.stream().anyMatch(v -> v.tier() == Tier.BREAKING);
+        }
     }
 
     /** Analyse {@code changes} against the config tree as it stands under {@code writeRoot} (the post-change state). */
@@ -121,6 +143,7 @@ public final class AffectedPipelines {
         Map<String, Hit> hits = new LinkedHashMap<>();
         Deque<Hit> queue = new ArrayDeque<>();
         List<Ignored> ignored = new ArrayList<>();
+        List<Change> real = new ArrayList<>();
 
         for (Change ch : changes) {
             String rel = rel(root, ch.file());
@@ -129,6 +152,7 @@ public final class AffectedPipelines {
                 ignored.add(new Ignored(rel, "decoded content unchanged (formatting only)"));
                 continue;
             }
+            real.add(ch);
             boolean reached = false;
 
             for (String id : readers.getOrDefault(ch.file(), List.of())) {
@@ -185,7 +209,8 @@ public final class AffectedPipelines {
             uncertain.add(new Uncertain("pipeline:" + f.name(),
                     "does not load, so what it reads is unknown: " + f.message()));
         }
-        return new Report(List.copyOf(hits.values()), List.copyOf(uncertain), List.copyOf(ignored));
+        List<Verdict> verdicts = ContractVerdicts.judge(root, registry, real, hits, consumers);
+        return new Report(List.copyOf(hits.values()), List.copyOf(uncertain), List.copyOf(ignored), verdicts);
     }
 
     private static boolean offer(Map<String, Hit> hits, Deque<Hit> queue, String id, List<String> via) {
@@ -248,19 +273,22 @@ public final class AffectedPipelines {
     }
 
     /**
-     * CI entry: {@code AffectedPipelines <configRoot> <baseRev> [--fail-on-affected]}. Diffs {@code baseRev}
+     * CI entry: {@code AffectedPipelines <configRoot> <baseRev> [--fail-on-affected] [--fail-on-breaking]}. Diffs {@code baseRev}
      * against the WORKING TREE (check out the change, pass its merge-base) under {@code configRoot}, reads
      * each modified/deleted file's pre-change content with {@code git show}, and prints {@link #render}.
-     * Exit 0; 1 when {@code --fail-on-affected} and something is affected or uncertain; 2 on a usage or git error.
+     * Exit 0; 1 when {@code --fail-on-affected} and something is affected or uncertain, or when
+     * {@code --fail-on-breaking} and any verdict is {@link Tier#BREAKING}; 2 on a usage or git error.
      */
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {
-            System.err.println("usage: AffectedPipelines <configRoot> <baseRev> [--fail-on-affected]");
+            System.err.println("usage: AffectedPipelines <configRoot> <baseRev> [--fail-on-affected] [--fail-on-breaking]");
             System.exit(2);
         }
         Path root = Path.of(args[0]).toAbsolutePath().normalize();
         String base = args[1];
-        boolean fail = args.length > 2 && "--fail-on-affected".equals(args[2]);
+        List<String> flags = List.of(args).subList(2, args.length);
+        boolean fail = flags.contains("--fail-on-affected");
+        boolean failBreaking = flags.contains("--fail-on-breaking");
         Path top = Path.of(git(root, "rev-parse", "--show-toplevel").trim());
         List<Change> changes = new ArrayList<>();
         for (String line : git(root, "diff", "--name-status", "--no-renames", base, "--", ".").split("\n")) {
@@ -276,7 +304,8 @@ public final class AffectedPipelines {
         }
         Report r = analyze(root, changes);
         System.out.print(render(r));
-        System.exit(fail && !(r.affected().isEmpty() && r.uncertain().isEmpty()) ? 1 : 0);
+        System.exit(fail && !(r.affected().isEmpty() && r.uncertain().isEmpty())
+                || failBreaking && r.breaking() ? 1 : 0);
     }
 
     private static String git(Path dir, String... args) throws IOException, InterruptedException {
@@ -298,6 +327,10 @@ public final class AffectedPipelines {
                 .append(String.join(" -> ", h.chain())).append('\n');
         for (Uncertain u : r.uncertain()) sb.append("UNCERTAIN ").append(u.subject()).append("  ")
                 .append(u.reason()).append('\n');
+        for (Verdict v : r.verdicts()) sb.append(String.format("%-17s", v.tier())).append(' ').append(v.subject())
+                .append(v.column() == null ? "" : "." + v.column())
+                .append(v.reader() == null ? "" : "  reader " + v.reader())
+                .append("  ").append(v.reason()).append('\n');
         for (Ignored i : r.ignored()) sb.append("IGNORED   ").append(i.file()).append("  ")
                 .append(i.reason()).append('\n');
         return sb.toString();

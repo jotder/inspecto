@@ -149,6 +149,20 @@ class AffectedPipelinesTest {
     }
 
     @Test
+    void aDatasetsPrefixedReferenceIsTheDatasetLinkNotUncertain(@TempDir Path root) throws Exception {
+        fixture(root);
+        pipeline(root, "pref", consumerOf("datasets/prod_ds"));   // the trigger-ref spelling the parser accepts
+        Path ds = root.resolve("registry/datasets/prod_ds.toon");
+        String before = Files.readString(ds);
+        Files.writeString(ds, before + "description: moved\n");
+
+        Report r = AffectedPipelines.analyze(root, List.of(new Change(ds, Status.MODIFIED, before)));
+
+        assertEquals(List.of("cons", "pref"), ids(r).stream().sorted().toList(), AffectedPipelines.render(r));
+        assertTrue(r.uncertain().isEmpty(), r.uncertain().toString());
+    }
+
+    @Test
     void aDeletedSchemaReachesThePipelineThatNoLongerLoads(@TempDir Path root) throws Exception {
         fixture(root);
         Path schema = root.resolve("other/other_schema.toon");
