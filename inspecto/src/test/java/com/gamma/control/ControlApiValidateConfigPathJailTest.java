@@ -102,6 +102,29 @@ class ControlApiValidateConfigPathJailTest {
         assertEquals(200, r.statusCode(), r.body());
     }
 
+    /**
+     * {@code VALIDATE-PREPARE-WRITES-STATUS-DIR-1}: CapabilityManifest exempts {@code /validate} as
+     * read-shaped ("writes nothing"). Until 2026-09-23 it ran {@code PipelineConfig.load}, whose
+     * {@code prepare()} CREATED the Pipeline's status directory. The whole tree under the root must be
+     * byte-for-byte the same listing before and after.
+     */
+    @Test
+    void validatingAConfigWhoseStatusDirDoesNotExistWritesNothing() throws Exception {
+        Path fresh = Files.createDirectories(cfg.resolve("fresh"));
+        Path toon = PipelineConfigBatchTest.writePipeline(fresh, "", false);
+        assertFalse(Files.exists(fresh.resolve("status")), "precondition: status dir absent");
+        List<String> before = tree(cfg);
+        HttpResponse<String> r = validate(toon.toString());
+        assertEquals(200, r.statusCode(), r.body());
+        assertEquals(before, tree(cfg), "POST /validate must not touch the filesystem");
+    }
+
+    private static List<String> tree(Path root) throws Exception {
+        try (var s = Files.walk(root)) {
+            return s.map(p -> root.relativize(p).toString().replace('\\', '/')).sorted().toList();
+        }
+    }
+
     @Test
     void aMissingFileInsideTheRootsIs404() throws Exception {
         HttpResponse<String> r = validate(cfg.resolve("nope.toon").toString());

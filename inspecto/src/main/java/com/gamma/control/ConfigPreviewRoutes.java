@@ -136,11 +136,13 @@ final class ConfigPreviewRoutes implements RouteModule {
             configPath = jailedConfigPath(api, configPath);
             PipelineConfig cfg;
             try {
-                cfg = PipelineConfig.load(configPath);
+                // loadForValidation, not load: this route is exempted as read-shaped ("writes nothing"),
+                // and load() creates the status directory (VALIDATE-PREPARE-WRITES-STATUS-DIR-1).
+                cfg = PipelineConfig.loadForValidation(configPath);
             } catch (IllegalArgumentException | IllegalStateException refused) {
                 // A config that does not load is the author's to fix, not a server fault: 422 with the
                 // loader's own message (file + line for a TOON decode refusal), never a bare 500.
-                // IllegalStateException is prepare()'s shape refusal (e.g. two sinks sharing one
+                // IllegalStateException is requireRunnable()'s shape refusal (e.g. two sinks sharing one
                 // DuckLake table, SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1) — the author's to fix too.
                 throw new ApiException(422, refused.getMessage());
             }

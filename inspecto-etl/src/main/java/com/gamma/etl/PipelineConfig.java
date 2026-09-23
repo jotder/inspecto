@@ -1758,13 +1758,25 @@ public final class PipelineConfig {
      * @throws IllegalArgumentException if any managed directory is nested inside the poll dir
      */
     public static PipelineConfig load(String configPath) throws IOException {
+        PipelineConfig cfg = loadForValidation(configPath);
+        cfg.createStatusDir();
+        return cfg;
+    }
+
+    /**
+     * {@link #load(String)} minus its one filesystem write: parses the file and runs every
+     * {@link #requireRunnable()} refusal, but never creates the status directory. For read-shaped callers
+     * ({@code POST /validate {configPath}}, {@code VALIDATE-PREPARE-WRITES-STATUS-DIR-1}) that must answer
+     * exactly what a registration would without touching the tree.
+     */
+    public static PipelineConfig loadForValidation(String configPath) throws IOException {
         // The config's own directory is the base for relative schema references (W1b): passing it needs no
         // caller change and no space-root threading, because a loaded config always HAS a directory.
         java.nio.file.Path file = java.nio.file.Paths.get(configPath);
         java.nio.file.Path here = file.toAbsolutePath().getParent();
         if (!Files.exists(file)) throw new java.io.FileNotFoundException("Toon file not found: " + configPath);
         PipelineConfig cfg = PipelineConfigParser.parse(PipelineConfigParser.readToon(file), configPath, here);
-        cfg.prepare();
+        cfg.requireRunnable();
         return cfg;
     }
 
@@ -1796,6 +1808,17 @@ public final class PipelineConfig {
      * its single version history is ill-defined across destinations — so that is refused here.
      */
     public void prepare() throws IOException {
+        requireRunnable();
+        createStatusDir();
+    }
+
+    /**
+     * The refusal half of {@link #prepare()}: every "this config cannot be armed" rule and NO filesystem
+     * access. {@link #loadForValidation(String)} runs only this half.
+     *
+     * @throws IllegalStateException naming the first rule the config breaks
+     */
+    public void requireRunnable() {
         if (sinks.size() > 1 && produces == Produces.REFERENCE && reference.load().versionedStore()) {
             throw new IllegalStateException(
                     "a versioned reference store (reference.load upsert/scd2) writes a single version history; "
@@ -1936,6 +1959,10 @@ public final class PipelineConfig {
                                 + "output_store, which cannot name N branches");
             }
         }
+    }
+
+    /** The side-effect half of {@link #prepare()}: create the status directory, if one is configured. */
+    private void createStatusDir() throws IOException {
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));
         }

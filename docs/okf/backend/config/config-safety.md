@@ -115,10 +115,22 @@ outside them, so a config with satellites was never loadable from outside them a
 ⚠ Open beside it: `POST /pipelines/authored/{id}/dry-run` and `POST /enrichment/preview` read a join step's
 caller-supplied `path:` data file with **no** jail and return its rows (or the resolved path in a 422) —
 deliberate for now per the `PipelineGraphRoutes.dryRunReferences` javadoc (data files live outside the write
-root), awaiting one operator decision for both (`PREVIEW-REFERENCE-PATH-UNJAILED-1`). And `/validate
-{configPath}` runs `PipelineConfig.prepare()`, which creates the Pipeline's status directory, so the
-`CapabilityManifest` "read-shaped, writes nothing" exemption is not strictly true
-(`VALIDATE-PREPARE-WRITES-STATUS-DIR-1`).
+root), awaiting one operator decision for both (`PREVIEW-REFERENCE-PATH-UNJAILED-1`).
+
+⚠ **`/validate {configPath}` writes nothing** (`VALIDATE-PREPARE-WRITES-STATUS-DIR-1`, reproduced and fixed
+2026-09-23). It used `PipelineConfig.load()`, whose `prepare()` CREATED the Pipeline's status directory, so
+the `CapabilityManifest` "read-shaped, writes nothing" exemption was false. `prepare()` is now two halves:
+`requireRunnable()` (every arming refusal, no filesystem access) and a private `createStatusDir()`.
+`PipelineConfig.loadForValidation()` = parse + `requireRunnable()` — same answer as a registration, no
+write; `load()` = `loadForValidation()` + `createStatusDir()`, so every real-run caller (`ConfigRegistry`,
+`CollectorService.registerPipeline`, the engine CLIs, `PipelineJobRunner`) creates the directory as before.
+Pinned over real HTTP by `ControlApiValidateConfigPathJailTest` (the listing of the whole root, before vs
+after). Audited siblings: `/validate`'s was the only read-shaped route calling `load()` — the graph lift,
+Pipeline list and bundle export read configs the registry already loaded (and whose directory registration
+already made), and the draft/preview paths use the pure `fromMap()`. Two non-route callers still use
+`load()` for a read and were left alone because a write follows anyway:
+`CollectorService.requireDistinctPipelineIds` (boot pre-check; the registry build right after runs `load()`
+on the same files) and `PipelineRenameRoutes` resume (a mutating route over an already-registered Pipeline).
 
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about

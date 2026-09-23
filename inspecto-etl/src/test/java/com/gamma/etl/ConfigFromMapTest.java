@@ -47,4 +47,19 @@ class ConfigFromMapTest {
         PipelineConfig.load(p.toString());
         assertTrue(Files.exists(dir.resolve("status")), "load (= fromMap + prepare) creates the status dir");
     }
+
+    /** VALIDATE-PREPARE-WRITES-STATUS-DIR-1: the read-shaped entry point writes nothing but still refuses. */
+    @Test
+    void loadForValidationCreatesNothingButStillRefusesAnUnrunnableShape(@TempDir Path dir) throws Exception {
+        Path p = PipelineConfigBatchTest.writePipeline(dir, "");
+        PipelineConfig.loadForValidation(p.toString());
+        assertFalse(Files.exists(dir.resolve("status")), "loadForValidation must NOT create the status dir");
+
+        // an ACTIVE summarize without output_store: is a requireRunnable() refusal — the same answer load() gives
+        Path bad = PipelineConfigBatchTest.writePipeline(dir, "  summarize:\n    group_by[1]: EVENT_DATE\n    measures[1]: count", true);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.loadForValidation(bad.toString()));
+        assertTrue(e.getMessage().contains("summarize"), e.getMessage());
+        assertFalse(Files.exists(dir.resolve("status")), "a refused config creates nothing either");
+    }
 }
