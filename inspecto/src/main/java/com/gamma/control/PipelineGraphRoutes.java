@@ -512,6 +512,8 @@ final class PipelineGraphRoutes implements RouteModule {
         try {
             return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body),
                     dryRunReferences(api));
+        } catch (ApiException e) {
+            throw e;
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (Exception e) {
@@ -743,19 +745,25 @@ final class PipelineGraphRoutes implements RouteModule {
      * reference store's current/as-of view cannot mean one thing in a preview and another in a real run.
      * The view is created on the throwaway dry-run connection and dies with it.
      *
-     * <p>⚠ <b>Deliberately NOT path-jailed</b>, against the backlog row's own stated constraint. A
-     * {@code path:} reference names a <em>data</em> file, which routinely lives outside the config write
-     * root, so jailing it there would refuse legitimate references — and it would buy nothing, because
-     * {@code POST /enrichment/preview} already resolves the very same {@code path:} references through the
-     * very same reader with no jail and no write root at all. If arbitrary-path reads through a preview are
-     * a concern, they are a concern about <em>both</em> surfaces and need one deliberate answer; a jail on
-     * this route alone would be security theatre that breaks working configs.
+     * <p><b>A {@code path:} reference is jailed to {@link com.gamma.config.safety.PathJail#allowedRoots()}</b>
+     * ({@code PREVIEW-REFERENCE-PATH-UNJAILED-1}, operator 2026-09-24) — NOT the write root, since a data file
+     * routinely lives outside it. Outside the roots → 403 before the file is opened. This one resolver serves
+     * both {@code POST …/dry-run} and {@code POST …/run?to=}; {@code POST /enrichment/preview} applies the same
+     * jail through {@link WriteGates#jailToAllowedRoots}.
      */
     private static RowShaper.ReferenceResolver dryRunReferences(ApiContext api) {
         return (conn, reference) -> {
             String sql;
+            com.gamma.enrich.EnrichmentConfig.Reference parsed;
             try {
-                sql = ReferenceReader.sqlFor(ReferenceReader.parse(reference), api.service().loadedPipelines());
+                parsed = ReferenceReader.parse(reference);
+            } catch (RuntimeException unresolvable) {
+                throw new ApiException(422, "dry-run cannot resolve reference '" + reference + "': "
+                        + unresolvable.getMessage());
+            }
+            if (!parsed.byName()) WriteGates.jailToAllowedRoots(parsed.path(), "transform.join.reference");
+            try {
+                sql = ReferenceReader.sqlFor(parsed, api.service().loadedPipelines());
             } catch (RuntimeException unresolvable) {
                 throw new ApiException(422, "dry-run cannot resolve reference '" + reference + "': "
                         + unresolvable.getMessage());

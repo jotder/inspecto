@@ -199,12 +199,7 @@ final class ConfigPreviewRoutes implements RouteModule {
                 throw new ApiException(400, "a relative 'configPath' needs a write root to resolve against; pass an absolute path");
             candidate = api.writeRoot().resolve(candidate);
         }
-        Path resolved;
-        try {
-            resolved = PathJail.requireUnderAny(PathJail.allowedRoots(), candidate.toString(), "configPath");
-        } catch (PathJail.Escape | IllegalArgumentException refused) {
-            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'configPath' is outside the allowed roots");
-        }
+        Path resolved = WriteGates.jailToAllowedRoots(candidate.toString(), "configPath");
         if (!Files.isRegularFile(resolved)) throw new ApiException(404, "no config file at 'configPath'");
         return resolved.toString();
     }

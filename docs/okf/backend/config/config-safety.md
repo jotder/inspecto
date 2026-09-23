@@ -112,10 +112,20 @@ path — an existence oracle. Now, before any filesystem access: relative value 
 `PATH_JAIL_VIOLATION`, identical for a present and a missing file · inside but not a file → 404. The roots
 are the load-time ones, not the write root: the load already refuses a config whose schema refs sit
 outside them, so a config with satellites was never loadable from outside them anyway. Pinned by `ControlApiValidateConfigPathJailTest`.
-⚠ Open beside it: `POST /pipelines/authored/{id}/dry-run` and `POST /enrichment/preview` read a join step's
-caller-supplied `path:` data file with **no** jail and return its rows (or the resolved path in a 422) —
-deliberate for now per the `PipelineGraphRoutes.dryRunReferences` javadoc (data files live outside the write
-root), awaiting one operator decision for both (`PREVIEW-REFERENCE-PATH-UNJAILED-1`).
+⚠ **A preview's reference `path:` is jailed under the same `PathJail.allowedRoots()`**
+(`PREVIEW-REFERENCE-PATH-UNJAILED-1`, operator decision 2026-09-24). Until then three read-shaped routes
+opened a caller-supplied reference data file with no jail and returned its rows: `POST
+/pipelines/authored/{id}/dry-run` and `POST /pipelines/authored/{id}/run?to=` (a `transform.join`
+`reference`, both through `PipelineGraphRoutes.dryRunReferences`) and `POST /enrichment/preview`
+(`references.<n>.path`, checked in `EnrichmentRoutes.previewEnrichment` before the engine opens it). Now a
+path reference outside the roots — absolute, `..` traversal, or a symlink out (the `PathJail.contains`
+real-path re-check) — or no roots configured → 403 `PATH_JAIL_VIOLATION` *"'<field>' is outside the allowed
+roots"*, before the file is read. By-name `reference/<pipeline>` refs are ids, not paths, and are not
+jailed. The roots are the safety roots, not the write root, because a data file routinely lives outside
+the write root. One helper, `WriteGates.jailToAllowedRoots`, serves these and `/validate {configPath}`.
+Pinned by `ControlApiPreviewReferenceJailTest` (a readable probe with the accepted file's content is
+refused; removing the jail turns the four refusals into 200s carrying its rows). ⚠ The `run?to=` route
+shares the resolver but has no dedicated real-HTTP test of the refusal.
 
 ⚠ **`/validate {configPath}` writes nothing** (`VALIDATE-PREPARE-WRITES-STATUS-DIR-1`, reproduced and fixed
 2026-09-23). It used `PipelineConfig.load()`, whose `prepare()` CREATED the Pipeline's status directory, so

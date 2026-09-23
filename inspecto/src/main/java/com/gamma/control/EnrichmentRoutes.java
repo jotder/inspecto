@@ -147,6 +147,10 @@ final class EnrichmentRoutes implements RouteModule {
         } catch (RuntimeException invalid) {
             throw new ApiException(422, "config is not a valid enrichment: " + invalid.getMessage());
         }
+        // PREVIEW-REFERENCE-PATH-UNJAILED-1: a path reference is a caller-named file whose rows the preview
+        // returns — jail it to the safety roots BEFORE the engine opens it (403), as /validate does.
+        for (EnrichmentConfig.Reference r : cfg.references())
+            if (!r.byName()) WriteGates.jailToAllowedRoots(r.path(), "references." + r.name() + ".path");
         try {
             return EnrichmentEngine.preview(cfg, sampleRows, api.service().loadedPipelines(), PREVIEW_LIMIT).toMap();
         } catch (Exception compute) {

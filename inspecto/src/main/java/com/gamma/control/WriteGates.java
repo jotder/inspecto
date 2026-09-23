@@ -58,6 +58,20 @@ public final class WriteGates {
         return normalized;
     }
 
+    /**
+     * Gate 3 against the SAFETY roots ({@link PathJail#allowedRoots()}) rather than the write root — for a
+     * caller-named file a read-shaped route opens (a {@code /validate} config, a preview's reference data
+     * file). Escape, or no roots configured → 403, with one message whether or not the file exists (no
+     * existence oracle, and the resolved path is never echoed). Returns the contained absolute path.
+     */
+    public static Path jailToAllowedRoots(String value, String field) {
+        try {
+            return PathJail.requireUnderAny(PathJail.allowedRoots(), value, field);
+        } catch (PathJail.Escape | IllegalArgumentException refused) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'" + field + "' is outside the allowed roots");
+        }
+    }
+
     /** Gate 4 — resource conflict → 409. */
     public static void conflictIf(boolean conflict, String message) {
         if (conflict) throw new ApiException(409, message);
