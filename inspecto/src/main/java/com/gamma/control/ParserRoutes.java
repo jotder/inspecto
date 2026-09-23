@@ -6,6 +6,7 @@ import com.gamma.parse.ParserPlugin;
 import com.gamma.parse.Parsers;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -32,7 +33,7 @@ final class ParserRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/parsers", (e, m) -> catalog());
-        api.post("/parsers/([^/]+)/preview", (e, m) -> preview(ApiContext.name(m), api.body(e)));
+        api.post("/parsers/([^/]+)/preview", (e, m) -> preview(api, ApiContext.name(m), api.body(e)));
     }
 
     private static List<Map<String, Object>> catalog() {
@@ -56,13 +57,14 @@ final class ParserRoutes implements RouteModule {
         return out;
     }
 
-    private static Object preview(String id, Map<String, Object> body) {
+    private static Object preview(ApiContext api, String id, Map<String, Object> body) {
         ParserPlugin parser = Parsers.get(id)
                 .orElseThrow(() -> new ApiException(404, "unknown parser: " + id));
         byte[] sample = sampleOf(body);
         Map<String, Object> grammar = grammarOf(body);
+        Path configDir = configDirOf(api, body);
         try {
-            ParseResult r = parser.preview(sample, grammar);
+            ParseResult r = parser.preview(sample, grammar, configDir);
             return toJson(r);
         } catch (PathJail.Escape escape) {
             // A grammar FILE reference (asn1.grammar_file) outside the allowed roots — the jail's verdict.
@@ -94,6 +96,23 @@ final class ParserRoutes implements RouteModule {
         if (bytes.length > MAX_SAMPLE_BYTES)
             throw new ApiException(400, "sample_b64 too large (max " + MAX_SAMPLE_BYTES + " bytes)");
         return bytes;
+    }
+
+    /**
+     * The Pipeline context: {@code subdir} is the directory the Pipeline's config file lives in, relative
+     * to the write root — the same meaning as every satellite route's {@code subdir} ({@code ''} = a
+     * Pipeline at the root). A relative grammar-file ref then resolves beside the Pipeline, the base the
+     * Pipeline itself resolves it from, so one spelling previews and ingests ({@code BUNDLE-ASN1-GRAMMAR-FILE-1}).
+     * Absent = no Pipeline context → {@code null}, the plugin's Space-root fallback. Not jailed here: the
+     * resolved FILE is jailed once, by {@code Asn1GrammarSource}.
+     */
+    private static Path configDirOf(ApiContext api, Map<String, Object> body) {
+        if (!body.containsKey("subdir")) return null;
+        String subdir = ApiContext.str(body, "subdir");
+        Path sub = Path.of(subdir == null ? "" : subdir.trim());
+        if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+        Path root = api.writeRoot();
+        return root == null ? null : root.resolve(sub).normalize();
     }
 
     private static Map<String, Object> grammarOf(Map<String, Object> body) {

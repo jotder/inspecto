@@ -49,16 +49,24 @@ export class ParsersService {
      * scratch-only. Caller errors (bad grammar, unparseable sample) come back as 422 with the
      * reason.
      */
-    /** `sampleB64` (a binary format's bytes — an .xlsx workbook) wins over `sampleText` when set. */
+    /**
+     * `sampleB64` (a binary format's bytes — an .xlsx workbook) wins over `sampleText` when set.
+     * `subdir` is the Pipeline context: the directory the Pipeline's config file lives in, relative to
+     * the write root (`''` = at the root). With it, a relative grammar-file ref (`asn1.grammar_file`)
+     * resolves beside the Pipeline — the spelling the Pipeline ingests with; without it (no Pipeline),
+     * from the Space config root.
+     */
     preview(
         id: string,
         grammar: Record<string, unknown>,
         sampleText: string,
         sampleB64?: string,
+        subdir?: string,
     ): Observable<ParserPreview> {
         return this.http.post<ParserPreview>(apiUrl(`/parsers/${encodeURIComponent(id)}/preview`), {
             grammar,
             ...(sampleB64 ? { sample_b64: sampleB64 } : { sample_text: sampleText }),
+            ...(subdir !== undefined ? { subdir } : {}),
         });
     }
 }

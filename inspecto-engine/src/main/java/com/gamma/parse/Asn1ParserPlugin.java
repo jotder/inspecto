@@ -13,6 +13,7 @@ import com.gamma.config.spec.FieldSpec;
 import com.gamma.config.spec.FieldType;
 import com.gamma.pipeline.SpaceConfigRoot;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -109,6 +110,11 @@ public final class Asn1ParserPlugin implements ParserPlugin {
 
     @Override
     public ParseResult preview(byte[] sample, Map<String, Object> grammar) throws Exception {
+        return preview(sample, grammar, null);
+    }
+
+    @Override
+    public ParseResult preview(byte[] sample, Map<String, Object> grammar, Path configDir) throws Exception {
         if (sample == null || sample.length == 0)
             throw new IllegalArgumentException("sample content is required");
         Map<String, Object> asn1 = sub(grammar, "asn1");
@@ -117,11 +123,12 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
         // Inline text wins over the .asn file ref — the ingester's rule, through the ingester's resolver.
-        // A preview has no config file to resolve beside, so a relative ref resolves against the bound
-        // Space's config root (null outside a Space: the working-directory reading).
+        // A relative ref resolves beside the Pipeline's config dir when the caller has one (the drawer
+        // sends it — the Pipeline's own spelling); with no Pipeline context, against the bound Space's
+        // config root (null outside a Space: the working-directory reading).
         Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
                 asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file",
-                SpaceConfigRoot.current());
+                configDir != null ? configDir : SpaceConfigRoot.current());
 
         // No grammar: dump the self-describing TLV structure so an unknown file can be inspected.
         if (module == null) {

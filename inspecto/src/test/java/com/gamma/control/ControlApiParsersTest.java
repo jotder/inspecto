@@ -169,6 +169,50 @@ class ControlApiParsersTest {
         }
     }
 
+    /**
+     * {@code BUNDLE-ASN1-GRAMMAR-FILE-1}: a Pipeline in a subdirectory spells its module as a sibling
+     * ({@code record.asn}), and the drawer sends the Pipeline's {@code subdir} so the preview resolves the
+     * SAME spelling beside it. Without a Pipeline context the ref falls back to the Space root, where the
+     * sibling spelling does not resolve; an absolute {@code subdir} is a caller error.
+     */
+    @Test
+    void asn1PreviewResolvesAGrammarFileBesideThePipelineSubdir(@TempDir Path cfg) throws Exception {
+        String grammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"
+                + "Record ::= [APPLICATION 1] SEQUENCE { id [0] INTEGER }\n"
+                + "END\n";
+        Path wr = java.nio.file.Files.createDirectories(cfg.resolve("wr"));
+        java.nio.file.Files.writeString(java.nio.file.Files.createDirectories(wr.resolve("msc")).resolve("record.asn"),
+                grammar);
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", wr.toString());
+        Ctx ctx;
+        try {
+            ctx = open(cfg);
+        } finally {
+            if (prior != null) System.setProperty("assist.write.root", prior);
+            else System.clearProperty("assist.write.root");
+        }
+        try (Ctx c = ctx) {
+            String sample = Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex("610380010A"));
+            ObjectMapper m = new ObjectMapper();
+            Map<String, Object> sibling = Map.of("asn1", Map.of("grammar_file", "record.asn", "root_type", "Record"));
+            JsonNode inline = json(send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar", grammar, "root_type", "Record")),
+                    "sample_b64", sample))));
+            JsonNode beside = json(send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", sibling, "subdir", "msc", "sample_b64", sample))));
+            assertEquals(inline, beside, "the Pipeline's sibling spelling previews beside it");
+
+            HttpResponse<String> noContext = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", sibling, "sample_b64", sample)));
+            assertEquals(422, noContext.statusCode(), noContext.body());
+
+            HttpResponse<String> absolute = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", sibling, "subdir", wr.resolve("msc").toString(), "sample_b64", sample)));
+            assertEquals(400, absolute.statusCode(), absolute.body());
+        }
+    }
+
     @Test
     void unknownParserIs404(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {

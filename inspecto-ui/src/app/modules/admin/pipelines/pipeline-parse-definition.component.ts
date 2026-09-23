@@ -852,7 +852,9 @@ export class PipelineParseDefinitionComponent {
     ): Observable<ParserPreview> => {
         const thread = this.sample();
         thread?.parseError.set(null);
-        return this.parsersApi.preview(type, grammar, text, b64).pipe(
+        // The Pipeline's own config dir travels, so a grammar_file ref previews with the spelling the
+        // Pipeline resolves it by — beside itself (BUNDLE-ASN1-GRAMMAR-FILE-1).
+        return this.parsersApi.preview(type, grammar, text, b64, this.configSubdir().trim()).pipe(
             tap((p) => {
                 if (p.kind !== 'table') return;
                 this.schemaStale.set(false); // these columns and these settings agree again

@@ -481,6 +481,7 @@ final class PipelineBundleRoutes implements RouteModule {
                 if (parsing.get(frontend) instanceof Map<?, ?>) {
                     Map<String, Object> f = new LinkedHashMap<>(mapAt(parsing, frontend));
                     if (f.get("segments") instanceof Map<?, ?> seg) f.put("segments", rewriteRefMap(seg, names));
+                    rewriteRef(f, "grammar_file", names);   // a stored .asn module (BUNDLE-ASN1-GRAMMAR-FILE-1)
                     parsing.put(frontend, f);
                 }
             }

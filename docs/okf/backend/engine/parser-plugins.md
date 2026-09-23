@@ -89,11 +89,16 @@ Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, w
 - **A relative ref resolves like `schema_file`** — `PathJail.resolveConfigRef`, never the working
   directory (`SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`). In a Pipeline it is resolved **beside the Pipeline's
   own config file** (a sibling name: `grammar_file: msc_cdr.asn`), by `PipelineConfigParser`, into
-  `Schemas.ingesterGrammar()` — the ingester never sees the config's directory. The stand-alone preview
-  has no config file, so it resolves from the **bound Space's config root** (`SpaceConfigRoot.current()`):
-  for a Pipeline in a subdirectory the preview spelling is `msc/msc_cdr.asn`. ⚠ The drawer does not send
-  its Pipeline's location to the preview route, so a sibling name typed there previews against the Space
-  root, not beside the Pipeline.
+  `Schemas.ingesterGrammar()` — the ingester never sees the config's directory. The preview has no config
+  file, so the Parse drawer sends its Pipeline's location: `POST /parsers/{id}/preview` takes an optional
+  body `subdir` (the Pipeline's config directory relative to the write root — the same meaning as every
+  satellite route's `subdir`, `''` = at the root), and the route resolves the ref beside
+  `writeRoot/<subdir>` via `ParserPlugin.preview(sample, grammar, configDir)` — so **one spelling
+  (`grammar_file: msc_cdr.asn`) previews and ingests** for a Pipeline in a subdirectory too
+  (`BUNDLE-ASN1-GRAMMAR-FILE-1`, 2026-09-23). Only with **no** Pipeline context (no `subdir` key: the
+  stand-alone Grammar dialog) does it fall back to the **bound Space's config root**
+  (`SpaceConfigRoot.current()`). An absolute `subdir` is 400; the base is not jailed — the resolved FILE
+  is, once, below.
 - The file ref is jailed **once**, by `Asn1GrammarSource`, with `PathJail.requireUnderAny(allowedRoots())`
   **before** the readability probe (an escaping ref is refused, never reported "not readable", which
   would leak whether a path outside the roots exists). The parser resolves but does **not** jail.
@@ -110,11 +115,15 @@ Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, w
 - Proof: `DemoCorpusIngestTest.mscCdrWithItsGrammarInAnAsnFilePreviewsAndIngestsIdenticallyToInline`
   moves the committed `msc_cdr` grammar into a `.asn` file and pins the same preview tree and the same
   rows in every segment as the inline original.
-- ⚠ **Only half carried by a Pipeline bundle.** The resolved module is in `referencedFiles()`, so the
-  export ships it as a satellite under its basename — but `PipelineBundleRoutes.rewriteSatelliteRefs`
-  does not rewrite `asn1.grammar_file`, so only a ref already spelled as a bare sibling name still
-  resolves after import (BACKLOG `BUNDLE-ASN1-GRAMMAR-FILE-1`, which also carries the preview-vs-Pipeline
-  spelling split for a Pipeline in a subdirectory).
+- **A Pipeline bundle carries it and re-points it** (`BUNDLE-ASN1-GRAMMAR-FILE-1`, 2026-09-23). The
+  resolved module is in `referencedFiles()`, so the export ships it as a satellite under its basename,
+  and `PipelineBundleRoutes.rewriteSatelliteRefs` rewrites `parsing.asn1.grammar_file` to that basename
+  like every other satellite ref. ⚠ Before this, an import of a non-sibling spelling
+  (`grammars/msc_cdr.asn`) still returned **200 and registered** — nothing resolves the module at
+  registration — and would only have failed at the first ingest. Proof (real HTTP):
+  `ControlApiPipelineBundleTest.anAsn1GrammarFileTravelsAndIsRepointedBesideTheImportedPipeline` (the
+  msc_cdr demo, grammar in a `.asn` file, export → import → the drawer's preview with `subdir` equals the
+  inline preview); `ControlApiParsersTest.asn1PreviewResolvesAGrammarFileBesideThePipelineSubdir`.
 
 **The grammar is OPTIONAL for preview — structural dump (2026-07-31).** BER is self-describing
 (every value carries its own tag and length), so with `asn1.grammar` blank the plugin skips the

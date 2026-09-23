@@ -2,6 +2,7 @@ package com.gamma.parse;
 
 import com.gamma.api.PublicApi;
 import com.gamma.config.spec.FieldSpec;
+import java.nio.file.Path;
 
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,18 @@ public interface ParserPlugin {
      * @param grammar the nested options map (never {@code null}; may be empty for all-default)
      */
     ParseResult preview(byte[] sample, Map<String, Object> grammar) throws Exception;
+
+    /**
+     * {@link #preview(byte[], Map)} for a grammar authored inside a Pipeline: a relative FILE reference in
+     * {@code grammar} (e.g. {@code asn1.grammar_file}) resolves beside {@code configDir} — the Pipeline's
+     * own config directory, the base the Pipeline itself resolves it from — so a ref previews with the
+     * spelling it ingests with. {@code null} = no Pipeline context (the plugin's own default). Default:
+     * a parser whose grammar names no file ignores it.
+     */
+    default ParseResult preview(byte[] sample, Map<String, Object> grammar, Path configDir)
+            throws Exception {
+        return preview(sample, grammar);
+    }
 
     /**
      * Optional clues: grammar values sniffed from {@code sample} (e.g. a proposed record element).

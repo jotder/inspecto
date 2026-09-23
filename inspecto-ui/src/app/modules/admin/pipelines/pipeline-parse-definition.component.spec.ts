@@ -28,6 +28,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
             [node]="node()"
             [grammarMissing]="grammarMissing()"
             [pipelineName]="pipelineName()"
+            [configSubdir]="configSubdir()"
             [sample]="sample"
             [filenameColumnTarget]="filenameColumnTarget()"
             [collectorInclude]="collectorInclude()"
@@ -44,6 +45,8 @@ class HostComponent {
     /** PARSE-HOME-1: the dangling template the host resolved, or null. */
     grammarMissing = signal<string | null>(null);
     pipelineName = signal('');
+    /** The open Pipeline's config dir, relative to the write root — '' (at the root) in most specs. */
+    configSubdir = signal('');
     /** The tab's sample thread — null in most specs, exactly as a host that keeps none. */
     sample: DefinitionStateService | null = null;
     /** null = the host's cross-node lineage field is not offered (ambiguous/no sink) — most specs. */
@@ -433,6 +436,25 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(thread.parsePreview()).toBeNull();
             expect(thread.parseError()).toBeNull();
         });
+
+        /**
+         * BUNDLE-ASN1-GRAMMAR-FILE-1: the Test parse sends the Pipeline's config dir, so a grammar-file
+         * ref previews beside the Pipeline — the spelling the Pipeline ingests with — never from the
+         * Space root.
+         */
+        it("sends the Pipeline's config dir with the Test parse", async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('cdr.ber', 'x');
+            const fixture = await create(delimitedNode(), [], 0, thread);
+            fixture.componentInstance.configSubdir.set('msc');
+            fixture.detectChanges();
+            const parsers = TestBed.inject(ParsersService) as unknown as { preview: ReturnType<typeof vi.fn> };
+            parsers.preview.mockReturnValue(of({ kind: 'tree', nodes: [] }));
+            editor(fixture).test();
+
+            expect(parsers.preview).toHaveBeenCalled();
+            expect(parsers.preview.mock.calls.at(-1)?.[4]).toBe('msc');
+        });
     });
 
     it('names a missing Grammar template in the Grammar section (PARSE-HOME-1)', async () => {
@@ -613,14 +635,14 @@ describe('PipelineParseDefinitionComponent', () => {
         it('offers a grammar FILE as the alternative to pasted text, and Apply carries the reference', async () => {
             const fixture = await create(asn1Node(), [ASN1_DEF]);
             editor(fixture).controlFor('asn1__grammar')?.setValue('');
-            editor(fixture).controlFor('asn1__grammar_file')?.setValue('spaces/demo/config/msc/msc_cdr.asn');
+            editor(fixture).controlFor('asn1__grammar_file')?.setValue('msc_cdr.asn');
             fixture.detectChanges();
 
             pane(fixture).submit();
 
             const parsing = fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>;
             const a = parsing['asn1'] as Record<string, unknown>;
-            expect(a['grammar_file']).toBe('spaces/demo/config/msc/msc_cdr.asn');
+            expect(a['grammar_file']).toBe('msc_cdr.asn');
             expect(a['grammar'] ?? '').toBe('');
         });
 

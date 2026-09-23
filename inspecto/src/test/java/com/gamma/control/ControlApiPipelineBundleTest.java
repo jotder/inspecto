@@ -162,6 +162,79 @@ class ControlApiPipelineBundleTest {
         }
     }
 
+    // ── a stored .asn grammar module travels AND is re-pointed (BUNDLE-ASN1-GRAMMAR-FILE-1) ──
+
+    /**
+     * The committed msc_cdr demo with its inline grammar moved into a {@code .asn} file referenced as
+     * {@code asn1.grammar_file: grammars/msc_cdr.asn} — NOT a bare sibling name, so only a rewritten ref
+     * resolves once the module lands beside the imported Pipeline. Export → import under a new name must
+     * carry the module byte-verbatim, rewrite the ref to its basename, resolve it beside the imported file,
+     * and the drawer's preview of that Pipeline (its {@code subdir} sent) must take the SAME spelling and
+     * answer exactly what the inline grammar answers.
+     */
+    @Test
+    void anAsn1GrammarFileTravelsAndIsRepointedBesideTheImportedPipeline(@TempDir Path dir) throws Exception {
+        Path repo = Path.of("..").toAbsolutePath().normalize();
+        Path src = repo.resolve("spaces/demo/config/msc");
+        Path cfgDir = Files.createDirectories(dir.resolve("cfg/msc"));
+        try (var siblings = Files.list(src)) {
+            for (Path f : siblings.filter(Files::isRegularFile).toList())
+                Files.copy(f, cfgDir.resolve(f.getFileName()));
+        }
+        Path toon = cfgDir.resolve("msc_cdr_pipeline.toon");
+        Map<String, Object> raw = ConfigCodec.toMap(Files.readString(toon));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> asn1 = (Map<String, Object>) ((Map<String, Object>) raw.get("parsing")).get("asn1");
+        String grammarText = String.valueOf(asn1.remove("grammar"));
+        String rootType = String.valueOf(asn1.get("root_type"));
+        Path asn = Files.createDirectories(cfgDir.resolve("grammars")).resolve("msc_cdr.asn");
+        Files.writeString(asn, grammarText);
+        asn1.put("grammar_file", "grammars/msc_cdr.asn");
+        Map<String, Object> dirs = new LinkedHashMap<>();   // absolute — no Space here, never the CWD
+        ((Map<?, ?>) raw.get("dirs")).forEach((k, v) -> dirs.put(String.valueOf(k),
+                dir.resolve(String.valueOf(v)).toString().replace('\\', '/')));
+        raw.put("dirs", dirs);
+        Files.writeString(toon, ConfigCodec.toToon(raw));
+        byte[] asnBytes = Files.readAllBytes(asn);
+
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr, toon)) {
+            HttpResponse<byte[]> zip = sendZip(c.port, "GET", "/pipelines/msc_cdr/bundle", null);
+            assertEquals(200, zip.statusCode());
+            assertArrayEquals(asnBytes, unzip(zip.body()).get("msc_cdr.asn"), "the module travels byte-verbatim");
+
+            HttpResponse<String> imp = send(c.port, "POST", "/pipelines/import?name=msc_copy", zip.body());
+            assertEquals(200, imp.statusCode(), imp.body());
+
+            Path written = wr.resolve("msc_copy").resolve("msc_copy_pipeline.toon");
+            Map<String, Object> imported = ConfigCodec.toMap(Files.readString(written));
+            Map<?, ?> importedAsn1 = (Map<?, ?>) ((Map<?, ?>) imported.get("parsing")).get("asn1");
+            assertEquals("msc_cdr.asn", importedAsn1.get("grammar_file"),
+                    "the grammar ref was rewritten to the bare basename beside the file");
+            Path landed = wr.resolve("msc_copy").resolve("msc_cdr.asn");
+            assertArrayEquals(asnBytes, Files.readAllBytes(landed));
+            assertEquals(landed.toAbsolutePath().normalize(),
+                    com.gamma.etl.PipelineConfig.load(written.toString()).schemas().ingesterGrammar(),
+                    "the imported Pipeline resolves its grammar to the module that landed beside it");
+
+            // the drawer's preview of the imported Pipeline: its subdir + the Pipeline's own spelling
+            String sample = java.util.Base64.getEncoder().encodeToString(Files.readAllBytes(
+                    repo.resolve("spaces/demo/data/samples/msc_cdr/MSC01_20260801_0800.ber")));
+            com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
+            HttpResponse<String> viaText = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar", grammarText, "root_type", rootType)),
+                    "sample_b64", sample)));
+            HttpResponse<String> viaFile = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar_file", "msc_cdr.asn", "root_type", rootType)),
+                    "subdir", "msc_copy",
+                    "sample_b64", sample)));
+            assertEquals(200, viaText.statusCode(), viaText.body());
+            assertEquals(200, viaFile.statusCode(), viaFile.body());
+            assertEquals(13, V1Body.of(viaText.body()).get("recordCount").asInt());
+            assertEquals(V1Body.of(viaText.body()), V1Body.of(viaFile.body()), "the preview tree is identical");
+        }
+    }
+
     // ── conflict matrix: refuse / overwrite / rename ─────────────────────────────
 
     @Test

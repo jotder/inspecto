@@ -32,8 +32,9 @@ import static com.gamma.util.Values.trimOrEmpty;
  * <p><b>The base.</b> The ingest passes the path {@code PipelineConfigParser} already resolved beside the
  * Pipeline's own config file ({@code Schemas.ingesterGrammar()}, absolute — so the base is moot there). The
  * parser resolves and does NOT jail: this class is the only jail on either path. The preview has no config
- * file, so it passes the Space config root — a preview ref is spelled from the Space's {@code config/}
- * directory, which is the same string as the Pipeline's spelling for a Pipeline that sits at that root.
+ * file, so it passes the directory the Pipeline's config file lives in when the caller names one (the
+ * drawer sends its Pipeline's {@code subdir}) — the same base, so the same spelling — and only with no
+ * Pipeline context the Space config root ({@code BUNDLE-ASN1-GRAMMAR-FILE-1}).
  *
  * <p>⚠ <b>The extension is enforced first ({@code .asn} / {@code .asn1}), before anything touches the
  * disk.</b> The preview route is compute-only and carries no capability, and a compile error can echo the
