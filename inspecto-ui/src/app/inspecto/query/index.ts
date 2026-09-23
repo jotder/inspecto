@@ -5,3 +5,5 @@ export * from './query-sql';
 export * from './query-eval';
 export { QueryConditionGroupComponent } from './query-condition-group.component';
 export { QueryPanelComponent } from './query-panel.component';
+export * from './sql-ast';
+export { SqlAstTableComponent } from './sql-ast-table.component';

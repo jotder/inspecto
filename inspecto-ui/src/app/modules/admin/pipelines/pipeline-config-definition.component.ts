@@ -43,6 +43,7 @@ import { InspectoSchemaPartitionsEditorComponent, SchemaPartitionRow } from 'app
 import { companionSchemaName } from 'app/inspecto/segments';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
 import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
+import { PipelineFilterPredicateComponent } from './pipeline-filter-predicate.component';
 import { groupByValidator, measuresValidator } from './measure-grammar';
 import { SummarizeEditorComponent } from './summarize-editor.component';
 import { nodeAttributesFor } from './node-attributes';
@@ -120,6 +121,7 @@ function mergeFormValues(
         EnrichmentEditorComponent,
         InspectoSchemaPartitionsEditorComponent,
         PipelineExtraConfigComponent,
+        PipelineFilterPredicateComponent,
         StepPreviewResultComponent,
         SummarizeEditorComponent,
     ],
@@ -185,6 +187,17 @@ function mergeFormValues(
                 [readOnly]="readOnly()"
                 (submitted)="submit()"
             ></inspecto-schema-form>
+        }
+        @if (isFilter() && formSpecs().length) {
+            <!-- AUTHORING-REDESIGN-1 (c): the row predicate's structure, read from DuckDB's own parse tree.
+                 The where field above stays the only way its text changes; a structured edit is written
+                 into that field only on the author's explicit accept of the exact before/after. -->
+            <app-pipeline-filter-predicate
+                [where]="filterWhere()"
+                [readOnly]="readOnly()"
+                [extraColumns]="upstreamColumns()"
+                (rewrite)="applyFilterRewrite($event)"
+            />
         }
 
         <!-- Additional config: keys OUTSIDE the schema render with their ACTUAL key and a control
@@ -354,6 +367,11 @@ export class PipelineConfigDefinitionComponent {
 
     readonly isSummarize = computed(() => this.node().type === 'transform.summarize');
 
+    /** A Filter Step shows its `where` predicate's structure beneath the form (AUTHORING-REDESIGN-1 (c)). */
+    readonly isFilter = computed(() => this.node().type === 'transform.filter');
+    /** The live `where` text: seeded from the node, re-read from the form on every interaction. */
+    readonly filterWhere = signal('');
+
     /** What the generic schema form renders: everything except the keys a bespoke editor owns. */
     readonly formSpecs = computed<AttributeSpec[]>(() =>
         this.isSummarize()
@@ -495,6 +513,8 @@ export class PipelineConfigDefinitionComponent {
             const n = this.node();
             this.lastDirty = false;
             this.dirtyChange.emit(false);
+            const where = n.config?.['where'];
+            this.filterWhere.set(typeof where === 'string' ? where : '');
             if (this.isEnrichment() && this.enrichInitFor !== n.id) {
                 this.enrichInitFor = n.id;
                 this.initEnrichment(n);
@@ -658,6 +678,26 @@ export class PipelineConfigDefinitionComponent {
     // boolean reads per click, and the pane is only mounted while the drawer is open.
     @HostListener('document:click')
     onInteraction(): void {
+        if (this.isFilter()) this.filterWhere.set(this.liveWhere());
+        this.emitDirty();
+    }
+
+    /** The `where` control's current text, or the last known one when the form is not mounted. */
+    private liveWhere(): string {
+        const v = this.schemaForm?.form.get('where')?.value;
+        return typeof v === 'string' ? v : this.filterWhere();
+    }
+
+    /**
+     * Write an ACCEPTED structured edit into the `where` field — the one place the predicate text lives.
+     * It dirties the pane like typing would; Apply still decides whether it reaches the node.
+     */
+    applyFilterRewrite(text: string): void {
+        const control = this.schemaForm?.form.get('where');
+        if (!control) return;
+        control.setValue(text);
+        control.markAsDirty();
+        this.filterWhere.set(text);
         this.emitDirty();
     }
 

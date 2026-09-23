@@ -36,6 +36,8 @@ import { PipelineExtraConfigComponent } from './pipeline-extra-config.component'
  * </ul>
  */
 
+const NO_TREE = { ok: false as const, error: { message: 'not read in this spec', position: null, subtype: null } };
+
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
 const PRODUCED_REF: MetadataNode = {
@@ -62,7 +64,8 @@ async function create(inputs: PaneInputs, api: Partial<ConfigService> = {}) {
             // The preview result renders <inspecto-data-table>, whose real theme service walks up to
             // GAMMA_APP_CONFIG — stub it, as the data-table's own spec does.
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
-            { provide: ComponentsService, useValue: { list: () => of([]) } },
+            // The Filter Step's predicate view reads through sqlAst; a parse error keeps the tree out of these cases.
+            { provide: ComponentsService, useValue: { list: () => of([]), sqlAst: () => of(NO_TREE) } },
             {
                 provide: ConfigService,
                 useValue: {
@@ -229,6 +232,42 @@ describe('PipelineConfigDefinitionComponent', () => {
         const out = applied(fixture);
         fixture.componentInstance.submit();
         expect(out()).toMatchObject({ id: 'flt', name: 'Row filter', description: 'drops test traffic' });
+    });
+
+    /**
+     * AUTHORING-REDESIGN-1 (c): a Filter Step shows its predicate's structure beneath the form, and an
+     * ACCEPTED structured edit lands in the `where` field — the one place the text lives — dirtying the
+     * pane exactly as typing would. Nothing reaches the node until Apply.
+     */
+    it('a Filter Step hosts the predicate view, and an accepted edit is written into the where field', async () => {
+        const fixture = await create({ node: { id: 'flt', type: 'transform.filter', config: { where: 'a > 1' } } });
+        const view = fixture.nativeElement.querySelector('app-pipeline-filter-predicate');
+        expect(view).not.toBeNull();
+        expect(fixture.componentInstance.filterWhere()).toBe('a > 1');
+        const seen: boolean[] = [];
+        fixture.componentInstance.dirtyChange.subscribe((d) => seen.push(d));
+
+        fixture.componentInstance.applyFilterRewrite('"a" > 2');
+        fixture.detectChanges();
+        expect(form(fixture).form.get('where')?.value).toBe('"a" > 2');
+        expect(fixture.componentInstance.filterWhere()).toBe('"a" > 2');
+        expect(seen.at(-1)).toBe(true);
+
+        const out = applied(fixture);
+        fixture.componentInstance.submit();
+        expect(out()?.config?.['where']).toBe('"a" > 2');
+    });
+
+    it('typing in the where field re-feeds the predicate view', async () => {
+        const fixture = await create({ node: { id: 'flt', type: 'transform.filter', config: { where: 'a > 1' } } });
+        form(fixture).form.get('where')?.setValue('b < 3');
+        fixture.componentInstance.onInteraction();
+        expect(fixture.componentInstance.filterWhere()).toBe('b < 3');
+    });
+
+    it('only a Filter Step hosts the predicate view', async () => {
+        const fixture = await create({ node: { id: 'r', type: 'transform.route' } });
+        expect(fixture.nativeElement.querySelector('app-pipeline-filter-predicate')).toBeNull();
     });
 
     /**
@@ -687,7 +726,9 @@ describe('PipelineConfigDefinitionComponent', () => {
      */
     describe('inline test', () => {
         const withPreview = (over: Record<string, unknown>): void => {
-            TestBed.overrideProvider(ComponentsService, { useValue: { list: () => of([]), ...over } });
+            TestBed.overrideProvider(ComponentsService, {
+                useValue: { list: () => of([]), sqlAst: () => of(NO_TREE), ...over },
+            });
         };
         const filter = (): PaneInputs => ({
             node: { id: 'flt', type: 'transform.filter' },

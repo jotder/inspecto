@@ -296,4 +296,20 @@ export class ComponentsService {
             sql,
         });
     }
+
+    /**
+     * DuckDB's own READ-ONLY parse tree of author SQL — `POST /components/sql/ast`. With `'predicate'` the
+     * text is a bare row condition (a Filter Step's `where`) and `ast` is its condition node. A parse failure
+     * is a 200 `{ok: false}`, never an HTTP error. ⛔ There is no reverse route and there will not be one
+     * (AUTHORING-REDESIGN-1 (c), Q2): the tree is read, never written back.
+     */
+    sqlAst(sql: string, fragment: 'statement' | 'predicate' = 'statement'): Observable<SqlAstResponse> {
+        return this.http.post<SqlAstResponse>(apiUrl('/components/sql/ast'), { sql, fragment });
+    }
 }
+
+/** `POST /components/sql/ast`'s answer. The tree is DuckDB's, verbatim — only the keys the SPA reads are
+ *  pinned (`contracts/sql-ast.contract.json`). */
+export type SqlAstResponse =
+    | { ok: true; ast: Record<string, unknown> }
+    | { ok: false; error: { message: string; position: number | null; subtype: string | null } };
