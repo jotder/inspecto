@@ -399,6 +399,9 @@ HTTP has no rollback. A re-run re-sends them under the same keys, so the receive
 on the key. Keys stay stable across re-runs only as far as the relation's row order does, and the
 sink adds no `ORDER BY`.
 
+⚠ **Not in the Recipe-view palette yet** (`WEBHOOK-RECIPE-PALETTE-1`): the `webhook:` verb compiles and
+the canvas can add the node, but the Recipe view's client-side verb lists do not carry it.
+
 **Edition (EDG-01).** The engine defines the `WebhookSinkTransport` SPI and ships **no**
 implementation. The one provider, `HttpWebhookSinkTransport`, lives in `inspecto-notify-channels`
 next to `WebhookChannel` and reuses its POST (`WebhookChannel.send`). On Personal there is no
