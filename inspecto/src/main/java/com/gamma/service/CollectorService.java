@@ -516,6 +516,19 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     String dd = root.dataDir();
                     return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                 })::value);
+        // LA-23: Investigation rules, evaluated by the optional inspecto-geo-link module when it ships (absent it,
+        // they are inert). ⚠ The root is resolved the way ControlApi.writeRoot() resolves where the Investigation
+        // routes WROTE — this Space's config dir, else -Dassist.write.root as read at construction — and NOT by
+        // re-reading the property lazily as the measure probe above does: a Space's Investigations live under its
+        // own config root, and a property read per sweep would look in whichever root the JVM names today.
+        String bootWriteRoot = System.getProperty("assist.write.root");
+        OptionalSpi.first(com.gamma.alert.InvestigationMeasureProbe.class).ifPresent(probe ->
+                alerting.investigationProbe(rule -> {
+                    java.nio.file.Path wr = root.config() != null ? root.config()
+                            : (bootWriteRoot == null || bootWriteRoot.isBlank()) ? null
+                            : java.nio.file.Path.of(bootWriteRoot.trim()).toAbsolutePath().normalize();
+                    return wr == null ? java.util.OptionalDouble.empty() : probe.value(wr, rule);
+                }));
         bus.subscribe(alerting::onEvent);
         if (!alertRules.isEmpty()) log.info("Alert engine armed with {} rule(s)", alertRules.size());
         // Event engine (Phase 1, v4.2.0): the append-only record of "what happened". Built from

@@ -72,6 +72,9 @@ public final class AlertService {
     private final Map<String, Long> lastFired = new ConcurrentHashMap<>();
     /** BI-5: evaluates {@code (dataset, measure)} → current scalar value; {@code null} disables measure rules. */
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalDouble> measureProbe;
+    /** LA-23: an Investigation rule → its Measure over the Working Set ({@link InvestigationMeasureProbe});
+     *  {@code null} (no {@code inspecto-geo-link} module) disables Investigation rules. */
+    private volatile java.util.function.Function<AlertRule, java.util.OptionalDouble> investigationProbe;
     /** DUCKLE-C1: {@code dataset id} → epoch millis of its last publication; {@code null} disables
      *  freshness rules (which is NOT the same as reporting them fresh — see {@link #evaluateFreshness}). */
     private volatile java.util.function.Function<String, java.util.OptionalLong> freshnessProbe;
@@ -117,6 +120,11 @@ public final class AlertService {
     /** Wire the BI-5 measure evaluator (BiFunction so this engine stays decoupled from the query layer). */
     public void measureProbe(java.util.function.BiFunction<String, String, java.util.OptionalDouble> probe) {
         this.measureProbe = probe;
+    }
+
+    /** Wire the LA-23 Investigation-rule evaluator (a Function so this engine never names the optional module). */
+    public void investigationProbe(java.util.function.Function<AlertRule, java.util.OptionalDouble> probe) {
+        this.investigationProbe = probe;
     }
 
     /**
@@ -254,6 +262,18 @@ public final class AlertService {
             fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out);
         }
 
+        // Investigation rules (LA-23) are scoped to their Investigation: the scope — and so the cooldown key, the
+        // Signal's correlation id and the Incident dedupe scope — is the Investigation id. The probe answers empty
+        // for anything it cannot vouch for (no owner binding, unknown Investigation), which never fires.
+        for (AlertRule rule : rules) {
+            if (!rule.isInvestigationRule()) continue;
+            var probe = investigationProbe;
+            if (probe == null) continue;
+            java.util.OptionalDouble value = probe.apply(rule);
+            if (value.isEmpty() || !rule.breached(value.getAsDouble())) continue;
+            fire(rule, rule.investigation(), rule.investigation(), value.getAsDouble(), nowMs, out);
+        }
+
         for (PipelineConfig cfg : configs.pipelines()) {
             String display = cfg.identity().name();
             String id = cfg.identity().pipelineName();
@@ -268,6 +288,7 @@ public final class AlertService {
                 // cover them -- it was deliberately narrowed to `dataset != null && maximumAge == null`
                 // because BOTH shapes use `dataset:`, so this skip has to be stated separately.
                 if (rule.isFreshnessRule()) continue;
+                if (rule.isInvestigationRule()) continue;   // its own pass above; no window, so inWindow would NPE
                 if (rule.onPipeline() != null && !matches(rule.onPipeline(), display, id)) continue;
                 if (ledger == null) ledger = status.batches(cfg);   // one read per pipeline pass
                 List<Map<String, String>> rows = inWindow(rule, ledger, nowMs);
@@ -460,6 +481,8 @@ public final class AlertService {
             attrs.put("rule", rule.name());
             if (rule.metric() != null) attrs.put("metric", rule.metric());
             if (rule.dataset() != null) attrs.put("dataset", rule.dataset());
+            if (rule.investigation() != null) attrs.put("investigation", rule.investigation());
+            if (rule.relation() != null) attrs.put("relation", rule.relation());
             if (rule.measure() != null) attrs.put("measure", rule.measure());
             attrs.put("comparator", rule.comparator());
             attrs.put("threshold", String.valueOf(rule.threshold()));

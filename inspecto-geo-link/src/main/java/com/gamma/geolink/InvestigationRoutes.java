@@ -307,6 +307,80 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /**
+     * LA-23 — build a NEW Investigation from an Investigation Template's ops (called by
+     * {@link InvestigationTemplateRoutes}, which resolves the template, its parameters and the binding). Additive:
+     * every existing route is untouched. {@code header} carries the new id, title, Dataset and column roles plus the
+     * template lineage; each op is an {@code /ops}-shaped body ({@code {op, ids?, entityType?, limit?}}) and is
+     * validated by the same {@link #params} an append uses. Gates, in {@link #create}'s order: unsafe id or column 422
+     * → unknown or not-viewable Dataset 404 (R3) → a column the relation lacks 422 → id escaping the store 403 → id
+     * taken 409. Every {@code expand} reads the NEW binding — the frontier is the whole Working Set at that point,
+     * because a template names no entities — and seals that read (D-E3). Assembled off to the side and moved into
+     * place in one rename, as a fork is, so a failed instantiation writes nothing.
+     */
+    Map<String, Object> instantiate(ApiContext api, HttpExchange ex, Path writeRoot, Map<String, Object> header,
+                                    List<Map<String, Object>> ops) throws IOException {
+        String id = String.valueOf(header.get("id"));
+        requireSafeId(id);
+        String dataset = String.valueOf(header.get("dataset"));
+        List<String> cols = new ArrayList<>();
+        for (String key : List.of("sourceCol", "targetCol", "linkKindCol")) {
+            String col = ident(header, key, !key.equals("linkKindCol"));
+            if (col != null) cols.add(col);
+        }
+        List<String> columns = relationColumns(dataset, InvRoutes.relationFor(api, ex, writeRoot, dataset));
+        for (String col : cols)
+            if (columns.stream().noneMatch(col::equalsIgnoreCase))
+                throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
+        SnapshotStore store = new SnapshotStore(writeRoot);
+        jail(store, id);
+        if (store.readInvestigation(id) != null) throw new ApiException(409, "investigation '" + id + "' already exists");
+
+        Map<String, Object> h = new LinkedHashMap<>(header);
+        h.put("owner", ApiContext.actor(ex));
+        h.put("createdAt", Instant.now().toString());
+        h.put("datasetVersion", null);   // D-E3, as create
+        h.put("parent", null);
+        Inv inv = new Inv(store, writeRoot, id, h);
+        InvestigationEvaluator.State state = new InvestigationEvaluator.State();
+        List<String> lines = new ArrayList<>(), sets = new ArrayList<>();
+        int step = 0;
+        for (Map<String, Object> body : ops) {
+            String op = ApiContext.str(body, "op");
+            if (DEFERRED.contains(op))
+                throw new ApiException(422, "op '" + op + "' is in the closed vocabulary but not implemented yet");
+            if (!SHIPPED.contains(op)) throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
+            Map<String, Object> e = entry(++step, "op", ex);
+            e.put("op", op);
+            e.put("params", params(op, body));
+            e.put("derivedFrom", body.get("derivedFrom"));
+            if (op.equals("expand")) {
+                List<String> frontier = new ArrayList<>(state.entities.keySet());
+                if (frontier.isEmpty()) throw new ApiException(422, "template step " + step + " expands an empty Working Set");
+                if (frontier.size() > MAX_FRONTIER)
+                    throw new ApiException(422, "template step " + step + " would expand " + frontier.size()
+                            + " entities; an expand frontier is capped at " + MAX_FRONTIER);
+                e.put("read", read(api, ex, inv, frontier, new ArrayList<>(state.excluded.keySet()),
+                        ((Number) ((Map<?, ?>) e.get("params")).get("limit")).intValue()));
+            }
+            e = roundTrip(e);
+            InvestigationEvaluator.apply(state, e);
+            e.put("workingSetHash", state.hash());
+            lines.add(canonical(e));
+            sets.add(canonical(setDoc(step, state)));
+        }
+        synchronized (lock(store.directory().resolve("investigations"))) {
+            if (!store.createFork(id, canonical(h), lines, sets))
+                throw new ApiException(409, "investigation '" + id + "' already exists");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("header", h);
+        out.put("steps", step);
+        out.put("workingSet", summary(state));
+        return out;
+    }
+
+    /**
      * {@code POST /inv/investigations/{id}/replay} — body {@code {at?, reread?}}. Evaluates the sealed log from
      * the first step (to {@code at} when given) and compares every position's hash with the one recorded when the
      * step was appended: {@code equivalent} is the incremental/full equivalence check (plan §2.3). With

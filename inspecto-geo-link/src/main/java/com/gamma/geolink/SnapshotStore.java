@@ -250,6 +250,59 @@ final class SnapshotStore {
         return true;
     }
 
+    // ── Investigation Templates (LA-23) — the method half of an Investigation, write-once like everything here ──
+    //   investigation-templates/<id>.json        CREATE_NEW — never rewritten; a changed method is a new id, so an
+    //                                            Investigation instantiated from a template always names exactly
+    //                                            the method it ran.
+    // ⚠ A directory, so it cannot collide with a snapshot: list() keeps only *.json FILES at this level.
+
+    private static final String TEMPLATES = "investigation-templates";
+
+    /** Where Investigation Templates live — for the path-jail assertion in the route. */
+    Path templateDirectory() {
+        return dir.resolve(TEMPLATES);
+    }
+
+    /** Save one template. False when the id is already taken — never an overwrite (409). */
+    boolean createTemplate(String id, String json) throws IOException {
+        Files.createDirectories(templateDirectory());
+        try {
+            Files.writeString(templateDirectory().resolve(id + ".json"), json, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            return true;
+        } catch (FileAlreadyExistsException e) {
+            return false;
+        }
+    }
+
+    /** One template's raw JSON, or null when it was never saved. */
+    String readTemplate(String id) throws IOException {
+        Path f = templateDirectory().resolve(id + ".json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
+    // ── Alert Rule bindings (LA-23) — the owner's record that an Alert Rule may evaluate this Investigation ──
+    //   investigations/<id>/alert-rules/<rule>.json   the bound rule's canonical hash, who bound it, when.
+    // Written only by the owner-gated binding route; read by the alert sweep, which has no caller of its own and
+    // so evaluates a rule only when a binding for exactly that rule exists here. Rewritten on re-binding (it is a
+    // relationship, not evidence), so the write is atomic.
+
+    /** Record (or replace) the binding of one Alert Rule to one Investigation. */
+    void bindAlertRule(String investigationId, String rule, String json) throws IOException {
+        Path d = investigationDir(investigationId).resolve("alert-rules");
+        Files.createDirectories(d);
+        Path tmp = Files.createTempFile(d, ".bind-", ".tmp");
+        Files.writeString(tmp, json, StandardCharsets.UTF_8);
+        Files.move(tmp, d.resolve(rule + ".json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** One Alert Rule's binding to an Investigation, raw, or null when that rule was never bound to it. */
+    String readAlertRuleBinding(String investigationId, String rule) throws IOException {
+        Path f = investigationDir(investigationId).resolve("alert-rules").resolve(rule + ".json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
     private static void deleteTree(Path p) throws IOException {
         try (var s = Files.walk(p)) {
             for (Path q : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(q);

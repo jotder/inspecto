@@ -122,6 +122,58 @@ class AlertRuleTest {
         assertEquals(ok.get("when"), AlertRule.fromMap(ok).when());
     }
 
+    // ── LA-23: an Alert Rule over an Investigation's Working Set ─────────────────────────────────────
+
+    private static Map<String, Object> investigationRule() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("name", "big-ring");
+        m.put("investigation", "inv-42");
+        m.put("measure", "count");
+        m.put("comparator", "gte");
+        m.put("threshold", 10);
+        m.put("severity", "CRITICAL");
+        return m;
+    }
+
+    @Test
+    void anInvestigationRuleParsesDefaultsToTheEntitiesRelationAndRoundTrips() {
+        AlertRule r = AlertRule.fromMap(investigationRule());
+        assertTrue(r.isInvestigationRule());
+        assertFalse(r.isMeasureRule(), "disjoint from the Dataset measure kind");
+        assertFalse(r.isFreshnessRule());
+        assertEquals("inv-42", r.investigation());
+        assertEquals("entities", r.relation(), "relation defaults to the entities relation");
+        assertEquals(r, AlertRule.fromMap(r.toMap()), "what the registry stores is what re-arms at boot");
+
+        Map<String, Object> links = investigationRule();
+        links.put("relation", "LINKS");
+        links.put("measure", "sum(count)");
+        assertEquals("links", AlertRule.fromMap(links).relation());
+    }
+
+    @Test
+    void anInvestigationRuleRefusesEveryOtherKindsFieldsAndItsOwnBadValues() {
+        for (var bad : Map.<String, Object>of(
+                "dataset", "sales_ds",
+                "metric", "error_rate",
+                "window", "1h",
+                "maximumAge", "6h",
+                "relation", "edges",
+                "measure", "median(hop)",
+                "when", Map.of("kind", "group", "op", "AND", "items", List.of())).entrySet()) {
+            Map<String, Object> m = investigationRule();
+            m.put(bad.getKey(), bad.getValue());
+            if (bad.getKey().equals("when"))   // an empty group normalises to absent — give it a condition
+                m.put("when", Map.of("kind", "group", "op", "AND", "items", List.of(
+                        Map.of("kind", "condition", "field", "status", "operator", "=", "value", "x"))));
+            assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m), "should reject " + bad);
+        }
+        Map<String, Object> orphan = valid();
+        orphan.put("relation", "links");
+        assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(orphan),
+                "a relation without an investigation names nothing");
+    }
+
     @Test
     void emptyWhenNormalizesToNull() {
         Map<String, Object> m = valid();

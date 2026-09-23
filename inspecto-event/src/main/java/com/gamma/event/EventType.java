@@ -197,6 +197,22 @@ public final class EventType {
      *  {@code truncated}, {@code cached} and the relation {@code key} (the sealed log's hash) — the LA-04
      *  query-audit shape, so a read of the relation is as visible as the projection it replaces. */
     public static final String LINK_INVESTIGATION_WORKING_SET_READ = "LINK_INVESTIGATION_WORKING_SET_READ";
+    /** An Investigation's op log was saved as an <b>Investigation Template</b> ({@code POST
+     *  /inv/investigations/{id}/template}, LA-23). {@code templateId}, {@code investigationId}, {@code parameters}
+     *  and {@code dropped} — how many analyst-judgement ops (exclude · hide · keep) were left behind, per D-E8. */
+    public static final String LINK_INVESTIGATION_TEMPLATE_SAVED = "LINK_INVESTIGATION_TEMPLATE_SAVED";
+    /** An Investigation Template was instantiated into a new Investigation ({@code POST
+     *  /inv/investigation-templates/{id}/instantiate}, LA-23). {@code templateId}, {@code investigationId},
+     *  {@code dataset} and {@code steps}; every {@code expand} read fresh data and is sealed in the new log. */
+    public static final String LINK_INVESTIGATION_TEMPLATE_INSTANTIATED = "LINK_INVESTIGATION_TEMPLATE_INSTANTIATED";
+    /** The Measures over an Investigation's Working Set were read ({@code GET /inv/investigations/{id}/measures},
+     *  LA-23) — the LA-04 query-audit shape: {@code investigationId}, {@code key} (the sealed log's hash) and
+     *  {@code measure} when one was asked for. */
+    public static final String LINK_INVESTIGATION_MEASURED = "LINK_INVESTIGATION_MEASURED";
+    /** An Alert Rule was bound to a Measure over an Investigation's Working Set ({@code POST
+     *  /inv/investigations/{id}/alert-rules}, LA-23) by the Investigation's owner. {@code rule},
+     *  {@code investigationId}, {@code relation}, {@code measure}, {@code threshold}. */
+    public static final String LINK_INVESTIGATION_ALERT_RULE_BOUND = "LINK_INVESTIGATION_ALERT_RULE_BOUND";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

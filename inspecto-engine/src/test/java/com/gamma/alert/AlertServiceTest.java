@@ -238,4 +238,59 @@ class AlertServiceTest {
         assertEquals(1, count(objects, ObjectType.ALERT), "it records an ALERT object");
         assertEquals(0, count(objects, ObjectType.INCIDENT), "but a warning breach does not open an Incident");
     }
+
+    // ── LA-23: an Alert Rule over an Investigation's Working Set ─────────────────────────────────────
+
+    private static AlertRule investigationRule(String severity) {
+        return AlertRule.fromMap(Map.of("name", "big-ring", "investigation", "inv-42", "measure", "count",
+                "comparator", "gte", "threshold", 3, "severity", severity));
+    }
+
+    /**
+     * The Investigation rule fires through the SAME path as every other kind — ALERT object, then (at CRITICAL) the
+     * Incident — scoped to the Investigation, and the Incident is deduped by rule within that scope: a re-fire after
+     * the cooldown, whose earlier ALERT was resolved, opens a fresh ALERT but no second Incident. The ledger pass
+     * runs over a real pipeline with ledger rows, so an Investigation rule reaching it (no window) would throw.
+     */
+    @Test
+    void anInvestigationRuleFiresThroughTheProbeAndPromotesToOneIncidentPerInvestigation(@TempDir Path dir)
+            throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        List<Map<String, String>> ledger = List.of(row("SUCCESS", 10, 10, 0, 100, LocalDateTime.now().minusMinutes(5)));
+        FakeObjectAccess objects = new FakeObjectAccess();
+        AlertService svc = new AlertService(List.of(investigationRule("CRITICAL")), configs(cfg), store(ledger), objects);
+        assertEquals(0, svc.evaluateAll().size(), "no probe wired (no Link Analysis module) → inert, never fired");
+
+        List<AlertRule> probed = new ArrayList<>();
+        svc.investigationProbe(r -> {
+            probed.add(r);
+            return java.util.OptionalDouble.of(5);
+        });
+        long now = System.currentTimeMillis();
+        List<Alert> fired = svc.evaluate(null, now);
+        assertEquals(1, fired.size());
+        assertEquals("inv-42", fired.get(0).pipeline(), "scoped to the Investigation");
+        assertEquals("entities count", fired.get(0).metric(), "labelled by relation + measure");
+        assertEquals(5.0, fired.get(0).value());
+        assertTrue(fired.get(0).message().contains("sealed Working Set"), fired.get(0).message());
+        assertEquals("big-ring", probed.get(0).name(), "the probe is handed the rule itself");
+        assertEquals(1, count(objects, ObjectType.ALERT));
+        assertEquals(1, count(objects, ObjectType.INCIDENT), "a CRITICAL breach opens an Incident");
+        FakeObjectAccess.Opened incident = objects.opened.stream().filter(o -> o.kind() == ObjectType.INCIDENT)
+                .findFirst().orElseThrow();
+        assertEquals("inv-42", incident.scope(), "the Incident's correlation scope is the Investigation");
+        assertEquals("inv-42", incident.attributes().get("investigation"));
+        assertEquals("entities", incident.attributes().get("relation"));
+
+        String alertId = objects.opened.stream().filter(o -> o.kind() == ObjectType.ALERT).findFirst().orElseThrow().id();
+        objects.close(alertId);
+        assertEquals(1, svc.evaluate(null, now + java.time.Duration.ofMinutes(11).toMillis()).size(),
+                "past the cooldown it fires again");
+        assertEquals(2, count(objects, ObjectType.ALERT), "a fresh ALERT, since the first was resolved");
+        assertEquals(1, count(objects, ObjectType.INCIDENT), "…but the active Incident dedupes the second promotion");
+
+        svc.investigationProbe(r -> java.util.OptionalDouble.empty());
+        assertEquals(0, svc.evaluate(null, now + java.time.Duration.ofMinutes(30).toMillis()).size(),
+                "a probe that cannot vouch for the rule (no owner binding) never fires");
+    }
 }

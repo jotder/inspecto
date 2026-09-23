@@ -459,7 +459,7 @@ caller-shaped SQL would not.
 | **LA-21** | Evidence / Monitoring Widgets | ⬜ | M | — (LA-20 shipped 2026-09-23; D-E6 decided: frozen by default) | Pinned default; kind on the tile; drift line. |
 | **LA-12** | Dossier + three renderings + chain of custody | ✅ **BACKEND SHIPPED 2026-09-23** — `DossierRoutes` (`GET /inv/investigations/{id}/dossier`, `POST …/dossier/verify`) over a pure `GraphDossierBuilder`; `ControlApiDossierTest` 8/8, tamper detection mutation-checked twice. As-built + deferrals in §5.6 | L | — (LA-10 shipped 2026-09-23) | `GraphDossierBuilder.java`: summary, topology, centrality/risk tables, chronological ledger, SHA-256 manifest (replaces the FNV-1a fingerprint); JSON / numbered steps / method statement; **negative space in all three**. |
 | **LA-22** | Synchronised Geo ↔ Link brushing | ✅ **SHIPPED 2026-09-23 (brush half)** — `geo-link-brush.ts` (`GeoLinkBrushService` + `nodeIdsForKeys`/`pointIdsForNodes`, joined only via `entityId()`); polygon/point on the map → node emphasis, node click → point emphasis; unkeyed points never brush. ⚠ **Re-grounded:** the ident param, SELECT column, wire types and `foldServerResult` had already shipped in `beb0170b`, so the remaining work was the emitter + consumers only. **Deferred:** split-pane mode, graph path → map route tracing. | ~~S–M~~ → **M** — 🔴 **I under-sized this and the correction matters.** The geometry half does ship, but `geo-projection.ts`'s own header records the projection as **backend-first since Phase 4**, so changing `projectPoints`/`coLocations` alone is **cosmetic in production** — `GeoRoutes.java` builds the points server-side and is the load-bearing half, needing a new ident param and SELECT column. ⚠ And the “selection event” is **net-new plumbing**: `geo-map.component.ts`'s displayed set has no `@Output` at all, so today the polygon is a DISPLAY FILTER that no other pane can hear. ~9 touchpoints (type, form, wire types, `foldServerResult`, Java route, `CoLocation`, the emitter). ⚠ `coLocations` also requires `p.label` truthy to participate, so a point with no entity column never co-locates — the same trap will apply to a key unless a fallback is decided. | — (D-U3 answered · D-U4 dissolved) | `GeoLinkSyncService.ts`: bounding-box on map isolates nodes; path on graph traces the route; split-pane mode. |
-| **LA-23** | Enquiry Templates → Measure → Alert Rule → Incident | ⬜ | M | — (LA-20 shipped 2026-09-23; D-E8 decided) | Cheap once LA-20 lands; every downstream noun ships. |
+| **LA-23** | Investigation Templates → Measure → Alert Rule → Incident | ✅ **BACKEND SHIPPED 2026-09-23 — every link of the chain, thinnest slice.** `InvestigationTemplateRoutes` (save a log as a template: seeds → parameters, `exclude`/`hide`/`keep` dropped per D-E8 with counts only; instantiate over the same or another Dataset with the same column roles, every `expand` re-read and sealed) · `InvestigationMeasureRoutes` (`GET …/measures`: a declared set + one asked-for Measure in the BI shorthand, over the LA-20 relation; `POST …/alert-rules`: an owner-bound Alert Rule, `investigation:` + `relation:` + `measure:`) · `AlertService` evaluates it through the existing fire → ALERT → CRITICAL Incident path, deduped per Investigation. Tests: `ControlApiInvestigationTemplateTest` 5/5, `ControlApiInvestigationAlertRuleTest` 6/6, `WorkingSetMeasuresTest` 3/3, `AlertRuleTest`/`AlertServiceTest` +2/+1; D-E8 and the alert firing mutation-checked. ⚠ The alert watches the SEALED Working Set (D-E3/D-E6) — it moves when the log moves, not when data does; live monitoring and scheduled re-instantiation deferred. As-built + deferrals in §5.8. SPA not started | M | — (LA-20 shipped 2026-09-23; D-E8 decided) | Cheap once LA-20 lands; every downstream noun ships. |
 | **LA-24** | Investigation sharing with a Case team | ⬜ **DEFERRED 2026-09-23 (operator): owner-only stays** | M | Investigation ↔ Case linkage (an LA-10 deferral) | Today an Investigation is owner-only in every edition, and on Enterprise the PDP can only NARROW that (the `AccessDecider` contract: an ALLOW never widens), so a Case team cannot read a colleague's Investigation. Decided: a deliberate limit, not a gap. When built, it rides on linking an Investigation to a Case; the plan's reading is read-only access for that Case's members with writes staying owner-only. ⛔ Widening through an Enterprise policy ALLOW was offered and NOT chosen — it would break the never-widens contract. |
 
 ---
@@ -717,7 +717,7 @@ guards is currently uncaught.
   and `null`. (4) `undo` and `reorder` are two routes this contract did not list.
 * ⏳ **Deferred:** `seedBy`, `excludeBy`, `threshold`, `window`, `annotate`, `snapshot` (they answer 422 *"not
   implemented yet"*, never *"unknown"*); the hop-ladder rung fields (LA-13); a list/GET-one route; Case
-  linkage of an Investigation; the Investigation Template (LA-23); stamping `investigationId`/`opSeq` onto
+  linkage of an Investigation; ~~the Investigation Template (LA-23)~~ ✅ shipped, §5.8; stamping `investigationId`/`opSeq` onto
   snapshots server-side (the snapshot body is stored verbatim, so a client can already carry them); SPA wiring.
 
 ### 5.6 Dossier routes — LA-12
@@ -835,9 +835,83 @@ now, reused so the owner + R3 gate is not duplicated):
   parent`. (2) The `AccessDecider` contract says a policy ALLOW never widens an existing gate, so on Enterprise a
   policy can only NARROW owner-only; letting a Case team read a colleague's Investigation would be a sharing
   model, which D-E7 did not decide. (3) §2.7 says "a **Widget** binds to it" — no Widget binds yet (LA-21).
-* ⏳ **Deferred:** the relation as a BI-queryable source (`/bi/query`, Measures, Alert Rules — LA-21/LA-23; the
-  binding must carry this gate with it); Case linkage and Case-scoped sharing; `?at=<step>` (a relation at a past
+* ⏳ **Deferred:** the relation as a BI-queryable source (`/bi/query` — LA-21; the binding must carry this gate with
+  it) — ✅ Measures and Alert Rules over it shipped with LA-23 WITHOUT going through `/bi`, carrying this gate (§5.8); Case linkage and Case-scoped sharing; `?at=<step>` (a relation at a past
   head); a cross-JVM cache (the cache is per process, which is correct but cold after restart).
+
+### 5.8 Investigation Template → Measure → Alert Rule → Incident — LA-23
+
+✅ **AS BUILT 2026-09-23 (backend)** — two new `RouteModule`s in `inspecto-geo-link`. `InvestigationRoutes` gained
+ONE additive package-private method, `instantiate(...)` (the fork loop's shape, over a new binding); no existing route
+changed and no registration line moved.
+
+| Route | Gate | Notes |
+|---|---|---|
+| `POST /inv/investigations/{id}/template` | `canManageIncidents` + `InvestigationRoutes.open` | `{id?, title?}` → the template; 422 when the effective log has no `seed`; 409 on a taken id (write-once) |
+| `GET /inv/investigation-templates/{id}` | open read, owner-only (404) | the stored template |
+| `POST /inv/investigation-templates/{id}/instantiate` | `canManageIncidents`, owner-only | `{id?, title?, params:{seed1:[…]}, dataset?, sourceCol?, targetCol?, linkKindCol?}` → a NEW Investigation; 422 missing/empty/unknown parameter → 404 Dataset (R3) → 422 column → 403 → 409; atomic (assembled aside, one rename) |
+| `GET /inv/investigations/{id}/measures` | open read + `open` (owner · R3 · PDP) | `?relation=&measure=` optional → `{head, measures[{name, relation, measure, value}], byKind[{kind, links, events}], measure?, key, cached}` |
+| `POST /inv/investigations/{id}/alert-rules` | `canAuthorAlertRules` + `open` | `{name, relation?, measure, comparator, threshold, severity}` → `{rule, current, wouldFire, disclosure}`; 422 any other field / invalid rule / uncomputable measure → 503 no alert engine → 409 name taken |
+
+* **Template = the method (D-E8, G-E12).** `seed` → a parameter (`seed1`, `seed2`, … in log order; ids NOT stored).
+  `expand` → carried with its `limit`; an expand that named its frontier becomes a whole-Working-Set expand, listed
+  under `generalised` with `exact` (whether the named frontier WAS the whole Working Set there). `exclude`, `hide`,
+  `keep` → dropped, listed under `dropped` as `{step, op, count}` — never the ids or the reason text (case data).
+  Undone steps are not part of the method. Any other op travels verbatim — that is where D-E8's "named reference lists
+  travel" lands — ⚠ but **nothing can take that path today**: `excludeBy` answers "not implemented yet" at append, and
+  no persisted named list exists (LA-17 deferred; verified again: no reference-list object in the code). Pinned: the
+  stored template contains none of the case's entity ids or reasons, and re-bound to the same seed it answers the
+  graph WITHOUT the analyst's exclusion (mutation-checked: carrying `exclude` makes that test red on the entity set).
+* **Store: `SnapshotStore`, not `ComponentStore`** — `audit/snapshots/investigation-templates/<id>.json`,
+  `CREATE_NEW`. D-E2's one durable mechanism; write-once, so an instantiated Investigation names exactly the method it
+  ran (its header carries `template {id}`, every step `derivedFrom {template, step}`). `ComponentStore` rejected:
+  overwritable; a registry kind is writable through the generic `/components/{type}` CRUD, around the D-E8 extraction;
+  and `ComponentAccess` sharing is a sharing model nobody decided for Link Analysis objects. Owner-only, like the
+  Investigation.
+* **Instantiation** binds the template's column ROLES to the new Dataset (names default to the template's; a kind
+  role must be bound if the template had one), applies the R3 gate to the new Dataset, and re-reads every `expand`
+  against it (sealed, D-E3). The instantiated log replays `equivalent` like any other.
+* **Measure over the Working Set — one grammar.** The BI Measure shorthand (`count` | `agg(field)`, validated by
+  `DatasetMeasureProbe.validMeasure`, split by `MeasureCompiler.splitShorthand`) over one relation's columns,
+  evaluated in-JVM from the cached LA-20 relation with SQL null rules (`sum`/`avg`/`min`/`max` on `hop`, `opSeq`,
+  `count` only; an aggregate over nothing is empty). Declared set: `entities` count, `links` count, `events`
+  (`sum(count)`), `excluded` count, `maxHop`, and links/events **by kind**. `WorkingSetMeasures`.
+* **Alert Rule.** `AlertRule` gained a fourth, disjoint kind — `investigation:` + `relation:` (default `entities`) +
+  `measure:` — refused beside `dataset`/`metric`/`window`/`when`/`maximumAge`. `AlertService` evaluates it in its own
+  pass through a `ServiceLoader` SPI (`com.gamma.alert.InvestigationMeasureProbe`, implemented by `WorkingSetMeasures`;
+  absent the module, the rules are inert), and fires through the EXISTING path: `ALERT_FIRED` + the `alert-rule.fired`
+  Signal (correlation `alert:<rule>|<investigation>`), the ALERT object, and at CRITICAL the Incident, deduped by rule
+  within the Investigation's scope (`AlertServiceTest` pins one Incident across two fires). The ledger pass skips the
+  kind (it has no window — mutation-checked: without the skip every sweep NPEs). The probe's write root is resolved as
+  `ControlApi.writeRoot()` resolves it (Space config, else `-Dassist.write.root` as read at boot) — not re-read per
+  sweep as `DatasetMeasureProbe`'s is.
+* **Access.** Authoring opens the Investigation through `InvestigationRoutes.open` (owner-only, R3, Enterprise PDP):
+  a non-owner's rule is refused as a 404 even with `canAuthorAlertRules`; a DENY refuses the owner. A sweep carries no
+  caller, so the gate travels as a **binding** — `investigations/<id>/alert-rules/<rule>.json` holding the rule's
+  canonical SHA-256 and the owner — and the probe evaluates a rule only when that binding matches the rule as armed
+  (pinned: a rule written straight into the registry and armed never evaluates; nor does a bound rule edited after
+  binding; mutation-checked). The generic `POST`/`PUT /alerts/rules` refuse the `investigation:` shape (422, naming the
+  route), so the Decision Rule `create-alert` consequence cannot author one either.
+* **Audit** — `LINK_INVESTIGATION_TEMPLATE_SAVED`, `LINK_INVESTIGATION_TEMPLATE_INSTANTIATED`,
+  `LINK_INVESTIGATION_MEASURED`, `LINK_INVESTIGATION_ALERT_RULE_BOUND` (best-effort, LA-04 shape).
+* 🔴 **Plan vs code.** (1) §2.7 frames the chain as a *detection* capability; as built the alert watches the **sealed**
+  Working Set (D-E3; D-E6's frozen default), so it moves when the log moves (an op, an undo, a new instantiation) and
+  never when the Dataset grows. A live re-read on every sweep would need a Dataset read with no caller, which could not
+  pass the R3 gate the analyst's reads pass — deferred rather than done identity-blind. (2) D-E8 speaks of exclusions
+  only; `hide` and `keep` are dropped too, on the same principle (they name entities of one graph). (3) An `expand`
+  that named its frontier cannot travel as-is (the names are case data) — generalised and reported, not refused.
+  (4) D-E8's "named lists travel" has nothing to carry until LA-17 or `excludeBy` ships. (5) The binding carries the
+  owner-only gate to sweep time, but NOT a later PDP DENY or the owner later losing sight of the Dataset — both are
+  checked when the rule is bound; the PDP judges a request Subject and a sweep has none. (6) A fired Alert (and
+  Incident) shows the Investigation id, relation, measure, value and threshold to everyone who can read Alerts and
+  Incidents — never an entity id; the binding response states this as `disclosure`.
+* ⏳ **Deferred:** live (Monitoring) evaluation and scheduled re-instantiation (a Job Type) — the two things that turn a
+  one-off alert into standing detection; a template list route and template sharing; editing a bound rule (delete via
+  `DELETE /alerts/rules/{name}`, then re-bind); a PDP re-check at sweep time; templates carrying `window`/hop-ladder
+  parameters (LA-13 rewrites the op vocabulary); Case linkage of the Incident to the Investigation's Case. **SPA
+  follow-up:** a *Save as template* action on the Investigation tab (show `dropped`/`generalised` before saving), an
+  *Instantiate* dialog (parameters + Dataset + column-role mapping), a Measures strip over the Working Set, and a
+  *Watch this measure* action posting to `…/alert-rules` that shows `current`, `wouldFire` and the `disclosure` text.
 
 ---
 

@@ -34,6 +34,13 @@ final class CapabilityManifest {
             new Entry("POST", "/inv/investigations/([^/]+)/ops", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/investigations/([^/]+)/reorder", Roles.CAN_MANAGE_INCIDENTS),
+            // InvestigationTemplateRoutes (LA-23) — saving a method and instantiating one into a new Investigation
+            // write the same store as the op log, so they are Case work like appending to it.
+            new Entry("POST", "/inv/investigations/([^/]+)/template", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigation-templates/([^/]+)/instantiate", Roles.CAN_MANAGE_INCIDENTS),
+            // InvestigationMeasureRoutes (LA-23) — binding an Alert Rule arms it, so it is alert authoring, as
+            // POST /alerts/rules is; the Investigation's owner-only / PDP gate applies on top.
+            new Entry("POST", "/inv/investigations/([^/]+)/alert-rules", Roles.CAN_AUTHOR_ALERT_RULES),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),

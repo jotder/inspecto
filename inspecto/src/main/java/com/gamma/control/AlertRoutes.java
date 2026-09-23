@@ -126,10 +126,18 @@ final class AlertRoutes implements RouteModule {
     }
 
     private static AlertRule parse(Map<String, Object> body) {
+        AlertRule rule;
         try {
-            return AlertRule.fromMap(body);
+            rule = AlertRule.fromMap(body);
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, e.getMessage());
         }
+        // LA-23: a rule over an Investigation's Working Set must pass that Investigation's owner-only / PDP gate,
+        // which only the Link Analysis module can apply — and only its route records the binding the evaluator
+        // requires, so a rule written here would be armed yet never evaluate. Refused loudly, with the way in.
+        if (rule.isInvestigationRule())
+            throw new ApiException(422, "an Alert Rule over an Investigation (investigation:) is authored through "
+                    + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
+        return rule;
     }
 }

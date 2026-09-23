@@ -42,6 +42,29 @@ import java.util.Set;
  *   }
  * </pre>
  *
+ * <p><b>Investigation rules (LA-23)</b> — watch a Measure over a Link Analysis Investigation's Working Set
+ * (the derived relation of LA-20) instead of a Dataset. {@code relation} picks one of the Working Set's three
+ * relations and {@code measure} is the SAME Measure shorthand a Dataset measure rule takes, over that relation's
+ * columns:
+ *
+ * <pre>
+ *   alert {
+ *     name:          big-ring
+ *     investigation: inv-42                   # an Investigation id
+ *     relation:      entities                 # entities | links | excluded (default entities)
+ *     measure:       count                    # count | agg(field), agg ∈ count/countDistinct/sum/avg/min/max
+ *     comparator:    gt
+ *     threshold:     10
+ *     severity:      CRITICAL
+ *   }
+ * </pre>
+ *
+ * ⚠ Authored only through {@code POST /inv/investigations/{id}/alert-rules} (the optional
+ * {@code inspecto-geo-link} module), which applies the Investigation's owner-only / PDP gate and records the
+ * binding beside the Investigation. The generic {@code /alerts/rules} routes refuse this shape, and the
+ * evaluator ({@link InvestigationMeasureProbe}) answers nothing for a rule with no matching binding — so a rule
+ * written around that route (a hand-edited registry file, a generic component write) never evaluates.
+ *
  * <p><b>Row-scoping {@code when} (Rules triad condition-tree promotion, 2026-07-18)</b> — a ledger-metric
  * rule may add a {@code when} condition tree (the same {@code query-types} shape Decision Rules author),
  * restricting the metric math to ledger rows matching it (e.g. only batches tagged a particular way).
@@ -64,12 +87,19 @@ import java.util.Set;
  */
 public record AlertRule(String name, String metric, String comparator, double threshold,
                         String window, String severity, String onPipeline,
-                        String dataset, String measure, Object when, String maximumAge) {
+                        String dataset, String measure, Object when, String maximumAge,
+                        String investigation, String relation) {
 
     public static final Set<String> METRICS =
             Set.of("error_rate", "failed_batches", "rejected_files", "duration_ms");
     public static final Set<String> COMPARATORS = Set.of("gt", "gte", "lt", "lte");
     public static final Set<String> SEVERITIES = Set.of("INFO", "WARNING", "CRITICAL");
+    /**
+     * The Working Set relations an Investigation rule may measure (LA-20's {@code ?of=}). ⚠ A mirror of
+     * {@code WorkingSetRoutes.COLUMNS}' keys in the optional module, which this engine cannot see —
+     * {@code WorkingSetMeasuresTest} there pins the two equal.
+     */
+    public static final Set<String> INVESTIGATION_RELATIONS = Set.of("entities", "links", "excluded");
 
     /** The historic ledger-metric rule shape (every pre-BI-5 caller). */
     public AlertRule(String name, String metric, String comparator, double threshold,
@@ -91,6 +121,14 @@ public record AlertRule(String name, String metric, String comparator, double th
         this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, null);
     }
 
+    /** Every pre-{@code investigation} (pre-LA-23) caller. */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                null, null);
+    }
+
     public AlertRule {
         require(name != null && !name.isBlank(), "alert.name is required");
         metric = lower(metric);
@@ -106,7 +144,23 @@ public record AlertRule(String name, String metric, String comparator, double th
         }
         when = (when instanceof Map<?, ?> m && !m.isEmpty()) ? when : null;
         maximumAge = (maximumAge == null || maximumAge.isBlank()) ? null : maximumAge.trim().toLowerCase(Locale.ROOT);
-        if (maximumAge != null) {
+        investigation = (investigation == null || investigation.isBlank()) ? null : investigation.trim();
+        relation = (relation == null || relation.isBlank()) ? null : relation.trim().toLowerCase(Locale.ROOT);
+        if (investigation != null) {
+            // Investigation rule (LA-23): a scalar Measure over one relation of an Investigation's Working Set.
+            // It reads the sealed log — never a Dataset, a ledger or a clock — so none of those shapes apply.
+            require(dataset == null, "an investigation alert (investigation:) must not also declare a dataset");
+            require(maximumAge == null, "an investigation alert (investigation:) must not also declare maximumAge");
+            require(metric == null, "an investigation alert (investigation:) must not also declare a ledger metric");
+            require(window == null, "an investigation alert (investigation:) takes no window (it reads the "
+                    + "Working Set)");
+            require(when == null, "alert.when scopes ledger rows; an investigation alert has none");
+            if (relation == null) relation = "entities";
+            require(INVESTIGATION_RELATIONS.contains(relation),
+                    "alert.relation must be one of " + INVESTIGATION_RELATIONS);
+            require(com.gamma.query.DatasetMeasureProbe.validMeasure(measure),
+                    "alert.measure must be count or agg(field) with agg ∈ count/countDistinct/sum/avg/min/max");
+        } else if (maximumAge != null) {
             // Freshness rule (DUCKLE-C1): "this Dataset must have published within maximumAge".
             // It is evaluated on a CLOCK against the last dataset.write Signal, so none of the
             // ledger-metric vocabulary applies — and a batch (Nb) window is not a clock at all,
@@ -138,6 +192,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         }
         require(COMPARATORS.contains(comparator), "alert.comparator must be one of " + COMPARATORS);
         require(SEVERITIES.contains(severity), "alert.severity must be one of " + SEVERITIES);
+        require(relation == null || investigation != null, "alert.relation requires alert.investigation");
         if (maximumAge == null) require(threshold > 0, "alert.threshold must be a positive number");
         onPipeline = (onPipeline == null || onPipeline.isBlank()) ? null : onPipeline.trim();
     }
@@ -145,6 +200,11 @@ public record AlertRule(String name, String metric, String comparator, double th
     /** Whether this is a BI-5 measure rule (a Dataset measure) vs a ledger-metric rule. */
     public boolean isMeasureRule() {
         return dataset != null && maximumAge == null;
+    }
+
+    /** Whether this is an LA-23 rule over an Investigation's Working Set — disjoint from the other three kinds. */
+    public boolean isInvestigationRule() {
+        return investigation != null;
     }
 
     /**
@@ -184,7 +244,9 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("dataset")),
                 str(alert.get("measure")),
                 alert.get("when"),
-                str(alert.get("maximumAge")));
+                str(alert.get("maximumAge")),
+                str(alert.get("investigation")),
+                str(alert.get("relation")));
     }
 
     /**
@@ -240,6 +302,8 @@ public record AlertRule(String name, String metric, String comparator, double th
         m.put("name", name);
         if (metric != null) m.put("metric", metric);
         if (dataset != null) m.put("dataset", dataset);
+        if (investigation != null) m.put("investigation", investigation);
+        if (relation != null) m.put("relation", relation);
         if (measure != null) m.put("measure", measure);
         if (maximumAge != null) m.put("maximumAge", maximumAge);
         m.put("comparator", comparator);

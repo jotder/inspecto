@@ -117,6 +117,28 @@ class ControlApiAlertRuleWriteTest {
         }
     }
 
+    /**
+     * LA-23: a rule over an Investigation's Working Set must pass that Investigation's owner-only gate, which only
+     * the Link Analysis route applies — so the generic create AND update refuse the shape, and write nothing.
+     */
+    @Test
+    void anInvestigationRuleIsRefusedHereOnCreateAndUpdate(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String body = "{\"name\":\"big-ring\",\"investigation\":\"inv-42\",\"measure\":\"count\","
+                + "\"comparator\":\"gte\",\"threshold\":3,\"severity\":\"CRITICAL\"}";
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", body);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("/inv/investigations/{id}/alert-rules"), "names the way in: " + r.body());
+            assertTrue(store(root).get("alert-rule", "big-ring").isEmpty(), "nothing written");
+            assertTrue(ruleNames(c.port).isEmpty(), "nothing armed");
+
+            assertEquals(200, send(c.port, "POST", "/alerts/rules", rule("big-ring", "gt", 0.05)).statusCode());
+            assertEquals(422, send(c.port, "PUT", "/alerts/rules/big-ring", body).statusCode(),
+                    "an update cannot turn an ordinary rule into an Investigation rule either");
+            assertEquals("error_rate", store(root).get("alert-rule", "big-ring").orElseThrow().content().get("metric"));
+        }
+    }
+
     @Test
     void unsafeNameRejected(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

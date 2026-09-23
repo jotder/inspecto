@@ -23,8 +23,12 @@ public record Alert(String rule, String severity, String pipeline, String metric
                     r.threshold(), r.maximumAge(), epochMillis, freshMsg);
         }
         // A measure rule (BI-5) has no ledger metric/window: label it by its measure over its dataset.
-        String metricLabel = r.metric() != null ? r.metric() : r.measure();
-        String windowLabel = r.window() != null ? r.window() : "current data";
+        // An Investigation rule (LA-23) is labelled by relation + measure, over the SEALED Working Set — it never
+        // reads current data, and saying so keeps the alert from over-claiming.
+        String metricLabel = r.metric() != null ? r.metric()
+                : r.isInvestigationRule() ? r.relation() + " " + r.measure() : r.measure();
+        String windowLabel = r.window() != null ? r.window()
+                : r.isInvestigationRule() ? "the sealed Working Set" : "current data";
         String msg = String.format(java.util.Locale.ROOT,
                 "%s: %s %s is %s (threshold %s %s over %s)",
                 r.severity(), pipeline, metricLabel, trim(value), r.comparator(), trim(r.threshold()),
