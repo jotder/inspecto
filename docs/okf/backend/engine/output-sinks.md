@@ -69,8 +69,9 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   `chunkedIngest`; plugin `GenerationModeIngester`) materialise via the union path when `sinks>1`
   (`CsvIngestStrategy`, `StreamingPluginIngestStrategy`).
 * **Editor round-trip** — `PipelineEditable.lower` no longer refuses `MULTI_SINK`; a graph with >1
-  distinct sink database lowers to a `sinks:` list (the shorthand stays consistent with the first
-  destination). Safe because a `transform.route`/`derive` node is not `LOWERABLE` (fails
+  distinct sink database lowers to a `sinks:` list (a NEW list's shorthand is built from the first
+  destination; over a file that already has one, `output:` is the default layer and is preserved — see
+  below). Safe because a `transform.route`/`derive` node is not `LOWERABLE` (fails
   `UNSUPPORTED_NODE` first), so every sink reaching here is a replicate-per-destination fan-out. The
   `MULTI_SINK` constant was deleted with the pipeline spec's Wave 0 (2026-08-31) — it had been
   unreachable since this change, and an unreachable refusal code reads as a live one.
@@ -83,21 +84,44 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
 ⚠ **Toon authoring:** in the indexed-tuple form `sinks[N]{database,format}:`, a `database` path
 (contains `:` and `/`) **must be quoted** — `"/data/hot",PARQUET` — or the tabular decoder reads 0 rows.
 
-🔴 **A `sinks[]` entry inherits NOTHING from `output:` — OPEN, and master is red on it**
-(`SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1`, filed 2026-09-23). `PipelineConfigParser` reads each entry's
-`compression` from that entry alone (null when the tuple has no such column) and defaults `format` to the
-literal `"CSV"`, *not* to `output.format`; `resolveSinks` then takes the declared list verbatim, so only
-the no-`sinks[]` shorthand ever reads `output.*`. The shipped `premed_events` declares
-`output.compression: snappy` above three `{database,format}` destinations and writes all three
-**uncompressed**. Two fixture sweeps already fail on it. ⚠ **Do not "fix" the round-trip alone** — making
-the bytes survive a save would leave the write path still ignoring the authored value. The open question
-is whether `output:` is the default layer for `sinks[]` entries or is meaningless beside them (in which
-case the parser should refuse the combination rather than accept and ignore it).
+**`output:` is the DEFAULT LAYER for every `sinks[]` entry** (operator decision 2026-09-23,
+`SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1`). All four keys the two share — `format`, `compression`,
+`ducklake`, `filename_column` — resolve **entry's own value → `output.*` → hard default** (`format` =
+`CSV`, the rest none). An explicit entry value always wins, including an opt-out (`compression: none`).
+Before this, an entry took nothing from `output:`: the parser defaulted an omitted `format` to the
+literal `"CSV"` and left `compression` null, so the shipped `premed_events` (`output.compression:
+snappy` above three `{database,format}` entries) never passed its codec to the write.
 
-Tests: `PipelineConfigSinksTest`, `ConfigSafetyValidatorTest` (per-sink jail/allow-list),
+* **Where it resolves** — `PipelineConfigParser` leaves an omitted entry key **null** (no `"CSV"`
+  default any more); `PipelineConfig.resolveSinks` fills it from `output:`. So `cfg.sinks()` always
+  carries **effective** values, and every writer (`IngestSinkWriter`, `ConsignmentIngestStrategy`, the
+  test-run scratch sinks) and `PipelineLift`'s display graph see the inherited value with no change of
+  their own.
+* **The editor does not materialise it** — `PipelineEditable.toMap` gives a sink node only its own
+  entry's keys, and `lower` **preserves `output:` verbatim** while the file keeps a plural `sinks:`
+  block (no node models that layer; the SPA's `lowerGraph` has the same `authoredSinks` rule). Before,
+  `lower` rebuilt `output:` from the primary node, which dropped the inherited codec on every no-edit save
+  and would have let one destination's explicit value re-point every other destination's inheritance.
+  **Collapsing to one destination** drops `sinks:` and folds the layer into the shorthand (the node's
+  own value, else the one it was inheriting). `RecipeConverter` takes the shorthand destination's keys
+  from its matching `sinks:` entry, not from `output:`, so the recipe round trip does not stamp the
+  inherited value onto `sinks[0]` either.
+* ⚠ **snappy is DuckDB's own parquet default.** A null compression appends no `COMPRESSION` option, so
+  `premed_events`'s bytes happened to be snappy before the fix too. The bug only showed on disk for any
+  *other* codec. That is why the on-disk test uses `zstd`: with the fallback reverted it reads `SNAPPY`,
+  not `ZSTD`.
+
+Tests: `PipelineConfigSinksTest` (incl. `anEntryInheritsEveryOutputKeyItOmits`,
+`anEntrysOwnValueOverridesTheOutputLayer`), `ConfigSafetyValidatorTest` (per-sink jail/allow-list),
 `PipelineLiftTest.liftsSinksListToADataFedFanOut`,
 `ConsignmentIngestorSinksTest.fanOutWritesEachDestinationAndFinalisesOnce`,
+`ConsignmentIngestorSinksTest.anEntryThatOmitsCompressionWritesTheOutputBlocksCodec` (reads the parquet
+codec off disk), `…anEntrysOwnCompressionOverridesTheOutputBlock`,
 `PipelineEditableTest.twoDistinctDatabasesLowerToASinksList`,
+`PipelineEditableTest.anInheritedOutputValueRoundTripsWithoutBeingMaterialisedPerSink`,
+`…anExplicitPerSinkValueOverridesWithoutRepointingTheLayer`,
+`…collapsingToOneDestinationFoldsTheInheritedValueIntoTheShorthand`, and the fixture sweeps
+`LiftLowerFixtureSweepTest` + `RecipeConverterTest` over the real `premed_events`,
 `ControlApiPipelineCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline`.
 
 ## Quarantine outcomes

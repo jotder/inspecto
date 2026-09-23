@@ -883,6 +883,7 @@ final class PipelineConfigParser {
 
         // ── sinks (plural destinations) ─────────────────────────────────────────
         // A top-level `sinks:` list, each entry a {database, format, compression, ducklake} destination.
+        // A key an entry omits inherits the `output:` value (resolveSinks), then the hard default.
         // Absent ⇒ PipelineConfig synthesises the single-`output:` one-element shorthand. More than one
         // destination is parsed + liftable but REFUSED when loaded for execution (PipelineConfig.prepare)
         // until the branch-aware executor is wired — see docs/superpower/sinks-config-format-plan.md.
@@ -901,7 +902,9 @@ final class PipelineConfigParser {
                     Identifiers.validate(sinkFilenameCol, "sinks[].filename_column");
                 b.sinks.add(new PipelineConfig.Sink(
                         db.toString(),
-                        String.valueOf(sink.getOrDefault("format", "CSV")).toUpperCase(),
+                        // absent stays null: output: is this entry's default layer, applied in
+                        // PipelineConfig.resolveSinks (SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1)
+                        sink.get("format") == null ? null : String.valueOf(sink.get("format")).toUpperCase(),
                         (String) sink.get("compression"),
                         castMapAt(sink, "ducklake"),
                         sinkFilenameCol));

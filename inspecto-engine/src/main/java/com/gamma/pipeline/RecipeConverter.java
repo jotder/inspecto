@@ -98,14 +98,23 @@ public final class RecipeConverter {
         // destinations. The output:/dirs shorthand is the first destination (it carries backup/temp +
         // the sink-owned write tuning, which plural entries never do); further sinks: entries follow.
         Map<String, Object> sink = new LinkedHashMap<>();
-        putIfPresent(sink, "format", output.get("format"));
-        putIfPresent(sink, "compression", output.get("compression"));
-        putIfPresent(sink, "ducklake", output.get("ducklake"));
+        // When a sinks: entry names the shorthand destination, the destination keys are THAT entry's
+        // own: output: is then the entries' default layer, and stamping its values onto this sink would
+        // materialise every inherited value into sinks[0] on the compile back
+        // (SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1). Without such an entry the shorthand IS output:.
+        Map<?, ?> destKeys = output;
+        if (config.get("sinks") instanceof List<?> declared)
+            for (Object s : declared)
+                if (s instanceof Map<?, ?> m && String.valueOf(m.get("database")).equals(dirs.get("database")))
+                    destKeys = m;
+        putIfPresent(sink, "format", destKeys.get("format"));
+        putIfPresent(sink, "compression", destKeys.get("compression"));
+        putIfPresent(sink, "ducklake", destKeys.get("ducklake"));
         // ⚠ filename_column belongs with its three neighbours above: it is a SINK-owned output key
         // (PipelineEditable's SINK_OUTPUT_KEYS, lifted and lowered with format/compression/ducklake),
         // so omitting it here deleted the source-filename lineage column on every round trip. Every
         // pipeline the UI scaffolds carries it, so no UI-created pipeline round-tripped at all.
-        putIfPresent(sink, "filename_column", output.get("filename_column"));
+        putIfPresent(sink, "filename_column", destKeys.get("filename_column"));
         putIfPresent(sink, "database", dirs.get("database"));
         putIfPresent(sink, "backup", dirs.get("backup"));
         putIfPresent(sink, "temp", dirs.get("temp"));

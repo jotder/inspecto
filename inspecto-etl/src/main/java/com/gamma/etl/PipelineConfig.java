@@ -1597,7 +1597,12 @@ public final class PipelineConfig {
     /**
      * Resolve the output destinations: an explicit {@code sinks:} list when present, otherwise the
      * one-element single-{@code output:} shorthand ({@code dirs.database} + {@code output:}). The result is
-     * never empty. A multi-destination config is <em>constructible and liftable</em> here (the graph editor
+     * never empty. {@code output:} is the <b>default layer</b> for every declared entry: a
+     * {@code format}/{@code compression}/{@code ducklake}/{@code filename_column} the entry omits takes the
+     * {@code output:} value, and only then the hard default (operator decision 2026-09-23,
+     * {@code SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1} — before it, an {@code output.compression} above a
+     * {@code sinks:} list was accepted and silently never written). An entry's own value always wins.
+     * A multi-destination config is <em>constructible and liftable</em> here (the graph editor
      * and {@link com.gamma.pipeline.PipelineLift} must be able to represent it); it is refused only when
      * loaded for <em>execution</em> — see {@link #prepare()}.
      */
@@ -1605,7 +1610,11 @@ public final class PipelineConfig {
         return (declared == null || declared.isEmpty())
                 ? List.of(new Sink(database, output.format(), output.compression(), output.duckLake(),
                         output.filenameColumn()))
-                : List.copyOf(declared);
+                : declared.stream().map(s -> new Sink(s.database(),
+                        s.format() != null ? s.format() : output.format(),
+                        s.compression() != null ? s.compression() : output.compression(),
+                        s.duckLake() != null ? s.duckLake() : output.duckLake(),
+                        s.filenameColumn() != null ? s.filenameColumn() : output.filenameColumn())).toList();
     }
 
     /**

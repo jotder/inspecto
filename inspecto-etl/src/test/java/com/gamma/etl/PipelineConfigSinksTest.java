@@ -78,6 +78,51 @@ class PipelineConfigSinksTest {
         assertDoesNotThrow(cfg::prepare, "plain multi-destination ingest is runnable");
     }
 
+    // ── SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1: output: is each entry's default layer ─────────────
+
+    @Test
+    void anEntryInheritsEveryOutputKeyItOmits() throws Exception {
+        Map<String, Object> m = base();
+        m.put("output", Map.of("format", "parquet", "compression", "snappy", "filename_column", "src_file",
+                "ducklake", Map.of("catalog", "lake")));
+        m.put("sinks", List.of(Map.of("database", "out_hot"), Map.of("database", "out_cold")));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(m);
+
+        for (PipelineConfig.Sink s : cfg.sinks()) {
+            assertEquals("PARQUET", s.format(), "format falls back to output.format, not the CSV hard default");
+            assertEquals("snappy", s.compression());
+            assertEquals("src_file", s.filenameColumn());
+            assertEquals(Map.of("catalog", "lake"), s.duckLake());
+        }
+    }
+
+    @Test
+    void anEntrysOwnValueOverridesTheOutputLayer() throws Exception {
+        Map<String, Object> m = base();
+        m.put("output", Map.of("format", "parquet", "compression", "snappy"));
+        m.put("sinks", List.of(
+                Map.of("database", "out_hot", "format", "csv", "compression", "none"),
+                Map.of("database", "out_cold", "compression", "zstd")));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(m);
+
+        assertEquals("CSV", cfg.sinks().get(0).format());
+        assertEquals("none", cfg.sinks().get(0).compression(), "an explicit opt-out wins over the layer");
+        assertEquals("PARQUET", cfg.sinks().get(1).format(), "only the omitted key inherits");
+        assertEquals("zstd", cfg.sinks().get(1).compression());
+    }
+
+    @Test
+    void withNoOutputBlockAnEntryFallsToTheHardDefault() throws Exception {
+        Map<String, Object> m = base();
+        m.put("sinks", List.of(Map.of("database", "out_hot")));
+
+        PipelineConfig.Sink s = PipelineConfig.fromMap(m).sinks().get(0);
+        assertEquals("CSV", s.format());
+        assertNull(s.compression());
+    }
+
     // ── B4: output.filename_column / sinks[].filename_column ────────────────────
 
     @Test

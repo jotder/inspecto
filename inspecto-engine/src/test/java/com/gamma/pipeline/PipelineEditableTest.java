@@ -1091,6 +1091,86 @@ class PipelineEditableTest {
         assertDoesNotThrow(() -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
     }
 
+    // ── SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1: output: is the sinks[] entries' default layer ──────────
+
+    /** The shipped premed_events shape: output.compression above {database,format} entries. */
+    private static Map<String, Object> inheritingSinksFile() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("name", "inherit");
+        m.put("active", false);
+        m.put("dirs", new LinkedHashMap<>(Map.of("poll", "in", "database", "db_a")));
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("format", "PARQUET");
+        output.put("compression", "zstd");
+        m.put("output", output);
+        m.put("sinks", new java.util.ArrayList<>(List.of(
+                new LinkedHashMap<>(Map.of("database", "db_a", "format", "PARQUET")),
+                new LinkedHashMap<>(Map.of("database", "db_b", "format", "PARQUET")))));
+        m.put("processing", new LinkedHashMap<>(Map.of("threads", 1)));
+        return m;
+    }
+
+    private static List<Map<?, ?>> sinkEntries(Map<String, Object> lowered) {
+        List<Map<?, ?>> out = new java.util.ArrayList<>();
+        for (Object o : (List<?>) lowered.get("sinks")) out.add((Map<?, ?>) o);
+        return out;
+    }
+
+    /** lift → editable → lower over the file keeps the inherited codec on output: and does NOT stamp it
+     *  onto any entry — while the parsed config still resolves it onto every destination. */
+    @Test
+    void anInheritedOutputValueRoundTripsWithoutBeingMaterialisedPerSink() throws Exception {
+        Map<String, Object> raw = inheritingSinksFile();
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        for (PipelineConfig.Sink s : cfg.sinks())
+            assertEquals("zstd", s.compression(), "effective codec of " + s.database());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        for (Object n : (List<?>) editable.get("nodes"))
+            if ("sink.persistent".equals(((Map<?, ?>) n).get("type")))
+                assertNull(((Map<?, ?>) ((Map<?, ?>) n).get("config")).get("compression"),
+                        "a sink node carries only its own entry's keys, not the inherited layer");
+
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, false);
+        assertEquals(raw, lowered, "an unedited save reproduces the file key-for-key");
+    }
+
+    /** An explicit per-sink value is that entry's alone: it lowers onto the entry and does NOT re-point
+     *  output: (which every other destination inherits); a new destination inherits, unmaterialised. */
+    @Test
+    void anExplicitPerSinkValueOverridesWithoutRepointingTheLayer() {
+        PipelineGraph g = new PipelineGraph("inherit", false, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of()),
+                node("s1", "sink.persistent", Map.of("database", "db_a", "format", "PARQUET", "compression", "gzip")),
+                node("s2", "sink.persistent", Map.of("database", "db_b", "format", "PARQUET")),
+                node("s3", "sink.persistent", Map.of("database", "db_c"))), List.of());
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, inheritingSinksFile(), false);
+
+        assertEquals(Map.of("format", "PARQUET", "compression", "zstd"), lowered.get("output"),
+                "the default layer is untouched by the primary destination's own override");
+        List<Map<?, ?>> sinks = sinkEntries(lowered);
+        assertEquals("gzip", sinks.get(0).get("compression"), "the explicit override is kept");
+        assertFalse(sinks.get(1).containsKey("compression"), "an inheriting entry stays inheriting");
+        assertEquals(Map.of("database", "db_c"), sinks.get(2), "a new destination inherits — nothing materialised");
+    }
+
+    /** Collapsing to ONE destination drops sinks: — the shorthand then IS the layer, so the node's
+     *  inherited value folds into output: instead of being lost. */
+    @Test
+    void collapsingToOneDestinationFoldsTheInheritedValueIntoTheShorthand() {
+        PipelineGraph g = new PipelineGraph("inherit", false, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of()),
+                node("s1", "sink.persistent", Map.of("database", "db_a", "format", "PARQUET"))), List.of());
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, inheritingSinksFile(), false);
+
+        assertNull(lowered.get("sinks"));
+        assertEquals(Map.of("format", "PARQUET", "compression", "zstd"), lowered.get("output"));
+    }
+
     @Test
     void strictIncompleteGraphNamesEveryMissingRole() {
         PipelineGraph g = new PipelineGraph("x", true,

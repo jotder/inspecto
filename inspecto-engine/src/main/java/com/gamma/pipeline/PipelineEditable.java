@@ -488,6 +488,11 @@ public final class PipelineEditable {
     private static final Set<String> SINK_ENTRY_MODELED =
             Set.of("database", "format", "compression", "ducklake", "filename_column");
 
+    /** The {@code output:} keys a {@code sinks[]} entry inherits when it omits them (the default layer —
+     *  {@code PipelineConfig.resolveSinks}); in lowering order. */
+    private static final List<String> SINK_OUTPUT_LAYER =
+            List.of("format", "compression", "ducklake", "filename_column");
+
     // ═════════════════════════════ editable lift ═════════════════════════════
 
     /**
@@ -1025,11 +1030,20 @@ public final class PipelineEditable {
         }
 
         if (primarySink != null) {
-            output.clear();
-            putIfPresent(output, "format", primarySink.cfg("format"));
-            putIfPresent(output, "compression", primarySink.cfg("compression"));
-            putIfPresent(output, "ducklake", primarySink.cfg("ducklake"));
-            putIfPresent(output, "filename_column", primarySink.cfg("filename_column"));
+            // output: is the DEFAULT LAYER of an authored sinks: list (SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1):
+            // each entry inherits every key it omits. No node models that layer — a sink node carries only
+            // its own entry's keys — so while the file keeps a plural block the layer is preserved verbatim;
+            // rebuilding it from the primary node dropped an inherited compression on every save and would
+            // let one destination's explicit value re-point every other destination's inheritance. (The
+            // SPA's lowerGraph has the same authoredSinks rule.) Collapsing to ONE destination folds the
+            // layer into the shorthand: the node's own value, else the value it was inheriting.
+            boolean authoredSinks = existing.get("sinks") instanceof List<?> l && !l.isEmpty();
+            if (!(authoredSinks && destByDatabase.size() > 1)) {
+                Map<String, Object> layer = authoredSinks ? new LinkedHashMap<>(output) : Map.of();
+                output.clear();
+                for (String k : SINK_OUTPUT_LAYER)
+                    putIfPresent(output, k, primarySink.cfg(k) != null ? primarySink.cfg(k) : layer.get(k));
+            }
             replaceOrRemove(dirs, "database", primarySink.cfg("database"));
             replaceOrRemove(dirs, "backup", primarySink.cfg("backup"));
             replaceOrRemove(dirs, "temp", primarySink.cfg("temp"));
