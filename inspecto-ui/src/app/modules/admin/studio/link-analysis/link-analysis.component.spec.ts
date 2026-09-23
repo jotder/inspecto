@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { ToastrService } from 'ngx-toastr';
-import { PipelinesService } from 'app/inspecto/api';
+import { InvService, PipelinesService, RecursivePathsRequest } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ElementDetailData } from 'app/inspecto/investigation';
 import { G6GraphData, GraphSource } from 'app/inspecto/graph';
@@ -53,6 +53,8 @@ function create(
         /** What the fake source returns when the query carries a `filter` (the stage-2 push). */
         filtered?: G6GraphData;
         queryParams?: Record<string, string>;
+        /** LA-11: a stand-in for the traversal route (the real service is used when absent). */
+        inv?: Partial<InvService>;
     } = {},
 ) {
     const queried: unknown[] = [];
@@ -76,6 +78,7 @@ function create(
             { provide: GraphSourcesService, useValue: { sources: [fakeSource], byId: () => fakeSource } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: PipelinesService, useValue: { list: () => of([]) } },
+            ...(opts.inv ? [{ provide: InvService, useValue: opts.inv }] : []),
             { provide: LinkAnalysisService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             {
@@ -758,5 +761,52 @@ describe('LinkAnalysisComponent', () => {
         c.levelOfDetail.set(false);
         expect(c.displayOptions().nodeLabels).toBe(true);
         expect(c.caps).toEqual({ projection: 500, analysis: 2000 });
+    });
+
+    it('LA-11 find paths: sends the RAW spelling over the loaded mapping, merges the walk and highlights it', async () => {
+        const minted: G6GraphData = {
+            nodes: [
+                { id: 'entity:acme', data: { label: 'ACME', kind: 'entity', spellings: ['ACME', 'acme.'] } },
+                { id: 'entity:bob', data: { label: 'Bob', kind: 'entity', spellings: ['Bob'] } },
+            ],
+            edges: [
+                {
+                    id: 'entity:acme->entity:bob:link',
+                    source: 'entity:acme',
+                    target: 'entity:bob',
+                    data: { kind: 'link' },
+                },
+            ],
+        };
+        const sent: RecursivePathsRequest[] = [];
+        const recursivePaths = vi.fn((req: RecursivePathsRequest) => {
+            sent.push(req);
+            return of({
+                paths: [{ nodes: ['ACME', 'Bob', 'Cara'], hops: 2, weight: null }],
+                truncated: false,
+                edgeYieldCapped: true,
+                fences: { maxDepth: 3, maxEdgeYield: 10000, timeoutMs: 5000 },
+            });
+        });
+        const { fixture } = create({ graph: minted, inv: { recursivePaths } });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.traversalMappingOptions()).toEqual([{ value: '0', label: 'Links: source → target' }]);
+
+        await c.findPaths({ from: 'entity:acme', mapping: 0, maxDepth: 3, direction: 'DIRECTED' });
+        expect(sent[0]).toMatchObject({
+            dataset: 'links-ds',
+            sourceCol: 'source',
+            targetCol: 'target',
+            startNode: 'ACME', // the first raw spelling, never the normalised id
+            targetNode: undefined,
+            maxDepth: 3,
+            direction: 'DIRECTED',
+        });
+        expect(c.graph()?.nodes.map((n) => n.id)).toEqual(['entity:acme', 'entity:bob', 'entity:cara']);
+        expect(c.emphasis()?.nodeIds).toEqual(['entity:acme', 'entity:bob', 'entity:cara']);
+        expect(c.emphasis()?.edgeIds[0]).toBe('entity:acme->entity:bob:link');
+        expect(c.serverPaths()).toMatchObject({ edgeYieldCapped: true, depthLimit: 3, deepest: 2 });
     });
 });

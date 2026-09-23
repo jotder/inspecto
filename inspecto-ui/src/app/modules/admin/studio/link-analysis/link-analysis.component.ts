@@ -34,7 +34,9 @@ import { firstValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 import {
     ExchangeService,
+    InvService,
     LensService,
+    MultiProjectionMappingSummary,
     PipelineSummary,
     PipelinesService,
     SessionService,
@@ -125,7 +127,15 @@ import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-sett
 import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotService } from 'app/inspecto/investigation';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { ProjectedGraph, projectionNodeCapValue, splitIdentityGroups } from './entity-projection';
+import {
+    MultiProjectedGraph,
+    ProjectedGraph,
+    ServerPathsState,
+    invErrorMessage,
+    projectionNodeCapValue,
+    recursivePathsToGraph,
+    splitIdentityGroups,
+} from './entity-projection';
 import { GeoLinkBrushService, nodeIdsForKeys } from './geo-link-brush';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
@@ -136,7 +146,7 @@ import {
     LinkAnalysisViewOptions,
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
-import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
+import { FindPathsRequest, LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -177,6 +187,9 @@ interface PresentationSnapshot {
  * GraphSource, shape a query, render through the shared {@link GraphViewComponent}, analyze with the
  * pure `graph-analysis` library, and save the investigation as a `link-analysis-view` Component.
  */
+/** LA-11: paths asked for per search — a readable list; the server says `truncated` when more exist. */
+const SERVER_PATH_LIMIT = 100;
+
 @Component({
     selector: 'inspecto-link-analysis',
     standalone: true,
@@ -241,6 +254,7 @@ export class LinkAnalysisComponent implements OnInit {
     });
     private pivotService = inject(PivotService);
     private graphSources = inject(GraphSourcesService);
+    private inv = inject(InvService);
     /** LA-22: the shared Geo ↔ Link brush. */
     private brush = inject(GeoLinkBrushService);
     private spaces = inject(SpacesService);
@@ -362,6 +376,51 @@ export class LinkAnalysisComponent implements OnInit {
     readonly truncated = signal(false);
     /** The query behind the rendered graph — what the collapsed form + status bar summarize. */
     readonly lastRun = signal<{ sourceId: GraphSourceId; query: GraphSourceQuery } | null>(null);
+    /** LA-08: each mapping's row count + own `truncated`, from a multi-Dataset projection (empty otherwise). */
+    readonly mappingSummary = signal<MultiProjectionMappingSummary[]>([]);
+    /** LA-11: the last server traversal, mapped onto the graph; reset with every fresh graph. */
+    readonly serverPaths = signal<ServerPathsState | null>(null);
+    readonly serverPathsBusy = signal(false);
+
+    /**
+     * LA-11: the edge mappings of the loaded query a server traversal can walk — one per single-Dataset mapping
+     * (with its `entityType`, so path ids match the drawn ones) or per LA-08 edge mapping (unscoped, as that
+     * projection mints them). The walk takes one `filter`: the pushed predicate, AND a mapping's own.
+     */
+    readonly traversalTargets = computed(() => {
+        const run = this.lastRun();
+        if (!run) return [];
+        const q = run.query;
+        const dsName = (id: string) => this.datasets().find((d) => d.id === id)?.name ?? id;
+        if (run.sourceId === 'entity-projection') {
+            const ps = q.projections?.length ? q.projections : q.projection ? [q.projection] : [];
+            return ps.map((p) => ({
+                dataset: p.datasetId,
+                sourceCol: p.sourceCol,
+                targetCol: p.targetCol,
+                entityType: p.entityType,
+                filter: q.filter,
+                label: `${dsName(p.datasetId)}: ${p.sourceCol} → ${p.targetCol}`,
+            }));
+        }
+        if (run.sourceId === 'entity-projection-multi') {
+            return (q.multi?.edges ?? []).map((e) => ({
+                dataset: e.dataset,
+                sourceCol: e.sourceColumn,
+                targetCol: e.targetColumn,
+                entityType: undefined,
+                filter:
+                    q.filter && e.filter
+                        ? { kind: 'group' as const, op: 'AND' as const, items: [q.filter, e.filter] }
+                        : (e.filter ?? q.filter),
+                label: `${dsName(e.dataset)}: ${e.sourceColumn} → ${e.targetColumn}`,
+            }));
+        }
+        return [];
+    });
+    readonly traversalMappingOptions = computed<PickerOption[]>(() =>
+        this.traversalTargets().map((t, i) => ({ value: String(i), label: t.label })),
+    );
 
     readonly sourceLabel = computed<string>(() => {
         const run = this.lastRun();
@@ -399,6 +458,21 @@ export class LinkAnalysisComponent implements OnInit {
                 if (p.attrCols?.length)
                     items.push({ icon: 'heroicons_outline:tag', label: 'Attributes', value: p.attrCols.join(', ') });
                 return items;
+            }
+            case 'entity-projection-multi': {
+                const name = (id: string) => this.datasets().find((d) => d.id === id)?.name ?? id;
+                return [
+                    ...(q.multi?.nodes ?? []).map((m) => ({
+                        icon: 'heroicons_outline:identification',
+                        label: m.category ?? 'Nodes',
+                        value: `${name(m.dataset)}: ${m.idColumn}`,
+                    })),
+                    ...(q.multi?.edges ?? []).map((m) => ({
+                        icon: 'heroicons_outline:arrow-long-right',
+                        label: m.type ?? 'Links',
+                        value: `${name(m.dataset)}: ${m.sourceColumn} → ${m.targetColumn}`,
+                    })),
+                ];
             }
             case 'lineage':
                 return [
@@ -792,11 +866,14 @@ export class LinkAnalysisComponent implements OnInit {
         this.latestSnapshot.set(null);
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
+        this.serverPaths.set(null);
+        this.mappingSummary.set([]);
         try {
             const g = await source.query(q);
             this.graph.set(g);
             this.resolvePendingPivot(g);
             this.truncated.set(!!(g as ProjectedGraph).truncated);
+            this.mappingSummary.set((g as MultiProjectedGraph).mappings ?? []);
             this.kindFilter.set([]);
             this.lastRun.set({ sourceId, query: q });
             this.queryOpen.set(false); // smart form: collapse to the selected-values summary
@@ -1182,6 +1259,10 @@ export class LinkAnalysisComponent implements OnInit {
                                 neighbors.slice(0, 8).join(', ') +
                                 (neighbors.length > 8 ? ` … +${neighbors.length - 8}` : ''),
                         },
+                        // LA-08: which Datasets this (possibly merged) entity was projected from.
+                        ...(node.data.provenance?.length
+                            ? [{ label: 'Datasets', value: node.data.provenance.join(', ') }]
+                            : []),
                     ],
                     branch: collapsed ? 'expand' : descendants(g, id).size ? 'collapse' : undefined,
                     objectRef,
@@ -1199,6 +1280,54 @@ export class LinkAnalysisComponent implements OnInit {
                     this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
                 }
             });
+    }
+
+    /**
+     * LA-11: walk paths server-side (`POST /inv/traversal/recursive-paths`) from the picked node, optionally to a
+     * second one, over one edge mapping of the loaded query. The server wants the RAW value, so a node sends its
+     * first raw spelling (its label for a non-projected node). The answer is merged into the working set —
+     * hops beyond it are added — and every returned path is highlighted; its fences are shown by the toolbox.
+     */
+    async findPaths(req: FindPathsRequest): Promise<void> {
+        const target = this.traversalTargets()[req.mapping];
+        const g = this.graph();
+        if (!target || !g) return;
+        const raw = (id: string): string => {
+            const n = g.nodes.find((x) => x.id === id);
+            return n?.data.spellings?.[0] ?? n?.data.label ?? id;
+        };
+        this.serverPathsBusy.set(true);
+        try {
+            const res = await firstValueFrom(
+                this.inv.recursivePaths({
+                    dataset: target.dataset,
+                    sourceCol: target.sourceCol,
+                    targetCol: target.targetCol,
+                    startNode: raw(req.from),
+                    targetNode: req.to ? raw(req.to) : undefined,
+                    maxDepth: req.maxDepth,
+                    direction: req.direction,
+                    filter: target.filter,
+                    limit: SERVER_PATH_LIMIT,
+                }),
+            );
+            const { graph, state } = recursivePathsToGraph(res, g, target.entityType);
+            this.graph.set(graph);
+            this.serverPaths.set(state);
+            this.emphasis.set(
+                state.paths.length
+                    ? {
+                          nodeIds: [...new Set(state.paths.flatMap((p) => p.nodeIds))],
+                          edgeIds: [...new Set(state.paths.flatMap((p) => p.edgeIds))],
+                      }
+                    : null,
+            );
+        } catch (err) {
+            this.serverPaths.set(null);
+            this.toastr.error(invErrorMessage(err, 'The server path search failed.'));
+        } finally {
+            this.serverPathsBusy.set(false);
+        }
     }
 
     /**

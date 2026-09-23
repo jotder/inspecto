@@ -8,7 +8,7 @@ import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-dat
 import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry.component';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { EntityProjectionGraphSource } from './entity-projection';
+import { EntityProjectionGraphSource, MultiProjectionGraphSource } from './entity-projection';
 
 /**
  * The concrete {@link GraphSource}s behind the Link Analysis Studio (GLOSSARY §11; design:
@@ -104,6 +104,7 @@ export class GraphSourcesService {
 
     readonly sources: GraphSource[] = [
         new EntityProjectionGraphSource(this.datasets, this.inv),
+        new MultiProjectionGraphSource(this.inv),
         new LineageGraphSource(this.catalog),
         new ComponentRegistryGraphSource(this.components),
         new PipelineGraphSource(this.pipelines),

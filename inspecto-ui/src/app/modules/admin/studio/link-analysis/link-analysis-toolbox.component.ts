@@ -50,6 +50,19 @@ import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-pa
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { ServerPathsState } from './entity-projection';
+
+/**
+ * LA-11: what the analyst asked the server to walk. `mapping` is the index into the host's
+ * `traversalMappings` (a picker value is a string); the host resolves it to a Dataset + column pair.
+ */
+export interface FindPathsRequest {
+    from: string;
+    to?: string;
+    mapping: number;
+    maxDepth: number;
+    direction: 'DIRECTED' | 'UNDIRECTED';
+}
 
 type AnalysisTab =
     | 'path'
@@ -58,6 +71,7 @@ type AnalysisTab =
     | 'communities'
     | 'pattern'
     | 'all-paths'
+    | 'server-paths'
     | 'components'
     | 'cycles'
     | 'cut-points'
@@ -175,13 +189,25 @@ export class LinkAnalysisToolboxComponent {
      */
     readonly timeAttr = input<string>('');
 
+    /**
+     * LA-11: the edge mappings a server traversal can walk (the loaded query's), as picker options whose value
+     * is the mapping's index. Empty = no Entity/Link projection is loaded, and the tool says so.
+     */
+    readonly traversalMappings = input<PickerOption[]>([]);
+    /** LA-11: the last server traversal's answer, mapped onto the graph by the host (null = none yet). */
+    readonly serverPaths = input<ServerPathsState | null>(null);
+    readonly serverPathsBusy = input(false);
+
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
+    /** LA-11: run a server-side multi-hop traversal — the host owns the call (this panel has no HTTP). */
+    readonly findPaths = output<FindPathsRequest>();
 
     /** The analysis tool groups (the accordion = the graph-algorithms toolbox). */
     readonly tools: { id: AnalysisTab; label: string; icon: string }[] = [
         { id: 'path', label: 'Shortest path', icon: 'heroicons_outline:arrows-right-left' },
         { id: 'all-paths', label: 'All paths', icon: 'heroicons_outline:share' },
+        { id: 'server-paths', label: 'Find paths (server)', icon: 'heroicons_outline:server-stack' },
         { id: 'explain', label: 'Explain node', icon: 'heroicons_outline:light-bulb' },
         { id: 'centrality', label: 'Centrality', icon: 'heroicons_outline:star' },
         { id: 'communities', label: 'Communities', icon: 'heroicons_outline:user-group' },
@@ -201,6 +227,15 @@ export class LinkAnalysisToolboxComponent {
     readonly pathTo = signal('');
     /** Shortest path by fewest hops, or by strongest ties (weighted). */
     readonly pathMetric = signal<'hops' | 'weighted'>('hops');
+    /** LA-11 knobs. Depth is clamped server-side to 1..10; the answer states the fence it applied. */
+    readonly serverMapping = signal('0');
+    readonly serverDepth = signal(6);
+    readonly serverDirection = signal<'DIRECTED' | 'UNDIRECTED'>('DIRECTED');
+    /** "To" is optional for a server walk — a blank-valued "any node" is the real no-target choice. */
+    readonly optionalPathNodeOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Any node' },
+        ...this.pathNodeOptions(),
+    ]);
     readonly explainFor = signal('');
     readonly explainHops = signal(1);
     readonly centralityMetric = signal<CentralityMetric>('degree');
@@ -296,6 +331,10 @@ export class LinkAnalysisToolboxComponent {
                 return this.patternMatches().length ? `${this.patternMatches().length} matches` : '';
             case 'all-paths':
                 return this.allPathsResult().length ? `${this.allPathsResult().length} paths` : '';
+            case 'server-paths': {
+                const sp = this.serverPaths();
+                return sp ? `${sp.paths.length} paths${sp.truncated ? ' · truncated' : ''}` : '';
+            }
             case 'components':
                 return this.components().length ? `${this.components().length} found` : '';
             case 'cycles':
@@ -439,6 +478,19 @@ export class LinkAnalysisToolboxComponent {
         this.emphasisChange.emit({
             nodeIds: [...new Set(paths.flatMap((p) => p.nodeIds))],
             edgeIds: [...new Set(paths.flatMap((p) => p.edgeIds))],
+        });
+    }
+
+    /** LA-11: ask the host to walk paths from `pathFrom` (to `pathTo`, when set) over the chosen edge mapping. */
+    runServerPaths(): void {
+        if (!this.pathFrom() || !this.traversalMappings().length) return;
+        const idx = Number(this.serverMapping());
+        this.findPaths.emit({
+            from: this.pathFrom(),
+            to: this.pathTo() && this.pathTo() !== this.pathFrom() ? this.pathTo() : undefined,
+            mapping: idx >= 0 && idx < this.traversalMappings().length ? idx : 0,
+            maxDepth: Math.max(1, Math.min(10, Math.floor(this.serverDepth() || 6))),
+            direction: this.serverDirection(),
         });
     }
 

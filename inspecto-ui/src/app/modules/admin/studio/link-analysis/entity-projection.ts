@@ -1,14 +1,23 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import {
     G6Edge,
     G6GraphData,
     G6Node,
     EntityProjection,
+    GraphSelection,
     GraphSource,
     GraphSourceQuery,
     mergeGraphs,
     normalizeEntityKey,
 } from 'app/inspecto/graph';
-import { InvService, ProjectionTriple } from 'app/inspecto/api';
+import {
+    InvService,
+    MultiProjectionMappingSummary,
+    MultiProjectionResult,
+    ProjectionTriple,
+    RecursivePathsResult,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import { firstValueFrom } from 'rxjs';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 
@@ -294,6 +303,179 @@ export class EntityProjectionGraphSource implements GraphSource {
         );
         return projectTriples(res.rows, res.truncated, p);
     }
+}
+
+/**
+ * A readable message for an `/inv/*` failure. A 404 there is deliberately ambiguous — the Dataset is unknown
+ * OR the caller may not view it (R3: shared-away reads as absence) — and on `/inv/projection/multi` it refuses
+ * the WHOLE call, so the message says no partial graph was drawn. A 422 carries the server's own reason.
+ */
+export function invErrorMessage(err: unknown, fallback: string): string {
+    if (err instanceof HttpErrorResponse && err.status === 404) {
+        return (
+            'A Dataset in this query is not available to you (unknown, or not shared with you) — ' +
+            'the whole query was refused, so no partial graph is shown. Server: ' +
+            apiErrorMessage(err, 'not found')
+        );
+    }
+    return apiErrorMessage(err, fallback);
+}
+
+/** Add `v` to a first-seen-order list held on a node/edge, creating it on first use. */
+function addTo(list: string[] | undefined, v: string): string[] {
+    const out = list ?? [];
+    if (!out.includes(v)) out.push(v);
+    return out;
+}
+
+/** An LA-08 answer as a graph, plus the per-mapping row summary the pane shows beside it. */
+export interface MultiProjectedGraph extends ProjectedGraph {
+    mappings: MultiProjectionMappingSummary[];
+}
+
+/**
+ * Map a `POST /inv/projection/multi` answer (LA-08) into the studio graph. The server returns values RAW, one
+ * entry per provenance (D-S4); every node id is minted by {@link entityId} UNSCOPED, so an entity that appears
+ * in two Datasets under two spellings is ONE node carrying both Datasets in `data.provenance` and both
+ * spellings in `data.spellings`. Node mappings are read first, so their label column and category win the
+ * display; an edge endpoint no node mapping named still becomes an entity. Edges fold on
+ * `sid->tid:kind[:attrs]` exactly as {@link projectTriples} does, summing counts across Datasets.
+ */
+export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGraph {
+    const nodes = new Map<string, G6Node>();
+    const edges = new Map<string, G6Edge & { data: { kind: string; count: number } }>();
+    let truncated = res.truncated;
+
+    const ensure = (value: string, provenance: string, label?: string | null, category?: string | null) => {
+        const id = entityId(undefined, value);
+        const node = nodes.get(id);
+        if (node) {
+            addSpelling(node, value);
+            node.data.provenance = addTo(node.data.provenance, provenance);
+            return id;
+        }
+        if (nodes.size >= projectionNodeCapValue()) {
+            truncated = true;
+            return null;
+        }
+        nodes.set(id, {
+            id,
+            data: { label: label || value, kind: category || 'entity', spellings: [value], provenance: [provenance] },
+        });
+        return id;
+    };
+
+    for (const n of res.nodes) {
+        const v = String(n.id ?? '').trim();
+        if (v) ensure(v, n.__provenance_dataset, n.label, n.category);
+    }
+    for (const t of res.edges) {
+        const s = String(t.source ?? '').trim();
+        const tv = String(t.target ?? '').trim();
+        if (!s || !tv) continue;
+        const sid = ensure(s, t.__provenance_dataset);
+        const tid = ensure(tv, t.__provenance_dataset);
+        if (!sid || !tid) continue;
+        const kind = t.kind ?? 'link';
+        const id = `${sid}->${tid}:${kind}${t.attrs ? ':' + JSON.stringify(t.attrs) : ''}`;
+        const existing = edges.get(id);
+        const count = (existing?.data.count ?? 0) + t.count;
+        const label = count > 1 ? `${kind} · ${count}` : kind;
+        if (existing) {
+            existing.data.count = count;
+            existing.data.kind = label;
+            existing.data.provenance = addTo(existing.data.provenance, t.__provenance_dataset);
+        } else {
+            edges.set(id, {
+                id,
+                source: sid,
+                target: tid,
+                data: { kind: label, count, attrs: t.attrs, provenance: [t.__provenance_dataset] },
+            });
+        }
+    }
+    return { nodes: [...nodes.values()], edges: [...edges.values()], truncated, mappings: res.mappings };
+}
+
+/** The LA-08 GraphSource: one `POST /inv/projection/multi` call per query. No incremental expand (yet). */
+export class MultiProjectionGraphSource implements GraphSource {
+    readonly id = 'entity-projection-multi' as const;
+    readonly label = 'Entity/Link (several Datasets)';
+    constructor(private inv: InvService) {}
+
+    async query(q: GraphSourceQuery): Promise<MultiProjectedGraph> {
+        const m = q.multi;
+        if (!m || (!m.nodes.length && !m.edges.length)) throw new Error('Add at least one node or edge mapping.');
+        try {
+            const res = await firstValueFrom(
+                this.inv.projectMulti({ nodes: m.nodes, edges: m.edges, filter: q.filter }),
+            );
+            return projectMultiResult(res);
+        } catch (err) {
+            throw new Error(invErrorMessage(err, 'The multi-Dataset projection failed.'), { cause: err });
+        }
+    }
+}
+
+/** What an LA-11 traversal found, in graph ids, with the server's fences stated rather than implied. */
+export interface ServerPathsState {
+    paths: GraphSelection[];
+    /** The path limit or the edge-yield fence cut the answer short. */
+    truncated: boolean;
+    /** A recursion level hit `maxEdgeYield`: longer paths may exist that were never walked. */
+    edgeYieldCapped: boolean;
+    /** The depth fence the server applied (after clamping) — no path longer than this was looked for. */
+    depthLimit: number;
+    /** The longest path returned, in hops (0 when none). */
+    deepest: number;
+}
+
+/**
+ * Map a `POST /inv/traversal/recursive-paths` answer (LA-11) onto the working set. Path values are raw; each is
+ * minted by {@link entityId} with the mapping's `entityType`, so a hop lands on the node the projection already
+ * drew. A step between two nodes the working set already links reuses that link (either direction); a step it
+ * does not have — the walk ran over the whole Dataset, not the loaded slice — is added as a `path` link, and
+ * so is any node it reached beyond the working set, so every returned path can be drawn and highlighted.
+ */
+export function recursivePathsToGraph(
+    res: RecursivePathsResult,
+    base: G6GraphData,
+    entityType?: string,
+): { graph: G6GraphData; state: ServerPathsState } {
+    const nodes = new Map(base.nodes.map((n) => [n.id, n]));
+    const edges = new Map(base.edges.map((e) => [e.id, e]));
+    const linkBetween = (a: string, b: string): string | undefined =>
+        [...edges.values()].find((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))?.id;
+
+    const paths: GraphSelection[] = res.paths.map((p) => {
+        const nodeIds = p.nodes.map((raw) => {
+            const value = String(raw ?? '').trim();
+            const id = entityId(entityType, value);
+            if (!nodes.has(id)) nodes.set(id, { id, data: { label: value, kind: 'entity', spellings: [value] } });
+            return id;
+        });
+        const edgeIds: string[] = [];
+        for (let i = 1; i < nodeIds.length; i++) {
+            const [a, b] = [nodeIds[i - 1], nodeIds[i]];
+            let id = linkBetween(a, b);
+            if (!id) {
+                id = `path:${a}->${b}`;
+                edges.set(id, { id, source: a, target: b, data: { kind: 'path' } });
+            }
+            edgeIds.push(id);
+        }
+        return { nodeIds, edgeIds };
+    });
+    return {
+        graph: { nodes: [...nodes.values()], edges: [...edges.values()] },
+        state: {
+            paths,
+            truncated: res.truncated,
+            edgeYieldCapped: res.edgeYieldCapped,
+            depthLimit: res.fences.maxDepth,
+            deepest: res.paths.reduce((m, p) => Math.max(m, p.hops), 0),
+        },
+    };
 }
 
 /**

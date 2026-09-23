@@ -311,4 +311,55 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    // ── LA-11: server-side multi-hop traversal ──
+
+    it('find paths (server): says what it needs until a projection offers an edge mapping', () => {
+        const { fixture, c } = make();
+        c.tab.set('server-paths');
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Load an Entity/Link projection first');
+    });
+
+    it('find paths (server): emits the walk request — To optional, depth clamped to the server fence', () => {
+        const { fixture, c } = make();
+        fixture.componentRef.setInput('traversalMappings', [
+            { value: '0', label: 'calls: A → B' },
+            { value: '1', label: 'wires: X → Y' },
+        ]);
+        const asked: unknown[] = [];
+        c.findPaths.subscribe((r) => asked.push(r));
+        c.pathFrom.set('a');
+        c.serverMapping.set('1');
+        c.serverDepth.set(40);
+        c.serverDirection.set('UNDIRECTED');
+        c.runServerPaths();
+        expect(asked).toEqual([{ from: 'a', to: undefined, mapping: 1, maxDepth: 10, direction: 'UNDIRECTED' }]);
+    });
+
+    it('find paths (server): states the fences honestly and lists the paths', async () => {
+        const { fixture, c, last } = make();
+        fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'calls: A → B' }]);
+        const path = { nodeIds: ['a', 'b', 'c'], edgeIds: ['a->b', 'b->c'] };
+        fixture.componentRef.setInput('serverPaths', {
+            paths: [path],
+            truncated: true,
+            edgeYieldCapped: true,
+            depthLimit: 6,
+            deepest: 2,
+        });
+        c.tab.set('server-paths');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[role="status"]')?.textContent?.replace(/\s+/g, ' ')).toContain(
+            '1 path · longest 2 hops · searched up to 6 hops',
+        );
+        expect(el.textContent).toContain('Edge-yield cap reached');
+        expect(c.toolBadge('server-paths')).toBe('1 paths · truncated');
+        const item = el.querySelector<HTMLButtonElement>('[aria-label="Server paths"] button')!;
+        expect(item.textContent).toContain('A → B → C');
+        item.click();
+        expect(last()).toEqual(path);
+        await expectNoA11yViolations(el);
+    });
 });

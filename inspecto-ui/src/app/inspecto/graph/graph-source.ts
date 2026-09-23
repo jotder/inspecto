@@ -1,4 +1,4 @@
-import type { GraphDirection } from 'app/inspecto/api';
+import type { GraphDirection, MultiEdgeMapping, MultiNodeMapping } from 'app/inspecto/api';
 import type { G6GraphData } from './graph-types';
 import type { ConditionGroup } from '../query/query-types';
 
@@ -10,7 +10,12 @@ import type { ConditionGroup } from '../query/query-types';
  */
 
 /** The four graph planes a query can target (GLOSSARY §11: P1 / P2 / P2′ / P3). */
-export type GraphSourceId = 'component-registry' | 'lineage' | 'provenance' | 'entity-projection';
+export type GraphSourceId =
+    | 'component-registry'
+    | 'lineage'
+    | 'provenance'
+    | 'entity-projection'
+    | 'entity-projection-multi';
 
 /**
  * The `entity-projection` mapping (P3): fold a Dataset's rows into a business Entity/Link graph —
@@ -63,6 +68,12 @@ export interface GraphSourceQuery {
      * results into one graph (entity-projection only). When present, takes precedence over `projection`.
      */
     projections?: EntityProjection[];
+    /**
+     * LA-08 (entity-projection-multi only): node mappings + edge mappings over several Datasets, answered by
+     * ONE `POST /inv/projection/multi` call. Entities from different Datasets whose values normalise to one
+     * key (D-S4) merge into one node, which keeps the Datasets it came from in `data.provenance`.
+     */
+    multi?: { nodes: MultiNodeMapping[]; edges: MultiEdgeMapping[] };
     /**
      * Stage 2 of the two-stage query loop (spec §3.7): the shared condition tree, applied to the Dataset's
      * rows BEFORE the fold so edge counts stay right. Sent verbatim as `filter` on `POST /inv/projection`.

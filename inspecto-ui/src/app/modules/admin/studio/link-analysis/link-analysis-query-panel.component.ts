@@ -1,5 +1,15 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
-import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    OnInit,
+    WritableSignal,
+    computed,
+    inject,
+    input,
+    output,
+    signal,
+} from '@angular/core';
+import { FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +24,9 @@ import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from '
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { LinkAnalysisView } from './link-analysis.service';
+
+/** `InvRoutes.MAX_MAPPINGS` — the server 422s above it; the form says so first. */
+const MAX_MULTI_MAPPINGS = 16;
 
 /** One line of the collapsed-query summary (also used by the host's canvas status bar). */
 export interface QuerySummaryItem {
@@ -97,6 +110,19 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     /** Column choices per extra-mapping row, indexed like `extraMappings.controls`. */
     readonly extraMappingColumns = signal<string[][]>([]);
 
+    /**
+     * LA-08 (`entity-projection-multi`): node mappings and edge mappings over several Datasets, answered by one
+     * `POST /inv/projection/multi` call. Column choices are indexed like each array's controls.
+     */
+    readonly nodeMappings = this.fb.array<FormGroup>([]);
+    readonly edgeMappings = this.fb.array<FormGroup>([]);
+    readonly nodeMappingColumns = signal<PickerOption[][]>([]);
+    readonly edgeMappingColumns = signal<PickerOption[][]>([]);
+    /** The optional label column's choices — a blank-valued "none" first, per the picker idiom. */
+    readonly nodeLabelColumnOptions = computed<PickerOption[][]>(() =>
+        this.nodeMappingColumns().map((cols) => [{ value: '', label: '—' }, ...cols]),
+    );
+
     // Picker option lists — the single-choice selects are `<inspecto-option-picker>`s over {value,label};
     // `attrCols` / `extraPipelines` stay `mat-select multiple` (the picker is single-choice).
     readonly sourceOptions = computed<PickerOption[]>(() =>
@@ -154,6 +180,50 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         this.extraMappingColumns.update((all) => all.filter((_, idx) => idx !== i));
     }
 
+    /** Add an LA-08 node mapping row: Dataset · id column · label column? · category?. */
+    addNodeMapping(): FormGroup {
+        const group = this.fb.nonNullable.group({ datasetId: [''], idColumn: [''], labelColumn: [''], category: [''] });
+        this.pushMultiRow(this.nodeMappings, this.nodeMappingColumns, group);
+        return group;
+    }
+
+    /** Add an LA-08 edge mapping row: Dataset · source column · target column · link type?. */
+    addEdgeMapping(): FormGroup {
+        const group = this.fb.nonNullable.group({
+            datasetId: [''],
+            sourceColumn: [''],
+            targetColumn: [''],
+            type: [''],
+        });
+        this.pushMultiRow(this.edgeMappings, this.edgeMappingColumns, group);
+        return group;
+    }
+
+    removeNodeMapping(i: number): void {
+        this.nodeMappings.removeAt(i);
+        this.nodeMappingColumns.update((all) => all.filter((_, idx) => idx !== i));
+    }
+
+    removeEdgeMapping(i: number): void {
+        this.edgeMappings.removeAt(i);
+        this.edgeMappingColumns.update((all) => all.filter((_, idx) => idx !== i));
+    }
+
+    /** Append a row whose Dataset pick loads its column choices — resolved by the row's CURRENT index. */
+    private pushMultiRow(
+        rows: FormArray<FormGroup>,
+        columns: WritableSignal<PickerOption[][]>,
+        group: FormGroup,
+    ): void {
+        group.controls['datasetId'].valueChanges.subscribe(async (id: string) => {
+            const opts = (await this.columnsForDataset(id)).map((c) => ({ value: c, label: c }));
+            const i = rows.controls.indexOf(group);
+            if (i >= 0) columns.update((all) => all.map((c, idx) => (idx === i ? opts : c)));
+        });
+        rows.push(group);
+        columns.update((all) => [...all, []]);
+    }
+
     private async onDatasetPicked(id: string): Promise<void> {
         this.datasetColumns.set(await this.columnsForDataset(id));
     }
@@ -189,6 +259,34 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
                     return { error: 'Every mapping needs an entity type when combining more than one.' };
                 }
                 return { projections: [primary, ...extras] };
+            }
+            case 'entity-projection-multi': {
+                const nodeRows = this.nodeMappings.controls.map((g) => g.getRawValue());
+                const edgeRows = this.edgeMappings.controls.map((g) => g.getRawValue());
+                if (!nodeRows.length && !edgeRows.length) return { error: 'Add at least one node or edge mapping.' };
+                // A half-filled row is refused, never silently dropped — a dropped row reads as "no rows there".
+                if (nodeRows.some((m) => !m.datasetId || !m.idColumn))
+                    return { error: 'Every node mapping needs a Dataset and an id column.' };
+                if (edgeRows.some((m) => !m.datasetId || !m.sourceColumn || !m.targetColumn))
+                    return { error: 'Every edge mapping needs a Dataset plus its source and target columns.' };
+                if (nodeRows.length + edgeRows.length > MAX_MULTI_MAPPINGS)
+                    return { error: `At most ${MAX_MULTI_MAPPINGS} mappings per query.` };
+                return {
+                    multi: {
+                        nodes: nodeRows.map((m) => ({
+                            dataset: m.datasetId,
+                            idColumn: m.idColumn,
+                            labelColumn: m.labelColumn || undefined,
+                            category: m.category.trim() || undefined,
+                        })),
+                        edges: edgeRows.map((m) => ({
+                            dataset: m.datasetId,
+                            sourceColumn: m.sourceColumn,
+                            targetColumn: m.targetColumn,
+                            type: m.type.trim() || undefined,
+                        })),
+                    },
+                };
             }
             case 'provenance': {
                 if (!f.pipeline) return { error: 'Pick a pipeline.' };
@@ -240,6 +338,26 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
             attrCols: primary?.attrCols ?? [],
             entityType: primary?.entityType ?? '',
         });
+        this.nodeMappings.clear();
+        this.edgeMappings.clear();
+        this.nodeMappingColumns.set([]);
+        this.edgeMappingColumns.set([]);
+        for (const m of query.multi?.nodes ?? []) {
+            this.addNodeMapping().patchValue({
+                datasetId: m.dataset,
+                idColumn: m.idColumn,
+                labelColumn: m.labelColumn ?? '',
+                category: m.category ?? '',
+            });
+        }
+        for (const m of query.multi?.edges ?? []) {
+            this.addEdgeMapping().patchValue({
+                datasetId: m.dataset,
+                sourceColumn: m.sourceColumn,
+                targetColumn: m.targetColumn,
+                type: m.type ?? '',
+            });
+        }
         this.extraMappings.clear();
         this.extraMappingColumns.set([]);
         for (const m of extras) {

@@ -229,4 +229,61 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         const { fixture } = make();
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    // ── LA-08: multi-Dataset projection ──
+
+    it('entity-projection-multi: builds node + edge mappings in the /inv/projection/multi body shape', () => {
+        const { c } = make('entity-projection-multi');
+        expect(c.buildQuery()).toEqual({ error: expect.stringMatching(/at least one node or edge mapping/) });
+
+        c.addNodeMapping().patchValue({
+            datasetId: 'people',
+            idColumn: 'ID',
+            labelColumn: 'NAME',
+            category: ' person ',
+        });
+        c.addEdgeMapping().patchValue({ datasetId: 'calls', sourceColumn: 'A', targetColumn: 'B' });
+        expect(c.buildQuery()).toEqual({
+            multi: {
+                nodes: [{ dataset: 'people', idColumn: 'ID', labelColumn: 'NAME', category: 'person' }],
+                edges: [{ dataset: 'calls', sourceColumn: 'A', targetColumn: 'B', type: undefined }],
+            },
+        });
+    });
+
+    it('entity-projection-multi: refuses a half-filled mapping instead of silently dropping it', () => {
+        const { c } = make('entity-projection-multi');
+        c.addEdgeMapping().patchValue({ datasetId: 'calls', sourceColumn: 'A' });
+        expect(c.buildQuery()).toEqual({ error: expect.stringMatching(/source and target/) });
+    });
+
+    it('entity-projection-multi: a saved view round-trips through the form', () => {
+        const { c } = make('entity-projection-multi');
+        const multi = {
+            nodes: [{ dataset: 'people', idColumn: 'ID', labelColumn: undefined, category: undefined }],
+            edges: [{ dataset: 'calls', sourceColumn: 'A', targetColumn: 'B', type: 'called' }],
+        };
+        c.patchFormFromView({
+            id: 'v',
+            name: 'v',
+            sourceId: 'entity-projection-multi',
+            query: { multi },
+        } as never);
+        expect(c.nodeMappings.length).toBe(1);
+        expect(c.edgeMappings.length).toBe(1);
+        expect(c.buildQuery()).toEqual({ multi });
+    });
+
+    it('entity-projection-multi: renders the mapping rows with no a11y violations', async () => {
+        const { fixture } = make('entity-projection-multi');
+        const el: HTMLElement = fixture.nativeElement;
+        const button = (text: string) =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes(text))!;
+        button('Add node mapping').click();
+        button('Add edge mapping').click();
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Node mapping 1"]')).not.toBeNull();
+        expect(el.querySelector('[aria-label="Edge mapping 1"]')).not.toBeNull();
+        await expectNoA11yViolations(el);
+    });
 });

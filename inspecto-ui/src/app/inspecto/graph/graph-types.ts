@@ -33,6 +33,11 @@ export interface G6Node {
          * the split-identity notice reports.
          */
         spellings?: string[];
+        /**
+         * LA-08: the Datasets this entity was projected from (`__provenance_dataset`), first-seen order. Two or
+         * more means rows from different Datasets normalised to one key and were merged into this node.
+         */
+        provenance?: string[];
     };
 }
 
@@ -45,6 +50,8 @@ export interface G6Edge {
         kind: string;
         /** Extra per-edge attributes (entity-projection `attrCols`), keyed by source column name. */
         attrs?: Record<string, string | null>;
+        /** LA-08: the Datasets this link was projected from (`__provenance_dataset`). */
+        provenance?: string[];
     };
 }
 

@@ -35,6 +35,18 @@
                 The projection hit the node cap — narrow the dataset or filter to see everything.
             </inspecto-alert>
         }
+        @if (mappingSummary().length) {
+            <p class="text-secondary m-0 flex flex-wrap gap-x-4 text-xs" aria-label="Rows per mapping">
+                @for (m of mappingSummary(); track $index) {
+                    <span class="tabular-nums"
+                        >{{ m.dataset }} ({{ m.role }}): {{ m.rows }} rows
+                        @if (m.truncated) {
+                            <span class="text-warn">· truncated</span>
+                        }
+                    </span>
+                }
+            </p>
+        }
 
         <!-- ══ toolbar: graph-only tools · saved views · save · display · canvas tools ══ -->
         <div class="flex flex-wrap items-center gap-2">
@@ -826,7 +838,11 @@
                             [suggested]="profile().suggestedTools"
                             [labelOf]="labelOf"
                             [timeAttr]="timeColumn()"
+                            [traversalMappings]="traversalMappingOptions()"
+                            [serverPaths]="serverPaths()"
+                            [serverPathsBusy]="serverPathsBusy()"
                             (emphasisChange)="emphasis.set($event)"
+                            (findPaths)="findPaths($event)"
                         ></inspecto-link-analysis-toolbox>
 
                         <!-- View — layouts and canvas overlays -->

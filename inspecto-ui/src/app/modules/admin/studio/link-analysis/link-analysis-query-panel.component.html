@@ -97,6 +97,100 @@
                     Add another mapping
                 </button>
             }
+            @case ('entity-projection-multi') {
+                <p class="text-secondary w-full text-sm">
+                    One query over several Datasets. Entities whose values match after normalisation merge into one
+                    node, which lists the Datasets it came from. A Dataset you cannot view refuses the whole query.
+                </p>
+                <!-- ── node mappings: which column of a Dataset names an entity ── -->
+                @for (m of nodeMappings.controls; track m; let i = $index) {
+                    <div
+                        [formGroup]="m"
+                        class="flex w-full flex-wrap items-center gap-2 rounded-lg border p-2"
+                        [attr.aria-label]="'Node mapping ' + (i + 1)"
+                        role="group"
+                    >
+                        <inspecto-option-picker
+                            class="w-48"
+                            label="Node Dataset"
+                            formControlName="datasetId"
+                            [options]="datasetOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-40"
+                            label="Id column"
+                            formControlName="idColumn"
+                            [options]="nodeMappingColumns()[i] ?? []"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-40"
+                            label="Label column (optional)"
+                            formControlName="labelColumn"
+                            [options]="nodeLabelColumnOptions()[i] ?? []"
+                        ></inspecto-option-picker>
+                        <mat-form-field subscriptSizing="dynamic" class="w-40">
+                            <mat-label>Category (optional)</mat-label>
+                            <input matInput formControlName="category" placeholder="e.g. person" />
+                        </mat-form-field>
+                        <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeNodeMapping(i)"
+                            [attr.aria-label]="'Remove node mapping ' + (i + 1)"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                    </div>
+                }
+                <!-- ── edge mappings: which column pair of a Dataset links two entities ── -->
+                @for (m of edgeMappings.controls; track m; let i = $index) {
+                    <div
+                        [formGroup]="m"
+                        class="flex w-full flex-wrap items-center gap-2 rounded-lg border p-2"
+                        [attr.aria-label]="'Edge mapping ' + (i + 1)"
+                        role="group"
+                    >
+                        <inspecto-option-picker
+                            class="w-48"
+                            label="Edge Dataset"
+                            formControlName="datasetId"
+                            [options]="datasetOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-40"
+                            label="Source column"
+                            formControlName="sourceColumn"
+                            [options]="edgeMappingColumns()[i] ?? []"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-40"
+                            label="Target column"
+                            formControlName="targetColumn"
+                            [options]="edgeMappingColumns()[i] ?? []"
+                        ></inspecto-option-picker>
+                        <mat-form-field subscriptSizing="dynamic" class="w-40">
+                            <mat-label>Link type (optional)</mat-label>
+                            <input matInput formControlName="type" placeholder="e.g. called" />
+                        </mat-form-field>
+                        <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeEdgeMapping(i)"
+                            [attr.aria-label]="'Remove edge mapping ' + (i + 1)"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                    </div>
+                }
+                <button mat-stroked-button type="button" (click)="addNodeMapping()">
+                    <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                    Add node mapping
+                </button>
+                <button mat-stroked-button type="button" (click)="addEdgeMapping()">
+                    <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                    Add edge mapping
+                </button>
+            }
             @case ('lineage') {
                 <mat-form-field subscriptSizing="dynamic" class="w-56">
                     <mat-label>Root node (optional)</mat-label>

@@ -451,7 +451,29 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   `edgeYieldCapped` + `truncated`), and a **5 s timeout** comes from a route-local `SqlSandboxPolicy`
   through the new `QueryExecutor.run(Request, policy)` overload. Audited as `LINK_TRAVERSED`. The body
   uses this file's `dataset`/`sourceCol`/`targetCol` names, not §5.3's `edgeDataset`/`sourceColumn`.
-  ⚠ The SPA does not call it yet — wiring is a follow-up.
+  **SPA wired 2026-09-23** — the toolbox's *Find paths (server)* group (`InvService.recursivePaths`): From
+  (required) and To (optional, blank = any node) over the loaded query's edge mappings, max hops, and
+  follow-direction / either-direction. The host sends the node's FIRST RAW SPELLING (the server compares
+  `CAST(col AS VARCHAR)` exactly, never the normalised id) plus the pushed `filter` (AND a multi mapping's
+  own), and `recursivePathsToGraph` mints every hop through `entityId()` with the mapping's `entityType`, reuses
+  a working-set link between two hops in either direction, and ADDS any node or `path` link the walk reached
+  beyond the loaded slice so every path can be highlighted. The answer states `searched up to N hops`,
+  the longest path, and a warning for `edgeYieldCapped` / `truncated`. ⚠ The response has **no
+  `depthUsed`** — what the pane shows is `fences.maxDepth`, the clamped fence the server applied. ⚠ A
+  folded node (several spellings) starts the walk from its first spelling only.
+* **`POST /inv/projection/multi` is wired as its own GraphSource** (LA-08 SPA half, 2026-09-23):
+  `entity-projection-multi`, "Entity/Link (several Datasets)" in the query dock. Rows are node mappings
+  (Dataset · id column · label column? · category?) and edge mappings (Dataset · source · target · link
+  type?); a half-filled row is refused, never dropped, and more than 16 is refused before the server 422s.
+  `projectMultiResult` mints every id UNSCOPED through `entityId()`, so one normalised key from several
+  Datasets is ONE node carrying `data.provenance` (shown in the hover tooltip and the node-detail
+  *Datasets* row) and every raw spelling in `data.spellings`; edges fold across Datasets with summed counts
+  and their own provenance. The per-mapping `mappings[]` summary renders under the canvas alerts with each
+  mapping's own `truncated`. A 404 — one Dataset unknown OR not viewable — reads as a refusal of the WHOLE
+  query with no partial graph (`invErrorMessage`); a 422 shows the server's reason. ⚠ Deliberately not
+  wired: node/edge `attributes`, per-edge `filter` authoring, and incremental expand on this source.
+  ⚠ The existing `entity-projection` multi-mapping path (N × `/inv/projection`, type-scoped ids) is
+  unchanged — the two coexist.
 
 * **Suspicion score carries its OWN cap, lower than the shared one** (D-S3, 750 by default, a third
   per-space setting beside the projection and analysis caps). Sizing one limit for 27 algorithms forces

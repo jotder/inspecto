@@ -115,6 +115,105 @@
                                 </ul>
                             }
                         }
+                        @case ('server-paths') {
+                            @if (!traversalMappings().length) {
+                                <p class="text-secondary text-sm">
+                                    Load an Entity/Link projection first — the server walks its edge Dataset.
+                                </p>
+                            } @else {
+                                <p class="text-secondary text-sm">
+                                    Walks the whole edge Dataset on the server, not just the loaded graph. Nodes it
+                                    reaches beyond the working set are added.
+                                </p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <inspecto-option-picker
+                                        class="w-56"
+                                        label="From"
+                                        [options]="pathNodeOptions()"
+                                        [ngModel]="pathFrom()"
+                                        (ngModelChange)="pathFrom.set($any($event))"
+                                    />
+                                    <inspecto-option-picker
+                                        class="w-56"
+                                        label="To (optional)"
+                                        [options]="optionalPathNodeOptions()"
+                                        [ngModel]="pathTo()"
+                                        (ngModelChange)="pathTo.set($any($event))"
+                                    />
+                                    @if (traversalMappings().length > 1) {
+                                        <inspecto-option-picker
+                                            class="w-56"
+                                            label="Edge Dataset"
+                                            [options]="traversalMappings()"
+                                            [ngModel]="serverMapping()"
+                                            (ngModelChange)="serverMapping.set($any($event))"
+                                        />
+                                    }
+                                    <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                        <mat-label>Max hops</mat-label>
+                                        <input
+                                            matInput
+                                            type="number"
+                                            min="1"
+                                            max="10"
+                                            [ngModel]="serverDepth()"
+                                            (ngModelChange)="serverDepth.set(+$event)"
+                                        />
+                                    </mat-form-field>
+                                    <mat-button-toggle-group
+                                        [value]="serverDirection()"
+                                        (change)="serverDirection.set($event.value)"
+                                        aria-label="Traversal direction"
+                                    >
+                                        <mat-button-toggle value="DIRECTED">Follow direction</mat-button-toggle>
+                                        <mat-button-toggle value="UNDIRECTED">Either direction</mat-button-toggle>
+                                    </mat-button-toggle-group>
+                                    <button
+                                        mat-stroked-button
+                                        (click)="runServerPaths()"
+                                        [disabled]="!pathFrom() || serverPathsBusy()"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                                        Find paths
+                                    </button>
+                                </div>
+                                @if (serverPaths(); as sp) {
+                                    <p class="m-0 text-sm tabular-nums" role="status" aria-label="Server path search">
+                                        @if (sp.paths.length) {
+                                            {{ sp.paths.length }} {{ sp.paths.length === 1 ? 'path' : 'paths' }} ·
+                                            longest {{ sp.deepest }} hops
+                                        } @else {
+                                            No path found
+                                        }
+                                        · searched up to {{ sp.depthLimit }} hops
+                                    </p>
+                                    @if (sp.edgeYieldCapped) {
+                                        <inspecto-alert variant="warning" title="Edge-yield cap reached">
+                                            A hop level hit the server's edge-yield fence, so part of the graph was not
+                                            walked — longer or other paths may exist.
+                                        </inspecto-alert>
+                                    } @else if (sp.truncated) {
+                                        <inspecto-alert variant="warning" title="Truncated">
+                                            The path limit cut the answer short — more paths exist than are shown.
+                                        </inspecto-alert>
+                                    }
+                                    @if (sp.paths.length) {
+                                        <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Server paths">
+                                            @for (p of sp.paths; track $index) {
+                                                <li>
+                                                    <button
+                                                        class="underline-offset-2 hover:underline"
+                                                        (click)="focusAllPath(p)"
+                                                    >
+                                                        {{ patternMatchLabel(p) }}
+                                                    </button>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                }
+                            }
+                        }
                         @case ('explain') {
                             <div class="flex flex-wrap items-center gap-2">
                                 <inspecto-option-picker
