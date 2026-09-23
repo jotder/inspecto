@@ -208,7 +208,7 @@ public final class AffectedPipelines {
         if (!ch.file().getFileName().toString().endsWith(".toon") || !Files.isRegularFile(ch.file())) return false;
         try {
             return ConfigCodec.toMap(ch.before())
-                    .equals(ConfigCodec.toMap(Files.readString(ch.file(), StandardCharsets.UTF_8)));
+                    .equals(com.gamma.util.ToonHelper.load(ch.file().toString()));
         } catch (Exception e) {
             return false;   // undecodable on either side: it is a change
         }
