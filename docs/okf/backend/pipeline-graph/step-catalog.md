@@ -370,7 +370,7 @@ webhook:
   retry: {count: 3, backoff: EXPONENTIAL, initial_delay: 1s, max_delay: 30s}
 ```
 
-The canvas palette offers it (catalog `addable`). The recipe verb `webhook:` compiles, and `RecipeConverter` projects it back, but it is **not** a `step-types.contract.json` entry. Like `profile`, the Recipe-view palette does not list it yet, because that list has a client fallback (`pipeline-graph.ts` `RECIPE_VERBS`) and a mock lower (`pipeline-editable.ts`) that would both need to learn the type.
+The canvas palette offers it (catalog `addable`). The recipe verb `webhook:` compiles, and `RecipeConverter` projects it back, but it is **not** a `step-types.contract.json` entry. ✅ Nothing more is owed in the SPA: the Recipe view was deleted (`6d3c68fa`, 2026-09-18), so the client `RECIPE_VERBS` fallback and the mock lower in `pipeline-editable.ts` (dead since `f1553136`) have no production reader (`WEBHOOK-RECIPE-PALETTE-1` refuted 2026-09-23; the dead mirrors are `STEP-TYPES-DEAD-CLIENT-MIRRORS-1`).
 
 **Egress (operator decision 2026-09-23).** ⛔ **There is no `url:` and no token key.** The block
 names a Connection whose connector is `https`. Onboarding one needs the admin-only
@@ -399,8 +399,8 @@ HTTP has no rollback. A re-run re-sends them under the same keys, so the receive
 on the key. Keys stay stable across re-runs only as far as the relation's row order does, and the
 sink adds no `ORDER BY`.
 
-⚠ **Not in the Recipe-view palette yet** (`WEBHOOK-RECIPE-PALETTE-1`): the `webhook:` verb compiles and
-the canvas can add the node, but the Recipe view's client-side verb lists do not carry it.
+✅ **No Recipe-view gap** (`WEBHOOK-RECIPE-PALETTE-1`, refuted 2026-09-23): the `webhook:` verb compiles and
+the canvas palette adds the node; the Recipe view whose client-side verb lists lacked it was deleted in `6d3c68fa`.
 
 **Edition (EDG-01).** The engine defines the `WebhookSinkTransport` SPI and ships **no**
 implementation. The one provider, `HttpWebhookSinkTransport`, lives in `inspecto-notify-channels`
@@ -440,6 +440,15 @@ where `PipelineEditable` derives LOWERABLE and STEP_KIND from — they are no lo
 lift/lower code that home names, and the runtime steps→graph seam — the
 four registrations [catalog-vs-executors](../engine/catalog-vs-executors.md) names). The board's
 edition cells and the two Enterprise-only rows live in `tools/render-processor-board.mjs`.
+
+⚠ **"Delivered" is not yet "releasable"** (`PROCESSOR-RELEASE-READINESS-1`, audit 2026-09-23, awaiting
+operator sign-off on the bar). The 37 delivered processors were measured against a draft 7-point bar
+(documented · real-path test · workbench preview/lift/lower · UI palette · edition gating · fails clearly at
+save · demo); ~22 pass nearly all. Gap groups include catalog↔docs drift (`parser.asn1.ber` maps to no node
+type), graph save and config write running different gates, step config errors surfacing only at run, an
+enrichment node silently skipped by the dry run, and edition gating that differs from `EDITIONS.md`.
+Questionably delivered: `schema.drift`, circuit breaker/throttle, `constraint.check`/`alert.dispatch`/
+`sink.quarantine`, `sink.archive`, `db.jdbc`.
 
 
 ## Collectors & Ingestion (`ACQ`) — 4 delivered · 5 partial · 11 planned

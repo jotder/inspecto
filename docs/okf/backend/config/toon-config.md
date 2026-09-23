@@ -70,7 +70,8 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `readToon`/`ConfigCodec` prefix silently degrades `file` to the pipeline path (the message is still
   shown verbatim).
   ⚠ `ToonHelper.load` prefixes the path the same way (`<path>: line N: …`), but the ~20 readers that call
-  `ConfigCodec.toMap(Files.readString(p))` themselves get the line, not the file, unless they add it.
+  `ConfigCodec.toMap(Files.readString(p))` themselves get the line, not the file, unless they add it
+  (`CONFIGCODEC-CALLERS-NO-FILE-NAME-1` — switch them to `ToonHelper.load`).
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does

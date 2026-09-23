@@ -112,6 +112,13 @@ path — an existence oracle. Now, before any filesystem access: relative value 
 `PATH_JAIL_VIOLATION`, identical for a present and a missing file · inside but not a file → 404. The roots
 are the load-time ones, not the write root: the load already refuses a config whose schema refs sit
 outside them, so a config with satellites was never loadable from outside them anyway. Pinned by `ControlApiValidateConfigPathJailTest`.
+⚠ Open beside it: `POST /pipelines/authored/{id}/dry-run` and `POST /enrichment/preview` read a join step's
+caller-supplied `path:` data file with **no** jail and return its rows (or the resolved path in a 422) —
+deliberate for now per the `PipelineGraphRoutes.dryRunReferences` javadoc (data files live outside the write
+root), awaiting one operator decision for both (`PREVIEW-REFERENCE-PATH-UNJAILED-1`). And `/validate
+{configPath}` runs `PipelineConfig.prepare()`, which creates the Pipeline's status directory, so the
+`CapabilityManifest` "read-shaped, writes nothing" exemption is not strictly true
+(`VALIDATE-PREPARE-WRITES-STATUS-DIR-1`).
 
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about
