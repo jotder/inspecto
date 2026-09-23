@@ -16,6 +16,10 @@
 > one Step that genuinely has a `WHERE`, a **structured predicate editor already exists and is already
 > adopted on five hosts** (§2.4), which makes the AST's job *recognition*, not authoring.
 >
+> **Step 0 SHIPPED (2026-09-23) — all four premises HELD on the real driver.** Four sibling pins in
+> `SqlSandboxTest` (duckdb_jdbc 1.5.2.1, sealed connection): R1+R2 round trip incl. a hand-mutated AST,
+> T2, T3, T4. Results in §6 Step 0. Steps 1-5 remain unbuilt, pending §7.
+>
 > **Decision owner:** the operator, on the five calls in §7. ⚠ Per the `dataset-column-derivation-plan`
 > lesson — *a plan is where a decision is described, the board is where it is queued* — §7 must be filed
 > into `BACKLOG.md` §1 by the main thread, or this pass stalls the way that one did for three days.
@@ -93,7 +97,7 @@ hand-written parser."* — that `json_serialize_sql('SELECT a FROM t WHERE b > 1
 containing `"error":false`, `where_clause` and `COMPARE_GREATERTHAN`. It then re-proves the seal
 (`SET enable_external_access=true` and `INSTALL excel` both throw).
 
-**`json_deserialize_sql` is not mentioned.** A repo-wide grep for either function across `src/main` and
+**`json_deserialize_sql` is not mentioned.** *(Closed 2026-09-23 by Step 0 — see §6.)* A repo-wide grep for either function across `src/main` and
 `src/test` returns hits only in that one test file and in prose docs. ⇒ The board's *"precondition
 DISCHARGED … Pinned by `SqlSandboxTest`"* is accurate about reading and **silent about writing**, which
 is the half clause (c) needs the moment the table becomes editable. Extending that test is **step 0** of
@@ -276,6 +280,20 @@ be skipped; it is the slice with the best value-to-risk ratio in the set.
   ⇒ **Worth doing even if nothing below is ever built:** it closes the half-discharged precondition in
   §2.2 and converts this plan's measurements into repo-owned evidence that a DuckDB bump would break
   loudly. Do this first.
+
+  ✅ **DONE 2026-09-23 — every premise HELD, none refuted.** Four sibling tests in
+  `inspecto-sql/src/test/java/com/gamma/sql/SqlSandboxTest.java`, all on a `SqlSandbox` after `seal()`:
+
+  | Pin | Premise | Result |
+  |---|---|---|
+  | `astRoundTripsThroughDeserializeOnASealedConnection` | R1 serialize→deserialize; R2 a hand-mutated AST (`COMPARE_GREATERTHAN`→`COMPARE_LESSTHAN`) deserializes | HELD — exact strings `SELECT a FROM t WHERE (b > 1)` / `… (b < 1)` |
+  | `serializeNeedsAnExplicitVarcharCastOnItsBindParameter` | T2 bare `?` refused, `?::VARCHAR` binds | HELD — message contains *"must be a VARCHAR"* |
+  | `slimmedAstDoesNotDeserialize` | T3 `skip_null/skip_empty` AST is smaller and one-way | HELD — deserialize throws naming `cte_map` |
+  | `astCarriesStartOffsetsButNoEndOffsets` | T4 `query_location` present, no end/span-like key | HELD — no key matching `location/offset/end/length/len/stop/span` besides `query_location` |
+
+  ⚠ The T4 pin is a key-name scan of one small AST, so it proves *no end-offset key is emitted for that
+  statement*, not a DuckDB guarantee; a bump that adds one fails the pin loudly, which is the intent.
+  ⚠ R3-R6 and T1/T5-T7 remain plan-measured only, not pinned — Step 0 named only T2-T4.
 
 - **Step 1 — the route, read direction only.** `POST /components/sql/ast` per §4, plus its real-HTTP
   test class (200/`ok:true`, 200/`ok:false` on a syntax error, 400 on missing `sql`, the `fragment:
