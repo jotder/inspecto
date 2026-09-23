@@ -45,7 +45,7 @@ what `csv_settings.null_strings` exists for.
 The file follows the shipped telecom analogue `spaces/demo/config/roaming/roaming_tap_pipeline.toon`
 (same space, same `processing.csv_settings` spelling rather than `parsing.delimited`), and every block
 it carries is on the accepted-block table in
-[`pipeline-config-keys.md`](../okf/backend/pipeline-graph/pipeline-config-keys.md).
+[`pipeline-config-keys.md`](../../okf/backend/pipeline-graph/pipeline-config-keys.md).
 
 - `dirs` — all nine leaves, on the `<space>/data/<name>/<role>` convention. Five are spec-declared;
   `errors` / `quarantine` / `markers` / `log_dir` are **engine-read and authoring-invisible** (that
@@ -243,7 +243,7 @@ Pipeline worked first run. The telecom-specific processors are the planned ones 
 `transform.telecom.rating`, `transform.telecom.roaming` (TAP3/CIBER surcharge),
 `transform.telecom.simbox`, and `parser.asn1.per` — while `parser.asn1.ber`, the decoder you would
 need for *pre*-mediation switch CDRs, is delivered. Full analysis:
-[`pipelines-workbench-moscow.md`](../archived-documents/plans-archive/pipelines-workbench-moscow.md) — **v2 of which is multi-domain**: a
+[`pipelines-workbench-moscow.md`](pipelines-workbench-moscow.md) — **v2 of which is multi-domain**: a
 sweep of all 26 shipped Pipelines and a test run over 24 of them, with this build kept as the depth probe.
 ⚠ v2 **corrects** three claims first made here: the parse stage IS testable in the builder (*Run to here*
 parses real inbox bytes through the real frontend — W4 drove only the dry-run panel), *"not yet tested"*
@@ -286,6 +286,6 @@ that target.
 
 ## References
 
-- [`pipeline-config-keys.md`](../okf/backend/pipeline-graph/pipeline-config-keys.md) — the accepted-block census this config conforms to
-- [`pipelines-workbench-moscow.md`](../archived-documents/plans-archive/pipelines-workbench-moscow.md) — the MoSCoW analysis this build fed
+- [`pipeline-config-keys.md`](../../okf/backend/pipeline-graph/pipeline-config-keys.md) — the accepted-block census this config conforms to
+- [`pipelines-workbench-moscow.md`](pipelines-workbench-moscow.md) — the MoSCoW analysis this build fed
 - `spaces/demo/config/roaming/roaming_tap_pipeline.toon` — the shipped telecom analogue this follows

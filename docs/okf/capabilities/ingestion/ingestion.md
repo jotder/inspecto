@@ -229,6 +229,27 @@ header name, so a stale mirror hides a column silently), the lineage ledger the 
 progress (`IngestProgress`, `StepProgress`) is **in-memory by decision** — a wedged step reads as a stale
 `startedAt`. The Run Detail's tabs are Batches / Files / Lineage / **Quarantine** / Commits.
 
+**Reference build — `postmed_xdr` (2026-09-22).** A post-mediated telecom xDR feed (pipe-delimited, one file
+per collection interval) built from scratch in `spaces/demo/config/postmed/` and verified against the written
+Parquet, not the exit code (⚠ exit 0 and a log ending at *"Planned N batch(es)"* say nothing about the
+outcome — read `status/*_batches_*.csv`). What it pins down: all 18 declared types survive to Parquet
+(`BIGINT` for byte counters — never `DOUBLE`, lossy above 2^53); `csv_settings.null_strings` turns `NULL`/`N/A`
+and an empty field into SQL NULL, so an unrated record's price stays NULL rather than `0.00`; omitting
+`date_formats`/`timestamp_formats` is what the validator warns about (`TRY_STRPTIME` → NULL). ⚠ The Hive
+partition columns are not uniformly typed — `year` reads back `BIGINT`, `month`/`day` `VARCHAR`, so a predicate
+on `month` needs a string literal. ⚠ The CLI does no space discovery: a `schema_file:` needs
+`-Dassist.safety.roots=<space>`. Its findings, all closed: `INGEST-REJECT-ACCOUNTING-1` (the batch row now
+splits `rejected_files`/`rejected_rows` and `total_input_rows` counts what arrived),
+`INGEST-ERRORS-CSV-PER-COLUMN-1` (one errors row per bad line, raw line once), and
+`DUPLICATE-CHECK-GRAIN-UNSTATED-1` — `processing.duplicate_check` is **file-grain** (marker/path-keyed); a
+re-emitted record passes, and record-grain dedup is the `transform.dedup` Step. The workbench-side findings
+(`GRAPH-SAVE-REFORMATS-CONFIG-1`, `UI-CREATED-PIPELINE-FLAT-HOME-1`, `READONLY-LENS-PALETTE-ENABLED-1`) are
+owned by [pipeline-editor](../../frontend/features/pipeline-editor.md) and
+[editable-round-trip](../../backend/pipeline-graph/editable-round-trip.md). Reproduce:
+`python spaces/demo/data/samples/gen-postmed-xdr.py --seed-inbox`, then run the CLI over the Pipeline; copy
+`PMXDR_20260904_001.psv.defect` in as `.psv` for the fault run. Build record:
+[postmed-xdr-pipeline-build](../../../archived-documents/plans-archive/postmed-xdr-pipeline-build.md).
+
 ### 3.7 Expectations
 
 `com.gamma.expectation` (`inspecto`): an `expectation` component (a condition tree in the shared query-types
