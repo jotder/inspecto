@@ -455,6 +455,10 @@ All three failing fails the batch with a message naming every remedy. ⛔ `read_
 frontend. Preview rides `sample_b64` (the workbook is binary) and its B2 type sniff is the same
 relation without `all_varchar`.
 
+⚠ **A date cell arrives as its Excel SERIAL** (`46237`), because every column is forced to text — so each
+date field needs a mapping conversion, and a raw Excel date cannot drive date partitioning. Reported
+2026-09-23 by the `gl_journal` demo lane, not yet re-grounded (`EXCEL-DATES-ARRIVE-AS-SERIALS-1`).
+
 ### 6.5 XML `[PLUGIN]` (or `text_regex` `[LIVE]` for *flat* XML)
 DuckDB has no core XML reader. For flat, one-element-per-line XML, `text_regex` with
 `regexp_extract` works. For real nested XML, write a `StreamingFileIngester` around a StAX/SAX

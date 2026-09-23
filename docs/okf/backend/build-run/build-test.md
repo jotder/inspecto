@@ -52,8 +52,10 @@ the pattern”* — on both the test run and the dry-run, which reads as an engi
 `<space>/config/**` file ending `_pipeline.toon`, creates each `dirs.*` leaf, copies
 `data/samples/<pipeline>/` (recursively) into that Pipeline's inbox, and copies `data/samples/ref/*`
 into `data/ref/`. A Pipeline with **no** same-named sample directory is **reported**, not skipped in
-silence — that line is how `lookup_step`, which ships no sample at all, stays visible
-(`DEMO-CORPUS-FORMAT-COVERAGE-1`).
+silence — that line is how `lookup_step`, which shipped no sample at all, stayed visible
+(`DEMO-CORPUS-FORMAT-COVERAGE-1`). *(It has shipped one since `WB-17`, 2026-09-22; the row CLOSED
+2026-09-23 once ASN.1, Excel, fixed-width and XML each gained a domain-shaped demo in `spaces/demo`
+— `msc_cdr`, `gl_journal`, `in_recharges`, `stock_movements` — pinned by `DemoCorpusIngestTest`.)*
 
 It is **idempotent and not a sync**: it creates and overwrites, it never deletes, so re-running after
 the engine has consumed an inbox re-seeds it and a file you dropped in by hand survives.

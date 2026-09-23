@@ -8,6 +8,20 @@ timestamp: 2026-09-22T00:00:00Z
 
 # Pipelines workbench — MoSCoW analysis (v2, multi-domain)
 
+> 🔴 **ARCHIVED 2026-09-23 — EXECUTED.** This is the spec the archived
+> [`workbench-trust-plan.md`](workbench-trust-plan.md) built: 18 of its 20 `WB-nn` items shipped, `WB-15`
+> (`S3`, decision `D3`) was REFUSED when its premise failed a count, all decisions `D2`–`D9` were signed, and the Could-tier domain demos closed
+> (`DEMO-CORPUS-FORMAT-COVERAGE-1`, `c1621799` + `a6492868`). ⛔ **Do not read it for current behaviour** —
+> the matrices below are the 2026-09-22 measurement, and most of their 🔴 cells are fixed. The truth lives in
+> [`pipeline-test-run.md`](../../okf/backend/engine/pipeline-test-run.md),
+> [`pipeline-editor.md`](../../okf/frontend/features/pipeline-editor.md),
+> [`pipeline-config-keys.md`](../../okf/backend/pipeline-graph/pipeline-config-keys.md),
+> [`editable-round-trip.md`](../../okf/backend/pipeline-graph/editable-round-trip.md) and
+> [`pipeline-authoring.md`](../../okf/capabilities/pipeline-authoring/pipeline-authoring.md). Still-open
+> items went to the board: `S8` → `PIPELINE-RUN-HISTORY-OVERLAY-1`, `S9` → `WORKBENCH-RESPONSIVE-FLOOR-1`,
+> the history/layout Coulds → `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`. The telecom business processors stay
+> `PLANNED` in `ProcessorCatalog`; assist-authored Pipelines stay *design first* in `pipeline-authoring.md`.
+
 ## 0. The question this prioritises against
 
 > **Goal.** An engineer can author a production ingest Pipeline for **any** shipped format and domain in
@@ -27,7 +41,7 @@ generic, nothing specific to postmed_xdr* — was correct, and v2 is the answer 
 | E1 | **API sweep of every shipped Pipeline** (`sweep.py`, 2026-09-22) | **26 Pipelines** — `default` 15 · `demo` 8 · `ucc` 3; lift, validate, lossless round-trip, display-projection PUT | Whether a behaviour is *universal* or a one-feed quirk. Cannot see the UI. |
 | E2 | **Test run over real bytes** (`POST …/authored/{id}/run`, the editor's *Run to here*) | **24 Pipelines** that ship a sample file — delimited, PSV, JSON, Excel, fixed-width, text_regex, ASN.1 BER, XML; dedup, filter, route, sql, summarize, join | Which formats and Step kinds the builder's own test instrument can exercise. |
 | E3 | **The durable OKF concepts** — `pipeline-editor.md`, `editable-round-trip.md`, `pipeline-authoring.md`, `pipeline-test-run.md`, `step-catalog.md` | What is a **recorded decision** vs a gap, and what is already shipped | Kept v1 from filing decisions as bugs — see §2. |
-| E4 | **One from-scratch build**, driven in the browser | `postmed_xdr`, telecom, [`postmed-xdr-pipeline-build.md`](postmed-xdr-pipeline-build.md) | Depth: the only reading that saw the panes, the palette and the create flow. |
+| E4 | **One from-scratch build**, driven in the browser | `postmed_xdr`, telecom, [`postmed-xdr-pipeline-build.md`](../../superpower/postmed-xdr-pipeline-build.md) | Depth: the only reading that saw the panes, the palette and the create flow. |
 
 Processor taxonomy of record: `ProcessorCatalog` — **119 processors, 36 DELIVERED / 16 PARTIAL /
 67 PLANNED** across eight families; `check-doc-counts` derives the same figures.
@@ -243,9 +257,9 @@ asked and what was answered.
 
 ## References
 
-- [`postmed-xdr-pipeline-build.md`](postmed-xdr-pipeline-build.md) — the depth probe (E4) and its eleven filed rows
-- [`pipeline-test-run.md`](../okf/backend/engine/pipeline-test-run.md) — the test run this page's `M1` correction rests on
-- [`editable-round-trip.md`](../okf/backend/pipeline-graph/editable-round-trip.md) — the round-trip contract behind `M5` and `S2`
-- [`pipeline-editor.md`](../okf/frontend/features/pipeline-editor.md) — the recorded decisions behind `S1`, `S5`, `S6`
-- [`pipeline-authoring.md`](../okf/capabilities/pipeline-authoring/pipeline-authoring.md) — the standing refusals in *Won't*
+- [`postmed-xdr-pipeline-build.md`](../../superpower/postmed-xdr-pipeline-build.md) — the depth probe (E4) and its eleven filed rows
+- [`pipeline-test-run.md`](../../okf/backend/engine/pipeline-test-run.md) — the test run this page's `M1` correction rests on
+- [`editable-round-trip.md`](../../okf/backend/pipeline-graph/editable-round-trip.md) — the round-trip contract behind `M5` and `S2`
+- [`pipeline-editor.md`](../../okf/frontend/features/pipeline-editor.md) — the recorded decisions behind `S1`, `S5`, `S6`
+- [`pipeline-authoring.md`](../../okf/capabilities/pipeline-authoring/pipeline-authoring.md) — the standing refusals in *Won't*
 - `inspecto-engine/src/main/java/com/gamma/pipeline/ProcessorCatalog.java` — the 119-processor taxonomy

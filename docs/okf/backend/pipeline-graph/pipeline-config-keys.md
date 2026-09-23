@@ -139,6 +139,12 @@ it was simply unauthorable. ⚠ The gap was TWICE what the row described: the pr
 no schema at all also validated clean. Both halves landed together. Pinned by
 `ControlApiSprintAContractsTest` and by the 26-of-26 HTTP round-trip sweep
 (`ControlApiPipelineGraphRoundTripSweepTest`); row `SAVE-GATE-VS-VALIDATE-DISAGREE-1`.
+
+⚠ **The `csv_settings` validation rules are delimited-only** (`WB-04`, 2026-09-22) — the delimiter rule as
+well as the `date_formats` / `timestamp_formats` ones. They used to fire on 6 of 26 shipped Pipelines that
+carry no `csv_settings` block at all (JSON, Excel, ASN.1, fixed-width, XML, the parquet re-ingest), so each
+was born `clean:false` for a rule that could not apply — which trains authors to skip warnings.
+Falsification-probed: forcing the gate open turns the test red. Row `VALIDATE-CSV-RULE-FRONTEND-BLIND-1`.
 | `processing.ingester_config` | free-form map handed to the plugin ingester | hand-authored only |
 | `processing.mapping_file` | `RowShaper` — a *declared* mapping reference; authored `processing.map.columns` beside it refuses `MAPPING_CONFLICT` | hand-authored only |
 

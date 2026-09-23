@@ -21,6 +21,10 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
   declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
   only safe when the map was originally `JToon.decode`-d. See [gotchas](../gotchas/cross-cutting.md).
+  ⚠ **An unquoted comma-bearing type in a table row** — reported 2026-09-23 by a demo lane, not yet
+  re-grounded: an unquoted `DECIMAL(18,2)` inside a TOON tabular row made the loader **skip the whole
+  Pipeline**, with only a server-log WARN (`TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1`). The comma is also
+  the tabular-row delimiter, so quote the value.
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does

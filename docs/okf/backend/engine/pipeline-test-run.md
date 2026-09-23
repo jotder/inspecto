@@ -93,6 +93,9 @@ The body is caller-supplied, so without containment this route is an arbitrary-f
   `Finding`s at authoring time) rather than enforcing.
 - Non-`local` connectors are **501** — there is no local path to stage from; those files reach the
   inbox via acquisition first.
+- A **Dataset-fed** Pipeline (`collector: dataset`) is **501** too, naming the Dataset (`WB-07`,
+  2026-09-22). It used to answer a `{files:[…]}` run with 200 *“no rows were parsed”* — an empty
+  success where the honest answer is a refusal. Row `TESTRUN-DATASET-COLLECTOR-SILENT-1`.
 
 ## Response, and the two grains in it
 
@@ -106,6 +109,11 @@ be quarantined even though nothing moved.
 
 `relations[].{node, rel, rowCount}` is load-bearing: the canvas marks a node ✕ on
 `rel === 'unmatched' && rowCount > 0`.
+
+The sibling `POST …/dry-run` takes `{sampleRows:[…], pipeline?}`. A body of the wrong JSON shape (a bare
+array is the natural first guess) is **400**, not 500 — fixed at the shared `ControlApi.body` seam
+(`WB-06`, 2026-09-22), because the 500 was every POST route's defect, not this route's; a route's own more
+specific 400 still reaches the caller. Row `DRYRUN-MALFORMED-BODY-500-1`.
 
 ## The `to=` cutoff (2026-08-14)
 
@@ -151,6 +159,38 @@ because the dry-run shares its SQL execution with the production executor.
 Used by `testRun`, `dryRunFlow` and `POST /components/transform/describe` (which carried its own looser
 copy until now). `DuckDbPendingQueryPreambleTest` runs the real driver, so a DuckDB upgrade that rewords
 the preamble goes red instead of letting it silently back in. Row `TESTRUN-BINDER-ERROR-LEAKS-PREAMBLE-1`.
+
+⚠ **Not yet adopted elsewhere:** four more routes (`BiRoutes`, `DbBrowserRoutes`, `EnrichmentRoutes`,
+`ExpectationRoutes`) build a 422 from a raw DuckDB message and probably carry the same preamble —
+unverified, reproduce per route before adopting the seam. Row `DUCKDB-PREAMBLE-OTHER-422S-1`.
+
+## Known open defects (reported 2026-09-23, not yet re-grounded)
+
+Found by the lanes that built the domain demos (`gl_journal`, `stock_movements`, `msc_cdr`,
+`in_recharges`). Each cause is the lane's hypothesis until someone reproduces it.
+
+🔴 **The seed is the MAPPED output, so the mappers run twice** (`TESTRUN-SEED-IS-MAPPED-OUTPUT-1`, P2,
+found independently by both lanes). `PipelineTestRun.sampleRowsBySegment` reads back the rows the ingest
+**wrote** — already mapped to canonical columns — and `PipelineGraphRoutes.testRun` passes them to
+`PipelineDryRun.runSeeded` **as the parse node's output**. The walk then re-applies `map` /
+`map_<segment>` to columns that are already canonical:
+- **Loud:** `in_recharges` (`AMOUNT_MINOR`), `msc_cdr` (`EVENT_TIME`) and `gl_journal` (`POSTING_SERIAL`)
+  refuse 422 with a binder error. `?to=parse` succeeds, so on those Pipelines the test run **cannot reach
+  route or sinks**.
+- **Silent, and worse:** `premed_events` answers 200 with **every `EVENT_TS` NULL** in the preview, while
+  a real ingest of the same file writes all 12 values. A builder is shown a broken mapping that is not
+  broken.
+- ⚠ **Fix direction undecided:** seed from the raw parsed relation, or seed downstream of `map` and skip
+  it. Either way the seed must match the relation the edge it enters actually carries — the same rule the
+  `D5` segment seeds follow (next section).
+
+⚠ **A failed batch reads as an empty one** (`TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1`, P2). When the file
+parsed but the batch failed, the route answers 200 *“no rows were parsed”*; `PipelineTestRun.Result.status()`
+and `error()` never reach the response. Seen with a binder error after 11 rows had parsed.
+
+⚠ **A long scratch path on Windows quarantines a readable file**
+(`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, P3). A scratch path near 250 characters failed the partition
+write, and the member was marked `QUARANTINED_UNREADABLE` although it read fine.
 
 ## A `route:<segment>` edge out of a parser IS walked (D5, signed 2026-09-22)
 

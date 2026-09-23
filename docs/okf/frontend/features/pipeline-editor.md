@@ -627,6 +627,10 @@ wired with `[editable]`.~~
   mounted once and outlives tab switches: its outcome is stamped with the pipeline id it came from
   and `result`/`error` are computed against the current one. ⛔ Never replace that with an effect
   that clears on id change (effects flush on Angular's schedule and can wipe a fresh result).
+  ✅ **A test run's own rows seed the thread** (`WB-12`, 2026-09-22), so the captured sample is one
+  click after *Run to here*. 🔴 Fixing it exposed a dead seam: `RunToHereDialog`'s Close carried no
+  value, so `afterClosed()` always emitted `undefined` and every consumer of the run result — including
+  the node-tested marking — was unreachable. Row `DRYRUN-SEEDS-AFTER-PARSE-1`.
 - Fixed-width traps a builder cannot discover from the form: `start` is a **0-based** offset
   (1-based counting shifts every field one character and parses "successfully"); `has_header`
   defaults `true` for `fixedwidth` too, silently eating a line — a server-published default,
@@ -770,6 +774,11 @@ each fix live). Genuinely open:
   ([editable-round-trip §21](../../backend/pipeline-graph/editable-round-trip.md)); the residuals
   R1/R4/R5/R6 shipped the same shift. Small follow-up in BACKLOG: migrate Duplicate + the
   row export onto the bundle routes (both still ride the client stream-bundle).
+- **Carried from the archived workbench MoSCoW (2026-09-23), demand-gated P3s:** the canvas overlays
+  the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`); the three-pane shell has no responsive floor —
+  at ~660px the canvas is a sliver (`WORKBENCH-RESPONSIVE-FLOOR-1`); and a Pipeline has no persisted
+  config history (undo/redo above is 50 per tab, lost on reload) and no persisted node positions
+  (`PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`).
 
 ## Verification culture (why this file reads the way it does)
 

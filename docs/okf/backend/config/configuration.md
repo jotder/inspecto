@@ -221,6 +221,13 @@ matching pattern in the right list: a `TIMESTAMP` value like `2018-04-09-00.00.0
 match a date-only pattern, and any unparsed value falls into the `1900/01/01` sentinel partition.
 (`VARCHAR` partition columns pass through as-is; `DOUBLE`/`INTEGER` use `TRY_CAST`.)
 
+⚠ **Open, reported 2026-09-23 by the demo lanes and not yet re-grounded** (`PARTITION-KEY-VALIDATION-GAPS-1`):
+a `partitionKey` naming a **mapped-only** column validates clean and fails at run time with a binder
+error; a partition column colliding **by case** with a mapped column (`account_class` vs
+`ACCOUNT_CLASS`) is silently renamed `account_class_1` and the folders split on the other column; and
+the shipped `excel_example`, partitioned on the text column `CATEGORY`, puts every row under
+`__HIVE_DEFAULT_PARTITION__` — not the `1900/01/01` sentinel described above.
+
 `create-schema` generates one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; it wrote the
 legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that
 marker, not the key name, is what `RecordTransform.isFieldList` keys on, so a row without one is not a field list.
