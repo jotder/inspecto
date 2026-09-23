@@ -39,6 +39,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'UNREACHABLE':
         case 'DENIED':
         case 'REVOKED':
+        case 'RED': // RAG — KPI below its red threshold (TM Forum scorecard convention)
             return 'error';
         case 'WARN':
         case 'WARNING':
@@ -49,6 +50,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'QUARANTINE':
         case 'QUARANTINED':
         case 'EXPIRED':
+        case 'AMBER': // RAG — between target and the red threshold
             return 'warning';
         case 'INFO':
         case 'OPEN':
@@ -68,6 +70,8 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'CLOSED':
         case 'ACTIVE':
         case 'LIVE':
+        case 'PASS':
+        case 'GREEN': // RAG — on or better than target
             return 'success';
         default:
             return 'neutral';

@@ -4,6 +4,7 @@ import { ColDef } from 'ag-grid-community';
 import { ChartData, ChartOptions, ChartType } from 'chart.js';
 import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { tableColDefs } from './table-columns';
 import { CHART_CATEGORICAL, CHART_PALETTES, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
 import { KpiComponent } from './plugins/kpi.component';
 import { getVizComponentLoader } from './viz-components';
@@ -221,9 +222,10 @@ export class VizRenderComponent {
         };
     });
 
+    /** Table columns: readable headers (or the widget's `columnLabels`) and status columns as badges. */
     readonly colDefs = computed<ColDef[] | undefined>(() => {
         const cols = this.props().columns;
-        return cols?.length ? cols.map((f) => ({ field: f })) : undefined;
+        return cols?.length ? tableColDefs(cols, this.renderOptions()) : undefined;
     });
 
     /** Inputs for the outlet component — the KPI's value/label, or a view-bound wrapper's saved-view id. */

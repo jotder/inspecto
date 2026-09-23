@@ -70,7 +70,10 @@ describe('VizRenderComponent', () => {
         };
         const c = create(TABLE_PLUGIN, props).componentInstance;
         expect(c.renderKind()).toBe('aggrid');
-        expect(c.colDefs()).toEqual([{ field: 'a' }, { field: 'b' }]);
+        expect(c.colDefs()).toEqual([
+            { field: 'a', headerName: 'A' },
+            { field: 'b', headerName: 'B' },
+        ]);
     });
 
     it('resolves the KPI component for a component-render plugin and passes inputs', () => {

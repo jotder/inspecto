@@ -144,6 +144,11 @@ export interface VizRenderOptions {
     limit?: number;
     /** Stack series (bar/area only). */
     stacked?: boolean;
+    /** Table only: header text per result column (`max_value` → 'Value'). Unlisted columns get
+     *  {@link humanizeColumn}'s default. */
+    columnLabels?: Record<string, string>;
+    /** Table only: columns rendered as status badges. Default: columns named status / severity / rag. */
+    badgeColumns?: string[];
 }
 
 /** The render-ready props a plugin produces from result rows (labels + series, or raw rows for the table). */
