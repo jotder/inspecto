@@ -205,8 +205,9 @@ leave the mapping, the step most likely to be wrong, as the one step a test run 
   `materialize` on the ingest thread.
 - ⚠ **The sample re-scans the raw relation** (a lazy `read_csv` view on the native lanes). Production already
   scans it twice (`materialize` + `countCastFailures`), so this adds a third bounded scan in a test run only.
-- ⚠ **An exception thrown by the observer is the ingest's exception** — on the single-member native lane that
-  reads as the member being unreadable. The sampler is a plain `SELECT … LIMIT`, so this is theoretical today.
+- ⚠ **An exception thrown by the observer is the ingest's exception** — on the single-member native lane it
+  fails the batch as a transform failure (the input still reads, see below). The sampler is a plain
+  `SELECT … LIMIT`, so this is theoretical today.
 - Pinned by `ControlApiPipelineTestRunDemoTest` (3, real HTTP over the shipped demos, each compared against a
   REAL ingest of the same committed sample): `premed_events` — all 12 `EVENT_TS` equal to the written values,
   route voice·sms·other `5·3·4` as written; `in_recharges` — 14 `AMOUNT`s equal to the written ones, route `10·4`; `msc_cdr` —
@@ -221,12 +222,28 @@ the raw seed alone the hole got WORSE, not better: a failure outside the mapping
 absent column fails the real transform, while the preview's map projects mapped columns only — answered 200
 with a clean preview and no warning. Pinned by
 `ControlApiPipelineTestRunTest.aBatchThatFailsAfterParsingIsReportedAsTheFailureNotAsEmpty`, which uses TWO files
-because only the multi-member lane fails the BATCH on a transform error.
-⚠ **The single-member native lane files a TRANSFORM failure as the input being unreadable**: `streamingIngest`
-holds `streamUnit`'s `materialize` inside the catch that quarantines `QUARANTINED_UNREADABLE`, so the same bad
-`partitionKey` over one file quarantines a readable file — in production that moves it out of the inbox.
-Reported as its own row (`SINGLE-MEMBER-TRANSFORM-FAILURE-QUARANTINES-1`, `docs/BACKLOG.md`); the write half was split out by `WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, the
-transform half was not.
+(written when only the multi-member lane failed the BATCH on a transform error; one file now does too).
+
+✅ **A transform failure fails the batch on the single-member lane too; it never quarantines the input**
+(`SINGLE-MEMBER-TRANSFORM-FAILURE-QUARANTINES-1`, fixed 2026-09-23). `streamingIngest` held `streamUnit`'s
+`materialize` inside the catch that quarantines `QUARANTINED_UNREADABLE`, so a bad `partitionKey` over ONE
+readable file quarantined it — in production, moving a good file out of the inbox. The view is lazy, so the
+read and the transform fail in one statement and the error text cannot tell them apart. **The seam:** when
+`materialize` throws, `streamUnit` re-drives the read ALONE with `SELECT COUNT(*) FROM raw_input` — the same
+readability probe `unionStreamingIngest` runs per member, so both native lanes now share one definition of
+*unreadable*. Probe fails → the original error propagates and the member is `QUARANTINED_UNREADABLE` as before;
+probe succeeds → `TransformFailedException` (*“transform failed for &lt;file&gt;: …”*), which `streamingIngest`
+rethrows beside `SinkFlushException`, so the batch is `FAILED` and the file stays in the inbox for the retry.
+**Cost: zero on a successful batch** — the probe runs only on the failure path (one extra read of a file that
+already failed). A cheaper pre-read or a `DESCRIBE` bind-check was not needed and would have taxed every batch.
+⚠ A runtime transform error (e.g. author SQL in an `EXPR` rule that throws) is classified correctly too — the
+probe does not care WHY the transform failed. ⚠ The chunked lane (`chunkedIngest`) has no quarantine catch at
+all: any failure, including an unreadable chunk, fails the batch — the opposite, file-preserving direction
+(`CHUNKED-UNREADABLE-FAILS-BATCH-1`). The Java parse lane (`IOException` only) and both plugin lanes (transform
+wrapped in `SinkFlushException`) already classified correctly. Pinned by
+`ConsignmentIngestorTest.singleMemberTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox` and
+`…singleMemberUnreadableInputIsStillQuarantinedUnreadable` (a non-gzip `.csv.gz`, which fails INSIDE
+`materialize`, so it exercises the probe's unreadable branch — a probe forced to succeed turns it red).
 
 ✅ **A failed partition write fails the batch; it never quarantines the input**
 (`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, fixed 2026-09-23). A scratch path near 250 characters failed the

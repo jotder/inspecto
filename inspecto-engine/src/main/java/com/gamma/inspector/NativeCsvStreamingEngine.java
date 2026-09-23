@@ -181,8 +181,8 @@ final class NativeCsvStreamingEngine {
         try {
             s = streamUnit(conn, m.file(), m.file().getName(), schema, cfg,
                     dbDir, baseName, partCols, m.srcId(), batch.batchId());
-        } catch (SinkFlushException e) {
-            throw e;   // the write failed, not the read → fail the batch (don't quarantine)
+        } catch (SinkFlushException | TransformFailedException e) {
+            throw e;   // the write or the transform failed, not the read → fail the batch (don't quarantine)
         } catch (Exception e) {
             // read_csv failure (unreadable/undecodable) surfaces when the CTAS drives it.
             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
@@ -266,7 +266,21 @@ final class NativeCsvStreamingEngine {
             throws Exception {
         dropTable(conn, "transformed");
         DuckDbCsvIngester.createRawInputView(physical, conn, schema, cfg, "raw_input", srcId);
-        DataTransformer.materialize(conn, schema, cfg);   // read_csv runs here (streaming)
+        try {
+            DataTransformer.materialize(conn, schema, cfg);   // read_csv runs here (streaming)
+        } catch (Exception e) {
+            // 🔴 The view is lazy, so a read failure and a transform failure (a partitionKey naming an
+            // absent column, a bad mapping) arrive as the SAME failed statement. Classify it by re-driving
+            // the read ALONE — the COUNT(*) readability probe the union lane uses per member. It runs only
+            // on this failure path, so a successful batch pays nothing. Readable → the transform failed:
+            // fail the batch, never quarantine a good file (SINGLE-MEMBER-TRANSFORM-FAILURE-QUARANTINES-1).
+            try {
+                countRows(conn, "raw_input");
+            } catch (Exception readFailure) {
+                throw e;   // the input itself is unreadable → the caller quarantines it
+            }
+            throw new TransformFailedException("transform failed for " + lineageName + ": " + msg(e), e);
+        }
         long castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
         long parsed  = countRows(conn, "transformed");
@@ -321,6 +335,11 @@ final class NativeCsvStreamingEngine {
     private static IngestOutcome empty(Consignment batch, LocalDateTime batchStart, MemberAudit memberAudit) {
         return new IngestOutcome(batchStart, "EMPTY", "", List.of(), List.of(memberAudit),
                 List.of(), List.of(), 0, batch.schemaName());
+    }
+
+    /** The transform failed over an input that reads fine — a batch failure, never a quarantine. */
+    private static final class TransformFailedException extends RuntimeException {
+        TransformFailedException(String message, Throwable cause) { super(message, cause); }
     }
 
     /** Per-unit streaming result aggregated by {@link #chunkedIngest}. */

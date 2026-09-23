@@ -269,6 +269,67 @@ class ConsignmentIngestorTest {
         }
     }
 
+    /**
+     * {@code SINGLE-MEMBER-TRANSFORM-FAILURE-QUARANTINES-1}: on the single-member native lane a READABLE
+     * file whose TRANSFORM fails (a {@code partitionKey} naming an absent column) was quarantined
+     * {@code QUARANTINED_UNREADABLE} — i.e. moved out of the inbox — because the lazy {@code read_csv}
+     * view and the transform fail in one statement. The transform failure must fail the BATCH and leave
+     * the file where it is, as the multi-member lane already does.
+     */
+    @Test
+    void singleMemberTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox(@TempDir Path dir)
+            throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        Files.writeString(dir.resolve("mini_schema.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema()
+                .replace("partitionKey: EVENT_DATE", "partitionKey: NO_SUCH_COLUMN"));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path solo = inbox.resolve("solo.csv");
+        Files.writeString(solo, "ID,AMT,EVENT_DATE\nx,9.0,2020-04-03\n");
+
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+                List.of(member(cfg, solo.toFile(), 0)));
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
+                cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
+
+        assertTrue(Files.exists(solo), "a readable file must stay in the inbox when its TRANSFORM fails");
+        Path quarantine = Path.of(cfg.dirs().quarantine());
+        if (Files.exists(quarantine))
+            try (Stream<Path> q = Files.walk(quarantine)) {
+                assertTrue(q.noneMatch(Files::isRegularFile), "nothing may be quarantined");
+            }
+        String batches = Files.readString(Path.of(cfg.dirs().batchesFilePath()));
+        assertTrue(batches.contains(",FAILED,"), "the batch must be FAILED: " + batches);
+        assertTrue(batches.contains("transform failed for solo.csv"),
+                "the batch error must name the transform: " + batches);
+        String status = Files.exists(Path.of(cfg.dirs().statusFilePath()))
+                ? Files.readString(Path.of(cfg.dirs().statusFilePath())) : "";
+        assertFalse(status.contains("QUARANTINED_UNREADABLE"), "the input read fine: " + status);
+    }
+
+    /** The other half of the split: a genuinely unreadable single member is still UNREADABLE. */
+    @Test
+    void singleMemberUnreadableInputIsStillQuarantinedUnreadable(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path corrupt = inbox.resolve("corrupt.csv.gz");
+        Files.write(corrupt, "this is not gzip-compressed data".getBytes());
+
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+                List.of(member(cfg, corrupt.toFile(), 0)));
+        ConsignmentIngestor.process(batch, cfg, new ConsignmentAuditWriter(
+                cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
+
+        try (Stream<Path> q = Files.walk(Path.of(cfg.dirs().quarantine()))) {
+            assertTrue(q.anyMatch(p -> p.getFileName().toString().equals("corrupt.csv.gz")),
+                    "an unreadable single member must be quarantined");
+        }
+        assertTrue(Files.readString(Path.of(cfg.dirs().statusFilePath())).contains("QUARANTINED_UNREADABLE"));
+    }
+
     @Test
     void singleMemberKeepsLegacyName(@TempDir Path dir) throws Exception {
         Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
