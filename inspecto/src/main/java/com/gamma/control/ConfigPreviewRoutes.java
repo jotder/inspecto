@@ -1,13 +1,10 @@
 package com.gamma.control;
 
 import com.gamma.config.io.ConfigLoader;
-import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.PathJail;
-import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
-import com.gamma.config.spec.Severity;
 import com.gamma.etl.ConfigValidator;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.TypeFlow;
@@ -171,34 +168,20 @@ final class ConfigPreviewRoutes implements RouteModule {
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
-        // Pre-flight: warn when a pipeline draft's schema_file won't resolve on this server —
-        // registration would otherwise fail later with an opaque error (v4.1.0).
+        // The SAME gate every save path runs (SaveGate), so /validate reports exactly what a save would
+        // refuse. 🔴 Until G3 (2026-09-23) this branch ran a hand-kept subset — six of the eleven
+        // checks, with the safety check opt-in behind `safety:true` — so a draft could validate clean
+        // and then 422 at the save. The opt-in is gone: `safetyChecked` is always true now.
         //
-        // W3: checked against the WRITE ROOT, because that is where this draft would land and a
-        // reference resolves config-relative FIRST. Without it every portable bare `<name>.toon` —
-        // the form the UI now writes — was reported unresolvable purely for not existing in the
-        // server's CWD. Null when writes are disabled: then there is no prospective home, and the
-        // CWD-only check is all that can honestly be said.
-        findings.addAll(ConfigRoutes.schemaFileFindings(type, draft, Severity.WARNING, api.writeRoot()));
-        // Pre-flight: a route: block that would refuse to arm. Reported here so the editor can show
-        // it while the operator is still authoring, rather than at the next run.
-        findings.addAll(ConfigRoutes.routeArmingFindings(type, draft));
-        // The write gate's arming check, on the draft branch too — see the configPath branch above.
-        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
-        findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
-        findings.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
-        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
-        // Opt-in hard-fail safety gate (R6): merged in only when the caller asks, so the default
-        // /validate response is byte-for-byte unchanged for existing callers.
-        boolean safety = "true".equalsIgnoreCase(String.valueOf(body.get("safety")));
-        if (safety) {
-            findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(), api.writeRoot()));
-        }
+        // W3: judged from the WRITE ROOT, because that is where this draft would land and a reference
+        // resolves config-relative FIRST. Null when writes are disabled: then there is no prospective
+        // home, and the CWD-only check is all that can honestly be said.
+        List<Finding> findings = SaveGate.check(api, type, draft, api.writeRoot(), api.writeRoot(),
+                SaveGate.Referents.MUST_EXIST);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", type);
         r.put("findings", findings);
-        r.put("safetyChecked", safety);
+        r.put("safetyChecked", true);
         r.put("clean", findings.isEmpty());
         return r;
     }

@@ -74,7 +74,6 @@ public final class TestConfigs {
         String toon = """
                 name: %s
                 active: true
-                version: 1
                 dirs:
                   poll: %s/inbox
                   database: %s/db

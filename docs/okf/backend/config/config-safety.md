@@ -369,6 +369,49 @@ Only `pipeline` and `enrichment` config types have a write surface to gate. This
 when `-Dassist.write.root` is set, writes are jailed to that root and validated here (see
 [auth & security](../editions/auth-security.md)).
 
+## One save gate for every door — `SaveGate` (2026-09-23)
+
+`SaveGate.check` (`inspecto/src/main/java/com/gamma/control/SaveGate.java`) is **the** list of content
+checks a config save runs, and every Pipeline-config door calls it: `POST /config/write`,
+`POST /config/patch`, `PUT /pipelines/{name}/graph`, `POST /pipelines/import`, and `POST /validate`
+(draft branch — it reports what a save would refuse; it never refuses). A caller refuses on any ERROR
+(`SaveGate.refuses`). The list, in order: spec validate · `ConfigSafetyValidator` (a job judged from the
+Space config root, everything else from its own directory) · schema-file resolution (WARNING) · the five
+arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys` census ·
+route-predicate columns · summarize measure types.
+
+🔴 **Why one function.** Before G3 (`PROCESSOR-RELEASE-READINESS-1`) each route carried its own hand-kept
+copy of that list, and the copies had drifted — reproduced over real HTTP before the fix:
+
+| door | missing before G3 |
+|---|---|
+| `PUT …/graph` (its comment claimed "the same gate") | unknown collector Connection, key census |
+| bundle import | key census, both TypeFlow checks |
+| `/validate` draft | Connection, key census, both TypeFlow checks; safety was opt-in (`safety:true`) |
+| every door, `/config/write` included | any `webhook:` check at all |
+
+⚠ The row's other half — "config write lacks `routeColumnFindings` + `summarizeMeasureFindings`" — was
+**already false**: `/config/write` ran both in a second gate after deriving the target. The shared gate
+retired that second gate by running once, BEFORE any path is resolved (422 still precedes the subdir-jail
+403, `WriteGateOrderTest`), judged from the *prospective* directory — the write root, or the requested
+`subdir` when it stays inside it.
+
+**The `webhook:` block** is judged at save as `WebhookSink.plan` judges it at run time, regardless of
+`active`: it must parse (`ERR_WEBHOOK_INVALID` — an authored `url:`/`token:`, an unknown key, a
+`batch_size` out of bounds; the parser's own message), its `connection` must name a Connection this Space
+holds (`ERR_WEBHOOK_CONNECTION_UNKNOWN`), and that Connection must be `https`
+(`ERR_WEBHOOK_CONNECTION_NOT_HTTPS`). Host, tunnel and proxy stay the Connection's own validation.
+
+⛔ **The one deliberate difference is bundle import, and it is a recorded decision, not drift**
+(`SaveGate.Referents.MAY_ARRIVE_LATER`): a pipeline bundle never carries its Connections (secrets never
+travel) and always lands inactive, so a **missing** Connection — collector or webhook — is a
+`WARN_UNRESOLVED_CONNECTION`, never a refusal. A Connection that exists but is the wrong kind is refused on
+import too. `/validate` drops its `safety` flag: `safetyChecked` is always `true`.
+
+Pinned by `ControlApiSaveGateParityTest`: every fault × every door, one verdict (25 cases + a clean control
++ the graph editor's own `sink.webhook` node shape). A new check added to `SaveGate` reaches all five doors
+at once; a door that stops calling it goes red there.
+
 ## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
 
 (a) Job `.toon` files bypass `ConfigSafetyValidator` at save because no `ConfigSpecs.job()` exists, so
@@ -385,8 +428,9 @@ a standing refusal (BACKLOG §6).
 ## The accepted-key census — which config types have one, and why not the rest
 
 `AcceptedConfigKeys` (`inspecto-config/src/main/java/com/gamma/config/spec/AcceptedConfigKeys.java`) is the
-second gate folded into the same 422 at `/config/write` and `/config/patch`
-(`ConfigWriteRoutes.java:87`, `:380`): **a key no component reads is refused** with
+second gate folded into the same 422 at every save path — since G3 (2026-09-23) through the one shared
+gate `SaveGate.check`, see [one save gate](#one-save-gate-for-every-door--savegate-2026-09-23) below:
+**a key no component reads is refused** with
 `ERR_UNKNOWN_CONFIG_KEY` and a near-name suggestion (`DUCKLE-C3-DEAD-PROPERTY-1`). A dead key is a
 *silent loss* — the save answers `written: true` and the engine never looks at it.
 

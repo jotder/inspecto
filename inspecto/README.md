@@ -284,7 +284,7 @@ GET  /pipelines/{name}/quarantine         quarantined inputs + reason
 GET  /pipelines/{name}/pending            inbox scan: files awaiting processing + under-processing flag
 POST /pipelines/{name}/reprocess          body {"batchId":"…"} — replay a batch
 POST /trigger                             run all pipelines once
-POST /validate                            body {"configPath":…} or {"type":…,"config":{…}[, "safety":true]}
+POST /validate                            body {"configPath":…} or {"type":…,"config":{…}}
 GET  /status                              live status snapshot (all pipelines)
 GET  /report[?from=&to=]                  service-wide batch-audit report
 GET  /jobs · /jobs/{name}/runs            jobs + run history

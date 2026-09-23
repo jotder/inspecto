@@ -125,11 +125,11 @@ system: the evidence cannot say something the code does not.
 | POST | `/components/transform/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:64` |
 | DELETE | `/config/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java:36` |
 | PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:55` |
-| POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:49` |
-| POST | `/config/preview/parsing` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:46` |
-| POST | `/config/preview/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:49` |
-| POST | `/config/suggest/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:50` |
-| POST | `/config/write` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:45` |
+| POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:44` |
+| POST | `/config/preview/parsing` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:43` |
+| POST | `/config/preview/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:46` |
+| POST | `/config/suggest/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:47` |
+| POST | `/config/write` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:40` |
 | POST | `/connections` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:40` |
 | DELETE | `/connections/([^/]+)` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:61` |
 | PUT | `/connections/([^/]+)` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:60` |
@@ -215,17 +215,17 @@ system: the evidence cannot say something the code does not.
 | POST | `/objects/([^/]+)/resolve` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:72` |
 | POST | `/objects/([^/]+)/split` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:79` |
 | POST | `/objects/([^/]+)/transition` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:73` |
-| POST | `/parsers/([^/]+)/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:35` |
-| PUT | `/pipelines/([^/]+)/graph` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:82` |
+| POST | `/parsers/([^/]+)/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:36` |
+| PUT | `/pipelines/([^/]+)/graph` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:78` |
 | POST | `/pipelines/([^/]+)/label` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:44` |
 | POST | `/pipelines/([^/]+)/rename` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java:52` |
 | POST | `/pipelines/([^/]+)/save-as-template` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:42` |
 | POST | `/pipelines/([^/]+)/settings` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:50` |
 | DELETE | `/pipelines/authored/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java:44` |
-| POST | `/pipelines/authored/([^/]+)/dry-run` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:66` |
-| POST | `/pipelines/authored/([^/]+)/run` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:70` |
-| POST | `/pipelines/authored/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:75` |
-| POST | `/pipelines/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineBundleRoutes.java:97` |
+| POST | `/pipelines/authored/([^/]+)/dry-run` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:62` |
+| POST | `/pipelines/authored/([^/]+)/run` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:66` |
+| POST | `/pipelines/authored/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:71` |
+| POST | `/pipelines/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineBundleRoutes.java:94` |
 | POST | `/pipelines/rename/resume` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java:56` |
 | POST | `/public/dashboards/([^/]+)/query` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:50` |
 | POST | `/public/delivery-status/([^/]+)` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java:58` |
@@ -264,7 +264,7 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/tags/rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:55` |
 | POST | `/tags/rules/([^/]+)/apply` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:57` |
 | POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:128` |
-| POST | `/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:43` |
+| POST | `/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:40` |
 
 <!--route-gating:end-->
 

@@ -102,11 +102,13 @@ class ControlApiConfigSpecTest {
     @Test
     void validateCleanDraftHasNoFindings(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            // Inside the allowed roots: /validate runs the safety check too since G3, as the save does.
+            String b = dir.toString().replace('\\', '/');
             String body = """
                     {"type":"pipeline","config":{
                        "name":"X",
-                       "dirs":{"poll":"/in","database":"/out"},
-                       "processing":{"threads":1}}}""";
+                       "dirs":{"poll":"%s/in","database":"%s/out"},
+                       "processing":{"threads":1}}}""".formatted(b, b);
             JsonNode out = V1Body.of(post(c.port, "/validate", body).body());
             assertTrue(out.get("clean").asBoolean(), "clean draft: " + out.get("findings"));
             assertEquals(0, out.get("findings").size());
@@ -136,18 +138,18 @@ class ControlApiConfigSpecTest {
     }
 
     @Test
-    void withoutSafetyFlagTheResponseIsUnchanged(@TempDir Path dir) throws Exception {
+    void theSafetyGateRunsWithoutTheFlag(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            // Same unsafe path, but no safety flag → spec-only validation (FILEPATH is free text),
-            // so no path-jail finding is injected and the gate is reported as not run.
+            // G3 (2026-09-23): /validate runs the save gate (SaveGate) whole, so the safety check is no
+            // longer opt-in — a draft that validated clean here used to 422 at the save.
             String body = """
                     {"type":"pipeline","config":{
                        "name":"X",
                        "dirs":{"poll":"/in","database":"/out","backup":"//evil/share"},
                        "processing":{"threads":1}}}""";
             JsonNode out = V1Body.of(post(c.port, "/validate", body).body());
-            assertFalse(out.get("safetyChecked").asBoolean(), "gate not run by default");
-            assertTrue(out.get("clean").asBoolean(), "spec-only path is unchanged: " + out.get("findings"));
+            assertTrue(out.get("safetyChecked").asBoolean(), "the gate always runs");
+            assertFalse(out.get("clean").asBoolean(), "unsafe path → not clean: " + out.get("findings"));
         }
     }
 

@@ -420,7 +420,7 @@ and unversioned.
 | `GET /pipelines/{name}/pending` | inbox scan — files awaiting processing (`pending`), an under-processing flag (`running`), and live per-file progress (`current`: batch id, file, index/total, started-at; `null` when not mid-file); read-only, no audit side effects (v4.1) |
 | `POST /pipelines/{name}/reprocess` | body `{"batchId":"…"}` — replay a batch |
 | `POST /trigger` | run all pipelines once |
-| `POST /validate` | body `{"configPath":"…"}` (saved file) or `{"type":…,"config":{…}[, "safety":true]}` (unsaved draft) — structured findings |
+| `POST /validate` | body `{"configPath":"…"}` (saved file) or `{"type":…,"config":{…}}` (unsaved draft — the full save gate, `SaveGate`) — structured findings |
 | `GET /status` | live status snapshot — all pipelines + rollup (v2.8.0) |
 | `GET /report[?from=&to=]` | service-wide batch-audit report; optional date range (v2.8.0; range v2.10.0) |
 | `GET /pipelines/{name}/report[?from=&to=]` | batch-audit report for one pipeline; optional date range (v2.8.0; range v2.10.0) |

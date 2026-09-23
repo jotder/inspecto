@@ -2,9 +2,6 @@ package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
-import com.gamma.config.safety.ConfigSafetyValidator;
-import com.gamma.config.safety.SafetyPolicy;
-import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
@@ -68,10 +65,10 @@ import static com.gamma.util.Values.mapAt;
  * ({@code name}, {@code conflict}) therefore travel as query parameters, not a JSON body.
  *
  * <p><b>Import gate order (fail closed)</b>: write-root 503 → manifest/spec validate 422 →
- * zip-slip path jail 403 → name conflict 409 (unless {@code conflict=overwrite|rename}) → the SAME
- * {@code ConfigSpecs.pipeline()} + {@code ConfigSafetyValidator} + three arming pre-check gate the
- * graph save runs, over the <em>retargeted</em> pipeline (ERROR ⇒ 422, nothing written; the import
- * always lands {@code active: false}, so arming findings surface as warnings) → atomic writes,
+ * zip-slip path jail 403 → name conflict 409 (unless {@code conflict=overwrite|rename}) → the one
+ * content gate every save path runs ({@link SaveGate}), over the <em>retargeted</em> pipeline (ERROR ⇒
+ * 422, nothing written; the import always lands {@code active: false}, so arming findings surface as
+ * warnings, and a missing Connection is a warning by decision) → atomic writes,
  * satellites before the pipeline.
  */
 final class PipelineBundleRoutes implements RouteModule {
@@ -308,18 +305,16 @@ final class PipelineBundleRoutes implements RouteModule {
             written.add(writeRoot.relativize(st).toString().replace('\\', '/'));
         }
 
-        List<Finding> findings = new ArrayList<>(
-                ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), retargeted));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", retargeted, SafetyPolicy.defaultPolicy(), destDir));
-        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", retargeted));
-        findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", retargeted));
-        findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", retargeted));
-        findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", retargeted));
-        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings("pipeline", retargeted));
+        // The ONE content gate every save path runs (SaveGate). 🔴 Until G3 (2026-09-23) this was a
+        // hand-kept copy lacking the unknown-key census and both TypeFlow checks, so a bundle landed a
+        // config /config/write refuses. MAY_ARRIVE_LATER: a missing Connection is reported, not refused
+        // — a pipeline bundle never carries one (see classifyRequirements and SaveGate.Referents).
+        List<Finding> findings = new ArrayList<>(SaveGate.check(api, "pipeline", retargeted, writeRoot, destDir,
+                SaveGate.Referents.MAY_ARRIVE_LATER));
         // Import-time referential integrity (W5): resolve the bundle's declared dependencies against
         // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
         List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);
-        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
+        if (SaveGate.refuses(findings)) {
             for (Path st : satellitePaths) Files.deleteIfExists(st);
             if (createdDir) {
                 try {

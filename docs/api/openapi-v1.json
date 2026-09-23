@@ -199,9 +199,6 @@
                   },
                   "config" : {
                     "type" : "object"
-                  },
-                  "safety" : {
-                    "type" : "boolean"
                   }
                 }
               }

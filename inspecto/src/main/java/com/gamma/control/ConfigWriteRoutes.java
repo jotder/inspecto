@@ -2,14 +2,10 @@ package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
-import com.gamma.config.safety.ConfigSafetyValidator;
-import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.safety.SchemaCompatibility;
-import com.gamma.config.spec.AcceptedConfigKeys;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
-import com.gamma.config.spec.Severity;
 import com.gamma.etl.SchemaMappingDrift;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.MappingCsv;
@@ -22,7 +18,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,44 +55,27 @@ final class ConfigWriteRoutes implements RouteModule {
         if (spec == null) throw new ApiException(404, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
 
-        // Gate: spec validation + the hard-fail safety check (R6). Block on ERRORs; warnings pass.
-        // ⚠ No config dir is passed here, unlike the patch route below and PUT /pipelines/{n}/graph:
-        // this gate runs BEFORE the target path is derived, so a config ref can only be resolved
-        // working-directory-relative. A pipeline written through THIS route carrying the portable bare
-        // `<name>.toon` would still be refused. Every UI path that authors one goes through the graph
-        // route, which is why it is not reordered here — moving a write gate is a bigger change than
-        // the defect warrants, and doing it blind risks the ordering the gate depends on.
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
-        // ⚠ The `null` target is deliberate and is NOT a third base: a job is judged from the Space
-        // config root here too (see safetyFindings), and only a NON-job falls back to the CWD-only
-        // behaviour the paragraph above describes. Without this a job draft would be judged from the
-        // process working directory — the very rule JOB-DIR-CWD-CONTAINMENT-1 retired.
-        findings.addAll(safetyFindings(type, draft, writeRoot, null));
-        // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
-        // returns written:true and the config is then silently dropped from the index forever.
-        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
-        // ERROR (when active): an armed route: that cannot arm registers and then throws on every
-        // run. Same reasoning as the row above — the save is the last moment the author is present.
-        findings.addAll(ConfigRoutes.routeArmingFindings(type, draft));
-        // ERROR (when active): disabled_steps cannot arm until park/drain ships (S4a gate).
-        findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
-        findings.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
-        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
-        // ERROR: a collector bound to a connection this space does not have cannot acquire anything —
-        // it throws once per poll cycle instead. Bundle import already refuses it; a save now agrees.
-        findings.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
-        // ERROR: a block no component reads is a SILENT LOSS — the save answers written:true and the
-        // engine never looks at it (`DUCKLE-C3-DEAD-PROPERTY-1`). An `x-` block is the author's own
-        // annotation and passes through untouched; a type with no census produces nothing.
-        findings.addAll(AcceptedConfigKeys.unknownKeyFindings(type, draft, Severity.ERROR));
-        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
+        // The one content gate every save path runs (SaveGate) — BEFORE any path is resolved, so an
+        // invalid payload is refused 422 ahead of the subdir jail 403 (house gate order, pinned by
+        // WriteGateOrderTest). It is judged from the PROSPECTIVE directory — the write root, or the
+        // requested subdir when that stays inside it (an escaping one is left to the jail below) — so a
+        // config-relative ref resolves as it will once written. Until G3 (2026-09-23) this gate ran from
+        // the working directory and a second gate after `target` ran the checks needing the directory.
+        String subdir = ApiContext.str(body, "subdir");
+        Path prospective = writeRoot;
+        if (subdir != null && !subdir.isBlank() && !Path.of(subdir.trim()).isAbsolute()) {
+            Path candidate = writeRoot.resolve(subdir.trim()).normalize();
+            if (candidate.startsWith(writeRoot.normalize())) prospective = candidate;
+        }
+        List<Finding> findings = SaveGate.check(api, type, draft, writeRoot, prospective,
+                SaveGate.Referents.MUST_EXIST);
+        if (SaveGate.refuses(findings)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
         }
 
         // Resolve under the write root; an optional subdir must stay inside it (path jail).
         Path dir = writeRoot;
-        String subdir = ApiContext.str(body, "subdir");
         if (subdir != null && !subdir.isBlank()) {
             Path sub = Path.of(subdir.trim());
             if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
@@ -167,30 +145,6 @@ final class ConfigWriteRoutes implements RouteModule {
         // ("satellites get the subdir too"), and that is the part no row has scoped. A /config/write for
         // a schema with no `subdir:` still lands flat. Landing the Pipeline half alone orphans the
         // reference it was supposed to keep together. Row: UI-CREATED-PIPELINE-FLAT-HOME-1.
-
-        // Warning only: the save still succeeds (the schema file may be created afterwards), but
-        // the operator learns now that Register would fail on this host.
-        //
-        // W3: deliberately AFTER `target`, so the check knows the directory the config is landing in.
-        // A reference resolves config-relative first, so the portable bare `<name>.toon` the UI now
-        // writes is only checkable against that parent; run earlier it warned on every single write.
-        findings.addAll(ConfigRoutes.schemaFileFindings(type, draft, Severity.WARNING, target.getParent()));
-
-        // TYPEFLOW-CONSUMERS-1 (a): the two save-time checks that need the DECLARED COLUMNS, which is why
-        // they are here and not in the block above — resolving `processing.schema_file` needs the
-        // directory the config lands in, exactly as schemaFileFindings does.
-        findings.addAll(ConfigRoutes.routeColumnFindings(type, draft, target.getParent()));
-        findings.addAll(ConfigRoutes.summarizeMeasureFindings(type, draft, target.getParent()));
-        // 🔴 A SECOND error gate, and it is load-bearing. The gate above runs before `target` exists, so
-        // without this one an ERROR raised by the two checks would be reported in `findings` and the
-        // config written anyway — an ERROR that does not refuse is worse than no check at all.
-        // (schemaFileFindings needs no gate: it is pinned to WARNING by its own severity argument.)
-        // Before the conflict/If-Match checks below, so a 422 refusal precedes a 409 — the house gate
-        // order is spec/validation 422 → jail 403 → conflict 409 → act.
-        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
-            return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
-                    "error", "config has ERROR-level findings; not written", "findings", findings));
-        }
 
         boolean exists = Files.exists(target);
         // Optimistic concurrency (`CLIENT-HALVES-1` (a), 2026-09-11). HERE and not earlier: `target` is
@@ -325,50 +279,6 @@ final class ConfigWriteRoutes implements RouteModule {
     }
 
     /**
-     * The base {@link ConfigSafetyValidator} resolves a config's relative values against — <b>and it
-     * means two different things depending on the kind</b>, which is the whole of
-     * {@code JOB-PATH-PATCH-ROUTE-WRONG-BASE-1}.
-     *
-     * <ul>
-     *   <li><b>pipeline / schema</b> — the config file's <em>own directory</em>, so a config
-     *       <em>reference</em> ({@code schema_file}, {@code grammar}) resolves the way the loader
-     *       resolves it: beside the config. That is what {@code getParent()} is for here.</li>
-     *   <li><b>job</b> — the <b>Space config root</b>. A job's relative path resolves against it and
-     *       nothing else ({@code JOB-DIR-CWD-CONTAINMENT-1}, operator 2026-09-16), and
-     *       {@link com.gamma.config.safety.PathJail#resolveJobPath} is the single rule the run-time
-     *       tasks call too.</li>
-     * </ul>
-     *
-     * <p>🔴 Passing a job {@code target.getParent()} judged it from {@code <space>/config/jobs} whenever
-     * the caller supplied {@code subdir:"jobs"} — the only shape that can address a job
-     * {@code POST /jobs} wrote, since that route always lands in {@code jobs/}. Driven 2026-09-16:
-     * {@code backup_dir:"../../outside/backups"} was <b>refused 422</b> by {@code PUT /jobs} and
-     * <b>written</b> by {@code /config/patch}, one directory level apart. Two gates, one value, two
-     * answers — the exact split {@code resolveJobPath}'s own javadoc forbids.
-     *
-     * <p>⚠ {@code writeRoot} <b>is</b> that root, not an approximation of it: {@code ControlApi.writeRoot()}
-     * returns the bound space's {@code root().config()}, which is precisely what {@code SpaceBootstrap}
-     * registers into {@code SpaceConfigRoot} for {@code JobRoutes} to read back — so the two gates cannot
-     * disagree. It is also the more robust of the two spellings here, because it is bound to the request's
-     * space rather than to an MDC lookup.
-     *
-     * <p>⚠ For a job, {@code writeRoot} is the base of every key EXCEPT the pipeline runner's two
-     * ({@code JOB-PATH-SINGLE-TENANT-GATE-BASE-1}): {@code SpaceConfigRoot.jobPathBase} hands those the
-     * config READ root, the base {@code PipelineJobRunner} reads them from — the launch dir in the
-     * single-tenant layout, the same {@code root().config()} in a self-contained Space.
-     *
-     * @param target the resolved config file, or {@code null} when the gate runs before it is derived
-     *               ({@code /config/write}) — where a non-job keeps its historical CWD-only behaviour
-     */
-    private static List<Finding> safetyFindings(String type, Map<String, Object> draft, Path writeRoot, Path target) {
-        if ("job".equalsIgnoreCase(type))
-            return ConfigSafetyValidator.checkJob(draft, SafetyPolicy.defaultPolicy(),
-                    k -> com.gamma.pipeline.SpaceConfigRoot.jobPathBase(k, writeRoot));
-        return ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(),
-                target == null ? null : target.getParent());
-    }
-
-    /**
      * {@code POST /config/patch} — deep-merge a partial draft over a config file's <em>current</em>
      * on-disk content and rewrite it atomically (collector-config unification, 2026-08-04). The
      * merge happens server-side, against the file as it is NOW — not against whatever the client
@@ -430,26 +340,11 @@ final class ConfigWriteRoutes implements RouteModule {
                             + "); rename via /config/write");
         }
 
-        // Same gate as /config/write, over the WHOLE merged draft: spec + hard-fail safety check;
-        // schema references resolve config-relative here because the file has a home directory.
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, merged));
-        findings.addAll(safetyFindings(type, merged, writeRoot, target));
-        findings.addAll(ConfigRoutes.schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
-        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, merged));
-        findings.addAll(ConfigRoutes.routeArmingFindings(type, merged));              // a patch can break arming too
-        findings.addAll(ConfigRoutes.stepDisableFindings(type, merged));                // and can add disabled_steps too
-        findings.addAll(ConfigRoutes.dedupWindowFindings(type, merged));               // and a windowed dedup (D-9)
-        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, merged));         // and two sinks sharing one lake table
-        findings.addAll(ConfigRoutes.unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
-        // A patch can ADD a dead block as easily as a write can, and over the merged draft so a block
-        // the patch did not touch is judged too (`DUCKLE-C3-DEAD-PROPERTY-1`).
-        findings.addAll(AcceptedConfigKeys.unknownKeyFindings(type, merged, Severity.ERROR));
-        // TYPEFLOW-CONSUMERS-1 (a): a patch can drop a column a route predicate reads, or retype a field a
-        // summarize measure sums — both of which the write path now refuses. ⚠ Unlike /config/write this
-        // needs no second gate: `target` is already resolved above, so these sit inside the existing one.
-        findings.addAll(ConfigRoutes.routeColumnFindings(type, merged, target.getParent()));
-        findings.addAll(ConfigRoutes.summarizeMeasureFindings(type, merged, target.getParent()));
-        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
+        // The one content gate (SaveGate), over the WHOLE merged draft — so a block the patch did not
+        // touch is judged too — against the file's own directory.
+        List<Finding> findings = SaveGate.check(api, type, merged, writeRoot, target.getParent(),
+                SaveGate.Referents.MUST_EXIST);
+        if (SaveGate.refuses(findings)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "merged config has ERROR-level findings; not written", "findings", findings));
         }

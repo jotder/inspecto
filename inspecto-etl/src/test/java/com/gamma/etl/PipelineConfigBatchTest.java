@@ -65,7 +65,6 @@ public class PipelineConfigBatchTest {
         String toon = """
             name: MINI_ETL
             active: %s
-            version: 1
             dirs:
               poll: %s/inbox
               database: %s/db

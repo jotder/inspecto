@@ -2,11 +2,7 @@ package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
-import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
-import com.gamma.config.spec.Severity;
-import com.gamma.config.safety.ConfigSafetyValidator;
-import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -269,7 +265,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * {@code PUT /pipelines/{name}/graph} — <b>lower the graph to the canonical config</b> (W5, U-A):
      * decode + structurally validate the posted graph (URL name authoritative), lower it over the
      * pipeline's <b>existing registered file</b> ({@link PipelineEditable#lower} — verbatim sections,
-     * unmodeled keys preserved), run the SAME spec + safety gate as {@code POST /config/write}, and
+     * unmodeled keys preserved), run the one content gate every save path runs ({@link SaveGate}), and
      * write atomically. An {@code active} graph (or a brand-new file) must be complete; an inactive
      * draft may be partial. Unrepresentable topologies 422 with named {@code refusals[]} instead of
      * being silently truncated.
@@ -325,32 +321,13 @@ final class PipelineGraphRoutes implements RouteModule {
             return ApiContext.respondJson(e, 422, Map.of("written", false, "refusals", refusals));
         }
 
-        // The same gate POST /config/write runs — the graph editor is a caller, not a second pipe.
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), lowered));
-        // ⚠ The config's OWN directory goes in: a config ref resolves config-relative first (W1b), and
-        // without it this ERROR gate resolved the portable bare `<name>.toon` against the working
-        // directory and refused a schema sitting right beside its pipeline — short-circuiting the save
-        // before the two checks below, which resolve correctly, could run.
-        findings.addAll(ConfigSafetyValidator.check("pipeline", lowered, SafetyPolicy.defaultPolicy(),
-                target.getParent()));
-        // W3: against the file's OWN directory — a reference resolves config-relative first, so the
-        // portable bare `<name>.toon` the Parse drawer writes would otherwise warn on every save.
-        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", lowered, Severity.WARNING, target.getParent()));
-        // The arming pre-checks /config/write and /config/patch already run (ERROR when active,
-        // WARNING on an inactive draft). Without them this route answered 200 written:true for a
-        // config that then failed to arm at the next ConfigRegistry.rebuild — one WARN log, the
-        // pipeline silently skipped every cycle.
-        findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", lowered));
-        findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", lowered));
-        findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", lowered));
-        findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", lowered));
-        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings("pipeline", lowered));
-        // TYPEFLOW-CONSUMERS-1 (a): the graph editor is where a route branch and a summarize node are
-        // actually authored, so this is the save path that sees them first — and the one the deferring
-        // plan meant by "needs the recipe/pipeline context". Inside the existing ERROR gate below.
-        findings.addAll(ConfigRoutes.routeColumnFindings("pipeline", lowered, target.getParent()));
-        findings.addAll(ConfigRoutes.summarizeMeasureFindings("pipeline", lowered, target.getParent()));
-        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
+        // The ONE content gate every save path runs (SaveGate) — the graph editor is a caller, not a
+        // second pipe. 🔴 Until G3 (2026-09-23) this was a hand-kept copy that claimed to be "the same
+        // gate" /config/write ran, and was not: it lacked the unknown-Connection and unknown-key checks.
+        // Against the file's OWN directory, so the portable bare `<name>.toon` resolves beside it.
+        List<Finding> findings = SaveGate.check(api, "pipeline", lowered, writeRoot, target.getParent(),
+                SaveGate.Referents.MUST_EXIST);
+        if (SaveGate.refuses(findings))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
 

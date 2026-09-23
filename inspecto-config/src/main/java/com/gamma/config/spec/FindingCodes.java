@@ -77,6 +77,20 @@ public final class FindingCodes {
      *  impossible — see {@code PipelineBundleRoutes.classifyRequirements}. */
     public static final String WARN_UNRESOLVED_CONNECTION = "WARN_UNRESOLVED_CONNECTION";
 
+    /** A {@code webhook:} block naming a Connection this Space does not hold — every run would refuse
+     *  before sending ({@code WebhookSink.plan}). Refused regardless of {@code active}, like an unknown
+     *  collector Connection; on bundle import it is {@link #WARN_UNRESOLVED_CONNECTION} instead. */
+    public static final String ERR_WEBHOOK_CONNECTION_UNKNOWN = "ERR_WEBHOOK_CONNECTION_UNKNOWN";
+
+    /** A {@code webhook:} block naming a Connection that exists but is not an {@code https} one — the
+     *  sink refuses any other connector at run time, so the save refuses it first, import included. */
+    public static final String ERR_WEBHOOK_CONNECTION_NOT_HTTPS = "ERR_WEBHOOK_CONNECTION_NOT_HTTPS";
+
+    /** A {@code webhook:} block its own parser refuses — an authored {@code url:}/{@code token:}, an
+     *  unknown key, no {@code connection}, a {@code batch_size} out of bounds. The parser's message is
+     *  carried verbatim; the pipeline would otherwise not load at all. */
+    public static final String ERR_WEBHOOK_INVALID = "ERR_WEBHOOK_INVALID";
+
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 
