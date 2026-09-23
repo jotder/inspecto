@@ -74,9 +74,38 @@ hierarchical parser that is `ingestable: true`**, because it names an ingester
 `asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`asn-parser/asn-decoders/asn-facade`,
 depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local repo from the
 separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
-note below). Grammar: `asn1.grammar` (the ASN.1 module text) / `asn1.root_type` / `asn1.strictness`
+note below). Grammar: `asn1.grammar` (the ASN.1 module text) **or** `asn1.grammar_file` (a stored
+`.asn` module, 2026-09-23 — see below) / `asn1.root_type` / `asn1.strictness`
 (BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_records`.
 No `suggest()`.
+
+**A grammar is either pasted TEXT or a stored `.asn` FILE (operator decision 2026-09-23).** A stored
+module is a path-jailed `.asn` file under the Space's config — deliberately **not** a new registry kind.
+Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, which the preview
+(`Asn1ParserPlugin.preview`), the flat config (`frontend: asn1`) and the ingester
+(`Asn1RecordIngester`) all call, so a grammar that previews is the grammar that ingests:
+
+- **Text wins when both are set** — the "parsing: keys win" overlay rule the ingester already applied.
+- The file ref is jailed with `PathJail.requireUnderAny(allowedRoots())` **before** any readability
+  probe (an escaping ref is refused, never reported "not readable", which would leak whether a path
+  outside the roots exists). Relative refs resolve like every other config ref the ingester reads
+  (server-root-relative, `spaces/demo/config/msc/msc_cdr.asn`) — the same rule as `schema_file`, so
+  when `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` moves that rule, this resolver is the one place to move.
+- ⚠ **The extension is enforced (`.asn` / `.asn1`).** `POST /parsers/{id}/preview` is compute-only
+  with no capability, and a compile error can echo the text it choked on — an unrestricted ref would
+  let a preview read any file under the roots back through an error message.
+- `frontend: asn1` carries `asn1.grammar_file` to the ingester **unresolved**, as the path key
+  `ingester_config.grammar` (and `asn1.grammar` as `grammar_text`), so resolution and the jail happen
+  once, at use. The load refuses an `asn1:` block carrying neither spelling.
+- The preview route maps the jail's `PathJail.Escape` to **403**; other grammar problems stay 422.
+- The drawer needs no bespoke UI: the ASN.1 form is SERVED from `grammarSchema()`, which now lists
+  `asn1.grammar_file` beside `asn1.grammar`.
+- Proof: `DemoCorpusIngestTest.mscCdrWithItsGrammarInAnAsnFilePreviewsAndIngestsIdenticallyToInline`
+  moves the committed `msc_cdr` grammar into a `.asn` file and pins the same preview tree and the same
+  rows in every segment as the inline original.
+- ⚠ **Not yet carried by a Pipeline bundle.** `PipelineBundleRoutes` exports/rewrites schema, grammar
+  and mapping satellites but not an `asn1.grammar_file`, so a bundled pipeline that references one
+  arrives without its module.
 
 **The grammar is OPTIONAL for preview — structural dump (2026-07-31).** BER is self-describing
 (every value carries its own tag and length), so with `asn1.grammar` blank the plugin skips the
@@ -221,16 +250,18 @@ remains equivalent.
   length prefix, so `SKIP_RECORD` cannot resync; half-ingesting a CDR file is worse than
   quarantining it. Input is memory-mapped (`ByteSource.map`), so files >2 GB are fine.
 
-`ingester_config`: `grammar` (path to the `.asn` module, required) · `root_type` (required) ·
+`ingester_config`: `grammar` (path to the `.asn` module) or `grammar_text` (inline module; wins when
+both are set) — one of the two required · `root_type` (required) ·
 `strictness` · `file_header_length` · `record_header_length`.
 
 Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
-- **Declarative decode profile — the remaining half.** Framing is now served (above), which was the
-  larger part of `GoldenCapture.CASES`'s hardcoded tuple. What is left is the **grammar source**:
-  the plugin takes pasted ASN.1 module *text*, where the profile envisioned a reference to a stored
-  schema module (the corpus keeps `.asn` files per vendor, e.g. `mtnOCC.asn`). Until that lands
-  there is nowhere to *store* a reusable module, and a per-vendor tx/transform config has no home
-  either.
+- ~~**Declarative decode profile — the grammar source.**~~ **CLOSED 2026-09-23.** Framing was served
+  earlier; the grammar source is now too. *(This bullet said until 2026-09-23 that the plugin takes
+  only pasted module text. That was already half-wrong — the ingester accepted a jailed `.asn` path
+  under `ingester_config.grammar` all along — and is now wholly wrong: preview, `frontend: asn1` and
+  the drawer all take `asn1.grammar_file`, see "A grammar is either pasted TEXT or a stored `.asn`
+  FILE" above.)* A per-vendor module is stored as a `.asn` file in the Space's config (the corpus
+  keeps them that way, e.g. `mtnOCC.asn`). A per-vendor tx/transform config still has no home.
 - ~~**The Maven coordinate split**~~ **RESOLVED 2026-08-01.** The root `pom.xml` now aggregates
   `asn-parser/asn-decoders`, so `com.gamma.asn:asn-facade` resolves from the reactor and the manual
   `mvn install` is gone (verified with the local repo's `com/gamma/asn` deleted: 23 modules,

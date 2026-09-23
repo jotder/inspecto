@@ -213,6 +213,31 @@ class UnifiedParsingBlockTest {
                     root_type: Record
                 """));
         assertTrue(e.getMessage().contains("asn1.grammar"), e.getMessage());
+        assertTrue(e.getMessage().contains("asn1.grammar_file"), "names BOTH spellings: " + e.getMessage());
+    }
+
+    /**
+     * Operator decision 2026-09-23: a stored module is a jailed {@code .asn} FILE. {@code asn1.grammar_file}
+     * travels to the ingester as the path key {@code ingester_config.grammar} UNRESOLVED — resolution and
+     * the jail happen once, at use, in the resolver preview and ingest share — and inline text beside it
+     * travels too, so the ingester's "text wins" rule decides, exactly as the preview does.
+     */
+    @Test
+    void asn1FrontendCarriesAGrammarFileAsTheIngesterPathKey(@TempDir Path dir) throws Exception {
+        Path seg = dir.resolve("seg_mo.toon");
+        Files.writeString(seg, SCHEMA, StandardCharsets.UTF_8);
+        PipelineConfig cfg = load(dir, "a1gf", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    grammar_file: cdr/record.asn
+                    root_type: Record
+                    segments:
+                      Record: %s
+                """.formatted(seg.toString().replace('\\', '/')));
+        assertEquals("cdr/record.asn", cfg.schemas().ingesterConfig().get("grammar"));
+        assertNull(cfg.schemas().ingesterConfig().get("grammar_text"));
+        assertEquals("Record", cfg.schemas().ingesterConfig().get("root_type"));
     }
 
     @Test

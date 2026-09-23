@@ -1,6 +1,8 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
+import com.gamma.parse.Asn1ParserPlugin;
+import com.gamma.parse.ParseResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -12,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,6 +63,89 @@ class DemoCorpusIngestTest {
             assertEquals(1, count(db.resolve(seg), "LAC IS NULL AND CELL_ID IS NULL"), seg + " rows without location");
         assertEquals(0, count(db.resolve("moCallRecord"), "EVENT_TS IS NULL"), "every answerTime parses");
         assertEquals(1, count(db.resolve("moCallRecord"), "DURATION_SEC = 2400"), "a multi-byte INTEGER decodes");
+    }
+
+    /**
+     * Operator decision 2026-09-23: a stored ASN.1 module is a path-jailed {@code .asn} FILE. The committed
+     * msc_cdr pipeline with its inline grammar moved into a {@code .asn} file ({@code asn1.grammar_file})
+     * must PREVIEW and INGEST exactly as the inline original does — same tree, same rows, every segment.
+     */
+    @Test
+    void mscCdrWithItsGrammarInAnAsnFilePreviewsAndIngestsIdenticallyToInline(@TempDir Path dir) throws Exception {
+        Path inlineDir = Files.createDirectories(dir.resolve("inline"));
+        Path fileDir = Files.createDirectories(dir.resolve("file"));
+        PipelineConfig inline = stage(inlineDir, "config/msc/msc_cdr_pipeline.toon");
+        PipelineConfig file = stageWithGrammarFile(fileDir, "config/msc/msc_cdr_pipeline.toon");
+        assertNull(file.schemas().ingesterConfig().get("grammar_text"), "the file run must not carry the text");
+        assertTrue(String.valueOf(file.schemas().ingesterConfig().get("grammar")).endsWith(".asn"));
+
+        // preview: the same sample through POST /parsers/asn1/preview's plugin, text vs file
+        byte[] sample = Files.readAllBytes(REPO.resolve("spaces/demo/data/samples/msc_cdr/MSC01_20260801_0800.ber"));
+        Asn1ParserPlugin plugin = new Asn1ParserPlugin();
+        Map<String, Object> inlineIc = inline.schemas().ingesterConfig();
+        Map<String, Object> fileIc = file.schemas().ingesterConfig();
+        ParseResult viaText = plugin.preview(sample, Map.of("asn1", Map.of(
+                "grammar", inlineIc.get("grammar_text"), "root_type", inlineIc.get("root_type"))));
+        ParseResult viaFile = plugin.preview(sample, Map.of("asn1", Map.of(
+                "grammar_file", fileIc.get("grammar"), "root_type", fileIc.get("root_type"))));
+        assertEquals(13, ((ParseResult.Tree) viaText).recordCount());
+        assertEquals(viaText, viaFile, "the preview tree is identical");
+
+        // ingest: the real path, both configs, every segment's rows
+        seed(inline, "msc_cdr/MSC01_20260801_0800.ber");
+        seed(file, "msc_cdr/MSC01_20260801_0800.ber");
+        CollectorProcessor.run(inline);
+        CollectorProcessor.run(file);
+        Path inlineDb = Path.of(inline.dirs().database());
+        Path fileDb = Path.of(file.dirs().database());
+        assertEquals(subdirs(inlineDb), subdirs(fileDb));
+        for (String seg : List.of("moCallRecord", "mtCallRecord", "moSMSRecord")) {
+            List<String> a = rows(inlineDb.resolve(seg));
+            assertFalse(a.isEmpty(), seg);
+            assertEquals(a, rows(fileDb.resolve(seg)), seg + " rows are identical");
+        }
+    }
+
+    /** {@link #stage}, then move the inline {@code asn1.grammar} text into {@code msc_cdr.asn} beside it. */
+    private static PipelineConfig stageWithGrammarFile(Path dir, String pipeline) throws Exception {
+        stage(dir, pipeline);   // writes the re-pointed copy beside the temp data
+        Path toon = dir.resolve(Path.of(pipeline).getFileName());
+        List<String> out = new ArrayList<>();
+        boolean moved = false;
+        for (String line : Files.readAllLines(toon)) {
+            String t = line.stripLeading();
+            if (!moved && t.startsWith("grammar: \"") && t.endsWith("\"")) {
+                Path asn = dir.resolve("msc_cdr.asn");
+                Files.writeString(asn, t.substring("grammar: \"".length(), t.length() - 1));
+                out.add(line.substring(0, line.length() - t.length()) + "grammar_file: "
+                        + asn.toString().replace('\\', '/'));
+                moved = true;
+            } else {
+                out.add(line);
+            }
+        }
+        assertTrue(moved, "the committed msc_cdr pipeline carries its grammar inline");
+        Files.write(toon, out);
+        return PipelineConfig.load(toon.toString());
+    }
+
+    /** Every row of a Parquet tree, rendered and sorted — the content, independent of file layout. */
+    private static List<String> rows(Path root) throws Exception {
+        String glob = root.toString().replace('\\', '/') + "/**/*.parquet";
+        List<String> out = new ArrayList<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:");
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT * FROM read_parquet('" + glob + "')")) {
+            int n = rs.getMetaData().getColumnCount();
+            while (rs.next()) {
+                StringBuilder b = new StringBuilder();
+                for (int i = 1; i <= n; i++) b.append(rs.getMetaData().getColumnName(i)).append('=')
+                        .append(rs.getString(i)).append('|');
+                out.add(b.toString());
+            }
+        }
+        out.sort(null);
+        return out;
     }
 
     /** in_recharges (fixed-width): 16 lines → header + trailer dropped → accepted 10 · rejected 4. */

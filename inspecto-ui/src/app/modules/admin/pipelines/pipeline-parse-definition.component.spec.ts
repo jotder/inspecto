@@ -169,6 +169,12 @@ const ASN1_DEF = {
     ingesterClass: 'com.gamma.ingester.Asn1RecordIngester',
     grammarSchema: [
         { path: 'asn1.grammar', label: 'ASN.1 grammar', type: 'STRING', description: 'X.680 module text.' },
+        {
+            path: 'asn1.grammar_file',
+            label: 'ASN.1 grammar file',
+            type: 'STRING',
+            description: 'A stored .asn module.',
+        },
         { path: 'asn1.root_type', label: 'Root type', type: 'STRING', description: 'Record binding type.' },
         {
             path: 'asn1.strictness',
@@ -597,6 +603,25 @@ describe('PipelineParseDefinitionComponent', () => {
             expect(a['root_type']).toBe('CallEventRecord');
             expect(a['grammar']).toContain('DEFINITIONS');
             expect(a['segments']).toEqual({ Record: 'asn1_cdr_Record.toon' }); // W3: portable, beside the config
+        });
+
+        /**
+         * Operator decision 2026-09-23: a stored module is a jailed `.asn` FILE. The served form offers
+         * `asn1.grammar_file` beside the pasted text, and Apply carries the reference into the block —
+         * the engine's shared resolver then previews and ingests it exactly like pasted text.
+         */
+        it('offers a grammar FILE as the alternative to pasted text, and Apply carries the reference', async () => {
+            const fixture = await create(asn1Node(), [ASN1_DEF]);
+            editor(fixture).controlFor('asn1__grammar')?.setValue('');
+            editor(fixture).controlFor('asn1__grammar_file')?.setValue('spaces/demo/config/msc/msc_cdr.asn');
+            fixture.detectChanges();
+
+            pane(fixture).submit();
+
+            const parsing = fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>;
+            const a = parsing['asn1'] as Record<string, unknown>;
+            expect(a['grammar_file']).toBe('spaces/demo/config/msc/msc_cdr.asn');
+            expect(a['grammar'] ?? '').toBe('');
         });
 
         /** A node pointing at schemas that failed to write is the state the ordering exists to prevent. */

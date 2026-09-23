@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.config.safety.PathJail;
 import com.gamma.parse.ParseResult;
 import com.gamma.parse.ParserPlugin;
 import com.gamma.parse.Parsers;
@@ -63,6 +64,9 @@ final class ParserRoutes implements RouteModule {
         try {
             ParseResult r = parser.preview(sample, grammar);
             return toJson(r);
+        } catch (PathJail.Escape escape) {
+            // A grammar FILE reference (asn1.grammar_file) outside the allowed roots — the jail's verdict.
+            throw new ApiException(403, escape.getMessage());
         } catch (IllegalArgumentException callerError) {
             throw new ApiException(422, callerError.getMessage());
         } catch (Exception parseFail) {

@@ -1,7 +1,6 @@
 package com.gamma.ingester;
 
 import com.gamma.asn.core.ByteSource;
-import com.gamma.config.safety.PathJail;
 import com.gamma.asn.core.Framing;
 import com.gamma.asn.core.ParseError;
 import com.gamma.asn.core.RecoveryPolicy;
@@ -12,12 +11,10 @@ import com.gamma.asn.schema.NamedNode;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RecordSink;
 import com.gamma.etl.StreamingFileIngester;
+import com.gamma.parse.Asn1GrammarSource;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -87,13 +84,15 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
     @Override
     public void ingest(File file, RecordSink sink, int srcId, PipelineConfig cfg) throws Exception {
         Map<String, Object> ic = cfg.schemas().ingesterConfig();
-        // `grammar_text` carries the module INLINE (what `frontend: asn1` synthesizes — the drawer
-        // authors text, not a file); `grammar` stays the path-jailed file reference. Text wins when
-        // both are present, matching the "parsing: keys win" overlay rule.
-        String grammarText = str(ic.get("grammar_text"));
-        String grammarPath = str(ic.get("grammar"));
+        // `grammar_text` carries the module INLINE; `grammar` is the path-jailed `.asn` file reference
+        // (what `frontend: asn1`'s `asn1.grammar_file` becomes). Text wins when both are present. The
+        // rule, the resolution and the jail are Asn1GrammarSource's — shared with the preview, so a
+        // grammar that previews is the grammar that ingests.
+        Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
+                ic.get("grammar_text"), "ingester_config.grammar_text",
+                ic.get("grammar"), "ingester_config.grammar");
         String rootType = str(ic.get("root_type"));
-        if (grammarText.isEmpty() && grammarPath.isEmpty())
+        if (module == null)
             throw new IllegalArgumentException(
                     "ingester_config.grammar_text (inline module) or ingester_config.grammar "
                     + "(path to the ASN.1 module) is required for Asn1RecordIngester");
@@ -101,24 +100,12 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
             throw new IllegalArgumentException(
                     "ingester_config.root_type is required for Asn1RecordIngester");
 
-        String moduleSource = grammarText;
-        String moduleLabel  = "ingester_config.grammar_text";
-        if (grammarText.isEmpty()) {
-            // Jailed before the readability probe: an escaping ref must be refused outright, not reported
-            // as "not readable", which leaks whether a path outside the roots exists.
-            Path grammarFile = PathJail.requireUnderAny(
-                    PathJail.allowedRoots(), grammarPath, "ingester_config.grammar");
-            if (!Files.isReadable(grammarFile))
-                throw new IllegalArgumentException("ingester_config.grammar not readable: " + grammarFile);
-            moduleSource = Files.readString(grammarFile, StandardCharsets.UTF_8);
-            moduleLabel  = grammarFile.toString();
-        }
         Asn1Decoder decoder;
         try {
-            decoder = Asn1Decoder.compile(moduleSource, rootType);
+            decoder = Asn1Decoder.compile(module.source(), rootType);
         } catch (Exception badGrammar) {
             throw new IllegalArgumentException(
-                    "invalid ASN.1 grammar " + moduleLabel + ": " + badGrammar.getMessage(), badGrammar);
+                    "invalid ASN.1 grammar " + module.label() + ": " + badGrammar.getMessage(), badGrammar);
         }
 
         Map<String, List<String>> selectorsByKey = declareSegments(cfg, sink);

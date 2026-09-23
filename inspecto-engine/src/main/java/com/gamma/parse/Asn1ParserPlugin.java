@@ -40,9 +40,10 @@ import static com.gamma.util.Values.trimOrEmpty;
  * column named {@code [0]} would be worthless.
  *
  * <p>Framing is served, not hardcoded: {@code file_header_length} and {@code record_header_length}
- * cover every layout in the parity corpus (see {@link #framing}). What remains for the declarative
- * decode profile tracked in {@code docs/BACKLOG.md} "Parsing (Stage-1)" is sourcing the grammar
- * from a schema-module reference rather than pasted module text.
+ * cover every layout in the parity corpus (see {@link #framing}). The grammar is sourced either as
+ * pasted module text ({@code asn1.grammar}) or as a stored {@code .asn} file ({@code asn1.grammar_file},
+ * operator decision 2026-09-23) — text wins when both are set, and both resolve through
+ * {@link Asn1GrammarSource}, the same resolver and jail the ingester uses.
  */
 public final class Asn1ParserPlugin implements ParserPlugin {
 
@@ -84,6 +85,10 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                                 + "Leave EMPTY to dump the file's raw TLV structure instead — BER is "
                                 + "self-describing, so an unknown file can be inspected before its "
                                 + "module is available. A grammar is still required to ingest."),
+                FieldSpec.of("asn1.grammar_file", "ASN.1 grammar file", FieldType.STRING,
+                        "Path to a stored .asn module in the Space's config (written like the segment "
+                                + "schema paths, e.g. spaces/demo/config/msc/msc_cdr.asn) — the alternative "
+                                + "to pasting the text above. Pasted text wins when both are set."),
                 FieldSpec.of("asn1.root_type", "Root type", FieldType.STRING,
                         "Name of the type in the grammar each record binds against, e.g. Record. "
                                 + "Required when a grammar is supplied; ignored in structural mode."),
@@ -105,18 +110,21 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         if (sample == null || sample.length == 0)
             throw new IllegalArgumentException("sample content is required");
         Map<String, Object> asn1 = sub(grammar, "asn1");
-        String grammarText = trimOrEmpty(asn1.get("grammar"));
         String rootType = trimOrEmpty(asn1.get("root_type"));
         Strictness strictness = strictness(trimOrEmpty(asn1.get("strictness")));
         Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
+        // Inline text wins over the .asn file ref — the ingester's rule, through the ingester's resolver.
+        Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
+                asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file");
 
         // No grammar: dump the self-describing TLV structure so an unknown file can be inspected.
-        if (grammarText.isEmpty()) {
+        if (module == null) {
             if (!rootType.isEmpty())
                 throw new IllegalArgumentException(
-                        "asn1.root_type was set without a grammar — supply asn1.grammar to bind "
-                                + "against '" + rootType + "', or clear root_type for a structural dump");
+                        "asn1.root_type was set without a grammar — supply asn1.grammar or "
+                                + "asn1.grammar_file to bind against '" + rootType
+                                + "', or clear root_type for a structural dump");
             return structural(sample, framing, strictness, maxRecords);
         }
         if (rootType.isEmpty())
@@ -124,7 +132,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
 
         Asn1Decoder decoder;
         try {
-            decoder = Asn1Decoder.compile(grammarText, rootType);
+            decoder = Asn1Decoder.compile(module.source(), rootType);
         } catch (Exception badGrammar) {
             throw new IllegalArgumentException("invalid ASN.1 grammar: " + badGrammar.getMessage(), badGrammar);
         }

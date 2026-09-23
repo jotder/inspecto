@@ -185,6 +185,23 @@ class Asn1RecordIngesterTest {
         assertTrue(e.getMessage().contains("not readable"), e.getMessage());
     }
 
+    /**
+     * The grammar ref goes through the resolver the preview shares ({@code Asn1GrammarSource}), so it
+     * refuses what the preview refuses: a ref must name an ASN.1 module, not any file under the roots.
+     */
+    @Test
+    void aGrammarPathThatIsNotAnAsnModuleIsAConfigError(@TempDir Path dir) throws Exception {
+        Path notAsn = dir.resolve("cdr.toon");
+        Files.writeString(notAsn, GRAMMAR, StandardCharsets.UTF_8);
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,
+                "grammar: %s\n    root_type: CallEventRecord".formatted(
+                        notAsn.toString().replace('\\', '/'))).toString());
+        File dat = write(dir, "cdr.ber", hex(MO_CALL_HEX));
+        Exception e = assertThrows(IllegalArgumentException.class,
+                () -> new Asn1RecordIngester().ingest(dat, new CapturingSink(), 0, cfg));
+        assertTrue(e.getMessage().contains(".asn"), e.getMessage());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     private static File write(Path dir, String name, byte[] bytes) throws Exception {

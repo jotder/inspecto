@@ -1,7 +1,11 @@
 package com.gamma.parse;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -221,5 +225,65 @@ class Asn1ParserPluginTest {
         assertTrue(id.children().isEmpty());
         ParseResult.Node events = t.nodes().get(0).children().get(2);
         assertNull(events.value());
+    }
+
+    // ── grammar FILE reference (operator decision 2026-09-23: a stored module is a jailed .asn file) ──
+
+    private static String asnFile(Path dir, String name, String body) throws Exception {
+        Path g = dir.resolve(name);
+        Files.writeString(g, body, StandardCharsets.UTF_8);
+        return g.toString().replace('\\', '/');
+    }
+
+    /** The same module as a file previews EXACTLY as the same module pasted inline. */
+    @Test
+    void aGrammarFilePreviewsIdenticallyToTheSameGrammarInline(@TempDir Path dir) throws Exception {
+        byte[] sample = hex(RECORD_1_HEX, RECORD_2_HEX);
+        ParseResult inline = asn1.preview(sample, grammar("grammar", GRAMMAR, "root_type", "Record"));
+        ParseResult file = asn1.preview(sample,
+                grammar("grammar_file", asnFile(dir, "test.asn", GRAMMAR), "root_type", "Record"));
+        assertEquals(inline, file);
+    }
+
+    /** Inline text wins when both are set — the ingester's rule, so preview and ingest agree. */
+    @Test
+    void inlineGrammarTextWinsOverAGrammarFile(@TempDir Path dir) throws Exception {
+        ParseResult.Tree t = assertInstanceOf(ParseResult.Tree.class, asn1.preview(hex(RECORD_1_HEX),
+                grammar("grammar", GRAMMAR, "grammar_file", asnFile(dir, "bad.asn", "not X.680"),
+                        "root_type", "Record")));
+        assertEquals("id", t.nodes().get(0).children().get(0).label());
+    }
+
+    @Test
+    void aGrammarFileOutsideTheAllowedRootsIsRefused() {
+        Path outside = Path.of(System.getProperty("user.home")).getRoot().resolve("nowhere-inspecto/x.asn");
+        Exception e = assertThrows(RuntimeException.class, () -> asn1.preview(hex(RECORD_1_HEX),
+                grammar("grammar_file", outside.toString(), "root_type", "Record")));
+        assertTrue(e.getMessage().contains("asn1.grammar_file"), e.getMessage());
+        assertTrue(e.getMessage().contains("outside the root"), e.getMessage());
+    }
+
+    /** A grammar ref names a grammar module — never an arbitrary file echoed back through an error. */
+    @Test
+    void aGrammarFileThatIsNotAnAsnModuleIsRefused(@TempDir Path dir) throws Exception {
+        String toon = asnFile(dir, "secrets.toon", "password: hunter2");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> asn1.preview(
+                hex(RECORD_1_HEX), grammar("grammar_file", toon, "root_type", "Record")));
+        assertTrue(e.getMessage().contains(".asn"), e.getMessage());
+        assertTrue(!e.getMessage().contains("hunter2"), e.getMessage());
+    }
+
+    @Test
+    void aMissingGrammarFileIsACallerError(@TempDir Path dir) {
+        String missing = dir.resolve("nope.asn").toString().replace('\\', '/');
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> asn1.preview(
+                hex(RECORD_1_HEX), grammar("grammar_file", missing, "root_type", "Record")));
+        assertTrue(e.getMessage().contains("not readable"), e.getMessage());
+    }
+
+    @Test
+    void theGrammarSchemaServesTheFileReferenceBesideTheText() {
+        List<String> paths = asn1.grammarSchema().stream().map(f -> f.path()).toList();
+        assertTrue(paths.contains("asn1.grammar") && paths.contains("asn1.grammar_file"), paths.toString());
     }
 }

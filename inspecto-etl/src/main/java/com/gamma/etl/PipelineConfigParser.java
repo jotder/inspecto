@@ -1669,10 +1669,12 @@ final class PipelineConfigParser {
 
     /**
      * Translate the {@code asn1:} block into the plugin wiring {@code frontend: asn1} means
-     * (definition-surface P3c). The grammar is <b>inline X.680 module text</b> — the shape the
-     * drawer's textarea and {@code POST /parsers/asn1/preview} author — carried to the ingester as
-     * {@code ingester_config.grammar_text}, never as the path-jailed {@code grammar} key. Hard-fails
-     * (draft rejected before any run) on a missing block, empty grammar/root_type, or missing
+     * (definition-surface P3c). The grammar is <b>inline X.680 module text</b> ({@code asn1.grammar},
+     * carried as {@code ingester_config.grammar_text}) and/or a <b>{@code .asn} file reference</b>
+     * ({@code asn1.grammar_file}, carried UNRESOLVED as the path key {@code ingester_config.grammar} —
+     * operator decision 2026-09-23). Text wins when both are set; that rule, the resolution and the
+     * jail live once, in {@code com.gamma.parse.Asn1GrammarSource}, which the preview uses too. Hard-fails
+     * (draft rejected before any run) on a missing block, no grammar of either spelling, empty root_type, or missing
      * segments — the tailored messages here, not the generic plugin ones.
      */
     @SuppressWarnings("unchecked")
@@ -1682,18 +1684,22 @@ final class PipelineConfigParser {
                     "frontend 'asn1' requires an 'asn1:' block with grammar, root_type and segments");
         Map<String, Object> a = (Map<String, Object>) aMap;
         String grammar  = a.get("grammar")   == null ? "" : String.valueOf(a.get("grammar")).trim();
+        String grammarFile = a.get("grammar_file") == null ? "" : String.valueOf(a.get("grammar_file")).trim();
         String rootType = a.get("root_type") == null ? "" : String.valueOf(a.get("root_type")).trim();
-        if (grammar.isEmpty())
+        if (grammar.isEmpty() && grammarFile.isEmpty())
             throw new IllegalArgumentException(
-                    "asn1.grammar (inline X.680 module text) is required to ingest — "
-                    + "an empty grammar is preview-only TLV inspection");
+                    "asn1.grammar (inline X.680 module text) or asn1.grammar_file (path to a .asn module) "
+                    + "is required to ingest — an empty grammar is preview-only TLV inspection");
         if (rootType.isEmpty())
             throw new IllegalArgumentException("asn1.root_type is required for frontend 'asn1'");
         if (!(a.get("segments") instanceof Map<?, ?> segs) || segs.isEmpty())
             throw new IllegalArgumentException(
                     "asn1.segments must be a non-empty map of {recordName: schemaPath} for frontend 'asn1'");
         Map<String, Object> ic = new LinkedHashMap<>();
-        ic.put("grammar_text", grammar);
+        // Both spellings travel as-authored; the ingester's resolver (shared with the preview) applies
+        // "text wins" and resolves + jails the file ONCE, at use — never here as well.
+        if (!grammar.isEmpty()) ic.put("grammar_text", grammar);
+        if (!grammarFile.isEmpty()) ic.put("grammar", grammarFile);
         ic.put("root_type", rootType);
         for (String k : new String[]{"strictness", "file_header_length", "record_header_length"})
             if (a.get(k) != null) ic.put(k, a.get(k));

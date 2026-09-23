@@ -138,6 +138,37 @@ class ControlApiParsersTest {
         }
     }
 
+    /**
+     * Operator decision 2026-09-23: the preview takes a stored {@code .asn} FILE ({@code asn1.grammar_file})
+     * and answers exactly what the same module pasted inline answers; a ref outside the allowed roots is
+     * the jail's verdict, 403 — never "not readable", which would leak whether the path exists.
+     */
+    @Test
+    void asn1PreviewTakesAGrammarFileAndAnEscapingOneIs403(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            String grammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"
+                    + "Record ::= [APPLICATION 1] SEQUENCE { id [0] INTEGER }\n"
+                    + "END\n";
+            Path asn = java.nio.file.Files.writeString(cfg.resolve("record.asn"), grammar);
+            String sample = Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex("610380010A"));
+            ObjectMapper m = new ObjectMapper();
+            JsonNode inline = json(send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar", grammar, "root_type", "Record")),
+                    "sample_b64", sample))));
+            JsonNode file = json(send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar_file", asn.toString(), "root_type", "Record")),
+                    "sample_b64", sample))));
+            assertEquals(inline, file);
+
+            String outside = Path.of(System.getProperty("user.home")).getRoot()
+                    .resolve("nowhere-inspecto/x.asn").toString();
+            HttpResponse<String> esc = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar_file", outside, "root_type", "Record")),
+                    "sample_b64", sample)));
+            assertEquals(403, esc.statusCode(), esc.body());
+        }
+    }
+
     @Test
     void unknownParserIs404(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {
