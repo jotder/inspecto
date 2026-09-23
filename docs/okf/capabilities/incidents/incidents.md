@@ -675,8 +675,9 @@ contents, merge, create contract, linking, postmortem, tagging); `alerts.compone
 ### 8.5 Runnable examples
 
 Committed config exercising the chain, all under `spaces/demo/config/` (mirrored in `inspecto-deploy/`):
-⚠ **zero armed Alert Rules** — `orders/orders_stream_failures_alert.toon` and `orders_volume_alert.toon`
-are pre-2026-07-18 files nothing loads (no `registry/alert-rules/` exists in the demo space) — one RCA
+two Alert Rules as `alert-rule` components, armed at boot — `registry/alert-rules/orders_stream_failures.toon`
+(metric shape, `CRITICAL` → Incident) and `registry/alert-rules/orders_low_volume.toon` (measure shape; moved off the
+dead pre-2026-07-18 `orders/*_alert.toon` files 2026-09-23) — one RCA
 template (`ops/orders_rca.toon`). ⛔ `ops/demo_ops_queue.toon` no longer exists — deleted 2026-09-14 with the capability (`RETIRE-HALVES-1`).
 ⛔ `ops/sla_escalation.toon` no longer exists either, deleted in the same change. ⚠ **Zero committed Case Rules, Tag Rules, notification rules or channel
 destinations**, and — by decision — no scheduled `incident_purge`.

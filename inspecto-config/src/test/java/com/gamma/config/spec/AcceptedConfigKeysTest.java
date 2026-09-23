@@ -166,7 +166,7 @@ class AcceptedConfigKeysTest {
 
     @Test
     void aLiveLedgerMetricAlertIsAccepted() {
-        // spaces/demo/config/orders/orders_stream_failures_alert.toon, verbatim.
+        // spaces/demo/config/registry/alert-rules/orders_stream_failures.toon, verbatim.
         Map<String, Object> raw = alertDraft(Map.of(
                 "name", "orders_stream_failures", "metric", "rejected_files", "comparator", "gt",
                 "threshold", 3, "window", "1h", "onPipeline", "orders", "severity", "CRITICAL"));
@@ -176,7 +176,7 @@ class AcceptedConfigKeysTest {
 
     @Test
     void aLiveMeasureAlertIsAccepted() {
-        // spaces/demo/config/orders/orders_volume_alert.toon — the BI-5 shape, whose `dataset:` and
+        // spaces/demo/config/registry/alert-rules/orders_low_volume.toon — the BI-5 shape, whose `dataset:` and
         // `measure:` keys the spec does NOT declare. This is the case a spec-only census would break.
         Map<String, Object> raw = alertDraft(Map.of(
                 "name", "orders_low_volume", "dataset", "orders_dataset", "measure", "count",

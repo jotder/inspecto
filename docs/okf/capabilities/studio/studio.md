@@ -389,7 +389,7 @@ enforced rather than merely documented. `DatasetMeasureProbe`
 the same compile-then-sandbox pattern as §3.3 reduced to a scalar — and it **degrades to empty rather
 than throwing**, so a broken Dataset cannot take down the sweep. `AlertService` evaluates these on every
 sweep and fires the existing `ALERT_FIRED` path; the Alert object and its notification are `INC`'s.
-A worked example ships: `spaces/demo/config/orders/orders_volume_alert.toon`.
+A worked example ships: `spaces/demo/config/registry/alert-rules/orders_low_volume.toon`.
 
 ### 3.12 Edition gating
 

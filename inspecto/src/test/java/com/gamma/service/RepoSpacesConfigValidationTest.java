@@ -49,6 +49,19 @@ class RepoSpacesConfigValidationTest {
     }
 
     @Test
+    void theDemoSpaceArmsItsAlertRulesFromTheRegistry() {
+        // ServiceBootstrap.loadAlerts arms ONLY alert-rule components under <config>/registry; a
+        // *_alert.toon anywhere else is read by nothing (the demo shipped two such dead files until 2026-09-23).
+        Path root = spacesRoot();
+        assertNotNull(root, "found NO spaces/ tree");
+        List<String> armed = new ArrayList<>();
+        for (com.gamma.pipeline.ComponentRegistry.Component c :
+                new com.gamma.pipeline.ComponentStore(root.resolve("demo/config/registry")).list("alert-rule"))
+            armed.add(AlertRule.fromMap(c.content()).name());
+        assertEquals(List.of("orders_low_volume", "orders_stream_failures"), armed.stream().sorted().toList());
+    }
+
+    @Test
     void everyAuthoredSpaceConfigParses() throws IOException {
         Path root = spacesRoot();
         // ASSERTION, not an assumption (2026-09-07). The corpus is COMMITTED — `spaces/**` is in the
@@ -78,6 +91,11 @@ class RepoSpacesConfigValidationTest {
     private void validate(Path f, String name) throws IOException {
         if (name.endsWith("_enrich.toon"))          { EnrichmentConfig.load(f.toString()); return; }
         if (name.endsWith("_alert.toon"))           { AlertRule.load(f); return; }
+        // registry Alert Rules are flat alert-rule components — armed at boot via AlertRule.fromMap
+        if (f.getParent().getFileName().toString().equals("alert-rules")
+                && f.getParent().getParent().getFileName().toString().equals("registry")) {
+            AlertRule.fromMap(ConfigCodec.toMap(Files.readString(f))); return;
+        }
         if (name.endsWith("_rca.toon"))             { RcaTemplate.load(f); return; }
         if (name.endsWith("_job.toon")) {
             Map<String, Object> raw = ConfigCodec.toMap(Files.readString(f));
