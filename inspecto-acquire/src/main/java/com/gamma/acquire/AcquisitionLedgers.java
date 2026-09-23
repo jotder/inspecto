@@ -131,6 +131,21 @@ public final class AcquisitionLedgers {
     }
 
     /**
+     * Move the watermark stashed for {@code from} (the staging file a remote connector wrote) to {@code to} (the
+     * inbox path it was landed at), because the commit side looks it up by the landed path (KAFKA-OFFSET-REKEY-1).
+     * Called by the remote land step right after the move; a no-op when nothing was stashed for {@code from}.
+     */
+    public static void rekeyDbWatermark(Path from, Path to) {
+        DbWatermark wm = PENDING_DB_WATERMARKS.remove(key(from));
+        if (wm != null) PENDING_DB_WATERMARKS.put(key(to), wm);
+    }
+
+    /** Drop any watermark stashed for {@code staged}: its slice failed to land or was quarantined, so it must never commit. */
+    public static void discardDbWatermark(Path staged) {
+        PENDING_DB_WATERMARKS.remove(key(staged));
+    }
+
+    /**
      * Build a ledger at {@code url}. The backend toggle ({@code -Dacquire.ledger.backend}, memory default | db)
      * stays process-global — only the URL becomes per-space — mirroring {@link com.gamma.service.ServiceStores}.
      * A {@code db} URL that fails to open degrades to in-memory so acquisition is never blocked.

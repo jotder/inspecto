@@ -4,7 +4,6 @@ import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.acquire.InMemoryAcquisitionLedger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -133,7 +132,6 @@ class RemoteSliceFrontierCommitTest {
         return n;
     }
 
-    @Disabled("KAFKA-OFFSET-REKEY-1 repro: frontier stashed by staging path, taken by inbox path; never advances, overlap re-ingested")
     @Test
     void committedSliceAdvancesTheFrontierAndTheNextCycleIngestsOnlyNewOffsets(@TempDir Path dir) throws Exception {
         FakeOffsetTailConnectorFactory.FETCHED.clear();

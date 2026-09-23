@@ -7,7 +7,6 @@ import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.acquire.InMemoryAcquisitionLedger;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.CollectorProcessor;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DbExportWatermarkCycleTest {
 
-    @Disabled("KAFKA-OFFSET-REKEY-1 repro: DB-export watermark stashed by staging path, taken by inbox path; never advances, rows re-ingested")
     @Test
     void committedExportAdvancesTheWatermarkAndLaterCyclesIngestOnlyNewRows(@TempDir Path dir) throws Exception {
         Path db = dir.resolve("export_src.duckdb");

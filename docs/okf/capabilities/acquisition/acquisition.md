@@ -337,6 +337,19 @@ the whole mechanism — and should be on the same filesystem, or the rename degr
 warns. The ordering is **land-then-ack**: a source-side `post` action that deletes the remote original runs
 only *after* the local copy is durably in the inbox.
 
+**The slice frontier moves with the land (KAFKA-OFFSET-REKEY-1, fixed 2026-09-24).** `kafka` and `db`
+stash their reached offset / row watermark in `AcquisitionLedgers` keyed by the file they wrote — the
+**staging** path — while `ConsignmentIngestor` takes it at commit by the **inbox** path. Until this fix the
+two never met: the frontier was never recorded, so every later cycle re-read from the start (DB export 3 → 6
+→ 10 rows over three cycles; Kafka 7 rows for 4 offsets). The one seam is `RemoteAcquisitionHandler.land`:
+right after the move it calls `AcquisitionLedgers.rekeyDbWatermark(staged, target)`; a failed move, and a
+slice rejected by `fetchAndVerify` (quarantine / skip), call `discardDbWatermark` so no stale frontier lingers
+under a staging path (the next cycle re-fetches and re-stashes). No connector changed. Pinned by
+`RemoteSliceFrontierRekeyTest` (engine), `RemoteSliceFrontierCommitTest` (inspecto) and
+`DbExportWatermarkCycleTest` (connectors). ⚠ **Still open: restart durability.** The stash is an in-process
+static map — a process restart between land and commit loses the frontier, and the slice is re-read
+(at-least-once, duplicates possible). Whether to persist it is an open operator question; not addressed here.
+
 **Integrity (§11).** `IntegrityChecker` applies two independent, cheap-to-skip checks to the staged copy:
 *size* (staged bytes == the listing's `RemoteFile.size()`, skipped on `SIZE_UNKNOWN`, since some FTP servers
 omit it) and *checksum* (only when the listing exposes a hash via `RemoteFile.etag()`, hashed with the

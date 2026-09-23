@@ -187,7 +187,10 @@ final class RemoteAcquisitionHandler {
         if (part == null || target == null) return;
 
         Path fetched = fetchAndVerify(cfg, connector, rf, part, etagAlgo, retry);
-        if (fetched == null) return;   // failure already handled (event + metric + quarantine/skip)
+        if (fetched == null) {         // failure already handled (event + metric + quarantine/skip)
+            com.gamma.acquire.AcquisitionLedgers.discardDbWatermark(part);   // a rejected slice's frontier never commits
+            return;
+        }
 
         if (rf.lastModified() != null) {
             try {
@@ -270,8 +273,13 @@ final class RemoteAcquisitionHandler {
                         rf.relativePath(), cfg.identity().pipelineName());
                 Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
             }
+            // The connector stashed this slice's frontier (Kafka offset / DB-export watermark) under the staging
+            // path; the commit takes it by the inbox path, so hand it over with the move (KAFKA-OFFSET-REKEY-1).
+            com.gamma.acquire.AcquisitionLedgers.rekeyDbWatermark(staged, target);
             return target;
         } catch (java.io.IOException e) {
+            // Not landed: the next cycle re-fetches (and re-stashes) the slice, so this frontier must not linger.
+            com.gamma.acquire.AcquisitionLedgers.discardDbWatermark(staged);
             AcquisitionTelemetry.incDownloadsFailed(cfg);
             AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
                     "Could not land " + rf.relativePath() + " in the inbox (" + e.getMessage() + ")",
