@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 
 /**
  * Webhook delivery channel — POSTs each notification as JSON ({@link Notification#toMap()} shape, the
@@ -71,12 +72,26 @@ public final class WebhookChannel implements NotificationChannel {
     }
 
     private void post(Notification n, String deliveryId) throws Exception {
-        HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url))
+        send(client, URI.create(url), token, timeout, JSON.writeValueAsString(n.toMap()),
+                deliveryId != null && !deliveryId.isBlank()
+                        ? Map.of("X-Inspecto-Delivery-Id", deliveryId) : Map.of());
+    }
+
+    /**
+     * The one JSON POST both webhook transports make — this channel and {@link HttpWebhookSinkTransport}
+     * (the {@code sink.webhook} node): {@code Content-Type: application/json}, an optional
+     * {@code Authorization: Bearer} token, extra headers, and any non-2xx answer thrown as a failure.
+     * The client is built with the JDK default redirect policy, {@code NEVER}: a 3xx is a failure, so a
+     * receiver cannot bounce rows to a host the configuration never named.
+     */
+    static void send(HttpClient client, URI url, String token, Duration timeout, String json,
+                     Map<String, String> headers) throws Exception {
+        HttpRequest.Builder req = HttpRequest.newBuilder(url)
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(n.toMap())));
+                .POST(HttpRequest.BodyPublishers.ofString(json));
         if (token != null) req.header("Authorization", "Bearer " + token);
-        if (deliveryId != null && !deliveryId.isBlank()) req.header("X-Inspecto-Delivery-Id", deliveryId);
+        headers.forEach(req::header);
         HttpResponse<String> resp = client.send(req.build(), HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() / 100 != 2)
             throw new IllegalStateException("webhook returned HTTP " + resp.statusCode());

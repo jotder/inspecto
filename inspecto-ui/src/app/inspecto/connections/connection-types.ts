@@ -42,7 +42,7 @@ export interface ConnTypeDef {
 
 const SECRET_HINT = 'a ${ENV:VAR} reference, not a raw secret';
 
-/** The five connection types offered in the dropdown (order as specified). */
+/** The connection types offered in the dropdown (order as specified; `https` appended 2026-09-23). */
 export const CONNECTION_TYPES: ConnTypeDef[] = [
     {
         type: 'database',
@@ -165,6 +165,40 @@ export const CONNECTION_TYPES: ConnTypeDef[] = [
                 control: 'checkbox',
                 target: 'option',
                 default: true,
+            },
+        ],
+    },
+    // The Webhook sink's target (sink.webhook). Egress is decided HERE, by whoever may onboard
+    // Connections — a pipeline only names one, it never carries a URL. The engine builds
+    // https://<host>[:<port>]<path> and refuses a tunnel or proxy (it does not dial through either).
+    {
+        type: 'https',
+        connector: 'https',
+        label: 'HTTPS webhook',
+        description: 'An HTTPS endpoint the Webhook sink POSTs rows to as JSON',
+        attrs: [
+            { key: 'host', label: 'Host', control: 'text', target: 'host', required: true },
+            { key: 'port', label: 'Port', control: 'number', target: 'port', default: 443 },
+            {
+                key: 'basePath',
+                label: 'Path',
+                control: 'text',
+                target: 'basePath',
+                hint: 'e.g. /hooks/orders',
+            },
+            {
+                key: 'password',
+                label: 'Bearer token',
+                control: 'password',
+                target: 'password',
+                hint: SECRET_HINT,
+            },
+            {
+                key: 'timeout_seconds',
+                label: 'Request timeout (s)',
+                control: 'number',
+                target: 'option',
+                default: 10,
             },
         ],
     },

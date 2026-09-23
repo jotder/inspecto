@@ -433,7 +433,13 @@ if ($channelsJarSrc) {
                 throw "inspecto-notify-channels.jar registers no $impl - the SPI file lists only: $spiBody"
             }
         }
-        Write-Host "  verified: javax.mail classes + both NotificationChannel registrations present" -ForegroundColor DarkGray
+        # sink.webhook's wire (WebhookSinkTransport) rides the same jar; without its SPI entry the node refuses
+        # with "ships no outbound HTTP transport" on a Professional bundle - Personal's answer, on the wrong edition.
+        $sinkSpi = $chZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.pipeline.exec.WebhookSinkTransport' }
+        if (-not $sinkSpi) {
+            throw "inspecto-notify-channels.jar has no META-INF/services/com.gamma.pipeline.exec.WebhookSinkTransport - sink.webhook would refuse as if this were Personal."
+        }
+        Write-Host "  verified: javax.mail classes + both NotificationChannel registrations + the WebhookSinkTransport registration present" -ForegroundColor DarkGray
     } finally { $chZip.Dispose() }
 }
 if ($backupJarSrc) {

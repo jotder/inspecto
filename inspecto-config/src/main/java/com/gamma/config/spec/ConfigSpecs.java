@@ -116,6 +116,17 @@ public final class ConfigSpecs {
                 FieldSpec.of("processing.profile.columns", "Profile columns", FieldType.LIST,
                         "Columns to profile (per-column row/null/distinct counts and min/max). Empty "
                                 + "or absent profiles every inbound column."),
+                // The Webhook sink's block (sink.webhook, 2026-09-23). ⛔ No url/token field by decision: the
+                // target is an https Connection an administrator onboarded, and the parser refuses both keys.
+                FieldSpec.of("webhook.connection", "Webhook Connection", FieldType.STRING,
+                        "Name of the https Connection the at-rest chain's rows are POSTed to as JSON; it carries "
+                                + "the endpoint and the bearer-token reference. Professional/Enterprise only."),
+                FieldSpec.withDefault("webhook.batch_size", "Webhook rows per request", FieldType.INT, 500,
+                        "Rows per JSON POST, 1-10000."),
+                FieldSpec.of("webhook.retry", "Webhook retry", FieldType.MAP,
+                        "Per-request retry, the Collector's grammar: count, backoff (EXPONENTIAL/LINEAR/FIXED), "
+                                + "initial_delay, max_delay. Every attempt carries the same Idempotency-Key. "
+                                + "Absent = one attempt."),
                 FieldSpec.of("processing.ingester", "Plugin ingester class", FieldType.STRING,
                         "FQCN of a plugin ingester; when set, processing.segments must be non-empty."),
                 // The Stage-2 arming condition (pipeline spec gap 8). Undeclared until 2026-08-31, which
@@ -123,8 +134,8 @@ public final class ConfigSpecs {
                 // being REFUSED at registration — the rule below moves that answer to authoring time.
                 FieldSpec.of("output_store", "Stage-2 output store", FieldType.STRING,
                         "Names the store an at-rest chain writes. Required to ARM a pipeline carrying "
-                                + "steps:, processing.dedup, processing.summarize, processing.profile "
-                                + "or processing.join — "
+                                + "steps:, processing.dedup, processing.summarize, processing.profile, "
+                                + "processing.join or webhook: — "
                                 + "those execute at rest (a pipeline_config: job), never on the linear "
                                 + "ingest path, and the chain needs an authored name for what it writes."),
                 // ── grammar: one concept, two spellings — `parsing.grammar` is CANONICAL ────────
@@ -306,20 +317,20 @@ public final class ConfigSpecs {
                 new CrossFieldRule(
                         "stage-two-blocks-require-output-store",
                         "An ACTIVE pipeline carrying steps:, processing.dedup, processing.summarize, "
-                                + "processing.profile or processing.join must declare a top-level output_store:. Those blocks "
+                                + "processing.profile, processing.join or webhook: must declare a top-level output_store:. Those blocks "
                                 + "execute at rest (a pipeline_config: job over the landed store), never "
                                 + "on the linear ingest path, so without output_store: they have nowhere "
                                 + "to write and the pipeline refuses to arm. Author output_store:, keep "
                                 + "the pipeline inactive (active: false), or remove the block.",
                         Severity.ERROR,
                         List.of("output_store", "steps", "processing.dedup",
-                                "processing.summarize", "processing.profile", "processing.join"),
+                                "processing.summarize", "processing.profile", "processing.join", "webhook"),
                         raw -> {
                             if (!Boolean.parseBoolean(str(raw, "active"))) return true;
                             boolean needs = false;
                             for (String block : List.of("steps", "processing.dedup",
                                                         "processing.summarize", "processing.profile",
-                                                        "processing.join"))
+                                                        "processing.join", "webhook"))
                                 needs |= authored(raw, block);
                             return !needs || present(raw, "output_store");
                         }),

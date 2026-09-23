@@ -148,6 +148,19 @@ final class PipelineConfigParser {
             Identifiers.validate(b.outputStore, "output_store");
         }
 
+        // ── outbound webhook sink (sink.webhook; absent ⇒ none) ──
+        // Kept verbatim beside the parsed record so lift/lower round-trips exactly what was authored;
+        // parsed here too so a malformed block (an authored url:, a typo'd key) fails at LOAD, not at the
+        // first POST. Arming (at-rest lane only) is prepare()'s call.
+        Object webhookAny = raw.get("webhook");
+        if (webhookAny != null && !(webhookAny instanceof Map))
+            throw new IllegalArgumentException("webhook: must be a map ({connection, batch_size, retry})");
+        Map<String, Object> webhookRaw = mapAt(raw, "webhook");
+        if (webhookRaw != null) {
+            b.webhook = parseWebhook(webhookRaw);
+            b.webhookConfig = new LinkedHashMap<>(webhookRaw);
+        }
+
         // ── entry-node trigger (T13 / §3.6; absent ⇒ default poll = today's behaviour) ──
         // Carried verbatim; the live loop (CollectorService) classifies it via PipelineTrigger into
         // schedule(every/cron) / event / manual. Absent leaves the pipeline on the global poll cycle.
@@ -462,15 +475,8 @@ final class PipelineConfigParser {
         }
 
         // ── retry / backoff (Phase F; additive, absent ⇒ a single attempt) ──────────────────
-        Retry retry = Retry.DISABLED;
         Map<String, Object> retryBlock = castMapAt(src, "retry");
-        if (retryBlock != null) {
-            retry = new Retry(
-                    toInt(retryBlock.getOrDefault("count", 0)),
-                    opt(retryBlock, "backoff", "EXPONENTIAL"),
-                    toMillis(opt(retryBlock, "initial_delay", "1s")),
-                    toMillis(opt(retryBlock, "max_delay", "60s")));
-        }
+        Retry retry = retryBlock == null ? Retry.DISABLED : parseRetry(retryBlock);
 
         // ── circuit breaker (Phase F; additive, absent ⇒ never trips) ───────────────────────
         CircuitBreaker circuitBreaker = CircuitBreaker.DISABLED;
@@ -1351,6 +1357,55 @@ final class PipelineConfigParser {
         if (v == null || v.toString().isBlank())
             throw new IllegalArgumentException("Missing required dirs." + key);
         return v.toString();
+    }
+
+    /** A {@code retry:} block ({@code count}/{@code backoff}/{@code initial_delay}/{@code max_delay}) — the one
+     *  grammar the Collector's retry and the webhook sink's retry share. */
+    private static Retry parseRetry(Map<String, Object> retryBlock) {
+        return new Retry(
+                toInt(retryBlock.getOrDefault("count", 0)),
+                opt(retryBlock, "backoff", "EXPONENTIAL"),
+                toMillis(opt(retryBlock, "initial_delay", "1s")),
+                toMillis(opt(retryBlock, "max_delay", "60s")));
+    }
+
+    /**
+     * The {@code webhook:} block (also a {@code sink.webhook} node's config). Strict about its keys, unlike
+     * the older blocks: a typo'd {@code batchsize} silently defaulting would send 500-row bodies to an
+     * endpoint sized for 50, and an authored {@code url:} is the egress path the Connection decision closed.
+     */
+    @SuppressWarnings("unchecked")
+    static PipelineConfig.Webhook parseWebhook(Map<?, ?> block) {
+        if (block == null) throw new IllegalArgumentException("webhook: must be a map");
+        for (Object k : block.keySet()) {
+            String key = String.valueOf(k);
+            if ("url".equals(key) || "token".equals(key) || "endpoint".equals(key))
+                throw new IllegalArgumentException("webhook." + key + " is not a key: the target endpoint and "
+                        + "its token live on the https Connection named by webhook.connection, which only an "
+                        + "administrator can onboard");
+            if (!PipelineConfig.Webhook.KEYS.contains(key))
+                throw new IllegalArgumentException("webhook: does not understand '" + key + "' (only "
+                        + String.join(" / ", PipelineConfig.Webhook.KEYS) + ")");
+        }
+        Object conn = block.get("connection");
+        int batchSize = intOr(block.get("batch_size"), PipelineConfig.Webhook.DEFAULT_BATCH_SIZE, "webhook.batch_size");
+        Retry retry = Retry.DISABLED;
+        Object r = block.get("retry");
+        if (r != null) {
+            if (!(r instanceof Map<?, ?> rm))
+                throw new IllegalArgumentException("webhook.retry must be a map ("
+                        + String.join(" / ", PipelineConfig.Webhook.RETRY_KEYS) + ")");
+            for (Object k : rm.keySet())
+                if (!PipelineConfig.Webhook.RETRY_KEYS.contains(String.valueOf(k)))
+                    throw new IllegalArgumentException("webhook.retry does not understand '" + k + "' (only "
+                            + String.join(" / ", PipelineConfig.Webhook.RETRY_KEYS) + ")");
+            try {
+                retry = parseRetry((Map<String, Object>) rm);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("webhook.retry: " + e.getMessage(), e);
+            }
+        }
+        return new PipelineConfig.Webhook(conn == null ? null : conn.toString(), batchSize, retry);
     }
 
     private static String opt(Map<String, Object> m, String key, String def) {

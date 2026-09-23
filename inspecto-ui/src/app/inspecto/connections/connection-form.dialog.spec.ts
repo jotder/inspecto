@@ -84,6 +84,30 @@ describe('ConnectionFormDialog', () => {
         expect(close).toHaveBeenCalledWith({ saved: expect.objectContaining({ id: 'pg_main' }) });
     });
 
+    it('onboards an https webhook target: endpoint on the profile, token as a reference, no URL field', () => {
+        const { c, api } = create();
+        c.onTypeChange('https');
+        expect(c.attrsForm().get('port')!.value).toBe(443);
+        expect(c.attrsForm().get('url')).toBeNull();
+        c.attrsForm().patchValue({
+            host: 'hooks.example.com',
+            basePath: '/hooks/orders',
+            password: '${ENV:ORDERS_HOOK_TOKEN}',
+        });
+        c.submit();
+        c.submit();
+        expect(api.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                connector: 'https',
+                host: 'hooks.example.com',
+                port: 443,
+                basePath: '/hooks/orders',
+                password: '${ENV:ORDERS_HOOK_TOKEN}',
+                options: expect.objectContaining({ timeout_seconds: '10' }),
+            }),
+        );
+    });
+
     it('rejects a duplicate name on the save step', () => {
         const { c, api } = create(undefined, ['sftp_box']);
         c.attrsForm().patchValue({ host: 'h', username: 'u' });

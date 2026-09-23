@@ -414,6 +414,51 @@ class NodeConfigNameContractTest {
         assertEquals(List.of("ID"), reparsed.join().on());
     }
 
+    /**
+     * The webhook node's contract: every declared attribute — {@code retry__*} nested into the node's
+     * {@code retry} map, exactly as the dialog's nestKeys writes it — survives lift → edit → lower →
+     * re-decode onto the {@link PipelineConfig.Webhook} the executor reads. Draft path ({@code fromMap}):
+     * the fixture carries no output_store:, and an ACTIVE webhook without one refuses at prepare().
+     */
+    @Test
+    void webhookAttributesReachTheEngine(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("webhook", new LinkedHashMap<>(Map.of("connection", "orders_hook")));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"sink.webhook".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            put(c, "connection", "billing_hook");
+            put(c, "batch_size", 50);
+            put(c, "retry.count", 4);
+            put(c, "retry.backoff", "LINEAR");
+            put(c, "retry.initial_delay", "3s");
+            put(c, "retry.max_delay", "30s");
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        assertEquals(1, nodes.stream().filter(n -> "sink.webhook".equals(n.type())).count(),
+                "the lift presents the webhook: block as ONE sink.webhook node");
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        PipelineConfig.Webhook w = PipelineConfig.fromMap(lowered).webhook();
+        assertNotNull(w);
+        assertEquals("billing_hook", w.connection());
+        assertEquals(50, w.batchSize());
+        assertEquals(4, w.retry().count());
+        assertEquals("LINEAR", w.retry().backoff());
+        assertEquals(3_000L, w.retry().initialDelayMillis());
+        assertEquals(30_000L, w.retry().maxDelayMillis());
+        // …and the declared table is exactly those keys, so nothing typed in the drawer is unreachable
+        assertEquals(List.of("connection", "batch_size", "retry__count", "retry__backoff", "retry__initial_delay",
+                        "retry__max_delay"),
+                NodeAttributes.forType("sink.webhook").stream().map(NodeAttribute::key).toList());
+    }
+
     // ── the editor's real save path ────────────────────────────────────────────────
 
     /** Lift the fixture, set {@code cfgPath} on the {@code nodeType} node, lower, re-read as the engine does. */

@@ -72,6 +72,11 @@ public final class PipelineEditable {
     public static final String MULTI_ACQUISITION = "MULTI_ACQUISITION";
     public static final String MULTI_GAP = "MULTI_GAP";
     public static final String MULTI_MARKER = "MULTI_MARKER";
+    /** A second {@code sink.webhook} node — the flat file has ONE {@code webhook:} block (same rule as above). */
+    public static final String MULTI_WEBHOOK = "MULTI_WEBHOOK";
+    /** A {@code sink.webhook} node whose config the {@code webhook:} parser refuses (no connection, an
+     *  authored {@code url:}, an unknown key, a batch size out of bounds) — refused at save, not at the first POST. */
+    public static final String WEBHOOK_INVALID = "WEBHOOK_INVALID";
     /** A {@code parser.delimited} node whose {@code parsing.frontend} names a DIFFERENT frontend. */
     public static final String PARSER_FRONTEND_MISMATCH = "PARSER_FRONTEND_MISMATCH";
     /**
@@ -675,6 +680,14 @@ public final class PipelineEditable {
         return c;
     }
 
+    /** A {@code sink.webhook} node's config as the {@code webhook:} block: verbatim, minus the node-level
+     *  {@code enabled} flag (whose flat home is {@code processing.disabled_steps}). */
+    private static Map<String, Object> webhookSection(PipelineNode n) {
+        Map<String, Object> c = new LinkedHashMap<>(n.config());
+        c.remove("enabled");
+        return c;
+    }
+
     /** The raw top-level {@code sinks[]} entry whose {@code database} equals {@code database}, or
      *  {@code null} — absent list or no match means the single-{@code output:} shorthand applies. */
     private static Map<?, ?> sinkEntryForDatabase(Map<String, Object> raw, Object database) {
@@ -701,7 +714,7 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
-        PipelineNode primarySink = null, quarantineSink = null;
+        PipelineNode primarySink = null, quarantineSink = null, webhook = null;
         // The transform chain in authored order — the five kinds the flat file can hold. Order is node
         // order, which is what the editor sends and what PipelineLift emits; the flat file has no edges,
         // so there is no topology to sort by at this point.
@@ -781,6 +794,19 @@ public final class PipelineEditable {
                     refusals.add(new PipelineCompileException.Refusal(SQL_STEP_EMPTY, n.id(),
                             "a transform.sql node needs a non-blank 'sql' SELECT"));
                 chain.add(n);
+            }
+            else if (BuiltinNodeType.SINK_WEBHOOK.type().equals(t)) {
+                if (webhook != null) refusals.add(new PipelineCompileException.Refusal(MULTI_WEBHOOK, n.id(),
+                        "the flat pipeline config has one webhook: block and '" + webhook.id()
+                                + "' already holds it"));
+                else {
+                    webhook = n;
+                    try {
+                        com.gamma.etl.PipelineConfig.Webhook.fromMap(webhookSection(n));
+                    } catch (IllegalArgumentException e) {
+                        refusals.add(new PipelineCompileException.Refusal(WEBHOOK_INVALID, n.id(), e.getMessage()));
+                    }
+                }
             }
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
@@ -963,6 +989,13 @@ public final class PipelineEditable {
             processing.put("profile", pm);
         } else if (strict) {
             processing.remove("profile");
+        }
+
+        // outbound webhook → the top-level webhook: block, node config verbatim (it IS the block)
+        if (webhook != null) {
+            out.put("webhook", webhookSection(webhook));
+        } else if (strict) {
+            out.remove("webhook");
         }
 
         // authored map projection → processing.map ({columns, rules}). ⚠ Unlike its three neighbours

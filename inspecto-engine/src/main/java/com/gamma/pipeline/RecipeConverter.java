@@ -202,6 +202,9 @@ public final class RecipeConverter {
                 for (Map<String, Object> extra : extraSinks) steps.add(step("sink", extra));
             }
         }
+        // the outbound webhook: its own verb, verbatim — omitting it here would let the compile back
+        // (strict) delete the block, since lower removes a webhook: no node speaks for
+        if (config.get("webhook") instanceof Map<?, ?> wh) steps.add(step("webhook", mapOf(wh)));
 
         recipe.put("steps", steps);
 

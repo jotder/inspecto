@@ -6,6 +6,7 @@ import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
+import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineStores;
 import org.slf4j.Logger;
@@ -109,6 +110,12 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
 
     @Override
     public void write(PipelineNode sink, String inputTable) throws Exception {
+        // sink.webhook: no bytes and no store — the branch POSTs its rows (WebhookSink). Its rows are not
+        // counted in totalRows/rowsByStore, which report what RESTS; a webhook's receiver is not a store.
+        if (BuiltinNodeType.SINK_WEBHOOK.type().equals(sink.type())) {
+            WebhookSink.deliver(conn, sink, inputTable, consignmentId);
+            return;
+        }
         if (sink.type().endsWith(".view")) {     // logical store — no bytes; PipelineJobRunner registers its definition
             log.info("[PIPELINEJOB] sink '{}' ({}) is a logical view — no bytes (definition registered by the pipeline job)",
                     sink.id(), sink.type());

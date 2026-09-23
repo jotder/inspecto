@@ -1078,10 +1078,10 @@
     "label" : "Outbound webhook dispatcher",
     "emoji" : "🪝",
     "icon" : "heroicons_outline:link",
-    "status" : "partial",
-    "capability" : "channel",
-    "note" : "webhook notification channel exists; not a chain sink",
-    "addable" : false
+    "status" : "delivered",
+    "nodeType" : "sink.webhook",
+    "note" : "top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+",
+    "addable" : true
   }, {
     "id" : "sink.dlq",
     "family" : "SNK",

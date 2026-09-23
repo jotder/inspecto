@@ -105,7 +105,7 @@ target hardware with a CI floor is still the single highest-value piece of evide
 
 ### 1.4 The extension surface — what "plugins for the rest" rests on
 
-**19**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
+**20**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
 from every `ServiceLoader.load(X.class)`, `OptionalSpi.all(X.class)` and `SpiSlot(X.class)` call site in
 `inspecto*/src/main` (re-counted 2026-09-14: the 2026-09-10 grep counted call sites of ONE loader and landed on
 the same number by coincidence — three security seams go through `SpiSlot`, and `TransformFunctionProvider`
@@ -117,7 +117,7 @@ feeds), `JobTypeProvider` and `MaintenanceTaskProvider` (their scheduled work), 
 
 ⚠ **Two honesty notes before any coverage percentage goes on a slide.** `ExpressionProvider` is declared and
 registered by nothing (`SPEC-DEADSEAM-1`). And the processor catalogue is **119**<!--count:processors-->
-entries of which **36**<!--count:processors-delivered--> are delivered, **16**<!--count:processors-partial-->
+entries of which **37**<!--count:processors-delivered--> are delivered, **15**<!--count:processors-partial-->
 partial, and the rest planned — a palette of inactive tiles a buyer will count. Claim coverage **by category
 covered end to end**, never as a percentage of that palette.
 
@@ -221,7 +221,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
 | Fault-tolerant DR at Professional; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |
-| **19**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
+| **20**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
 | A distinct Professional bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
 
 ### 4.2 We MUST NOT claim yet — and what unlocks each
@@ -230,7 +230,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 |---|---|---|
 | Anything about the AI assistant or autonomy | ships in **no** bundle (`CP-14`, `PKG-5`) | `PKG-5` resolves and the assistant is in a downloadable artifact — **filed as a §1 decision needing an owner, 2026-09-11** |
 | "1 trillion rows/day" for Professional | off by 10–250× on one node (§1.3) | never for Professional; an Enterprise cluster-design conversation |
-| "119 processors" | 67 are planned, inactive tiles | say **36**<!--count:processors-delivered--> delivered, or name the families |
+| "119 processors" | 67 are planned, inactive tiles | say **37**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above; one dead SPI | phrase as categories covered + named seams (§1.4) |
 | A production-grade Expectation engine | routes, no UI (`ING-6`) | the UI ships, or GX suites import |
 | "Low maintenance" | the install kit (preflight, service wrappers, upgrade/rollback) is unbuilt | deployment Phases 0–1 ship — `DEPLOY-SERVICE-WRAPPER-1` (P1) is the first piece |

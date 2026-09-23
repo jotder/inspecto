@@ -1030,6 +1030,52 @@ public final class PipelineConfig {
     }
 
     /**
+     * The outbound webhook sink (top-level {@code webhook:}) — the authored half of the {@code sink.webhook}
+     * node. It POSTs the at-rest chain's output rows as JSON, {@code batchSize} rows per request, to the
+     * Connection named by {@code connection}.
+     *
+     * <p>⛔ <b>There is no URL key and no secret key, by decision</b> (operator, 2026-09-23). The target is a
+     * named Connection with connector {@code https}: onboarding one needs the admin-only
+     * {@code canOnboardConnections} grant, so a pipeline author can point rows only at an endpoint an
+     * administrator already approved, and the bearer token is that Connection's {@code SecretResolver}
+     * reference. An authored {@code url:} is refused by name rather than ignored.
+     *
+     * <p>{@code retry} reuses the Collector's {@code retry:} shape ({@code count}/{@code backoff}/
+     * {@code initial_delay}/{@code max_delay}) and is executed by the same {@code RetryPolicy}; absent ⇒
+     * one attempt. Executes on the at-rest lane only — {@link #prepare()} refuses it on the ingest lane.
+     */
+    @PublicApi(since = "4.0.0")
+    public record Webhook(String connection, int batchSize, Retry retry) {
+        /** Rows per POST when {@code batch_size} is absent. */
+        public static final int DEFAULT_BATCH_SIZE = 500;
+        /** Upper bound on {@code batch_size} — one request body stays a bounded allocation. */
+        public static final int MAX_BATCH_SIZE = 10_000;
+        /** Every key the block may carry; anything else is refused. */
+        public static final List<String> KEYS = List.of("connection", "batch_size", "retry");
+        /** Every key its {@code retry:} sub-block may carry. */
+        public static final List<String> RETRY_KEYS = List.of("count", "backoff", "initial_delay", "max_delay");
+
+        public Webhook {
+            if (connection == null || connection.isBlank())
+                throw new IllegalArgumentException("webhook: needs a 'connection' — the name of an https "
+                        + "Connection that carries the target endpoint and its token reference");
+            connection = connection.trim();
+            if (batchSize < 1 || batchSize > MAX_BATCH_SIZE)
+                throw new IllegalArgumentException("webhook.batch_size must be between 1 and "
+                        + MAX_BATCH_SIZE + ", got: " + batchSize);
+            retry = retry == null ? Retry.DISABLED : retry;
+        }
+
+        /**
+         * Parse and validate a {@code webhook:} block (or a {@code sink.webhook} node's config, which is the
+         * same map). Unknown keys — an authored {@code url:} above all — are refused by name.
+         */
+        public static Webhook fromMap(Map<?, ?> block) {
+            return PipelineConfigParser.parseWebhook(block);
+        }
+    }
+
+    /**
      * The authored half of the projection slot ({@code processing.map}; a Record Transformer,
      * {@code transform.sql}) — the flat file's home
      * for a projection an operator typed into the map node's dialog, added so that
@@ -1204,6 +1250,10 @@ public final class PipelineConfig {
     /** Per-column profile ({@code processing.profile}); {@code null} when absent. */
     private final Profile profile;
 
+    /** The outbound webhook sink ({@code webhook:}) parsed, and its block verbatim; both {@code null} when absent. */
+    private final Webhook webhook;
+    private final Map<String, Object> webhookConfig;
+
     /** Reference join ({@code processing.join}); {@code null} when absent. */
     private final Join join;
 
@@ -1329,6 +1379,12 @@ public final class PipelineConfig {
     /** Per-column profile ({@code processing.profile}), or {@code null} when absent. Same at-rest posture
      *  as {@link #summarize()}: it aggregates, so it needs somewhere for the result to rest. */
     public Profile profile() { return profile; }
+
+    /** The outbound webhook sink ({@code webhook:}), or {@code null} when absent. At-rest lane only —
+     *  {@link #prepare()} refuses an active pipeline whose chain would never reach it. */
+    public Webhook webhook() { return webhook; }
+    /** The {@code webhook:} block <b>verbatim</b> (the {@code sink.webhook} node's config), or {@code null}. */
+    public Map<String, Object> webhookConfig() { return webhookConfig; }
     /**
      * Reference join ({@code processing.join}), or {@code null} when absent. Authoring/round-trip only:
      * {@link #prepare()} refuses an {@code active} pipeline carrying it — the linear batch path has no
@@ -1406,6 +1462,8 @@ public final class PipelineConfig {
         this.route = b.route;
         this.summarize = b.summarize;
         this.profile = b.profile;
+        this.webhook = b.webhook;
+        this.webhookConfig = b.webhookConfig;
         this.join = b.join;
         this.mapConfig = b.mapConfig;
         this.disabledSteps = List.copyOf(b.disabledSteps);
@@ -1493,6 +1551,8 @@ public final class PipelineConfig {
         this.route = route;
         this.summarize = src.summarize;
         this.profile = src.profile;
+        this.webhook = src.webhook;
+        this.webhookConfig = src.webhookConfig;
         this.join = src.join;
         this.mapConfig = src.mapConfig;
         this.disabledSteps = src.disabledSteps;
@@ -1742,6 +1802,26 @@ public final class PipelineConfig {
                             + "combining it with multiple sinks: destinations is not supported "
                             + "(see docs/superpower/sinks-config-format-plan.md)");
         }
+        // webhook: executes on the AT-REST lane only (operator decision 2026-09-23): PipelineLift.stageTwo
+        // hangs the sink.webhook branch beside the output_store: sink, and the ingest lane has no executor
+        // for it. So an active pipeline without output_store: would arm, ingest — and never send a row,
+        // and a route: pipeline runs its branches on the ingest lane where the webhook would be skipped
+        // the same way. Both refuse by name; a silent non-delivery is the failure this gate exists for.
+        if (active && webhook != null) {
+            if (outputStore == null)
+                throw new IllegalStateException(
+                        "webhook: does not execute on the linear ingest lane — author a top-level "
+                                + "output_store: and run the chain at rest (pipeline_config: pipeline job), "
+                                + "keep the pipeline inactive (active: false), or remove the webhook block");
+            boolean multiSchema = schemas.selector() != null
+                    || (schemas.segments() != null && !schemas.segments().isEmpty());
+            if (route != null || multiSchema)
+                throw new IllegalStateException(
+                        "webhook: runs at rest over ONE landed store, but this pipeline "
+                                + (route != null ? "routes rows on the ingest lane (route:)"
+                                                 : "is multi-schema and lands several stores")
+                                + " — the webhook would never be reached; remove one of the two");
+        }
         // route: ARMS (branch-aware-executor arming plan S3, 2026-08-26): ConsignmentGraphRunner is wired
         // at the writeAndTrace choke point, so an active route: pipeline executes its branch tree.
         // Arming stays FAIL-CLOSED on every shape that would drop rows silently — the exact
@@ -1866,6 +1946,8 @@ public final class PipelineConfig {
         Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline
         Summarize summarize = null;           // group-by rollup (processing.summarize); null ⇒ none
         Profile profile = null;               // per-column profile (processing.profile); null ⇒ none
+        Webhook webhook = null;               // outbound webhook sink (webhook:); null ⇒ none
+        Map<String, Object> webhookConfig = null;   // the webhook: block verbatim; null ⇒ none
         Join join = null;                     // reference join (processing.join); null ⇒ none
         MapConfig mapConfig = null;           // authored map projection (processing.map); null ⇒ none
         List<String> disabledSteps = List.of();   // processing.disabled_steps (S4/D-13); empty ⇒ all enabled

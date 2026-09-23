@@ -63,6 +63,11 @@ final class IngestSinkWriter implements PipelineExecutor.SinkWriter {
 
     @Override
     public void write(PipelineNode sink, String inputTable) throws Exception {
+        // prepare() refuses an active webhook pipeline on this lane; this is the backstop for a graph that
+        // reached it anyway — a named refusal, never a "matches no sinks[] destination" puzzle or a skip.
+        if (com.gamma.pipeline.BuiltinNodeType.SINK_WEBHOOK.type().equals(sink.type()))
+            throw new IllegalStateException("sink '" + sink.id() + "' is a webhook, which runs on the at-rest "
+                    + "lane only (output_store: + a pipeline_config: job), never on the ingest lane");
         PipelineConfig.Sink dest = destinationOf(sink);
         // The same re-rooting rule as writeAndTrace's fan-out: dbDir's suffix beyond dirs.database
         // (e.g. the table subdir) is preserved under the destination's own database root.

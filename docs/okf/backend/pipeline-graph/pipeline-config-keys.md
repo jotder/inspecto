@@ -46,7 +46,7 @@ There is also a **third, utility-only reader family** outside both authorities: 
 
 History: 18 parser-only when the ratchet landed (2026-08-31); 17 after `output_store` was declared the
 same day (gap 8); **16** after CONSIGNMENT-HOME-1 declared `collector.consignment.max_files`
-(2026-09-02), which took `collector` off the list. The 16<!--count:step-types--> current entries are exactly
+(2026-09-02), which took `collector` off the list. The 16 current entries are exactly
 `UNDECLARED_BLOCKS`.
 
 ⚠ **Granularity is the block, deliberately.** Leaf drift *inside* a declared block is not covered —
@@ -75,11 +75,12 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `parsing` | spec, partially (`parsing.grammar` is the canonical grammar ref; `source_timezone` / `delimited.*` are rule-only) | `mergeParsing` / `resolveGrammarRef` → format frontends | Parse drawer; New-pipeline writes `parsing.frontend` (D3) |
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
-| `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
+| `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`/`webhook`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
 | `sinks` | parser-only | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
 | `route` | parser-only | `ConsignmentGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
 | `steps` | parser-only — **entry kept deliberately** (no item-schema facility; declaring it would game the ratchet) | `PipelineLift` authored-order chain → at-rest `pipeline_config:` job | Recipe view step cards (`<app-pipeline-step-cards>`) |
 | `trigger` | parser-only | `PipelineScheduler` (`every:`/`cron:` per-tick gate); dataset-commit trigger (`on:dataset`) | canvas trigger nodes (`trigger__every`/`trigger__cron` borrow the top-level keys); `trigger.type` is derived |
+| `webhook` | spec (`connection`/`batch_size`/`retry`, since 2026-09-23) | `PipelineLift.stageTwo` → `sink.webhook` branch → `WebhookSink` (at rest only; `prepare()` refuses the ingest lane); **strict keys**, and an authored `url:`/`token:` is refused by name | the `sink.webhook` node drawer (verbatim) / recipe verb `webhook:` ([step-catalog](step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)) |
 
 Rules that cut across blocks:
 
@@ -285,6 +286,10 @@ against, round-tripped untouched.
 | `stream` | spec |
 | `template` | parser-only |
 | `trigger` | parser-only |
+| `webhook` | spec |
+| `webhook.batch_size` | spec |
+| `webhook.connection` | spec |
+| `webhook.retry` | spec |
 
 <!-- /generated:accepted-config-keys -->
 

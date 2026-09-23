@@ -582,5 +582,55 @@
     "tier" : "advanced",
     "help" : "Adds a column of this name carrying each row’s source file. New pipelines default to file_name; blank = no column (lineage stays in the ledger only).",
     "placeholder" : "file_name"
+  } ],
+  "sink.webhook" : [ {
+    "key" : "connection",
+    "label" : "Connection",
+    "type" : "autocomplete",
+    "tier" : "required",
+    "help" : "An https Connection — it carries the endpoint (host, port, path) and the bearer-token reference."
+  }, {
+    "key" : "batch_size",
+    "label" : "Rows per request",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "max" : 10000.0,
+    "help" : "Rows sent in one JSON POST. Blank = 500."
+  }, {
+    "key" : "retry__count",
+    "label" : "Retries per request",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 0.0,
+    "help" : "Extra attempts for a request the endpoint rejects or times out; every attempt carries the same Idempotency-Key. Blank = no retry."
+  }, {
+    "key" : "retry__backoff",
+    "label" : "Retry backoff",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "EXPONENTIAL",
+    "options" : [ {
+      "value" : "EXPONENTIAL",
+      "label" : "Exponential"
+    }, {
+      "value" : "LINEAR",
+      "label" : "Linear"
+    }, {
+      "value" : "FIXED",
+      "label" : "Fixed"
+    } ]
+  }, {
+    "key" : "retry__initial_delay",
+    "label" : "First retry delay",
+    "type" : "string",
+    "tier" : "advanced",
+    "placeholder" : "1s"
+  }, {
+    "key" : "retry__max_delay",
+    "label" : "Longest retry delay",
+    "type" : "string",
+    "tier" : "advanced",
+    "placeholder" : "60s"
   } ]
 }

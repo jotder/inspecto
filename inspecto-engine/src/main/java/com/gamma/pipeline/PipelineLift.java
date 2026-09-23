@@ -48,6 +48,8 @@ public final class PipelineLift {
     static final String PARSE             = "parse";
     static final String QUARANTINE        = "quarantine";
     static final String GAP               = "gap";
+    /** The {@code sink.webhook} node ({@code webhook:}) — one per flat file, on both lifts. */
+    static final String WEBHOOK           = "webhook";
 
     /** Lift a loaded {@link PipelineConfig} into a {@link PipelineGraph}. */
     public static PipelineGraph lift(PipelineConfig cfg) {
@@ -90,6 +92,26 @@ public final class PipelineLift {
         } else {
             // single schema: one linear chain off the parser's data edge
             branch(nodes, edges, PipelineRel.DATA, null, s.single(), null, cfg, rowFilters);
+        }
+
+        // 4. the outbound webhook (webhook:) — a second sink branch fed by whatever feeds the persistent
+        //    sink, which is exactly where stageTwo hangs it at run time. ⚠ Emitted for EVERY file that
+        //    carries the block, even a route/multi-schema one (no DATA edge into a sink ⇒ no edge here, and
+        //    prepare() refuses arming it): a lift that skipped it would make the next strict lower delete
+        //    the block — a silent edit loss.
+        if (cfg.webhookConfig() != null) {
+            String feed = null;
+            for (PipelineEdge e : edges) {
+                if (!PipelineRel.DATA.equals(e.rel())) continue;
+                for (PipelineNode n : nodes)
+                    if (n.id().equals(e.to()) && BuiltinNodeType.SINK_PERSISTENT.type().equals(n.type())
+                            && !QUARANTINE.equals(n.id())) { feed = e.from(); break; }
+                if (feed != null) break;
+            }
+            nodes.add(new PipelineNode(WEBHOOK, BuiltinNodeType.SINK_WEBHOOK.type(), "Webhook",
+                    "POSTs rows to Connection '" + cfg.webhook().connection() + "'",
+                    new LinkedHashMap<>(cfg.webhookConfig()), null));
+            if (feed != null) edges.add(PipelineEdge.data(feed, WEBHOOK));
         }
 
         // Phase 4 S4 (D-13): overlay the authored disable list onto the lifted nodes — the flat file's
@@ -147,7 +169,8 @@ public final class PipelineLift {
     public static PipelineGraph stageTwo(PipelineConfig cfg) {
         String name = cfg.identity().pipelineName();
         List<PipelineConfig.Step> steps = cfg.steps();
-        if (steps.isEmpty())
+        // A webhook alone is a Stage-2 chain worth running: "send what landed" needs no transform.
+        if (steps.isEmpty() && cfg.webhook() == null)
             throw new IllegalArgumentException("pipeline '" + name + "' has no Stage-2 chain to lift");
         String out = cfg.outputStore();
         if (out == null)
@@ -200,6 +223,15 @@ public final class PipelineLift {
         nodes.add(new PipelineNode(STAGE2_SINK, BuiltinNodeType.SINK_PERSISTENT.type(), out,
                 "Persistent store", sinkCfg, null));
         edges.add(PipelineEdge.data(upstream, STAGE2_SINK));
+
+        // The webhook is a second BRANCH off the chain's end, beside the output_store: sink — not after
+        // it: both consume the same relation, and the BranchCommitCoordinator finalises the run only once
+        // both have committed, so a rejected POST fails the run instead of being logged past.
+        if (cfg.webhookConfig() != null) {
+            nodes.add(new PipelineNode(WEBHOOK, BuiltinNodeType.SINK_WEBHOOK.type(), "Webhook", null,
+                    new LinkedHashMap<>(cfg.webhookConfig()), null));
+            edges.add(PipelineEdge.data(upstream, WEBHOOK));
+        }
 
         return new PipelineGraph(name + "_stage2", cfg.active(), nodes, edges);
     }

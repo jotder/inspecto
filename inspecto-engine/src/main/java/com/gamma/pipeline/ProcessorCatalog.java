@@ -175,7 +175,7 @@ public final class ProcessorCatalog {
             p("SNK", "sink.stream.kafka", "📤", "heroicons_outline:queue-list", "Apache Kafka topic producer", Status.PLANNED, null, null, null),
             p("SNK", "sink.stream.aws", "📨", "heroicons_outline:paper-airplane", "AWS SQS / SNS event publisher", Status.PLANNED, null, null, null),
             p("SNK", "sink.notify.email", "📧", "heroicons_outline:envelope", "Email & report dispatcher", Status.PARTIAL, null, "mail.send", "the `mail.send` JOB + mail channels; not a chain sink"),
-            p("SNK", "sink.api.webhook", "🪝", "heroicons_outline:link", "Outbound webhook dispatcher", Status.PARTIAL, null, "channel", "webhook notification channel exists; not a chain sink"),
+            p("SNK", "sink.api.webhook", "🪝", "heroicons_outline:link", "Outbound webhook dispatcher", Status.DELIVERED, "sink.webhook", null, "top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Professional+"),
             p("SNK", "sink.dlq", "🕳️", "heroicons_outline:archive-box-x-mark", "Dead-letter queue", Status.PLANNED, null, null, null));
 
     static {

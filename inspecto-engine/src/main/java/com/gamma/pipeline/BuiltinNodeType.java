@@ -185,6 +185,13 @@ public enum BuiltinNodeType implements PipelineNodeType {
     SINK_VIEW("sink.view", NodeCategory.SINK, "Sink (view)",
             "A non-persistent logical store; jobs / KPI / report / alert APIs bind to it by store name.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.ON_COMMIT), false),
+    // Outbound webhook (catalog `sink.api.webhook`, operator pick 2026-09-23). Flat home: the top-level
+    // webhook: block {connection, batch_size, retry}. Writes no bytes and declares no store — it is a
+    // commit BRANCH beside the output_store: sink on the at-rest lane (PipelineLift.stageTwo), executed by
+    // WebhookSink through the WebhookSinkTransport SPI that only Professional+ bundles provide.
+    SINK_WEBHOOK("sink.webhook", NodeCategory.SINK, "Webhook",
+            "POSTs the batch's rows as JSON to an https Connection, batch_size rows per request.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE), false, FlatHome.BLOCK),
 
     // ── reporting / notification ────────────────────────────────────────────────────
     ALERT("alert", NodeCategory.CONTROL, "Alert",

@@ -17,7 +17,7 @@ import static com.gamma.util.Values.str;
  * finding 2: compile-at-authoring, the registry learns no second format).
  *
  * <p><b>Verb coverage:</b> {@code collect / parse / map / dedup / route / summarize / transform.filter
- * / sink} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
+ * / sink / webhook} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
  * the parser node (schema/mapping resolution is parser-owned in the flat config); {@code summarize}
  * and {@code transform.join} (D-4's {@code transform: {join: references/x, on: k}} →
  * {@code processing.join}) execute on the at-rest Stage-2 path — {@code PipelineJobRunner} lifts them
@@ -129,6 +129,7 @@ public final class RecipeCompiler {
                 }
                 case "summarize" -> nodes.add(summarize(id, cfg, refusals));
                 case "profile" -> nodes.add(profile(id, cfg, refusals));
+                case "webhook" -> nodes.add(webhook(id, cfg, refusals));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                         "unknown step verb '" + verb + "'"));
             }
@@ -327,6 +328,21 @@ public final class RecipeCompiler {
                         "transform." + e.getKey() + " is not lowerable yet (only filter / join compile)"));
             }
         }
+    }
+
+    /**
+     * {@code webhook:} → the {@code sink.webhook} node ({@code {connection, batch_size, retry}}, verbatim — it
+     * lowers to the top-level {@code webhook:} block). Validated here so a recipe naming a {@code url:} or a
+     * typo'd key refuses beside its own step rather than as a whole-file lowering error.
+     */
+    private static PipelineNode webhook(String id, Map<String, Object> cfg,
+                                        List<PipelineCompileException.Refusal> refusals) {
+        try {
+            com.gamma.etl.PipelineConfig.Webhook.fromMap(cfg);
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, BuiltinNodeType.SINK_WEBHOOK.type(), new LinkedHashMap<>(cfg));
     }
 
     /** {@code sink} → persistent sink node (keys pass verbatim: table/format/compression/database/…). */

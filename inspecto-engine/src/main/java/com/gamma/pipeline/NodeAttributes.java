@@ -413,12 +413,33 @@ public final class NodeAttributes {
                             + "alias 'input' (FROM input) — the engine rewrites it to the real relation at "
                             + "execution. No DDL/DML, no multiple statements."));
 
+    /**
+     * {@code sink.webhook} (→ the top-level {@code webhook:} block). ⛔ No URL and no token attribute, by
+     * decision (2026-09-23): the target is the https Connection named here, which only an administrator can
+     * onboard, and its token is that Connection's secret reference. The {@code retry__*} keys nest to the
+     * node's {@code retry} map — the Collector's own retry grammar. Keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> SINK_WEBHOOK = List.of(
+            NodeAttribute.of("connection", "Connection", "autocomplete", "required")
+                    .help("An https Connection — it carries the endpoint (host, port, path) and the bearer-token reference."),
+            NodeAttribute.of("batch_size", "Rows per request", "number", "optional")
+                    .min(1).max(com.gamma.etl.PipelineConfig.Webhook.MAX_BATCH_SIZE)
+                    .help("Rows sent in one JSON POST. Blank = " + com.gamma.etl.PipelineConfig.Webhook.DEFAULT_BATCH_SIZE + "."),
+            NodeAttribute.of("retry__count", "Retries per request", "number", "advanced").min(0)
+                    .help("Extra attempts for a request the endpoint rejects or times out; every attempt "
+                            + "carries the same Idempotency-Key. Blank = no retry."),
+            NodeAttribute.of("retry__backoff", "Retry backoff", "select", "advanced").defaultValue("EXPONENTIAL")
+                    .options("EXPONENTIAL", "Exponential", "LINEAR", "Linear", "FIXED", "Fixed"),
+            NodeAttribute.of("retry__initial_delay", "First retry delay", "string", "advanced").placeholder("1s"),
+            NodeAttribute.of("retry__max_delay", "Longest retry delay", "string", "advanced").placeholder("60s"));
+
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, SINK_WEBHOOK))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -437,6 +458,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);
         m.put(BuiltinNodeType.SINK_MATERIALIZED.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_VIEW.type(), OUTPUT);
+        m.put(BuiltinNodeType.SINK_WEBHOOK.type(), SINK_WEBHOOK);
         // NOT Map.copyOf: that returns an UNORDERED map, so the committed contract JSON would come out in a
         // different key order on a different JVM run and the drift test would fail at random.
         return java.util.Collections.unmodifiableMap(m);

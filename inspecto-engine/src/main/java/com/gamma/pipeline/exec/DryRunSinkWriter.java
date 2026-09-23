@@ -3,6 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.api.PublicApi;
 import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineStores;
 import org.slf4j.Logger;
@@ -45,6 +46,16 @@ public final class DryRunSinkWriter implements PipelineExecutor.SinkWriter {
 
     @Override
     public void write(PipelineNode sink, String inputTable) throws Exception {
+        // sink.webhook: resolve everything a real send would (config, edition transport, Connection, token)
+        // so the dry run refuses exactly what the run would — then send NOTHING. No registry row: a webhook
+        // produces no store for a SIMULATED output to stand in for.
+        if (BuiltinNodeType.SINK_WEBHOOK.type().equals(sink.type())) {
+            WebhookSink.Target t = WebhookSink.plan(sink);
+            long rows = previewCount(inputTable);
+            log.info("[PIPELINEJOB] dry run: sink '{}' would POST {} row(s) to webhook Connection '{}' — nothing sent",
+                    sink.id(), rows < 0 ? "an unknown number of" : String.valueOf(rows), t.webhook().connection());
+            return;
+        }
         if (sink.type().endsWith(".view")) {
             log.info("[PIPELINEJOB] dry run: sink '{}' ({}) is a logical view — nothing to simulate",
                     sink.id(), sink.type());
