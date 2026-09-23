@@ -117,7 +117,11 @@ final class DecisionRoutes implements RouteModule {
         Map<String, Object> rule = RouteErrors.existing(store, TYPE, "decision rule", name);
         List<Map<String, Object>> sample = ApiContext.sampleRows(body);
         Map<String, Object> sim = new LinkedHashMap<>();
-        sim.put("matched", ConditionTree.matched(rule.get("when"), sample));
+        try {
+            sim.put("matched", ConditionTree.matched(rule.get("when"), sample));
+        } catch (IllegalArgumentException e) {   // a rule stored before the save guard — never "matches all"
+            throw new ApiException(422, "decision rule 'when': " + e.getMessage());
+        }
         sim.put("total", sample.size());
         sim.put("checkedAt", System.currentTimeMillis());
         Map<String, Object> next = new LinkedHashMap<>(rule);
@@ -339,6 +343,11 @@ final class DecisionRoutes implements RouteModule {
         rule.putIfAbsent("description", "");
         rule.putIfAbsent("target", "");
         rule.putIfAbsent("when", Map.of("kind", "group", "op", "AND", "items", List.of()));
+        try {
+            ConditionTree.requireGroupRoot(rule.get("when"));   // a bare root would match EVERY row
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, "decision rule 'when': " + e.getMessage());
+        }
         Object priority = rule.get("priority");
         rule.put("priority", priority instanceof Number num ? num.intValue() : 100);
         rule.put("enabled", !"false".equalsIgnoreCase(String.valueOf(rule.getOrDefault("enabled", true))));

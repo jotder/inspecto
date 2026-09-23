@@ -44,10 +44,7 @@ public final class ConditionSql {
      *         the caller believed it filtered (fail-open); it is refused instead.
      */
     public static String predicate(Object when) {
-        if (when != null && !(when instanceof Map<?, ?> m && (m.isEmpty() || isGroup(m))))
-            throw new IllegalArgumentException("the condition tree's root must be a group "
-                    + "({kind:'group', op:'AND'|'OR', items:[...]}), not a bare condition or other value; "
-                    + "wrap a single condition in a one-item group");
+        ConditionTree.requireGroupRoot(when);
         String g = group(when);
         return g == null ? "TRUE" : g;
     }

@@ -101,6 +101,27 @@ class AlertRuleTest {
                 "a measure alert has no ledger rows to scope");
     }
 
+    /**
+     * 🔴 A bare condition as the root used to match EVERY ledger row, and a non-map {@code when} (a string)
+     * was silently dropped to "no filter" — either way the rule fired on rows it was meant to exclude.
+     * Both are refused at parse time, which is what the save route (422) and the boot loader (warn + not
+     * armed) both call. The twin: the same condition inside a group is accepted.
+     */
+    @Test
+    void aWhenWhoseRootIsNotAGroupIsRefused() {
+        Map<String, Object> leaf = Map.of("kind", "condition", "field", "status", "operator", "=", "value", "FAILED");
+        for (Object bad : List.of(leaf, "status = FAILED", List.of(leaf))) {
+            Map<String, Object> m = valid();
+            m.put("when", bad);
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m),
+                    String.valueOf(bad));
+            assertTrue(e.getMessage().startsWith("alert.when"), e.getMessage());
+        }
+        Map<String, Object> ok = valid();
+        ok.put("when", Map.of("kind", "group", "op", "AND", "items", List.of(leaf)));
+        assertEquals(ok.get("when"), AlertRule.fromMap(ok).when());
+    }
+
     @Test
     void emptyWhenNormalizesToNull() {
         Map<String, Object> m = valid();

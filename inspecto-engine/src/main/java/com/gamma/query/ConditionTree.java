@@ -39,9 +39,11 @@ public final class ConditionTree {
     private enum ColType { NUMBER, STRING, DATE, BOOLEAN }
 
     /**
-     * Count how many of {@code rows} satisfy the {@code when} tree. A {@code null} / non-group
-     * {@code when}, or an empty group, imposes no constraint and matches every row (mirrors
+     * Count how many of {@code rows} satisfy the {@code when} tree. An absent tree ({@code null} or an
+     * empty map) or an empty group imposes no constraint and matches every row (mirrors
      * {@code matchGroup}'s "no constraint ⇒ true"). Column types are inferred from {@code rows}.
+     *
+     * @throws IllegalArgumentException when the root is present but not a group — see {@link #requireGroupRoot}
      */
     public static int matched(Object when, List<Map<String, Object>> rows) {
         return filter(when, rows).size();
@@ -53,11 +55,28 @@ public final class ConditionTree {
      * (e.g. an Alert Rule's {@code when} pre-filter over ledger rows) rather than just a count.
      */
     public static List<Map<String, Object>> filter(Object when, List<Map<String, Object>> rows) {
+        requireGroupRoot(when);
         if (rows == null || rows.isEmpty()) return List.of();
         Map<String, ColType> types = inferColumns(rows);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> row : rows) if (matchGroup(when, row, types)) out.add(row);
         return out;
+    }
+
+    /**
+     * The root rule every condition-tree consumer shares (this evaluator and {@link ConditionSql}): an
+     * absent tree ({@code null} or an empty map) is fine and means "no constraint"; otherwise the root must
+     * be a group. A bare leaf ({@code {kind:'condition',…}} or a kind-less {@code {field,operator,value}}),
+     * a string or a list used to read as "no constraint" and matched EVERY row — an Alert Rule fired on all
+     * of them — so it is refused instead. Callers validate with this at save time.
+     *
+     * @throws IllegalArgumentException when the root is present but is not a group
+     */
+    public static void requireGroupRoot(Object when) {
+        if (when != null && !(when instanceof Map<?, ?> m && (m.isEmpty() || isGroup(m))))
+            throw new IllegalArgumentException("the condition tree's root must be a group "
+                    + "({kind:'group', op:'AND'|'OR', items:[...]}), not a bare condition or other value; "
+                    + "wrap a single condition in a one-item group");
     }
 
     // ── tree walk (port of matchGroup / matchCondition / isComplete) ────────────────
@@ -94,7 +113,7 @@ public final class ConditionTree {
 
     /** A node is a group when it declares {@code kind:'group'}, or (kind absent) it carries a nested
      *  item list rather than a leaf's {@code field}/{@code operator}. */
-    private static boolean isGroup(Map<String, Object> m) {
+    private static boolean isGroup(Map<?, ?> m) {
         Object kind = m.get("kind");
         if ("group".equals(kind)) return true;
         if ("condition".equals(kind)) return false;

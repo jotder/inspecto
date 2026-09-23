@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
+import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -122,6 +124,41 @@ class ControlApiDecisionRulesTest {
             assertEquals(2, sim.get("matched").asInt(), "cost > 5000 ⇒ the 9200 and 7000 rows");
             assertEquals(3, sim.get("total").asInt());
             assertTrue(sim.get("checkedAt").asLong() > 0);
+        }
+    }
+
+    /** 🔴 A bare-condition {@code when} is refused at save (422); the same condition in a group saves. */
+    @Test
+    void savingAWhenWhoseRootIsNotAGroupIs422(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            String bare = HI_COST_RULE.replace(
+                    "{\"kind\":\"group\",\"op\":\"AND\",\"items\":[{\"kind\":\"condition\",\"field\":\"cost\",\"operator\":\">\",\"value\":\"5000\"}]}",
+                    "{\"kind\":\"condition\",\"field\":\"cost\",\"operator\":\">\",\"value\":\"5000\"}");
+            assertNotEquals(HI_COST_RULE, bare, "the fixture rewrite must bite");
+            HttpResponse<String> r = send(c.port, "POST", "/decision-rules", bare);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("group"), r.body());
+            assertFalse(send(c.port, "GET", "/decision-rules", null).body().contains("quarantine_high_cost"),
+                    "nothing was stored");
+            int ok = send(c.port, "POST", "/decision-rules", HI_COST_RULE).statusCode();
+            assertTrue(ok == 200 || ok == 201, "the grouped twin saves: " + ok);
+        }
+    }
+
+    /**
+     * 🔴 A rule stored before the save guard (or written around it) must not simulate as "matches all":
+     * the sample would report every row matched. It answers 422 instead.
+     */
+    @Test
+    void simulatingAStoredBareWhenIs422NotAllMatched(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        try (Ctx c = open(cfg, wr)) {
+            new ComponentStore(wr.resolve("registry")).write("decision-rule", "legacy_bare", Map.of(
+                    "name", "legacy_bare", "targetType", "pipeline", "target", "orders",
+                    "consequences", List.of(Map.of("action", "tag", "destination", "x")),
+                    "when", Map.of("kind", "condition", "field", "cost", "operator", ">", "value", "5000")));
+            String sample = "{\"sampleRows\":[{\"cost\":9200},{\"cost\":50}]}";
+            HttpResponse<String> r = send(c.port, "POST", "/decision-rules/legacy_bare/simulate", sample);
+            assertEquals(422, r.statusCode(), r.body());
         }
     }
 

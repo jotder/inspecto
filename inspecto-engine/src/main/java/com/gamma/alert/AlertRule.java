@@ -99,6 +99,11 @@ public record AlertRule(String name, String metric, String comparator, double th
         window = window == null ? null : window.trim().toLowerCase(Locale.ROOT);
         dataset = (dataset == null || dataset.isBlank()) ? null : dataset.trim();
         measure = (measure == null || measure.isBlank()) ? null : measure.trim();
+        try {
+            com.gamma.query.ConditionTree.requireGroupRoot(when);   // a bare root / a string used to match ALL rows
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("alert.when: " + e.getMessage());
+        }
         when = (when instanceof Map<?, ?> m && !m.isEmpty()) ? when : null;
         maximumAge = (maximumAge == null || maximumAge.isBlank()) ? null : maximumAge.trim().toLowerCase(Locale.ROOT);
         if (maximumAge != null) {

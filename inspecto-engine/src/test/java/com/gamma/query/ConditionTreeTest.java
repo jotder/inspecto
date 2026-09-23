@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Semantics contract for {@link ConditionTree} — the backend port of the UI's offline query
@@ -126,6 +127,37 @@ class ConditionTreeTest {
     @Test
     void emptySampleCountsZero() {
         assertEquals(0, ConditionTree.matched(and(cond("a", ">", "1")), List.of()));
+    }
+
+    // ── root rule (parity with ConditionSql.predicate) ───────────────────────────────
+
+    /**
+     * 🔴 A root that is present but not a group used to read as "no constraint" and matched EVERY row —
+     * an Alert Rule would fire on all of them. It is refused instead, on every entry point, even over no
+     * rows (the refusal is about the tree, not the data). The twin: the same leaf inside a group filters.
+     */
+    @Test
+    void aRootThatIsNotAGroupIsRefusedNeverMatchesAll() {
+        List<Map<String, Object>> rows = List.of(row("cost", 9200), row("cost", 50));
+        Map<String, Object> kindless = new LinkedHashMap<>();
+        kindless.put("field", "cost");
+        kindless.put("operator", ">");
+        kindless.put("value", "5000");
+        for (Object bad : List.of(cond("cost", ">", "5000"), kindless, "cost > 5000", List.of(cond("cost", ">", "5000")))) {
+            assertThrows(IllegalArgumentException.class, () -> ConditionTree.matched(bad, rows), String.valueOf(bad));
+            assertThrows(IllegalArgumentException.class, () -> ConditionTree.filter(bad, List.of()), String.valueOf(bad));
+            assertThrows(IllegalArgumentException.class, () -> ConditionTree.requireGroupRoot(bad), String.valueOf(bad));
+        }
+        assertEquals(1, ConditionTree.matched(and(cond("cost", ">", "5000")), rows), "wrapped in a group it filters");
+    }
+
+    /** The deliberate no-ops survive: an absent tree, an empty map and an empty group constrain nothing. */
+    @Test
+    void anAbsentOrEmptyTreeStillMatchesEveryRow() {
+        List<Map<String, Object>> rows = List.of(row("cost", 9200), row("cost", 50));
+        assertEquals(2, ConditionTree.matched(null, rows));
+        assertEquals(2, ConditionTree.matched(Map.of(), rows));
+        assertEquals(2, ConditionTree.matched(and(), rows));
     }
 
     // ── builders (mirror the query-types.ts JSON shape) ─────────────────────────────

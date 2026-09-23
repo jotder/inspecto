@@ -86,9 +86,18 @@ all three native `read_csv` streaming paths), between `DataTransformer` and `Par
   unfiltered data with a 200. `ConditionSql.predicate` now throws `IllegalArgumentException` for it
   (the ETL run fails closed; `/inv/*` and `/expectations` map it to 422; `query_author` returns an
   error result). Absent (`null`/`{}`) and an empty group still mean "no constraint" — deliberate, and
-  so do incomplete leaves inside a group (the SPA's half-built rows). ⚠ `ConditionTree` was **not**
-  changed: in-JVM, a bare-leaf root still matches every row (Alert Rule `when`, `/decision-rules`
-  simulate) — the same shape, left for a follow-up.
+  so do incomplete leaves inside a group (the SPA's half-built rows). ✅ **The in-JVM half followed
+  the same day:** the rule now lives in ONE place, `ConditionTree.requireGroupRoot`, which
+  `ConditionSql.predicate` and `ConditionTree.filter`/`matched` both call, so the SQL and in-JVM
+  evaluators cannot drift on it. Per caller: a Decision Rule save with a bare `when` → **422**
+  (nothing stored); `simulate` over a rule stored before that guard → **422**, never "all matched";
+  `AlertRule`'s constructor refuses it as `alert.when: …`, so the Alert Rule save route answers 422 and
+  the boot loader (`ServiceBootstrap.loadAlerts`) **warns and does not arm** the rule — evaluation
+  therefore never sees a bare root. ⚠ `AlertRule` also used to turn a **non-map** `when` (a string)
+  into `null` — "no filter", i.e. fire on every row; that is refused too. Checked 2026-09-23: no Alert
+  Rule or Decision Rule in `spaces/*/config` uses a bare root (the jobs' `when:` strings are Signal
+  trigger expressions, a different grammar `ConditionTree` never reads), so no existing rule stops
+  arming.
 - **Consequences over the matched set** (tags first so copies carry them; then copies; then one
   removal if anything moves/drops): `tag` appends to a `__tags` VARCHAR column (added on first use —
   `SqlViews.reader` now sets `union_by_name=true` for Parquet so older un-tagged files stay readable
