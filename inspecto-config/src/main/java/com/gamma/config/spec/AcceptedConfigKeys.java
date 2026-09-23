@@ -99,8 +99,10 @@ public final class AcceptedConfigKeys {
      *       {@code temp}, {@code status_dir}) and ALSO engine-read undeclared ones ({@code errors},
      *       {@code quarantine}, {@code markers}, {@code log_dir}). Descending on "has a declared
      *       sub-block" would refuse four keys the engine reads today.</li>
-     *   <li>{@code collector} is the same shape and worse: only {@code consignment.max_files} is
-     *       declared, while the block legitimately carries every connector's own keys — the ones
+     *   <li>{@code collector} is the same shape and worse: only a handful of leaves are declared
+     *       ({@code consignment.max_files}, and since 2026-09-23 {@code fetch.rate_limit} and the
+     *       {@code retry.*} / {@code circuit_breaker.*} leaves), while the block legitimately carries
+     *       every connector's own keys — the ones
      *       {@code RecipeConverter} round-trips through {@code collect:}.</li>
      * </ul>
      *
@@ -139,7 +141,7 @@ public final class AcceptedConfigKeys {
      * <p>18 when the ratchet landed (2026-08-31); 17 after gap 8 declared {@code output_store} the same
      * day; 16 after CONSIGNMENT-HOME-1 declared {@code collector.consignment.max_files} (2026-09-02).
      *
-     * <p>🔴 {@code collector} is NOT on this list (it is declared, via one leaf) and that is what makes
+     * <p>🔴 {@code collector} is NOT on this list (it is declared, via a few leaves) and that is what makes
      * the {@code collect:} round trip safe: {@code RecipeConverter} round-trips arbitrary collector-block
      * keys through {@code collect:}, and because the block is accepted WHOLE, none of them is flagged.
      * {@code RecipeCompiler}'s refusal to blanket-reject unknown {@code collect:} keys therefore stands

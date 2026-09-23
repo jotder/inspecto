@@ -145,6 +145,58 @@
     "help" : "Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited.",
     "placeholder" : "10MB/s"
   }, {
+    "key" : "retry__count",
+    "label" : "Retries",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 0.0,
+    "help" : "Remote Collectors only. Extra attempts for a listing or a file download that fails (a connectivity fault). Blank = 0, one attempt."
+  }, {
+    "key" : "retry__backoff",
+    "label" : "Retry backoff",
+    "type" : "select",
+    "tier" : "advanced",
+    "options" : [ {
+      "value" : "EXPONENTIAL",
+      "label" : "Exponential"
+    }, {
+      "value" : "LINEAR",
+      "label" : "Linear"
+    }, {
+      "value" : "FIXED",
+      "label" : "Fixed"
+    } ],
+    "help" : "How the delay grows between retries, full-jittered and capped at the longest delay. Blank = Exponential."
+  }, {
+    "key" : "retry__initial_delay",
+    "label" : "First retry delay",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Delay before the first retry — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = 1s.",
+    "placeholder" : "1s"
+  }, {
+    "key" : "retry__max_delay",
+    "label" : "Longest retry delay",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Cap on any one retry delay. Blank = 60s.",
+    "placeholder" : "60s"
+  }, {
+    "key" : "circuit_breaker__failure_threshold",
+    "label" : "Circuit breaker threshold",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 1.0,
+    "help" : "Remote Collectors only. After this many consecutive failed listings the Collector is skipped until the cooldown passes, then one trial listing runs. Setting this or the cooldown turns the breaker on; blank both = never trips.",
+    "placeholder" : "5"
+  }, {
+    "key" : "circuit_breaker__cooldown",
+    "label" : "Circuit breaker cooldown",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "How long a tripped breaker skips acquisition — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = 5m (when the breaker is on).",
+    "placeholder" : "5m"
+  }, {
     "key" : "consignment__max_files",
     "label" : "Max files per consignment",
     "type" : "number",
@@ -522,6 +574,43 @@
     "type" : "boolean",
     "tier" : "advanced",
     "help" : "Whether cycle overrun adjusts this pipeline's cap; off pins it at the stated cap. Blank = inherit -Dingest.backpressure.adaptive."
+  }, {
+    "key" : "ducklake__enabled",
+    "label" : "Register in DuckLake",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "group" : "DuckLake catalog",
+    "help" : "After each committed batch, register the written Parquet files in a DuckLake catalog. Blank = off. Needs catalog URL, data path and table."
+  }, {
+    "key" : "ducklake__catalog_url",
+    "label" : "Catalog URL",
+    "type" : "string",
+    "tier" : "advanced",
+    "group" : "DuckLake catalog",
+    "help" : "The DuckLake catalog backend, attached as ducklake:<this>.",
+    "placeholder" : "postgres:dbname=lake host=db"
+  }, {
+    "key" : "ducklake__data_path",
+    "label" : "Data path",
+    "type" : "string",
+    "tier" : "advanced",
+    "group" : "DuckLake catalog",
+    "help" : "The catalog's DATA_PATH. A relative path resolves under the Space directory; an object-store URI is kept as written."
+  }, {
+    "key" : "ducklake__schema",
+    "label" : "Schema",
+    "type" : "string",
+    "tier" : "advanced",
+    "group" : "DuckLake catalog",
+    "help" : "Catalog schema the table is created in. Blank = main.",
+    "placeholder" : "main"
+  }, {
+    "key" : "ducklake__table",
+    "label" : "Table",
+    "type" : "string",
+    "tier" : "advanced",
+    "group" : "DuckLake catalog",
+    "help" : "Catalog table the files are inserted into; a batch that lands in a table sub-directory uses that name instead."
   } ],
   "sink.materialized" : [ {
     "key" : "format",

@@ -399,6 +399,11 @@ describe('PipelineConfigDefinitionComponent', () => {
             'intake__max_files_per_cycle',
             'intake__min_files_per_cycle',
             'intake__adaptive',
+            'ducklake__enabled',
+            'ducklake__catalog_url',
+            'ducklake__data_path',
+            'ducklake__schema',
+            'ducklake__table',
         ]);
     });
 

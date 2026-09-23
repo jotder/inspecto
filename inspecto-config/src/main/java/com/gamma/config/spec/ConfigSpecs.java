@@ -27,6 +27,9 @@ public final class ConfigSpecs {
 
     private ConfigSpecs() {}
 
+    /** A Collector duration as {@code PipelineConfigParser.toMillis} accepts it: bare seconds, or N s|m|h|d. */
+    private static final String DURATION = "\\s*[+-]?\\d+\\s*[smhdSMHD]?\\s*";
+
     /** Spec types in canonical order — also the set accepted by {@code GET /config/spec/{type}}. */
     public static final List<String> TYPES =
             List.of("pipeline", "enrichment", "job", "schema", "meta", "alert", "expectation",
@@ -244,6 +247,37 @@ public final class ConfigSpecs {
                 // working (a deployed config must not start failing) and the editor heals it on save.
                 FieldSpec.withDefault("collector.consignment.max_files", "Consignment max files", FieldType.INT, 1,
                         "CANONICAL. Files packed into one Consignment; raise above 1 for intra-consignment parallelism."),
+                // ── remote-Collector resilience + throttle (PROCESSOR-RELEASE-READINESS-1 G4/G5, 2026-09-23) ──
+                // PipelineConfigParser.parseCollector reads all of these; until now only the parser knew them,
+                // so a bad duration or count surfaced at LOAD instead of at the save. The duration pattern is
+                // exactly what the parser's toMillis accepts (a bare number = seconds, or N s|m|h|d).
+                // ⚠ NO spec defaults here, deliberately: the config pane seeds spec defaults into the saved
+                // file (config.component.ts toAttrSpecs), and a written circuit_breaker block ARMS the
+                // breaker — the parser enables it on presence. Each default is stated in the description.
+                FieldSpec.of("collector.fetch.rate_limit", "Download rate limit", FieldType.STRING,
+                        "Remote Collectors only: cap on this pipeline's download bandwidth — 512KB/s, 10MB/s, "
+                                + "1GB/s or a bare number of bytes/s. Blank = unlimited."),
+                FieldSpec.of("collector.retry.count", "Retries", FieldType.INT,
+                        "Remote Collectors only: extra attempts for a failed listing or file download. Default 0 "
+                                + "(one attempt)."),
+                FieldSpec.enumField("collector.retry.backoff", "Retry backoff",
+                        List.of("EXPONENTIAL", "LINEAR", "FIXED", "CONSTANT"), null,
+                        "How the delay grows between retries (CONSTANT is an alias of FIXED); full-jittered and "
+                                + "capped at max_delay. Default EXPONENTIAL."),
+                new FieldSpec("collector.retry.initial_delay", "First retry delay",
+                        "Delay before the first retry: a bare number of seconds or N s|m|h|d. Default 1s.",
+                        FieldType.STRING, false, null, List.of(), DURATION, null, null),
+                new FieldSpec("collector.retry.max_delay", "Longest retry delay",
+                        "Cap on any one retry delay: a bare number of seconds or N s|m|h|d. Default 60s.",
+                        FieldType.STRING, false, null, List.of(), DURATION, null, null),
+                FieldSpec.of("collector.circuit_breaker.failure_threshold", "Circuit breaker threshold", FieldType.INT,
+                        "Remote Collectors only: consecutive failed listings that trip the breaker, which then "
+                                + "skips acquisition until the cooldown passes. The block's presence turns it on. "
+                                + "Default 5."),
+                new FieldSpec("collector.circuit_breaker.cooldown", "Circuit breaker cooldown",
+                        "How long a tripped breaker skips acquisition before one trial listing: a bare number of "
+                                + "seconds or N s|m|h|d. Default 5m.",
+                        FieldType.STRING, false, null, List.of(), DURATION, null, null),
                 FieldSpec.withDefault("processing.batch.max_files", "Consignment max files (deprecated)", FieldType.INT, 1,
                         "DEPRECATED alias of collector.consignment.max_files, read only when the canonical block is "
                                 + "absent; the editor rewrites it into collector.consignment on the next save."),

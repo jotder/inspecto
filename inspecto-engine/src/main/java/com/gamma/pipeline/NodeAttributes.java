@@ -90,6 +90,25 @@ public final class NodeAttributes {
             NodeAttribute.of("fetch__rate_limit", "Download rate limit", "string", "advanced")
                     .placeholder("10MB/s")
                     .help("Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited."),
+            // Retry + circuit breaker (collector.retry / collector.circuit_breaker, CollectorProcessor.acquire):
+            // remote Collectors only — the local inbox path never reaches them. ⚠ No defaultValue on any of
+            // them: the form seeds defaults into the saved node, and a seeded circuit_breaker map ARMS the
+            // breaker (the parser enables it on the block's presence). The engine defaults go in the help.
+            NodeAttribute.of("retry__count", "Retries", "number", "advanced").min(0)
+                    .help("Remote Collectors only. Extra attempts for a listing or a file download that fails (a connectivity fault). Blank = 0, one attempt."),
+            NodeAttribute.of("retry__backoff", "Retry backoff", "select", "advanced")
+                    .options("EXPONENTIAL", "Exponential", "LINEAR", "Linear", "FIXED", "Fixed")
+                    .help("How the delay grows between retries, full-jittered and capped at the longest delay. Blank = Exponential."),
+            NodeAttribute.of("retry__initial_delay", "First retry delay", "string", "advanced").placeholder("1s")
+                    .help("Delay before the first retry — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = 1s."),
+            NodeAttribute.of("retry__max_delay", "Longest retry delay", "string", "advanced").placeholder("60s")
+                    .help("Cap on any one retry delay. Blank = 60s."),
+            NodeAttribute.of("circuit_breaker__failure_threshold", "Circuit breaker threshold", "number", "advanced").min(1)
+                    .placeholder("5")
+                    .help("Remote Collectors only. After this many consecutive failed listings the Collector is skipped until the cooldown passes, then one trial listing runs. Setting this or the cooldown turns the breaker on; blank both = never trips."),
+            NodeAttribute.of("circuit_breaker__cooldown", "Circuit breaker cooldown", "string", "advanced")
+                    .placeholder("5m")
+                    .help("How long a tripped breaker skips acquisition — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = 5m (when the breaker is on)."),
             // Consignment formation (CONSIGNMENT-HOME-1, 2026-09-02): the ConsignmentPlanner caps, homed
             // on the Collector because that is where the plan runs — in the poll cycle, before any sink
             // exists. Declared consignment__* so the dialog's nestKeys lands them on the node's nested
@@ -277,6 +296,26 @@ public final class NodeAttributes {
                 .help("Floor the adaptive controller may halve this pipeline's cap down to. Blank = inherit -Dingest.minFilesPerCycle."));
         attrs.add(NodeAttribute.of("intake__adaptive", "Adaptive intake control", "boolean", "advanced")
                 .help("Whether cycle overrun adjusts this pipeline's cap; off pins it at the stated cap. Blank = inherit -Dingest.backpressure.adaptive."));
+        // DuckLake registration (DuckLakeRegistrar): ducklake__* nests to the node's `ducklake` map, which
+        // lowers to output.ducklake: (or the node's sinks[] entry). Kept off OUTPUT on purpose — that table is
+        // also the materialized/view sinks' and Onboarding's, and only a persistent sink registers files.
+        attrs.add(NodeAttribute.of("ducklake__enabled", "Register in DuckLake", "boolean", "advanced")
+                .group("DuckLake catalog")
+                .help("After each committed batch, register the written Parquet files in a DuckLake catalog. Blank = off. Needs catalog URL, data path and table."));
+        attrs.add(NodeAttribute.of("ducklake__catalog_url", "Catalog URL", "string", "advanced")
+                .group("DuckLake catalog")
+                .placeholder("postgres:dbname=lake host=db")
+                .help("The DuckLake catalog backend, attached as ducklake:<this>."));
+        attrs.add(NodeAttribute.of("ducklake__data_path", "Data path", "string", "advanced")
+                .group("DuckLake catalog")
+                .help("The catalog's DATA_PATH. A relative path resolves under the Space directory; an object-store URI is kept as written."));
+        attrs.add(NodeAttribute.of("ducklake__schema", "Schema", "string", "advanced")
+                .group("DuckLake catalog")
+                .placeholder("main")
+                .help("Catalog schema the table is created in. Blank = main."));
+        attrs.add(NodeAttribute.of("ducklake__table", "Table", "string", "advanced")
+                .group("DuckLake catalog")
+                .help("Catalog table the files are inserted into; a batch that lands in a table sub-directory uses that name instead."));
         return List.copyOf(attrs);
     }
 

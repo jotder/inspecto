@@ -150,6 +150,61 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         placeholder: '10MB/s',
         help: "Remote Collectors only. Cap this pipeline's download bandwidth — a rate like 512KB/s, 10MB/s, or a bare number (bytes/s). Blank = unlimited.",
     },
+    // Retry + circuit breaker (collector.retry / collector.circuit_breaker): remote Collectors only. No
+    // `default` on any of them — a seeded circuit_breaker map ARMS the breaker. Mirrors NodeAttributes.COLLECTOR.
+    {
+        key: 'retry__count',
+        label: 'Retries',
+        type: 'number',
+        tier: 'advanced',
+        min: 0,
+        help: 'Remote Collectors only. Extra attempts for a listing or a file download that fails (a connectivity fault). Blank = 0, one attempt.',
+    },
+    {
+        key: 'retry__backoff',
+        label: 'Retry backoff',
+        type: 'select',
+        tier: 'advanced',
+        options: [
+            { value: 'EXPONENTIAL', label: 'Exponential' },
+            { value: 'LINEAR', label: 'Linear' },
+            { value: 'FIXED', label: 'Fixed' },
+        ],
+        help: 'How the delay grows between retries, full-jittered and capped at the longest delay. Blank = Exponential.',
+    },
+    {
+        key: 'retry__initial_delay',
+        label: 'First retry delay',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '1s',
+        help: 'Delay before the first retry — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = 1s.',
+    },
+    {
+        key: 'retry__max_delay',
+        label: 'Longest retry delay',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '60s',
+        help: 'Cap on any one retry delay. Blank = 60s.',
+    },
+    {
+        key: 'circuit_breaker__failure_threshold',
+        label: 'Circuit breaker threshold',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        placeholder: '5',
+        help: 'Remote Collectors only. After this many consecutive failed listings the Collector is skipped until the cooldown passes, then one trial listing runs. Setting this or the cooldown turns the breaker on; blank both = never trips.',
+    },
+    {
+        key: 'circuit_breaker__cooldown',
+        label: 'Circuit breaker cooldown',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '5m',
+        help: 'How long a tripped breaker skips acquisition — 30s, 5m, 2h, 1d, or a bare number of seconds. Blank = 5m (when the breaker is on).',
+    },
     // Consignment formation (CONSIGNMENT-HOME-1, 2026-09-02): the ConsignmentPlanner caps, homed on the
     // Collector because the plan runs in the poll cycle before any sink exists. consignment__* nests to
     // `collector.consignment: {max_files, max_bytes, order}` — the block the parser reads FIRST; the

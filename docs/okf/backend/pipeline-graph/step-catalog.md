@@ -78,6 +78,63 @@ top-level `trigger:`. The UI flattens the nested keys with `__`, shown here as d
 **Refusals.** `connector: dataset` without `dataset:` (and the reverse) refuse at load. A Connection
 that is not `local` needs a saved Connection profile.
 
+**Configuration — the `collector:` block** (2026-09-23, `PROCESSOR-RELEASE-READINESS-1` G5). Unlike the
+other Part A tables this one is the **parser's** key set (`PipelineConfigParser.parseCollector` + the
+consignment caps), not only the served `AttributeSpec`s, because the canvas form is a curated subset.
+*Form* names the acquisition-node attribute (`__` = nesting; `NodeAttributes.COLLECTOR`); *spec* marks a
+leaf `ConfigSpecs.pipeline()` declares, so `POST /config/write` and the graph save type-check it. Every
+sub-block is additive: absent means the default in the table. *Remote* = read only on the remote
+acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches it.
+
+| Key | Type · default | Form | What it does |
+|---|---|---|---|
+| `connector` | string · `local` | — (derived) | `local`, `dataset`, or the named Connection's connector. The form derives it at save and never asks. |
+| `connection` | string | `connection` (writes `use: connection/<name>`) | The saved Connection profile — host, credentials and the connector's own options (below). |
+| `dataset` | string | `dataset` | Dataset entry: the Dataset whose snapshots each cycle copies in. Only with `connector: dataset`. |
+| `id` | string · the pipeline name | — | The Collector's id. Circuit-breaker state is keyed by it. |
+| `include` | list · `processing.file_pattern` | `include` | Discovery patterns (`glob:` or `regex:` over the relative path). |
+| `exclude` | list | `exclude` | Patterns removed from discovery. |
+| `recursive_depth` | number · `-1` (unbounded) | `recursive_depth` | How deep discovery walks. |
+| `discovery` | `poll` · `watch` · `poll` | `discovery` | `watch` = filesystem events on a local poll root. |
+| `stability.window` | duration · `30s` | `stability__window` | Hold a file until it has been quiet this long. The block's presence turns the gate on; absent = off. |
+| `stability.size_checks` | number · `2` | — | Consecutive polls the size must hold (minimum 1). |
+| `stability.ready_marker` | string | — | A sibling marker (`{name}.done`) that releases the file at once. |
+| `stability.exclude_temp_files` / `exclude_temp_patterns` | boolean · `true` / list | — | Drop `*.tmp`-style partial files (`Stability.DEFAULT_TEMP_PATTERNS` unless listed). |
+| `duplicate.mode` | `path` · `metadata` · `checksum` · `etag` · `path` | `duplicate__mode` | How a re-seen file is recognised. `path` = the marker; the others use the fingerprint ledger. An unknown value reads as `path` (`DuplicatePolicy.Mode.from`). |
+| `duplicate.algorithm` | string · `SHA256` | — | Checksum algorithm for `checksum` mode. |
+| `duplicate.on_change` | `reprocess` · `ignore` · `alert` · `archive_old_version` · `reprocess` | `duplicate__on_change` | What a changed known file does. ⚠ An unknown value reads as `reprocess`, and the form's `skip` option is one: it is not in `DuplicatePolicy.OnChange.from`, so it reprocesses. |
+| `guarantee` | `BEST_EFFORT` · `AT_LEAST_ONCE` · `EXACTLY_ONCE` · `BEST_EFFORT` | `guarantee` | The two stronger values need a content-based `duplicate.mode`; over `path` the parser warns and behaves best-effort. |
+| `gap_detection.sequence` / `.enabled` | string / boolean · `true` | — (the `gap` node) | Numbered-series template (`ORDERS_{yyyyMMdd}`); a hole raises `SEQUENCE_GAP`. Authored on its own node. |
+| `incremental.watermark` | `last_modified` | — | Skip files modified strictly before the ledger's high-watermark. Needs a content-based `duplicate.mode` (the parser warns otherwise; path mode never engages it). Other values disable it. |
+| `fetch.parallel_fetch` | number · `1` | `fetch__parallel_fetch` | *Remote.* Files downloaded at once, each on its own connector session. |
+| `fetch.rate_limit` | rate · unlimited | `fetch__rate_limit` · spec | *Remote.* Bandwidth cap: `512KB/s`, `10MBps`, `1GB/s` or bare bytes/s (1024-based). |
+| `fetch.staging_dir` | path | — | *Remote.* Where a fetch stages before it lands in the inbox. |
+| `fetch.mode` | string · `STAGE` | — | Parsed and round-tripped; no code reads it. |
+| `retry.count` | number · `0` | `retry__count` · spec | *Remote.* Extra attempts for a failed listing or file download. `0` = one attempt. |
+| `retry.backoff` | `EXPONENTIAL` · `LINEAR` · `FIXED` (`CONSTANT` = `FIXED`) · `EXPONENTIAL` | `retry__backoff` · spec | Full-jittered, capped at `max_delay` (`RetryPolicy`). The engine reads an unknown value as `EXPONENTIAL`; the spec refuses it at save. |
+| `retry.initial_delay` / `retry.max_delay` | duration · `1s` / `60s` | `retry__initial_delay` / `retry__max_delay` · spec | First delay, and the cap on any one delay. |
+| `circuit_breaker.failure_threshold` | number · `5` | `circuit_breaker__failure_threshold` · spec | *Remote.* Consecutive failed listings that trip the breaker. The block's presence turns the breaker on; absent = never trips. |
+| `circuit_breaker.cooldown` | duration · `5m` | `circuit_breaker__cooldown` · spec | How long a tripped breaker skips acquisition before one trial listing. |
+| `post_action.on_success` | `RETAIN` · `DELETE` · `MOVE` · `RENAME` · `TAG` · `RETAIN` | `post_action__on_success` | *Remote.* What happens to the source-side original after a successful fetch. Checked against the connector's capabilities each cycle. |
+| `post_action.archive_path` | path template | `post_action__archive_path` | The `MOVE` target. `yyyy`/`yy`/`MM`/`dd`/`HH`/`mm`/`ss` resolve against now (`PostAction.resolveTemplate`). |
+| `post_action.tags` | map | — | Tags `TAG` writes. |
+| `post_action.on_unsupported` | `FAIL` · `WARN_AND_CONTINUE` · `IGNORE` · `WARN_AND_CONTINUE` | — | When the connector lacks the capability: `FAIL` stops the cycle, the others retain the file. |
+| `consignment.max_files` / `.max_bytes` / `.order` | number · `1` / number / `mtime` · `name` | `consignment__*` | Consignment packing ([above](#collect--acquisition--the-collector)). `max_files` is spec-declared. |
+
+Duration = a bare number of seconds or `N` + `s`/`m`/`h`/`d` (`toMillis`); the spec's pattern is the same
+rule, pinned by `CollectorResilienceSpecParityTest`. The acquisition node also borrows `trigger__*`,
+marker dedup (`duplicate_check`, `marker_extension`, `retention_days`, `markers_dir`) and `unpack__*` from
+outside the block. Their keys are in the served contract.
+
+**Connection options the Collector depends on.** These are keys of the Connection profile
+(`*_connection.toon` `options:`), not of `collector:`. Profile fields and every connector:
+[connectors](../acquisition/connectors.md).
+
+| Connector | Option | What it does |
+|---|---|---|
+| `sftp` | `base_path` (profile field) · `options.private_key` · `options.host_key` / `known_hosts` / `strict_host_key` | Listing root (default `.`); key-file auth; host-key pinning (`HostKeyPolicy`). `strict_host_key: true` with neither `host_key` nor `known_hosts` refuses to connect. |
+| `db` | `options.query` (required) · `options.export_name` (required) · `options.watermark_column` · `options.watermark_initial` · `options.watermark_type` (`string` · `long` · `timestamp`) · `options.jdbc_url` · `options.driver` | `DbExportConnector`: runs the date-templated query and lands one CSV per cycle. `watermark_column` needs a `:watermark` placeholder in `query` (refused otherwise); the new maximum is stored only after the batch commits. |
+
 **Examples.** `examples/07-steps/collect` · `spaces/default/config/collect_step` (include/exclude,
 recursion, gap detection) · `05-acquisition/*` and `06-serve/{sequence-gap,checksum-change,
 incremental-watermark}` for the duplicate and gap policies.
@@ -345,6 +402,20 @@ but execute only when a `route:` pairs them.
 | `intake.max_files_per_cycle` | number | advanced | — | **Intake cap (files/cycle).** This pipeline's admission cap, overriding the -Dingest.maxFilesPerCycle global; 0 = explicitly unbounded (exempts this pipeline from a fleet-wide cap). Blank = inherit the global. |
 | `intake.min_files_per_cycle` | number | advanced | — | **Intake cap floor.** Floor the adaptive controller may halve this pipeline's cap down to. Blank = inherit -Dingest.minFilesPerCycle. |
 | `intake.adaptive` | boolean | advanced | — | **Adaptive intake control.** Whether cycle overrun adjusts this pipeline's cap; off pins it at the stated cap. Blank = inherit -Dingest.backpressure.adaptive. |
+| `ducklake.enabled` | boolean | advanced | — | **Register in DuckLake.** After each committed batch, register the written Parquet files in a DuckLake catalog. Blank = off. Needs catalog URL, data path and table. |
+| `ducklake.catalog_url` | string | advanced | — | **Catalog URL.** The DuckLake catalog backend, attached as ducklake:<this>. |
+| `ducklake.data_path` | string | advanced | — | **Data path.** The catalog's DATA_PATH. A relative path resolves under the Space directory; an object-store URI is kept as written. |
+| `ducklake.schema` | string | advanced | — | **Schema.** Catalog schema the table is created in. Blank = main. |
+| `ducklake.table` | string | advanced | — | **Table.** Catalog table the files are inserted into; a batch that lands in a table sub-directory uses that name instead. |
+
+The `ducklake.*` keys (the "DuckLake catalog" group, added 2026-09-23) lower to `output.ducklake:`, or to
+the node's own `sinks[]` entry. An entry without its own block inherits `output.ducklake`
+(`PipelineConfig.resolveSinks`), and `DuckLakeRegistrar` registers each sink's files in that sink's lake.
+`ConfigSafetyValidator` refuses an enabled block that lacks `catalog_url`, `data_path` or `table` (and
+path-jails `data_path`). The `ducklake.*` leaves are not declared in `ConfigSpecs.pipeline()`: `output` is
+accepted whole. On one node a failed registration is logged and the batch succeeds. With
+`-Dinspecto.topology=partitioned`, a failed or missing registration fails the batch. The rules are in
+`DuckLakeRegistrar.requireRegistrationConfigured` and `onRegistrationFailure`.
 
 **Example.** `examples/07-steps/sink` (CSV + `SOURCE_FILE`) · `04-output/csv-output` ·
 `spaces/default/config/sink_step`.
@@ -426,6 +497,108 @@ reach, so they refuse 422 the same way (G8, 2026-09-23; before, they showed the 
 `DryRunSinkWriter` (dispatch) · `PipelineConfig.Webhook` · `inspecto-notify-channels/…/HttpWebhookSinkTransport`.
 Tests: `WebhookSinkTest`, `WebhookSinkLiftLowerTest`, `PipelineConfigWebhookTest`,
 `HttpWebhookSinkTransportTest` (a JDK `HttpServer` stub), `NodeConfigNameContractTest#webhookAttributesReachTheEngine`.
+
+---
+
+## The delivered processors that are not chain Steps — where their keys live
+
+*Added 2026-09-23 (`PROCESSOR-RELEASE-READINESS-1` G11).* Part B lists four DELIVERED processors whose
+*Maps to* is a capability or a companion config, not a `steps[]` kind. None of them has an
+`AttributeSpec` table in `node-attributes.contract.json`. Their keys come from the parser each names, and
+the declared ones also from its `ConfigSpecs` spec.
+
+### `enrichment.reference` → the `enrichment` node — a Stage-2 `*_enrich.toon`
+
+**Function.** Runs hand-written SQL over a Pipeline's committed Stage-1 output joined to named
+references, and writes an enriched store. The canvas `enrichment` node is **companion-persisted**: its
+truth is the `*_enrich.toon`, which `PipelineEditable.lower` ignores
+([pipeline-editor § The enrichment Step](../../frontend/features/pipeline-editor.md#the-enrichment-step)).
+Parser: `EnrichmentConfig.fromMap`. Spec: `ConfigSpecs.enrichment()`, censused one level down
+(`AcceptedConfigKeys`, `EnrichmentKeyCoverageContractTest`).
+
+| Key | Type · default | What it does |
+|---|---|---|
+| `name` | string · required | The enrichment's id. |
+| `input.database` | data path · required | The Stage-1 Hive-partitioned output it reads. Relative = under the Space directory. |
+| `input.format` | `PARQUET` · `CSV` · `PARQUET` | Format of that output. |
+| `input.partitions` | list · required | Hive partition columns on the input; `[]` = unpartitioned. |
+| `output.database` | data path · required | Where the enriched output is written. |
+| `output.format` / `output.compression` | `PARQUET` · `CSV` · `PARQUET` / string | Output format and codec. |
+| `output.partitions` | list · required | Output grain: bare names or `{column, source}` entries. One agreed `source` records event-time bounds. |
+| `transform` / `transform_file` | SQL / path · one required | SQL over the `input` view and the named references. `transform_file` is read when `transform` is blank. |
+| `references.<name>.path` / `.ref` | data path / id · exactly one | The view registered as `<name>`: a file, or a Reference Dataset by name. Parser-only (`ENRICHMENT_PARSER_ONLY`). |
+| `references.<name>.format` | string · `PARQUET` | Format of a `path` reference. |
+| `references.<name>.as_of` | ISO date or date-time | Read the Reference as of that instant. Needs `ref`; a `path` has no version history. |
+| `triggers.on_pipeline` | string | Upstream Pipeline (or enrichment) whose commit triggers an incremental recompute. |
+| `triggers.schedule_seconds` | integer | Interval of a full recompute; `<= 0` disables. |
+
+### `quality.constraint.check` → Expectations
+
+**Function.** An at-rest data-quality check. `ExpectationEvaluator` counts the violating records in the
+target's at-rest Parquet. A FAILED check opens a deduplicated `expectation:<name>` Incident and emits
+`EXPECTATION_FAILED`. It is authored through `/expectations*` and persisted as an `expectation` component
+under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
+[ingestion § Expectations](../../capabilities/ingestion/ingestion.md#37-expectations). Parser:
+`Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same fourteen keys.
+
+| Key | Type · default | What it does |
+|---|---|---|
+| `name` | string · required | The check's name. |
+| `description` | string | Free text. |
+| `targetType` | `pipeline` · `job` · `pipeline` | Whose at-rest data is scanned. |
+| `target` | string · required | That Pipeline or Job's name. |
+| `kind` | `non_null` · `range` · `regex` · `referential` · `condition` · required | The constraint. The spec lists `non_null` as its default, but the record refuses an absent kind. |
+| `column` | string | The checked column. Required for every kind except `condition`. |
+| `min` / `max` | number | `range` bounds; at least one. |
+| `pattern` | regex | `regex`: the value must match. |
+| `refDataset` / `refColumn` | string | `referential`: the lookup relation and column; both required. |
+| `when` | condition tree | `condition`: the violation predicate itself (`ConditionSql`). |
+| `severity` | `MINOR` · `MAJOR` · `CRITICAL` · `MAJOR` | Severity of the Incident raised. |
+| `enabled` | boolean · `true` | Evaluate-all skips a disabled check. |
+
+### `control.alert.dispatch` → Alert Rules
+
+**Function.** `AlertService` sweeps the rules on a timer and on `POST /alerts/evaluate`. A breach emits
+`ALERT_FIRED` and the `alert-rule.fired` Signal, which the notification reactor fans out to channels
+([incidents § Alert Rules](../../capabilities/incidents/incidents.md#32-alert-rules),
+[§ the default reactor](../../capabilities/incidents/incidents.md#82-alerts-notifications-and-diagnosis--the-default-reactor)).
+Rules are persisted as `alert-rule` components under `<write-root>/registry`, through
+`/alerts/rules*` (`AlertRoutes`). Parser: `AlertRule.fromMap`, a flat map of the keys below. Spec:
+`ConfigSpecs.alert()`, with `dataset`/`measure`/`when` parser-only (`ALERT_PARSER_ONLY`). One record,
+four disjoint shapes, chosen by which keys are present:
+
+| Key | Shape | What it does |
+|---|---|---|
+| `name` | all · required | The rule's name. |
+| `metric` | ledger | `error_rate` · `failed_batches` · `rejected_files` · `duration_ms`, over the batches ledger. |
+| `window` | ledger | `Ns`/`Nm`/`Nh`/`Nd` elapsed, or `Nb` = the last N batches. |
+| `onPipeline` | ledger | Restrict to one Pipeline; blank = every Pipeline. |
+| `when` | ledger | Condition tree scoping the ledger rows before the metric aggregates them. Refused on the other shapes. |
+| `dataset` + `measure` | measure | A Measure (`count`, or `agg(field)` with agg = count · countDistinct · sum · avg · min · max) over a Dataset's current data. No `metric`, `window` or `when`. |
+| `dataset` + `maximumAge` | freshness | The Dataset must have published within `Ns`/`Nm`/`Nh`/`Nd`. Comparator and threshold are fixed (`gt`, 0), and a measure, metric, window or `when` is refused. |
+| `investigation` + `relation` + `measure` | investigation | A Measure over an Investigation's Working Set (`relation`: `entities` · `links` · `excluded`, default `entities`). Authored only through `POST /inv/investigations/{id}/alert-rules`. |
+| `comparator` | all but freshness | `gt` · `gte` · `lt` · `lte`. |
+| `threshold` | all but freshness | A positive number. `error_rate` is a fraction in (0, 1]. |
+| `severity` | all | `INFO` · `WARNING` · `CRITICAL`. |
+
+### `sink.quarantine` → the quarantine directory and the reject log
+
+**Function.** Two outputs, and neither is a node the author adds. A file the engine cannot process
+at all is moved to `dirs.quarantine`, under a reason sub-directory: `field_mismatch/`, `unreadable/`,
+`corrupt_download/` or `retry_exhausted/`
+([operations-reference § Quarantine](../build-run/operations-reference.md#quarantine),
+[output-sinks § Quarantine outcomes](../engine/output-sinks.md#quarantine-outcomes)). The rows a
+parse rejects drain to `<dirs.errors>/<base>_errors.csv`. The lift models a quarantine *node* (a
+`sink.persistent` carrying `dir`, never `database`) only for selector/segments pipelines. Otherwise the
+directory has no owning node, and a save preserves it.
+
+| Key | Type · default | What it does |
+|---|---|---|
+| `dirs.quarantine` | data path · `<dirs.poll>/quarantine` | Quarantine root. The quarantine node's `dir`. Engine-read, not spec-declared (`dirs` is accepted whole). |
+| `dirs.errors` | data path · `<dirs.poll>/errors` | Where `<base>_errors.csv` reject logs land. Engine-read, not spec-declared. |
+| `processing.csv_settings.store_rejects` | boolean · `true` | Capture rejected rows. `false` skips capture, since reject rows carry raw source data. |
+| `processing.csv_settings.rejects_table` / `rejects_scan` / `rejects_limit` | identifier / identifier / number | `read_csv`'s reject tables (`reject_errors` / `reject_scans`) and the per-file cap (blank or 0 = unlimited). |
+| `-Dingest.retry.max` (system property) | number · `5` | Commit failures before a file is quarantined as `retry_exhausted`. `0` = retry without bound. |
 
 ---
 

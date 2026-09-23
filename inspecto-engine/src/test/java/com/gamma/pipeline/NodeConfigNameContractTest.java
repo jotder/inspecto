@@ -91,6 +91,22 @@ class NodeConfigNameContractTest {
                         c -> c.collector().postAction().onSuccess(), "MOVE"),
                 new Contract("acquisition", "post_action__archive_path", "post_action.archive_path", "/arch",
                         c -> c.collector().postAction().archivePath(), "/arch"),
+                // ── retry + circuit breaker (PROCESSOR-RELEASE-READINESS-1 G5, 2026-09-23): collector.retry /
+                // collector.circuit_breaker, read by CollectorProcessor.acquire. The breaker arms on the
+                // block's presence, so ONE key reaching the engine also proves `enabled`.
+                new Contract("acquisition", "retry__count", "retry.count", 4,
+                        c -> c.collector().retry().count(), 4),
+                new Contract("acquisition", "retry__backoff", "retry.backoff", "LINEAR",
+                        c -> c.collector().retry().backoff(), "LINEAR"),
+                new Contract("acquisition", "retry__initial_delay", "retry.initial_delay", "3s",
+                        c -> c.collector().retry().initialDelayMillis(), 3_000L),
+                new Contract("acquisition", "retry__max_delay", "retry.max_delay", "2m",
+                        c -> c.collector().retry().maxDelayMillis(), 120_000L),
+                new Contract("acquisition", "circuit_breaker__failure_threshold", "circuit_breaker.failure_threshold", 3,
+                        c -> c.collector().circuitBreaker().failureThreshold(), 3),
+                new Contract("acquisition", "circuit_breaker__cooldown", "circuit_breaker.cooldown", "90s",
+                        c -> c.collector().circuitBreaker().enabled() ? c.collector().circuitBreaker().cooldownMillis() : -1L,
+                        90_000L),
 
                 // ── the `duplicate:` keys — on ACQUISITION since the 2026-08-04 fold. D9 had split
                 // them onto a `transform.dedup.fingerprint` node; that node was removed because the
@@ -140,6 +156,18 @@ class NodeConfigNameContractTest {
                 // B4: the source-filename lineage column — lowers onto output.filename_column.
                 new Contract("sink.persistent", "filename_column", "filename_column", "src_file",
                         c -> c.output().filenameColumn(), "src_file"),
+                // DuckLake registration (G5): ducklake__* nests to the node's `ducklake` map, lowered onto
+                // output.ducklake — the block DuckLakeRegistrar reads per sink.
+                new Contract("sink.persistent", "ducklake__enabled", "ducklake.enabled", true,
+                        c -> c.output().duckLake().get("enabled"), true),
+                new Contract("sink.persistent", "ducklake__catalog_url", "ducklake.catalog_url", "postgres:dbname=lake",
+                        c -> c.output().duckLake().get("catalog_url"), "postgres:dbname=lake"),
+                new Contract("sink.persistent", "ducklake__data_path", "ducklake.data_path", "s3://lake/data",
+                        c -> c.output().duckLake().get("data_path"), "s3://lake/data"),
+                new Contract("sink.persistent", "ducklake__schema", "ducklake.schema", "cdr",
+                        c -> c.output().duckLake().get("schema"), "cdr"),
+                new Contract("sink.persistent", "ducklake__table", "ducklake.table", "calls",
+                        c -> c.output().duckLake().get("table"), "calls"),
 
                 // ── Consignment formation — the nested consignment map on the COLLECTOR (CONSIGNMENT-HOME-1,
                 // 2026-09-02; was batch__* on the sink). The dialog's nestKeys turns consignment__max_files
