@@ -6,6 +6,7 @@ import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.PathJail;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.util.AtomicFiles;
@@ -357,9 +358,9 @@ final class PipelineSettingsRoutes implements RouteModule {
 
     /**
      * Copy the source's {@code processing.schema_file} next to the template and repoint at the copy, so the
-     * two configs never share a schema an operator might edit. A relative reference resolves against the
-     * source config's own directory first and the working directory second — the same order
-     * {@link PipelineConfig#load} uses. When it cannot be resolved or read the original value is left
+     * two configs never share a schema an operator might edit. A relative reference resolves beside the
+     * source config — {@link PathJail#resolveConfigRef}, the resolver {@link PipelineConfig#load} uses.
+     * When it cannot be resolved or read the original value is left
      * alone (harmless: the parser reads it, never writes it) and a note explains why.
      */
     private static void copySchemaFile(Map<String, Object> src, Map<String, Object> t, String id,
@@ -369,13 +370,14 @@ final class PipelineSettingsRoutes implements RouteModule {
         Object ref = processing.get("schema_file");
         if (ref == null || String.valueOf(ref).isBlank()) return;   // inline schemas / segments: nothing to copy
 
-        Path from = Path.of(String.valueOf(ref));
-        if (!from.isAbsolute()) {
-            Path here = srcPath.toAbsolutePath().getParent();
-            Path beside = here == null ? null : here.resolve(from);
-            from = (beside != null && Files.isReadable(beside)) ? beside : from.toAbsolutePath();
+        Path from;
+        try {
+            from = PathJail.resolveConfigRef(srcPath.toAbsolutePath().getParent(), String.valueOf(ref),
+                    "processing.schema_file");
+        } catch (PathJail.Escape refused) {
+            from = null;
         }
-        if (!Files.isReadable(from)) {
+        if (from == null || !Files.isReadable(from)) {
             notes.add("schema_file '" + ref + "' could not be read, so it still points at the source's schema"
                     + " — repoint it before editing the schema");
             return;

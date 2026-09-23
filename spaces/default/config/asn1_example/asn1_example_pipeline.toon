@@ -31,7 +31,7 @@ parsing:
     root_type: CallEventRecord
     strictness: BER
     segments:
-      moCallRecord: spaces/default/config/asn1_example/asn1_example_schema.toon
+      moCallRecord: asn1_example_schema.toon
 
 collector:
   discovery: poll

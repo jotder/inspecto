@@ -24,7 +24,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 90
-  schema_file: spaces/demo/config/ledger/gl_journal_schema.toon
+  schema_file: gl_journal_schema.toon
 
 parsing:
   frontend: xlsx

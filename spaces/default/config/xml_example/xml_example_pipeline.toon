@@ -31,7 +31,7 @@ parsing:
   plugin:
     ingester: com.gamma.ingester.XmlRecordIngester
     segments:
-      order: spaces/default/config/xml_example/xml_example_schema.toon
+      order: xml_example_schema.toon
     ingester_config:
       record_element: order
       namespace_aware: false

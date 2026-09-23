@@ -57,10 +57,52 @@ keeps its `PathEscape` → 403 contract), nine operator-supplied path fields acr
 `MaintenanceJob` / `ReportJob`, and `PipelineConfigParser.resolveSchemaRef` at load. Advisory caller:
 this validator.
 
-⚠ **Relative values resolve against the working directory, not against the root.** Every config this
-product ships authors its refs from the server root (`schema_file: spaces/default/config/…`), so
-resolving them against the root would double the prefix and break every space. ⛔ Do not "simplify"
-this, and never jail a config path against its own `configDir`.
+⚠ **`PathJail.require` reads a relative value against the working directory — so every caller holding a
+relative value RESOLVES it first, against the base that value means, and then jails it once.** Two
+resolvers, one rule (`resolveAgainst`):
+
+* **`PathJail.resolveConfigRef(configDir, …)`** — a config's reference to ANOTHER config file resolves
+  **beside the referring config** (`SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`, 2026-09-23). Keys:
+  `processing.schema_file`, every `schemas[].schema_file`, `processing.mapping_file`,
+  `parsing.grammar` / `processing.grammar`, every `segments` value (`parsing.plugin.*`, `processing.*`,
+  `asn1.*`), and Asn1RecordIngester's `ingester_config.grammar` (= `asn1.grammar_file`). Callers:
+  `PipelineConfigParser.resolveSchemaRef` (load), `ConfigSafetyValidator.resolveRef` (422 gate),
+  `ConfigRoutes.resolvedPath` (the schema-file WARNING and `declaredColumns`),
+  `PipelineSettingsRoutes.copySchemaFile` (template copy), and `com.gamma.parse.Asn1GrammarSource` (the
+  ASN.1 grammar file: the parser resolves `ingester_config.grammar` beside the config WITHOUT jailing it,
+  and this one resolver — shared with the stand-alone preview, whose base is the Space config root —
+  checks the `.asn`/`.asn1` extension and jails it once, at use). Before this they were hand-kept copies
+  of one rule.
+* **`PathJail.resolveJobPath(spaceConfigRoot, …)`** — a job's path values, against the Space config root
+  (`JOB-DIR-CWD-CONTAINMENT-1`; see [jobs](../control-plane/jobs.md)).
+
+🔴 **Why the config-ref rule changed.** Until 2026-09-23 the shipped configs spelled their refs from the
+server root (`schema_file: spaces/demo/config/orders/orders_schema.toon`) and the loader fell back to the
+working directory (W1b's *"config-relative first, CWD second"*). That meant something from exactly one
+directory: a bundle launched from `inspecto-deploy/` with `-Dspaces.root=..\spaces` resolved
+`inspecto-deploy\spaces\demo\…`, **31 of 32 shipped Pipelines** failed to register, and Pipelines, Runs
+and Processing Status rendered empty. Every shipped ref is now spelled beside its pipeline (a bare
+sibling name), and the fallback is gone. Pinned by `ShippedPipelinesLoadFromAnyWorkingDirectoryTest`
+(surefire's CWD is the module dir, so it IS the "launched elsewhere" condition — its premise is asserted,
+not assumed).
+
+⛔ **The ambiguous ref is REFUSED, not relocated.** A relative ref with nothing beside its config, while the
+old working-directory spelling DOES exist, throws `PathJail.Escape` naming both paths — the same rule as
+jobs. ⚠ **That refusal only fires when the old CWD file exists** (see the `resolveJobPath` note in
+[jobs](../control-plane/jobs.md)): from any other directory an unmigrated `spaces/<space>/config/…` ref is
+simply *not found*. Both fail closed; neither reads the wrong file.
+
+⚠ **`../` is legal** — it resolves from the config's directory and the jail judges the result. W1b skipped
+a config-relative candidate that climbed out of `configDir` and fell through to the (then unjailed) CWD
+reading; a narrower "stay under `configDir`" rule beside the jail would be a path jailed twice.
+
+⚠ **Still working-directory-relative — same cause, NOT fixed here:** every data path — `dirs.*`,
+`output.ducklake.data_path`, `processing.duckdb.temp_directory`, enrichment `references.<n>.path`,
+connection `base_path`. The shipped configs spell these `spaces/<space>/data/…` too, so the
+`inspecto-deploy/` launch mode now REGISTERS the demo Pipelines but their data directories still resolve
+under the launch directory. That is a data-root question, not a config-ref one → BACKLOG
+`DATA-DIRS-RESOLVE-AGAINST-CWD-1`. A `null` `configDir` (an in-memory draft: `PipelineConfig.fromMap`)
+also keeps the CWD reading — a draft has no directory to resolve against.
 
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about

@@ -23,7 +23,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: spaces/default/config/collect_step/collect_step_schema.toon
+  schema_file: collect_step_schema.toon
   csv_settings:
     delimiter: ","
     date_formats[1]: "%Y-%m-%d"

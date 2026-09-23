@@ -281,6 +281,27 @@ class Asn1ParserPluginTest {
         assertTrue(e.getMessage().contains("not readable"), e.getMessage());
     }
 
+    /**
+     * A preview has no config file, so a RELATIVE grammar ref resolves from the bound Space's config root
+     * through the same {@code PathJail.resolveConfigRef} rule a Pipeline's refs use — never the CWD
+     * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}).
+     */
+    @Test
+    void aRelativeGrammarFileResolvesFromTheSpaceConfigRoot(@TempDir Path spaceConfig) throws Exception {
+        Files.createDirectories(spaceConfig.resolve("cdr"));
+        asnFile(spaceConfig.resolve("cdr"), "test.asn", GRAMMAR);
+        byte[] sample = hex(RECORD_1_HEX, RECORD_2_HEX);
+        ParseResult inline = asn1.preview(sample, grammar("grammar", GRAMMAR, "root_type", "Record"));
+        com.gamma.pipeline.SpaceConfigRoot.register("asn1-preview-test", spaceConfig);
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, "asn1-preview-test");
+        try {
+            assertEquals(inline, asn1.preview(sample, grammar("grammar_file", "cdr/test.asn", "root_type", "Record")));
+        } finally {
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            com.gamma.pipeline.SpaceConfigRoot.forget("asn1-preview-test");
+        }
+    }
+
     @Test
     void theGrammarSchemaServesTheFileReferenceBesideTheText() {
         List<String> paths = asn1.grammarSchema().stream().map(f -> f.path()).toList();

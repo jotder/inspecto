@@ -21,9 +21,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * pipeline would not load, and a space directory could not be moved, renamed, or imported under a new name
  * without rewriting every reference inside it — the "least changes to promote to another instance" goal.
  *
- * <p>The fix is resolution order, not a format change: <b>config-relative first, working-directory second</b>.
- * A bare {@code x_schema.toon} beside its pipeline is portable, and every legacy config keeps loading
- * byte-identically because its form is still tried. Nothing on disk needs migrating.
+ * <p>W1b's fix was resolution order: <b>config-relative first, working-directory second</b>. ⚠ Superseded
+ * 2026-09-23 ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}): the "second" is gone. A relative ref resolves
+ * beside its config ONLY ({@code PathJail.resolveConfigRef}); one that only the working directory can see is
+ * refused with both paths named, and the shipped configs were respelled beside their pipelines.
  */
 class SchemaRefResolutionTest {
 
@@ -85,25 +86,35 @@ class SchemaRefResolutionTest {
     // ── what must NOT change ───────────────────────────────────────────────────────────
 
     /**
-     * The legacy form — resolved from the working directory, NOT from the config's directory. Written under
-     * {@code target/} (build output, and a real relative path from the process CWD) because that is the only
-     * way to exercise the fallback honestly; a temp dir is absolute and would take the absolute branch.
+     * The old working-directory form is REFUSED, not read ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). The
+     * file is written under {@code target/} — a real relative path from the process CWD — so the only thing
+     * that could satisfy the ref is the fallback this row removed. Silently reading it would make the
+     * Pipeline's meaning depend on the directory the server was launched from; refusing names both paths.
      */
     @Test
-    void aWorkingDirectoryRelativeReferenceStillLoads(@TempDir Path dir) throws Exception {
+    void aWorkingDirectoryOnlyReferenceIsRefusedNamingBothPaths(@TempDir Path dir) throws Exception {
         Path legacyDir = Path.of("target", "w1b-legacy");
         Files.createDirectories(legacyDir);
         Path legacySchema = legacyDir.resolve("legacy_schema.toon");
         writeSchema(legacySchema);
         try {
-            // Deliberately NOT under `dir`: the config-relative candidate cannot exist, so only the
-            // working-directory branch can satisfy this — exactly the pre-W1b path.
-            PipelineConfig cfg = load(dir, "target/w1b-legacy/legacy_schema.toon");
-            assertEquals(List.of("ACCOUNT_NUMBER", "EVENT_DATE"), columns(cfg));
+            com.gamma.config.safety.PathJail.Escape e = assertThrows(com.gamma.config.safety.PathJail.Escape.class,
+                    () -> load(dir, "target/w1b-legacy/legacy_schema.toon"));
+            assertTrue(e.getMessage().contains("beside its own config file"), e.getMessage());
+            assertTrue(e.getMessage().contains(legacySchema.toAbsolutePath().normalize().toString()),
+                    "the message must name the working-directory file it refused to read: " + e.getMessage());
+            assertTrue(e.getMessage().contains("not resolved silently"), e.getMessage());
         } finally {
             Files.deleteIfExists(legacySchema);
             Files.deleteIfExists(legacyDir);
         }
+    }
+
+    /** No file anywhere: an honest "not found", naming the ref as authored. */
+    @Test
+    void aReferenceThatResolvesNowhereIsNotFound(@TempDir Path dir) {
+        FileNotFoundException e = assertThrows(FileNotFoundException.class, () -> load(dir, "missing_schema.toon"));
+        assertTrue(e.getMessage().contains("missing_schema.toon"), e.getMessage());
     }
 
     @Test
@@ -116,22 +127,61 @@ class SchemaRefResolutionTest {
     }
 
     /**
-     * A reference that climbs out of the config's directory must not be satisfied by the new
-     * config-relative branch — otherwise W1b would have turned every config into a reader of arbitrary
-     * files above its own tree. It falls through to the legacy branch (which resolves from the working
-     * directory and finds nothing here), so the load fails rather than silently escaping.
-     *
-     * <p>⚠ This is containment for the branch W1b introduces, NOT a security boundary: the legacy branch
-     * remains unjailed, which is the systemic pass tracked in {@code BACKLOG.md} §6.
+     * {@code ../} resolves from the config's directory — a nested Pipeline may name a sibling directory's
+     * schema — and containment is then the ONE jail's verdict. W1b refused to resolve it config-relative
+     * and let it fall through to the (then unjailed) working-directory reading; a second, narrower
+     * "stay under configDir" rule beside the jail would be a path jailed twice.
      */
     @Test
-    void aParentEscapingReferenceIsNotResolvedAgainstTheConfigDirectory(@TempDir Path tmp) throws Exception {
+    void aParentReferenceResolvesFromTheConfigDirectoryAndTheJailJudgesIt(@TempDir Path tmp) throws Exception {
         writeSchema(tmp.resolve("outside_schema.toon"));            // one level ABOVE the config dir
         Path configDir = Files.createDirectories(tmp.resolve("cfg"));
-        FileNotFoundException e = assertThrows(FileNotFoundException.class,
-                () -> load(configDir, "../outside_schema.toon"),
-                "a ../ reference must not be resolved against the config directory");
-        assertTrue(e.getMessage().contains("outside_schema.toon"), e.getMessage());
+        assertEquals(List.of("ACCOUNT_NUMBER", "EVENT_DATE"), columns(load(configDir, "../outside_schema.toon")),
+                "inside the allowed roots, a ../ ref resolves from the config's own directory");
+
+        String before = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", configDir.toString());
+        try {
+            com.gamma.config.safety.PathJail.Escape e = assertThrows(com.gamma.config.safety.PathJail.Escape.class,
+                    () -> load(configDir, "../outside_schema.toon"));
+            assertTrue(e.getMessage().contains("outside the root"), e.getMessage());
+        } finally {
+            if (before == null) System.clearProperty("assist.safety.roots");
+            else System.setProperty("assist.safety.roots", before);
+        }
+    }
+
+    /**
+     * {@code ingester_config.grammar} — Asn1RecordIngester's grammar FILE — resolves beside the config too.
+     * The ingester never sees the config's directory, so it used to jail the authored value against the
+     * working directory. The authored map stays verbatim (a save writes it back); the resolved path rides
+     * beside it.
+     */
+    @Test
+    void anAsn1IngesterGrammarFileResolvesBesideTheConfig(@TempDir Path dir) throws Exception {
+        writeSchema(dir.resolve("call_schema.toon"));
+        Files.writeString(dir.resolve("cdr.asn"), "CDR DEFINITIONS ::= BEGIN END", StandardCharsets.UTF_8);
+        Path pipeline = dir.resolve("asn_pipeline.toon");
+        Files.writeString(pipeline, """
+                name: ASN_ETL
+                version: 1
+                %s
+                output:
+                  format: PARQUET
+                processing:
+                  threads: 1
+                  file_pattern: "glob:**/*.ber"
+                  ingester: com.gamma.ingester.Asn1RecordIngester
+                  ingester_config:
+                    grammar: cdr.asn
+                    root_type: Rec
+                  segments:
+                    CALL: call_schema.toon
+                """.formatted(dirsBlock(dir)), StandardCharsets.UTF_8);
+        PipelineConfig cfg = PipelineConfig.load(pipeline.toString());
+        assertEquals(dir.resolve("cdr.asn").toAbsolutePath().normalize(), cfg.schemas().ingesterGrammar());
+        assertEquals("cdr.asn", cfg.schemas().ingesterConfig().get("grammar"),
+                "the authored value must stay verbatim — it is what a save writes back");
     }
 
     // ── the other two reference sites ──────────────────────────────────────────────────

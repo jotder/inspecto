@@ -38,9 +38,10 @@ timestamp: 2026-07-16T00:00:00Z
   2026-07-31.** `grammar` and `dirs.*` are still bare `Paths.get(...)` in `PipelineConfigParser` with no
   rebasing to `spaces/<id>/`, and only the *space discovery* layer (`-Dspaces.root`) is space-relative — so
   those must stay repo/bundle-root-relative, and `SpaceMigrator` cannot auto-fix absolute/author-relative ones.
-  **Schema references (`schema_file`, `schemas[].schema_file`, `parsing.plugin.segments`) now go through
-  `PipelineConfigParser.resolveSchemaRef`: config-relative first, CWD second** (unification W1b), so a bare
-  basename beside the pipeline is portable. ⚠ The mixed model is the trap — in one config file a bare
+  **Schema references (`schema_file`, `schemas[].schema_file`, `segments`, `grammar`, `mapping_file`) now go
+  through `PipelineConfigParser.resolveSchemaRef` → `PathJail.resolveConfigRef`: beside the config, never the
+  CWD** (W1b made it config-relative first; `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` removed the CWD second on
+  2026-09-23), so a bare basename beside the pipeline is portable and loads from any launch directory. ⚠ The mixed model is the trap — in one config file a bare
   `orders_schema.toon` resolves while a bare `dirs.poll: inbox` still means `<CWD>/inbox`.
   ⚠ ⚠ Anything that *validates* a schema reference must mirror `resolveSchemaRef` or it will reject configs
   the engine runs. `ConfigRoutes.schemaFileFindings` is an **ERROR** gate at registration and takes a

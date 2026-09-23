@@ -65,6 +65,39 @@ class LiftLowerFixtureSweepTest {
         return v;
     }
 
+    /**
+     * Prefix {@code dir} onto every relative config ref the parser resolves beside its config:
+     * {@code schema_file}, each {@code schemas[].schema_file}, {@code grammar}, and every {@code segments}
+     * value — under {@code processing:} and under any {@code parsing.*} block.
+     */
+    @SuppressWarnings("unchecked")
+    private static void spellOutConfigRefs(Map<String, Object> config, String dir) {
+        if (config.get("processing") instanceof Map<?, ?> proc) spellOutRefsIn((Map<String, Object>) proc, dir);
+        if (config.get("parsing") instanceof Map<?, ?> parsing) {
+            spellOutRefsIn((Map<String, Object>) parsing, dir);
+            for (Object block : parsing.values())
+                if (block instanceof Map<?, ?> b) spellOutRefsIn((Map<String, Object>) b, dir);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void spellOutRefsIn(Map<String, Object> m, String dir) {
+        for (String k : List.of("schema_file", "grammar"))
+            if (m.get(k) instanceof String v && isRelativeFileRef(v)) m.put(k, dir + v);
+        if (m.get("schemas") instanceof List<?> rows)
+            for (Object row : rows)
+                if (row instanceof Map<?, ?> r && r.get("schema_file") instanceof String v && isRelativeFileRef(v))
+                    ((Map<String, Object>) r).put("schema_file", dir + v);
+        if (m.get("segments") instanceof Map<?, ?> segs)
+            for (Map.Entry<String, Object> e : ((Map<String, Object>) segs).entrySet())
+                if (e.getValue() instanceof String v && isRelativeFileRef(v)) e.setValue(dir + v);
+    }
+
+    /** A relative path to a file — not an absolute path, not inline grammar text, not a registry id. */
+    private static boolean isRelativeFileRef(String v) {
+        return v.endsWith(".toon") && !Path.of(v).isAbsolute() && !v.contains(" ");
+    }
+
     @Test
     void everyRepoFixtureSurvivesAnUneditedLiftLowerRoundTrip() throws Exception {
         List<Path> fixtures = pipelineFixtures();
@@ -83,13 +116,10 @@ class LiftLowerFixtureSweepTest {
         for (Path f : fixtures) {
             Map<String, Object> original = rebase(
                     ConfigCodec.toMap(Files.readString(f, StandardCharsets.UTF_8)), repoRoot);
-            // A portable schema_file is a bare sibling name resolved beside the pipeline file at load;
-            // spell it out here for the same reason as the rebase above.
-            if (original.get("processing") instanceof Map<?, ?> proc
-                    && proc.get("schema_file") instanceof String sf && !sf.contains("/") && !sf.contains("\\")) {
-                @SuppressWarnings("unchecked") Map<String, Object> pm = (Map<String, Object>) proc;
-                pm.put("schema_file", f.getParent().toString().replace('\\', '/') + "/" + sf);
-            }
+            // Every satellite ref is a sibling name resolved beside the pipeline file at load
+            // (SCHEMA-FILE-RESOLVES-AGAINST-CWD-1), and fromMap has no file — spell each one out here for
+            // the same reason as the rebase above.
+            spellOutConfigRefs(original, f.getParent().toString().replace('\\', '/') + "/");
             try {
                 PipelineConfig cfg = PipelineConfig.fromMap(original);
                 Map<String, Object> editable = PipelineEditable.toMap(cfg, original);

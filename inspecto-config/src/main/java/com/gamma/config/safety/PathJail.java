@@ -26,10 +26,13 @@ import java.util.List;
  *   <li>re-check symlink escape against the nearest existing ancestor's real path.</li>
  * </ol>
  *
- * <p><b>Relative values resolve against the working directory, not against the root.</b> That is
- * deliberate and load-bearing: every config this product ships authors its refs relative to the
- * server root ({@code schema_file: spaces/default/config/…}), so resolving them against the root
- * instead would double the prefix and break every space. See the plan's §2.
+ * <p><b>{@link #require} resolves a relative value against the working directory, not against the
+ * root</b> — it is a containment verdict, not a resolver. A caller holding a relative value resolves it
+ * FIRST, against the base that value means: {@link #resolveConfigRef} (a config's refs to other config
+ * files, beside the referring config) or {@link #resolveJobPath} (a job's paths, against the Space config
+ * root). ⚠ Until 2026-09-23 the shipped configs spelled their refs from the server root
+ * ({@code schema_file: spaces/default/config/…}) and relied on this working-directory reading, so a server
+ * launched from any other directory could not load them ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}).
  *
  * <p>{@link #require} is defined in terms of {@link #contains}, so the enforcing and advisory
  * surfaces cannot drift apart — that shared truth is the point of this class, and is pinned by test.
@@ -169,6 +172,30 @@ public final class PathJail {
      *             place for a context that genuinely has no Space (the job runner outside a Space).
      */
     public static Path resolveJobPath(Path base, String value, String field) {
+        return resolveAgainst(base, value, field, "a job's relative path now resolves against the Space config root");
+    }
+
+    /**
+     * <b>Resolve a config file's reference to ANOTHER config file</b> — {@code schema_file},
+     * {@code schemas[].schema_file}, {@code mapping_file}, {@code grammar}, a {@code segments} value,
+     * {@code ingester_config.grammar} ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}, 2026-09-23). A relative
+     * ref resolves against {@code configDir}, the referring config's OWN directory, and never the process
+     * working directory: a Pipeline whose satellites resolve only when the server was launched from the
+     * repo root is a Pipeline that fails to register from any bundle directory.
+     *
+     * <p>⛔ Same rule — and the same code — as {@link #resolveJobPath}, with a different base: the ambiguous
+     * case (nothing beside the config, but the old working-directory spelling exists) is REFUSED, naming
+     * both paths, rather than silently read from the CWD. That was the fallback this replaces.
+     *
+     * @param configDir the referring config's directory; {@code null} for an in-memory draft with no home,
+     *                  which keeps the working-directory reading (there is nothing else to resolve against)
+     */
+    public static Path resolveConfigRef(Path configDir, String value, String field) {
+        return resolveAgainst(configDir, value, field, "a relative config reference resolves beside its own config file");
+    }
+
+    /** The one relative-path rule behind {@link #resolveJobPath} and {@link #resolveConfigRef}. */
+    private static Path resolveAgainst(Path base, String value, String field, String rule) {
         String s = value == null ? "" : value.trim();
         if (s.isEmpty()) throw new Escape(field, value == null ? "null" : value, "is blank");
         Path authored;
@@ -179,16 +206,16 @@ public final class PathJail {
         }
         if (base == null || authored.isAbsolute()) return authored.toAbsolutePath().normalize();
 
-        Path spaceRelative = base.toAbsolutePath().normalize().resolve(authored).normalize();
-        if (Files.exists(spaceRelative)) return spaceRelative;
+        Path baseRelative = base.toAbsolutePath().normalize().resolve(authored).normalize();
+        if (Files.exists(baseRelative)) return baseRelative;
 
         Path cwdRelative = authored.toAbsolutePath().normalize();
-        if (!spaceRelative.equals(cwdRelative) && Files.exists(cwdRelative))
-            throw new Escape(field, s, "is relative, and a job's relative path now resolves against the "
-                    + "Space config root (" + spaceRelative + ") — but nothing exists there, while "
-                    + cwdRelative + " does. That is the path this job used to mean. Make it absolute, or "
-                    + "move it under the Space root; it is not resolved silently either way");
-        return spaceRelative;
+        if (!baseRelative.equals(cwdRelative) && Files.exists(cwdRelative))
+            throw new Escape(field, s, "is relative, and " + rule + " (" + baseRelative
+                    + ") — but nothing exists there, while " + cwdRelative + " does, resolved against the "
+                    + "working directory the way it used to be. Make it absolute, or respell it relative to "
+                    + base.toAbsolutePath().normalize() + "; it is not resolved silently either way");
+        return baseRelative;
     }
 
     /** {@link #resolveJobPath} + the containment check, for a run-time task holding the Space root. */

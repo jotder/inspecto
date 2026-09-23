@@ -23,7 +23,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 90
-  schema_file: spaces/default/config/json_example/json_example_schema.toon
+  schema_file: json_example_schema.toon
   csv_settings:
     timestamp_formats[1]: "%Y-%m-%dT%H:%M:%S"
 

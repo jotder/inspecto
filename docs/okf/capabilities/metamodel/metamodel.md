@@ -275,10 +275,10 @@ screen*, and the glossary's Catalog definition ("Schemas and Datasets") predates
   rather than degraded to `VARCHAR` — before 2026-08-22 a `type: BIGINT` silently produced a string column.
   `classification` is a free string (`PII` / `INTERNAL` by convention, SCH-03) — **metadata only, nothing
   enforces masking on it** (SEC-08, Enterprise-only, unbuilt); no enum and no owner page exists (§5).
-- **Resolution.** `PipelineConfigParser.resolveSchemaRef` (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java:1201-1220`):
-  config-relative first, then CWD; `schema/<id>` → `registry/schemas/<id>.toon`, `grammar/<id>` →
-  `registry/grammars/<id>.toon`, `mapping/<id>` → `registry/mappings/<id>.csv`; mirrored in
-  `ConfigSafetyValidator` and `ConfigRoutes`. ⚠ **No `registry/schemas/` directory exists in any committed
+- **Resolution.** `PipelineConfigParser.resolveSchemaRef` (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java:1232-1239`):
+  beside the config only, via `PathJail.resolveConfigRef` (never the CWD, since 2026-09-23); `schema/<id>` → `registry/schemas/<id>.toon`, `grammar/<id>` →
+  `registry/grammars/<id>.toon`, `mapping/<id>` → `registry/mappings/<id>.csv`; `ConfigSafetyValidator` and
+  `ConfigRoutes` call the same resolver. ⚠ **No `registry/schemas/` directory exists in any committed
   Space** — every shipped schema is pipeline-owned.
 - **Generation.** `SchemaExtractor` (`inspecto-util/src/main/java/com/gamma/util/SchemaExtractor.java`, CLI
   `create-schema`) infers `<source>_schema.toon` + `<source>_pipeline.toon` from a sample by DuckDB type

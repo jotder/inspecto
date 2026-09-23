@@ -86,11 +86,14 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
         Map<String, Object> ic = cfg.schemas().ingesterConfig();
         // `grammar_text` carries the module INLINE; `grammar` is the path-jailed `.asn` file reference
         // (what `frontend: asn1`'s `asn1.grammar_file` becomes). Text wins when both are present. The
-        // rule, the resolution and the jail are Asn1GrammarSource's — shared with the preview, so a
-        // grammar that previews is the grammar that ingests.
+        // rule and the jail are Asn1GrammarSource's — shared with the preview, so a grammar that previews
+        // is the grammar that ingests. The FILE is read from `ingesterGrammar()`, the ref the parser
+        // already resolved beside the config (SCHEMA-FILE-RESOLVES-AGAINST-CWD-1): this ingester never
+        // sees the config's directory, so resolving the authored `grammar` here would read it against the
+        // working directory. The parser does not jail it; Asn1GrammarSource does, once.
         Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
                 ic.get("grammar_text"), "ingester_config.grammar_text",
-                ic.get("grammar"), "ingester_config.grammar");
+                cfg.schemas().ingesterGrammar(), "ingester_config.grammar", null);
         String rootType = str(ic.get("root_type"));
         if (module == null)
             throw new IllegalArgumentException(

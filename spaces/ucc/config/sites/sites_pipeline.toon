@@ -23,8 +23,8 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 90
-  grammar:     spaces/ucc/config/sites/sites.grammar.toon
-  schema_file: spaces/ucc/config/sites/sites_schema.toon
+  grammar:     sites.grammar.toon
+  schema_file: sites_schema.toon
 
 collector:
   discovery: poll

@@ -60,10 +60,11 @@ import static org.junit.jupiter.api.Assertions.fail;
  * <ul>
  *   <li><b>The write path WRITES.</b> Driving the committed {@code spaces/} tree would rewrite tracked
  *       fixtures on every test run — the repository's own files as test scratch.</li>
- *   <li><b>Fixture paths are repo-relative and surefire's CWD is the module directory</b>, so
- *       {@code schema_file: spaces/default/…} resolves to {@code inspecto/spaces/default/…} and does not
- *       exist ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). Rewriting the {@code spaces/} prefix to the
- *       absolute temp copy sidesteps that open defect instead of encoding it.</li>
+ *   <li><b>Fixture DATA paths are repo-relative and surefire's CWD is the module directory</b>, so
+ *       {@code dirs.poll: spaces/default/…} resolves to {@code inspecto/spaces/default/…}. Rewriting the
+ *       {@code spaces/} prefix to the absolute temp copy keeps every run out of the module dir. (Satellite
+ *       refs no longer need it — they are sibling names resolved beside their config since
+ *       {@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1} — but the whole space is still copied so they resolve.)</li>
  * </ul>
  * ⚠ The rewrite cannot mask a round-trip loss: both reads come from the SAME rewritten file, so anything
  * the save drops is dropped between two reads that were always going to agree otherwise.

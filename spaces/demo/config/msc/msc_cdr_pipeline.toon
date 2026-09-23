@@ -35,9 +35,9 @@ parsing:
     root_type: CallEventRecord
     strictness: BER
     segments:
-      moCallRecord: spaces/demo/config/msc/msc_cdr_mo_call_schema.toon
-      mtCallRecord: spaces/demo/config/msc/msc_cdr_mt_call_schema.toon
-      moSMSRecord: spaces/demo/config/msc/msc_cdr_mo_sms_schema.toon
+      moCallRecord: msc_cdr_mo_call_schema.toon
+      mtCallRecord: msc_cdr_mt_call_schema.toon
+      moSMSRecord: msc_cdr_mo_sms_schema.toon
 
 collector:
   discovery: poll

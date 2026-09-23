@@ -86,26 +86,34 @@ Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, w
 (`Asn1RecordIngester`) all call, so a grammar that previews is the grammar that ingests:
 
 - **Text wins when both are set** — the "parsing: keys win" overlay rule the ingester already applied.
-- The file ref is jailed with `PathJail.requireUnderAny(allowedRoots())` **before** any readability
-  probe (an escaping ref is refused, never reported "not readable", which would leak whether a path
-  outside the roots exists). Relative refs resolve like every other config ref the ingester reads
-  (server-root-relative, `spaces/demo/config/msc/msc_cdr.asn`) — the same rule as `schema_file`, so
-  when `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` moves that rule, this resolver is the one place to move.
-- ⚠ **The extension is enforced (`.asn` / `.asn1`).** `POST /parsers/{id}/preview` is compute-only
-  with no capability, and a compile error can echo the text it choked on — an unrestricted ref would
-  let a preview read any file under the roots back through an error message.
-- `frontend: asn1` carries `asn1.grammar_file` to the ingester **unresolved**, as the path key
-  `ingester_config.grammar` (and `asn1.grammar` as `grammar_text`), so resolution and the jail happen
-  once, at use. The load refuses an `asn1:` block carrying neither spelling.
+- **A relative ref resolves like `schema_file`** — `PathJail.resolveConfigRef`, never the working
+  directory (`SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`). In a Pipeline it is resolved **beside the Pipeline's
+  own config file** (a sibling name: `grammar_file: msc_cdr.asn`), by `PipelineConfigParser`, into
+  `Schemas.ingesterGrammar()` — the ingester never sees the config's directory. The stand-alone preview
+  has no config file, so it resolves from the **bound Space's config root** (`SpaceConfigRoot.current()`):
+  for a Pipeline in a subdirectory the preview spelling is `msc/msc_cdr.asn`. ⚠ The drawer does not send
+  its Pipeline's location to the preview route, so a sibling name typed there previews against the Space
+  root, not beside the Pipeline.
+- The file ref is jailed **once**, by `Asn1GrammarSource`, with `PathJail.requireUnderAny(allowedRoots())`
+  **before** the readability probe (an escaping ref is refused, never reported "not readable", which
+  would leak whether a path outside the roots exists). The parser resolves but does **not** jail.
+- ⚠ **The extension is enforced (`.asn` / `.asn1`) first, before anything touches the disk.**
+  `POST /parsers/{id}/preview` is compute-only with no capability, and a compile error can echo the text
+  it choked on — an unrestricted ref would let a preview read any file under the roots back through an
+  error message.
+- `frontend: asn1` carries `asn1.grammar_file` as-authored as the path key `ingester_config.grammar`
+  (and `asn1.grammar` as `grammar_text`), so a save writes back the relative value; the resolved path
+  lives apart, in `ingesterGrammar()`. The load refuses an `asn1:` block carrying neither spelling.
 - The preview route maps the jail's `PathJail.Escape` to **403**; other grammar problems stay 422.
 - The drawer needs no bespoke UI: the ASN.1 form is SERVED from `grammarSchema()`, which now lists
   `asn1.grammar_file` beside `asn1.grammar`.
 - Proof: `DemoCorpusIngestTest.mscCdrWithItsGrammarInAnAsnFilePreviewsAndIngestsIdenticallyToInline`
   moves the committed `msc_cdr` grammar into a `.asn` file and pins the same preview tree and the same
   rows in every segment as the inline original.
-- ⚠ **Not yet carried by a Pipeline bundle.** `PipelineBundleRoutes` exports/rewrites schema, grammar
-  and mapping satellites but not an `asn1.grammar_file`, so a bundled pipeline that references one
-  arrives without its module.
+- ⚠ **Only half carried by a Pipeline bundle.** The resolved module is in `referencedFiles()`, so the
+  export ships it as a satellite under its basename — but `PipelineBundleRoutes.rewriteSatelliteRefs`
+  does not rewrite `asn1.grammar_file`, so only a ref already spelled as a bare sibling name still
+  resolves after import.
 
 **The grammar is OPTIONAL for preview — structural dump (2026-07-31).** BER is self-describing
 (every value carries its own tag and length), so with `asn1.grammar` blank the plugin skips the

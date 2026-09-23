@@ -25,14 +25,14 @@ processing:
     marker_extension: .processed
     retention_days: 90
   schemas[3]{column_count,file_pattern,schema_file,table}:
-    76,  "glob:**/*other*",    "spaces/ucc/config/voucher/voucher_76.toon",  voucher_other
-    116, "glob:**/*main*",     "spaces/ucc/config/voucher/voucher_116.toon", voucher_main
-    537, "",                   "spaces/ucc/config/voucher/voucher_537.toon", voucher
+    76,  "glob:**/*other*",    "voucher_76.toon",  voucher_other
+    116, "glob:**/*main*",     "voucher_116.toon", voucher_main
+    537, "",                   "voucher_537.toon", voucher
   duckdb:
     temp_directory: ""
     memory_limit: ""
     max_temp_directory_size: ""
-  grammar: spaces/ucc/config/voucher/voucher.grammar.toon
+  grammar: voucher.grammar.toon
 
 collector:
   consignment:

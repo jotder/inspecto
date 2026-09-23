@@ -357,12 +357,17 @@ public final class PipelineConfig {
      * non-null; all three are {@code null} for a schema-less <em>draft</em> (v5.1.0 — allowed
      * only while {@code active: false}; arming without a schema is rejected at parse).
      * {@code ingesterClass} is the plugin FQCN ({@code null} for built-in CSV);
-     * {@code ingesterConfig} is the plugin's free-form settings map (empty, never null).
+     * {@code ingesterConfig} is the plugin's free-form settings map (empty, never null), exactly as
+     * authored. {@code ingesterGrammar} is its {@code grammar} file ref RESOLVED beside the config
+     * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}) but NOT jailed — the ingester's grammar resolver jails it
+     * once, at use — or {@code null} when it names none; kept apart from
+     * the map so the authored relative value, not a machine-specific absolute path, is what a save
+     * writes back.
      */
     @PublicApi(since = "2.0.0")
     public record Schemas(SchemaSelector selector, Map<String, Object> single,
                           LinkedHashMap<String, Map<String, Object>> segments,
-                          String ingesterClass, Map<String, Object> ingesterConfig) {}
+                          String ingesterClass, Map<String, Object> ingesterConfig, Path ingesterGrammar) {}
 
     /**
      * Optional DuckDB engine-resource controls (additive, 3.10.0). All {@code null}/blank ⇒
@@ -1376,7 +1381,8 @@ public final class PipelineConfig {
                 b.ingesterClass,
                 b.ingesterConfig != null
                         ? Collections.unmodifiableMap(b.ingesterConfig)
-                        : Collections.emptyMap());
+                        : Collections.emptyMap(),
+                b.ingesterGrammar);
         this.duckdb   = new DuckDbSettings(b.duckMemoryLimit, b.duckTempDirectory, b.duckMaxTempSize);
         this.chunking = new Chunking(b.chunkMaxFileBytes, b.chunkTargetBytes);
         this.intake = b.intake;
@@ -1950,5 +1956,6 @@ public final class PipelineConfig {
         String ingesterClass;
         LinkedHashMap<String, Map<String, Object>> segmentSchemas;
         Map<String, Object> ingesterConfig;
+        Path ingesterGrammar;
     }
 }

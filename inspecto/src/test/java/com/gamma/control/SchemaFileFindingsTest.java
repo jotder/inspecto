@@ -83,13 +83,39 @@ class SchemaFileFindingsTest {
                 "with no config directory there is nothing to be relative to, so it is still flagged");
     }
 
+    /**
+     * {@code ../} resolves from the config's directory, as the loader resolves it
+     * ({@code PathJail.resolveConfigRef}). This check asks EXISTENCE only; whether the result escapes the
+     * allowed roots is {@code ConfigSafetyValidator}'s question, and every gate pairs the two.
+     */
     @Test
-    void aParentEscapingReferenceIsStillFlagged(@TempDir Path tmp) throws Exception {
+    void aParentReferenceResolvesFromTheConfigDirectory(@TempDir Path tmp) throws Exception {
         Files.writeString(tmp.resolve("outside_schema.toon"), "raw:\n  name: ok\n");
         Path configDir = Files.createDirectories(tmp.resolve("cfg"));
         Map<String, Object> draft = Map.of("name", "X",
                 "processing", Map.of("schema_file", "../outside_schema.toon"));
-        assertEquals(1, ConfigRoutes.schemaFileFindings("pipeline", draft, Severity.ERROR, configDir).size(),
-                "the config-relative branch is contained, so a ../ escape does not resolve");
+        assertTrue(ConfigRoutes.schemaFileFindings("pipeline", draft, Severity.ERROR, configDir).isEmpty(),
+                "the file exists where the loader will look for it");
+    }
+
+    /**
+     * {@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}: a ref only the working directory can see does NOT resolve —
+     * the loader refuses it — so it is flagged. {@code target/} is a real CWD-relative directory under
+     * surefire; before the fix this ref was silently read from there.
+     */
+    @Test
+    void aReferenceOnlyTheWorkingDirectoryCanSeeIsFlagged(@TempDir Path configDir) throws Exception {
+        Path cwdOnly = Path.of("target", "cwd-only-schema", "legacy_schema.toon");
+        Files.createDirectories(cwdOnly.getParent());
+        Files.writeString(cwdOnly, "raw:\n  name: ok\n");
+        try {
+            Map<String, Object> draft = Map.of("name", "X",
+                    "processing", Map.of("schema_file", "target/cwd-only-schema/legacy_schema.toon"));
+            assertEquals(1, ConfigRoutes.schemaFileFindings("pipeline", draft, Severity.ERROR, configDir).size(),
+                    "the loader refuses a working-directory-only ref, so this gate must flag it");
+        } finally {
+            Files.deleteIfExists(cwdOnly);
+            Files.deleteIfExists(cwdOnly.getParent());
+        }
     }
 }

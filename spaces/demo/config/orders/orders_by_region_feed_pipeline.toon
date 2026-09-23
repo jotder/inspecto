@@ -28,7 +28,7 @@ output:
 processing:
   threads: 1
   file_pattern: "glob:**/*.parquet"
-  schema_file: spaces/demo/config/orders/orders_by_region_feed_schema.toon
+  schema_file: orders_by_region_feed_schema.toon
 
 parsing:
   frontend: parquet

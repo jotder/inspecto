@@ -23,7 +23,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 90
-  schema_file: spaces/default/config/excel_example/excel_example_schema.toon
+  schema_file: excel_example_schema.toon
 
 parsing:
   frontend: xlsx

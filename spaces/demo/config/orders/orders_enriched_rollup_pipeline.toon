@@ -12,7 +12,7 @@ output:
 
 processing:
   file_pattern: "glob:**/*.csv"
-  schema_file: spaces/demo/config/orders/orders_schema.toon
+  schema_file: orders_schema.toon
   dedup:
     keys[1]: ORDER_ID
     order_by: ORDER_DATE DESC

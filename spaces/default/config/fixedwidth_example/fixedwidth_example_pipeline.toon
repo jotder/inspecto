@@ -23,7 +23,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 90
-  schema_file: spaces/default/config/fixedwidth_example/fixedwidth_example_schema.toon
+  schema_file: fixedwidth_example_schema.toon
 
 parsing:
   frontend: fixedwidth

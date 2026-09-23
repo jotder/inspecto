@@ -77,19 +77,45 @@ class ConfigSafetyValidatorTest {
     }
 
     /**
-     * ⚠ The existence half of the loader's rule. A ref that does NOT exist config-relative keeps
-     * resolving from the working directory — otherwise every legacy config, whose refs resolve that
-     * way and which is the form every config in this repo uses, would start failing.
+     * A ref that does not exist YET is judged beside the config, not from the working directory
+     * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). Existence is a WARNING for {@code ConfigRoutes} — the
+     * schema is often written after its pipeline — and containment is this gate's question: a not-yet
+     * written sibling is contained. (Until 2026-09-23 this fell back to the CWD reading and was refused as
+     * "outside the allowed roots" whenever the CWD was not under them.)
      */
     @Test
-    void aRefThatDoesNotExistBesideTheConfigKeepsTheWorkingDirectoryMeaning(@TempDir Path root)
-            throws IOException {
+    void aRefThatDoesNotExistYetIsJudgedBesideTheConfig(@TempDir Path root) throws IOException {
         Path configDir = java.nio.file.Files.createDirectories(root.resolve("config"));
 
         List<Finding> f = ConfigSafetyValidator.check("pipeline", pipelineWithSchemaRef("absent.toon"),
                 SafetyPolicy.withRoots(root), configDir);
 
-        assertFalse(f.isEmpty(), "nothing beside the config ⇒ the as-authored form is judged, as before");
+        assertTrue(f.isEmpty(), "a sibling-to-be is contained: " + f);
+    }
+
+    /**
+     * The ambiguous ref — nothing beside the config, but the old working-directory spelling exists — is an
+     * ERROR naming both paths, the loader's refusal raised at authoring. {@code target/} is a real
+     * CWD-relative directory under surefire, so only the removed fallback could have satisfied this ref.
+     */
+    @Test
+    void aRefOnlyTheWorkingDirectoryCanSeeIsAnErrorNamingBothPaths(@TempDir Path root) throws IOException {
+        Path configDir = java.nio.file.Files.createDirectories(root.resolve("config"));
+        Path cwdOnly = Path.of("target", "cwd-only-ref", "legacy_schema.toon");
+        java.nio.file.Files.createDirectories(cwdOnly.getParent());
+        java.nio.file.Files.writeString(cwdOnly, "raw: {}");
+        try {
+            List<Finding> f = ConfigSafetyValidator.check("pipeline",
+                    pipelineWithSchemaRef("target/cwd-only-ref/legacy_schema.toon"),
+                    SafetyPolicy.withRoots(root), configDir);
+            assertEquals(1, f.size(), f.toString());
+            assertEquals(Severity.ERROR, f.get(0).severity());
+            assertTrue(f.get(0).message().contains(cwdOnly.toAbsolutePath().normalize().toString()), f.toString());
+            assertTrue(f.get(0).message().contains("not resolved silently"), f.toString());
+        } finally {
+            java.nio.file.Files.deleteIfExists(cwdOnly);
+            java.nio.file.Files.deleteIfExists(cwdOnly.getParent());
+        }
     }
 
     /** A minimal pipeline map with the given dirs map + optional processing/output overlays. */

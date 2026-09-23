@@ -233,8 +233,10 @@ public class SchemaExtractor {
             dupCheck.put("marker_extension", ".processed");
             processing.put("duplicate_check", dupCheck);
 
-            // Use a relative path so the pipeline is portable when deployed via package.ps1
-            processing.put("schema_file", "config/" + sourceName + "/" + sourceName + "_schema.toon");
+            // The bare sibling name: the schema is written beside this pipeline (outputDir), and a relative
+            // ref resolves beside its own config, never against the working directory
+            // (SCHEMA-FILE-RESOLVES-AGAINST-CWD-1) — so the pair relocates as a unit.
+            processing.put("schema_file", sourceName + "_schema.toon");
 
             Map<String, Object> csvSettings = new LinkedHashMap<>();
             csvSettings.put("delimiter",        delimiter);

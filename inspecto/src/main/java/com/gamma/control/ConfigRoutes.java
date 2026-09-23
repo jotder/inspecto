@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.config.io.ConfigLoader;
+import com.gamma.config.safety.PathJail;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
@@ -48,8 +49,8 @@ final class ConfigRoutes {
      * {@code processing.schemas[].schema_file}. No-op for non-pipeline types.
      *
      * <p>⚠ This must resolve references <b>exactly</b> the way {@link PipelineConfig#load} does, or it
-     * becomes a gate that rejects configs the engine would happily run. Since W1b that means
-     * config-relative first, working-directory second — hence {@code configDir}.
+     * becomes a gate that rejects configs the engine would happily run. That means beside the config,
+     * never the working directory ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}) — hence {@code configDir}.
      *
      * @param severity  WARNING at validate/save time (the file may be created later, or the config
      *                  may be destined for another host); ERROR at register time (it will fail)
@@ -301,7 +302,6 @@ final class ConfigRoutes {
         return schemaFileFindings(type, draft, severity, null);
     }
 
-    /** Mirrors {@code PipelineConfigParser.resolveSchemaRef}: config-relative first, then the CWD. */
     /**
      * The columns a pipeline draft's declared schema carries, for the save-time checks that need to know
      * what a step may reference (`TYPEFLOW-CONSUMERS-1` (a)). Reads {@code processing.schema_file},
@@ -468,15 +468,19 @@ final class ConfigRoutes {
         };
     }
 
-    /** {@link #resolves}' path half — the resolved file, or {@code null} when it resolves nowhere. */
+    /**
+     * {@link #resolves}' path half — the resolved file, or {@code null} when it resolves nowhere. Resolved
+     * by {@link PathJail#resolveConfigRef}, the loader's own resolver, so this cannot disagree with
+     * {@code PipelineConfig.load}; the ambiguous ref it refuses resolves nowhere here.
+     */
     private static Path resolvedPath(String ref, Path configDir) {
-        Path asAuthored = Path.of(ref);
-        if (configDir != null && !asAuthored.isAbsolute()) {
-            Path base      = configDir.toAbsolutePath().normalize();
-            Path candidate = base.resolve(asAuthored).normalize();
-            if (candidate.startsWith(base) && Files.isRegularFile(candidate)) return candidate;
+        Path file;
+        try {
+            file = PathJail.resolveConfigRef(configDir, ref, "processing.schema_file");
+        } catch (PathJail.Escape refused) {
+            return null;
         }
-        return Files.isRegularFile(asAuthored) ? asAuthored : null;
+        return Files.isRegularFile(file) ? file : null;
     }
 
     private static boolean resolves(String ref, Path configDir) {
@@ -485,7 +489,7 @@ final class ConfigRoutes {
 
     private static String unresolvable(String schemaPath) {
         return "schema file does not resolve on the server: '" + schemaPath
-                + "' (a relative reference resolves beside its own config file first, then against"
-                + " the server's working directory: " + Path.of("").toAbsolutePath() + ")";
+                + "' (a relative reference resolves beside its own config file, never against the"
+                + " server's working directory)";
     }
 }

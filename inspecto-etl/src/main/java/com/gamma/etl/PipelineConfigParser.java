@@ -1116,8 +1116,21 @@ final class PipelineConfigParser {
                 ? (String) pluginBlock.get("ingester") : (String) proc.get("ingester");
         Object icfg = pluginBlock != null && pluginBlock.get("ingester_config") != null
                 ? pluginBlock.get("ingester_config") : proc.get("ingester_config");
-        if (icfg instanceof Map<?, ?> icfgMap)
+        if (icfg instanceof Map<?, ?> icfgMap) {
             b.ingesterConfig = (Map<String, Object>) icfgMap;
+            // Asn1RecordIngester's `ingester_config.grammar` FILE is a config ref like any other: resolved
+            // beside this config here, where the config's directory is known, rather than against the
+            // working directory inside the ingester, which never sees it. ⚠ Keyed on that ingester: the
+            // map is free-form, and another plugin's `grammar` need not be a path at all.
+            // ⛔ Resolved here, NOT jailed: the .asn/.asn1 check and the one jail are
+            // com.gamma.parse.Asn1GrammarSource's, at use — the resolver the preview shares. Jailing here
+            // as well would be a path jailed twice.
+            if (ASN1_INGESTER.equals(b.ingesterClass)
+                    && icfgMap.get("grammar") instanceof String gref && !gref.isBlank()) {
+                b.ingesterGrammar = PathJail.resolveConfigRef(configDir, gref.trim(), "ingester_config.grammar");
+                b.referencedFiles.add(b.ingesterGrammar);
+            }
+        }
         if (b.ingesterClass != null && !b.ingesterClass.isBlank()) {
             Object segsRaw = pluginBlock != null && pluginBlock.get("segments") != null
                     ? pluginBlock.get("segments") : proc.get("segments");
@@ -1153,30 +1166,6 @@ final class PipelineConfigParser {
     // ── schema reference resolution ───────────────────────────────────────────
 
     /**
-     * Resolve a schema reference to the file to actually read — <b>config-relative first, working-directory
-     * second</b> (unification W1b).
-     *
-     * <p>Why two: every schema reference on disk today is written working-directory-relative
-     * (`spaces/&lt;space&gt;/config/x_schema.toon`, and the space template literally carries a
-     * `spaces/${SPACE}/...` placeholder), so the process must be launched from the base directory or the
-     * pipeline does not load — and a space directory cannot be moved, renamed, or imported under a new name
-     * without rewriting every reference inside it. Resolving relative to the config file's OWN directory
-     * makes a bare `x_schema.toon` portable: the whole space tree relocates and still resolves. The legacy
-     * form keeps working because it is only tried second, so nothing on disk needs migrating.
-     *
-     * <p>Jailing: the config-relative candidate must stay <b>under</b> {@code configDir}. A reference that
-     * climbs out (`../../etc/passwd`) does not silently escape — it is skipped here and left to the legacy
-     * branch, which is the pre-existing (unjailed, advisory-only) behaviour rather than a new hole. Full
-     * containment enforcement is the separate systemic pass in {@code BACKLOG.md} §6; this method is
-     * deliberately not a security boundary and must not be mistaken for one.
-     *
-     * @param ref       the raw reference as authored (`processing.schema_file`, a `schemas[].schema_file`,
-     *                  or a `parsing.plugin.segments` value)
-     * @param configDir directory of the config being parsed, or {@code null} for an in-memory draft
-     * @return the path to read; absolute refs and the null-{@code configDir} case return {@code ref} as-is,
-     *         byte-identically to the pre-W1b behaviour
-     */
-    /**
      * Resolve a grammar reference to the file to read. Two spellings are accepted:
      *
      * <ul>
@@ -1203,6 +1192,9 @@ final class PipelineConfigParser {
         return resolveSchemaRef("registry/grammars/" + id + ".toon", configDir, "grammar");
     }
 
+    /** The ingester whose {@code ingester_config.grammar} is a file ref (the parser resolves it). */
+    private static final String ASN1_INGESTER = "com.gamma.ingester.Asn1RecordIngester";
+
     /** The registry-reference prefix a Grammar-bound parser node carries ({@code use: grammar/<id>}). */
     private static final String GRAMMAR_REF_PREFIX = "grammar/";
 
@@ -1222,29 +1214,30 @@ final class PipelineConfigParser {
     }
 
     /**
-     * ⚠ <b>Resolution here is a portability preference; containment is the boundary.</b> The
-     * {@code configDir}-relative candidate is <em>preferred</em> when it exists, and the as-authored
-     * (working-directory-relative) form is the documented fallback — that fallback is not a legacy
-     * corner, it is the form <b>every</b> config in this repo uses, so it cannot be removed
-     * (see the plan's §2). What S4 adds is that whichever form wins must still resolve under the
-     * allowed roots, or the load fails.
+     * Resolve a reference to another config file to the file actually read
+     * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}, 2026-09-23): a relative ref resolves <b>beside the
+     * referring config</b>, through {@link PathJail#resolveConfigRef} — never against the process working
+     * directory — and the result is jailed once against the allowed roots.
+     *
+     * <p>🔴 The working-directory fallback this replaces (unification W1b kept it "second") is what made
+     * every shipped Pipeline unloadable from a bundle launched outside the repo root: their refs were spelled
+     * {@code spaces/<space>/config/…}, a path that means something only from one directory. Those refs are
+     * now spelled beside their config. A ref that still names a file only the working directory can see is
+     * REFUSED with both paths named, not read.
+     *
+     * <p>⚠ {@code ../} is legal — it resolves from the config's directory and is then judged by the one
+     * jail. Containment is {@link PathJail}'s job; a second, narrower "must stay under configDir" rule here
+     * would be a path jailed twice.
+     *
+     * @param configDir directory of the config being parsed, or {@code null} for an in-memory draft, which
+     *                  keeps the working-directory reading (a draft has no directory to resolve against)
      */
     private static Path resolveSchemaRef(String ref, Path configDir, String field) {
         if (ref.startsWith(SCHEMA_REF_PREFIX)) {
             String id = ref.substring(SCHEMA_REF_PREFIX.length());
             return resolveSchemaRef("registry/schemas/" + id + ".toon", configDir, field);
         }
-        Path asAuthored = Paths.get(ref);
-        Path resolved;
-        if (configDir == null || asAuthored.isAbsolute()) {
-            resolved = asAuthored;
-        } else {
-            Path base      = configDir.toAbsolutePath().normalize();
-            Path candidate = base.resolve(asAuthored).normalize();
-            // Only prefer the portable form when it is both contained AND actually present — otherwise a legacy
-            // config (whose ref resolves from the working directory) must keep loading unchanged.
-            resolved = candidate.startsWith(base) && Files.exists(candidate) ? candidate : asAuthored;
-        }
+        Path resolved = PathJail.resolveConfigRef(configDir, ref, field);
         return PathJail.requireUnderAny(PathJail.allowedRoots(), resolved.toString(), field);
     }
 
@@ -1671,9 +1664,11 @@ final class PipelineConfigParser {
      * Translate the {@code asn1:} block into the plugin wiring {@code frontend: asn1} means
      * (definition-surface P3c). The grammar is <b>inline X.680 module text</b> ({@code asn1.grammar},
      * carried as {@code ingester_config.grammar_text}) and/or a <b>{@code .asn} file reference</b>
-     * ({@code asn1.grammar_file}, carried UNRESOLVED as the path key {@code ingester_config.grammar} —
-     * operator decision 2026-09-23). Text wins when both are set; that rule, the resolution and the
-     * jail live once, in {@code com.gamma.parse.Asn1GrammarSource}, which the preview uses too. Hard-fails
+     * ({@code asn1.grammar_file}, carried as-authored as the path key {@code ingester_config.grammar} —
+     * operator decision 2026-09-23), which the plugin-block read then resolves beside this config into
+     * {@code Schemas.ingesterGrammar} like any other ingester's {@code grammar}. Text wins when both are
+     * set; that rule, the extension check and the one jail live in {@code com.gamma.parse.Asn1GrammarSource},
+     * which the preview uses too. Hard-fails
      * (draft rejected before any run) on a missing block, no grammar of either spelling, empty root_type, or missing
      * segments — the tailored messages here, not the generic plugin ones.
      */
@@ -1696,15 +1691,16 @@ final class PipelineConfigParser {
             throw new IllegalArgumentException(
                     "asn1.segments must be a non-empty map of {recordName: schemaPath} for frontend 'asn1'");
         Map<String, Object> ic = new LinkedHashMap<>();
-        // Both spellings travel as-authored; the ingester's resolver (shared with the preview) applies
-        // "text wins" and resolves + jails the file ONCE, at use — never here as well.
+        // Both spellings travel as-authored (the authored relative value is what a save writes back);
+        // the file is resolved beside the config by the plugin-block read, and Asn1GrammarSource (shared
+        // with the preview) applies "text wins" and jails it ONCE, at use — never here as well.
         if (!grammar.isEmpty()) ic.put("grammar_text", grammar);
         if (!grammarFile.isEmpty()) ic.put("grammar", grammarFile);
         ic.put("root_type", rootType);
         for (String k : new String[]{"strictness", "file_header_length", "record_header_length"})
             if (a.get(k) != null) ic.put(k, a.get(k));
         Map<String, Object> plugin = new LinkedHashMap<>();
-        plugin.put("ingester", "com.gamma.ingester.Asn1RecordIngester");
+        plugin.put("ingester", ASN1_INGESTER);
         plugin.put("ingester_config", ic);
         plugin.put("segments", a.get("segments"));
         return plugin;

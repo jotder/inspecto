@@ -37,7 +37,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: spaces/demo/config/premed/premed_events_schema.toon
+  schema_file: premed_events_schema.toon
   csv_settings:
     delimiter: ","
     date_formats[1]: "%Y-%m-%d"

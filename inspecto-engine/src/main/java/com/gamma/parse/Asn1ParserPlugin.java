@@ -11,6 +11,7 @@ import com.gamma.asn.facade.Asn1Decoder;
 import com.gamma.asn.schema.NamedNode;
 import com.gamma.config.spec.FieldSpec;
 import com.gamma.config.spec.FieldType;
+import com.gamma.pipeline.SpaceConfigRoot;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -86,9 +87,10 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                                 + "self-describing, so an unknown file can be inspected before its "
                                 + "module is available. A grammar is still required to ingest."),
                 FieldSpec.of("asn1.grammar_file", "ASN.1 grammar file", FieldType.STRING,
-                        "Path to a stored .asn module in the Space's config (written like the segment "
-                                + "schema paths, e.g. spaces/demo/config/msc/msc_cdr.asn) — the alternative "
-                                + "to pasting the text above. Pasted text wins when both are set."),
+                        "Path to a stored .asn module, relative to the Pipeline's config file like the "
+                                + "segment schema paths (a sibling name, e.g. msc_cdr.asn); a stand-alone "
+                                + "preview reads it from the Space's config directory. The alternative to "
+                                + "pasting the text above. Pasted text wins when both are set."),
                 FieldSpec.of("asn1.root_type", "Root type", FieldType.STRING,
                         "Name of the type in the grammar each record binds against, e.g. Record. "
                                 + "Required when a grammar is supplied; ignored in structural mode."),
@@ -115,8 +117,11 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
         // Inline text wins over the .asn file ref — the ingester's rule, through the ingester's resolver.
+        // A preview has no config file to resolve beside, so a relative ref resolves against the bound
+        // Space's config root (null outside a Space: the working-directory reading).
         Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
-                asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file");
+                asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file",
+                SpaceConfigRoot.current());
 
         // No grammar: dump the self-describing TLV structure so an unknown file can be inspected.
         if (module == null) {

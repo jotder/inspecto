@@ -35,7 +35,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: spaces/demo/config/recharge/in_recharges_schema.toon
+  schema_file: in_recharges_schema.toon
   csv_settings:
     date_formats[1]: "%Y%m%d"
     timestamp_formats[1]: "%Y%m%d%H%M%S"

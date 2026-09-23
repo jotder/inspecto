@@ -32,9 +32,9 @@ parsing:
   plugin:
     ingester: com.gamma.ingester.XmlRecordIngester
     segments:
-      receipt:  spaces/demo/config/warehouse/stock_receipt_schema.toon
-      dispatch: spaces/demo/config/warehouse/stock_dispatch_schema.toon
-      transfer: spaces/demo/config/warehouse/stock_transfer_schema.toon
+      receipt:  stock_receipt_schema.toon
+      dispatch: stock_dispatch_schema.toon
+      transfer: stock_transfer_schema.toon
     ingester_config:
       record_element: ""
       namespace_aware: false

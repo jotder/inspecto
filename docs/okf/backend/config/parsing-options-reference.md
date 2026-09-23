@@ -285,12 +285,13 @@ parsing:
   # Sugar for the plugin wiring below: at load PipelineConfigParser#asn1PluginBlock synthesizes
   # the Asn1RecordIngester binding, so everything downstream is the one plugin path. The grammar
   # is INLINE X.680 text (carried as ingester_config.grammar_text) OR a stored .asn file
-  # (grammar_file, carried unresolved as the path-jailed ingester_config.grammar); text wins when
-  # both are set, and preview + ingest resolve both through the one Asn1GrammarSource.
+  # (grammar_file, carried as-authored as ingester_config.grammar and resolved BESIDE this config,
+  # like schema_file); text wins when both are set, and preview + ingest read both through the one
+  # Asn1GrammarSource, which checks the extension and jails the file once.
   # An explicit plugin: block alongside is refused (which binding wins would be undefined).
   asn1:
     grammar: "CDR DEFINITIONS ::= BEGIN ... END"   # inline X.680 module text, OR
-    grammar_file: spaces/demo/config/msc/msc_cdr.asn   # a stored .asn/.asn1 module (one required)
+    grammar_file: msc_cdr.asn   # a stored .asn/.asn1 module beside this config (one required)
     root_type: CallEventRecord                     # required
     strictness: BER            # BER (default) | DER | CER
     file_header_length: 0      # bytes skipped once at file start (e.g. 50, Huawei framing)

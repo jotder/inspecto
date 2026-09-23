@@ -483,7 +483,7 @@ UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
   `inspecto-pipeline-bundle` v1, satellites `{path, sha256}`, `requirements[]`, `notes[]`), the
   pipeline toon, every satellite byte-verbatim under its bare basename, and each `*_enrich.toon`
   companion. **Closure = `PipelineConfig.referencedFiles()`** — the engine's own resolution
-  (config-relative first, W1b); ⛔ no second resolver exists. `collector.connection` travels as a
+  (beside the config, `PathJail.resolveConfigRef`); ⛔ no second resolver exists. `collector.connection` travels as a
   secret-free `requirements[]` entry; a literal secret-looking value is masked to `***` + noted.
 - **`POST /pipelines/import?name=&conflict=refuse|overwrite|rename`** (`canAuthorWorkbench`; raw
   zip body + query params — the codebase has no multipart parser, matching

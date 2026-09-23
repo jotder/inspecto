@@ -218,8 +218,9 @@ class UnifiedParsingBlockTest {
 
     /**
      * Operator decision 2026-09-23: a stored module is a jailed {@code .asn} FILE. {@code asn1.grammar_file}
-     * travels to the ingester as the path key {@code ingester_config.grammar} UNRESOLVED — resolution and
-     * the jail happen once, at use, in the resolver preview and ingest share — and inline text beside it
+     * travels to the ingester as the path key {@code ingester_config.grammar} as-authored, resolved beside
+     * the config into {@code Schemas.ingesterGrammar}; the jail happens once, at use, in the resolver
+     * preview and ingest share — and inline text beside it
      * travels too, so the ingester's "text wins" rule decides, exactly as the preview does.
      */
     @Test
@@ -236,6 +237,9 @@ class UnifiedParsingBlockTest {
                       Record: %s
                 """.formatted(seg.toString().replace('\\', '/')));
         assertEquals("cdr/record.asn", cfg.schemas().ingesterConfig().get("grammar"));
+        // SCHEMA-FILE-RESOLVES-AGAINST-CWD-1: resolved BESIDE the config (not jailed — that is at use),
+        // even though no such file exists yet: a load does not read the module.
+        assertEquals(dir.resolve("cdr/record.asn").toAbsolutePath().normalize(), cfg.schemas().ingesterGrammar());
         assertNull(cfg.schemas().ingesterConfig().get("grammar_text"));
         assertEquals("Record", cfg.schemas().ingesterConfig().get("root_type"));
     }

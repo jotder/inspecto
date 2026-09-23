@@ -1,10 +1,13 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
+import com.gamma.event.EventLog;
 import com.gamma.parse.Asn1ParserPlugin;
 import com.gamma.parse.ParseResult;
+import com.gamma.pipeline.SpaceConfigRoot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.MDC;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,10 +38,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code TESTRUN-SEED-IS-MAPPED-OUTPUT-1}.
  *
  * <p>The committed config is staged into a temp root: every {@code spaces/demo/data/…} path is
- * re-pointed at the temp copy (the demo's own data dirs are never touched), while
- * {@code spaces/demo/config/…} schema paths are resolved against the repo so the COMMITTED schemas are
- * what runs. A path inside a TOON array row is quoted, because an absolute Windows path begins
- * {@code C:} and would otherwise parse as a key.
+ * re-pointed at the temp copy (the demo's own data dirs are never touched), and the pipeline's directory —
+ * its COMMITTED schemas beside it — is copied with it, because a satellite ref resolves beside its config
+ * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). A path inside a TOON array row is quoted, because an
+ * absolute Windows path begins {@code C:} and would otherwise parse as a key.
  */
 class DemoCorpusIngestTest {
 
@@ -77,17 +80,29 @@ class DemoCorpusIngestTest {
         PipelineConfig inline = stage(inlineDir, "config/msc/msc_cdr_pipeline.toon");
         PipelineConfig file = stageWithGrammarFile(fileDir, "config/msc/msc_cdr_pipeline.toon");
         assertNull(file.schemas().ingesterConfig().get("grammar_text"), "the file run must not carry the text");
-        assertTrue(String.valueOf(file.schemas().ingesterConfig().get("grammar")).endsWith(".asn"));
+        assertEquals("msc_cdr.asn", file.schemas().ingesterConfig().get("grammar"),
+                "the authored sibling name is what the config keeps (and a save writes back)");
+        assertEquals(fileDir.resolve("config/msc/msc_cdr.asn").toAbsolutePath().normalize(),
+                file.schemas().ingesterGrammar(), "resolved beside the pipeline, never against the CWD");
 
-        // preview: the same sample through POST /parsers/asn1/preview's plugin, text vs file
+        // preview: the same sample through POST /parsers/asn1/preview's plugin, text vs file. A preview has
+        // no config file, so its relative ref resolves from the bound Space's config root.
         byte[] sample = Files.readAllBytes(REPO.resolve("spaces/demo/data/samples/msc_cdr/MSC01_20260801_0800.ber"));
         Asn1ParserPlugin plugin = new Asn1ParserPlugin();
         Map<String, Object> inlineIc = inline.schemas().ingesterConfig();
         Map<String, Object> fileIc = file.schemas().ingesterConfig();
         ParseResult viaText = plugin.preview(sample, Map.of("asn1", Map.of(
                 "grammar", inlineIc.get("grammar_text"), "root_type", inlineIc.get("root_type"))));
-        ParseResult viaFile = plugin.preview(sample, Map.of("asn1", Map.of(
-                "grammar_file", fileIc.get("grammar"), "root_type", fileIc.get("root_type"))));
+        ParseResult viaFile;
+        SpaceConfigRoot.register("demo-corpus-test", fileDir.resolve("config"));
+        MDC.put(EventLog.SPACE_MDC_KEY, "demo-corpus-test");
+        try {
+            viaFile = plugin.preview(sample, Map.of("asn1", Map.of(
+                    "grammar_file", "msc/msc_cdr.asn", "root_type", fileIc.get("root_type"))));
+        } finally {
+            MDC.remove(EventLog.SPACE_MDC_KEY);
+            SpaceConfigRoot.forget("demo-corpus-test");
+        }
         assertEquals(13, ((ParseResult.Tree) viaText).recordCount());
         assertEquals(viaText, viaFile, "the preview tree is identical");
 
@@ -106,19 +121,22 @@ class DemoCorpusIngestTest {
         }
     }
 
-    /** {@link #stage}, then move the inline {@code asn1.grammar} text into {@code msc_cdr.asn} beside it. */
+    /**
+     * {@link #stage}, then move the inline {@code asn1.grammar} text into {@code msc_cdr.asn} BESIDE the
+     * pipeline, referenced by its bare sibling name — the spelling a satellite ref resolves from
+     * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}).
+     */
     private static PipelineConfig stageWithGrammarFile(Path dir, String pipeline) throws Exception {
         stage(dir, pipeline);   // writes the re-pointed copy beside the temp data
-        Path toon = dir.resolve(Path.of(pipeline).getFileName());
+        Path toon = dir.resolve(pipeline);
         List<String> out = new ArrayList<>();
         boolean moved = false;
         for (String line : Files.readAllLines(toon)) {
             String t = line.stripLeading();
             if (!moved && t.startsWith("grammar: \"") && t.endsWith("\"")) {
-                Path asn = dir.resolve("msc_cdr.asn");
+                Path asn = toon.resolveSibling("msc_cdr.asn");
                 Files.writeString(asn, t.substring("grammar: \"".length(), t.length() - 1));
-                out.add(line.substring(0, line.length() - t.length()) + "grammar_file: "
-                        + asn.toString().replace('\\', '/'));
+                out.add(line.substring(0, line.length() - t.length()) + "grammar_file: msc_cdr.asn");
                 moved = true;
             } else {
                 out.add(line);
@@ -225,13 +243,16 @@ class DemoCorpusIngestTest {
 
     private static PipelineConfig stage(Path dir, String space, String pipeline) throws Exception {
         String data = dir.resolve("data").toString().replace('\\', '/') + "/";
-        String config = REPO.resolve("spaces/" + space + "/config").toString().replace('\\', '/') + "/";
-        List<String> out = new ArrayList<>();
-        for (String line : Files.readAllLines(REPO.resolve("spaces/" + space).resolve(pipeline))) {
-            String l = rewrite(line, "spaces/" + space + "/data/", data);
-            out.add(rewrite(l, "spaces/" + space + "/config/", config));
+        Path source = REPO.resolve("spaces/" + space).resolve(pipeline);
+        Path toon = dir.resolve(pipeline);
+        Files.createDirectories(toon.getParent());
+        try (var siblings = Files.list(source.getParent())) {
+            for (Path f : siblings.filter(Files::isRegularFile).toList())
+                if (!f.equals(source)) Files.copy(f, toon.getParent().resolve(f.getFileName()));
         }
-        Path toon = dir.resolve(Path.of(pipeline).getFileName());
+        List<String> out = new ArrayList<>();
+        for (String line : Files.readAllLines(source))
+            out.add(rewrite(line, "spaces/" + space + "/data/", data));
         Files.write(toon, out);
         return PipelineConfig.load(toon.toString());
     }

@@ -24,7 +24,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: spaces/demo/config/mule/mule_transfers_schema.toon
+  schema_file: mule_transfers_schema.toon
   csv_settings:
     delimiter: ","
     has_header: true

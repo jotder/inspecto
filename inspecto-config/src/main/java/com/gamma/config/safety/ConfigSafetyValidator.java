@@ -4,9 +4,7 @@ import com.gamma.api.PublicApi;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.RawConfig;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -80,8 +78,9 @@ public final class ConfigSafetyValidator {
      * so a <b>config reference</b> ({@code schema_file}, {@code mapping_file}, {@code grammar}) can be
      * resolved the way the loader resolves it.
      *
-     * <p>🔴 <b>Why this overload exists.</b> Since unification W1b a config ref resolves
-     * <em>config-relative first, working-directory second</em>, and the Parse drawer deliberately
+     * <p>🔴 <b>Why this overload exists.</b> A config ref resolves <em>beside its config</em> (W1b made
+     * that the first choice; {@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1} made it the only one), and the
+     * Parse drawer deliberately
      * writes the portable bare {@code <name>.toon} beside its pipeline. Three checkpoints resolve
      * these refs — this gate, {@code ConfigRoutes.schemaFileFindings}, and the loader's
      * {@code PipelineConfigParser.resolveSchemaRef} — and only this one was still CWD-only. Because it
@@ -509,7 +508,10 @@ public final class ConfigSafetyValidator {
         }
         Path norm;
         try {
-            norm = resolveRef(s, configDir);
+            norm = resolveRef(s, configDir, field);
+        } catch (PathJail.Escape ambiguous) {
+            out.add(Finding.error(field, ambiguous.getMessage()));
+            return;
         } catch (RuntimeException ex) {
             out.add(Finding.error(field, "path '" + s + "' is not a valid path: " + ex.getMessage()));
             return;
@@ -528,28 +530,19 @@ public final class ConfigSafetyValidator {
     }
 
     /**
-     * Resolve a path value the way the LOADER resolves it — {@code configDir}-relative preferred,
-     * working-directory as the documented fallback.
+     * Resolve a path value the way the LOADER resolves it — through the SAME
+     * {@link PathJail#resolveConfigRef} {@code PipelineConfigParser.resolveSchemaRef} calls: beside the
+     * config, never against the working directory ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). A
+     * {@code null} {@code configDir} — a data dir, or a draft with no home — keeps the working-directory
+     * reading, which is what {@code dirs.*} still mean.
      *
-     * <p>⚠ Deliberately byte-for-byte the rule in {@code PipelineConfigParser.resolveSchemaRef}: the
-     * config-relative candidate wins only when it is both <b>contained under {@code configDir}</b> and
-     * <b>actually present on disk</b>. Both halves matter. Containment stops {@code ../../etc/passwd}
-     * from being laundered into the config directory — a bare {@code ..} ref still normalises out and
-     * is jailed exactly as before. Existence keeps every legacy config loading unchanged: those refs
-     * resolve from the working directory, and preferring a non-existent config-relative candidate
-     * would start failing configs that work today.
+     * <p>⛔ This gate must never be more permissive than the loader. It used to carry its own byte-for-byte
+     * copy of the loader's rule; one resolver is how the two stop being able to diverge.
      *
-     * <p>⛔ This gate must never be more permissive than the loader. If the two rules ever diverge, a
-     * draft passes authoring and then fails at load — the exact split this method was written to end.
+     * @throws PathJail.Escape for the ambiguous ref the resolver refuses (it names both paths)
      */
-    private static Path resolveRef(String value, Path configDir) {
-        Path asAuthored = Paths.get(value);
-        if (configDir == null || asAuthored.isAbsolute()) return asAuthored.toAbsolutePath().normalize();
-        Path base = configDir.toAbsolutePath().normalize();
-        Path candidate = base.resolve(asAuthored).normalize();
-        return candidate.startsWith(base) && Files.exists(candidate)
-                ? candidate
-                : asAuthored.toAbsolutePath().normalize();
+    private static Path resolveRef(String value, Path configDir, String field) {
+        return PathJail.resolveConfigRef(configDir, value, field);
     }
 
     /**

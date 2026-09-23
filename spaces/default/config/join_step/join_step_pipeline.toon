@@ -23,7 +23,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: spaces/default/config/join_step/join_step_schema.toon
+  schema_file: join_step_schema.toon
   csv_settings:
     delimiter: ","
     date_formats[1]: "%Y-%m-%d"

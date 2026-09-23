@@ -23,7 +23,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: spaces/demo/config/payments/payments_schema.toon
+  schema_file: payments_schema.toon
   csv_settings:
     delimiter: "|"
     has_header: true

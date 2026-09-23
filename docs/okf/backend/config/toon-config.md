@@ -51,17 +51,19 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `processing`/`dirs` sections deliberately stay inline because their locals (`proc`, `dirs`) are read
   throughout. `parseCollector` returns a `Collector`; `parseParsing` returns a private `Grammar` record
   because five of its locals are read by `parsePlugin` further down.
-  **Schema-reference resolution (W1b, 2026-07-31): config-relative first, JVM CWD second.** A relative
-  `schema_file` / `schemas[].schema_file` / `parsing.plugin.segments` value is resolved against **the config
-  file's own directory** if it exists and stays inside it, otherwise against the **JVM CWD** — so a bare
-  `orders_schema.toon` beside its pipeline is portable (the space tree can be moved, renamed, or imported
-  under a new name with no edits), while every legacy `spaces/<id>/config/...` value keeps loading unchanged.
-  `fromMap(map)` has no directory, so it takes the CWD branch only.
+  **Schema-reference resolution: beside the config, never the JVM CWD** (W1b 2026-07-31 made it
+  config-relative first; `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` 2026-09-23 removed the CWD second). A relative
+  `schema_file` / `schemas[].schema_file` / `segments` / `grammar` / `mapping_file` value resolves through
+  `PathJail.resolveConfigRef` against **the config file's own directory** — so a bare `orders_schema.toon`
+  beside its pipeline is portable and the server loads it from any launch directory. A legacy
+  `spaces/<id>/config/...` value is refused (naming both paths) or not found. `fromMap(map)` has no
+  directory, so it keeps the CWD reading.
   ⚠ **`dirs.*` is still CWD-only** — it was not part of W1b. *(Corrected 2026-09-08: this line used to say
   `grammar` was CWD-only too. It is not — `resolveGrammarRef` delegates to `resolveSchemaRef(ref, configDir,
   "grammar")` (`PipelineConfigParser.java:1181-1185`), so a `grammar` ref takes the same config-relative-first
   branch as `schema_file`, including the `grammar:<id>` registry form.)*
-  ⚠ The config-relative branch is contained (a `../` escape is skipped, not resolved); the CWD branch is
+  *(Superseded 2026-09-23: `../` now resolves from the config's directory and the one jail judges it.)*
+  ⚠ The config-relative branch was contained (a `../` escape was skipped, not resolved); the CWD branch was
   **not** jailed and is explicitly not a security boundary (see [gotchas](../gotchas/cross-cutting.md) and
   `BACKLOG.md` §6).
 
