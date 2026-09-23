@@ -538,7 +538,25 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   original log, its per-step Working Sets and any snapshot anchored to them stay byte-identical. The log and
   Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
   **owner-only** (a non-owner reads 404), writes need `canManageIncidents`, and a bound Dataset shared away
-  from the caller makes the Investigation read as absent. ⚠ The SPA does not call it yet.
+  from the caller makes the Investigation read as absent.
+* **The Investigation tab drives it** (LA-10 SPA half, 2026-09-23): the right dock's third tab
+  (`link-analysis-investigation.component` over the pane-provided `InvestigationSessionStore`, so the session
+  survives the dock collapsing). *Start Investigation* needs a last run of ONE `entity-projection` mapping
+  and binds its Dataset + source/target/kind columns — ⚠ the query's `filter` is NOT sent, because the
+  create route takes none, and the panel says so. While one is open, a canvas click picks the entity instead
+  of opening the detail dialog; the canvas draws the **Working Set** (hidden entities left off, "Show the
+  query graph" to pick seeds). Ops send the node's RAW spellings — the Working Set graph is folded through
+  `projectTriples`/`entityId()` so its node ids match the query graph's (D-S4), and the server's untrimmed
+  value is added to `spellings` because the fold trims. Exclude has a required reason field; undo, replay
+  (optional re-read → per-expand drift table) and re-order (up/down → an on-screen "this creates a fork"
+  explanation → switch to the fork, whose header lineage is shown) are all wired. Truncation is shown from
+  the log (every effective expand whose sealed read was cut), not only from the last response.
+  ⚠ **No list or get-one route exists**, so the SPA remembers the ids it created and saves them with the
+  view (`LinkAnalysisView.investigations`: id, title, entityType, parentId); restoring a view opens none.
+  ⚠ `/ops` and `/undo` answer the Working Set as COUNTS and the delta's link changes as counts, so the store
+  re-reads `GET /log` + `POST /replay` after every mutation — which also writes a `link.investigation.replayed`
+  audit event per step. ⚠ Not wired: the six deferred ops, a client-side `canManageIncidents` gate (a 403 is
+  surfaced instead), drag-to-reorder, replay `at`.
 * **An Investigation has a Dossier with a SHA-256 chain of custody** (LA-12, backend shipped 2026-09-23;
   `DossierRoutes` + `GraphDossierBuilder` in `inspecto-geo-link`). `GET /inv/investigations/{id}/dossier`
   (`?at=` a prefix, `?snapshots=` exhibits, `?format=json|steps|method`) answers summary, topology, a

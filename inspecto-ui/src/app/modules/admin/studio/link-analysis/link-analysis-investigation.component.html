@@ -1,0 +1,342 @@
+<section class="flex flex-col gap-3 text-sm" aria-label="Investigation">
+    @if (store.error()) {
+        <inspecto-alert variant="error" title="Investigation">{{ store.error() }}</inspecto-alert>
+    }
+
+    @if (store.refs().length) {
+        <inspecto-option-picker
+            label="Investigation"
+            [options]="pickerOptions()"
+            [ngModel]="store.activeId()"
+            (ngModelChange)="switchTo($event)"
+            placeholder="Open a remembered Investigation"
+        ></inspecto-option-picker>
+    }
+
+    @if (!store.active()) {
+        <!-- ── start ── -->
+        @if (projection(); as p) {
+            <p class="text-secondary m-0 text-xs">
+                An Investigation is an ordered, append-only log of steps over <strong>{{ p.datasetId }}</strong> ({{
+                    p.sourceCol
+                }}
+                → {{ p.targetCol }}). Each step is recorded with who, when and why, and the reads are sealed so the log
+                replays identically. It reads the whole Dataset — the query's filter is not applied.
+            </p>
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <mat-label>Title (optional)</mat-label>
+                <input matInput [formControl]="title" (keydown.enter)="start()" />
+                @if (title.hasError('maxlength')) {
+                    <mat-error>At most 200 characters.</mat-error>
+                }
+            </mat-form-field>
+            <button mat-flat-button color="primary" [disabled]="store.busy() || title.invalid" (click)="start()">
+                Start Investigation
+            </button>
+        } @else {
+            <inspecto-alert variant="info" title="Nothing to investigate yet">{{ projectionIssue() }}</inspecto-alert>
+        }
+        <p class="text-secondary m-0 text-xs">
+            There is no server-side list of Investigations: this screen remembers the ones it created, and saving the
+            view keeps them with it.
+        </p>
+    } @else {
+        <!-- ── the open Investigation ── -->
+        @if (store.header(); as h) {
+            <div class="flex items-start gap-1">
+                <div class="min-w-0">
+                    <div class="truncate font-semibold">{{ h.title || h.id }}</div>
+                    <div class="text-secondary text-xs">{{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}</div>
+                </div>
+                <button
+                    mat-icon-button
+                    class="ml-auto"
+                    (click)="store.close()"
+                    matTooltip="Close the Investigation (it stays remembered)"
+                    aria-label="Close the Investigation"
+                >
+                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                </button>
+            </div>
+            @if (h.parent; as parent) {
+                <div
+                    class="rounded-md border p-2 text-xs"
+                    style="border-color: var(--gamma-border)"
+                    aria-label="Lineage"
+                >
+                    <strong>Fork</strong> of <code>{{ parent.id }}</code> — its effective steps re-applied in the order
+                    {{ parent.order.join(', ') }} (the parent had {{ parent.parentSteps }} log entries and is
+                    unchanged).
+                    @if (parentRemembered()) {
+                        <button mat-button class="!ml-1" (click)="openParent()">Open the parent</button>
+                    }
+                </div>
+            }
+        } @else if (!store.busy()) {
+            <button mat-stroked-button (click)="store.forget(store.activeId()!)">Forget this Investigation</button>
+        }
+
+        <p class="m-0 text-xs tabular-nums" aria-label="Working Set">
+            <strong>Working Set:</strong> {{ counts().entities }} entities · {{ counts().links }} links ·
+            {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
+        </p>
+        <mat-checkbox [ngModel]="!store.showWorkingSet()" (ngModelChange)="store.showWorkingSet.set(!$event)">
+            Show the query graph (to pick seeds)
+        </mat-checkbox>
+
+        @if (store.truncatedSteps().length) {
+            <inspecto-alert variant="warning" title="Incomplete Working Set">
+                The expand at step {{ store.truncatedSteps().join(', ') }} hit its row limit — some neighbours were not
+                read. Name fewer entities to expand, or exclude a hub first.
+            </inspecto-alert>
+        }
+        @if (store.workingSetGraph()?.truncated) {
+            <inspecto-alert variant="warning" title="Not all drawn">
+                The Working Set has more entities than the canvas node cap — the drawing is partial; the counts above
+                are complete.
+            </inspecto-alert>
+        }
+        @if (store.lastStep()?.protected?.length) {
+            <inspecto-alert variant="info" title="Kept entities were not excluded">
+                {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
+            </inspecto-alert>
+        }
+
+        <!-- ── act on the selected entity ── -->
+        <section
+            class="flex flex-col gap-2 rounded-md border p-2"
+            style="border-color: var(--gamma-border)"
+            aria-label="Selected entity"
+        >
+            @if (store.selected(); as n) {
+                <div class="text-xs">
+                    Selected: <strong>{{ n.data.label }}</strong>
+                    @if (!selectedInSet().length) {
+                        <span class="text-secondary">(not in the Working Set)</span>
+                    }
+                </div>
+                <div class="flex flex-wrap gap-1">
+                    <button mat-stroked-button [disabled]="store.busy()" (click)="seed()">Seed</button>
+                    <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="expand()">
+                        Expand one hop
+                    </button>
+                    <button
+                        mat-stroked-button
+                        [disabled]="store.busy() || !selectedInSet().length"
+                        (click)="mark('keep')"
+                    >
+                        Keep
+                    </button>
+                    <button
+                        mat-stroked-button
+                        [disabled]="store.busy() || !selectedInSet().length"
+                        (click)="mark('hide')"
+                    >
+                        Hide
+                    </button>
+                </div>
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Reason to exclude</mat-label>
+                    <input matInput [formControl]="reason" (keydown.enter)="exclude()" />
+                    @if (reason.hasError('required')) {
+                        <mat-error>An exclusion needs a reason — without one it cannot be challenged.</mat-error>
+                    } @else if (reason.hasError('maxlength')) {
+                        <mat-error>At most 200 characters.</mat-error>
+                    }
+                </mat-form-field>
+                <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="exclude()">
+                    Exclude
+                </button>
+            } @else {
+                <p class="text-secondary m-0 text-xs">
+                    Click an entity on the canvas to act on it. Seed from the query graph; expand, keep, hide or exclude
+                    entities of the Working Set.
+                </p>
+            }
+            <button
+                mat-button
+                [disabled]="store.busy() || !counts().entities"
+                (click)="expand(true)"
+                matTooltip="Expand one hop from every entity in the Working Set (at most 1 000)"
+            >
+                Expand the whole Working Set
+            </button>
+        </section>
+
+        <!-- ── the op log ── -->
+        <section aria-label="Op log">
+            <div class="mb-1 flex items-center gap-1">
+                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Op log</h3>
+                <button
+                    mat-button
+                    class="ml-auto"
+                    [disabled]="store.busy() || !store.canUndo()"
+                    (click)="store.undo()"
+                    aria-label="Undo the latest step"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
+                    Undo
+                </button>
+            </div>
+            @if (store.log(); as log) {
+                @if (log.entries.length) {
+                    <ol class="m-0 flex list-none flex-col gap-1 p-0">
+                        @for (e of log.entries; track e.step) {
+                            <li class="rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="font-mono text-xs tabular-nums">{{ e.step }}</span>
+                                    <span class="text-xs font-semibold">{{ opLabel(e) }}</span>
+                                    @if (e.undoneBy != null) {
+                                        <span class="text-secondary text-xs">undone by step {{ e.undoneBy }}</span>
+                                    }
+                                    <span class="text-secondary ml-auto text-[11px]">{{ time(e.at) }}</span>
+                                </div>
+                                <div class="text-xs" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
+                                @if (e.params?.reason) {
+                                    <div class="text-secondary text-xs">Reason: {{ e.params!.reason }}</div>
+                                }
+                                @if (e.author) {
+                                    <div class="text-secondary text-[11px]">by {{ e.author }}</div>
+                                }
+                            </li>
+                        }
+                    </ol>
+                    @if (log.truncated) {
+                        <p class="text-secondary m-0 mt-1 text-xs">
+                            Showing the first {{ log.entries.length }} of {{ log.total }} steps.
+                        </p>
+                    }
+                } @else {
+                    <p class="text-secondary m-0 text-xs">No steps yet — seed an entity to begin.</p>
+                }
+            }
+        </section>
+
+        <!-- ── re-order → fork ── -->
+        <section aria-label="Re-order steps">
+            @if (order(); as o) {
+                <inspecto-alert variant="info" title="Re-ordering creates a fork">
+                    The original Investigation stays exactly as it is. A new Investigation is created with these steps
+                    in the new order, every expand re-reads the Dataset, and it records this one as its parent.
+                </inspecto-alert>
+                <ol class="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+                    @for (step of o; track step; let i = $index; let first = $first; let last = $last) {
+                        <li
+                            class="flex items-center gap-1 rounded-md border px-2 py-1"
+                            style="border-color: var(--gamma-border)"
+                        >
+                            <span class="min-w-0 flex-auto truncate text-xs">{{ stepLabel(step) }}</span>
+                            <button
+                                mat-icon-button
+                                [disabled]="first"
+                                (click)="move(i, -1)"
+                                [attr.aria-label]="'Move step ' + step + ' up'"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-up"></mat-icon>
+                            </button>
+                            <button
+                                mat-icon-button
+                                [disabled]="last"
+                                (click)="move(i, 1)"
+                                [attr.aria-label]="'Move step ' + step + ' down'"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                            </button>
+                        </li>
+                    }
+                </ol>
+                <div class="mt-2 flex gap-2">
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        [disabled]="store.busy() || !orderChanged()"
+                        (click)="createFork()"
+                    >
+                        Create fork
+                    </button>
+                    <button mat-button (click)="order.set(null)">Cancel</button>
+                </div>
+            } @else {
+                <button
+                    mat-button
+                    [disabled]="store.busy() || store.effectiveSteps().length < 2"
+                    (click)="beginReorder()"
+                >
+                    Re-order steps…
+                </button>
+            }
+        </section>
+
+        <!-- ── replay + drift ── -->
+        <section class="flex flex-col gap-1" aria-label="Replay">
+            <div class="flex items-center gap-2">
+                <mat-checkbox [ngModel]="reread()" (ngModelChange)="reread.set($event)">
+                    Re-read current data (drift check)
+                </mat-checkbox>
+                <button mat-stroked-button class="ml-auto" [disabled]="store.busy()" (click)="store.replay(reread())">
+                    Replay
+                </button>
+            </div>
+            @if (store.replayResult(); as r) {
+                @if (r.equivalent) {
+                    <inspecto-alert variant="success" title="Replay is equivalent">
+                        Re-evaluating the sealed log from step 1 gives the same Working Set at every step.
+                    </inspecto-alert>
+                } @else {
+                    <inspecto-alert variant="error" title="Replay is NOT equivalent">
+                        The Working Set differs from what was recorded at step {{ r.mismatches.join(', ') }}.
+                    </inspecto-alert>
+                }
+                @if (r.reread) {
+                    @if (r.drift.length) {
+                        <table class="w-full text-xs" aria-label="Drift per expand step">
+                            <thead>
+                                <tr class="text-secondary text-left">
+                                    <th scope="col">Step</th>
+                                    <th scope="col">Sealed rows</th>
+                                    <th scope="col">Rows now</th>
+                                    <th scope="col">Drift</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (d of r.drift; track d.step) {
+                                    <tr>
+                                        <td class="tabular-nums">{{ d.step }}</td>
+                                        <td class="tabular-nums">{{ d.sealedRows }}</td>
+                                        <td class="tabular-nums">{{ d.currentRows }}</td>
+                                        <td [class.font-semibold]="d.diverged">
+                                            {{ d.diverged ? 'changed' : 'same' }}
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <p class="text-secondary m-0 text-xs">
+                            {{
+                                r.diverged
+                                    ? 'The Dataset has changed since at least one read was sealed.'
+                                    : 'Every sealed read still matches current data.'
+                            }}
+                            The Working Set shown stays the sealed one.
+                        </p>
+                    } @else {
+                        <p class="text-secondary m-0 text-xs">No expand steps to re-read.</p>
+                    }
+                }
+            }
+        </section>
+
+        @if (store.workingSet()?.excluded?.length) {
+            <section aria-label="Excluded entities">
+                <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Excluded</h3>
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                    @for (x of store.workingSet()!.excluded; track x.id) {
+                        <li>
+                            <strong>{{ x.id }}</strong> — {{ x.reason }} (step {{ x.step }})
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    }
+</section>

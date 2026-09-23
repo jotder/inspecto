@@ -216,6 +216,16 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                 </button>
+                <!-- LA-10: the Investigation op log (opens the right dock's Investigation tab) -->
+                <button
+                    mat-icon-button
+                    (click)="openInvestigation()"
+                    [color]="investigation.active() ? 'primary' : undefined"
+                    matTooltip="Investigation — an ordered, replayable op log"
+                    aria-label="Open the Investigation"
+                >
+                    <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
+                </button>
 
                 @if (search() || kindFilter().length || timeColumn()) {
                     <button
@@ -725,7 +735,7 @@
                     <div class="relative min-h-0 flex-auto">
                         <inspecto-graph-view
                             [fill]="true"
-                            [data]="displayed()"
+                            [data]="canvasData()"
                             [emphasis]="emphasis() ?? geoBrushEmphasis()"
                             [display]="displayOptions()"
                             [tooltips]="true"
@@ -748,9 +758,12 @@
                             aria-label="Render status"
                         >
                             <span
-                                >{{ displayed()?.nodes?.length ?? 0 }} nodes ·
-                                {{ displayed()?.edges?.length ?? 0 }} links drawn</span
+                                >{{ canvasData()?.nodes?.length ?? 0 }} nodes ·
+                                {{ canvasData()?.edges?.length ?? 0 }} links drawn</span
                             >
+                            @if (investigation.canvas()) {
+                                <span>Investigation Working Set</span>
+                            }
                             @if (lodLabelsOff()) {
                                 <span>labels off above {{ lodLabelCap }} nodes (level of detail)</span>
                             }
@@ -815,6 +828,7 @@
                         >
                             <mat-button-toggle value="analysis">Analysis</mat-button-toggle>
                             <mat-button-toggle value="view">View</mat-button-toggle>
+                            <mat-button-toggle value="investigation">Investigation</mat-button-toggle>
                         </mat-button-toggle-group>
                         <button
                             class="ml-auto"
@@ -844,6 +858,14 @@
                             (emphasisChange)="emphasis.set($event)"
                             (findPaths)="findPaths($event)"
                         ></inspecto-link-analysis-toolbox>
+
+                        <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->
+                        @if (toolboxTab() === 'investigation') {
+                            <inspecto-link-analysis-investigation
+                                [projection]="investigationProjection()"
+                                [projectionIssue]="investigationIssue()"
+                            ></inspecto-link-analysis-investigation>
+                        }
 
                         <!-- View — layouts and canvas overlays -->
                         <div [hidden]="toolboxTab() !== 'view'" class="flex flex-col gap-3">
@@ -996,6 +1018,14 @@
                         aria-label="Open the analysis tools"
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        (click)="openInvestigation()"
+                        matTooltip="Investigation"
+                        aria-label="Open the Investigation"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:queue-list"></mat-icon>
                     </button>
                     <button
                         mat-icon-button

@@ -4,6 +4,7 @@ import { ComponentsService } from 'app/inspecto/api';
 import { GraphSourceId, GraphSourceQuery, DomainProfileId } from 'app/inspecto/graph';
 import { SavedViewStore } from 'app/inspecto/investigation';
 import { GraphDisplayOptions, GraphLayoutId, GraphViewPlugins } from 'app/modules/admin/catalog/graph-view.component';
+import type { InvestigationRef } from './investigation-state';
 
 /**
  * A saved investigation — a **Link-Analysis View** (GLOSSARY §11), persisted as the
@@ -34,6 +35,11 @@ export interface LinkAnalysisView {
     profile?: DomainProfileId;
     /** View toolbox state: canvas plugins/behaviors and which overlays are open; absent = defaults. */
     view?: LinkAnalysisViewOptions;
+    /**
+     * LA-10: the Investigations started from this view. The backend has no list or get-one route, so this is
+     * where their ids are remembered; the log and Working Set stay server-side (owner-only). Absent = none.
+     */
+    investigations?: InvestigationRef[];
 }
 
 export interface LinkAnalysisViewOptions {
@@ -77,6 +83,7 @@ function toContent(v: LinkAnalysisView): Record<string, unknown> {
         layout: v.layout,
         profile: v.profile,
         view: v.view,
+        investigations: v.investigations,
     };
 }
 
@@ -90,6 +97,7 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         layout?: GraphLayoutId;
         profile?: DomainProfileId;
         view?: LinkAnalysisViewOptions;
+        investigations?: InvestigationRef[];
     };
     return {
         id,
@@ -101,5 +109,6 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         layout: c.layout,
         profile: c.profile,
         view: c.view,
+        investigations: Array.isArray(c.investigations) ? c.investigations : undefined,
     };
 }

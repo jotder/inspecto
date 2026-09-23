@@ -53,6 +53,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import {
     G6GraphData,
+    EntityProjection,
     GraphSourceId,
     GraphSourceQuery,
     analysisNodeCapValue,
@@ -148,6 +149,8 @@ import {
 } from './link-analysis.service';
 import { FindPathsRequest, LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
+import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -223,7 +226,10 @@ const SERVER_PATH_LIMIT = 100;
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         AiExplainComponent,
+        LinkAnalysisInvestigationComponent,
     ],
+    // LA-10: the Investigation session outlives the toolbox dock, which destroys its panel on collapse.
+    providers: [InvestigationSessionStore],
     templateUrl: './link-analysis.component.html',
     host: {
         '(document:fullscreenchange)': 'onFullscreenChange()',
@@ -297,7 +303,9 @@ export class LinkAnalysisComponent implements OnInit {
     readonly queryDockOpen = signal(true);
     /** The right dock (Analysis | View toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(true);
-    readonly toolboxTab = signal<'analysis' | 'view'>('analysis');
+    readonly toolboxTab = signal<'analysis' | 'view' | 'investigation'>('analysis');
+    /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
+    readonly investigation = inject(InvestigationSessionStore);
     /** Canvas overlays — each minimises to a pill so the graph gets the space. */
     readonly legendOpen = signal(true);
     readonly workingSetOpen = signal(true);
@@ -606,6 +614,23 @@ export class LinkAnalysisComponent implements OnInit {
         const threshold = this.superNodeThreshold();
         return threshold >= 2 ? aggregateSuperNodes(g, threshold, this.expandedSuperHubs()) : g;
     });
+    /** What the canvas draws: an open Investigation's Working Set, else the query graph. */
+    readonly canvasData = computed<G6GraphData | null>(() => this.investigation.canvas() ?? this.displayed());
+    /**
+     * LA-10: an Investigation binds ONE Dataset + source/target columns, so it can start only from a last run
+     * of a single Entity/Link mapping. `investigationIssue` says why not otherwise.
+     */
+    readonly investigationProjection = computed<EntityProjection | null>(() => {
+        const run = this.lastRun();
+        return run?.sourceId === 'entity-projection' && run.query.projection && !run.query.projections?.length
+            ? run.query.projection
+            : null;
+    });
+    readonly investigationIssue = computed(() =>
+        this.lastRun()?.query.projections?.length
+            ? 'An Investigation binds one Dataset mapping — this query has several. Run a single Entity/Link mapping.'
+            : 'Run an Entity/Link query over one Dataset first — the Investigation binds that Dataset and its source and target columns.',
+    );
     /** True while any super-node is on the canvas — the footer says so, since counts then differ. */
     readonly hasSuperNodes = computed(
         () => this.displayed()?.nodes.some((n) => n.data.kind === SUPER_NODE_KIND) ?? false,
@@ -1040,6 +1065,12 @@ export class LinkAnalysisComponent implements OnInit {
         this.toolboxTab.set('analysis');
     }
 
+    /** LA-10: open the Investigation tab (start one, or work the open one's op log). */
+    openInvestigation(): void {
+        this.toolboxDockOpen.set(true);
+        this.toolboxTab.set('investigation');
+    }
+
     /** Open the View toolbox (layouts, lenses, overlays). */
     openViewTools(): void {
         this.toolboxDockOpen.set(true);
@@ -1227,6 +1258,15 @@ export class LinkAnalysisComponent implements OnInit {
         // would do nothing at all. Clicking a stand-in means "show me what you are standing in for".
         if (this.displayed()?.nodes.find((n) => n.id === id)?.data.kind === SUPER_NODE_KIND) {
             this.toggleSuperNode(id);
+            return;
+        }
+        // LA-10: while an Investigation is open a click picks the entity its ops act on (Investigation tab).
+        if (this.investigation.active()) {
+            const picked = this.canvasData()?.nodes.find((n) => n.id === id);
+            if (picked) {
+                this.investigation.selected.set(picked);
+                this.openInvestigation();
+            }
             return;
         }
         const g = this.baseGraph();
@@ -1516,6 +1556,8 @@ export class LinkAnalysisComponent implements OnInit {
             layout: this.layoutId(),
             profile: this.profileId() === 'generic' ? undefined : this.profileId(),
             view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
+            // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.
+            investigations: this.investigation.refs().length ? this.investigation.refs() : undefined,
         };
         this.saving.set(true);
         try {
@@ -1542,6 +1584,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.legendOpen.set(view.view?.legend ?? true);
         this.workingSetOpen.set(view.view?.workingSet ?? true);
         this.queryPanel?.patchFormFromView(view);
+        this.investigation.restore(view.investigations ?? []);
         await this.execute(view.sourceId, view.query);
     }
 

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { apiUrl } from './api-base';
+import { apiUrl, toParams } from './api-base';
 import type { ConditionGroup } from '../query/query-types';
 
 /** One aggregated projection triple: a distinct (source, target[, kind]) pair with its folded row count. */
@@ -137,6 +137,182 @@ export interface RecursivePathsResult {
     fences: { maxDepth: number; maxEdgeYield: number; timeoutMs: number };
 }
 
+// ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
+
+/** The five ops the backend evaluates. `seedBy`, `excludeBy`, `threshold`, `window`, `annotate` and
+ *  `snapshot` are in the closed vocabulary but answer 422 "not implemented yet" — never offer them. */
+export type InvestigationOpName = 'seed' | 'expand' | 'exclude' | 'hide' | 'keep';
+
+/** `POST /inv/investigations` — bound to one Dataset + the projection's columns. */
+export interface InvestigationCreateRequest {
+    id?: string;
+    title?: string;
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    linkKindCol?: string;
+}
+
+/** A fork's parent (D-E4): the Investigation it was re-ordered from, the order, and the parent's log length. */
+export interface InvestigationLineage {
+    id: string;
+    order: number[];
+    parentSteps: number;
+}
+
+export interface InvestigationHeader {
+    id: string;
+    title: string | null;
+    owner: string | null;
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    linkKindCol: string | null;
+    createdAt: string;
+    /** Always null (D-E3): no version-addressable read exists, so reads are sealed at use, not pinned. */
+    datasetVersion: null;
+    parent: InvestigationLineage | null;
+}
+
+/** One op's body. Ids are RAW Dataset values — the server compares `CAST(col AS VARCHAR)` exactly. */
+export type InvestigationOpRequest =
+    | { op: 'seed'; ids: string[]; entityType?: string }
+    | { op: 'expand'; ids?: string[]; limit?: number }
+    | { op: 'exclude'; ids: string[]; reason: string }
+    | { op: 'hide' | 'keep'; ids: string[] };
+
+/** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
+export interface WorkingSetDelta {
+    admitted: string[];
+    removed: string[];
+    linksAdded: number;
+    linksRemoved: number;
+    hidden: string[];
+    kept: string[];
+    excluded: string[];
+}
+
+/** The Working Set as COUNTS (what `/ops`, `/undo` and `/reorder` answer). */
+export interface WorkingSetSummary {
+    entities: number;
+    links: number;
+    excluded: number;
+    hash: string;
+}
+
+export interface InvestigationStepResult {
+    step: number;
+    op: InvestigationOpName | 'undo';
+    undoes?: number;
+    delta: WorkingSetDelta;
+    /** True when this step's expand hit its row limit — the Working Set is then incomplete. */
+    truncated: boolean;
+    /** On `exclude`: the ids a prior `keep` protected, so they were NOT excluded. */
+    protected?: string[];
+    read?: { rowCount: number; fingerprint: string; readAt: string };
+    workingSet: WorkingSetSummary;
+}
+
+export interface InvestigationForkRequest {
+    /** A permutation of the parent's EFFECTIVE op steps (undo entries and undone ops excluded). */
+    order: number[];
+    id?: string;
+    title?: string;
+}
+
+export interface InvestigationForkResult {
+    id: string;
+    parent: InvestigationLineage;
+    steps: number;
+    workingSet: WorkingSetSummary;
+}
+
+export interface WorkingSetEntity {
+    /** The RAW value, as the Dataset holds it. */
+    id: string;
+    type: string | null;
+    hop: number;
+    seed: string;
+    admittedBy: number;
+    hidden: boolean;
+    kept: boolean;
+}
+
+export interface WorkingSetLink {
+    source: string;
+    target: string;
+    kind: string | null;
+    count: number;
+    admittedBy: number;
+}
+
+export interface WorkingSetExclusion {
+    id: string;
+    step: number;
+    reason: string;
+}
+
+/** The full Working Set — only `/replay` returns it. */
+export interface WorkingSet {
+    entities: WorkingSetEntity[];
+    links: WorkingSetLink[];
+    excluded: WorkingSetExclusion[];
+    hash: string;
+}
+
+export interface InvestigationReplayRequest {
+    at?: number;
+    /** Re-run every effective expand's recorded query against current data and report drift. */
+    reread?: boolean;
+}
+
+export interface ReplayDriftRow {
+    step: number;
+    dataset: string;
+    sealedAt: string;
+    sealedFingerprint: string;
+    currentFingerprint: string;
+    sealedRows: number;
+    currentRows: number;
+    diverged: boolean;
+}
+
+export interface InvestigationReplayResult {
+    id: string;
+    at: number;
+    workingSet: WorkingSet;
+    /** Full re-evaluation agrees with every hash recorded at append time. */
+    equivalent: boolean;
+    mismatches: number[];
+    reread: boolean;
+    drift: ReplayDriftRow[];
+    diverged: boolean;
+}
+
+export interface InvestigationLogEntry {
+    step: number;
+    kind: 'op' | 'undo';
+    author: string | null;
+    at: string;
+    op?: InvestigationOpName;
+    params?: { ids: string[]; entityType?: string | null; limit?: number; reason?: string };
+    undoes?: number;
+    undoneBy: number | null;
+    read?: { dataset: string; readAt: string; rowCount: number; truncated: boolean; fingerprint: string };
+    derivedFrom?: { investigation: string; step: number };
+    workingSetHash: string;
+    /** The server's plain-language line for this step. */
+    text: string;
+}
+
+export interface InvestigationLog {
+    header: InvestigationHeader;
+    entries: InvestigationLogEntry[];
+    /** The TRUE number of log entries; `entries` may be capped (`truncated`). */
+    total: number;
+    truncated: boolean;
+}
+
 /**
  * Investigation-studio backend (INV-1): the real DuckDB-side Entity Projection over a Dataset —
  * the server half of the Link Analysis studio's `entity-projection` GraphSource. Offline/mock mode
@@ -165,4 +341,37 @@ export class InvService {
     recursivePaths(req: RecursivePathsRequest): Observable<RecursivePathsResult> {
         return this.http.post<RecursivePathsResult>(apiUrl('/inv/traversal/recursive-paths'), req);
     }
+
+    // ── LA-10 Investigation. There is NO list or get-one route: the caller remembers the ids it created. ──
+
+    createInvestigation(req: InvestigationCreateRequest): Observable<InvestigationHeader> {
+        return this.http.post<InvestigationHeader>(apiUrl('/inv/investigations'), req);
+    }
+
+    appendInvestigationOp(id: string, op: InvestigationOpRequest): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, 'ops'), op);
+    }
+
+    /** Reverts the latest effective op (a recorded log edit). 409 when there is nothing to undo. */
+    undoInvestigation(id: string): Observable<InvestigationStepResult> {
+        return this.http.post<InvestigationStepResult>(invPath(id, 'undo'), {});
+    }
+
+    /** D-E4: re-ordering FORKS — the answer is a NEW Investigation; the original is untouched. */
+    reorderInvestigation(id: string, req: InvestigationForkRequest): Observable<InvestigationForkResult> {
+        return this.http.post<InvestigationForkResult>(invPath(id, 'reorder'), req);
+    }
+
+    /** The only route that answers the FULL Working Set (entities, links, exclusions). Persists nothing. */
+    replayInvestigation(id: string, req: InvestigationReplayRequest = {}): Observable<InvestigationReplayResult> {
+        return this.http.post<InvestigationReplayResult>(invPath(id, 'replay'), req);
+    }
+
+    investigationLog(id: string, limit?: number): Observable<InvestigationLog> {
+        return this.http.get<InvestigationLog>(invPath(id, 'log'), { params: toParams({ limit }) });
+    }
+}
+
+function invPath(id: string, action: string): string {
+    return apiUrl(`/inv/investigations/${encodeURIComponent(id)}/${action}`);
 }
