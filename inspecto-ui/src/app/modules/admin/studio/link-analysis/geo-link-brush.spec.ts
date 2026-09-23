@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GeoPoint } from 'app/inspecto/geo';
+import { entityId } from './entity-projection';
 import { GeoLinkBrushService, nodeIdsForKeys, pointIdsForNodes } from './geo-link-brush';
 
 /**
@@ -12,24 +13,25 @@ function pt(id: string, key?: string, label?: string): GeoPoint {
 
 describe('nodeIdsForKeys (Geo → Link)', () => {
     it('maps a geo key to the node the projection minted for the same value', () => {
-        const nodes = new Set(['entity:IMSI-1', 'entity:IMSI-2']);
-        expect(nodeIdsForKeys(['IMSI-1'], nodes, [undefined])).toEqual(['entity:IMSI-1']);
+        const nodes = new Set([entityId(undefined, 'IMSI-1'), entityId(undefined, 'IMSI-2')]);
+        expect(nodeIdsForKeys(['IMSI-1'], nodes, [undefined])).toEqual([entityId(undefined, 'IMSI-1')]);
     });
 
     it('matches a type-scoped node only through the mapping entity type', () => {
-        const nodes = new Set(['entity:person:Bob', 'entity:account:Bob']);
-        expect(nodeIdsForKeys(['Bob'], nodes, ['person'])).toEqual(['entity:person:Bob']);
+        const nodes = new Set([entityId('person', 'Bob'), entityId('account', 'Bob')]);
+        expect(nodeIdsForKeys(['Bob'], nodes, ['person'])).toEqual([entityId('person', 'Bob')]);
     });
 
-    it('never matches a key that is only equal after case folding', () => {
-        expect(nodeIdsForKeys(['acme ltd'], new Set(['entity:ACME Ltd']), [undefined])).toEqual([]);
+    it('matches a spelling variant of the key, because ids are normalised (D-S4)', () => {
+        const acme = entityId(undefined, 'ACME Ltd');
+        expect(nodeIdsForKeys([' acme  ltd.'], new Set([acme]), [undefined])).toEqual([acme]);
     });
 });
 
 describe('pointIdsForNodes (Link → Geo)', () => {
     it('highlights the points whose KEY maps to a selected node, ignoring their labels', () => {
         const points = [pt('pt:0', 'K1', 'Somebody'), pt('pt:1', 'K2', 'K1'), pt('pt:2', undefined, 'K1')];
-        expect(pointIdsForNodes(points, new Set(['entity:K1']), [undefined])).toEqual(['pt:0']);
+        expect(pointIdsForNodes(points, new Set([entityId(undefined, 'K1')]), [undefined])).toEqual(['pt:0']);
     });
 });
 

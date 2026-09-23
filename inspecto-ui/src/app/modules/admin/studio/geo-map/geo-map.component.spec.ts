@@ -350,10 +350,10 @@ describe('GeoMapComponent', () => {
         c.closePolygon();
         expect(brush.brush()).toEqual({ origin: 'geo', keys: ['K1'] });
 
-        brush.fromLink(['entity:K2'], [undefined]);
+        brush.fromLink(['entity:k2'], [undefined]);
         c.clearTools();
         expect(brush.brush()).toBeNull(); // clearing the area clears the brush it published
-        brush.fromLink(['entity:K2'], [undefined]);
+        brush.fromLink(['entity:k2'], [undefined]);
         expect(c.emphasis()).toEqual({ pointIds: ['pt:2'] });
     });
 

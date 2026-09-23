@@ -212,10 +212,10 @@ describe('LinkAnalysisComponent', () => {
     it('LA-22: a Geo brush highlights the nodes its keys project to, and a node click brushes the map', async () => {
         const keyed: G6GraphData = {
             nodes: [
-                { id: 'entity:K1', data: { label: 'Alias', kind: 'entity' } },
-                { id: 'entity:K2', data: { label: 'K1', kind: 'entity' } }, // label equal to the key: must NOT match
+                { id: 'entity:k1', data: { label: 'Alias', kind: 'entity' } },
+                { id: 'entity:k2', data: { label: 'K1', kind: 'entity' } }, // label equal to the key: must NOT match
             ],
-            edges: [{ id: 'e', source: 'entity:K1', target: 'entity:K2', data: { kind: 'link' } }],
+            edges: [{ id: 'e', source: 'entity:k1', target: 'entity:k2', data: { kind: 'link' } }],
         };
         const { fixture } = create({ graph: keyed });
         fixture.detectChanges();
@@ -223,12 +223,12 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         const brush = TestBed.inject(GeoLinkBrushService);
         brush.fromGeo(['K1']);
-        expect(c.geoBrushEmphasis()).toEqual({ nodeIds: ['entity:K1'], edgeIds: [] });
+        expect(c.geoBrushEmphasis()).toEqual({ nodeIds: ['entity:k1'], edgeIds: [] });
 
         const dialog = fixture.debugElement.injector.get(MatDialog);
         vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(undefined) } as never);
-        c.onNodeClick('entity:K2');
-        expect(brush.brush()).toMatchObject({ origin: 'link', nodeIds: ['entity:K2'] });
+        c.onNodeClick('entity:k2');
+        expect(brush.brush()).toMatchObject({ origin: 'link', nodeIds: ['entity:k2'] });
         expect(c.geoBrushEmphasis()).toBeNull();
     });
 
