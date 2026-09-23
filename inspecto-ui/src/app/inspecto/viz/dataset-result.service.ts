@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { BiFilter, BiQueryBody, BiQueryService } from 'app/inspecto/api/bi-query.service';
@@ -14,20 +15,34 @@ import { QuerySpec } from './viz-types';
  * of silently dropping terms.
  */
 
+/** A run's outcome. `throttled` marks a run the server kept refusing with `429 RATE_LIMITED` after the
+ *  retries — distinct from a failed query, so a tile can say "rate limited" instead of "No data". */
+export interface DatasetRunResult extends SqlRunResult {
+    throttled?: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DatasetResultService {
+    /** Back-off before each retry of a 429. The `/bi/query` bucket refills at 2 tokens/s
+     *  (`RateLimiter.dashboard()`), so the first retry nearly always lands. Overridable for specs. */
+    static RETRY_DELAYS_MS: readonly number[] = [1000, 2000, 4000];
+
     private bi = inject(BiQueryService);
-    private cache = new Map<string, Promise<SqlRunResult>>();
+    private cache = new Map<string, Promise<DatasetRunResult>>();
 
     /** Run `spec` — an identical spec already in flight or resolved is reused, not re-run. */
-    run(spec: QuerySpec, cols: ColumnMeta[] = []): Promise<SqlRunResult> {
+    run(spec: QuerySpec, cols: ColumnMeta[] = []): Promise<DatasetRunResult> {
         const key = hashSpec(spec);
         const cached = this.cache.get(key);
         if (cached) return cached;
         const promise = this.runRemote(spec, cols);
         this.cache.set(key, promise);
-        // A failed run shouldn't stick forever — drop it so the next call retries instead of replaying the error.
-        promise.catch(() => this.cache.delete(key));
+        // A failed run shouldn't stick forever — drop it so the next call retries instead of replaying the
+        // error. runRemote never rejects (failures resolve as {ok:false}), so this must key on the result:
+        // a `.catch` here never fired, and a throttled tile replayed its 429 until a page reload.
+        promise.then((r) => {
+            if (!r.ok) this.cache.delete(key);
+        });
         return promise;
     }
 
@@ -37,7 +52,7 @@ export class DatasetResultService {
     }
 
     /** Execute the spec server-side. Never throws — errors come back as `{ok:false}` results. */
-    private async runRemote(spec: QuerySpec, cols: ColumnMeta[]): Promise<SqlRunResult> {
+    private async runRemote(spec: QuerySpec, cols: ColumnMeta[]): Promise<DatasetRunResult> {
         const body = biQueryBody(spec, cols);
         if (!body) {
             return {
@@ -48,11 +63,26 @@ export class DatasetResultService {
                     'empty projection) that the BI endpoint cannot run.',
             };
         }
-        try {
-            const r = await firstValueFrom(this.bi.run(body));
-            return { ok: true, rows: r.rows };
-        } catch (e) {
-            return { ok: false, rows: [], error: apiErrorMessage(e, 'BI query failed on the server.') };
+        const delays = DatasetResultService.RETRY_DELAYS_MS;
+        for (let attempt = 0; ; attempt++) {
+            try {
+                const r = await firstValueFrom(this.bi.run(body));
+                return { ok: true, rows: r.rows };
+            } catch (e) {
+                const throttled = e instanceof HttpErrorResponse && e.status === 429;
+                if (throttled && attempt < delays.length) {
+                    await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+                    continue;
+                }
+                return throttled
+                    ? {
+                          ok: false,
+                          rows: [],
+                          throttled: true,
+                          error: 'Rate limited — too many queries in a short time.',
+                      }
+                    : { ok: false, rows: [], error: apiErrorMessage(e, 'BI query failed on the server.') };
+            }
         }
     }
 }

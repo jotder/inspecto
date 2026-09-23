@@ -44,6 +44,13 @@ class ControlApiRateLimitTest {
                 .GET().build(), BodyHandlers.ofString());
     }
 
+    /** A {@code POST /bi/query} with an empty model: answered 4xx by the handler, never 429 unless throttled. */
+    private HttpResponse<String> biQuery(int port) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/bi/query"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{}")).build(), BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> health(int port) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/health"))
                 .GET().build(), BodyHandlers.ofString());
@@ -67,6 +74,32 @@ class ControlApiRateLimitTest {
             // (c) an unrelated route (not in the throttled prefix set) is unaffected by the exhausted bucket.
             HttpResponse<String> h = health(c.port);
             assertEquals(200, h.statusCode(), "unrelated route must not be throttled");
+        }
+    }
+
+    /**
+     * {@code /bi/query} has its own, larger bucket (operator decision 2026-09-24): a dashboard fires one query per
+     * widget, so it must survive several 12-tile dashboards in a row — and exhausting it must not throttle ad-hoc
+     * SQL or agent calls, nor the reverse.
+     */
+    @Test
+    void biQueryHasItsOwnDashboardSizedBucketIndependentOfTheStandardOne(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            // (a) the standard bucket is exhausted first — /bi/query must still be served.
+            for (int i = 0; i < 20; i++) agentCases(c.port);
+            assertEquals(429, agentCases(c.port).statusCode(), "standard bucket should be exhausted");
+            assertNotEquals(429, biQuery(c.port).statusCode(), "an exhausted standard bucket must not throttle /bi/query");
+
+            // (b) 120 dashboard queries in one burst (one already spent above) all reach the handler — ten
+            // 12-tile dashboards, far past the old shared 20.
+            for (int i = 1; i < 120; i++) {
+                HttpResponse<String> r = biQuery(c.port);
+                assertNotEquals(429, r.statusCode(), "dashboard query " + i + " should not be throttled yet");
+            }
+            // (c) the 121st in the same burst finds the dashboard bucket empty.
+            HttpResponse<String> exhausted = biQuery(c.port);
+            assertEquals(429, exhausted.statusCode(), "121st /bi/query should be throttled");
+            assertTrue(exhausted.body().contains("rate limit"), "body: " + exhausted.body());
         }
     }
 }

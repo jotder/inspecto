@@ -1,6 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BiQueryService } from 'app/inspecto/api/bi-query.service';
 import { QuerySpec } from './viz-types';
 import { biQueryBody, DatasetResultService } from './dataset-result.service';
@@ -53,7 +54,8 @@ describe('DatasetResultService', () => {
     });
 
     it('still returns the cached run after it resolves (not just while in flight)', async () => {
-        const { svc } = setup();
+        // A SUCCESSFUL run: a failed one is deliberately dropped from the cache (see the 429 suite).
+        const { svc } = setup(vi.fn(() => of({ rows: [] })));
         const p1 = svc.run(spec());
         await p1;
         const p2 = svc.run(spec());
@@ -102,6 +104,53 @@ describe('DatasetResultService', () => {
         expect(res.ok).toBe(false);
         expect(res.error).toContain('cannot run');
         expect(biRun).not.toHaveBeenCalled();
+    });
+});
+
+describe('DatasetResultService — 429 rate limiting', () => {
+    const tooMany = () => throwError(() => new HttpErrorResponse({ status: 429, statusText: 'Too Many Requests' }));
+    const saved = DatasetResultService.RETRY_DELAYS_MS;
+    beforeEach(() => (DatasetResultService.RETRY_DELAYS_MS = [0, 0]));
+    afterEach(() => (DatasetResultService.RETRY_DELAYS_MS = saved));
+
+    it('retries a 429 and returns the rows once the server accepts', async () => {
+        const biRun = vi
+            .fn()
+            .mockReturnValueOnce(tooMany())
+            .mockReturnValueOnce(of({ rows: [{ a: 1 }] }));
+        const { svc } = setup(biRun);
+        const r = await svc.run(spec(), COLS);
+        expect(r).toEqual({ ok: true, rows: [{ a: 1 }] });
+        expect(biRun).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports throttled — not a bare empty result — when every retry is refused', async () => {
+        const biRun = vi.fn(() => tooMany());
+        const { svc } = setup(biRun);
+        const r = await svc.run(spec(), COLS);
+        expect(r.ok).toBe(false);
+        expect(r.throttled).toBe(true);
+        expect(r.error).toContain('Rate limited');
+        expect(biRun).toHaveBeenCalledTimes(3); // first try + two retries
+    });
+
+    it('a failed run is not replayed from the cache — the next identical call runs again', async () => {
+        const biRun = vi
+            .fn()
+            .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 500 })))
+            .mockReturnValueOnce(of({ rows: [{ a: 2 }] }));
+        const { svc } = setup(biRun);
+        expect((await svc.run(spec(), COLS)).ok).toBe(false);
+        await Promise.resolve();
+        expect(await svc.run(spec(), COLS)).toEqual({ ok: true, rows: [{ a: 2 }] });
+    });
+
+    it('a non-429 error is not retried', async () => {
+        const biRun = vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+        const { svc } = setup(biRun);
+        const r = await svc.run(spec(), COLS);
+        expect(r.throttled).toBeUndefined();
+        expect(biRun).toHaveBeenCalledTimes(1);
     });
 });
 

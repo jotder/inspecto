@@ -8,34 +8,55 @@ import java.util.concurrent.ConcurrentHashMap;
  * otherwise saturate DuckDB or spend model tokens without bound. In-memory only, per {@link ControlApi}
  * instance — no config framework, no external store, matching the project's no-new-dependency bar.
  *
- * <p>Default budget: {@link #CAPACITY} requests, refilling at {@link #REFILL_PER_SECOND} tokens/second
- * (i.e. steady-state {@code CAPACITY} requests per {@code CAPACITY / REFILL_PER_SECOND} seconds, with a
- * burst up to {@code CAPACITY}). Fixed, not configurable — no existing gate in this file reads a rate-limit
- * config key, so there is no established pattern to extend.
+ * <p>Each instance is one budget: a burst of {@code capacity} requests, refilling at {@code refillPerSecond}
+ * tokens/second. Two budgets exist ({@link #standard()} and {@link #dashboard()}); both are fixed, not
+ * configurable — no existing gate in this file reads a rate-limit config key, so there is no pattern to extend.
+ *
+ * <p>⚠ {@code /bi/query} has its OWN, larger bucket (operator decision 2026-09-24): every Studio widget fires
+ * one {@code POST /bi/query}, so a 10–12 tile dashboard spent half the shared 20-token burst and the next
+ * dashboard rendered "No data" tiles (429). Ad-hoc SQL, reconciliation and agent calls keep the original
+ * budget — they are the routes an interactive user cannot multiply by the dozen per page view.
  */
 final class RateLimiter {
 
-    /** Burst size — the most requests a subject may fire before refill catches up. */
-    private static final double CAPACITY = 20.0;
-    /** Steady-state throughput: one request every 3 seconds per subject. */
-    private static final double REFILL_PER_SECOND = 1.0 / 3.0;
+    /** The original budget: burst 20, then one request every 3 seconds per subject. */
+    static RateLimiter standard() { return new RateLimiter(20.0, 1.0 / 3.0); }
+
+    /** The dashboard budget for {@code /bi/query}: burst 120 (≈ ten 12-tile dashboards), then 2 requests/second. */
+    static RateLimiter dashboard() { return new RateLimiter(120.0, 2.0); }
+
+    private final double capacity;
+    private final double refillPerSecond;
+
+    RateLimiter(double capacity, double refillPerSecond) {
+        this.capacity = capacity;
+        this.refillPerSecond = refillPerSecond;
+    }
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
     /** True when {@code key} has a token to spend (and spends it); false when exhausted. */
     boolean tryConsume(String key) {
-        return buckets.computeIfAbsent(key, k -> new Bucket()).tryConsume();
+        return buckets.computeIfAbsent(key, k -> new Bucket(capacity, refillPerSecond)).tryConsume();
     }
 
     private static final class Bucket {
-        private double tokens = CAPACITY;
+        private final double capacity;
+        private final double refillPerSecond;
+        private double tokens;
         private long lastRefillNanos = System.nanoTime();
+
+        Bucket(double capacity, double refillPerSecond) {
+            this.capacity = capacity;
+            this.refillPerSecond = refillPerSecond;
+            this.tokens = capacity;
+        }
 
         synchronized boolean tryConsume() {
             long now = System.nanoTime();
             double elapsedSeconds = (now - lastRefillNanos) / 1_000_000_000.0;
             lastRefillNanos = now;
-            tokens = Math.min(CAPACITY, tokens + elapsedSeconds * REFILL_PER_SECOND);
+            tokens = Math.min(capacity, tokens + elapsedSeconds * refillPerSecond);
             if (tokens < 1.0) return false;
             tokens -= 1.0;
             return true;

@@ -167,4 +167,42 @@ describe('WidgetHostComponent', () => {
         fixture.componentInstance.onCategoryClick('premium');
         expect(emitted).toEqual({ field: 'tariff', value: 'premium' });
     });
+
+    it('a throttled run shows the explained Rate limited state with Retry — not an empty chart', async () => {
+        let calls = 0;
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: () => {
+                        calls++;
+                        return Promise.resolve(
+                            calls === 1
+                                ? { ok: false, rows: [], throttled: true, error: 'Rate limited' }
+                                : { ok: true, rows: [{ sum_duration_s: 5 }] },
+                        );
+                    },
+                },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', WIDGET);
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('inspecto-alert');
+        expect(alert?.textContent).toContain('Rate limited');
+        expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeNull();
+        await expectNoA11yViolations(fixture.nativeElement);
+
+        (alert.querySelector('button') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(calls).toBe(2);
+        expect(fixture.nativeElement.querySelector('inspecto-alert')).toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeTruthy();
+    });
 });

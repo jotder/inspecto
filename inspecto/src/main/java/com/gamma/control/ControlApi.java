@@ -220,7 +220,9 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private final Idempotency.Store idempotency = new Idempotency.Store();
 
     /** Per-subject token-bucket throttle for the expensive routes ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}). */
-    private final RateLimiter rateLimiter = new RateLimiter();
+    private final RateLimiter rateLimiter = RateLimiter.standard();
+    /** {@code /bi/query}'s own, larger bucket — one request per dashboard widget (see {@link RateLimiter#dashboard()}). */
+    private final RateLimiter dashboardLimiter = RateLimiter.dashboard();
 
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
@@ -905,7 +907,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             String ip = ApiContext.ip(ex);
             return ip == null ? "unknown" : ip;
         });
-        if (!rateLimiter.tryConsume(key))
+        RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter : rateLimiter;
+        if (!bucket.tryConsume(key))
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + path + " — retry later");
     }
 

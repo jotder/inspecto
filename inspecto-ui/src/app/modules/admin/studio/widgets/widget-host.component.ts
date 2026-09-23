@@ -13,6 +13,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { isSharedRef } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { StaleMark } from 'app/inspecto/signal/stale-tiles';
@@ -53,6 +54,7 @@ export interface DrillEvent {
         MatTooltipModule,
         VizRenderComponent,
         InspectoEmptyStateComponent,
+        InspectoAlertComponent,
         StatusBadgeComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -106,6 +108,13 @@ export interface DrillEvent {
                                 title="Access revoked"
                                 message="This widget's shared dataset is no longer available — the owner space may have revoked or expired the grant."
                             />
+                        } @else if (throttled()) {
+                            <!-- The server kept answering 429 RATE_LIMITED after the retries. Say so: an
+                                 empty chart here read as "No data", which is false and not actionable. -->
+                            <inspecto-alert variant="warning" title="Rate limited">
+                                Too many queries in a short time — the server is throttling this widget.
+                                <button mat-button type="button" (click)="retry()">Retry</button>
+                            </inspecto-alert>
                         } @else {
                             <inspecto-viz-render
                                 [plugin]="p"
@@ -186,6 +195,10 @@ export class WidgetHostComponent {
     readonly canExport = computed(() => this.plugin()?.render.kind === 'chartjs');
     /** False once a data run fails — a shared-bound dataset that no longer resolves (revoked/expired grant). */
     private readonly runOk = signal(true);
+    /** The last run was refused `429` even after {@link DatasetResultService}'s retries. */
+    readonly throttled = signal(false);
+    /** Bumped by {@link retry} so the query effect re-runs. */
+    private readonly retryTick = signal(0);
     /** Show the "access revoked" empty-state: a shared-bound dataset whose backing grant no longer resolves. */
     readonly showRevoked = computed(() => isSharedRef(this.resolvedDataset()?.physicalRef) && !this.runOk());
 
@@ -217,6 +230,7 @@ export class WidgetHostComponent {
             const plugin = this.plugin();
             const widget = this.resolvedWidget();
             const dataset = this.resolvedDataset();
+            this.retryTick();
             if (!plugin || !widget || !dataset || plugin.meta.viewKind) return;
             const spec = plugin.buildQuery(widget.controls, {
                 datasetId: dataset.id,
@@ -227,6 +241,7 @@ export class WidgetHostComponent {
                 .run(spec, this.colMetas())
                 .then((res) => {
                     this.runOk.set(res.ok);
+                    this.throttled.set(!!res.throttled);
                     this.props.set(plugin.transformProps(res.ok ? res.rows : [], widget.controls));
                 })
                 .catch(() => {
@@ -234,6 +249,12 @@ export class WidgetHostComponent {
                     this.props.set({ labels: [], series: [] });
                 });
         });
+    }
+
+    /** Re-run the widget's query after a throttled run. */
+    retry(): void {
+        this.throttled.set(false);
+        this.retryTick.update((n) => n + 1);
     }
 
     /** Resolve the clicked category to the field it came from (the widget's `x` channel, or `series` for
