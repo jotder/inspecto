@@ -79,6 +79,40 @@ is for `PipelineConfig` to carry the provenance, never for a second reader to in
   would be a partial closure presented as a whole — the trap for a caller asking "what does an import
   need".
 
+## Over a diff — which Pipelines a change reaches (duckle C7, first slice)
+
+`com.gamma.service.AffectedPipelines` (2026-09-24, `DUCKLE-C7-AFFECTED-CONTRACTS-1`) asks the same
+question in the other direction and **over a change set instead of one Pipeline**: given the files a
+revision touched, which Pipelines does it reach, each with the chain that reached it? It is a **CI-shaped
+check, not an in-app git feature** (the operator's 2026-09-15 ruling), and it builds no lineage model of
+its own — every edge is one the product already reads:
+
+| Edge | Read through |
+|---|---|
+| file → Pipeline (child → parent) | `ConfigRegistry` + `PipelineConfig.referencedFiles()`, the outward half above |
+| producer Pipeline → Dataset | `PipelineDependents.scan` (`sourceName` / `physicalRef` head), the inward half above |
+| Dataset → consumer Pipeline | `collector.dataset`, the id `connector: dataset` resolves |
+
+Propagation is breadth-first, so a chain is the shortest one, e.g.
+`file:prod/prod_schema.toon -> pipeline:prod -> dataset:prod_ds -> pipeline:cons`.
+
+- **Deleting a producer is a change.** A deleted `*_pipeline.toon` is reported (id from its pre-change
+  `name`), and the Datasets still naming it lead on to their consumers. A deleted file a surviving
+  Pipeline read makes that Pipeline fail to load; the load failure names the file, so it is reported as
+  reached **and** as uncertain.
+- **Formatting is not a change.** A modified `.toon` whose decoded content is equal before and after
+  reaches nothing. Canvas geometry needs no rule: node positions live in browser storage
+  (`pipeline-layout.ts`), never in config.
+- **Uncertain, never resolved:** a Pipeline that does not load; a `collector.dataset` that is not a bare
+  Dataset id (templated `${…}` or path-shaped `datasets/x`); a deleted Pipeline with no pre-change content
+  (id taken from the file name).
+- **Entry point:** `AffectedPipelines.main <configRoot> <baseRev> [--fail-on-affected]` diffs `baseRev`
+  against the working tree with `git diff --name-status --no-renames` (a rename is a delete + an add) and
+  reads pre-change content with `git show`. Exit 1 only when asked and something is affected or uncertain.
+- ⛔ **Deferred:** the contract verdicts (breaking / possibly breaking / revalidate, by reader) — the
+  larger half of the row; non-Pipeline dependents (enrichment, job, Expectation, Widget) in the output;
+  enrichment `references.<n>.ref` and job `on_pipeline` as Pipeline-to-Pipeline edges; a CI wiring.
+
 ## Related
 
 * [Metadata bundle](metadata-bundle.md) — the export/import surface this closure is meant to feed
