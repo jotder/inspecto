@@ -253,8 +253,17 @@ public final class PipelineExecutor {
         }
     }
 
-    /** What a dry-run produced: every node's named relations + which table each sink would consume. No commit. */
-    public record DryRunResult(Map<String, Map<String, String>> produced, Map<String, String> sinkInputs) {}
+    /**
+     * What a dry-run produced: every node's named relations + which table each sink would consume. No commit.
+     *
+     * <p>{@code notExecuted} ({@code nodeId → type}) is every enabled node the walk REACHED — its inbound
+     * relation was live — but has no executor for, so it produced nothing and everything below it received
+     * nothing (G8 of {@code PROCESSOR-RELEASE-READINESS-1}). Control terminals are not in it: they consume and
+     * produce no data relation by design. It exists so the caller can say so BY NAME — a reached node that
+     * silently yields nothing is the one answer a preview must never give.
+     */
+    public record DryRunResult(Map<String, Map<String, String>> produced, Map<String, String> sinkInputs,
+                               Map<String, String> notExecuted) {}
 
     /**
      * <b>T18 — bounded-sample dry-run.</b> The same topological walk + {@link RowShaper} as {@link #execute}, but
@@ -317,6 +326,7 @@ public final class PipelineExecutor {
         Map<String, Map<String, String>> produced = new LinkedHashMap<>();
         produced.put(seedNodeId, new LinkedHashMap<>(seedRelations));
         Map<String, String> sinkInputs = new LinkedHashMap<>();
+        Map<String, String> notExecuted = new LinkedHashMap<>();
 
         for (String nodeId : topoOrder(g)) {
             if (nodeId.equals(seedNodeId)) continue;
@@ -334,9 +344,13 @@ public final class PipelineExecutor {
             } else if (isShapeable(node.type())) {
                 produced.put(nodeId, index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced),
                         nodeId, references)));
+            } else if (!PipelineNodeTypes.isCategory(node.type(), NodeCategory.CONTROL)) {
+                // e.g. `enrichment` — a post-commit Stage-2 job, not a walk step. Reached, not run: record
+                // it so the preview names it instead of answering as if the branch simply ended here.
+                notExecuted.put(nodeId, node.type());
             }
         }
-        return new DryRunResult(produced, sinkInputs);
+        return new DryRunResult(produced, sinkInputs, notExecuted);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.api.PublicApi;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.NodeCategory;
+import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineNodeTypes;
@@ -12,10 +13,14 @@ import com.gamma.util.DuckDbUtil;
 
 import java.io.File;
 import java.sql.Connection;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <b>T18 — pipeline dry-run (§7.2): "test the pipeline incrementally".</b> Runs a bounded sample through a pipeline's
@@ -137,6 +142,13 @@ public final class PipelineDryRun {
             PipelineExecutor.DryRunResult dr =
                     PipelineExecutor.dryRun(conn, g, seedNode, seeds, references, stopAtNodeId);
             Map<String, PipelineNode> byId = g.byId();
+            // G8: a webhook branch refuses here exactly as the job dry run's DryRunSinkWriter refuses it —
+            // the same WebhookSink.plan (config, edition transport, Connection, token), then nothing sent.
+            // Before this, a bundle with no WebhookSinkTransport previewed the branch as healthy.
+            for (String sinkId : dr.sinkInputs().keySet()) {
+                PipelineNode n = byId.get(sinkId);
+                if (n != null && BuiltinNodeType.SINK_WEBHOOK.type().equals(n.type())) WebhookSink.plan(n);
+            }
 
             List<NodeDryRun> nodes = new ArrayList<>();
             for (Map.Entry<String, Map<String, String>> e : dr.produced().entrySet()) {
@@ -159,7 +171,9 @@ public final class PipelineDryRun {
                         ScratchTables.count(conn, s.getValue()),
                         ScratchTables.readRows(conn, s.getValue(), SAMPLE_ROWS)));
             }
-            return new Result(seedNode, nodes, sinks, warningsFor(nodes, sinks, seedNode));
+            List<String> warnings = new ArrayList<>(notExecutedWarnings(g, dr));
+            warnings.addAll(warningsFor(nodes, sinks, seedNode));
+            return new Result(seedNode, nodes, sinks, List.copyOf(warnings));
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
@@ -186,6 +200,46 @@ public final class PipelineDryRun {
             return List.of("no sink received any rows — the sample was filtered or joined away before "
                     + "reaching an output, so this run cannot tell you the pipeline writes what you expect");
         return List.of();
+    }
+
+    /**
+     * G8 of {@code PROCESSOR-RELEASE-READINESS-1} — name every node the walk reached but could not run, and
+     * the nodes below it that therefore received nothing. It used to be silent: an {@code enrichment} mid-walk
+     * produced no relation, the sink under it vanished from {@code sinks}, and neither DRYRUN-2 warning fired
+     * because there was no sink branch left to be empty.
+     *
+     * <p>⚖ <b>Warned, not run, and not refused.</b> An {@code enrichment} is a post-commit Stage-2 job over
+     * the <em>committed store</em> (its partitions, prior batches, its own references) — neither run lane
+     * executes it as a walk step, so running it over the sample would preview something no run does. Refusing
+     * would make every graph carrying one un-previewable over a node the rest of the walk does not need.
+     */
+    private static List<String> notExecutedWarnings(PipelineGraph g, PipelineExecutor.DryRunResult dr) {
+        List<String> out = new ArrayList<>();
+        for (Map.Entry<String, String> e : dr.notExecuted().entrySet()) {
+            String why = BuiltinNodeType.ENRICHMENT.type().equals(e.getValue())
+                    ? "an enrichment is a post-commit Stage-2 job over the committed store, and a dry run "
+                      + "commits nothing — preview it with POST /enrichment/preview"
+                    : "the dry run has no executor for a '" + e.getValue() + "' node";
+            List<String> below = starvedBelow(g, e.getKey(), dr);
+            out.add("node '" + e.getKey() + "' (" + e.getValue() + ") was NOT previewed: " + why
+                    + (below.isEmpty() ? "" : "; so nothing reached "
+                       + String.join(", ", below.stream().map(n -> "'" + n + "'").toList())));
+        }
+        return out;
+    }
+
+    /** Descendants of {@code nodeId} (within-graph edges) that neither produced a relation nor fed a sink. */
+    private static List<String> starvedBelow(PipelineGraph g, String nodeId, PipelineExecutor.DryRunResult dr) {
+        Set<String> seen = new LinkedHashSet<>();
+        Deque<String> todo = new ArrayDeque<>(List.of(nodeId));
+        while (!todo.isEmpty()) {
+            String cur = todo.poll();
+            for (PipelineEdge edge : g.edgesFrom(cur))
+                if (!PipelineRel.ON_COMMIT.equals(edge.rel()) && seen.add(edge.to())) todo.add(edge.to());
+        }
+        seen.removeIf(n -> !g.byId().containsKey(n)
+                || dr.produced().containsKey(n) || dr.sinkInputs().containsKey(n));
+        return List.copyOf(seen);
     }
 
     /**

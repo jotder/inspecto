@@ -141,6 +141,45 @@ Two boundaries worth keeping straight:
 
 An unknown `to=` throws → **400**, rather than silently widening to the whole graph.
 
+## Two blind spots closed: enrichment and webhook (G8, 2026-09-23)
+
+Both apply to `POST …/dry-run` and to run-to-here, because both go through `PipelineDryRun.runSeeded`.
+Row `PROCESSOR-RELEASE-READINESS-1`, gap G8.
+
+**An `enrichment` node is WARNED BY NAME, not run and not refused.** The walk runs only `transform.*`
+(`PipelineExecutor.isShapeable`), `transform.merge` and sinks. An `enrichment` node mid-walk used to produce
+nothing, and nothing below it ran either. Its sink disappeared from `sinks[]` and no warning fired, because
+both DRYRUN-2 warnings need either no node reached at all or a sink that got zero rows. Now
+`PipelineExecutor.DryRunResult.notExecuted` lists every enabled node the walk reached and has no executor for.
+Control terminals are left out, since they produce no data relation by design. `PipelineDryRun` adds one
+warning per such node. The warning names the node, gives the reason, and lists the nodes below it that got
+nothing, for example: *node 'enr' (enrichment) was NOT previewed: … preview it with POST /enrichment/preview;
+so nothing reached 'sink'*.
+⚖ **Why a warning and not a run:** an enrichment is a post-commit Stage-2 job. It reads the *committed store*
+(partitions, earlier batches, its own references), and neither run lane runs it as a walk step. Running
+it over the sample would preview something no real run does. **Why not a refusal:** that would block the
+preview of every graph with an enrichment in it, because of one node the rest of the walk doesn't need.
+Any future node type the walk has no executor for gets the same named warning.
+
+⚠ **The companion shape never gets as far as the walk.** `GET /pipelines/{name}/graph/raw` adds a
+`*_enrich.toon` companion to the graph as a `sink.persistent --data--> enrichment` edge
+(`attachCompanionEnrichments`). `PipelineValidator` refuses that edge with `ILLEGAL_EMIT`: a sink emits
+only `on_commit / success / failure`. So posting that graph back as a dry-run candidate returns 422 before
+anything runs, and so does `PUT …/graph`, because both use `parseAndValidateFlow`. This is filed as its own
+row and not fixed here.
+
+**A `sink.webhook` branch now refuses the way the job dry run does.** For every webhook sink the walk reaches,
+`PipelineDryRun` calls `WebhookSink.plan`. That is the same resolution `DryRunSinkWriter` uses: config, edition
+transport, Connection, token. On a bundle with no `WebhookSinkTransport` (Personal), the dry run returns
+**422** with WebhookSink's own message, which names the sink and the edition. It used to show a healthy
+branch with a row count. The same call also refuses an unregistered Connection or a token that doesn't
+resolve, just as the job dry run does. Nothing is ever sent.
+
+Pinned by `ControlApiDryRunBlindSpotsTest` (2, real HTTP). The `inspecto` module does not depend on
+`inspecto-notify-channels`, so its test classpath matches Personal. Falsified: making each fix a no-op turns
+its own test red with the old answer (`warnings: []` and `sinks: []` for the enrichment, 200 with the webhook
+branch counted for the webhook).
+
 ## A SQL failure reads as the real error first (2026-09-23)
 
 A step whose SQL is wrong 422s with *“test run failed: Binder Error: Referenced column "EVENT_TS" not
@@ -348,9 +387,9 @@ and when a probe leaves a test green, suspect the test, not the probe.
 - `inspecto/…/control/PipelineGraphRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
 - `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
 - `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
-- `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`
+- `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`, `notExecutedWarnings`, the `WebhookSink.plan` loop in `runSeeded`
 - `inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`
 - `inspecto-engine/…/query/QueryExecutor.java` — `run` (the plain-`Statement` view registration and no-bind query)
 - Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (8, real HTTP),
   `ControlApiPipelineTestRunDemoTest` (3, real HTTP over the shipped demos vs a real ingest),
-  `PipelineDryRunTest` (15, of which 5 pin the cutoff)
+  `PipelineDryRunTest` (15, of which 5 pin the cutoff), `ControlApiDryRunBlindSpotsTest` (2, real HTTP — G8)
