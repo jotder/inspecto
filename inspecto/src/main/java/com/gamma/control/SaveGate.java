@@ -78,6 +78,7 @@ final class SaveGate {
         f.addAll(ConfigRoutes.routeArmingFindings(type, draft));
         f.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         f.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
+        f.addAll(ConfigRoutes.stepConfigFindings(type, draft, configDir));   // G4: the run's step refusals
         f.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
         // Referential: a collector bound to a Connection this Space does not have throws once per poll.
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));

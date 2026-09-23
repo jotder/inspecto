@@ -622,7 +622,8 @@ operator sign-off on the bar). The 37 delivered processors were measured against
 save · demo); ~22 pass nearly all. Gap groups include catalog↔docs drift (✅ fixed 2026-09-23, G1:
 `parser.asn1.ber` now maps onto the `parser.asn1` node type and is addable from the palette — it was a
 *capability* mapping, so the canvas drew it inactive; every count on this page now carries a
-`<!--count:…-->` marker derived from the contract, and Part B's rows agree with it), graph save and config write running different gates, step config errors surfacing only at run,
+`<!--count:…-->` marker derived from the contract, and Part B's rows agree with it), graph save and config write running different gates, step config errors surfacing only at run (✅ fixed
+2026-09-23, G4 — see [config safety](../config/config-safety.md#step-config-checks-g4)),
 and edition gating that differs from `EDITIONS.md`. (G8, the dry-run blind spots, is closed: an enrichment
 node is now named in a warning rather than skipped silently — see
 [pipeline test run](../engine/pipeline-test-run.md).)

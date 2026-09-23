@@ -49,6 +49,14 @@ public final class FindingCodes {
     /** The same windowed-dedup refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_DEDUP_WINDOW_UNARMABLE = "WARN_DEDUP_WINDOW_UNARMABLE";
 
+    /** An ACTIVE pipeline whose {@code lookup} / {@code profile} / {@code dedup} / {@code filter} step config
+     *  the run would refuse — a missing or malformed required key, or a column the declared schema does not
+     *  carry ({@code PROCESSOR-RELEASE-READINESS-1} G4). */
+    public static final String ERR_STEP_CONFIG_INVALID = "ERR_STEP_CONFIG_INVALID";
+
+    /** The same step-config refusal on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_STEP_CONFIG_INVALID = "WARN_STEP_CONFIG_INVALID";
+
     /** Two {@code sinks[]} destinations whose effective ducklake is one catalog + one registered table —
      *  every batch would insert both destinations' files into it ({@code SinkLakeCollisions}). A shape
      *  rule, not an arming one: refused regardless of {@code active}, so it has no {@code WARN_} twin. */

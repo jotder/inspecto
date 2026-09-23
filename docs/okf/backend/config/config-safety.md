@@ -380,7 +380,7 @@ checks a config save runs, and every Pipeline-config door calls it: `POST /confi
 (`SaveGate.refuses`). The list, in order: spec validate · `ConfigSafetyValidator` (a job judged from the
 Space config root, everything else from its own directory) · schema-file resolution (WARNING) · the five
 arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys` census ·
-route-predicate columns · summarize measure types.
+route-predicate columns · summarize measure types · step configs (lookup, filter, dedup, profile — G4).
 
 🔴 **Why one function.** Before G3 (`PROCESSOR-RELEASE-READINESS-1`) each route carried its own hand-kept
 copy of that list, and the copies had drifted — reproduced over real HTTP before the fix:
@@ -413,6 +413,26 @@ import too. `/validate` drops its `safety` flag: `safetyChecked` is always `true
 Pinned by `ControlApiSaveGateParityTest`: every fault × every door, one verdict (25 cases + a clean control
 + the graph editor's own `sink.webhook` node shape). A new check added to `SaveGate` reaches all five doors
 at once; a door that stops calling it goes red there.
+
+### Step config checks (G4)
+
+*Added 2026-09-23 (`PROCESSOR-RELEASE-READINESS-1` G4).* `ConfigRoutes.stepConfigFindings`, run by
+`SaveGate` after the dedup-window check, refuses at save what `RowShaper` used to refuse only on the first
+run. It reads the `steps:` chain and the legacy `processing.dedup` / `processing.profile` blocks:
+
+| Step | refused at save |
+|---|---|
+| `lookup` | no `column`; no `mappings`; a mapping that is not `key=value` (named); a `column` the schema does not declare |
+| `filter` | a blank `where` |
+| `dedup` | an empty or absent `keys` list; a key the schema does not declare |
+| `profile` | a named column the schema does not declare (an empty block still means "every column") |
+
+Codes `ERR_STEP_CONFIG_INVALID` (active) / `WARN_STEP_CONFIG_INVALID` (inactive draft), the same
+severity split the arming checks use. ⚠ **Columns are judged only while the row is still the schema's.**
+From the first `sql`, `join`, `summarize`, `profile` or `route` step on, the inbound columns are unknown
+here, and unknown is not wrong. A `lookup` with a `target` adds that column. An unreadable schema says
+nothing, as with the TypeFlow checks. ⚠ **Not covered:** a `route:` branch's own `steps[]` sub-chain is
+not walked. Pinned by `StepConfigSaveFindingsTest`.
 
 ## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
 

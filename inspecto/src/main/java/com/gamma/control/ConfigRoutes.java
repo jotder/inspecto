@@ -258,6 +258,106 @@ final class ConfigRoutes {
         return out;
     }
 
+    /**
+     * The {@code lookup} / {@code profile} / {@code dedup} / {@code filter} step configs, judged at save as
+     * {@code RowShaper} judges them at run ({@code PROCESSOR-RELEASE-READINESS-1} G4): a lookup needs a
+     * {@code column} and at least one {@code key=value} mapping, a filter a non-blank {@code where}, a
+     * dedup a non-empty {@code keys} list - and a lookup column, dedup key or profile column must be one
+     * the declared schema carries. Covers the {@code steps:} chain and the legacy {@code processing.dedup}
+     * / {@code processing.profile} blocks. Severity follows the other arming findings: ERROR when active,
+     * WARNING on an inactive draft.
+     *
+     * <p>Columns are judged only while the row is still the schema's: from the first {@code sql},
+     * {@code join}, {@code summarize}, {@code profile} or {@code route} step on, the inbound columns are no
+     * longer known here, and unknown is not wrong. A {@code lookup} with a {@code target} adds that column.
+     * An unreadable schema says nothing about columns (see {@link #declaredColumns}). Branch
+     * {@code steps[]} sub-chains inside {@code route:} are not walked.
+     */
+    static List<Finding> stepConfigFindings(String type, Map<String, Object> draft, Path configDir) {
+        if (!"pipeline".equals(type)) return List.of();
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        List<String> known = new ArrayList<>();
+        for (TypeFlow.Column c : declaredColumns(draft, configDir)) known.add(c.name());
+        List<String> columns = known.isEmpty() ? null : known;   // null = the row's columns are unknown
+        List<String> refusals = new ArrayList<>();
+        List<String> fields = new ArrayList<>();
+        if (draft.get("steps") instanceof List<?> steps) {
+            for (int i = 0; i < steps.size(); i++) {
+                if (!(steps.get(i) instanceof Map<?, ?> entry) || entry.size() != 1) continue;
+                String kind = String.valueOf(entry.keySet().iterator().next());
+                Map<?, ?> cfg = entry.values().iterator().next() instanceof Map<?, ?> m ? m : Map.of();
+                String refusal = stepRefusal(kind, cfg, columns);
+                if (refusal != null) { refusals.add(refusal); fields.add("steps[" + i + "]." + kind); }
+                if (PipelineConfig.Step.LOOKUP.equals(kind)) {
+                    if (columns != null && cfg.get("target") != null) columns.add(String.valueOf(cfg.get("target")));
+                } else if (!PipelineConfig.Step.FILTER.equals(kind) && !PipelineConfig.Step.DEDUP.equals(kind)) {
+                    columns = null;
+                }
+            }
+        }
+        Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        // Legacy projection order: filter, join, dedup, summarize, profile.
+        if (proc.get("join") != null) columns = null;
+        if (proc.get("dedup") instanceof Map<?, ?> dd) {
+            String refusal = stepRefusal(PipelineConfig.Step.DEDUP, dd, columns);
+            if (refusal != null) { refusals.add(refusal); fields.add("processing.dedup"); }
+        }
+        if (proc.get("summarize") != null) columns = null;
+        if (proc.get("profile") instanceof Map<?, ?> pf) {
+            String refusal = stepRefusal(PipelineConfig.Step.PROFILE, pf, columns);
+            if (refusal != null) { refusals.add(refusal); fields.add("processing.profile"); }
+        }
+        List<Finding> out = new ArrayList<>();
+        for (int i = 0; i < refusals.size(); i++)
+            out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, fields.get(i), refusals.get(i),
+                    active ? FindingCodes.ERR_STEP_CONFIG_INVALID : FindingCodes.WARN_STEP_CONFIG_INVALID,
+                    active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
+        return out;
+    }
+
+    /** The first refusal the run would raise for one step's config, or {@code null}; {@code columns} null = unknown. */
+    private static String stepRefusal(String kind, Map<?, ?> cfg, List<String> columns) {
+        switch (kind) {
+            case PipelineConfig.Step.LOOKUP -> {
+                String column = cfg.get("column") == null ? "" : String.valueOf(cfg.get("column")).trim();
+                if (column.isEmpty()) return "transform.lookup needs a 'column' - the column it transcodes";
+                if (!(cfg.get("mappings") instanceof List<?> maps) || maps.stream().allMatch(o -> o == null))
+                    return "transform.lookup needs at least one 'mappings' entry of the form key=value";
+                for (Object o : maps)
+                    if (o != null && o.toString().indexOf('=') <= 0)
+                        return "transform.lookup: mapping '" + o + "' is not key=value";
+                return undeclared("transform.lookup column", List.of(column), columns);
+            }
+            case PipelineConfig.Step.FILTER -> {
+                Object where = cfg.get("where");
+                return where == null || String.valueOf(where).isBlank()
+                        ? "transform.filter needs a non-blank 'where' predicate" : null;
+            }
+            case PipelineConfig.Step.DEDUP -> {
+                if (!(cfg.get("keys") instanceof List<?> keys) || keys.isEmpty())
+                    return "transform.dedup needs a non-empty 'keys' list - the columns that identify a duplicate";
+                return undeclared("transform.dedup key", keys, columns);
+            }
+            case PipelineConfig.Step.PROFILE -> {
+                return cfg.get("columns") instanceof List<?> cols
+                        ? undeclared("transform.profile column", cols, columns) : null;
+            }
+            default -> { return null; }
+        }
+    }
+
+    /** The first of {@code names} the declared {@code columns} do not carry (case-insensitive, as DuckDB binds). */
+    private static String undeclared(String what, List<?> names, List<String> columns) {
+        if (columns == null) return null;
+        for (Object o : names) {
+            if (o == null || o.toString().isBlank()) continue;
+            String name = o.toString().trim();
+            if (columns.stream().noneMatch(c -> c.equalsIgnoreCase(name)))
+                return what + " '" + name + "' is not a column of the declared schema (have: " + columns + ")";
+        }
+        return null;
+    }
+
     /** One dedup config block's windowed-scope refusal, if any, as a finding anchored at {@code field}. */
     private static void addDedupWindowFinding(List<Finding> out, Severity severity, boolean active,
                                               String field, Map<?, ?> dedup) {
