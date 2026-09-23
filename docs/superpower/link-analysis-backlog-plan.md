@@ -457,7 +457,7 @@ caller-shaped SQL would not.
 | **LA-19** | Evidential controls | ⬜ | L | LA-10 | Scope binding, minimisation, four-eyes, retention/purge, per-entity annotation, **coverage indicator**. |
 | **LA-20** | Working Set as a log-defined derived relation + cache | ⬜ | L | D-E3, D-E7 | §2.7; the cache is a functional requirement (six tiles = six re-runs per view). |
 | **LA-21** | Evidence / Monitoring Widgets | ⬜ | M | LA-20, D-E6 | Pinned default; kind on the tile; drift line. |
-| **LA-12** | Dossier + three renderings + chain of custody | ⬜ | L | LA-10 | `GraphDossierBuilder.java`: summary, topology, centrality/risk tables, chronological ledger, SHA-256 manifest (replaces the FNV-1a fingerprint); JSON / numbered steps / method statement; **negative space in all three**. |
+| **LA-12** | Dossier + three renderings + chain of custody | ✅ **BACKEND SHIPPED 2026-09-23** — `DossierRoutes` (`GET /inv/investigations/{id}/dossier`, `POST …/dossier/verify`) over a pure `GraphDossierBuilder`; `ControlApiDossierTest` 8/8, tamper detection mutation-checked twice. As-built + deferrals in §5.6 | L | LA-10 | `GraphDossierBuilder.java`: summary, topology, centrality/risk tables, chronological ledger, SHA-256 manifest (replaces the FNV-1a fingerprint); JSON / numbered steps / method statement; **negative space in all three**. |
 | **LA-22** | Synchronised Geo ↔ Link brushing | ✅ **SHIPPED 2026-09-23 (brush half)** — `geo-link-brush.ts` (`GeoLinkBrushService` + `nodeIdsForKeys`/`pointIdsForNodes`, joined only via `entityId()`); polygon/point on the map → node emphasis, node click → point emphasis; unkeyed points never brush. ⚠ **Re-grounded:** the ident param, SELECT column, wire types and `foldServerResult` had already shipped in `beb0170b`, so the remaining work was the emitter + consumers only. **Deferred:** split-pane mode, graph path → map route tracing. | ~~S–M~~ → **M** — 🔴 **I under-sized this and the correction matters.** The geometry half does ship, but `geo-projection.ts`'s own header records the projection as **backend-first since Phase 4**, so changing `projectPoints`/`coLocations` alone is **cosmetic in production** — `GeoRoutes.java` builds the points server-side and is the load-bearing half, needing a new ident param and SELECT column. ⚠ And the “selection event” is **net-new plumbing**: `geo-map.component.ts`'s displayed set has no `@Output` at all, so today the polygon is a DISPLAY FILTER that no other pane can hear. ~9 touchpoints (type, form, wire types, `foldServerResult`, Java route, `CoLocation`, the emitter). ⚠ `coLocations` also requires `p.label` truthy to participate, so a point with no entity column never co-locates — the same trap will apply to a key unless a fallback is decided. | — (D-U3 answered · D-U4 dissolved) | `GeoLinkSyncService.ts`: bounding-box on map isolates nodes; path on graph traces the route; split-pane mode. |
 | **LA-23** | Enquiry Templates → Measure → Alert Rule → Incident | ⬜ | M | LA-20, D-E8 | Cheap once LA-20 lands; every downstream noun ships. |
 
@@ -710,6 +710,65 @@ guards is currently uncaught.
   implemented yet"*, never *"unknown"*); the hop-ladder rung fields (LA-13); a list/GET-one route; Case
   linkage of an Investigation; the Investigation Template (LA-23); stamping `investigationId`/`opSeq` onto
   snapshots server-side (the snapshot body is stored verbatim, so a client can already carry them); SPA wiring.
+
+### 5.6 Dossier routes — LA-12
+
+✅ **AS BUILT 2026-09-23 (backend).** These routes are in a new `DossierRoutes`, registered through
+`META-INF/services`. `InvestigationRoutes` was left untouched because a parallel lane (LA-20) is editing it.
+
+| Route | Gate | Notes |
+|---|---|---|
+| `GET /inv/investigations/{id}/dossier` | open read, owner-only | `?at=` (a prefix, 0..steps, max 5 000) · `?snapshots=a,b` (max 20) · `?format=json` (default: the whole dossier in the envelope) `\|steps\|method` (that one rendering as `text/plain`) |
+| `POST /inv/investigations/{id}/dossier/verify` | read-shaped exemption | body `{manifest}`, a bare manifest, or a whole dossier → `{verified, selfConsistent, intact, submittedRoot, currentRoot, changed, missing, added, contentChanged, integrity}` |
+
+* **Three renderings.** All three are text, so no new dependency was needed: the re-runnable **JSON** log,
+  where the sealed rows are summarised by their fingerprint and stay in the store, covered by the manifest ·
+  numbered plain-language **steps** with author and time · the **method statement**, which closes with the
+  custody root. Every exclusion is listed with its id, step, author, reason and basis. Undone steps, truncated
+  reads, hidden entities, the unassessed coverage, which measures exist over which set, and the unpinned Dataset
+  version are listed in all three (**G-E10**). ⏳ **PDF / HTML deferred:** there is no PDF library in the
+  dependency set, and `format=method` is already a text document ready to hand over.
+* **Manifest (G-R6).** SHA-256 over the raw stored bytes of `header.json`, each log line (`log.jsonl#<step>`),
+  each `sets/<step>.json` and each included snapshot, plus canonical-JSON hashes of `entities`, `links`,
+  `excluded` and `scores`. `root` is SHA-256 of the canonical manifest body; `generatedAt` sits outside it, so
+  two builds of an unchanged store have the same root. Hashing log LINES rather than the file lets a prefix
+  dossier (`?at=`) cover exactly what it includes and name the step that changed.
+* **Two independent tamper checks.** (1) `integrity` needs no earlier manifest. It replays each position as the
+  PREFIX it was at append time and checks it against the recorded `workingSetHash`. It also checks each set
+  file's `hash` against the replay and against its own content, and each sealed read's rows against their
+  `fingerprint`. (2) `verify` compares a held manifest with one rebuilt now. It catches what (1) cannot: a
+  tamper that kept every internal hash consistent, or a change to `header.json`, which no recorded hash
+  covers. A step or snapshot that has since disappeared is reported under `missing`, never refused. The
+  test tampers with a set file, the header, the log and a snapshot, and edits a manifest. **Mutation-checked:**
+  disabling the artefact comparison, or the set's content-hash check, turns the tests red on the tampered
+  values, not on a side effect.
+* **Centrality/risk tables.** No server-side graph algorithm exists, so none is computed here. The tables are
+  the `metrics` a snapshot sealed, computed client-side, each labelled with the snapshot, its `createdAt` and
+  its node count. Degree in `topology` is a count of the sealed links, not an algorithm.
+* **Access.** Owner-only (a non-owner gets 404) plus the R3 Dataset check, both copied from
+  `InvestigationRoutes.open`. Building a dossier reads no Dataset, so no `relationFor` call is involved. An
+  included snapshot must be **anchored**: its stored body must carry `investigationId` equal to this
+  Investigation (422 otherwise), and its `origin.dataset` must be viewable (404). Without that, the dossier
+  would become the first route that returns snapshot CONTENT, open to anyone who owns any Investigation.
+* **Audit.** `LINK_DOSSIER_BUILT` (at, format, root, intact) and `LINK_DOSSIER_VERIFIED` (verified, both roots,
+  changed count). Both are best-effort, per LA-04.
+* 🔴 **Plan vs code.** (1) *"Replaces the FNV-1a fingerprint"* holds on the SERVER only. The SPA's
+  `graph-snapshot.ts` still uses FNV-1a: moving it to Web Crypto SHA-256 makes `snapshotGraph` and
+  `verifySnapshot` async, which reaches `link-analysis-evidence.dialogs.ts`, its spec and the on-screen copy.
+  That is more than a two-file change, so it was **deferred**. The dossier's manifest, not the SPA's
+  `manifestHash`, is the custody root. (2) *Centrality tables* are carried, not computed, as above. (3) The
+  dossier is **not persisted** as an Artifact: it is regenerated deterministically, and custody is proved by
+  the reader's held manifest. A stored, `opSeq`-anchored dossier Artifact is deferred. (4) `render()` and
+  `open()` are copied from `InvestigationRoutes`, to be folded together once LA-20 lands. The dossier's
+  `render` deliberately lists EVERY excluded id, never "and N more".
+* 🔴 **Found while grounding (LA-10 defect, not fixed here — the file is under a parallel lane):**
+  `POST /inv/investigations/{id}/replay` reports **`equivalent:false` after ANY undo** on an untampered log.
+  `InvestigationEvaluator.evaluate` collects the undone steps across the WHOLE log before folding. So replay
+  position *k* skips an op undone LATER, while the `workingSetHash` recorded at *k* includes it. Probe: seed,
+  expand, exclude, hide, undo, then replay answers `equivalent:false, mismatches:[4]`. The dossier's integrity
+  check avoids this by evaluating prefixes. The fix is for `replay` to do the same.
+* ⏳ **Deferred:** SPA wiring (no Dossier UI yet) · the SPA SHA-256 swap · PDF/HTML renderings · a persisted
+  Dossier Artifact · coverage (LA-19) · server-side centrality · snapshot dossiers without an Investigation.
 
 ---
 

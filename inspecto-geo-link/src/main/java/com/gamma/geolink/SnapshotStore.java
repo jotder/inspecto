@@ -202,6 +202,15 @@ final class SnapshotStore {
     }
 
     /**
+     * One step's sealed Working Set file, raw, or null when it was never written (LA-12 reads it for the
+     * dossier's integrity check and manifest). Read-only — additive beside the write paths above.
+     */
+    String readSet(String id, int step) throws IOException {
+        Path f = investigationDir(id).resolve("sets").resolve(step + ".json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
+    /**
      * Append one step, then seal the Working Set it evaluated to. ⚠ The ORDER is deliberate: the log line is the
      * source of truth and is written first; a crash before the set lands leaves a step whose set replay can
      * recompute, never a set with no step behind it.

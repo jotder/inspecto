@@ -184,6 +184,14 @@ public final class EventType {
      *  {@code equivalent} reports the incremental/replay equivalence check; with {@code reread},
      *  {@code diverged} reports whether current data no longer matches a sealed read. */
     public static final String LINK_INVESTIGATION_REPLAYED = "LINK_INVESTIGATION_REPLAYED";
+    /** An Investigation's Dossier was issued ({@code GET /inv/investigations/{id}/dossier}, LA-12). {@code at},
+     *  {@code format}, the SHA-256 manifest {@code root} and {@code intact} (whether the stored evidence still
+     *  agrees with its own recorded hashes) carry what was handed over — issuing evidence is an act, not a view. */
+    public static final String LINK_DOSSIER_BUILT = "LINK_DOSSIER_BUILT";
+    /** A Dossier manifest was checked against the store ({@code POST /inv/investigations/{id}/dossier/verify},
+     *  LA-12). {@code verified}, {@code submittedRoot}, {@code currentRoot} and {@code changed} (artefacts whose
+     *  bytes differ) carry the custody verdict. */
+    public static final String LINK_DOSSIER_VERIFIED = "LINK_DOSSIER_VERIFIED";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

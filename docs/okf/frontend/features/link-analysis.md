@@ -510,6 +510,29 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
   **owner-only** (a non-owner reads 404), writes need `canManageIncidents`, and a bound Dataset shared away
   from the caller makes the Investigation read as absent. ⚠ The SPA does not call it yet.
+* **An Investigation has a Dossier with a SHA-256 chain of custody** (LA-12, backend shipped 2026-09-23;
+  `DossierRoutes` + `GraphDossierBuilder` in `inspecto-geo-link`). `GET /inv/investigations/{id}/dossier`
+  (`?at=` a prefix, `?snapshots=` exhibits, `?format=json|steps|method`) answers summary, topology, a
+  chronological ledger, centrality/risk tables, **negative space**, an integrity report and the three
+  renderings: the re-runnable JSON log, numbered plain-language steps, and a method statement that cites the
+  custody hash. Every exclusion, with its id, step, author and reason, appears in **all three** (G-E10).
+  `format=steps|method` answer `text/plain`. The **manifest** hashes the raw stored bytes of `header.json`,
+  every log line (`log.jsonl#<step>`), every `sets/<step>.json` and every included snapshot, plus the canonical
+  entities, links, exclusions and score vectors (G-R6); its `root` is SHA-256 over the manifest body and does
+  not depend on when the dossier was built. `POST …/dossier/verify` rebuilds the manifest from the store and
+  names each artefact that is `changed`, `missing` or `added`; an edited manifest fails its own root
+  (`selfConsistent:false`). ⚠ **Two independent checks**: the `integrity` section re-checks the hashes LA-10
+  recorded (per-step replay against `workingSetHash`, each set file against its own `hash`, each sealed read
+  against its `fingerprint`), so the FIRST dossier after a tamper already reports it. A tamper that keeps every
+  internal hash consistent, or one to the header (no recorded hash covers it), is caught by the manifest
+  alone. ⛔ **No server-side graph algorithm exists**, so the dossier computes no centrality. Its score tables
+  are the vectors a snapshot sealed, computed client-side, each labelled with the snapshot, its time and its
+  node count. A snapshot must be **anchored**, meaning its body's `investigationId` names this Investigation,
+  or it is refused (422), so a dossier cannot be used to read another analyst's snapshot. Access matches the
+  Investigation: owner-only, plus the R3 Dataset check. Neither route persists anything; both are audited
+  (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). ⚠ The SPA still fingerprints snapshots with FNV-1a:
+  swapping it to Web Crypto SHA-256 makes `snapshotGraph`/`verifySnapshot` async, which reaches the evidence
+  dialog and its spec, so it was deferred.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as
