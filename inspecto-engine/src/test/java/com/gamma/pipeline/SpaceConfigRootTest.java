@@ -173,6 +173,27 @@ class SpaceConfigRootTest {
         assertEquals(serverWide.resolve("registry"), SpaceConfigRoot.currentRegistry());
     }
 
+    /**
+     * {@code JOB-PATH-SINGLE-TENANT-GATE-BASE-1}: the one resolver the job save gates and the pipeline
+     * runner share. The runner's two keys go to the read root; every other job key stays on {@code current()}.
+     */
+    @Test
+    void jobPathBaseSplitsPerKeyBetweenTheReadRootAndTheSpaceRoot(@TempDir Path launch, @TempDir Path serverWide,
+                                                                  @TempDir Path ucc) {
+        System.setProperty("assist.write.root", serverWide.toString());
+        SpaceConfigRoot.registerConfigReadRoot(EventLog.DEFAULT_SPACE_ID, launch);
+        assertEquals(launch, SpaceConfigRoot.jobPathBase("pipeline_config"));
+        assertEquals(launch, SpaceConfigRoot.jobPathBase("data_dir"));
+        for (String k : java.util.List.of("dir", "archive_dir", "backup_dir", "archive", "target_dir", "out_dir", "config"))
+            assertEquals(serverWide, SpaceConfigRoot.jobPathBase(k), k);
+
+        // A self-contained Space: both answers are its config root, so nothing moves there.
+        SpaceConfigRoot.register("ucc", ucc);
+        MDC.put(EventLog.SPACE_MDC_KEY, "ucc");
+        assertEquals(ucc, SpaceConfigRoot.jobPathBase("pipeline_config"));
+        assertEquals(ucc, SpaceConfigRoot.jobPathBase("dir"));
+    }
+
     @Test
     void aSelfContainedSpacesReadRootIsItsConfigRoot(@TempDir Path ucc, @TempDir Path launch) {
         SpaceConfigRoot.register("ucc", ucc);

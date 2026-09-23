@@ -162,6 +162,32 @@ public final class SpaceConfigRoot {
         return forSpaceConfigReadRoot(EventLog.currentSpaceId());
     }
 
+    /**
+     * The job keys whose run-time reader ({@code PipelineJobRunner}) resolves against
+     * {@link #currentConfigReadRoot()}; every other job path key resolves against the Space config root.
+     */
+    public static final java.util.Set<String> CONFIG_READ_ROOT_JOB_KEYS = java.util.Set.of("pipeline_config", "data_dir");
+
+    /**
+     * <b>The ONE answer to "what does a job's relative {@code key} resolve against"</b>
+     * ({@code JOB-PATH-SINGLE-TENANT-GATE-BASE-1}) — called by the job save gates AND the pipeline runner, so
+     * the two cannot drift. Before this the gates judged every key from {@link #current()} (the write root)
+     * while the runner read {@code pipeline_config}/{@code data_dir} from the read root: in the single-tenant
+     * layout those differ, and a job that RUNS ({@code pipeline_config: orders_pipeline.toon}) was refused at
+     * save. In a self-contained Space the two roots are the same directory, so nothing changes there.
+     *
+     * @param key       the bare job key, e.g. {@code pipeline_config}
+     * @param spaceRoot the caller's Space config root, used for every key the pipeline runner does not read
+     */
+    public static Path jobPathBase(String key, Path spaceRoot) {
+        return CONFIG_READ_ROOT_JOB_KEYS.contains(key) ? currentConfigReadRoot() : spaceRoot;
+    }
+
+    /** {@link #jobPathBase(String, Path)} with {@link #current()} as the Space config root. */
+    public static Path jobPathBase(String key) {
+        return jobPathBase(key, current());
+    }
+
     /** {@link #currentConfigReadRoot()} for a caller that already holds the Space id; {@code null} means the default Space. */
     public static Path forSpaceConfigReadRoot(String spaceId) {
         String id = spaceId == null ? EventLog.DEFAULT_SPACE_ID : spaceId;

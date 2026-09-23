@@ -251,8 +251,9 @@ public final class PipelineJobRunner implements Job {
         // would re-point all 19 committed values (12 `pipeline_config`, 7 `data_dir: out`). With the read root
         // = the launch dir, a value that resolves resolves to the same file as before; only an escape from the
         // policy roots is refused (PathJail.Escape, unmapped — the maintenance tasks' idiom).
+        // `JOB-PATH-SINGLE-TENANT-GATE-BASE-1`: the base comes from `SpaceConfigRoot.jobPathBase`, the resolver
+        // the job save gates call too, so the gate and this reader cannot judge a value from different roots.
         List<Path> jailRoots = PathJail.allowedRoots();
-        Path readRoot = SpaceConfigRoot.currentConfigReadRoot();
         String flatPath = cfg.opt("pipeline_config", null);
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
         // read only, kept for existing *_job.toon files that were never resaved.
@@ -263,7 +264,8 @@ public final class PipelineJobRunner implements Job {
             if (pipelineIdOpt != null || cfg.opt("flow", null) != null)
                 throw new IllegalArgumentException("pipeline job '" + cfg.name()
                         + "' carries both pipeline_config: and pipeline:/flow: — pick one graph source");   // vocab-allow: names the two config KEYS, `pipeline:` and the legacy `flow:`
-            flatPath = PathJail.requireJobPathUnderAny(jailRoots, readRoot, flatPath, "job.pipeline_config").toString();
+            flatPath = PathJail.requireJobPathUnderAny(jailRoots,
+                    SpaceConfigRoot.jobPathBase("pipeline_config"), flatPath, "job.pipeline_config").toString();
             g = com.gamma.pipeline.PipelineLift.stageTwo(com.gamma.etl.PipelineConfig.load(flatPath));
             pipelineId = g.name();
         } else {
@@ -284,7 +286,7 @@ public final class PipelineJobRunner implements Job {
         // would rewrite persisted SQL for every existing relative `data_dir`. The constructor default is the
         // Space's own data root (JobService), not an authored path, and is not jailed.
         if (cfg.opt("data_dir", null) != null)
-            PathJail.requireJobPathUnderAny(jailRoots, readRoot, dir, "job.data_dir");
+            PathJail.requireJobPathUnderAny(jailRoots, SpaceConfigRoot.jobPathBase("data_dir"), dir, "job.data_dir");
         requireTopLevelSinks(g, dir);
         String batchId = cfg.opt("batch_id", cfg.name().toLowerCase().replace(' ', '_')
                 + "-" + System.currentTimeMillis());

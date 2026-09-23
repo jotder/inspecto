@@ -389,8 +389,9 @@ final class JobRoutes implements RouteModule {
         // JOB-DIR-CWD-CONTAINMENT-1: the Space config root is what a job's relative path resolves
         // against (operator 2026-09-16) - the same base the run-time tasks use, so the 422 gate and the
         // jail cannot disagree. A null root (no Space) keeps the legacy working-directory behaviour.
-        findings.addAll(ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy(),
-                com.gamma.pipeline.SpaceConfigRoot.current()));
+        // JOB-PATH-SINGLE-TENANT-GATE-BASE-1: the base is chosen PER KEY by the resolver the runners call.
+        findings.addAll(ConfigSafetyValidator.checkJob(raw, SafetyPolicy.defaultPolicy(),
+                com.gamma.pipeline.SpaceConfigRoot::jobPathBase));
         List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
                 .map(f -> f.fieldPath() + ": " + f.message()).toList();
         if (!errors.isEmpty()) throw new ApiException(422, "job refused at save: " + errors);

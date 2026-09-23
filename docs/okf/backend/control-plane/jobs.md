@@ -653,7 +653,7 @@ committed configs.
   matching the three `MaintenanceJob` siblings. ⛔ `ReferenceCompactor.compact(Path,long)` stays unjailed
   on purpose: `CollectorService:1276` feeds it a pipeline's own resolved dirs, not an authored value.
 - ~~**`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`**~~ ✅ **SHIPPED 2026-09-16, and the defect was not the one the
-  row named.** `ConfigWriteRoutes.safetyBase` dispatches on TYPE, because `configDir` legitimately means
+  row named.** `ConfigWriteRoutes.safetyBase` (now `safetyFindings`) dispatches on TYPE, because `configDir` legitimately means
   two different things: a pipeline/schema resolves its `schema_file`/`grammar` refs against the config
   file's own directory, a job against the Space config root. ⛔ "Make them the same" was the wrong fix.
   The real third base was `/config/write:71`, which passed **no base at all** and judged a job against the
@@ -680,7 +680,12 @@ committed configs.
   with no jail at all.** ✅ **Both were discharged the same day by `JOB-PATH-REPORT-ENRICH-SPLIT-1`,
   reader first and only then the list** — see that section below. ⇒ `JOB_PATH_KEYS` is now **nine**:
   the seven after `archive_dir` joined, plus `out_dir` and `config`.
-- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining **29** committed values space-relative.
+- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining committed values space-relative.
+  ✅ **Remainder: 0 real values** *(the "29" this bullet carried was stale).* After the five 2026-09-16
+  re-points, 24 were left: the 19 `PipelineJobRunner` values need none, because
+  `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` option 1 resolves them against the config READ root (the launch
+  dir, where they always pointed), and since `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` the save gate agrees;
+  4 are `${…}` placeholders, not values; 1 is `store`, which no job-path rule covers.
   ⛔ Land it with whichever runtime row lands last, or the configs refuse in between. *(33 → 32: the one
   `out_dir` value moved with its runtime. ⛔ Not licence to re-point the rest early.)*
   ~~🔴 **Three of the 32 are now orphaned the OTHER way**~~ ✅ **CLOSED 2026-09-16, same day.**
@@ -691,6 +696,30 @@ committed configs.
   `backup_dir: ../data/backups`, each driven to land byte-identically on the legacy target, and now
   pinned by `DemoBackupJobPathsResolveUnderTheSpaceRootTest` — the first thing in the repo that holds
   a committed config value and its reader's rule together.
+
+### `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` — a job's base is chosen PER KEY, by one resolver
+
+In the single-tenant layout a job has **two** bases, not one. `PipelineJobRunner` reads `pipeline_config`
+and `data_dir` against `SpaceConfigRoot.currentConfigReadRoot()` — the launch dir, which
+`SpaceManager.single()` registers (`serve-example.sh` cd's into the example) — while the maintenance
+tasks, `ReportJob` and `EnrichJob` read their keys against `SpaceConfigRoot.current()` — the write root,
+`-Dassist.write.root` (e.g. `<example>/out/write`). The save gates judged **every** key from the write
+root, so a value that RUNS (`pipeline_config: orders_pipeline.toon` in `inspecto/examples/07-steps/*`)
+was refused by `resolveJobPath`'s ambiguous-case branch, and re-saving that job through `POST|PUT /jobs`
+answered 422.
+
+**As built (2026-09-23):** `SpaceConfigRoot.jobPathBase(key[, spaceRoot])` is the one answer —
+`CONFIG_READ_ROOT_JOB_KEYS` (`pipeline_config`, `data_dir`) go to the read root, every other key to the
+Space config root. `PipelineJobRunner` calls it for its two reads; all four job save gates
+(`JobRoutes.parseJob`, `BundleRoutes` job import, `/config/write`, `/config/patch`) pass it to
+`ConfigSafetyValidator.checkJob(raw, policy, baseForKey)`. Pinned by `ControlApiJobPathSingleTenantBaseTest`
+(real HTTP, launch-dir fixture) and `SpaceConfigRootTest.jobPathBaseSplitsPerKeyBetweenTheReadRootAndTheSpaceRoot`.
+
+- ⚠ **Multi-Space mode is unchanged by construction:** a self-contained Space registers no read root,
+  so `currentConfigReadRoot()` falls back to the same `root().config()` `current()` returns.
+- ⛔ **A new key that joins `JOB_PATH_KEYS` must also be placed in (or out of)
+  `CONFIG_READ_ROOT_JOB_KEYS`** by what its reader calls — the gate reads the base from there.
+- ⚠ `schema_file` is not a job key and not part of this rule (`SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`).
 
 ### `JOB-PATH-REPORT-ENRICH-SPLIT-1` — the last two readers, and what they taught
 

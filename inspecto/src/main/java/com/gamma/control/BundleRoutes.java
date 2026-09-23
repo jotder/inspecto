@@ -494,8 +494,8 @@ final class BundleRoutes implements RouteModule {
             // per-item `failed` result (see the BundleSource javadoc) — it never aborts the batch.
             Map<String, Object> raw = Map.of("job", stamped);
             List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.job(), raw));
-            findings.addAll(ConfigSafetyValidator.check("job", raw, SafetyPolicy.defaultPolicy(),
-                    com.gamma.pipeline.SpaceConfigRoot.current()));
+            findings.addAll(ConfigSafetyValidator.checkJob(raw, SafetyPolicy.defaultPolicy(),
+                    com.gamma.pipeline.SpaceConfigRoot::jobPathBase));
             List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
                     .map(f -> f.fieldPath() + ": " + f.message()).toList();
             if (!errors.isEmpty()) throw new IllegalArgumentException("job refused at import: " + errors);

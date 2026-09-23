@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
@@ -102,7 +103,7 @@ public final class ConfigSafetyValidator {
         switch (type) {
             case "pipeline" -> checkPipeline(raw, p, configDir, out);
             case "enrichment" -> checkEnrichment(raw, p, out);
-            case "job" -> checkJob(raw, p, configDir, out);
+            case "job" -> checkJob(raw, p, k -> configDir, out);
             default -> { /* schema / meta: no path/numeric/output surface to gate */ }
         }
         return out;
@@ -120,7 +121,9 @@ public final class ConfigSafetyValidator {
      * keys this list does not name still get their run-time check.
      *
      * <p>⚠ <b>A key belongs here only when the run-time reader resolves it the SAME way</b> — through
-     * {@link PathJail#requireJobPathUnderAny} against the Space config root. ⛔ <b>Reader first, then
+     * {@link PathJail#requireJobPathUnderAny} against the base {@code SpaceConfigRoot.jobPathBase(key)}
+     * names (the config READ root for the pipeline runner's two keys, the Space config root for the
+     * rest). ⛔ <b>Reader first, then
      * this list</b> — adding a key here while its runtime still resolved against the process working
      * directory would manufacture exactly the gate/runtime split {@link PathJail#resolveJobPath} exists
      * to end. That order is not advice; it is why {@code out_dir} and {@code config} were held OUT by
@@ -137,21 +140,39 @@ public final class ConfigSafetyValidator {
                     "target_dir", "out_dir", "config");
 
     /**
-     * ⚠ {@code configDir} here is the <b>Space config root</b>, and unlike every other kind it is USED:
+     * ⚠ The base here is the <b>Space config root</b>, and unlike every other kind it is USED:
      * a job's relative path resolves against it ({@code JOB-DIR-CWD-CONTAINMENT-1}, operator
      * 2026-09-16), through the same {@link PathJail#resolveJobPath} the run-time tasks call. ⛔ The two
      * must not diverge — a gate that resolved differently from the jail would pass a draft the run then
      * refuses, which is the split the whole row was about. A {@code null} root leaves the legacy
      * working-directory behaviour, for a caller with no Space.
+     *
+     * <p>The job gate takes a base PER KEY ({@code JOB-PATH-SINGLE-TENANT-GATE-BASE-1}). The control plane
+     * passes the engine's {@code SpaceConfigRoot.jobPathBase} — the resolver the pipeline runner calls too —
+     * because in the single-tenant layout the runner's {@code pipeline_config}/{@code data_dir} base (the
+     * launch dir) is not the maintenance tasks' base (the write root). One base for every key refused a
+     * pipeline job that runs.
+     *
+     * @param baseForKey bare key ({@code data_dir}, ...) to the root its relative value resolves against;
+     *                   a {@code null} result keeps the legacy working-directory behaviour for that key
      */
-    private static void checkJob(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
+    public static List<Finding> checkJob(Map<String, Object> raw, SafetyPolicy policy,
+                                         Function<String, Path> baseForKey) {
+        List<Finding> out = new ArrayList<>();
+        if (raw == null) return out;
+        checkJob(raw, policy == null ? SafetyPolicy.defaultPolicy() : policy, baseForKey, out);
+        return out;
+    }
+
+    private static void checkJob(Map<String, Object> raw, SafetyPolicy p, Function<String, Path> baseForKey,
+                                 List<Finding> out) {
         for (String k : JOB_PATH_KEYS) {
             String field = "job." + k;
             String v = RawConfig.str(raw, field);
             if (v == null || v.isBlank()) continue;
             Path resolved;
             try {
-                resolved = PathJail.resolveJobPath(configDir, v, field);
+                resolved = PathJail.resolveJobPath(baseForKey.apply(k), v, field);
             } catch (RuntimeException ex) {
                 out.add(Finding.error(field, ex.getMessage()));
                 continue;

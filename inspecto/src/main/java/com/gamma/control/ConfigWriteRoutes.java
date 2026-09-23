@@ -69,11 +69,10 @@ final class ConfigWriteRoutes implements RouteModule {
         // the defect warrants, and doing it blind risks the ordering the gate depends on.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, draft));
         // ⚠ The `null` target is deliberate and is NOT a third base: a job is judged from the Space
-        // config root here too (see safetyBase), and only a NON-job falls back to the CWD-only
+        // config root here too (see safetyFindings), and only a NON-job falls back to the CWD-only
         // behaviour the paragraph above describes. Without this a job draft would be judged from the
         // process working directory — the very rule JOB-DIR-CWD-CONTAINMENT-1 retired.
-        findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(),
-                safetyBase(type, writeRoot, null)));
+        findings.addAll(safetyFindings(type, draft, writeRoot, null));
         // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
         // returns written:true and the config is then silently dropped from the index forever.
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
@@ -352,12 +351,20 @@ final class ConfigWriteRoutes implements RouteModule {
      * disagree. It is also the more robust of the two spellings here, because it is bound to the request's
      * space rather than to an MDC lookup.
      *
+     * <p>⚠ For a job, {@code writeRoot} is the base of every key EXCEPT the pipeline runner's two
+     * ({@code JOB-PATH-SINGLE-TENANT-GATE-BASE-1}): {@code SpaceConfigRoot.jobPathBase} hands those the
+     * config READ root, the base {@code PipelineJobRunner} reads them from — the launch dir in the
+     * single-tenant layout, the same {@code root().config()} in a self-contained Space.
+     *
      * @param target the resolved config file, or {@code null} when the gate runs before it is derived
      *               ({@code /config/write}) — where a non-job keeps its historical CWD-only behaviour
      */
-    private static Path safetyBase(String type, Path writeRoot, Path target) {
-        if ("job".equalsIgnoreCase(type)) return writeRoot;
-        return target == null ? null : target.getParent();
+    private static List<Finding> safetyFindings(String type, Map<String, Object> draft, Path writeRoot, Path target) {
+        if ("job".equalsIgnoreCase(type))
+            return ConfigSafetyValidator.checkJob(draft, SafetyPolicy.defaultPolicy(),
+                    k -> com.gamma.pipeline.SpaceConfigRoot.jobPathBase(k, writeRoot));
+        return ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(),
+                target == null ? null : target.getParent());
     }
 
     /**
@@ -425,8 +432,7 @@ final class ConfigWriteRoutes implements RouteModule {
         // Same gate as /config/write, over the WHOLE merged draft: spec + hard-fail safety check;
         // schema references resolve config-relative here because the file has a home directory.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, merged));
-        findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy(),
-                safetyBase(type, writeRoot, target)));
+        findings.addAll(safetyFindings(type, merged, writeRoot, target));
         findings.addAll(ConfigRoutes.schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, merged));
         findings.addAll(ConfigRoutes.routeArmingFindings(type, merged));              // a patch can break arming too
