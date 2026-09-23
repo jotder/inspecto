@@ -1,9 +1,9 @@
 package com.gamma.objects;
 
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -38,7 +38,7 @@ public record RcaTemplate(String name, List<String> sections) {
     /** Load an {@code *_rca.toon} (an {@code rca { … }} block). */
     @SuppressWarnings("unchecked")
     public static RcaTemplate load(Path path) throws IOException {
-        Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
+        Map<String, Object> root = ToonHelper.load(path.toString());
         Object rca = root.get("rca");
         if (!(rca instanceof Map)) throw new IllegalArgumentException(path + " has no 'rca' block");
         return fromMap((Map<String, Object>) rca);

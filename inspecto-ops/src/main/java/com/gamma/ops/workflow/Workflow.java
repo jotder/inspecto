@@ -1,10 +1,9 @@
 package com.gamma.ops.workflow;
 
-import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.objects.ObjectType;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -201,7 +200,7 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
     /** Load a {@code *_workflow.toon} (a {@code workflow { … }} block). */
     @SuppressWarnings("unchecked")
     public static Workflow load(Path path) throws IOException {
-        Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
+        Map<String, Object> root = ToonHelper.load(path.toString());
         Object wf = root.get("workflow");
         if (!(wf instanceof Map)) throw new IllegalArgumentException(path + " has no 'workflow' block");
         return fromMap((Map<String, Object>) wf);

@@ -1,9 +1,8 @@
 package com.gamma.ops.tag;
 
-import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,7 +39,7 @@ public record Tag(String name, long createdAt) {
     /** Load a {@code *_tag.toon} (a {@code tag { … }} block). */
     @SuppressWarnings("unchecked")
     public static Tag load(Path path) throws IOException {
-        Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
+        Map<String, Object> root = ToonHelper.load(path.toString());
         Object t = root.get("tag");
         if (!(t instanceof Map)) throw new IllegalArgumentException(path + " has no 'tag' block");
         return fromMap((Map<String, Object>) t);

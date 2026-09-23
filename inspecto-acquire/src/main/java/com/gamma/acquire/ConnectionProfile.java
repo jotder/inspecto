@@ -1,10 +1,10 @@
 package com.gamma.acquire;
 
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.config.safety.PathJail;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -104,7 +104,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
     /** Load an {@code *_connection.toon} (a {@code connection { … }} block). */
     @SuppressWarnings("unchecked")
     public static ConnectionProfile load(Path path) throws IOException {
-        Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
+        Map<String, Object> root = ToonHelper.load(path.toString());
         Object conn = root.get("connection");
         if (!(conn instanceof Map)) throw new IllegalArgumentException(path + " has no 'connection' block");
         return fromMap((Map<String, Object>) conn).resolvedBeside(path.toAbsolutePath().getParent());

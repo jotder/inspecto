@@ -1,7 +1,7 @@
 package com.gamma.service;
 
 import com.gamma.acquire.ConnectionProfile;
-import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.job.JobConfig;
 import org.slf4j.Logger;
@@ -176,7 +176,7 @@ public final class DataSourceBundleResolver {
     /** A registry component's identity — in-file {@code name}, else {@code id}, else the file stem. */
     private static String componentNameOf(Path p) {
         try {
-            Map<String, Object> c = ConfigCodec.toMap(Files.readString(p));
+            Map<String, Object> c = ToonHelper.load(p.toString());
             for (String key : new String[]{"name", "id"}) {
                 Object v = c.get(key);
                 if (v != null && !v.toString().isBlank()) return v.toString().trim();
@@ -223,7 +223,7 @@ public final class DataSourceBundleResolver {
             for (Path p : s.filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(".toon")).sorted().toList()) {
                 try {
-                    if (matches.test(ConfigCodec.toMap(Files.readString(p)))) out.add(p);
+                    if (matches.test(ToonHelper.load(p.toString()))) out.add(p);
                 } catch (RuntimeException | IOException bad) {
                     log.warn("skipping unreadable {} component {}: {}", typeDir, p, bad.toString());
                 }

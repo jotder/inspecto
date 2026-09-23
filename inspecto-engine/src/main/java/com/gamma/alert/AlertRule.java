@@ -1,9 +1,8 @@
 package com.gamma.alert;
 
-import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Locale;
@@ -257,7 +256,7 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     @SuppressWarnings("unchecked")
     public static AlertRule load(Path path) throws IOException {
-        Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
+        Map<String, Object> root = ToonHelper.load(path.toString());
         Object alert = root.get("alert");
         require(alert instanceof Map, path + " has no 'alert' block");
         return fromMap((Map<String, Object>) alert);

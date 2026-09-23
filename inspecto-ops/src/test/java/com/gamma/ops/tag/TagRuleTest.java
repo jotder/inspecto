@@ -26,6 +26,19 @@ class TagRuleTest {
                 .attributes(attrs).createdAt(1).updatedAt(1).build();
     }
 
+    /** {@code CONFIGCODEC-CALLERS-NO-FILE-NAME-1}: a decode refusal names the FILE as well as the line. */
+    @Test
+    void aFileThatDoesNotDecodeIsRefusedNamingTheFile(@TempDir Path dir) throws Exception {
+        Path f = Files.writeString(dir.resolve("bad_tagrule.toon"), """
+                tag_rule:
+                  rows[2]{a,b}:
+                    1,2
+                    3
+                """);
+        String m = assertThrows(IllegalArgumentException.class, () -> TagRule.load(f)).getMessage();
+        assertTrue(m.startsWith(f + ": line 4:"), m);
+    }
+
     @Test
     void everySetCriterionMustMatch() {
         TagRule rule = new TagRule("r", "urgent",

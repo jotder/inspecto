@@ -1,11 +1,10 @@
 package com.gamma.ops.tag;
 
-import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.ops.OperationalObject;
 import com.gamma.util.Values;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -63,7 +62,7 @@ public record CaseRule(String name, String title, TagRule.Filter filter, int thr
     /** Load a {@code *_caserule.toon} (a {@code case_rule { … }} block). */
     @SuppressWarnings("unchecked")
     public static CaseRule load(Path path) throws IOException {
-        Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
+        Map<String, Object> root = ToonHelper.load(path.toString());
         Object r = root.get("case_rule");
         if (!(r instanceof Map)) throw new IllegalArgumentException(path + " has no 'case_rule' block");
         return fromMap((Map<String, Object>) r);

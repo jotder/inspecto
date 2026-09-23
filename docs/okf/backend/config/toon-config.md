@@ -69,9 +69,18 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `ConfigRegistryTest`. ⚠ The file/line split reads the message TEXT: a loader that changes the
   `readToon`/`ConfigCodec` prefix silently degrades `file` to the pipeline path (the message is still
   shown verbatim).
-  ⚠ `ToonHelper.load` prefixes the path the same way (`<path>: line N: …`), but the ~20 readers that call
-  `ConfigCodec.toMap(Files.readString(p))` themselves get the line, not the file, unless they add it
-  (`CONFIGCODEC-CALLERS-NO-FILE-NAME-1` — switch them to `ToonHelper.load`).
+  `ToonHelper.load` prefixes the path the same way (`<path>: line N: …`), and it is **the one file
+  decode** (`CONFIGCODEC-CALLERS-NO-FILE-NAME-1`, 2026-09-23): the 15 readers that called
+  `ConfigCodec.toMap(Files.readString(p))` themselves — `DataSourceRoutes`, `DataSourceBundleResolver`,
+  `ConnectionProfile`, `AlertRule`, `RcaTemplate`, `MetadataValidateTask`, `ConfigMigrator`, ops
+  `Tag` / `TagRule` / `CaseRule` / `Workflow` — now call it, so their refusals name the file. Decoding a
+  **string** already in hand (a request body, a bundle entry) stays `ConfigCodec.toMap`. ⛔ Pinned by
+  `NoHandRolledToonFileDecodeContractTest` (`inspecto-config`), which text-scans every module's
+  `src/main/java` for `toMap(Files.read` / `JToon.decode(Files.read` and lists offenders, plus
+  `TagRuleTest`'s named-file refusal. ⚠ A missing file is now `FileNotFoundException` ("Toon file not
+  found"), not `NoSuchFileException` — both are `IOException`. `PipelineConfigParser.readToon` still reads
+  and prefixes by hand (same message shape); `ComponentStore`'s history read decodes text it also needs for
+  CSV kinds and swallows every error.
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does

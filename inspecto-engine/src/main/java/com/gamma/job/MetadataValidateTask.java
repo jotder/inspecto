@@ -1,7 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.pipeline.SpaceConfigRoot;
-import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.signal.Severity;
@@ -122,7 +122,7 @@ final class MetadataValidateTask {
                     .filter(f -> f.getFileName().toString().endsWith("_pipeline.toon"))
                     .filter(f -> !f.startsWith(writeRoot.resolve("registry"))).toList()) {
                 try {
-                    Map<String, Object> raw = ConfigCodec.toMap(Files.readString(p));
+                    Map<String, Object> raw = ToonHelper.load(p.toString());
                     String explicit = blankToNull(raw.get("id"));
                     if (explicit != null) {
                         ids.add(explicit.trim());
@@ -150,7 +150,7 @@ final class MetadataValidateTask {
                     .filter(f -> !f.startsWith(writeRoot.resolve("registry"))).toList()) {
                 String name = p.getFileName().toString().replaceFirst("\\.toon$", "");
                 try {
-                    Map<String, Object> raw = ConfigCodec.toMap(Files.readString(p));
+                    Map<String, Object> raw = ToonHelper.load(p.toString());
                     if (raw.get("triggers") instanceof Map<?, ?> t) {
                         String on = blankToNull(t.get("on_pipeline"));
                         if (on != null && !ids.contains(on.trim().toLowerCase()))

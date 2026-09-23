@@ -1,6 +1,7 @@
 package com.gamma.pipeline;
 
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.util.MappingCsv;
 
 import java.io.IOException;
@@ -156,7 +157,7 @@ public final class ConfigMigrator {
     static String whyTheRecipeWouldNotCompile(Path src) {
         try {
             RecipeCompiler.compile(RecipeConverter.toRecipe(
-                    ConfigCodec.toMap(Files.readString(src, StandardCharsets.UTF_8))));
+                    ToonHelper.load(src.toString())));
             return null;
         } catch (Exception e) {
             return e.getMessage();
@@ -170,7 +171,7 @@ public final class ConfigMigrator {
     // ── writing ──────────────────────────────────────────────────────────────
 
     private static void writePipeline(Conversion c) throws IOException {
-        Map<String, Object> config = ConfigCodec.toMap(Files.readString(c.from(), StandardCharsets.UTF_8));
+        Map<String, Object> config = ToonHelper.load(c.from().toString());
         write(c.to().get(0), ConfigCodec.toToon(RecipeConverter.toRecipe(config)));
     }
 
@@ -203,7 +204,7 @@ public final class ConfigMigrator {
     @SuppressWarnings("unchecked")
     private static void writeSchema(Conversion c) throws IOException {
         Map<String, Object> schema =
-                new LinkedHashMap<>(ConfigCodec.toMap(Files.readString(c.from(), StandardCharsets.UTF_8)));
+                new LinkedHashMap<>(ToonHelper.load(c.from().toString()));
         Map<String, Object> mapping = schema.get("mapping") instanceof Map<?, ?> m
                 ? new LinkedHashMap<>((Map<String, Object>) m) : null;
         List<Map<String, Object>> rules = mapping != null && mapping.get("rules") instanceof List<?> l

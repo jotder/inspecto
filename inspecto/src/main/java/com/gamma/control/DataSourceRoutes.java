@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.util.ToonHelper;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
@@ -18,7 +19,6 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -192,7 +192,7 @@ final class DataSourceRoutes implements RouteModule {
             Path file = config.resolve(rel);
             Map<String, Object> map;
             try {
-                map = ConfigCodec.toMap(Files.readString(file));
+                map = ToonHelper.load(file.toString());
             } catch (RuntimeException | IOException bad) {
                 out.put(rel, List.of(new Finding(Severity.ERROR, "(parse)", "cannot parse pipeline: " + bad)));
                 continue;
