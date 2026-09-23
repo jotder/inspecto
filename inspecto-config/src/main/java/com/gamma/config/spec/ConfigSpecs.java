@@ -573,7 +573,16 @@ public final class ConfigSpecs {
                 FieldSpec.of("alert.maximumAge", "Maximum age", FieldType.STRING,
                         "Dataset freshness limit: Ns/Nm/Nh/Nd since the Dataset last published "
                                 + "(e.g. 6h, 1d). Requires alert.dataset; takes no metric, window or "
-                                + "threshold. Absent = this rule does not check freshness.")
+                                + "threshold. Absent = this rule does not check freshness."),
+                // LA-23 Investigation rule: watches a Measure over an Investigation's sealed Working Set.
+                // Authored ONLY through POST /inv/investigations/{id}/alert-rules (the generic alert
+                // routes refuse this kind), declared here so the spec and AlertRule.fromMap agree.
+                FieldSpec.of("alert.investigation", "Investigation", FieldType.STRING,
+                        "The Investigation whose Working Set the rule watches. Requires alert.relation and "
+                                + "alert.measure; takes no metric, window or dataset."),
+                FieldSpec.enumField("alert.relation", "Working Set relation",
+                        List.of("entities", "links", "excluded"), null,
+                        "Which relation of the Investigation's Working Set the Measure is computed over.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(
