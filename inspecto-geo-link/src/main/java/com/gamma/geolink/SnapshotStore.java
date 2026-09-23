@@ -36,6 +36,11 @@ import java.util.regex.Pattern;
  * <p>⚠ What is stored is what the SPA already materialises: full {@code nodes} and {@code edges}, not id
  * references. Storing ids only would mean re-reading labels and amounts from live data on reopen, which is the
  * defect this object exists to avoid (plan §5.4, corrected 2026-09-22).
+ *
+ * <p><b>Investigations live here too</b> (LA-10, decision {@code D-E2}): an Investigation's op log and the
+ * Working Set each step evaluates to persist in this store, under {@code investigations/<id>/}, with the same
+ * write-once rules — a header and every per-step Working Set are {@code CREATE_NEW}, and the log only ever
+ * appends. One durable mechanism, not two half-built stores with different semantics.
  */
 final class SnapshotStore {
 
@@ -151,5 +156,94 @@ final class SnapshotStore {
     /** Where the sealed records live — for the path-jail assertion in the route. */
     Path directory() {
         return dir;
+    }
+
+    // ── Investigations (LA-10, decision D-E2: the op log and its Working Sets live in THIS store) ─────────
+    //
+    // Layout, under the same audit root and with the same write-once discipline as a snapshot:
+    //   investigations/<id>/header.json          CREATE_NEW — bindings, owner, fork lineage; never rewritten
+    //   investigations/<id>/log.jsonl            APPEND — one line per step; the source of truth
+    //   investigations/<id>/sets/<step>.json     CREATE_NEW — the Working Set that step evaluated to
+    // ⚠ The directory name "investigations" cannot collide with a snapshot: list() keeps only *.json files.
+
+    private static final String INVESTIGATIONS = "investigations";
+
+    /** One Investigation's directory. The id is SAFE_ID-checked by the caller; the route jails the result. */
+    Path investigationDir(String id) {
+        return dir.resolve(INVESTIGATIONS).resolve(id);
+    }
+
+    /** Create an Investigation's header. False when the id already exists — never an overwrite (409). */
+    boolean createInvestigation(String id, String headerJson) throws IOException {
+        Path d = investigationDir(id);
+        Files.createDirectories(d);
+        try {
+            Files.writeString(d.resolve("header.json"), headerJson, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            return true;
+        } catch (FileAlreadyExistsException e) {
+            return false;
+        }
+    }
+
+    /** The header's raw JSON, or null when the Investigation was never created. */
+    String readInvestigation(String id) throws IOException {
+        Path f = investigationDir(id).resolve("header.json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
+    /** The log's lines, in step order (empty for a fresh Investigation). */
+    List<String> readLog(String id) throws IOException {
+        Path f = investigationDir(id).resolve("log.jsonl");
+        if (!Files.isRegularFile(f)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) if (!line.isBlank()) out.add(line);
+        return out;
+    }
+
+    /**
+     * Append one step, then seal the Working Set it evaluated to. ⚠ The ORDER is deliberate: the log line is the
+     * source of truth and is written first; a crash before the set lands leaves a step whose set replay can
+     * recompute, never a set with no step behind it.
+     */
+    void appendStep(String id, int step, String lineJson, String workingSetJson) throws IOException {
+        Path d = investigationDir(id);
+        Files.writeString(d.resolve("log.jsonl"), lineJson + "\n", StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        Files.createDirectories(d.resolve("sets"));
+        Files.writeString(d.resolve("sets").resolve(step + ".json"), workingSetJson, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+    }
+
+    /**
+     * Write a whole fork (header, log and sets) into a scratch directory, then MOVE it into place in one rename,
+     * so a failed fork leaves nothing half-written under a real id. False when the id is already taken.
+     */
+    boolean createFork(String id, String headerJson, List<String> lines, List<String> sets) throws IOException {
+        Path root = dir.resolve(INVESTIGATIONS);
+        Files.createDirectories(root);
+        // A leading '.' can never match SAFE_ID, so the scratch name cannot shadow a real Investigation.
+        Path tmp = Files.createTempDirectory(root, ".fork-");
+        Files.writeString(tmp.resolve("header.json"), headerJson, StandardCharsets.UTF_8);
+        if (!lines.isEmpty()) Files.writeString(tmp.resolve("log.jsonl"), String.join("\n", lines) + "\n",
+                StandardCharsets.UTF_8);
+        Files.createDirectories(tmp.resolve("sets"));
+        for (int i = 0; i < sets.size(); i++)
+            Files.writeString(tmp.resolve("sets").resolve((i + 1) + ".json"), sets.get(i), StandardCharsets.UTF_8);
+        // ⚠ Checked before the move, not caught after it: moving a directory onto an existing one fails with a
+        // platform-specific exception (AccessDenied on Windows), not reliably FileAlreadyExists. The route
+        // serialises writers to one Investigation root, so the check and the move do not race each other.
+        if (Files.exists(investigationDir(id))) {
+            deleteTree(tmp);
+            return false;
+        }
+        Files.move(tmp, investigationDir(id), java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        return true;
+    }
+
+    private static void deleteTree(Path p) throws IOException {
+        try (var s = Files.walk(p)) {
+            for (Path q : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(q);
+        }
     }
 }

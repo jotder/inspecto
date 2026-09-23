@@ -28,6 +28,12 @@ final class CapabilityManifest {
             // /inv/* POSTs are exempted as read-shaped; these two persist, so they are gated instead.
             new Entry("POST", "/inv/snapshots", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/snapshots/attach", Roles.CAN_MANAGE_INCIDENTS),
+            // InvestigationRoutes (LA-10) — the op log is evidence, so appending to it is Case work like sealing
+            // a snapshot. /replay persists nothing and is exempted as read-shaped below.
+            new Entry("POST", "/inv/investigations", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/ops", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/investigations/([^/]+)/reorder", Roles.CAN_MANAGE_INCIDENTS),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),
@@ -294,6 +300,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/inv/projection/multi", "read-shaped", "computes a multi-dataset projection from the body; persists nothing"),
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
+            new Exemption("POST", "/inv/investigations/([^/]+)/replay", "read-shaped", "re-evaluates a sealed Investigation log (LA-10); persists nothing"),
             new Exemption("POST", "/recon/columns", "read-shaped", "lists comparable columns for a draft"),
             new Exemption("POST", "/recon/breaks", "read-shaped", "computes breaks for a draft; persists nothing"),
             new Exemption("POST", "/recon/rows", "read-shaped", "lists the raw rows behind one key (RECON-CARDINALITY-2); persists nothing"),

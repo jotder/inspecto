@@ -169,6 +169,21 @@ public final class EventType {
      *  it is a relationship, and writing it into the snapshot would invalidate the fingerprint that makes
      *  the snapshot evidence. {@code snapshotId} and {@code caseId} carry the link. */
     public static final String LINK_SNAPSHOT_ATTACHED = "LINK_SNAPSHOT_ATTACHED";
+    /** A Link Analysis Investigation was created ({@code POST /inv/investigations}, LA-10) — bound to one
+     *  Dataset and projection mapping. {@code investigationId} and {@code dataset} carry the binding. */
+    public static final String LINK_INVESTIGATION_CREATED = "LINK_INVESTIGATION_CREATED";
+    /** One step was appended to an Investigation's op log ({@code POST /inv/investigations/{id}/ops} or
+     *  {@code /undo}, LA-10). {@code op} ({@code undo} for a log edit), {@code step} and, for a Dataset-reading
+     *  op, {@code rows}, {@code truncated} and the sealed read's {@code fingerprint}. */
+    public static final String LINK_INVESTIGATION_STEPPED = "LINK_INVESTIGATION_STEPPED";
+    /** A re-ordered log was FORKED into a new Investigation ({@code POST /inv/investigations/{id}/reorder},
+     *  LA-10, decision D-E4). The original is untouched; {@code parentId} and {@code investigationId} carry the
+     *  lineage. */
+    public static final String LINK_INVESTIGATION_FORKED = "LINK_INVESTIGATION_FORKED";
+    /** An Investigation's log was fully re-evaluated ({@code POST /inv/investigations/{id}/replay}, LA-10).
+     *  {@code equivalent} reports the incremental/replay equivalence check; with {@code reread},
+     *  {@code diverged} reports whether current data no longer matches a sealed read. */
+    public static final String LINK_INVESTIGATION_REPLAYED = "LINK_INVESTIGATION_REPLAYED";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

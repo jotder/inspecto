@@ -161,6 +161,11 @@ system: the evidence cannot say something the code does not.
 | POST | `/geo/routes` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:67` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:64` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:65` |
+| POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:104` |
+| POST | `/inv/investigations/([^/]+)/ops` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:106` |
+| POST | `/inv/investigations/([^/]+)/reorder` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:110` |
+| POST | `/inv/investigations/([^/]+)/replay` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:112` |
+| POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:108` |
 | POST | `/inv/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:96` |
 | POST | `/inv/projection/multi` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:98` |
 | POST | `/inv/projection/neighbors` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:97` |

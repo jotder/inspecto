@@ -422,7 +422,7 @@ small win that makes two shipped packs honest was trapped behind a two-week rewr
 
 | Id | Item | State | Size | Blocked on | Detail |
 |---|---|---|---|---|---|
-| **LA-10** | Enquiry object + ordered op log + incremental evaluator | ⬜ | L | D-E1, D-E2, D-E3 | `POST /inv/enquiries`, `/ops`, `/replay`, `GET /log` (§5.5). Ops `seed`, `expand` (one hop over `neighbors`), `exclude`, `hide`, `keep`; real undo; replaces the mock snapshot store. *Delivers prune-then-expand — the scenario's blocking step.* |
+| **LA-10** | Investigation object + ordered op log + incremental evaluator | ✅ **BACKEND SHIPPED 2026-09-23** — routes renamed to `/inv/investigations` (D-E1); all five ops, real undo, deterministic replay with an equivalence check, D-E3 seal + drift re-read, D-E4 fork (`ControlApiInvestigationsTest` 11/11, fork test mutation-checked twice). As-built + deferrals in §5.5. SPA wiring still open | L | — (D-E1, D-E2, D-E3, D-E4 decided) | `POST /inv/enquiries`, `/ops`, `/replay`, `GET /log` (§5.5). Ops `seed`, `expand` (one hop over `neighbors`), `exclude`, `hide`, `keep`; real undo; replaces the mock snapshot store. *Delivers prune-then-expand — the scenario's blocking step.* |
 | **LA-11** | Server-side multi-hop traversal `POST /inv/traversal/recursive-paths` | ✅ **BACKEND SHIPPED 2026-09-23** — all four fences enforced in-recursion and tested with positive twins (`ControlApiInvTraversalTest` 14/14); body names follow `/inv/projection` (`dataset`/`sourceCol`/`targetCol`), not §5.3; SPA wiring and the G-R4 perf gate still open | L | — (D-S2 answered: server-side recursive CTE) | DuckDB recursive CTE; fences — max depth (default 6), timeout (5 000 ms), max edge yield; the primitive `expand` compiles to. Contract §5.3. Working Set materialised so pruning does not re-query; pre-aggregated contact-pair Dataset (A, B, window, count, duration, value) as substrate, raw records on drill-down. |
 | **LA-13** | Hop ladder + time model | ⬜ | L | LA-10, LA-11 | Per-rung fields §2.4; absolute range + midnight-crossing intraday window + **timezone contract**; in-window thresholds; `truncated` per rung. *Delivers the motivating scenario end to end.* |
 | **LA-14a** | Temporal ordering on the linear matcher | ✅ **SHIPPED 2026-09-22** | S | — |
@@ -662,6 +662,54 @@ guards is currently uncaught.
 | `POST /inv/enquiries/{id}/ops` | append one op; returns the Working Set delta + `truncated` |
 | `POST /inv/enquiries/{id}/replay` | full evaluation from `seed`; verification and evidence |
 | `GET /inv/enquiries/{id}/log` | the ordered op log, renderable as plain-language steps |
+
+✅ **AS BUILT 2026-09-23 (backend) — the path noun is `investigations`, per D-E1**, in a new
+`InvestigationRoutes` (registered beside `InvRoutes`, which was left untouched) over a pure
+`InvestigationEvaluator`:
+
+| Route | Gate | Notes |
+|---|---|---|
+| `POST /inv/investigations` | `canManageIncidents` | body `{id?, title?, dataset, sourceCol, targetCol, linkKindCol?}`; 503 → 422 → 404 (R3) → 422 unknown column → 403 → 409 |
+| `POST /inv/investigations/{id}/ops` | `canManageIncidents` | `{op, ids?, reason?, entityType?, limit?}` → `{step, delta, truncated, read?, workingSet{entities,links,excluded,hash}}` |
+| `POST /inv/investigations/{id}/undo` | `canManageIncidents` | **added** — not in this table before; 409 when there is nothing to undo |
+| `POST /inv/investigations/{id}/reorder` | `canManageIncidents` | **added** — D-E4; `{order:[step…], id?, title?}` → a NEW Investigation |
+| `POST /inv/investigations/{id}/replay` | read-shaped exemption | `{at?, reread?}` → `{workingSet, equivalent, mismatches, drift, diverged}` |
+| `GET /inv/investigations/{id}/log` | open read, bounded (`?limit`, default 500, max 5 000, true `total` + `truncated`) | each entry carries a plain-language `text` |
+
+* **Store (D-E2).** `SnapshotStore` was extended, not duplicated: `audit/snapshots/investigations/<id>/`
+  holds `header.json` (CREATE_NEW), `log.jsonl` (append-only, the source of truth, written FIRST) and
+  `sets/<step>.json` (CREATE_NEW — the Working Set each step evaluated to).
+* **Seal (D-E3).** `datasetVersion` is always `null`. Each `expand` stores the rows it read, the exact query
+  inputs (frontier, excluded, limit), `readAt` and a SHA-256 `fingerprint` — weak provenance, not a pin.
+  Replay evaluates the sealed rows, so it cannot move (G-E11); `reread` re-runs each recorded query and
+  reports per-step drift (G-E3). ⛔ G-E2 (byte-identical replay against a pinned version) stays deferred.
+* **Two evaluators, one spec — honestly scoped.** The append path evaluates the round-tripped log plus the
+  new step and records that position's hash; `/replay` recomputes every position from step 1 and reports
+  `equivalent` + the steps whose hash disagrees. The check is pinned to be able to FAIL (a tampered hash is
+  reported). ⚠ "Incremental" means the Dataset read is a one-hop delta; the in-memory fold itself is
+  re-run from the sealed log, which needs no Dataset access.
+* **Fork (D-E4).** `reorder` takes a permutation of the EFFECTIVE op steps, re-applies them in the new order,
+  **re-reads** every `expand` (a new order means a new frontier, so the parent's sealed rows do not describe
+  it), and moves the assembled fork into place in one rename. The header carries `parent {id, order,
+  parentSteps}` and every step `derivedFrom {investigation, step}`. The original log, its sets and any snapshot
+  anchored to it are byte-identical after — pinned, and the test kills both an in-place-rewrite mutant and an
+  ignore-the-order mutant.
+* **Access.** Owner-only (non-owner → 404, as R3 answers): grounded — snapshots, the comparable object, have
+  no owner or sharing model, and `ComponentAccess` covers registry components only. Every route applies the R3
+  Dataset gate; every Dataset READ goes through `ComponentAccess.canView`. `relationFor` is duplicated from
+  `InvRoutes` rather than moved, to avoid editing that class under a parallel lane — fold them together later.
+* **Semantics chosen where the plan was silent.** Seeding an excluded id re-admits it (a later explicit op
+  wins); `exclude` of a KEPT id is a no-op reported as `protected`; `expand` with no `ids` expands the whole
+  Working Set (hidden included — hide is display-only), capped at 1 000 frontier entities; excluded ids are
+  filtered IN the query so an excluded hub cannot spend the fan-out budget.
+* 🔴 **Plan vs code.** (1) *Real undo* is a recorded log edit (`kind: undo`), deliberately NOT a twelfth op —
+  §2.2's vocabulary stays closed. (2) *"Replaces the mock snapshot store"* was already done by LA-03; nothing
+  here touches it. (3) *"Returns id + pinned Dataset version"* cannot hold under D-E3; the field is present
+  and `null`. (4) `undo` and `reorder` are two routes this contract did not list.
+* ⏳ **Deferred:** `seedBy`, `excludeBy`, `threshold`, `window`, `annotate`, `snapshot` (they answer 422 *"not
+  implemented yet"*, never *"unknown"*); the hop-ladder rung fields (LA-13); a list/GET-one route; Case
+  linkage of an Investigation; the Investigation Template (LA-23); stamping `investigationId`/`opSeq` onto
+  snapshots server-side (the snapshot body is stored verbatim, so a client can already carry them); SPA wiring.
 
 ---
 

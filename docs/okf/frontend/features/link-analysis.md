@@ -474,6 +474,20 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   does not fail the save: the snapshot is already sealed, and saying otherwise would be a lie about
   evidence that exists. 🔴 Removing the old methods compiled clean — **a DI change is invisible to
   type-checking**, and only the specs found a caller constructing the service outside an injector.
+* **An Investigation is a server-side, append-only op log** (LA-10, backend shipped 2026-09-23;
+  `InvestigationRoutes` + `InvestigationEvaluator` in `inspecto-geo-link`). `POST /inv/investigations` binds
+  one Dataset + projection mapping; `/{id}/ops` appends `seed` · `expand` (one hop) · `exclude` (reason
+  required) · `hide` · `keep` and answers the Working Set **delta** + `truncated`; `/{id}/undo` is a real undo
+  (a recorded log edit — the state after it is byte-identical to the state before the undone op);
+  `/{id}/replay` re-evaluates the whole log and `GET /{id}/log` renders each step as a plain-language line.
+  ⛔ **Nothing is pinned** (D-E3): `datasetVersion` is always `null`; each `expand` instead SEALS the rows it
+  read with a SHA-256 fingerprint, so replay cannot move when the data grows, and `replay {reread:true}`
+  re-runs every recorded query and reports drift per step rather than serving it. ⛔ **Re-ordering forks**
+  (D-E4): `/{id}/reorder` creates a new Investigation whose header names its parent and order; the
+  original log, its per-step Working Sets and any snapshot anchored to them stay byte-identical. The log and
+  Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
+  **owner-only** (a non-owner reads 404), writes need `canManageIncidents`, and a bound Dataset shared away
+  from the caller makes the Investigation read as absent. ⚠ The SPA does not call it yet.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as

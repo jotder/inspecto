@@ -65,7 +65,9 @@ class NoGeoLinkShipsInThePersonalBuildTest {
             // four behind the module: it passed by never touching the paths that had drifted. A test with a
             // private copy of the list it is checking cannot detect the drift it exists to detect.
             for (String[] r : AbsentGeoLinkRoutes.SURFACE) {
-                HttpResponse<String> res = send(c.port, r[0], r[1], "{}");
+                // A pattern's path parameter (LA-10's /inv/investigations/([^/]+)/...) is not a legal URI — probe
+                // it with a concrete segment, exactly as a client would reach it.
+                HttpResponse<String> res = send(c.port, r[0], r[1].replace("([^/]+)", "probe"), "{}");
                 assertEquals(503, res.statusCode(), r[0] + " " + r[1] + " -> " + res.body());
                 JsonNode err = V1Body.of(res.body()).get("error");
                 assertNotNull(err, r[1] + " must carry the v1 error object: " + res.body());
