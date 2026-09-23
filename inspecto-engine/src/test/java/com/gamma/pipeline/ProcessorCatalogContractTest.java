@@ -67,4 +67,19 @@ class ProcessorCatalogContractTest {
         assertTrue(addable >= 30, "the addable palette collapsed: " + addable + " (35 when this floor was set)");
         assertEquals(ProcessorCatalog.PROCESSORS.size(), procs.size());
     }
+
+    /**
+     * PROCESSOR-RELEASE-READINESS-1 G1: `parser.asn1.ber` was mapped as a CAPABILITY, so the palette drew it
+     * inactive although `parser.asn1` is an authorable node type. A delivered processor over a Step must
+     * name that node type, which is what makes it addable.
+     */
+    @Test
+    void asn1BerDecoderMapsOntoTheAuthorableAsn1NodeType() {
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> procs = (List<Map<String, Object>>) PipelineProjection.processorCatalog().get("processors");
+        Map<String, Object> ber = procs.stream().filter(m -> "parser.asn1.ber".equals(m.get("id"))).findFirst().orElseThrow();
+        assertEquals(BuiltinNodeType.PARSER_ASN1.type(), ber.get("nodeType"));
+        assertNull(ber.get("capability"));
+        assertEquals(Boolean.TRUE, ber.get("addable"), "parser.asn1.ber must be addable from the palette");
+    }
 }

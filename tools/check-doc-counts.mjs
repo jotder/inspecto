@@ -65,6 +65,13 @@ const MANIFEST = {
             .filter(p => p.status === 'partial').length,
         source: `${CONTRACTS}/processor-catalog.contract.json`,
     },
+    'processors-planned': {
+        floor: 2,
+        what: 'Step Processors with status planned',
+        derive: () => json(`${CONTRACTS}/processor-catalog.contract.json`).processors
+            .filter(p => p.status === 'planned').length,
+        source: `${CONTRACTS}/processor-catalog.contract.json`,
+    },
     'processor-families': {
         floor: 1,
         what: 'Step Processor families',
@@ -226,6 +233,23 @@ const MANIFEST = {
         source: 'tools/dependencies.lock',
     },
 };
+
+// The per-FAMILY split — `processors-<family>-<status>`, e.g. `processors-dq-delivered`. step-catalog.md's
+// eight family headings stated it by hand and drifted (PROCESSOR-RELEASE-READINESS-1 G1, 2026-09-23: the DQ
+// heading said "6 · 1" while the contract held 7 · 0). One id per family × status, from the contract's own
+// family codes; `zeroOk` because a family may legitimately have no partial (or no planned) entry.
+for (const f of json(`${CONTRACTS}/processor-catalog.contract.json`).families) {
+    for (const status of ['delivered', 'partial', 'planned']) {
+        MANIFEST[`processors-${f.code.toLowerCase()}-${status}`] = {
+            floor: 1,
+            zeroOk: true,
+            what: `Step Processors in family ${f.code} with status ${status}`,
+            derive: () => json(`${CONTRACTS}/processor-catalog.contract.json`).processors
+                .filter(p => p.family === f.code && p.status === status).length,
+            source: `${CONTRACTS}/processor-catalog.contract.json`,
+        };
+    }
+}
 
 
 /**

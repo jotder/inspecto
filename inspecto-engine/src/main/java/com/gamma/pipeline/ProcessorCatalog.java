@@ -83,7 +83,7 @@ public final class ProcessorCatalog {
             p("PRS", "parser.json", "🧬", "heroicons_outline:code-bracket", "JSON object & JSON Lines (NDJSON) parser", Status.DELIVERED, "parser.json", null, null),
             p("PRS", "parser.excel", "📑", "heroicons_outline:table-cells", "Excel workbook parser", Status.DELIVERED, "parser.xlsx", null, "needs the DuckDB `excel` extension in the bundle (multiformat X1)"),
             p("PRS", "parser.xml", "📑", "heroicons_outline:code-bracket-square", "XML / XPath / DOM unpacker", Status.PARTIAL, "parser.plugin", null, "tree→segments bridge ships XML ingests; no XPath selector grammar yet"),
-            p("PRS", "parser.asn1.ber", "📡", "heroicons_outline:cpu-chip", "ASN.1 BER telecom CDR decoder", Status.DELIVERED, null, "parser.asn1", "asn-parser reactor (decoders, vendor plugins)"),
+            p("PRS", "parser.asn1.ber", "📡", "heroicons_outline:cpu-chip", "ASN.1 BER telecom CDR decoder", Status.DELIVERED, BuiltinNodeType.PARSER_ASN1.type(), null, "asn-parser reactor (decoders, vendor plugins)"),
             p("PRS", "parser.pattern.regex", "🔎", "heroicons_outline:magnifying-glass", "Named-group regex extractor", Status.DELIVERED, "parser.text_regex", null, null),
             p("PRS", "parser.plugin", "🧩", "heroicons_outline:puzzle-piece", "Custom ingester plugin (segments, multi-event)", Status.DELIVERED, "parser.plugin", null, "ParserPlugin SPI; `segments: {CALL, SMS}`"),
             p("PRS", "parser.keyvalue", "🏷️", "heroicons_outline:tag", "Key-value / logfmt parser", Status.PLANNED, null, null, null),

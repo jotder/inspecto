@@ -265,9 +265,9 @@
     "emoji" : "📡",
     "icon" : "heroicons_outline:cpu-chip",
     "status" : "delivered",
-    "capability" : "parser.asn1",
+    "nodeType" : "parser.asn1",
     "note" : "asn-parser reactor (decoders, vendor plugins)",
-    "addable" : false
+    "addable" : true
   }, {
     "id" : "parser.pattern.regex",
     "family" : "PRS",
