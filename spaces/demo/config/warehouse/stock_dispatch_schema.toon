@@ -1,0 +1,42 @@
+partitionKey: MOVED_AT
+raw:
+  name: dispatch
+  format: CSV
+  fields[7]{name,selector,type,description}:
+    MOVEMENT_ID,"@id",VARCHAR,"Goods dispatch identifier (the record element's id attribute)"
+    MOVED_AT,"at",TIMESTAMP,"When the movement was booked (warehouse-local wall clock, no offset)"
+    SKU,"item.@sku",VARCHAR,"Stock-keeping unit"
+    QTY,"item.qty.#text",INTEGER,"Quantity moved: the qty element's text, which also carries a uom attribute"
+    UOM,"item.qty.@uom",VARCHAR,"Unit of measure"
+    SALES_ORDER,"order",VARCHAR,"Sales order the stock was picked for"
+    LOCATION,"location",VARCHAR,"Bin location picked from"
+mapping:
+  canonicalName: stock_dispatches
+  rawName: dispatch
+  fields[8]:
+    - name: MOVEMENT_ID
+      from: MOVEMENT_ID
+      fn: keep
+    - name: MOVED_AT
+      from: MOVED_AT
+      fn: keep
+    - name: MOVEMENT_DATE
+      from: ""
+      fn: custom
+      args:
+        expression: "CAST(MOVED_AT AS DATE)"
+    - name: SKU
+      from: SKU
+      fn: keep
+    - name: QTY
+      from: QTY
+      fn: keep
+    - name: UOM
+      from: UOM
+      fn: keep
+    - name: SALES_ORDER
+      from: SALES_ORDER
+      fn: keep
+    - name: LOCATION
+      from: LOCATION
+      fn: keep

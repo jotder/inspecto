@@ -1,0 +1,41 @@
+name: gl_journal
+active: false
+description: "Month-end general-ledger journal export from a finance team's workbook: a titled sheet whose header and lines are read through an explicit range (the totals row under them is not a journal line), landed per account class. The domain-shaped counterpart to the synthetic excel_example."
+
+dirs:
+  poll:       spaces/demo/data/inbox/gl_journal
+  database:   spaces/demo/data/gl_journal/database
+  backup:     spaces/demo/data/gl_journal/backup
+  temp:       spaces/demo/data/gl_journal/temp
+  errors:     spaces/demo/data/gl_journal/errors
+  quarantine: spaces/demo/data/gl_journal/quarantine
+  markers:    spaces/demo/data/gl_journal/markers
+  status_dir: spaces/demo/data/gl_journal/status
+  log_dir:    spaces/demo/data/gl_journal/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.xlsx"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 90
+  schema_file: spaces/demo/config/ledger/gl_journal_schema.toon
+
+parsing:
+  frontend: xlsx
+  xlsx:
+    sheet: Journal
+    range: "A3:K16"
+    header: true
+    normalize_names: true
+    ignore_errors: false
+    stop_at_empty: false
+
+collector:
+  discovery: poll
+  connector: local

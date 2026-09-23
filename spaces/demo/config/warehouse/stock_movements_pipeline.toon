@@ -1,0 +1,44 @@
+name: stock_movements
+active: false
+description: "End-of-day warehouse stock-movement export: one XML document per warehouse per business day holding a mixed sequence of receipts, dispatches and transfers, each kind landed in its own store. Stock-count adjustments are not declared and are skipped as junk. The domain-shaped counterpart to the synthetic xml_example."
+
+dirs:
+  poll:       spaces/demo/data/inbox/stock_movements
+  database:   spaces/demo/data/stock_movements/database
+  backup:     spaces/demo/data/stock_movements/backup
+  temp:       spaces/demo/data/stock_movements/temp
+  errors:     spaces/demo/data/stock_movements/errors
+  quarantine: spaces/demo/data/stock_movements/quarantine
+  markers:    spaces/demo/data/stock_movements/markers
+  status_dir: spaces/demo/data/stock_movements/status
+  log_dir:    spaces/demo/data/stock_movements/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.xml"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  csv_settings:
+    timestamp_formats[1]: "%Y-%m-%dT%H:%M:%S"
+
+parsing:
+  frontend: plugin
+  plugin:
+    ingester: com.gamma.ingester.XmlRecordIngester
+    segments:
+      receipt:  spaces/demo/config/warehouse/stock_receipt_schema.toon
+      dispatch: spaces/demo/config/warehouse/stock_dispatch_schema.toon
+      transfer: spaces/demo/config/warehouse/stock_transfer_schema.toon
+    ingester_config:
+      record_element: ""
+      namespace_aware: false
+
+collector:
+  discovery: poll
+  connector: local

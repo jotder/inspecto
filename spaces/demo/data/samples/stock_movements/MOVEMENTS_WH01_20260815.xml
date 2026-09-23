@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<stockMovements warehouse="WH01" businessDate="2026-08-15" source="SYNTHETIC">
+  <receipt id="RCV-0001">
+    <at>2026-08-15T06:05:00</at>
+    <item sku="SKU-10001"><qty uom="EA">120</qty></item>
+    <supplier>SUP-001</supplier>
+    <location>A-01-01</location>
+  </receipt>
+  <receipt id="RCV-0002">
+    <at>2026-08-15T06:40:00</at>
+    <item sku="SKU-10002"><qty uom="EA">80</qty></item>
+    <supplier>SUP-001</supplier>
+    <location>A-01-02</location>
+  </receipt>
+  <dispatch id="DSP-0001">
+    <at>2026-08-15T08:12:00</at>
+    <item sku="SKU-10001"><qty uom="EA">30</qty></item>
+    <order>SO-5001</order>
+    <location>A-01-01</location>
+  </dispatch>
+  <transfer id="TRF-0001">
+    <at>2026-08-15T09:00:00</at>
+    <item sku="SKU-10002"><qty uom="EA">40</qty></item>
+    <from>A-01-02</from>
+    <to>B-02-03</to>
+  </transfer>
+  <receipt id="RCV-0003">
+    <at>2026-08-15T09:30:00</at>
+    <item sku="SKU-10003"><qty uom="EA">200</qty></item>
+    <supplier>SUP-002</supplier>
+    <location>A-02-01</location>
+    <note>Pallet re-wrapped on arrival</note>
+  </receipt>
+  <dispatch id="DSP-0002">
+    <at>2026-08-15T10:45:00</at>
+    <item sku="SKU-10003"><qty uom="EA">50</qty></item>
+    <order>SO-5002</order>
+    <location>A-02-01</location>
+  </dispatch>
+  <adjustment id="ADJ-0001">
+    <at>2026-08-15T12:00:00</at>
+    <item sku="SKU-10002"><qty uom="EA">-2</qty></item>
+    <reason>CYCLE_COUNT</reason>
+    <location>B-02-03</location>
+  </adjustment>
+  <receipt id="RCV-0004">
+    <at>2026-08-15T13:15:00</at>
+    <item sku="SKU-10004"><qty uom="EA">60</qty></item>
+    <supplier>SUP-003</supplier>
+    <location>C-01-01</location>
+  </receipt>
+  <dispatch id="DSP-0003">
+    <at>2026-08-15T14:20:00</at>
+    <item sku="SKU-10004"><qty uom="EA">40</qty></item>
+    <order>SO-5003</order>
+    <location>C-01-01</location>
+  </dispatch>
+  <transfer id="TRF-0002">
+    <at>2026-08-15T15:05:00</at>
+    <item sku="SKU-10003"><qty uom="EA">20</qty></item>
+    <from>A-02-01</from>
+    <to>B-01-01</to>
+  </transfer>
+  <receipt id="RCV-0005">
+    <at>2026-08-15T16:30:00</at>
+    <item sku="SKU-10005"><qty uom="EA">20</qty></item>
+    <supplier>SUP-002</supplier>
+    <location>C-02-04</location>
+  </receipt>
+  <dispatch id="DSP-0004">
+    <at>2026-08-15T17:10:00</at>
+    <item sku="SKU-10001"><qty uom="EA">30</qty></item>
+    <order>SO-5004</order>
+    <location>A-01-01</location>
+  </dispatch>
+</stockMovements>

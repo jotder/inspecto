@@ -1,0 +1,63 @@
+partitions[1]{column,source,type}:
+  acct_class,ACCOUNT_CLASS,VARCHAR
+raw:
+  name: JOURNAL
+  format: CSV
+  fields[11]{name,selector,type,description,unit,classification}:
+    ENTRY_ID,"entry_id",VARCHAR,"Journal entry identifier; every entry balances","",""
+    LINE_NO,"line_no",INTEGER,"Line number within the entry","",""
+    POSTING_SERIAL,"posting_date",INTEGER,"Posting date as the workbook stores it: an Excel 1900-system day serial","days",""
+    ACCOUNT,"account",VARCHAR,"Chart-of-accounts code","",""
+    ACCOUNT_NAME,"account_name",VARCHAR,"Chart-of-accounts name","",""
+    ACCOUNT_CLASS,"account_class",VARCHAR,"Account class: ASSET, LIABILITY, EXPENSE or REVENUE; also the partition source","",""
+    COST_CENTER,"cost_center",VARCHAR,"Cost center code","",""
+    DEBIT,"debit","DECIMAL(18,2)","Debit amount; empty on a credit line","USD",""
+    CREDIT,"credit","DECIMAL(18,2)","Credit amount; empty on a debit line","USD",""
+    CURRENCY,"currency",VARCHAR,"ISO 4217 currency code as keyed by the preparer (normalised by the mapping)","",""
+    MEMO,"memo",VARCHAR,"Line memo","",""
+mapping:
+  canonicalName: gl_journal
+  rawName: JOURNAL
+  fields[12]:
+    - name: ENTRY_ID
+      from: ENTRY_ID
+      fn: keep
+    - name: LINE_NO
+      from: LINE_NO
+      fn: keep
+    - name: POSTING_DATE
+      from: ""
+      fn: custom
+      args:
+        expression: "CAST(DATE '1899-12-30' + TRY_CAST(POSTING_SERIAL AS INTEGER) AS DATE)"
+    - name: ACCOUNT
+      from: ACCOUNT
+      fn: keep
+    - name: ACCOUNT_NAME
+      from: ACCOUNT_NAME
+      fn: keep
+    - name: ACCOUNT_CLASS
+      from: ACCOUNT_CLASS
+      fn: keep
+    - name: COST_CENTER
+      from: COST_CENTER
+      fn: keep
+    - name: DEBIT
+      from: DEBIT
+      fn: keep
+    - name: CREDIT
+      from: CREDIT
+      fn: keep
+    - name: AMOUNT
+      from: ""
+      fn: custom
+      args:
+        expression: "COALESCE(TRY_CAST(DEBIT AS DECIMAL(18,2)), 0) - COALESCE(TRY_CAST(CREDIT AS DECIMAL(18,2)), 0)"
+    - name: CURRENCY
+      from: ""
+      fn: custom
+      args:
+        expression: "UPPER(TRIM(CURRENCY))"
+    - name: MEMO
+      from: MEMO
+      fn: keep
