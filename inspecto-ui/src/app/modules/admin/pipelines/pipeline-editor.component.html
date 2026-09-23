@@ -533,6 +533,18 @@
                     (nodeOpen)="onNodeOpen($event)"
                 >
                 </app-pipeline-editor-graph>
+                <!-- Dragged Step positions are remembered per browser (pipeline-layout.ts); this is the
+                     way back to the automatic layout. A view preference, so not gated on authoring. -->
+                <button
+                    class="absolute bottom-2 right-2 z-10 border"
+                    style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                    mat-icon-button
+                    (click)="resetLayout()"
+                    matTooltip="Auto-arrange Steps (forget the remembered positions)"
+                    aria-label="Auto-arrange Steps"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                </button>
             </div>
 
             <div

@@ -20,13 +20,21 @@ import { G6GraphData, nodeColor, nodeIcon } from 'app/modules/admin/catalog/cata
 import { NodeKind } from 'app/inspecto/api';
 import { canvasTheme, nodeStatusStroke } from 'app/inspecto/theme/chart-tokens';
 import { NodeStatus, statusGlyph } from './pipeline-graph';
+import {
+    PipelinePositions,
+    applyPipelineLayout,
+    clearPipelineLayout,
+    loadPipelineLayout,
+    savePipelineLayout,
+} from './pipeline-layout';
 
 /**
  * Interactive AntV G6 host for the pipeline editor. Unlike the read-only {@link GraphViewComponent} (which
  * `destroy()`s + rebuilds on every data change), this host keeps a **persistent** graph and mutates it in
  * place ({@link addNode}/{@link addEdge}/{@link removeElement}/{@link updateNodeLabel}) so user-arranged
  * positions survive edits. It only rebuilds when {@link graphKey} (the selected pipeline id) changes or the
- * colour scheme flips. Authored flows store no coordinates, so node moves are purely visual (not emitted).
+ * colour scheme flips. The Pipeline config stores no coordinates; a dragged arrangement is remembered per
+ * browser instead ({@link persistLayout}, `pipeline-layout.ts`) and restored on the next open.
  *
  * <p>Gestures: plain **drag moves** a node (`drag-element`); **Shift+drag** from one node to another draws
  * an edge ({@link edgeCreated} via `create-edge`) — both share the drag gesture, so the Shift modifier
@@ -133,7 +141,34 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
         const node: Record<string, unknown> = { id, data: { label, kind } };
         if (x != null && y != null) node['style'] = { x, y };
         this.graph.addNodeData([node as unknown as NodeData]);
-        this.graph.draw();
+        // Once the author has arranged this Pipeline, a new Step joins that arrangement — otherwise the
+        // next open finds a node the layout does not cover and falls back to the automatic layout.
+        // After the draw settles, so the new element has a position to read.
+        const arranged = !!loadPipelineLayout(this.graphKey);
+        void Promise.resolve(this.graph.draw()).then(() => {
+            if (arranged) this.persistLayout();
+        });
+    }
+
+    /** Remember every node's current position for this Pipeline (called after a drag). */
+    persistLayout(): void {
+        if (!this.graph || !this.graphKey) return;
+        const positions: PipelinePositions = {};
+        for (const n of this.graph.getNodeData()) {
+            try {
+                const [x, y] = this.graph.getElementPosition(n.id);
+                if (Number.isFinite(x) && Number.isFinite(y)) positions[n.id] = [x, y];
+            } catch {
+                // not drawn yet — it has no position to remember
+            }
+        }
+        savePipelineLayout(this.graphKey, positions);
+    }
+
+    /** Forget the remembered arrangement and re-run the automatic layout. */
+    resetLayout(): void {
+        clearPipelineLayout(this.graphKey);
+        if (this.ready) this.rebuild();
     }
 
     /** Add a node at the viewport centre — the keyboard/click path to add (no drag coordinates). */
@@ -230,9 +265,12 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
         const statusOf = (d: NodeData): NodeStatus => (d.data as { status?: NodeStatus }).status ?? 'configured';
         const iconOf = (d: NodeData): string => (d.data as { iconSrc?: string }).iconSrc ?? nodeIcon(kindOf(d));
         const colorOf = (d: NodeData): string => (d.data as { color?: string }).color ?? nodeColor(kindOf(d));
+        // A remembered arrangement that covers every node replaces the automatic layout entirely —
+        // G6 re-runs a configured layout over explicit coordinates, so the layout option is dropped.
+        const restored = applyPipelineLayout(this.data, loadPipelineLayout(this.graphKey));
         const graph = new Graph({
             container: this.hostEl.nativeElement,
-            data: (this.data ?? { nodes: [], edges: [] }) as unknown as GraphData,
+            data: (restored ?? this.data ?? { nodes: [], edges: [] }) as unknown as GraphData,
             autoFit: 'view',
             // G6 defaults to [0.01, 10] — 1% (nodes vanish to specks) up to 1000% (one tile fills the
             // canvas). Neither end is a state anyone wants to land in, and scroll-wheel zoom reaches
@@ -274,13 +312,14 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
                     labelBackground: false,
                 },
             },
-            layout: { type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 },
+            ...(restored ? {} : { layout: { type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 } }),
             behaviors: [
                 'drag-canvas',
                 'zoom-canvas',
                 'click-select',
                 {
-                    // Plain drag MOVES a node (positions are visual-only; authored flows store no coords).
+                    // Plain drag MOVES a node (visual only — remembered per browser on drag end, never
+                    // written into the Pipeline config).
                     // Gated to plain drag so Shift+drag is free for create-edge below — both share the drag
                     // gesture, so the Shift modifier is what disambiguates move vs. connect.
                     type: 'drag-element',
@@ -339,6 +378,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
             if (ev.target?.id) this.nodeHover.emit({ id: ev.target.id, x: ev.client?.x ?? 0, y: ev.client?.y ?? 0 });
         });
         graph.on('node:pointerleave', () => this.nodeHover.emit(null));
+        graph.on(NodeEvent.DRAG_END, () => this.persistLayout());
         graph.render();
         this.graph = graph;
     }

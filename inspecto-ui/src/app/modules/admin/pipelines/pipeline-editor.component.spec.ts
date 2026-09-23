@@ -2439,6 +2439,43 @@ describe('PipelineEditorComponent', () => {
         expect(c.dirty()).toBe(false);
     });
 
+    describe('responsive floor (WORKBENCH-RESPONSIVE-FLOOR-1)', () => {
+        const FLOOR = PipelineEditorComponent.RESPONSIVE_FLOOR_PX;
+
+        it('collapses the palette when the viewport crosses below the floor, and reopens it above', () => {
+            const c = make(); // jsdom's viewport (1024) is at the floor — measured as wide
+            expect(c.paletteOpen()).toBe(true);
+            c.applyResponsiveFloor(660);
+            expect(c.paletteOpen()).toBe(false);
+            expect(c.inspectorOpen()).toBe(true); // only ONE side pane gives way
+            c.applyResponsiveFloor(FLOOR + 200);
+            expect(c.paletteOpen()).toBe(true);
+        });
+
+        it('never fights the author: a palette reopened while narrow stays open, and one closed by hand stays closed', () => {
+            const c = make();
+            c.applyResponsiveFloor(660);
+            c.togglePalette(); // the rail's reopen button
+            expect(c.paletteOpen()).toBe(true);
+            c.applyResponsiveFloor(640); // still narrow — no crossing, no action
+            expect(c.paletteOpen()).toBe(true);
+
+            c.applyResponsiveFloor(FLOOR + 200);
+            c.togglePalette(); // closed by hand while wide
+            c.applyResponsiveFloor(660);
+            c.applyResponsiveFloor(FLOOR + 200);
+            expect(c.paletteOpen()).toBe(false); // the floor did not close it, so it does not reopen it
+        });
+
+        it('Auto-arrange delegates to the canvas', () => {
+            const c = make();
+            const reset = vi.fn();
+            (c as unknown as { canvas: { resetLayout: () => void } }).canvas = { resetLayout: reset };
+            c.resetLayout();
+            expect(reset).toHaveBeenCalledTimes(1);
+        });
+    });
+
     it('dropping a palette node adds it to the model and the canvas', () => {
         const c = make();
         c.model.set(structuredClone(FLOW));

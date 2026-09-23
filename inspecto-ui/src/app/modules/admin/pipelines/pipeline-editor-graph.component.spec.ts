@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component';
+import { loadPipelineLayout } from './pipeline-layout';
 
 /** G6 can't instantiate in jsdom (per the angular-ui skill) and this host mounts the canvas
  *  unconditionally in ngAfterViewInit — so `rebuild()` is stubbed out before the first
@@ -42,6 +43,24 @@ describe('PipelineEditorGraphComponent', () => {
         } as unknown as DragEvent;
         c.onDrop(drop);
         expect(dropped).toHaveBeenCalledWith(expect.objectContaining({ type: 'collector' }));
+    });
+
+    it('persists every node position for the Pipeline, and Auto-arrange forgets them', () => {
+        localStorage.clear();
+        const fixture = create();
+        const c = fixture.componentInstance;
+        c.graphKey = 'orders';
+        const pos: Record<string, [number, number]> = { a: [10, 20], b: [30, 40] };
+        (c as unknown as { graph: unknown }).graph = {
+            getNodeData: () => [{ id: 'a' }, { id: 'b' }],
+            getElementPosition: (id: string) => [...pos[id], 0],
+            destroy: vi.fn(),
+        };
+        c.persistLayout();
+        expect(loadPipelineLayout('orders')).toEqual(pos);
+
+        c.resetLayout();
+        expect(loadPipelineLayout('orders')).toBeNull();
     });
 
     it('renders the canvas host (empty, no graph mounted) with no a11y violations', async () => {

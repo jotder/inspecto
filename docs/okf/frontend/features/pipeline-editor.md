@@ -112,6 +112,29 @@ G6 host needs its own `ResizeObserver`; a maximized dock overlays the body row a
 (`width:100%` beside `shrink-0` siblings clips its own footer). Opening a parse pane transiently
 widens the dock to 420px (`InspectoSplitDirective.ensureAtLeast` — never persisted).
 
+**Responsive floor** (`WORKBENCH-RESPONSIVE-FLOOR-1`, 2026-09-23): below a **1024px viewport**
+(`PipelineEditorComponent.RESPONSIVE_FLOOR_PX`) the **palette** collapses to its rail, so the canvas
+keeps a usable width; the Properties dock stays, because it is where a Step is configured. The rail's
+own button reopens it. `applyResponsiveFloor(width)` acts only when the viewport **crosses** the floor
+(on init and on `window:resize`): it never fights the author — a palette reopened while narrow stays
+open, and widening reopens only a palette the FLOOR closed, not one the author closed. It is
+viewport-based on purpose, not a container measure: the preview browser delivers no `ResizeObserver`
+callbacks, and the shell's nav drawer already leaves the page below `md` (960px).
+
+**Remembered Step positions** (layout half of `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`, 2026-09-23):
+dragging a Step persists every node's position (`node:dragend` → `persistLayout()`), and the next open
+restores them instead of re-running the automatic `antv-dagre` layout. **Home = browser
+`localStorage`, `inspecto.pipelines.layout.<space>.<pipelineId>`** (`pipelines/pipeline-layout.ts`) —
+deliberately NOT the `*_pipeline.toon`: the [editable round-trip](../../backend/pipeline-graph/editable-round-trip.md)
+carries no coordinates, and a position key there would be config the engine never reads that every
+writer must preserve. Positions are a view preference, like the dock widths and grid layouts beside
+them. Rules: a stored layout is applied **only when it covers every node** (a Step it does not know —
+added by a config edit or on another device — makes the whole graph fall back to the automatic
+layout, rather than half-restored beside a stranger); stale ids are ignored; once a layout exists, an
+added Step joins it. The canvas-corner **Auto-arrange** button (`resetLayout()`) forgets it and
+re-lays out; it is not author-gated (a view preference). Accepted costs: the layout does not follow
+the author to another device, and a Pipeline id change starts from the automatic layout.
+
 ## The Step-type vocabulary is the engine's, and only the engine's
 
 **Since 2026-09-02 the palette renders the served Step Processor TAXONOMY when it is available**
@@ -775,10 +798,9 @@ each fix live). Genuinely open:
   R1/R4/R5/R6 shipped the same shift. Small follow-up in BACKLOG: migrate Duplicate + the
   row export onto the bundle routes (both still ride the client stream-bundle).
 - **Carried from the archived workbench MoSCoW (2026-09-23), demand-gated P3s:** the canvas overlays
-  the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`); the three-pane shell has no responsive floor —
-  at ~660px the canvas is a sliver (`WORKBENCH-RESPONSIVE-FLOOR-1`); and a Pipeline has no persisted
-  config history (undo/redo above is 50 per tab, lost on reload) and no persisted node positions
-  (`PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`).
+  the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`); and a Pipeline has no persisted config
+  history (undo/redo above is 50 per tab, lost on reload — the open half of `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`). The
+  responsive floor and remembered Step positions shipped 2026-09-23 (see *Shell* above).
 
 ## Verification culture (why this file reads the way it does)
 

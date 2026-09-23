@@ -573,6 +573,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
 
     togglePalette(): void {
         this.paletteOpen.update((o) => !o);
+        this.paletteAutoCollapsed = false; // the author's choice now — the floor must not undo it
     }
 
     /** Reveal the right dock on the given tab (an already-showing tab collapses the dock again). */
@@ -672,6 +673,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     ngOnInit(): void {
+        if (typeof window !== 'undefined') this.applyResponsiveFloor(window.innerWidth);
         this.load();
     }
 
@@ -807,7 +809,44 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     onWindowResize(): void {
         if (typeof window !== 'undefined') {
             this.maxDockWidth.set(Math.max(380, Math.round(window.innerWidth * 0.5)));
+            this.applyResponsiveFloor(window.innerWidth);
         }
+    }
+
+    // ── responsive floor (WORKBENCH-RESPONSIVE-FLOOR-1) ──────────────────────────────────────────────
+    /**
+     * Below this viewport width the step palette collapses to its rail, so the canvas keeps a usable
+     * width (at ~660px both docks open left the canvas a sliver). Viewport-based, not a container
+     * measure: the preview browser delivers no ResizeObserver callbacks, and the shell's nav drawer
+     * leaves the page below `md` (960px) anyway. The rail's own button reopens the palette.
+     */
+    static readonly RESPONSIVE_FLOOR_PX = 1024;
+    /** Whether the last measured viewport was below the floor (`null` = not measured yet). */
+    private belowFloor: boolean | null = null;
+    /** The palette is collapsed because of the floor, not by the author — so widening reopens it. */
+    private paletteAutoCollapsed = false;
+
+    /**
+     * Act only when the viewport CROSSES the floor: collapse the palette on the way down, reopen it on
+     * the way up if the floor (not the author) closed it. An author who reopens the palette while
+     * narrow keeps it open until the next crossing — the floor never fights a deliberate choice.
+     */
+    applyResponsiveFloor(width: number): void {
+        const below = width < PipelineEditorComponent.RESPONSIVE_FLOOR_PX;
+        if (below === this.belowFloor) return;
+        this.belowFloor = below;
+        if (below && this.paletteOpen()) {
+            this.paletteOpen.set(false);
+            this.paletteAutoCollapsed = true;
+        } else if (!below && this.paletteAutoCollapsed) {
+            this.paletteOpen.set(true);
+            this.paletteAutoCollapsed = false;
+        }
+    }
+
+    /** Forget this Pipeline's remembered Step positions and re-run the automatic layout. */
+    resetLayout(): void {
+        this.canvas?.resetLayout();
     }
 
     /**
