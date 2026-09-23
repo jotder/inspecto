@@ -848,7 +848,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<id>/at
 
 ### Observability — metrics & structured events
 
-`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-metrics` module** (`pom.xml:93`/`:121`, Standard+Enterprise only): on **Personal the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentMetricsRoutes.java:18-25`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
+`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-metrics` module** (`pom.xml:93`/`:121`, Professional+Enterprise only): on **Personal the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentMetricsRoutes.java:18-25`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
 
 ```bash
 curl -s localhost:8080/metrics

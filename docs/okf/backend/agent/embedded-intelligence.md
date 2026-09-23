@@ -402,7 +402,7 @@ The AGT-5 phased roadmap **P0–P5 is complete**, plus P4 polish (2nd pilot clas
 periodic state-watch, shipped 2026-07-21) — and the P2 authoring tier is now complete (`kpi_report_builder`
 shipped 2026-07-22). Remaining items are deliberate deferrals, not gaps:
 the embedding-retrieval upgrade (assessed **not warranted** at the 256-cap corpus; drop-in seam preserved
-behind `CaseSimilarity.score`) · hosted providers (Standard+) · the optional S8 signal-backbone slice.
+behind `CaseSimilarity.score`) · hosted providers (Professional+) · the optional S8 signal-backbone slice.
 One actionable cross-repo item remains, and it is **no longer a gate**: the eoiagent per-tool
 `DryRunProvider` seam **shipped upstream 2026-09-08**, so what is left is consuming it — let the framework
 populate `ApprovalRequest.preview` instead of `AgentApprovals`' own previewer. 🔴 This paragraph read

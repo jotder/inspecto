@@ -219,7 +219,7 @@ registry id** (operator, 2026-09-06). Schema: `docs/api/schemas/metadata-bundle.
 
 ### 3.7 The Exchange boundary (cross-Space, by grant)
 
-`inspecto-exchange` (Standard+, EDG-01 cell 4) roots at `spaces/_shared/` — reserved, never a Space —
+`inspecto-exchange` (Professional+, EDG-01 cell 4) roots at `spaces/_shared/` — reserved, never a Space —
 holding `offers.toon` (owner-listed Datasets / Widgets / saved views, catalog metadata only) and `grants.toon`
 (the `ShareGrant` ledger tying an offer to a consumer Space). Sharing is per-item, opt-in, grant-mediated,
 **read-only**, fail-closed; **cross-Space writes never**; **Schema sharing refused** (a Dataset's Result Set

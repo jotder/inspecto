@@ -84,11 +84,11 @@ Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.
 | Jar | Personal | Standard / Enterprise |
 |---|---|---|
 | `inspecto.jar` (shaded core) | ✅ | ✅ |
-| `inspecto-security.jar` (OIDC `Authenticator` SPI) | — | ✅ Standard+ |
+| `inspecto-security.jar` (OIDC `Authenticator` SPI) | — | ✅ Professional+ |
 | `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Enterprise only |
 | `inspecto-connectors.jar` (shaded sidecar — `CONNECTORS-BUNDLE-1`) | ✅ | ✅ |
-| the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Standard+ |
-| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ |
+| the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Professional+ |
+| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Professional+ |
 | **`inspecto-agent` / `inspecto-intelligence`** | **never** | **never** |
 
 > ⚠ **Staged-jar totals** (added 2026-09-09 — this table listed 3 of the 12): Personal stages **2**

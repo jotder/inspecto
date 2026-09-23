@@ -52,7 +52,7 @@ chart, a board, a graph, a map — and where an investigator asks *who connects 
   pattern packs, saved Link-Analysis Views.
 * **Geo Map Analysis** — the offline MapLibre basemap, GeoSource/GeoQuery, the intelligence
   toolbox, tools and layers, saved Geo Views.
-* **The edition gate** for the two investigation studios (`inspecto-geo-link`, Standard+).
+* **The edition gate** for the two investigation studios (`inspecto-geo-link`, Professional+).
 
 **Out of scope (owned elsewhere)**
 
@@ -95,7 +95,7 @@ CORRECTION the board was wrong on 2026-09-08 and has been amended in the same co
 | **INV-3** | **Cases** grouping Incidents; RCA templates; correlation ids end-to-end | Must | ✅ SHIPPED — **but this row does not belong to Studio.** ⛔ **MOVED to `INC`** (`incidents/incidents.md` owns the Alert → Incident → Case chain, Case Rules and RCA templates). A Case is one `ObjectType` value on the operational-objects tables, reached at `/cases` from the objects module, not from `/studio/*`. `GLOSSARY.md` §14's point that "Investigation" was never a coherent area is this row | **CORRECTION — S/E, not `All`.** The Case machinery is `inspecto-ops` (`EDITIONS` `CP-11`, gated 2026-09-08 by EDG-01 cell 7). Personal gets `AbsentObjectRoutes` and `features.ops = false` |
 | **INV-4** | Cross-studio bridges | Could | ✅ SHIPPED — **exactly one bridge exists**: geo co-location → a graph dialog over the shared G6 host. A full hand-off into `/studio/link-analysis` was deliberately deferred, and there is no link→geo bridge | S/E with the studios |
 
-🔴 **Three BI rows promise Standard+ for code that is ungated — the mirror image of `OPS-2`.** `BI-4`,
+🔴 **Three BI rows promise Professional+ for code that is ungated — the mirror image of `OPS-2`.** `BI-4`,
 `BI-6` and `BI-7` all read `S/E`, but `BiRoutes`, `ShareRoutes`, `ShareTokens`, `TablePngRenderer` and
 `PdfRenderer` all sit in the **core** modules and no `features.*` flag governs them: a Personal install can
 mint a public share link, run a headless BI query and render a PDF. EDG-01's six cells did not include them,
@@ -397,7 +397,7 @@ A worked example ships: `spaces/demo/config/orders/orders_volume_alert.toon`.
 list, and no `features.*` flag governs the Query Library, Viz Library, Dashboard Builder, Template
 Gallery or KPI gallery. `EDITIONS` `CP-08` is ✅ in all three editions and is correct.
 
-**The two investigation studios are Standard+** (`CP-09`, EDG-01 cell 3b, 2026-09-07).
+**The two investigation studios are Professional+** (`CP-09`, EDG-01 cell 3b, 2026-09-07).
 `inspecto-geo-link` contributes `GeoRoutes` and `InvRoutes` through the public `RouteModule`
 ServiceLoader seam (`inspecto-geo-link/src/main/resources/META-INF/services/com.gamma.control.RouteModule`).
 Absent the module, core `AbsentGeoLinkRoutes` claims the five paths and answers `503` naming what is not
@@ -439,7 +439,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | 2026-08-14 | The rows seam is asked in **one** place (`DatasetRowsService`), under the spec-running result service; every result is a page carrying `truncated` and an error | `studio.md` |
 | 2026-08-31 | **`MOCK-DEAD-COMPUTE-1`** — the former client-side folds are retained as reference oracles after the mock backend's deletion, because the live paths are asserted against them; deleting them deletes the guards | code contracts in `entity-projection.ts`, `geo-projection.ts` |
 | 2026-09-02 | `trend-monitor` added to the template pack — the temporal starter board | `studio.md`; `EDITIONS` `CP-08` |
-| 2026-09-07 | **EDG-01 cell 3b** — `GeoRoutes` + `InvRoutes` move to `inspecto-geo-link` (Standard+); Personal gets a core 503 stub | operator; `EDITIONS` `CP-09` |
+| 2026-09-07 | **EDG-01 cell 3b** — `GeoRoutes` + `InvRoutes` move to `inspecto-geo-link` (Professional+); Personal gets a core 503 stub | operator; `EDITIONS` `CP-09` |
 | 2026-09-07 | 🔴 `hasRoute` **excludes absent-module stubs**, so a capability flag stays honest; stubs register last and only for unclaimed patterns | `ApiContext` contract |
 | 2026-09-08 | This spec: `INV-3` moved to `INC` and its edition corrected; `INV-1`/`INV-2`'s stale open items and mislabelled deferral fixed; `BI-1`'s Datasets pane, `BI-4`'s formats and `BI-7`'s follow-up corrected; the Visualization Type count pinned at 13 | this file §2 |
 
@@ -501,7 +501,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 9. **The template gallery's own specs use ids that do not ship.** Its tests name `kpi_total`,
    `sum_by_dim` and `kpi_board` alongside the one real id, so a reader grepping for shipped ids finds
    fixtures. Ids are server-owned; the fixtures should say so.
-10. 🔴 **`BI-4`, `BI-6` and `BI-7` promise Standard+ for ungated code** (the note under §2). A Personal
+10. 🔴 **`BI-4`, `BI-6` and `BI-7` promise Professional+ for ungated code** (the note under §2). A Personal
     install can mint a public share link, run a headless BI query and render a PDF. Either the three rows
     become `All`, or a seventh EDG-01 cell moves them. A product decision either way.
 11. 🔴 **The anonymous public embed has no compliance control.** `compliance/controls-matrix.md` holds no

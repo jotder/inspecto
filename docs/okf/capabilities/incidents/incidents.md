@@ -131,14 +131,15 @@ shapes**: the ledger-metric shape — `metric` ∈ `error_rate | failed_batches 
 comparator, threshold, `window`, optional `onPipeline` — and the **Measure shape** (BI-5, 2026-09-06) —
 `dataset` (a Dataset component id) + `measure` (`count | agg(field)`, agg ∈ count / countDistinct / sum /
 avg / min / max). Both take a `when` condition tree that scopes rows before aggregation (metric shape only).
-`severity` ∈ `INFO | WARNING | CRITICAL`. Rules are files `<name>_alert.toon` under the write root
-(2 committed examples, `spaces/demo/config/orders/`).
+`severity` ∈ `INFO | WARNING | CRITICAL`. Rules are `alert-rule` components under `<write-root>/registry/alert-rules/`
+(`ComponentStore`, `ComponentRegistry` dir `alert-rules`), armed at boot by `ServiceBootstrap.loadAlerts` —
+promoted off raw `*_alert.toon` files 2026-07-18. ⚠ A leftover `*_alert.toon` is **not read by anything**.
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
 (`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
 `alert-rule.fired` Signal (`:243`), and appends to a **bounded in-memory ring** the feed reads
 (`GET /alerts`). `POST /alerts/evaluate` runs a sweep on demand. **The engine does not hot-load
-`*_alert.toon`**: `POST/PUT/DELETE /alerts/rules[/{name}]` (`AlertRoutes.java:44-48`, gated
+the registry**: `POST/PUT/DELETE /alerts/rules[/{name}]` (`AlertRoutes.java:44-48`, gated
 `canAuthorAlertRules`, fail-closed gate order, `ConfigCodec` + `AtomicFiles`) arm the rule in the running
 `AlertService` in-process; a restart re-arms from the files. Since 2026-08-10 an `alerts` Platform Service
 exists so `alert.evaluate` holds a real grant, and its dry-run stand-in must report "nothing was evaluated".
@@ -458,7 +459,7 @@ earlier one, both appear.
 
 | Date | Decision | Why |
 |---|---|---|
-| 2026-09-02 | **CP-12 split**: the in-app feed stays in every edition; delivery channels are CP-15 (Standard+) | The feed is the product's nervous system; a transport is a deployment |
+| 2026-09-02 | **CP-12 split**: the in-app feed stays in every edition; delivery channels are CP-15 (Professional+) | The feed is the product's nervous system; a transport is a deployment |
 | 2026-09-07 (operator) | Gating is **`ServiceLoader` modules**, never `-D` switches | A switch leaves the code in the bundle |
 | 2026-09-07 | Cell 1: channels move to `inspecto-notify-channels`; Personal registers **zero** | `SmtpEmailChannel` had reached Personal through the connector sidecar, which is not edition-gated |
 | 2026-09-08 (operator) | Cell 7: the **whole `com.gamma.ops` domain** becomes `inspecto-ops`; `OPS-01` and `SP-CTL-02` amended; ⛔ `/alerts*` stays | Operational objects are a multi-operator workflow; Personal is single-user. A gap still raises the *event* everywhere |
@@ -674,7 +675,8 @@ contents, merge, create contract, linking, postmortem, tagging); `alerts.compone
 ### 8.5 Runnable examples
 
 Committed config exercising the chain, all under `spaces/demo/config/` (mirrored in `inspecto-deploy/`):
-two Alert Rules (`orders/orders_stream_failures_alert.toon`, `orders_volume_alert.toon`), one RCA
+⚠ **zero armed Alert Rules** — `orders/orders_stream_failures_alert.toon` and `orders_volume_alert.toon`
+are pre-2026-07-18 files nothing loads (no `registry/alert-rules/` exists in the demo space) — one RCA
 template (`ops/orders_rca.toon`). ⛔ `ops/demo_ops_queue.toon` no longer exists — deleted 2026-09-14 with the capability (`RETIRE-HALVES-1`).
 ⛔ `ops/sla_escalation.toon` no longer exists either, deleted in the same change. ⚠ **Zero committed Case Rules, Tag Rules, notification rules or channel
 destinations**, and — by decision — no scheduled `incident_purge`.

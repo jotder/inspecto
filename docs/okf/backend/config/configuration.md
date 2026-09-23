@@ -430,9 +430,6 @@ collector:
   gap_detection:                  # alert on a hole in an expected series
     enabled: true
     sequence: "CDR_{yyyyMMddHH}"
-  integrity:                      # verify fetched bytes (remote)
-    size_check: true
-    checksum: SHA256
   fetch:                          # retrieval tuning (remote)
     parallel_fetch: 8             # >1 ⇒ pool of independent connector sessions
     rate_limit: 50MBps            # token-bucket; 50MB/s, 512KBps, or a bare bytes/s number
@@ -489,11 +486,14 @@ best-effort + commit-log replay in that case.
 Java-date token) and emits a `SEQUENCE_GAP` event per missing key in the series; the service tier promotes that
 to a managed ALERT object (trackable in Cases/Issues) with no extra config.
 
-> ⚠ **Doc drift, open (`DOC-DRIFT-COLLECTOR-ALERT-1`, filed 2026-09-23):** nothing reads a `collector.integrity:` block as documented here; `output.ducklake.*` is undeclared in `ConfigSpecs`; and the retired edition name "Standard+" still appears in several OKF docs.
+**Fetch integrity** *(remote, always on — there is no `integrity:` key)* — every fetched file is checked by
+`IntegrityChecker.verify` from `RemoteAcquisitionHandler`: size vs. the listing (skipped when the listing has
+no size), and checksum vs. the server etag when present, hashed with `duplicate.algorithm`. A failure discards
+the bytes to quarantine (`corrupt_download`) and skips the file — never processed corrupt.
 
-**`integrity`** *(remote)* — every fetched file is checked (size vs. the listing, checksum vs. the server etag
-when present). A failure discards the bytes to quarantine (`corrupt_download`) and skips the file — never
-processed corrupt.
+⚠ **`output.ducklake.*` is read but not declared in `ConfigSpecs`** — `PipelineCompiler` / `PipelineEditable`
+carry it and `ConfigSafetyValidator` jails `output.ducklake.data_path`, but the spec lists only
+`output.format` / `output.compression` / `output.filename_column`. See [output sinks](../engine/output-sinks.md).
 
 **`fetch`** *(remote)* — `parallel_fetch > 1` fetches over a pool of independent connector sessions (the clients
 hold one non-thread-safe session each, so concurrency uses extra sessions, not shared reuse). `rate_limit` is a

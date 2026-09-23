@@ -121,7 +121,7 @@ in-memory store oldest-first so nothing emitted before the configured backend at
 🔴 **The default is a per-EDITION choice made in the launcher, not in the engine** (`EVENTS-DURABLE-1`,
 2026-09-11). The engine default stays `memory`, because Personal's promise is zero files and zero
 configuration — but a ring that empties on restart cannot carry the **tamper-evident, append-only** audit
-trail Standard+ sells, and `AuditTrail` emits `EventType.AUDIT` straight into `EventLog`. So the
+trail Professional+ sells, and `AuditTrail` emits `EventType.AUDIT` straight into `EventLog`. So the
 Standard/Enterprise launchers emitted by `inspecto/package.ps1` now pass **`-Devents.backend=parquet`**,
 selected off the same `inspecto-security.jar` presence check that turns on OIDC. `-Devents.dir` is
 deliberately left unset: it falls back to `SpaceRoot.eventsDir()`, so discover mode keeps **one trail per
@@ -350,7 +350,7 @@ artifacts (`-Djobs.runlog.maxEntries`, default 10,000); `runlog_prune` is its re
 | `retire_superseded` | the **bytes** of output revisions the outputs catalog marks `SUPERSEDED` | core | ⚠ **the one retention task a correctness fix depends on** — without it every full recompute leaves a complete extra copy forever; since 2026-08-29 the runner **WARNs** after a recompute when no enabled job exists |
 | `storage_report`, `storage_trend` | per-axis usage (+ a queryable `maintenance_storage` sample on a real run); two-point growth slope, breach ETA, archive candidates | core | trend emits `maintenance.storage.trend` (WARN) inside `warn_days` |
 | `db_maintenance`, `scheduler_audit`, `metadata_validate`, `file_repository_audit`, `materialize` | CHECKPOINT/VACUUM via host seams; cron sanity; broken refs/duplicates/missing data; repository consistency; view materialisation | core | |
-| `backup`, `backup_verify`, `restore` | timestamped zip + SHA-256 sidecar manifest via `Checksums`; hash-first verify (fail-closed); manifest-validated restore with **zip-slip jail** and conflict preview — archive-based, the whole config tree, *not* bundle import | **`inspecto-backup`** (`BackupTaskProvider`) | Standard+/Enterprise (`OPS-06`, cell 2, 2026-09-07). On Personal: *unknown maintenance task*, refused loudly. Pinned by `NoBackupTaskShipsInThePersonalBuildTest` |
+| `backup`, `backup_verify`, `restore` | timestamped zip + SHA-256 sidecar manifest via `Checksums`; hash-first verify (fail-closed); manifest-validated restore with **zip-slip jail** and conflict preview — archive-based, the whole config tree, *not* bundle import | **`inspecto-backup`** (`BackupTaskProvider`) | Professional+/Enterprise (`OPS-06`, cell 2, 2026-09-07). On Personal: *unknown maintenance task*, refused loudly. Pinned by `NoBackupTaskShipsInThePersonalBuildTest` |
 | `incident_purge` | Archived Incidents with notes, links, tag edges — **the only task that deletes operator business records** | **`inspecto-ops`** (`OpsMaintenanceTasks`) | MNT-14; `retention_days` required, `max_count` default 1000; legal hold fail-safe and re-checked inside `purge()`; G3 — the audit history survives. **Nothing schedules it, and nothing should** |
 
 The **`MaintenanceTaskProvider`** ServiceLoader seam (`inspecto-engine/src/main/java/com/gamma/job/MaintenanceTaskProvider.java`):
@@ -406,7 +406,7 @@ host's — the rules are `DAT`'s.
 
 | Flag | Default | Reader |
 |---|---|---|
-| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Standard+; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
+| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Professional+; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
 | `-Devents.db.url` / `.user` / `.password` | `SpaceRoot.eventsDbUrl()` — `<space>/duckdb/inspecto-events.db` | `OperationalDb.Family.EVENTS`, `DbEventStore` |
 | `-Dstatus.backend` | `db` | `OperationalDb.java`, `ServiceStores.java` |
 | `-Djobs.backend` | `none` | `ServiceStores.java`, `DbJobRunStore.java`, `HealthDetails.java` |
