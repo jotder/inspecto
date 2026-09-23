@@ -60,6 +60,18 @@ class ConfigSpecsTest {
     }
 
     @Test
+    void everyOutputDucklakeKeyTheEngineReadsIsDeclared() {
+        // DuckLakeRegistrar.registerOne reads these five leaves of output.ducklake; ConfigSafetyValidator
+        // requires catalog_url/data_path/table when enabled and jails data_path.
+        ConfigSpec p = ConfigSpecs.pipeline();
+        for (String k : List.of("output.ducklake.enabled", "output.ducklake.catalog_url",
+                "output.ducklake.data_path", "output.ducklake.schema", "output.ducklake.table"))
+            assertTrue(p.field(k).isPresent(), k + " is read by the engine but not declared in ConfigSpecs");
+        assertEquals(FieldType.BOOL, p.field("output.ducklake.enabled").get().type());
+        assertEquals("main", p.field("output.ducklake.schema").get().defaultValue());
+    }
+
+    @Test
     void crossFieldRuleCheckReportsFindingOnViolationOnly() {
         CrossFieldRule rule = new CrossFieldRule("r", "must hold", Severity.ERROR,
                 List.of("a.b"), raw -> RawConfig.present(raw, "a.b"));

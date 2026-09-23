@@ -491,9 +491,11 @@ to a managed ALERT object (trackable in Cases/Issues) with no extra config.
 no size), and checksum vs. the server etag when present, hashed with `duplicate.algorithm`. A failure discards
 the bytes to quarantine (`corrupt_download`) and skips the file — never processed corrupt.
 
-⚠ **`output.ducklake.*` is read but not declared in `ConfigSpecs`** — `PipelineCompiler` / `PipelineEditable`
-carry it and `ConfigSafetyValidator` jails `output.ducklake.data_path`, but the spec lists only
-`output.format` / `output.compression` / `output.filename_column`. See [output sinks](../engine/output-sinks.md).
+**`output.ducklake.*`** *(declared in `ConfigSpecs.pipeline()` since 2026-09-23)* — the five leaves
+`DuckLakeRegistrar` reads: `enabled` (BOOL, default `false`), `catalog_url`, `data_path` (FILEPATH), `schema`
+(default `main`) and `table`. All are optional in the spec; `ConfigSafetyValidator` requires `catalog_url` /
+`data_path` / `table` when `enabled` is true and jails `data_path`. A `sinks[]` entry's own `ducklake` block
+overrides this one. See [output sinks](../engine/output-sinks.md).
 
 **`fetch`** *(remote)* — `parallel_fetch > 1` fetches over a pool of independent connector sessions (the clients
 hold one non-thread-safe session each, so concurrency uses extra sessions, not shared reuse). `rate_limit` is a

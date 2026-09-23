@@ -247,6 +247,7 @@ against, round-tripped untouched.
 | `name` | spec |
 | `output` | spec |
 | `output.compression` | spec |
+| `output.ducklake` | spec |
 | `output.filename_column` | spec |
 | `output.format` | spec |
 | `output_store` | spec |

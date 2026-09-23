@@ -316,7 +316,21 @@ public final class ConfigSpecs {
                         "Codec for the output (e.g. snappy); blank = format default."),
                 FieldSpec.of("output.filename_column", "Source filename column", FieldType.STRING,
                         "Adds a column of this name carrying each row's source file (B4); "
-                                + "blank = no column (lineage stays in the ledger only).")
+                                + "blank = no column (lineage stays in the ledger only)."),
+                // DuckLake registration (DuckLakeRegistrar.registerOne). Optional: catalog_url, data_path and
+                // table become required only when enabled is true — ConfigSafetyValidator enforces that and
+                // jails data_path, so none is FieldSpec.required here. A sinks[] entry's own ducklake block
+                // overrides this one.
+                FieldSpec.withDefault("output.ducklake.enabled", "Register in DuckLake", FieldType.BOOL, false,
+                        "Register each written file into a DuckLake table after the write."),
+                FieldSpec.of("output.ducklake.catalog_url", "DuckLake catalog URL", FieldType.STRING,
+                        "The DuckLake catalog backend, attached as ducklake:<this>. Required when enabled."),
+                FieldSpec.of("output.ducklake.data_path", "DuckLake data path", FieldType.FILEPATH,
+                        "DuckLake DATA_PATH; resolved under the Space and path-jailed. Required when enabled."),
+                FieldSpec.withDefault("output.ducklake.schema", "DuckLake schema", FieldType.STRING, "main",
+                        "Catalog schema the table is registered in."),
+                FieldSpec.of("output.ducklake.table", "DuckLake table", FieldType.STRING,
+                        "Table the files are registered into. Required when enabled.")
         );
 
         int cores = Runtime.getRuntime().availableProcessors();
