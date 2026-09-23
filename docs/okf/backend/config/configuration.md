@@ -247,7 +247,7 @@ The shipped `excel_example` used `partitionKey: CATEGORY` (every row under the H
 declares `partitions[1]{column,source,type}: item_category,CATEGORY,VARCHAR`, pinned end to end by
 `DemoCorpusIngestTest.excelExamplePartitionsByCategoryNotUnderTheHiveDefault`. ⚠ Two more shipped
 schemas carry the same shape and still land under the Hive default: `asn1_example` (`partitionKey: IMSI`)
-and `orders_by_region_feed` (`partitionKey: REGION`).
+and `orders_by_region_feed` (`partitionKey: REGION`) — BACKLOG `DATE-PARTITION-ON-TEXT-SHIPPED-1`.
 
 `create-schema` generates one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; it wrote the
 legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that

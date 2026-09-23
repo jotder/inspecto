@@ -33,12 +33,13 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `PipelineConfigParser.readToon` prefixes the file — the one decode for the pipeline file and every
   schema / segment / grammar file it references. `POST /validate {configPath}` answers that as **422**
   (it was a 500). ⚠ Still only a WARN on the registry path: a Pipeline that does not load is absent from
-  `GET /pipelines`, with no load-error surface in the API or the SPA.
+  `GET /pipelines`, with no load-error surface in the API or the SPA (BACKLOG
+  `PIPELINE-LOAD-FAILURE-INVISIBLE-1`).
   ⚠ Other readers that call `JToon.decode` directly (`ToonHelper.load`, `SchemaExtractor`, `MainApp`,
   `inspecto-exchange`) still get the bare message.
   🔴 **`toMap` is not lenient.** JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is
   `strict=true` — the same options as `toMapStrict`. The two methods decode identically; the "lenient"
-  wording in `ConfigCodec`'s javadoc is wrong.
+  wording in `ConfigCodec`'s javadoc is wrong (BACKLOG `CONFIGCODEC-LENIENT-IS-STRICT-1`).
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does

@@ -681,7 +681,8 @@ committed configs.
   reader first and only then the list** — see that section below. ⇒ `JOB_PATH_KEYS` is now **nine**:
   the seven after `archive_dir` joined, plus `out_dir` and `config`.
 - **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining committed values space-relative.
-  ✅ **Remainder: 0 real values** *(the "29" this bullet carried was stale).* After the five 2026-09-16
+  ✅ **CLOSED 2026-09-23 with no code — remainder: 0 real values** *(the "29" this bullet carried was
+  stale, and so is the sequencing ⛔ below: there is nothing left to land).* After the five 2026-09-16
   re-points, 24 were left: the 19 `PipelineJobRunner` values need none, because
   `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` option 1 resolves them against the config READ root (the launch
   dir, where they always pointed), and since `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` the save gate agrees;

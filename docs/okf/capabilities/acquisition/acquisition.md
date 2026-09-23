@@ -137,8 +137,12 @@ opposite of `IntakeGovernor`/T15, which deliberately does **not** throttle on in
 the ingest *consumer* on backlog would be positive feedback.
 
 ⚠ The gate bounds backlog **across** ticks, not within one: a single acquire cycle still fetches the whole
-discovered listing, so one tick can overshoot the mark. Bounding a single cycle's fetch volume is a separate
-deferred knob (`acquire.maxFilesPerCycle`, `BACKLOG.md` §6).
+discovered listing, so one tick can overshoot the mark. A per-cycle intake cap is **live** under another
+name — files via `-Dingest.maxFilesPerCycle` (`IntakeGovernor.capFor` → `CollectorProcessor.admit`, per
+Pipeline `processing.intake.max_files_per_cycle`) and bytes via `-Dingest.maxBytesPerCycle` (2026-09-16,
+`20ff050d`) — but both run after listing, on local files, so they bound materialisation, not remote fetch
+bandwidth. Bounding the *fetch* would need a listing-with-sizes seam that does not exist (branch-aware
+residual (f) in `BACKLOG.md`).
 
 ### 3.3 Phase A — discovery
 
@@ -636,8 +640,9 @@ consignment `order` **`mtime`** · stability `window` **`30s`** / `size_checks` 
 
 ### 3.17 Still future (declared, so it is not re-proposed as new)
 
-A presigned-URL / STS credential mode for `s3`; a Vault/KMS `SecretResolver` scope; `acquire.maxFilesPerCycle`
-(bounding one cycle's fetch volume — `BACKLOG.md` §6). The SPI makes each non-disruptive.
+A presigned-URL / STS credential mode for `s3`; a Vault/KMS `SecretResolver` scope; a remote-fetch
+bandwidth cap (the per-cycle file and byte intake caps already ship — see the back-pressure note above; only
+a cap on what one cycle *fetches* remains). The SPI makes each non-disruptive.
 
 ⚠ Do not restore a **`4.x`** attribution for phases A–F. That branch and its `v4.0.0`/`v4.0.0-RC1` tags were
 deleted 2026-08-17 (`docs/BRANCHING.md` §0-A); the phases shipped on `master`. Both
@@ -721,7 +726,7 @@ so they are not re-proposed as new ideas; none is scheduled.
 | Outbound object-store export | `EXPORT-1` (P3) | The inverse direction of ACQ-4 — recommendation of record only |
 | Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
 | "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |
-| `acquire.maxFilesPerCycle` | branch-aware residual **(f)** | A per-cycle intake cap; `collector.consignment.max_files` bounds the consignment, not the cycle |
+| Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`) | branch-aware residual **(f)** | The per-cycle intake caps SHIPPED (`-Dingest.maxFilesPerCycle`, `-Dingest.maxBytesPerCycle`); both run after listing on local files, so a cap on what a cycle *fetches* needs a listing-with-sizes seam that does not exist |
 | Multi-part archives | Unpack (11) | `depth: 1` is deliberate (§6.9); *multi-part* (`.z01`, split RAR) is simply unbuilt |
 | Missing connection not caught until first poll | W5 | A Collector referencing an absent Connection saves cleanly and fails at runtime |
 | Acquisition ledger defaults to `memory` | Completeness-KPI hold | 🔴 The default loses the ledger on restart, which is also why the completeness KPI cannot be computed on a fresh install |

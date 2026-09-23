@@ -140,6 +140,7 @@ into the output lake (measured live: `lake_out` held `A=3 B=5`, `lake_a` had no 
   ATTACH**, and names the offending `sinks[]` database; a sink that wrote nothing is skipped.
 * ⚠ **Two sinks inheriting the SAME lake both register** into its one table, so a replicate fan-out puts
   each row there once per destination — exactly what the old pooled call did; the decision is per sink.
+  Keep or dedupe is an open operator question (BACKLOG `SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1`).
   The caller's table name (`batch.table()`) still overrides a block's `table` key, per sink.
 
 Tests: `DuckLakeRegistrarPerSinkTest` (7). A live two-catalog DuckLake run (ducklake extension cached)

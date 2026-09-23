@@ -121,7 +121,7 @@ open, and widening reopens only a palette the FLOOR closed, not one the author c
 viewport-based on purpose, not a container measure: the preview browser delivers no `ResizeObserver`
 callbacks, and the shell's nav drawer already leaves the page below `md` (960px).
 
-**Remembered Step positions** (layout half of `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`, 2026-09-23):
+**Remembered Step positions** (the layout half of the row once filed as `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`, 2026-09-23; the open history half is now `PIPELINE-CONFIG-HISTORY-1`):
 dragging a Step persists every node's position (`node:dragend` → `persistLayout()`), and the next open
 restores them instead of re-running the automatic `antv-dagre` layout. **Home = browser
 `localStorage`, `inspecto.pipelines.layout.<space>.<pipelineId>`** (`pipelines/pipeline-layout.ts`) —
@@ -818,7 +818,8 @@ each fix live). Genuinely open:
 - **Carried from the archived workbench MoSCoW (2026-09-23), demand-gated P3s:** ~~the canvas overlays
   the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`)~~ **SHIPPED 2026-09-23** as the run picker
   above; and a Pipeline has no persisted config history (undo/redo above is 50 per tab, lost on reload —
-  the open half of `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`). The responsive floor and remembered Step
+  `PIPELINE-CONFIG-HISTORY-1`, renamed 2026-09-23 from `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1` once its
+  layout half shipped). The responsive floor and remembered Step
   positions shipped 2026-09-23 (see *Shell* above).
 
 ## Verification culture (why this file reads the way it does)

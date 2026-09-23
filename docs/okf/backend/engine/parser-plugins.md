@@ -113,7 +113,8 @@ Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, w
 - ⚠ **Only half carried by a Pipeline bundle.** The resolved module is in `referencedFiles()`, so the
   export ships it as a satellite under its basename — but `PipelineBundleRoutes.rewriteSatelliteRefs`
   does not rewrite `asn1.grammar_file`, so only a ref already spelled as a bare sibling name still
-  resolves after import.
+  resolves after import (BACKLOG `BUNDLE-ASN1-GRAMMAR-FILE-1`, which also carries the preview-vs-Pipeline
+  spelling split for a Pipeline in a subdirectory).
 
 **The grammar is OPTIONAL for preview — structural dump (2026-07-31).** BER is self-describing
 (every value carries its own tag and length), so with `asn1.grammar` blank the plugin skips the

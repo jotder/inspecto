@@ -104,6 +104,10 @@ under the launch directory. That is a data-root question, not a config-ref one �
 `DATA-DIRS-RESOLVE-AGAINST-CWD-1`. A `null` `configDir` (an in-memory draft: `PipelineConfig.fromMap`)
 also keeps the CWD reading — a draft has no directory to resolve against.
 
+⚠ **Unverified, filed for reproduction:** `POST /validate {configPath}` appears to load whatever server
+path the caller names with no path jail on `configPath` itself → BACKLOG `VALIDATE-CONFIGPATH-UNJAILED-1`
+(security; reproduce before building against it).
+
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about
 whether a space boots. Verify with a real server boot from the repo root.
