@@ -58,6 +58,7 @@ class NlToScheduleSkillTest {
             assertEquals("0 2 * * *", data.get("cron"));
             assertEquals("maintenance", data.get("jobType"));
             assertEquals("every day at 02:00", data.get("humanReadable"));
+            assertTrue(res.answer().contains("save it through POST /jobs"), res.answer());
             assertFalse(data.containsKey("onPipeline"), "no upstream pipeline in this request");
 
             @SuppressWarnings("unchecked")
