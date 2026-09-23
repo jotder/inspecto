@@ -99,8 +99,10 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         type: 'select',
         tier: 'advanced',
         options: [
+            { value: 'ignore', label: 'Ignore (skip)' },
             { value: 'reprocess', label: 'Reprocess' },
-            { value: 'skip', label: 'Skip' },
+            { value: 'alert', label: 'Reprocess + alert' },
+            { value: 'archive_old_version', label: 'Archive old version, reprocess' },
         ],
         help: 'What to do when a known file re-appears changed.',
     },

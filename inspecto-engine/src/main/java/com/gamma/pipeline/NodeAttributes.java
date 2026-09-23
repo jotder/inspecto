@@ -71,7 +71,8 @@ public final class NodeAttributes {
             NodeAttribute.of("recursive_depth", "Recursive depth", "number", "advanced").min(0)
                     .help("Blank = unbounded."),
             NodeAttribute.of("duplicate__on_change", "On changed duplicate", "select", "advanced")
-                    .options("reprocess", "Reprocess", "skip", "Skip")
+                    .options("ignore", "Ignore (skip)", "reprocess", "Reprocess", "alert", "Reprocess + alert",
+                            "archive_old_version", "Archive old version, reprocess")
                     .help("What to do when a known file re-appears changed."),
             NodeAttribute.of("guarantee", "Delivery guarantee", "select", "advanced")
                     .options("BEST_EFFORT", "Best effort", "AT_LEAST_ONCE", "At least once",

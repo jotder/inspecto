@@ -128,4 +128,22 @@ class NodeAttributesContractTest {
         assertSame(com.gamma.objects.FindingsSpec.TYPES, NodeAttribute.TYPES);
         assertSame(com.gamma.objects.FindingsSpec.TIERS, NodeAttribute.TIERS);
     }
+    /**
+     * COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1: every {@code duplicate__on_change} option must NAME a
+     * {@link com.gamma.acquire.DuplicatePolicy.OnChange} value. {@code OnChange.from} maps anything unknown to
+     * REPROCESS, so an offered "skip" silently reprocessed changed files; a string-only contract cannot see that.
+     */
+    @Test
+    void everyOnChangeOptionNamesADuplicatePolicyValue() {
+        NodeAttribute a = NodeAttributes.COLLECTOR.stream()
+                .filter(x -> x.key().equals("duplicate__on_change")).findFirst().orElseThrow();
+        for (NodeAttribute.Option o : a.options()) {
+            assertEquals(o.value().toUpperCase(),
+                    com.gamma.acquire.DuplicatePolicy.OnChange.from(o.value()).name(),
+                    "option '" + o.value() + "' is not a DuplicatePolicy.OnChange value");
+        }
+        assertEquals(java.util.Arrays.stream(com.gamma.acquire.DuplicatePolicy.OnChange.values())
+                        .map(v -> v.name().toLowerCase()).toList(),
+                a.options().stream().map(NodeAttribute.Option::value).toList());
+    }
 }
