@@ -211,7 +211,9 @@ The current model:
 output on disk permanently.** The old overwrite was O(1) disk; this is not. **No longer silent
 (2026-08-29):** `PipelineJobRunner` now warns naming the affected store(s) the moment step 2 actually
 supersedes something and no enabled `retire_superseded` job is configured — see
-[operations-reference.md](../build-run/operations-reference.md) for the wiring.
+[operations-reference.md](../build-run/operations-reference.md) for the wiring. A copyable example ships
+**disabled** at `spaces/demo/config/jobs/retire_superseded_job.toon` (2026-09-23): the task reads only
+`retention_days` and walks the process-wide output registry, so it carries **no** path or store key.
 
 ## 5. The Watermark — completeness
 

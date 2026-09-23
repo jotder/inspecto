@@ -1,0 +1,7 @@
+job:
+  name: retire_superseded
+  type: maintenance
+  task: retire_superseded
+  cron: "30 4 * * 0"
+  enabled: false
+  retention_days: "7"

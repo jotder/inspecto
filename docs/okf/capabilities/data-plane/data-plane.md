@@ -669,7 +669,7 @@ server), `PipelineJobRunnerTest` (`sinkNestedInsideAnotherStoreFailsClosed`, `sl
 `registry/datasets/`: 7 in `spaces/demo` (`maintenance_backups`, `ops_analytics`, `orders_dataset`,
 `orders_enriched_dataset`, `orders_rollup_dataset`, `payments_dataset`, `shipments_dataset`), 3 in
 `spaces/ucc`, 1 in the starter template; `registry/queries/`: 1 (`orders_by_region`). `warehouse_setup.sql`
-at the repo root (253 lines, outside the build). **No committed `materialize` or `retire_superseded` job.**
+at the repo root (253 lines, outside the build). `jobs/`: one committed `materialize` job (`orders_by_region_materialize`) and one `retire_superseded` job (`retire_superseded_job.toon`, 2026-09-23) that ships **DISABLED** — enabling retirement deletes bytes, so it is an operator call; the demo therefore still takes the WARN path.
 
 ### 8.5 Guards
 
@@ -686,5 +686,5 @@ run time; `SchemaFieldTypes` at load (`MET`); `expression-guard` and `measure-gr
 | **`DuckLakeRegistrar` has no test; the warehouse runbook has no code** | `inspecto-etl` test tree; repo root |
 | **Postgres coverage is opt-in and partial** — 9 of 12 families, only with a server | §3.8 |
 | **No test that the DuckDB session zone equals the host zone** — pinned by ⛔ comments at three call sites | `duckdb.md` |
-| **No test that `retire_superseded` is configured** — only a WARN | §3.2 |
+| **No test that `retire_superseded` is ENABLED anywhere** — only a WARN; the demo job ships disabled on purpose, pinned by `DemoRetireSupersededJobShipsDisabledTest` | §3.2 |
 | **The SCD2 `load` value is accepted and never honoured** — no test could pass | §3.2 |
