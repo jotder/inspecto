@@ -865,7 +865,13 @@ final class InspectoTools {
             }
             // The model supplies only a structured tree; ConditionSql renders it to a trusted predicate
             // ("TRUE" for an empty/absent tree — no constraint), so no model-authored SQL text is spliced.
-            String predicate = ConditionSql.predicate(mapArg(call, "when"));
+            // A root that is not a group is refused, never rendered as an unfiltered TRUE.
+            String predicate;
+            try {
+                predicate = ConditionSql.predicate(call.arguments() == null ? null : call.arguments().get("when"));
+            } catch (IllegalArgumentException notAGroup) {
+                return error("when: " + notAGroup.getMessage());
+            }
             String sql = "SELECT * FROM (" + relation + ") AS __q"
                     + ("TRUE".equals(predicate) ? "" : " WHERE " + predicate);
             List<Finding> findings = SqlGuard.check(sql);

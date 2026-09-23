@@ -80,7 +80,15 @@ all three native `read_csv` streaming paths), between `DataTransformer` and `Par
   predicate (same walk/operators as `ConditionTree`; typing is operand-driven — numeric operand ⇒
   `TRY_CAST(col AS DOUBLE)`, ISO date ⇒ `TRY_CAST(col AS TIMESTAMP)`, else case-sensitive VARCHAR;
   substring ops case-insensitive). Parity is test-enforced (`ConditionSqlTest` asserts SQL counts ==
-  `ConditionTree.matched` over the same data).
+  `ConditionTree.matched` over the same data). 🔴 **The root must be a group** (2026-09-23): a bare
+  leaf at the top level (`{kind:'condition',…}`, a kind-less `{field,operator,value}`, or a non-map)
+  used to render `TRUE`, so a Decision Rule's consequences hit EVERY row and `/inv/*` returned
+  unfiltered data with a 200. `ConditionSql.predicate` now throws `IllegalArgumentException` for it
+  (the ETL run fails closed; `/inv/*` and `/expectations` map it to 422; `query_author` returns an
+  error result). Absent (`null`/`{}`) and an empty group still mean "no constraint" — deliberate, and
+  so do incomplete leaves inside a group (the SPA's half-built rows). ⚠ `ConditionTree` was **not**
+  changed: in-JVM, a bare-leaf root still matches every row (Alert Rule `when`, `/decision-rules`
+  simulate) — the same shape, left for a follow-up.
 - **Consequences over the matched set** (tags first so copies carry them; then copies; then one
   removal if anything moves/drops): `tag` appends to a `__tags` VARCHAR column (added on first use —
   `SqlViews.reader` now sets `union_by_name=true` for Parquet so older un-tagged files stay readable

@@ -623,6 +623,39 @@ class ControlApiInvProjectionTest {
         }
     }
 
+    /**
+     * A bare condition at the top level (no group around it) used to render as TRUE: the call returned 200
+     * with EVERY row while the analyst believed it filtered. It is now a 422 on /projection and /neighbors;
+     * the twin — the same leaf wrapped in a group — filters.
+     */
+    @Test
+    void aBareConditionAtTheTopLevelIs422AndItsGroupedTwinFilters(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedTxns(c);
+            for (String bare : List.of(
+                    "{\"kind\":\"condition\",\"field\":\"channel\",\"operator\":\"=\",\"value\":\"sms\"}",
+                    "{\"field\":\"channel\",\"operator\":\"=\",\"value\":\"sms\"}",
+                    "{\"field\":\"channel\",\"op\":\"=\",\"value\":\"sms\"}")) {
+                HttpResponse<String> r = project(c.port,
+                        "{\"dataset\":\"txns_ds\",\"sourceCol\":\"payer\",\"targetCol\":\"payee\",\"filter\":" + bare + "}");
+                assertEquals(422, r.statusCode(), "bare " + bare + " -> " + r.body());
+                assertTrue(r.body().contains("group"), r.body());
+                HttpResponse<String> n = neighbors(c.port, "{\"dataset\":\"txns_ds\",\"sourceCol\":\"payer\","
+                        + "\"targetCol\":\"payee\",\"value\":\"alice\",\"filter\":" + bare + "}");
+                assertEquals(422, n.statusCode(), "neighbors, bare " + bare + " -> " + n.body());
+            }
+
+            HttpResponse<String> twin = project(c.port, """
+                    {"dataset":"txns_ds","sourceCol":"payer","targetCol":"payee",
+                     "filter":{"kind":"group","op":"AND","items":[
+                       {"kind":"condition","field":"channel","operator":"=","value":"sms"}]}}""");
+            assertEquals(200, twin.statusCode(), twin.body());
+            JsonNode rows = json(twin.body()).at("/rows");
+            assertEquals(1, rows.size(), "only the sms pair survives: " + rows);
+            assertEquals(2, rows.get(0).get("count").asInt());
+        }
+    }
+
     /** /neighbors delegates to the projection, so it inherits the filter with no separate code path. */
     @Test
     void theFilterSurvivesThroughNeighbors(@TempDir Path cfg, @TempDir Path root) throws Exception {

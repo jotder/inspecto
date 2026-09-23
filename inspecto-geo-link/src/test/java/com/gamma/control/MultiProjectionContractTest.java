@@ -155,6 +155,28 @@ class MultiProjectionContractTest {
         }
     }
 
+    /** A bare top-level condition, shared or per-edge, used to render TRUE (all 4 edges); now a 422. */
+    @Test
+    void aBareConditionFilterIs422AtTheTopLevelAndPerEdge(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, false)) {
+            seed(c);
+            String leaf = "{\"kind\":\"condition\",\"field\":\"amount\",\"operator\":\">\",\"value\":\"10000\"}";
+            String perEdge = THREE.replace("\"type\":\"WIRE\",", "\"type\":\"WIRE\",\"filter\":" + leaf + ",");
+            HttpResponse<String> bad = multi(c.port, perEdge, null);
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("group"), bad.body());
+
+            String top = THREE.replace("\"edges\":[", "\"filter\":{\"field\":\"secs\",\"operator\":\">\",\"value\":\"3\"},\"edges\":[");
+            HttpResponse<String> badTop = multi(c.port, top, null);
+            assertEquals(422, badTop.statusCode(), badTop.body());
+
+            String twin = THREE.replace("\"type\":\"WIRE\",", "\"type\":\"WIRE\",\"filter\":{\"kind\":\"group\",\"op\":\"AND\",\"items\":[" + leaf + "]},");
+            HttpResponse<String> ok = multi(c.port, twin, null);
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertEquals(3, json(ok.body()).get("edges").size(), "the grouped twin narrows the wires mapping");
+        }
+    }
+
     @Test
     void limitIsPerMappingAndTruncationIsReported(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, false)) {

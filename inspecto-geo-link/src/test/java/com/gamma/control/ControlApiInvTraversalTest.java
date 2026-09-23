@@ -226,6 +226,21 @@ class ControlApiInvTraversalTest {
         }
     }
 
+    /** A bare top-level condition used to render TRUE and prune nothing (B→D survived); now a 422. Twin above. */
+    @Test
+    void aBareConditionAtTheTopLevelIs422(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedWires(c);
+            HttpResponse<String> bare = traverse(c.port, body("\"targetNode\":\"E\",\"filter\":"
+                    + "{\"kind\":\"condition\",\"field\":\"amount\",\"operator\":\"!=\",\"value\":50}"));
+            assertEquals(422, bare.statusCode(), bare.body());
+            assertTrue(bare.body().contains("group"), bare.body());
+            JsonNode twin = ok(c, body("\"targetNode\":\"E\",\"filter\":"
+                    + "{\"kind\":\"group\",\"op\":\"AND\",\"items\":[{\"kind\":\"condition\",\"field\":\"amount\",\"operator\":\"!=\",\"value\":50}]}"));
+            assertEquals(List.of("A-B-C-D-E"), paths(twin), "the grouped twin prunes B→D");
+        }
+    }
+
     @Test
     void unknownColumnsAndFilterFieldsAre422(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

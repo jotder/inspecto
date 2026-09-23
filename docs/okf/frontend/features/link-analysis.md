@@ -270,7 +270,12 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   filtered rows. Every leaf `field` is checked against the relation's actual columns first and an unknown
   one is 422 `CONFIG_VALIDATION_FAILED` naming the field — identifiers never reach the renderer
   unvalidated (operator decision D-S5, 2026-09-22). Cost: a filtered call probes the relation's columns
-  with one extra zero-row query; unfiltered calls are unchanged.
+  with one extra zero-row query; unfiltered calls are unchanged. 🔴 **The `filter` root must be a group**
+  (2026-09-23, on `/projection`, `/neighbors`, `/projection/multi` top-level and per-edge, and
+  `/traversal/recursive-paths`): a bare condition at the top level used to render `TRUE` and return every
+  row with a 200 while the fields were still validated — fail-open. It is now a 422 naming the expected
+  group shape. The SPA always sends a `ConditionGroup`, so nothing it builds is refused. An empty group
+  and incomplete leaves are still a deliberate no-op (see [decision rules](../../backend/control-plane/decision-rules.md)).
 * **Projection, expansion and schema inspection are audited** (LA-04): `InvRoutes`/`GeoRoutes` emit
   `link.projected`, `link.expanded`, `link.schema.inspected`, `geo.projected` and `geo.routes.projected`,
   each carrying the dataset, the result size and `truncated`, best-effort so an audit failure can never

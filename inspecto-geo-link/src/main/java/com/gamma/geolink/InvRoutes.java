@@ -886,10 +886,7 @@ public final class InvRoutes implements RouteModule {
                 throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
         }
         String filterSql = "TRUE";
-        if (body.get("filter") != null) {
-            checkFilterFields(body.get("filter"), columns, datasetId);
-            filterSql = ConditionSql.predicate(body.get("filter"));
-        }
+        if (body.get("filter") != null) filterSql = checkedFilterSql(body.get("filter"), columns, datasetId);
 
         String src = q(sourceCol), tgt = q(targetCol);
         String wSel = weightCol != null ? "TRY_CAST(" + q(weightCol) + " AS DOUBLE)" : "CAST(NULL AS DOUBLE)";
@@ -1024,12 +1021,22 @@ public final class InvRoutes implements RouteModule {
      *
      * <p>Absent tree, or one that constrains nothing (empty group, only incomplete leaves) → {@code TRUE},
      * a no-op — parity with {@code ConditionSql}/{@code ConditionTree}'s "an empty group matches every row".
+     * A root that is not a group (a bare condition, or not an object) is a 422: it used to render as
+     * {@code TRUE} and return every row while the analyst believed the data was filtered.
      */
     private static String filterSql(Object filter, String datasetId, String relationSql) {
         if (filter == null) return "TRUE";
-        List<String> columns = relationColumns(datasetId, relationSql);
+        return checkedFilterSql(filter, relationColumns(datasetId, relationSql), datasetId);
+    }
+
+    /** Field-check then render; {@link ConditionSql}'s refusal of a non-group root becomes a 422. */
+    private static String checkedFilterSql(Object filter, List<String> columns, String datasetId) {
         checkFilterFields(filter, columns, datasetId);
-        return ConditionSql.predicate(filter);
+        try {
+            return ConditionSql.predicate(filter);
+        } catch (IllegalArgumentException notAGroup) {
+            throw new ApiException(422, "'filter': " + notAGroup.getMessage());
+        }
     }
 
     /** The relation's column names, probed with a zero-row SELECT — the same technique {@link #schemaRelationships} uses. */

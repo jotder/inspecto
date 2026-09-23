@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Parity tests: for every operator, {@link ConditionSql#predicate} evaluated by DuckDB over a table
@@ -163,6 +165,31 @@ class ConditionSqlTest {
     void emptyGroupMatchesAll() throws Exception {
         assertParity(ROWS.size(), group("AND"));
         assertParity(ROWS.size(), null);
+    }
+
+    /**
+     * A root that is not a group used to render as {@code TRUE}: a bare leaf constrained NOTHING while
+     * every caller carried on (fail-open on /inv/*, every row matched by a Decision Rule). It is refused.
+     */
+    @Test
+    void aRootThatIsNotAGroupIsRefusedNotRenderedAsTrue() {
+        Map<String, Object> kindless = new LinkedHashMap<>(cond("cost", ">", "100"));
+        kindless.remove("kind");
+        Map<String, Object> opTypo = Map.of("field", "amount", "op", ">", "value", 100);   // the reported shape
+        for (Object root : List.of(cond("cost", ">", "100"), kindless, opTypo, "cost > 100", List.of())) {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> ConditionSql.predicate(root), "must refuse root: " + root);
+            assertTrue(e.getMessage().contains("group"), e.getMessage());
+        }
+    }
+
+    /** The twins: the same leaf inside a group filters; absent/empty still means no constraint (deliberate). */
+    @Test
+    void theSameLeafInAGroupFiltersAndAbsentOrEmptyIsStillNoConstraint() throws Exception {
+        assertParity(3, group("AND", cond("cost", ">", "100")));
+        assertEquals("TRUE", ConditionSql.predicate(null));
+        assertEquals("TRUE", ConditionSql.predicate(Map.of()));
+        assertEquals("TRUE", ConditionSql.predicate(group("AND")));
     }
 
     @Test

@@ -34,11 +34,20 @@ public final class ConditionSql {
     }
 
     /**
-     * The tree as a DuckDB boolean expression. A {@code null}/non-group tree or an empty group
-     * imposes no constraint and renders as {@code TRUE} (parity with {@link ConditionTree}'s
-     * "empty group matches every row").
+     * The tree as a DuckDB boolean expression. An absent tree ({@code null} or an empty map) or an
+     * empty group imposes no constraint and renders as {@code TRUE} (parity with
+     * {@link ConditionTree}'s "empty group matches every row").
+     *
+     * @throws IllegalArgumentException when the root is present but is not a group — a bare leaf
+     *         ({@code {kind:'condition',…}} or a kind-less {@code {field,operator,value}}), or not a
+     *         map at all. Such a root used to render as {@code TRUE}, so it constrained nothing while
+     *         the caller believed it filtered (fail-open); it is refused instead.
      */
     public static String predicate(Object when) {
+        if (when != null && !(when instanceof Map<?, ?> m && (m.isEmpty() || isGroup(m))))
+            throw new IllegalArgumentException("the condition tree's root must be a group "
+                    + "({kind:'group', op:'AND'|'OR', items:[...]}), not a bare condition or other value; "
+                    + "wrap a single condition in a one-item group");
         String g = group(when);
         return g == null ? "TRUE" : g;
     }

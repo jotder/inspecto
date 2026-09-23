@@ -780,6 +780,32 @@ class InspectoToolsTest {
         }
     }
 
+    /** A bare leaf as {@code when} used to render TRUE — an unfiltered draft the model believed filtered. */
+    @Test
+    void queryAuthorRefusesABareLeafWhenInsteadOfAuthoringAnUnfilteredQuery(@TempDir Path dir) throws Exception {
+        String prior = System.setProperty("assist.write.root", dir.toString());
+        try {
+            new ViewStore(dir.resolve("views")).write(new ViewDefinition(
+                    "v_orders", "f_orders", List.of("orders"), "SELECT 1 AS gross", T0.toString()));
+            ComponentStore components = new ComponentStore(dir.resolve("registry"));
+            components.write("dataset", "orders", Map.of("view", "v_orders"));
+            Tool qa = tool(InspectoTools.tools(seeded(), components, List::of), "query_author");
+
+            Map<String, Object> bare = Map.of("kind", "condition", "field", "gross", "operator", ">", "value", 100);
+            ToolResult r = qa.invoke(new ToolCall("query_author",
+                    Map.of("dataset", "orders", "when", bare), new RunId("t")));
+            assertFalse(r.ok(), "a bare leaf must not author an unfiltered query");
+            assertTrue(r.error().contains("group"), r.error());
+
+            ToolResult notAMap = qa.invoke(new ToolCall("query_author",
+                    Map.of("dataset", "orders", "when", "gross > 100"), new RunId("t")));
+            assertFalse(notAMap.ok(), "a non-tree 'when' must not be silently dropped");
+        } finally {
+            if (prior == null) System.clearProperty("assist.write.root");
+            else System.setProperty("assist.write.root", prior);
+        }
+    }
+
     @Test
     void queryAuthorWithoutAWriteRootIsAnErrorResult() {
         Tool qa = tool(InspectoTools.tools(seeded(), null, List::of), "query_author");
