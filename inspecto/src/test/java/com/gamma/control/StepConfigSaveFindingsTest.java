@@ -213,6 +213,73 @@ class StepConfigSaveFindingsTest {
                 Map.of("filter", Map.of("where", "K = 'a'"))))))));
     }
 
+    // ── legacy processing.csv_settings.where filter ──────────────────────────────
+
+    private static Map<String, Object> legacyFilter(Path schema, String where) {
+        Map<String, Object> draft = new LinkedHashMap<>();
+        draft.put("name", "P");
+        draft.put("active", true);
+        draft.put("processing", Map.of("schema_file", schema.toString(),
+                "csv_settings", Map.of("where", where)));
+        return draft;
+    }
+
+    @Test
+    void aLegacyFilterOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, legacyFilter(schemaFile(dir), "AMOUNT > 0")),
+                "processing.csv_settings.where", "AMOUNT");
+    }
+
+    @Test
+    void aLegacyFilterOverAMappedColumnIsClean(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, legacyFilter(mappedSchemaFile(dir), "STATUS = 'SHIPPED' AND GROSS >= 30")));
+    }
+
+    @Test
+    void aLegacyFilterWhoseBindFailsForAnyOtherReasonFailsOpen(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, legacyFilter(schemaFile(dir), "no_such_function(QTY) > 0")));
+    }
+
+    // ── route STEP branch predicates ─────────────────────────────────────────────
+
+    private static Map<String, Object> routeWhere(String where) {
+        return Map.of("route", Map.of("branches", List.of(Map.of("key", "hot", "where", where))));
+    }
+
+    @Test
+    void aRouteStepPredicateOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        List<Finding> out = check(dir, pipeline(schemaFile(dir), true, List.of(routeWhere("MSISDN = '1'"))));
+        assertEquals(1, out.size(), out.toString());
+        assertEquals(Severity.ERROR, out.get(0).severity());
+        assertEquals(FindingCodes.ERR_ROUTE_PREDICATE_COLUMN, out.get(0).code());
+        assertEquals("steps[0].route.branches[hot].where", out.get(0).fieldPath());
+        assertTrue(out.get(0).message().contains("MSISDN"), out.get(0).message());
+    }
+
+    @Test
+    void aRouteStepPredicateOverAMappedColumnIsClean(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(mappedSchemaFile(dir), true, List.of(routeWhere("GROSS > 10")))));
+    }
+
+    @Test
+    void aRouteStepPredicateWhoseBindFailsForAnyOtherReasonFailsOpen(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true,
+                List.of(routeWhere("no_such_function(QTY) > 0")))));
+    }
+
+    @Test
+    void aRouteStepPredicateAfterAnSqlStepIsNotJudged(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("sql", Map.of("sql", "SELECT ID AS K FROM input")),
+                routeWhere("K = 'a'")))));
+    }
+
+    @Test
+    void aBlankRouteStepPredicateIsNotReportedHere(@TempDir Path dir) throws Exception {
+        // routeArmingFindings owns the blank-predicate refusal - no double report.
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(routeWhere(" ")))));
+    }
+
     // ── dedup ────────────────────────────────────────────────────────────────────
 
     @Test

@@ -444,8 +444,17 @@ schema's `mapping.fields[]` names** (steps see the mapped row, so a `custom`-der
 filter_step's `GROSS` is real). 🔴 Only a genuine `Referenced column … not found` binder error is refused;
 every other bind failure (unknown function, type mismatch, the probe's own mechanics) **fails open** — the
 first cut refused the shipped `filter_step` Pipeline because it knew only the raw fields, and DuckDB's JDBC
-wraps every bind error as "Attempting to execute an unsuccessful or closed pending query result". The legacy `processing.filter` block is not
-checked here. Pinned by `StepConfigSaveFindingsTest`.
+wraps every bind error as "Attempting to execute an unsuccessful or closed pending query result".
+**The legacy filter is checked too** (as-built 2026-09-24): it is `processing.csv_settings.where` (the key
+`PipelineConfig.resolveSteps` projects as the first `filter` step — there is no `processing.filter` key),
+bound first in the legacy order against raw + mapped columns, anchored at `processing.csv_settings.where`
+with the `*_STEP_CONFIG_INVALID` codes; a blank value means "no filter" and is not refused. **A `route`
+step's own branch predicates** (`steps[i].route.branches[<key>].where`) are bound against the columns
+known at that point in the chain (skipped once they are unknown, e.g. after an `sql` step) by the same
+helper `routeColumnFindings` uses (`branchPredicateFindings`), so they carry the
+`ERR_/WARN_ROUTE_PREDICATE_COLUMN` codes, the same fail-open rule and the same SqlGuard-on-assembled-probe
+rule; a blank predicate stays `routeArmingFindings`' refusal and is not double-reported. Pinned by
+`StepConfigSaveFindingsTest`.
 
 ## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
 

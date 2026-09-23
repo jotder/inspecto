@@ -277,7 +277,10 @@ final class ConfigRoutes {
      * checks, each branch starting from the columns known at the route point - both for a {@code route}
      * step in the {@code steps:} chain and for the legacy top-level {@code route:} block. A filter's
      * {@code where} is bound against the known columns exactly as {@link #routeColumnFindings} binds a
-     * branch predicate ({@code SqlGuard} on the assembled probe, then {@code TypeFlow.describe}).
+     * branch predicate ({@code SqlGuard} on the assembled probe, then {@code TypeFlow.describe}). The legacy
+     * filter ({@code processing.csv_settings.where}) is checked the same way, first in the legacy order. A
+     * {@code route} step's own branch predicates are bound here too (ROUTE_PREDICATE codes, via
+     * {@link #branchPredicateFindings}); the legacy top-level block's stay {@link #routeColumnFindings}'.
      */
     static List<Finding> stepConfigFindings(String type, Map<String, Object> draft, Path configDir) {
         if (!"pipeline".equals(type)) return List.of();
@@ -287,10 +290,17 @@ final class ConfigRoutes {
         List<TypeFlow.Column> columns = known.isEmpty() ? null : known;   // null = the row's columns are unknown
         List<String> refusals = new ArrayList<>();
         List<String> fields = new ArrayList<>();
+        List<Finding> predicates = new ArrayList<>();   // route-step branch predicates, ROUTE_PREDICATE codes
         if (draft.get("steps") instanceof List<?> steps)
-            columns = walkSteps(steps, "steps", columns, refusals, fields);
+            columns = walkSteps(steps, "steps", columns, refusals, fields, predicates, active);
         Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
         // Legacy projection order: filter, join, dedup, summarize, profile, route.
+        // The legacy filter is processing.csv_settings.where (PipelineConfig.resolveSteps); blank = no filter.
+        if (proc.get("csv_settings") instanceof Map<?, ?> csv && csv.get("where") != null
+                && !String.valueOf(csv.get("where")).isBlank()) {
+            String refusal = stepRefusal(PipelineConfig.Step.FILTER, csv, columns);
+            if (refusal != null) { refusals.add(refusal); fields.add("processing.csv_settings.where"); }
+        }
         if (proc.get("join") != null) columns = null;
         if (proc.get("dedup") instanceof Map<?, ?> dd) {
             String refusal = stepRefusal(PipelineConfig.Step.DEDUP, dd, columns);
@@ -303,8 +313,8 @@ final class ConfigRoutes {
             columns = null;
         }
         if (draft.get("route") instanceof Map<?, ?> route)
-            walkBranches(route, "route", columns, refusals, fields);
-        List<Finding> out = new ArrayList<>();
+            walkBranches(route, "route", columns, refusals, fields, predicates, active);
+        List<Finding> out = new ArrayList<>(predicates);
         for (int i = 0; i < refusals.size(); i++)
             out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, fields.get(i), refusals.get(i),
                     active ? FindingCodes.ERR_STEP_CONFIG_INVALID : FindingCodes.WARN_STEP_CONFIG_INVALID,
@@ -376,7 +386,8 @@ final class ConfigRoutes {
 
     /** Walks one {@code steps[]} chain at {@code prefix}; returns the columns known after it (null = unknown). */
     private static List<TypeFlow.Column> walkSteps(List<?> steps, String prefix, List<TypeFlow.Column> columns,
-                                                   List<String> refusals, List<String> fields) {
+                                                   List<String> refusals, List<String> fields,
+                                                   List<Finding> predicates, boolean active) {
         for (int i = 0; i < steps.size(); i++) {
             if (!(steps.get(i) instanceof Map<?, ?> entry) || entry.size() != 1) continue;
             String kind = String.valueOf(entry.keySet().iterator().next());
@@ -384,7 +395,12 @@ final class ConfigRoutes {
             String at = prefix + "[" + i + "]." + kind;
             String refusal = stepRefusal(kind, cfg, columns);
             if (refusal != null) { refusals.add(refusal); fields.add(at); }
-            if (PipelineConfig.Step.ROUTE.equals(kind)) walkBranches(cfg, at, columns, refusals, fields);
+            if (PipelineConfig.Step.ROUTE.equals(kind)) {
+                // The legacy top-level route: block's predicates are routeColumnFindings'; a route STEP's are bound here.
+                if (columns != null && cfg.get("branches") instanceof List<?> branches)
+                    predicates.addAll(branchPredicateFindings(branches, at, columns, active));
+                walkBranches(cfg, at, columns, refusals, fields, predicates, active);
+            }
             if (PipelineConfig.Step.LOOKUP.equals(kind)) {
                 if (columns != null && cfg.get("target") != null)
                     columns.add(new TypeFlow.Column(String.valueOf(cfg.get("target")), "VARCHAR"));
@@ -397,12 +413,13 @@ final class ConfigRoutes {
 
     /** Walks each branch's {@code steps[]} of one route config, each from its own copy of {@code columns}. */
     private static void walkBranches(Map<?, ?> route, String prefix, List<TypeFlow.Column> columns,
-                                     List<String> refusals, List<String> fields) {
+                                     List<String> refusals, List<String> fields,
+                                     List<Finding> predicates, boolean active) {
         if (!(route.get("branches") instanceof List<?> branches)) return;
         for (int b = 0; b < branches.size(); b++)
             if (branches.get(b) instanceof Map<?, ?> branch && branch.get("steps") instanceof List<?> sub)
                 walkSteps(sub, prefix + ".branches[" + b + "].steps",
-                        columns == null ? null : new ArrayList<>(columns), refusals, fields);
+                        columns == null ? null : new ArrayList<>(columns), refusals, fields, predicates, active);
     }
 
     /** The first refusal the run would raise for one step's config, or {@code null}; {@code columns} null = unknown. */
@@ -594,6 +611,16 @@ final class ConfigRoutes {
         if (columns.isEmpty()) return List.of();   // unknown ≠ empty — see declaredColumns
         addMappedColumns(draft, configDir, columns);   // a branch predicate sees the MAPPED row
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        return branchPredicateFindings(branches, "route", columns, active);
+    }
+
+    /**
+     * Binds each branch {@code where} of one route config against {@code columns} (never null here) - shared
+     * by the legacy top-level {@code route:} block ({@link #routeColumnFindings}) and a {@code route} step in
+     * the {@code steps:} chain ({@link #stepConfigFindings}). Findings anchor at {@code prefix.branches[key].where}.
+     */
+    private static List<Finding> branchPredicateFindings(List<?> branches, String prefix,
+                                                         List<TypeFlow.Column> columns, boolean active) {
         Severity severity = active ? Severity.ERROR : Severity.WARNING;
         List<Finding> out = new ArrayList<>();
         for (Object b : branches) {
@@ -603,7 +630,7 @@ final class ConfigRoutes {
             if (where == null || String.valueOf(where).isBlank()) continue;
             String predicate = String.valueOf(where);
             String probe = "SELECT * FROM \"input\" WHERE " + predicate;
-            String fieldPath = "route.branches[" + m.get("key") + "].where";
+            String fieldPath = prefix + ".branches[" + m.get("key") + "].where";
             String code = active ? FindingCodes.ERR_ROUTE_PREDICATE_COLUMN
                                  : FindingCodes.WARN_ROUTE_PREDICATE_COLUMN;
             String guidance = active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE;
