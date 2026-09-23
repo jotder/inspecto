@@ -130,7 +130,14 @@ final class ConfigPreviewRoutes implements RouteModule {
     private Object validate(ApiContext api, Map<String, Object> body) throws IOException {
         String configPath = ApiContext.str(body, "configPath");
         if (configPath != null) {
-            PipelineConfig cfg = PipelineConfig.load(configPath);
+            PipelineConfig cfg;
+            try {
+                cfg = PipelineConfig.load(configPath);
+            } catch (IllegalArgumentException refused) {
+                // A config that does not load is the author's to fix, not a server fault: 422 with the
+                // loader's own message (file + line for a TOON decode refusal), never a bare 500.
+                throw new ApiException(422, refused.getMessage());
+            }
             List<String> warnings = ConfigValidator.validate(cfg);
             Map<String, Object> decoded = ConfigLoader.filesystem().decode(configPath);
             List<Finding> findings =

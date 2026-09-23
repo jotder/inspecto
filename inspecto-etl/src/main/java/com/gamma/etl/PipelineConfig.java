@@ -1,7 +1,6 @@
 package com.gamma.etl;
 
 import com.gamma.api.PublicApi;
-import com.gamma.util.ToonHelper;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -1678,7 +1677,7 @@ public final class PipelineConfig {
      * Parse the pipeline {@code .toon} file at {@code configPath}, validate all
      * directories, load schema(s), and return an immutable {@code PipelineConfig}.
      *
-     * <p>Equivalent to {@code fromMap(ToonHelper.load(configPath)).prepare()} — it decodes the file,
+     * <p>Equivalent to {@code fromMap(ConfigCodec.toMap(<file text>)).prepare()} — it decodes the file,
      * builds the (pure) config, then performs the one filesystem side-effect (creating the status
      * directory). Splitting those steps lets a draft be parsed/validated from memory with no I/O via
      * {@link #fromMap(Map)}.
@@ -1695,8 +1694,10 @@ public final class PipelineConfig {
     public static PipelineConfig load(String configPath) throws IOException {
         // The config's own directory is the base for relative schema references (W1b): passing it needs no
         // caller change and no space-root threading, because a loaded config always HAS a directory.
-        java.nio.file.Path here = java.nio.file.Paths.get(configPath).toAbsolutePath().getParent();
-        PipelineConfig cfg = PipelineConfigParser.parse(ToonHelper.load(configPath), configPath, here);
+        java.nio.file.Path file = java.nio.file.Paths.get(configPath);
+        java.nio.file.Path here = file.toAbsolutePath().getParent();
+        if (!Files.exists(file)) throw new java.io.FileNotFoundException("Toon file not found: " + configPath);
+        PipelineConfig cfg = PipelineConfigParser.parse(PipelineConfigParser.readToon(file), configPath, here);
         cfg.prepare();
         return cfg;
     }

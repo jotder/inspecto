@@ -46,4 +46,54 @@ class ConfigCodecTest {
         assertTrue(ConfigCodec.isStrictDecodable(canonical));
         assertEquals(m, ConfigCodec.toMapStrict(canonical));
     }
+
+    // ── TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1: a tabular row whose width disagrees with its header ──
+
+    private static final String UNQUOTED_DECIMAL = """
+            raw:
+              fields[2]{name,type}:
+                ID,INTEGER
+                AMT,DECIMAL(18,2)
+            """;
+
+    @Test
+    void aRowWiderThanItsHeaderNamesTheLineTheTableTheCountsAndTheQuotedFix() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ConfigCodec.toMap(UNQUOTED_DECIMAL));
+        String m = e.getMessage();
+        assertTrue(m.contains("line 4"), m);
+        assertTrue(m.contains("'fields'"), m);
+        assertTrue(m.contains("3 values") && m.contains("2 columns"), m);
+        assertTrue(m.contains("\"DECIMAL(18,2)\""), "suggests the quoted value: " + m);
+        assertNotNull(e.getCause(), "JToon's own refusal is kept as the cause");
+        // Same refusal, same message, on the strict path.
+        assertEquals(m, assertThrows(IllegalArgumentException.class,
+                () -> ConfigCodec.toMapStrict(UNQUOTED_DECIMAL)).getMessage());
+    }
+
+    @Test
+    void theQuotedValueIsOneValue() {
+        Map<String, Object> m = ConfigCodec.toMap(UNQUOTED_DECIMAL.replace("DECIMAL(18,2)", "\"DECIMAL(18,2)\""));
+        assertEquals(List.of(Map.of("name", "ID", "type", "INTEGER"), Map.of("name", "AMT", "type", "DECIMAL(18,2)")),
+                ((Map<?, ?>) m.get("raw")).get("fields"));
+    }
+
+    @Test
+    void aRowNarrowerThanItsHeaderIsNamedToo() {
+        String m = assertThrows(IllegalArgumentException.class, () -> ConfigCodec.toMap("""
+                sinks[2]{database,format}:
+                  db1,CSV
+                  db2
+                """)).getMessage();
+        assertTrue(m.contains("line 3") && m.contains("'sinks'"), m);
+        assertTrue(m.contains("1 value") && m.contains("2 columns"), m);
+    }
+
+    @Test
+    void aDecodeFailureThatIsNotARowWidthPassesThroughUnchanged() {
+        String bad = "sinks[3]{database,format}:\n  db1,CSV\n";
+        String direct = assertThrows(IllegalArgumentException.class,
+                () -> dev.toonformat.jtoon.JToon.decode(bad)).getMessage();
+        assertEquals(direct, assertThrows(IllegalArgumentException.class, () -> ConfigCodec.toMap(bad)).getMessage());
+    }
 }

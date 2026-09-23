@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.safety.PathJail;
 import com.gamma.etl.PipelineConfig.Builder;
 import com.gamma.etl.PipelineConfig.CircuitBreaker;
@@ -18,7 +19,6 @@ import com.gamma.etl.PipelineConfig.Stability;
 import com.gamma.util.MappingCsv;
 import com.gamma.util.StructureCsv;
 import com.gamma.util.ToonHelper;
-import dev.toonformat.jtoon.JToon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -668,7 +668,7 @@ final class PipelineConfigParser {
                 if (!Files.exists(schemaFile))
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 Map<String, Object> schemaCfg = (Map<String, Object>)
-                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                        readToon(schemaFile);
                 mergeSiblingStructure(schemaCfg, schemaFile, b);
                 mergeSiblingMapping(schemaCfg, schemaFile, b);
                 Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
@@ -708,7 +708,7 @@ final class PipelineConfigParser {
                 if (!Files.exists(schemaFile))
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 b.singleSchema = (Map<String, Object>)
-                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                        readToon(schemaFile);
                 mergeSiblingStructure(b.singleSchema, schemaFile, b);
                 mergeSiblingMapping(b.singleSchema, schemaFile, b);
                 applyMappingFile(proc, b.singleSchema, configDir, b);
@@ -1134,7 +1134,7 @@ final class PipelineConfigParser {
                 if (!Files.exists(schemaFile))
                     throw new FileNotFoundException("Segment schema not found for '" + key + "': " + schemaPath);
                 Map<String, Object> schema = (Map<String, Object>)
-                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                        readToon(schemaFile);
                 mergeSiblingStructure(schema, schemaFile, b);
                 mergeSiblingMapping(schema, schemaFile, b);
                 Identifiers.validateSchema(schema, "segment[" + key + "]");
@@ -1929,7 +1929,21 @@ final class PipelineConfigParser {
         if (!Files.exists(grammarFile))
             throw new FileNotFoundException("Grammar file not found: " + grammarFile);
         log.info("[CONFIG] Grammar: {}", grammarFile);
-        return (Map<String, Object>) JToon.decode(Files.readString(grammarFile, StandardCharsets.UTF_8));
+        return readToon(grammarFile);
+    }
+
+    /**
+     * Decode a config {@code .toon} file through {@link ConfigCodec}, prefixing any refusal with the file.
+     * A schema's decode error surfaces through the <em>pipeline's</em> load, so without the prefix the
+     * author is pointed at the wrong file (TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1).
+     */
+    static Map<String, Object> readToon(Path file) throws IOException {
+        String text = Files.readString(file, StandardCharsets.UTF_8);
+        try {
+            return ConfigCodec.toMap(text);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(file + ": " + e.getMessage(), e);
+        }
     }
 
     /**

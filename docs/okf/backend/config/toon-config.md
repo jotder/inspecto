@@ -21,10 +21,24 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
   declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
   only safe when the map was originally `JToon.decode`-d. See [gotchas](../gotchas/cross-cutting.md).
-  ⚠ **An unquoted comma-bearing type in a table row** — reported 2026-09-23 by a demo lane, not yet
-  re-grounded: an unquoted `DECIMAL(18,2)` inside a TOON tabular row made the loader **skip the whole
-  Pipeline**, with only a server-log WARN (`TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1`). The comma is also
-  the tabular-row delimiter, so quote the value.
+  ⚠ **An unquoted comma-bearing value in a table row is REFUSED, by line** (`TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1`,
+  fixed 2026-09-23). The comma is also the row delimiter, so `AMT,"1",DECIMAL(18,2)` under
+  `fields[3]{name,selector,type}` is **four** values — genuinely ambiguous, so it is never guessed at.
+  JToon always refused it, but as a bare *"Tabular row value count (4) does not match header field count
+  (3)"*: no file, no line, no key. `ConfigRegistry` logged that as a WARN against the *pipeline* path and
+  skipped the Pipeline, while the bad line was in the *schema* file. Now `ConfigCodec.toMap`/`toMapStrict`
+  re-throw JToon's row-width refusal (and only that one — every other decode error passes through
+  unchanged) as *"line 7: a row of tabular array 'fields' {name,selector,type} has 4 values but its header
+  declares 3 columns — a ',' inside a value splits it; double-quote that value, e.g. "DECIMAL(18,2)""*, and
+  `PipelineConfigParser.readToon` prefixes the file — the one decode for the pipeline file and every
+  schema / segment / grammar file it references. `POST /validate {configPath}` answers that as **422**
+  (it was a 500). ⚠ Still only a WARN on the registry path: a Pipeline that does not load is absent from
+  `GET /pipelines`, with no load-error surface in the API or the SPA.
+  ⚠ Other readers that call `JToon.decode` directly (`ToonHelper.load`, `SchemaExtractor`, `MainApp`,
+  `inspecto-exchange`) still get the bare message.
+  🔴 **`toMap` is not lenient.** JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is
+  `strict=true` — the same options as `toMapStrict`. The two methods decode identically; the "lenient"
+  wording in `ConfigCodec`'s javadoc is wrong.
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does

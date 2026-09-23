@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -171,6 +172,23 @@ class ControlApiConfigSpecTest {
             assertEquals(c.name, out.get("pipeline").asText());
             assertTrue(out.has("warnings"), "legacy warnings field preserved");
             assertTrue(out.has("findings"), "structured findings added");
+        }
+    }
+
+    /**
+     * TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1: a config whose schema does not decode is the author's to fix.
+     * It used to answer a bare 500 carrying JToon's line-less "Tabular row value count" message.
+     */
+    @Test
+    void configPathWhoseSchemaDoesNotDecodeIs422NamingTheFileAndLine(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Path toon = c.svc.pathFor(c.name).orElseThrow();
+            Files.writeString(dir.resolve("mini_schema.toon"), PipelineConfigBatchTest.miniSchema()
+                    .replace("AMT,\"1\",DOUBLE", "AMT,\"1\",DECIMAL(18,2)"));
+            String body = "{\"configPath\":\"" + toon.toString().replace("\\", "/") + "\"}";
+            HttpResponse<String> r = post(c.port, "/validate", body);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("mini_schema.toon") && r.body().contains("line 7"), r.body());
         }
     }
 }
