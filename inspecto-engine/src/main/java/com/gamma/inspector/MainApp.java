@@ -2,10 +2,8 @@ package com.gamma.inspector;
 
 import com.gamma.config.safety.PathJail;
 import com.gamma.util.*;
-import dev.toonformat.jtoon.JToon;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -251,8 +249,7 @@ public class MainApp {
         String path = subArgs[0];
         if (!Files.exists(Paths.get(path)))
             throw new IOException("Pipeline toon not found: " + path);
-        Map<String, Object> toon = (Map<String, Object>) JToon.decode(
-                Files.readString(Paths.get(path), StandardCharsets.UTF_8));
+        Map<String, Object> toon = ToonHelper.load(path);
         if (toon.get("dirs") instanceof Map<?, ?> dirs) {
             java.nio.file.Path configDir = Paths.get(path).toAbsolutePath().getParent();
             Map<String, Object> resolved = new java.util.LinkedHashMap<>();

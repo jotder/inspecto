@@ -28,6 +28,13 @@
             <artifactId>inspecto-api</artifactId>
         </dependency>
 
+        <!-- ToonHelper.decode — the one strict TOON decode seam ConfigCodec.toMap delegates to
+             (CONFIGCODEC-LENIENT-IS-STRICT-1). util is the lower-ranked leaf, so the edge runs this way. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+        </dependency>
+
         <!-- TOON serialisation for ConfigCodec (version managed by the parent — shared
              with the core since the S5 split). -->
         <dependency>

@@ -1,6 +1,7 @@
 package com.gamma.exchange;
 
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.ToonHelper;
 import dev.toonformat.jtoon.JToon;
 
 import java.io.IOException;
@@ -65,15 +66,11 @@ public final class ExchangeSnapshots {
     }
 
     /** The live snapshot's freshness, or empty when nothing has been published for the item yet. */
-    @SuppressWarnings("unchecked")
     public static Optional<SnapshotMeta> readCurrent(Path itemDir) {
         Path file = currentFile(itemDir);
         if (!Files.exists(file)) return Optional.empty();
         try {
-            Object decoded = JToon.decode(Files.readString(file, StandardCharsets.UTF_8));
-            return decoded instanceof Map<?, ?> m
-                    ? Optional.of(SnapshotMeta.fromMap((Map<String, Object>) m))
-                    : Optional.empty();
+            return Optional.of(SnapshotMeta.fromMap(ToonHelper.load(file.toString())));
         } catch (IOException e) {
             throw new UncheckedIOException("reading " + file, e);
         }

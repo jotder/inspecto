@@ -4,7 +4,7 @@ title: TOON Configuration
 description: ConfigCodec (JToon), the three config file types, PipelineConfigParser, and the tabular-array serialization gotcha.
 resource: inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java
 tags: [config, toon, jtoon, parser, gotcha]
-timestamp: 2026-06-28T00:00:00Z
+timestamp: 2026-09-23T00:00:00Z
 ---
 
 # TOON Configuration
@@ -12,11 +12,27 @@ timestamp: 2026-06-28T00:00:00Z
 All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key reference: [`configuration.md`](configuration.md).
 
 * **`ConfigCodec`** (`inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java`) — thin JToon wrapper:
-  `toMap` (lenient, tolerates `#` comments), `toMapStrict` (canonical assertion), `toToon` (canonical encode).
-  🔴 **"Tolerates" means "does not throw", NOT "reads correctly."** A `#` line above a block makes the
-  lenient decode **truncate the file there**, and the load accepts the truncated map with no error and no
-  warning — every key after the comment is silently gone. Never author `#` comments in a live config; if
-  you inherit one, decode the file and compare its top-level key list.
+  `toMap` (**strict** decode) and `toToon` (canonical encode). Nothing else.
+  **One decode seam, and it is strict** (`CONFIGCODEC-LENIENT-IS-STRICT-1`, 2026-09-23). The seam is
+  `ToonHelper.decode` (`inspecto-util/src/main/java/com/gamma/util/ToonHelper.java`); `ConfigCodec.toMap`
+  delegates to it and `ToonHelper.load(path)` wraps it, prefixing the path to any decode refusal
+  (`<path>: line N: …`). It lives in `inspecto-util`, not `inspecto-config`, because util is the
+  documented `com.gamma` leaf ([reactor](../modules/reactor.md)) and `ToonHelper`/`SchemaExtractor` read
+  TOON too; so the edge runs `inspecto-config → inspecto-util` (every consumer of config already had util).
+  Every former direct `JToon.decode` reader — `ToonHelper.load`, `SchemaExtractor`, `MainApp` (`ura`
+  CLI), `inspecto-exchange`'s `Ledger`/`ExchangeSnapshots` — now goes through it. `toMapStrict` and
+  `isStrictDecodable` were **deleted**: `toMap` was documented "lenient, tolerates `#` comments" but
+  JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is `strict=true` — the two methods
+  had always decoded identically, so no caller ever had leniency to rely on. It was **not** made lenient
+  on purpose: non-strict JToon silently truncates a too-wide tabular row (`DECIMAL(18,2)` loses `2)`),
+  drops the missing columns of a too-narrow one and reads a bad array header as an empty list — the
+  falsification run of `ToonHelperTest` / `ConfigCodecTest` under `withStrict(false)` accepted both rows
+  with no error. Pinned by `ToonHelperTest` (strict + file/line) and `ConfigCodecTest`.
+  🔴 **JToon has no comment syntax, in either mode.** A raw `#` line is parsed as TOON, never skipped:
+  between two scalars it happens to be ignored, but above a block it **truncates the file there**, and the
+  load accepts the truncated map with no error and no warning — every key after the comment is silently
+  gone. Never author `#` comments in a live config; if you inherit one, decode the file and compare its
+  top-level key list.
   **Gotcha**: `toToon` does **not** emit tabular-array format — a Java-constructed schema whose `fields`/
   `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
   declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
@@ -26,8 +42,8 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `fields[3]{name,selector,type}` is **four** values — genuinely ambiguous, so it is never guessed at.
   JToon always refused it, but as a bare *"Tabular row value count (4) does not match header field count
   (3)"*: no file, no line, no key. `ConfigRegistry` logged that as a WARN against the *pipeline* path and
-  skipped the Pipeline, while the bad line was in the *schema* file. Now `ConfigCodec.toMap`/`toMapStrict`
-  re-throw JToon's row-width refusal (and only that one — every other decode error passes through
+  skipped the Pipeline, while the bad line was in the *schema* file. Now the decode seam (`ToonHelper.decode`, behind
+  `ConfigCodec.toMap`) re-throws JToon's row-width refusal (and only that one — every other decode error passes through
   unchanged) as *"line 7: a row of tabular array 'fields' {name,selector,type} has 4 values but its header
   declares 3 columns — a ',' inside a value splits it; double-quote that value, e.g. "DECIMAL(18,2)""*, and
   `PipelineConfigParser.readToon` prefixes the file — the one decode for the pipeline file and every
@@ -53,11 +69,8 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `ConfigRegistryTest`. ⚠ The file/line split reads the message TEXT: a loader that changes the
   `readToon`/`ConfigCodec` prefix silently degrades `file` to the pipeline path (the message is still
   shown verbatim).
-  ⚠ Other readers that call `JToon.decode` directly (`ToonHelper.load`, `SchemaExtractor`, `MainApp`,
-  `inspecto-exchange`) still get the bare message.
-  🔴 **`toMap` is not lenient.** JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is
-  `strict=true` — the same options as `toMapStrict`. The two methods decode identically; the "lenient"
-  wording in `ConfigCodec`'s javadoc is wrong (BACKLOG `CONFIGCODEC-LENIENT-IS-STRICT-1`).
+  ⚠ `ToonHelper.load` prefixes the path the same way (`<path>: line N: …`), but the ~20 readers that call
+  `ConfigCodec.toMap(Files.readString(p))` themselves get the line, not the file, unless they add it.
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does
@@ -94,5 +107,5 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
 | `<src>_schema.toon` | `raw.fields[]` (name/selector/type), `mapping.fields[]` (name/from/fn/args — Record Transformer rows; a legacy `mapping.rules[]` is still read and converted), `partitions[]` |
 | `<src>_pipeline.toon` | `name`, `active`, `dirs.*`, `output.format/compression`, `processing.*` (threads, batch, csv_settings, schema_file, streaming, ingester/segments), `collector:` acquisition block |
 
-No `#` comments are allowed in files the strict parser handles. Writes go through
+No `#` comments are allowed in any `.toon` file — there is only the strict parser, and it has no comment syntax. Writes go through
 [`ConfigSafetyValidator`](config-safety.md).

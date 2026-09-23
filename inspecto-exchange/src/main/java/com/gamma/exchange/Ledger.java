@@ -1,6 +1,7 @@
 package com.gamma.exchange;
 
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.ToonHelper;
 import dev.toonformat.jtoon.JToon;
 
 import java.io.IOException;
@@ -47,8 +48,7 @@ final class Ledger {
     static List<Map<String, Object>> read(Path file, String key) {
         if (!Files.exists(file)) return new ArrayList<>();
         try {
-            Object decoded = JToon.decode(Files.readString(file, StandardCharsets.UTF_8));
-            if (decoded instanceof Map<?, ?> top && top.get(key) instanceof List<?> rows) {
+            if (ToonHelper.load(file.toString()).get(key) instanceof List<?> rows) {
                 List<Map<String, Object>> out = new ArrayList<>();
                 for (Object o : rows) if (o instanceof Map<?, ?> r) out.add((Map<String, Object>) r);
                 return out;

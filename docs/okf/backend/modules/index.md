@@ -11,7 +11,7 @@ modules. Reactor shape, version management, and the module-extraction playbook:
 * [Java review coverage](review-coverage.md) - what has been read line-by-line, what has not, and the defect classes that keep recurring (2026-08-18).
 * `inspecto-api/` — dependency-free leaf: the `@PublicApi` annotation (`inspecto-api`).
 * `inspecto-util/` — leaf (w.r.t. `com.gamma`): DuckDB access + CSV/file/tar helpers (`inspecto-util`).
-* `inspecto-config/` — config spec/codec/safety (`inspecto-config`); depends only on fp-api.
+* `inspecto-config/` — config spec/codec/safety (`inspecto-config`); depends on fp-api + fp-util (its TOON decode is util's `ToonHelper.decode`).
 * `inspecto-sql/` — sandboxed DuckDB SQL: `SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews` (`inspecto-sql`); depends on fp-api/config/util.
 * `inspecto-etl/` — `com.gamma.etl`: ingest/transform/output core — `PipelineConfig`, ingesters, batch planning, quarantine, partitioned Parquet (`inspecto-etl`).
 * `inspecto-event/` — `com.gamma.event` + `metrics`: the Operational-Intelligence event store + metric registry; owns `logback.xml` (`inspecto-event`).

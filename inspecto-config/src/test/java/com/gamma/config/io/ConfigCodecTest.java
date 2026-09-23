@@ -8,9 +8,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for the canonical {@code .toon} codec (P1): the re-encoded form is always strict-decodable
- * (comment-free, canonical) — the G5 guarantee that anything the codec produces can be re-parsed
- * under strict rules even if the original input carried {@code #} comments.
+ * Tests for the canonical {@code .toon} codec (P1): the re-encoded form is comment-free and decodes back
+ * to the same map through the one (strict) decode, {@code toMap}.
  *
  * <p>The companion contract test that walks every SHIPPED sample config lives in the core module
  * ({@code ShippedExamplesRoundTripTest}) with the {@code examples/} fixture tree it validates —
@@ -28,23 +27,20 @@ class ConfigCodecTest {
                         "inputs", List.of("events/CALL", "EVENTS_DAILY_KPI"),
                         "grain", "msisdn, month")));
         String toon = ConfigCodec.toToon(src);
-        assertTrue(ConfigCodec.isStrictDecodable(toon));
-        assertEquals(src, ConfigCodec.toMapStrict(toon));
+        assertEquals(src, ConfigCodec.toMap(toon));
     }
 
     @Test
     void encodeNormalisesCommentBearingInputToStrictCleanForm() {
-        // lenient decode reads a comment-bearing draft; the canonical re-encode drops the comments
-        // and is strict-decodable — the guarantee that matters, independent of JToon's own
-        // (version-dependent) tolerance of comments under strict mode.
+        // JToon has no comment syntax, but a '#' line between two scalars happens to decode; the
+        // canonical re-encode drops it and decodes back to the same map — the guarantee that matters.
         String commented = "name: x\n# a comment line\nversion: 1\n";
         Map<String, Object> m = ConfigCodec.toMap(commented);
         assertEquals("x", m.get("name"));
 
         String canonical = ConfigCodec.toToon(m);
         assertFalse(canonical.contains("#"), "canonical form carries no comments");
-        assertTrue(ConfigCodec.isStrictDecodable(canonical));
-        assertEquals(m, ConfigCodec.toMapStrict(canonical));
+        assertEquals(m, ConfigCodec.toMap(canonical));
     }
 
     // ── TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1: a tabular row whose width disagrees with its header ──
@@ -66,9 +62,6 @@ class ConfigCodecTest {
         assertTrue(m.contains("3 values") && m.contains("2 columns"), m);
         assertTrue(m.contains("\"DECIMAL(18,2)\""), "suggests the quoted value: " + m);
         assertNotNull(e.getCause(), "JToon's own refusal is kept as the cause");
-        // Same refusal, same message, on the strict path.
-        assertEquals(m, assertThrows(IllegalArgumentException.class,
-                () -> ConfigCodec.toMapStrict(UNQUOTED_DECIMAL)).getMessage());
     }
 
     @Test

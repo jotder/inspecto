@@ -265,8 +265,7 @@ public class SchemaExtractor {
         File configFile = new File(configPath);
         if (!configFile.exists()) return;
 
-        Map<String, Object> config = (Map<String, Object>)
-                JToon.decode(Files.readString(configFile.toPath(), StandardCharsets.UTF_8));
+        Map<String, Object> config = ToonHelper.load(configPath);
 
         if (config.containsKey("csv_settings")) {
             Map<String, Object> csv = (Map<String, Object>) config.get("csv_settings");
@@ -309,8 +308,8 @@ public class SchemaExtractor {
         try {
             File f = new File(schemaPath);
             if (!f.exists()) return byName;
-            Object decoded = JToon.decode(Files.readString(f.toPath(), StandardCharsets.UTF_8));
-            if (!(decoded instanceof Map<?, ?> cfg) || !(cfg.get("raw") instanceof Map<?, ?> raw)
+            Map<String, Object> cfg = ToonHelper.load(schemaPath);
+            if (!(cfg.get("raw") instanceof Map<?, ?> raw)
                     || !(raw.get("fields") instanceof List<?> list)) {
                 return byName;
             }

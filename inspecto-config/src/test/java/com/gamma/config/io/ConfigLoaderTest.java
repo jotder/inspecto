@@ -182,7 +182,7 @@ class ConfigLoaderTest {
                 "output", Map.of("database", "db/out", "partitions", List.of()),
                 "transform", "SELECT 1");
         String toon = ConfigCodec.toToon(draft);
-        Map<String, Object> back = ConfigCodec.toMapStrict(toon);
+        Map<String, Object> back = ConfigCodec.toMap(toon);
         assertEquals(List.of(), ((Map<?, ?>) back.get("input")).get("partitions"),
                 "input.partitions must decode back as an empty LIST, not vanish");
         assertEquals(List.of(), ((Map<?, ?>) back.get("output")).get("partitions"),

@@ -13,10 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Contract test over the CORE module's shipped {@code examples/} tree: every committed sample
- * config round-trips through {@code decode → encode → strict-decode} with an equal map, and the
- * re-encoded form is always strict-decodable (comment-free, canonical) — the G5 guarantee that
- * anything the codec produces can be re-parsed under strict rules even if the original on-disk
- * file carried {@code #} comments.
+ * config round-trips through {@code decode → encode → decode} with an equal map, and the re-encoded
+ * form is comment-free — the G5 guarantee that anything the codec produces decodes back through the
+ * one (strict) {@code ConfigCodec.toMap}.
  *
  * <p>Lives in the core module (not fp-config, where the rest of {@code ConfigCodecTest} moved in
  * the S5 split) because the fixture it walks is the core's own {@code examples/} directory —
@@ -42,14 +41,11 @@ class ShippedExamplesRoundTripTest {
 
         for (Path p : toons) {
             String text = Files.readString(p, StandardCharsets.UTF_8);
-            Map<String, Object> map1 = ConfigCodec.toMap(text);                 // lenient: tolerates comments
+            Map<String, Object> map1 = ConfigCodec.toMap(text);
             String canonical = ConfigCodec.toToon(map1);                        // canonical encode
-
-            assertTrue(ConfigCodec.isStrictDecodable(canonical),
-                    "re-encoded form of " + p + " must be strict-decodable (comment-free, canonical)");
             assertFalse(canonical.contains("\n#"), "canonical form of " + p + " must carry no comments");
 
-            Map<String, Object> map2 = ConfigCodec.toMapStrict(canonical);      // strict re-decode
+            Map<String, Object> map2 = ConfigCodec.toMap(canonical);            // re-decode
             assertEquals(map1, map2, "round-trip map mismatch for " + p);
         }
     }
