@@ -32,6 +32,7 @@ import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceRoot;
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.DuckDbUtil;
 import com.gamma.util.MappingCsv;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
@@ -507,7 +508,7 @@ final class PipelineGraphRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (Exception e) {
-            throw new ApiException(422, "dry-run failed: " + e.getMessage());
+            throw new ApiException(422, "dry-run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -599,7 +600,7 @@ final class PipelineGraphRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (Exception e) {
-            throw new ApiException(422, "test run failed: " + e.getMessage());
+            throw new ApiException(422, "test run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } finally {
             PipelineTestRun.deleteScratch(scratch);
         }

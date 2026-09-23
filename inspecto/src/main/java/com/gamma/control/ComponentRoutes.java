@@ -18,6 +18,7 @@ import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineReferences;
 import com.gamma.pipeline.exec.ComponentPreview;
 import com.gamma.sql.SqlGuard;
+import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,13 +160,12 @@ final class ComponentRoutes implements RouteModule {
      * query result}, a newline, then {@code Error: Binder Error: Referenced column "X" not found…}.
      * That first line is driver plumbing which says nothing about the SQL, and it was the FIRST thing
      * the author read in the pane's alert. Everything from the real error onward is kept verbatim: it
-     * names the column and lists the candidate bindings, which IS the validation. Only a wrapper at
-     * the very start is removed, so a long message keeps its tail.
+     * names the column and lists the candidate bindings, which IS the validation. Only that exact
+     * driver text is removed, so a long message keeps its tail. The stripping is the ONE shared seam,
+     * {@link DuckDbUtil#withoutPendingQueryPreamble}, which the Pipeline test run and dry-run use too.
      */
     private static String duckDbMessage(String message) {
-        if (message == null) return "the SQL could not be described";
-        int marker = message.indexOf("\nError: ");
-        return marker >= 0 && marker < 200 ? message.substring(marker + "\nError: ".length()) : message;
+        return message == null ? "the SQL could not be described" : DuckDbUtil.withoutPendingQueryPreamble(message);
     }
 
     /** The registry root under the write root, or {@code null} when writes are disabled (no write root). */

@@ -345,4 +345,25 @@ public final class DuckDbUtil {
             default        -> throw new IllegalStateException("Unexpected format: " + format);
         };
     }
+
+    /**
+     * The line DuckDB's JDBC driver (1.5.x) puts in front of a failure it finds while EXECUTING a plain
+     * {@link java.sql.Statement}: {@code Statement.execute(String)} runs a pending query without checking
+     * whether preparing it failed, so DuckDB composes this text, a newline, {@code Error: }, then the real
+     * error into ONE native message. The {@link java.sql.SQLException} carries no cause, no suppressed and
+     * no SQLState to recover it from — {@code Connection.prepareStatement} reports the same SQL cleanly,
+     * which is how this was confirmed (TESTRUN-BINDER-ERROR-LEAKS-PREAMBLE-1).
+     */
+    static final String PENDING_QUERY_PREAMBLE =
+            "Invalid Input Error: Attempting to execute an unsuccessful or closed pending query result\nError: ";
+
+    /**
+     * {@code message} without DuckDB's pending-query preamble, so an author reads the actionable error
+     * ({@code Binder Error: Referenced column … Candidate bindings: …}) first. Only that exact driver
+     * text is removed, wherever a wrapper placed it; everything else — including any caller prefix — is
+     * kept verbatim. {@code null} stays {@code null}.
+     */
+    public static String withoutPendingQueryPreamble(String message) {
+        return message == null ? null : message.replace(PENDING_QUERY_PREAMBLE, "");
+    }
 }

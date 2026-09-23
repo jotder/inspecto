@@ -133,6 +133,25 @@ Two boundaries worth keeping straight:
 
 An unknown `to=` throws → **400**, rather than silently widening to the whole graph.
 
+## A SQL failure reads as the real error first (2026-09-23)
+
+A step whose SQL is wrong 422s with *“test run failed: Binder Error: Referenced column "EVENT_TS" not
+found … Candidate bindings: "EVENT_DATE" …”* — the actionable error first, the column and the candidates
+kept verbatim. `POST …/dry-run` does the same (*“dry-run failed: …”*).
+
+⚠ **Why there was anything to strip:** DuckDB's JDBC driver (1.5.2.1) runs `Statement.execute(String)` as a
+pending query without checking whether preparing it failed, so a bind failure arrives as ONE native message:
+*“Invalid Input Error: Attempting to execute an unsuccessful or closed pending query result”*, a newline,
+`Error: `, then the real error. The `SQLException` carries **no cause, no suppressed, no SQLState** — there
+is no "real exception" to unwrap. `Connection.prepareStatement` on the same SQL reports the Binder Error
+cleanly, which is how the cause was confirmed; switching the walk to prepared statements was **declined**
+because the dry-run shares its SQL execution with the production executor.
+
+✅ **One seam:** `DuckDbUtil.withoutPendingQueryPreamble` removes exactly that driver text and nothing else.
+Used by `testRun`, `dryRunFlow` and `POST /components/transform/describe` (which carried its own looser
+copy until now). `DuckDbPendingQueryPreambleTest` runs the real driver, so a DuckDB upgrade that rewords
+the preamble goes red instead of letting it silently back in. Row `TESTRUN-BINDER-ERROR-LEAKS-PREAMBLE-1`.
+
 ## A `route:<segment>` edge out of a parser IS walked (D5, signed 2026-09-22)
 
 ✅ **Decision (operator, 2026-09-22):** the test run **walks segment routes**. The alternative — declaring
@@ -193,5 +212,6 @@ and when a probe leaves a test green, suspect the test, not the probe.
 - `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
 - `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
 - `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`
-- Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (6, real HTTP),
+- `inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`
+- Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (7, real HTTP),
   `PipelineDryRunTest` (15, of which 5 pin the cutoff)

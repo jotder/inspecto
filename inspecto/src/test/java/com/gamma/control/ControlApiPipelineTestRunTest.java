@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
+import com.gamma.pipeline.PipelineCodec;
+import com.gamma.pipeline.PipelineStore;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +19,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -173,6 +176,43 @@ class ControlApiPipelineTestRunTest {
                     "{\"files\":[\"a.csv\"]}").statusCode());
             assertEquals(404, send(c.port, "POST", "/pipelines/authored/test_etl/run",
                     "{\"files\":[\"nope.csv\"]}").statusCode(), "a file inside the jail but absent is 404");
+        }
+    }
+
+    /**
+     * {@code TESTRUN-BINDER-ERROR-LEAKS-PREAMBLE-1} — a step whose SQL names an absent column 422s with the
+     * ACTIONABLE error first. DuckDB's JDBC driver reports a failure found at execute time as
+     * <i>"Invalid Input Error: Attempting to execute an unsuccessful or closed pending query result"</i>, a
+     * newline, then the real error; that first line is driver bookkeeping and used to be what the author
+     * read first. The column and the candidate bindings must survive — they ARE the fix instruction.
+     */
+    @Test
+    void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path dir) throws Exception {
+        seedInbox(dir);
+        Path wr = dir.resolve("wr");
+        // The stored graph wins over the lifted one (graphFor), so this is the registered pipeline's own id.
+        new PipelineStore(wr.resolve("flows")).write("test_etl", PipelineCodec.fromMap(JSON.readValue("""
+            {"name":"test_etl","active":false,
+             "nodes":[{"id":"acq","type":"acquisition"},
+                      {"id":"flt","type":"transform.filter","config":{"where":"EVENT_TS IS NOT NULL"}},
+                      {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
+             "edges":[{"from":"acq","rel":"data","to":"flt"},{"from":"flt","rel":"data","to":"sink"}]}""",
+                Map.class)));
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", wr.toString());
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> r = send(c.port, "POST",
+                    "/pipelines/authored/test_etl/run", "{\"files\":[\"a.csv\"]}");
+            assertEquals(422, r.statusCode(), r.body());
+            String message = JSON.readTree(r.body()).get("error").get("message").asText();
+            assertFalse(message.contains("pending query result"), "the driver preamble leaked: " + message);
+            assertTrue(message.startsWith("test run failed: Binder Error: "),
+                    "the actionable error must come first: " + message);
+            assertTrue(message.contains("EVENT_TS"), "the absent column is named: " + message);
+            assertTrue(message.contains("Candidate bindings"), "the candidates are kept: " + message);
+        } finally {
+            if (prior != null) System.setProperty("assist.write.root", prior);
+            else System.clearProperty("assist.write.root");
         }
     }
 
