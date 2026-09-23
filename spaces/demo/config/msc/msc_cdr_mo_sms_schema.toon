@@ -9,7 +9,7 @@ raw:
     MSC_ID,mscIdentity,VARCHAR
     LAC,location.lac,INTEGER
     CELL_ID,location.cellId,INTEGER
-    EVENT_TIME,originationTime,VARCHAR
+    EVENT_TIME,originationTime,TIMESTAMP
     SMS_RESULT,smsResult,INTEGER
 mapping:
   canonicalName: msc_mo_sms

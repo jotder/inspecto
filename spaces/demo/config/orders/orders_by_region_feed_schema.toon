@@ -1,4 +1,5 @@
-partitionKey: REGION
+partitions[1]{column,source,type}:
+  sales_region,REGION,VARCHAR
 raw:
   name: ORDERS_BY_REGION
   format: PARQUET

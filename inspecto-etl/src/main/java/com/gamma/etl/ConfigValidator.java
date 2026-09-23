@@ -77,6 +77,8 @@ public final class ConfigValidator {
         // Partition defs that load fine but cannot be written as declared (PARTITION-KEY-VALIDATION-GAPS-1):
         // a source that is not a raw field (a run-time binder error), and a column colliding by case with a
         // mapped column (refused by DataTransformer.selectFor). Reported here so POST /validate says so.
+        // Also a DATE_* partition over a field declared non-date (DATE-PARTITION-ON-TEXT-SHIPPED-1): it runs
+        // clean and puts every unparsed row under __HIVE_DEFAULT_PARTITION__.
         Map<String, Map<String, Object>> schemas = new LinkedHashMap<>();
         if (cfg.schemas().single() != null) schemas.put("single schema", cfg.schemas().single());
         if (cfg.schemas().segments() != null)
@@ -212,8 +214,12 @@ public final class ConfigValidator {
         if (defs.isEmpty() || !(schema.get("raw") instanceof Map<?, ?> raw)
                 || !(raw.get("fields") instanceof List<?> fields)) return List.of();
         List<String> rawNames = new ArrayList<>();
+        Map<String, String> rawTypes = new LinkedHashMap<>();
         for (Object f : fields)
-            if (f instanceof Map<?, ?> m && m.get("name") instanceof String n) rawNames.add(n);
+            if (f instanceof Map<?, ?> m && m.get("name") instanceof String n) {
+                rawNames.add(n);
+                rawTypes.put(n, m.get("type") instanceof String t ? t : null);
+            }
         List<String> mapped = new ArrayList<>();
         try {
             for (Map<String, Object> c : DataTransformer.dataColumns(schema, cfg.csv(), "raw_input"))
@@ -223,6 +229,7 @@ public final class ConfigValidator {
         }
         List<String> out = new ArrayList<>(PartitionDef.sourcesNotRaw(defs, rawNames, mapped));
         out.addAll(PartitionDef.columnCollisions(defs, mapped));
+        out.addAll(PartitionDef.dateSourcesNotDateTyped(defs, rawTypes));
         return out;
     }
 

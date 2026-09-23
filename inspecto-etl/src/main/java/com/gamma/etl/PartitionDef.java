@@ -151,6 +151,32 @@ public record PartitionDef(String column, String source, Type type) {
                 .toList();
     }
 
+    /**
+     * Sources of {@code DATE_*} defs that {@code raw.fields[]} declares as a non-date type, as author-facing
+     * messages ({@code DATE-PARTITION-ON-TEXT-SHIPPED-1}). A {@code partitionKey:} over an identifier or a code
+     * (an IMSI, a region) parses no value as a date, so every row lands under {@code __HIVE_DEFAULT_PARTITION__}
+     * — and it loads and runs clean. Three shipped Pipelines had that shape.
+     *
+     * <p>Judged on the DECLARED type because that is all a config says: a {@code VARCHAR} field may hold
+     * date text that {@code date_formats} parses, but a field holding dates should say so ({@code DATE} /
+     * {@code TIMESTAMP} / {@code TIMESTAMPTZ}), which is also what picks the format list the partition parses
+     * with. A source that is not a raw field is skipped — {@link #sourcesNotRaw} reports it.
+     *
+     * @param rawTypes raw field name → declared type, compared ignoring case as DuckDB binds identifiers
+     */
+    public static List<String> dateSourcesNotDateTyped(List<PartitionDef> defs, Map<String, String> rawTypes) {
+        Map<String, String> types = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        types.putAll(rawTypes);
+        return defs.stream().filter(PartitionDef::isDate)
+                .map(PartitionDef::source).filter(s -> s != null && types.containsKey(s)).distinct()
+                .filter(s -> !SchemaFieldTypes.isDateLike(types.get(s)))
+                .map(s -> "DATE partition source '" + s + "' is declared " + SchemaFieldTypes.normalize(types.get(s))
+                        + ", not a date — a value that does not parse as a date is NULL, so its rows land under"
+                        + " __HIVE_DEFAULT_PARTITION__. Declare the field DATE/TIMESTAMP if it holds dates, or"
+                        + " partition it as text: partitions[1]{column,source,type}: <column>," + s + ",VARCHAR")
+                .toList();
+    }
+
     private static Set<String> caseInsensitive(Collection<String> names) {
         Set<String> s = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         s.addAll(names);

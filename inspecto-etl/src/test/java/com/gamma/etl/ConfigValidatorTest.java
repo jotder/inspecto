@@ -305,6 +305,65 @@ class ConfigValidatorTest {
                 "a partition column that collides by case with a mapped column must be reported. Got: " + warnings);
     }
 
+    /**
+     * {@code DATE-PARTITION-ON-TEXT-SHIPPED-1} — a {@code partitionKey:} over a field declared {@code VARCHAR}
+     * (an IMSI) loads and runs clean and puts every row under {@code __HIVE_DEFAULT_PARTITION__}. Reported once
+     * per source, although the shorthand expands to three DATE defs.
+     */
+    @Test
+    void aDatePartitionOverAFieldDeclaredNonDateIsReportedOnce(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema.toon");
+        Files.writeString(schema, """
+                partitionKey: IMSI
+                raw:
+                  name: x
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    IMSI,"0",VARCHAR
+                    DURATION,"1",INTEGER
+                mapping:
+                  canonicalName: x
+                  rawName: x
+                  fields[2]{name,from,fn}:
+                    IMSI,IMSI,keep
+                    DURATION,DURATION,keep
+                """);
+        List<String> hits = ConfigValidator.validate(loadPipeline(dir, schema)).stream()
+                .filter(w -> w.contains("DATE partition source")).toList();
+        assertEquals(1, hits.size(), "one report for the one source. Got: " + hits);
+        assertTrue(hits.get(0).contains("'IMSI'") && hits.get(0).contains("VARCHAR")
+                && hits.get(0).contains("__HIVE_DEFAULT_PARTITION__"), hits.get(0));
+    }
+
+    /** The negative's probe: the same shape over date-typed sources is silent, whichever spelling. */
+    @Test
+    void aDatePartitionOverADateOrTimestampFieldIsNotReported(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema.toon");
+        Files.writeString(schema, """
+                partitions[3]{column,source,type}:
+                  year,EVENT_DATE,DATE_YEAR
+                  month,EVENT_TS,DATE_MONTH
+                  region_code,REGION,VARCHAR
+                raw:
+                  name: x
+                  format: CSV
+                  fields[3]{name,selector,type}:
+                    EVENT_DATE,"0",date
+                    EVENT_TS,"1",TIMESTAMP
+                    REGION,"2",VARCHAR
+                mapping:
+                  canonicalName: x
+                  rawName: x
+                  fields[3]{name,from,fn}:
+                    EVENT_DATE,EVENT_DATE,keep
+                    EVENT_TS,EVENT_TS,keep
+                    REGION,REGION,keep
+                """);
+        List<String> hits = ConfigValidator.validate(loadPipeline(dir, schema)).stream()
+                .filter(w -> w.contains("DATE partition source")).toList();
+        assertEquals(List.of(), hits, "DATE / TIMESTAMP sources (any spelling), and a VARCHAR partition of a text field, are fine");
+    }
+
     private static String basePipeline(Path dir, String schemaPath) {
         return """
                 name: VALIDATOR_ETL

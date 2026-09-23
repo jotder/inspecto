@@ -1,4 +1,5 @@
-partitionKey: IMSI
+partitions[1]{column,source,type}:
+  served_imsi,IMSI,VARCHAR
 raw:
   name: mo_call
   format: CSV

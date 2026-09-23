@@ -245,9 +245,30 @@ Two more rules, both `PARTITION-KEY-VALIDATION-GAPS-1` (fixed 2026-09-23):
 
 The shipped `excel_example` used `partitionKey: CATEGORY` (every row under the Hive default); it now
 declares `partitions[1]{column,source,type}: item_category,CATEGORY,VARCHAR`, pinned end to end by
-`DemoCorpusIngestTest.excelExamplePartitionsByCategoryNotUnderTheHiveDefault`. ⚠ Two more shipped
-schemas carry the same shape and still land under the Hive default: `asn1_example` (`partitionKey: IMSI`)
-and `orders_by_region_feed` (`partitionKey: REGION`) — BACKLOG `DATE-PARTITION-ON-TEXT-SHIPPED-1`.
+`DemoCorpusIngestTest.excelExamplePartitionsByCategoryNotUnderTheHiveDefault`.
+
+**A `DATE_*` partition must be cut from a field declared `DATE`, `TIMESTAMP` or `TIMESTAMPTZ`**
+(`DATE-PARTITION-ON-TEXT-SHIPPED-1`, fixed 2026-09-23). `ConfigValidator` reports a `partitionKey:` or
+`DATE_*` entry whose `source` `raw.fields[]` declares any other type — once per source, startup `WARN` and
+`POST /validate {configPath}` → `clean:false`. It judges the **declared** type because that is all a config
+says: a `VARCHAR` field can hold date text `date_formats` parses, but it is also how an identifier or a code
+reached a date partition, loaded clean and put every row under the Hive default. A field that holds dates
+should say so — the declared type is also what picks the format list the partition parses with. A report,
+not a refusal. `ShippedDatePartitionsAreDateTypedTest` (`inspecto-etl`) runs the rule over every shipped
+Space and `inspecto/examples` Pipeline and fails on any hit. Its first run found seven:
+
+| Config | Was | Now |
+|---|---|---|
+| `asn1_example` (default) and `examples/02-parsing/asn1-frontend` | `partitionKey: IMSI` | `served_imsi,IMSI,VARCHAR` — the grammar carries no time field |
+| `orders_by_region_feed` (demo) | `partitionKey: REGION` | `sales_region,REGION,VARCHAR` — the feed is one row per region |
+| `examples/02-parsing/xlsx-frontend` | `partitionKey: CATEGORY` | `item_category,CATEGORY,VARCHAR` (as `excel_example`) |
+| `msc_cdr` (demo), all three segments | `EVENT_TIME` declared `VARCHAR` | declared `TIMESTAMP` — it already partitioned correctly through `date_formats`; the folders are unchanged (`year=2026/month=08/day=01`) and the `custom` `strptime(EVENT_TIME, …)` still reads the raw text |
+
+Pinned end to end by `DemoCorpusIngestTest.asn1ExamplePartitionsByImsiNotUnderTheHiveDefault`,
+`…ordersByRegionFeedPartitionsByRegionNotUnderTheHiveDefault` (collects a snapshot through its own
+`connector: dataset`) and the day folders now asserted in `…mscCdrSplitsFiveFourThreeByChoiceAlternative`.
+⚠ `served_imsi` is one folder per subscriber — right for a three-record example, the wrong partition for
+a production CDR store.
 
 `create-schema` generates one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; it wrote the
 legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that

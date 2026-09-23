@@ -4,6 +4,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.event.EventLog;
 import com.gamma.parse.Asn1ParserPlugin;
 import com.gamma.parse.ParseResult;
+import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -62,6 +63,10 @@ class DemoCorpusIngestTest {
         for (String seg : List.of("moCallRecord", "mtCallRecord", "moSMSRecord"))
             assertEquals(1, count(db.resolve(seg), "LAC IS NULL AND CELL_ID IS NULL"), seg + " rows without location");
         assertEquals(0, count(db.resolve("moCallRecord"), "EVENT_TS IS NULL"), "every answerTime parses");
+        // DATE-PARTITION-ON-TEXT-SHIPPED-1: EVENT_TIME is declared TIMESTAMP, so every record is cut into a
+        // real day folder — none under the Hive default.
+        for (String seg : List.of("moCallRecord", "mtCallRecord", "moSMSRecord"))
+            assertEquals(List.of("year=2026/month=08/day=01"), leafPartitions(db.resolve(seg)), seg + " day folders");
         assertEquals(1, count(db.resolve("moCallRecord"), "DURATION_SEC = 2400"), "a multi-byte INTEGER decodes");
     }
 
@@ -232,6 +237,62 @@ class DemoCorpusIngestTest {
         assertEquals(0, count(db, "CATEGORY IS NULL"), "the mapped CATEGORY column is written, not renamed");
     }
 
+    /**
+     * {@code DATE-PARTITION-ON-TEXT-SHIPPED-1} — the shipped {@code asn1_example} used {@code partitionKey: IMSI},
+     * a DATE partition over a text identifier, so every record landed under {@code __HIVE_DEFAULT_PARTITION__}.
+     * Its grammar carries no time field, so it now partitions on the IMSI as text.
+     */
+    @Test
+    void asn1ExamplePartitionsByImsiNotUnderTheHiveDefault(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = stage(dir, "default", "config/asn1_example/asn1_example_pipeline.toon");
+        seed(cfg, "default", "asn1_example/CDR_20260801.ber");
+
+        CollectorProcessor.run(cfg);
+
+        Path seg = Path.of(cfg.dirs().database()).resolve("moCallRecord");
+        assertEquals(List.of("served_imsi=42", "served_imsi=77", "served_imsi=91"),
+                subdirs(seg).stream().filter(p -> !p.startsWith(".")).toList(),   // not .staging
+                "one folder per IMSI of the sample, none the Hive default");
+        assertEquals(0, count(seg, "IMSI IS NULL"), "the mapped IMSI column is written, not renamed");
+    }
+
+    /**
+     * {@code DATE-PARTITION-ON-TEXT-SHIPPED-1} — the shipped {@code orders_by_region_feed} used
+     * {@code partitionKey: REGION}, a DATE partition over the region code, so every row landed under
+     * {@code __HIVE_DEFAULT_PARTITION__}. The feed is one row per region, so it now partitions on the region.
+     * Its producer is a materialize job, so the Dataset and one snapshot in its shape are written here, and
+     * the feed collects it through its own {@code connector: dataset}.
+     */
+    @Test
+    void ordersByRegionFeedPartitionsByRegionNotUnderTheHiveDefault(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = stage(dir, "config/orders/orders_by_region_feed_pipeline.toon");
+        new ComponentStore(dir.resolve("config/registry"))
+                .write("dataset", "orders_by_region", Map.of("physicalRef", "orders_by_region"));
+        Path snapshots = Files.createDirectories(dir.resolve("data/orders_by_region"));
+        String snapshot = snapshots.resolve("orders_by_region_20260801T000000.parquet").toString().replace('\\', '/');
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement s = c.createStatement()) {
+            s.execute("COPY (SELECT * FROM (VALUES ('APAC', 120.5), ('EMEA', 300.0), ('NA', 75.25)) t(region, sum_gross))"
+                    + " TO '" + snapshot + "' (FORMAT PARQUET)");
+        }
+
+        SpaceConfigRoot.register("demo-corpus-feed", dir.resolve("config"));
+        SpaceConfigRoot.registerDataRoot("demo-corpus-feed", dir.resolve("data"));
+        MDC.put(EventLog.SPACE_MDC_KEY, "demo-corpus-feed");
+        try {
+            CollectorProcessor.run(cfg);
+        } finally {
+            MDC.remove(EventLog.SPACE_MDC_KEY);
+            SpaceConfigRoot.forget("demo-corpus-feed");
+        }
+
+        Path db = Path.of(cfg.dirs().database());
+        List<String> parts = subdirs(db).stream().filter(p -> !p.startsWith(".")).toList();   // not .staging
+        assertEquals(List.of("sales_region=APAC", "sales_region=EMEA", "sales_region=NA"), parts,
+                "one folder per region, none the Hive default");
+        assertEquals(3, count(db, "true"), "the three region rows");
+        assertEquals(0, count(db, "REGION IS NULL"), "the mapped REGION column is written, not renamed");
+    }
+
     // ── harness ─────────────────────────────────────────────────────────────────────────────────
 
     private static PipelineConfig stage(Path dir, String pipeline) throws Exception {
@@ -277,6 +338,15 @@ class DemoCorpusIngestTest {
     private static List<String> subdirs(Path root) throws Exception {
         try (Stream<Path> s = Files.list(root)) {
             return s.filter(Files::isDirectory).map(p -> p.getFileName().toString()).sorted().toList();
+        }
+    }
+
+    /** Every Hive partition path under {@code root} that holds a data file, e.g. {@code year=2026/month=08/day=01}. */
+    private static List<String> leafPartitions(Path root) throws Exception {
+        try (Stream<Path> s = Files.walk(root)) {
+            return s.filter(p -> p.getFileName().toString().endsWith(".parquet"))
+                    .map(p -> root.relativize(p.getParent()).toString().replace('\\', '/'))
+                    .distinct().sorted().toList();
         }
     }
 }

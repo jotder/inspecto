@@ -9,7 +9,7 @@ raw:
     MSC_ID,mscIdentity,VARCHAR
     LAC,location.lac,INTEGER
     CELL_ID,location.cellId,INTEGER
-    EVENT_TIME,answerTime,VARCHAR
+    EVENT_TIME,answerTime,TIMESTAMP
     DURATION_SEC,callDuration,INTEGER
     CAUSE_FOR_TERM,causeForTerm,INTEGER
 mapping:
