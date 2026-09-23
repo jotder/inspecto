@@ -782,6 +782,13 @@ guards is currently uncaught.
 
 *(Numbered 5.7 because the parallel LA-12 dossier lane adds its own §5.6.)*
 
+🔴 **D-E7 gate moved into `InvestigationRoutes.open` at merge (2026-09-23).** As first built, the Enterprise
+PDP check (`RowScope.visible(ex, "investigation", …)`) ran on `/working-set` alone, and its test asserted `/log`
+stayed 200 under a DENY — so a policy hid one view of data that `/log` (the sealed rows), `/replay` and
+`/dossier` still served, and `/ops` still wrote. The check now lives in the ONE gate every Investigation route
+opens through, and `DossierRoutes` uses that gate instead of its copy; `ControlApiInvestigationPolicyTest` pins
+404 for the owner on log, dossier, replay and ops under a DENY (red on the old code at `/log`: 200).
+
 ✅ **AS BUILT 2026-09-23 (backend)** — `WorkingSetRoutes` in `inspecto-geo-link`, a separate `RouteModule` so the
 LA-10 classes changed only by two visibility modifiers (`InvestigationRoutes.Inv` and `open` are package-private
 now, reused so the owner + R3 gate is not duplicated):

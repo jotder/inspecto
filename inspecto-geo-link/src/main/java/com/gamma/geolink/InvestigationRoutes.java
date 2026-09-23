@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.RowScope;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.control.WriteGates;
@@ -588,8 +589,13 @@ public final class InvestigationRoutes implements RouteModule {
 
     /**
      * Open one Investigation: 503 without a write root; 422 for an unsafe id; 404 when it does not exist, when
-     * a Subject other than its owner asks (indistinguishable from absence), or when its bound Dataset exists but
-     * the caller can no longer view it (R3).
+     * a Subject other than its owner asks (indistinguishable from absence), when its bound Dataset exists but
+     * the caller can no longer view it (R3), or when the Enterprise PDP denies it (D-E7).
+     *
+     * <p>🔴 The D-E7 policy check lives HERE, the one gate every Investigation route opens through — log, ops,
+     * undo, reorder, replay, the Working Set and the Dossier. It first shipped only on the Working Set route, so a
+     * policy DENY blocked that one read while {@code /log} (which carries the sealed rows), {@code /replay} and
+     * {@code /dossier} still served the same content and {@code /ops} still wrote.
      */
     static Inv open(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation");
@@ -607,7 +613,20 @@ public final class InvestigationRoutes implements RouteModule {
                 .map(ComponentRegistry.Component::content);
         if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
             throw new ApiException(404, "no dataset '" + dataset + "'");
-        return new Inv(store, writeRoot, id, header);
+        Inv inv = new Inv(store, writeRoot, id, header);
+        if (!RowScope.visible(ex, "investigation", resource(inv)))   // Enterprise PDP (D-E7); a DENY reads as absence
+            throw new ApiException(404, "no investigation '" + id + "'");
+        return inv;
+    }
+
+    /** What the Enterprise PDP judges: the Investigation's id, owner, bound Dataset and (for a fork) parent. */
+    static Map<String, Object> resource(Inv inv) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("id", inv.id());
+        r.put("owner", inv.header().get("owner"));
+        r.put("dataset", inv.dataset());
+        if (inv.header().get("parent") instanceof Map<?, ?> p) r.put("parent", p.get("id"));
+        return r;
     }
 
     private static List<String> relationColumns(String datasetId, String relationSql) {

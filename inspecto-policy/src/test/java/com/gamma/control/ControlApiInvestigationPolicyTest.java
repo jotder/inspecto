@@ -29,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * LA-20 / D-E7 on the Enterprise edition, end to end: with {@code inspecto-policy} AND {@code inspecto-geo-link} on
  * the classpath the core discovers the real {@code PolicyEngine} on its own (nothing here forces a decider), and an
  * authored Access Policy targeting {@code resourceKinds: [investigation]} judges an Investigation's Working Set
- * relation at the row PEP — a DENY is a 404 even for the Investigation's owner, and with no policy the
- * Professional rule (owner-only) is what remains.
+ * relation — and, through the one shared gate {@code InvestigationRoutes.open}, EVERY Investigation route: a
+ * DENY is a 404 even for the Investigation's owner, and with no policy the Professional rule (owner-only) remains.
  */
 class ControlApiInvestigationPolicyTest {
 
@@ -84,8 +84,17 @@ class ControlApiInvestigationPolicyTest {
                             "when", "resource.dataset == 'calls_ds'")))));
             assertEquals(404, send(c.port, "GET", path, null, "owner").statusCode(),
                     "the PolicyEngine's row-level DENY hides the relation from its own owner");
-            assertEquals(200, send(c.port, "GET", "/inv/investigations/case-a/log", null, "owner").statusCode(),
-                    "a resourceKinds policy never bites at route level — only the relation's row PEP consults it");
+            // 🔴 The DENY must hold on EVERY Investigation route, not just the relation: /log carries the sealed rows,
+            // /replay and /dossier render them, /ops writes. It first shipped on /working-set alone, so this line
+            // used to assert /log stayed 200 — the policy hid one view of data every other route still served.
+            for (String[] r : new String[][]{
+                    {"GET", "/inv/investigations/case-a/log", null},
+                    {"GET", "/inv/investigations/case-a/dossier", null},
+                    {"POST", "/inv/investigations/case-a/replay", "{}"},
+                    {"POST", "/inv/investigations/case-a/ops", "{\"op\":\"seed\",\"ids\":[\"bob\"]}"}}) {
+                assertEquals(404, send(c.port, r[0], r[1], r[2], "owner").statusCode(),
+                        r[0] + " " + r[1] + " must obey the same DENY as the Working Set");
+            }
         }
     }
 

@@ -4,8 +4,6 @@ import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.RouteModule;
-import com.gamma.control.Subject;
-import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
@@ -194,29 +192,13 @@ public final class DossierRoutes implements RouteModule {
         return out;
     }
 
-    /** As {@code InvestigationRoutes.open}: 503 → 422 unsafe id → 404 absent, not the owner, or R3. */
+    /** Through the ONE Investigation gate ({@link InvestigationRoutes#open}: 503 → 422 unsafe id → 403 → 404 absent,
+     *  not the owner, R3 or an Enterprise policy DENY), keeping the header's raw bytes for the manifest. */
     private static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
-        Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis dossier");
-        if (!SnapshotStore.SAFE_ID.matcher(id).matches())
-            throw new ApiException(422, "investigation id must match " + SnapshotStore.SAFE_ID.pattern()
-                    + ", got '" + id + "'");
-        SnapshotStore store = new SnapshotStore(writeRoot);
-        Path root = store.directory().resolve("investigations").normalize();
-        Path target = store.investigationDir(id).normalize();
-        if (!target.startsWith(root) || target.equals(root))
-            throw new ApiException(403, "investigation id escapes the investigation store");
-        String raw = store.readInvestigation(id);
+        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        String raw = inv.store().readInvestigation(id);
         if (raw == null) throw new ApiException(404, "no investigation '" + id + "'");
-        @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
-        Optional<Subject> subject = ApiContext.subject(ex);
-        if (subject.isPresent() && !subject.get().id().equals(header.get("owner")))
-            throw new ApiException(404, "no investigation '" + id + "'");
-        String dataset = String.valueOf(header.get("dataset"));
-        Optional<Map<String, Object>> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", dataset)
-                .map(ComponentRegistry.Component::content);
-        if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
-            throw new ApiException(404, "no dataset '" + dataset + "'");
-        return new Opened(store, writeRoot, id, raw);
+        return new Opened(inv.store(), inv.writeRoot(), id, raw);
     }
 
     private static List<String> castStrings(Object o) {

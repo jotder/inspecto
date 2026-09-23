@@ -3,7 +3,6 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.RouteModule;
-import com.gamma.control.RowScope;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
@@ -46,7 +45,8 @@ import java.util.Map;
  *       Dataset sharing — being able to view the Dataset does NOT make someone else's Investigation readable.</li>
  *   <li>{@link RowScope#visible} with {@code resourceKind = "investigation"} — the Enterprise PDP
  *       ({@code inspecto-policy}'s {@code PolicyEngine}) judges the resolved Investigation; a {@code DENY} is a 404,
- *       even for the owner. {@code ALLOW}/{@code ABSTAIN} fall through to rule 1 — the {@code AccessDecider}
+ *       even for the owner — applied inside {@link InvestigationRoutes#open}, so EVERY Investigation route obeys
+ *       it, not only this one. {@code ALLOW}/{@code ABSTAIN} fall through to rule 1 — the {@code AccessDecider}
  *       contract that a policy allow never widens an existing gate — so on Enterprise the effective rule is
  *       owner AND not policy-denied. With no Subject attached (Personal) nothing is enforced, as everywhere else in
  *       the control plane.</li>
@@ -89,9 +89,7 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     private Object workingSet(ApiContext api, HttpExchange ex, String id) throws IOException {
-        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);   // 503 · 422 · 403 · 404 owner/R3
-        if (!RowScope.visible(ex, "investigation", resource(inv)))              // Enterprise PDP (D-E7)
-            throw new ApiException(404, "no investigation '" + id + "'");
+        InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);   // 503 · 422 · 403 · 404 owner/R3/PDP
 
         String of = ApiContext.query(ex, "of");
         if (of == null || of.isBlank()) of = "entities";
@@ -131,15 +129,6 @@ public final class WorkingSetRoutes implements RouteModule {
     }
 
     /** The resolved Investigation as the PDP sees it — {@code resource.*} in an Access Policy's {@code when}. */
-    private static Map<String, Object> resource(InvestigationRoutes.Inv inv) {
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("id", inv.id());
-        r.put("owner", inv.header().get("owner"));
-        r.put("dataset", inv.dataset());
-        if (inv.header().get("parent") instanceof Map<?, ?> p) r.put("parent", p.get("id"));
-        return r;
-    }
-
     /** The relation at the log's current committed head — from the cache when the head has not moved. */
     static Relation relation(InvestigationRoutes.Inv inv, boolean[] cachedOut) throws IOException {
         Path logFile = inv.dir().resolve("log.jsonl");
