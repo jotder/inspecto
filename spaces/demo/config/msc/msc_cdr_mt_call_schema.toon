@@ -1,0 +1,47 @@
+partitionKey: EVENT_TIME
+raw:
+  name: mt_call
+  format: CSV
+  fields[9]{name,selector,type}:
+    IMSI,servedIMSI,VARCHAR
+    MSISDN,servedMSISDN,VARCHAR
+    CALLING_NUMBER,callingNumber,VARCHAR
+    MSC_ID,mscIdentity,VARCHAR
+    LAC,location.lac,INTEGER
+    CELL_ID,location.cellId,INTEGER
+    EVENT_TIME,answerTime,VARCHAR
+    DURATION_SEC,callDuration,INTEGER
+    CAUSE_FOR_TERM,causeForTerm,INTEGER
+mapping:
+  canonicalName: msc_mt_call
+  rawName: mt_call
+  fields[9]:
+    - name: IMSI
+      from: IMSI
+      fn: keep
+    - name: MSISDN
+      from: MSISDN
+      fn: keep
+    - name: CALLING_NUMBER
+      from: CALLING_NUMBER
+      fn: keep
+    - name: MSC_ID
+      from: MSC_ID
+      fn: keep
+    - name: LAC
+      from: LAC
+      fn: keep
+    - name: CELL_ID
+      from: CELL_ID
+      fn: keep
+    - name: EVENT_TS
+      from: ""
+      fn: custom
+      args:
+        expression: "strptime(EVENT_TIME, '%Y%m%d%H%M%S')"
+    - name: DURATION_SEC
+      from: DURATION_SEC
+      fn: keep
+    - name: CAUSE_FOR_TERM
+      from: CAUSE_FOR_TERM
+      fn: keep

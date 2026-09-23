@@ -1,0 +1,43 @@
+partitionKey: EVENT_TIME
+raw:
+  name: mo_sms
+  format: CSV
+  fields[8]{name,selector,type}:
+    IMSI,servedIMSI,VARCHAR
+    MSISDN,servedMSISDN,VARCHAR
+    DESTINATION_NUMBER,destinationNumber,VARCHAR
+    MSC_ID,mscIdentity,VARCHAR
+    LAC,location.lac,INTEGER
+    CELL_ID,location.cellId,INTEGER
+    EVENT_TIME,originationTime,VARCHAR
+    SMS_RESULT,smsResult,INTEGER
+mapping:
+  canonicalName: msc_mo_sms
+  rawName: mo_sms
+  fields[8]:
+    - name: IMSI
+      from: IMSI
+      fn: keep
+    - name: MSISDN
+      from: MSISDN
+      fn: keep
+    - name: DESTINATION_NUMBER
+      from: DESTINATION_NUMBER
+      fn: keep
+    - name: MSC_ID
+      from: MSC_ID
+      fn: keep
+    - name: LAC
+      from: LAC
+      fn: keep
+    - name: CELL_ID
+      from: CELL_ID
+      fn: keep
+    - name: EVENT_TS
+      from: ""
+      fn: custom
+      args:
+        expression: "strptime(EVENT_TIME, '%Y%m%d%H%M%S')"
+    - name: SMS_RESULT
+      from: SMS_RESULT
+      fn: keep

@@ -1,0 +1,46 @@
+partitionKey: RECHARGE_TS
+raw:
+  name: RECHARGES
+  format: CSV
+  fields[9]{name,selector,type}:
+    REC_TYPE,"0",VARCHAR
+    SEQ_NO,"1",INTEGER
+    MSISDN,"2",VARCHAR
+    RECHARGE_TS,"3",TIMESTAMP
+    CHANNEL,"4",VARCHAR
+    AMOUNT_MINOR,"5",BIGINT
+    CURRENCY,"6",VARCHAR
+    STATUS,"7",VARCHAR
+    REASON,"8",VARCHAR
+mapping:
+  canonicalName: in_recharges
+  rawName: RECHARGES
+  fields[8]:
+    - name: SEQ_NO
+      from: SEQ_NO
+      fn: keep
+    - name: MSISDN
+      from: MSISDN
+      fn: keep
+    - name: RECHARGE_TS
+      from: RECHARGE_TS
+      fn: keep
+    - name: CHANNEL
+      from: CHANNEL
+      fn: keep
+    - name: AMOUNT
+      from: ""
+      fn: custom
+      args:
+        expression: "CAST(AMOUNT_MINOR AS DECIMAL(12,2)) / 100"
+    - name: CURRENCY
+      from: CURRENCY
+      fn: keep
+    - name: STATUS
+      from: STATUS
+      fn: keep
+    - name: REJECT_REASON
+      from: ""
+      fn: custom
+      args:
+        expression: "NULLIF(REASON, '')"

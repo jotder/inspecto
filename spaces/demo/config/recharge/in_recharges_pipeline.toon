@@ -1,0 +1,62 @@
+name: in_recharges
+active: false
+description: "Prepaid recharge export from an IN platform as fixed-width text: a short header, one 57-character detail per top-up, a short trailer carrying the count. min_record_length drops the header and trailer, the mapping undoes the implied two decimals, and each recharge is routed by STATUS into accepted or rejected. The domain-shaped counterpart to the synthetic fixedwidth_example. Sample and layout: data/samples/gen-in-recharges.py."
+
+dirs:
+  poll:       spaces/demo/data/inbox/in_recharges
+  database:   spaces/demo/data/in_recharges/accepted
+  backup:     spaces/demo/data/in_recharges/backup
+  temp:       spaces/demo/data/in_recharges/temp
+  errors:     spaces/demo/data/in_recharges/errors
+  quarantine: spaces/demo/data/in_recharges/quarantine
+  markers:    spaces/demo/data/in_recharges/markers
+  status_dir: spaces/demo/data/in_recharges/status
+  log_dir:    spaces/demo/data/in_recharges/logs
+
+output:
+  format: PARQUET
+
+sinks[2]{database,format}:
+  spaces/demo/data/in_recharges/accepted,PARQUET
+  spaces/demo/data/in_recharges/rejected,PARQUET
+
+route:
+  mode: case
+  default: rejected
+  branches[2]{key,where,database}:
+    accepted,"STATUS = 'OK'",spaces/demo/data/in_recharges/accepted
+    rejected,"STATUS <> 'OK'",spaces/demo/data/in_recharges/rejected
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.dat"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: spaces/demo/config/recharge/in_recharges_schema.toon
+  csv_settings:
+    date_formats[1]: "%Y%m%d"
+    timestamp_formats[1]: "%Y%m%d%H%M%S"
+
+parsing:
+  frontend: fixedwidth
+  encoding: utf-8
+  fixedwidth:
+    record: line
+    trim: both
+    min_record_length: 57
+    fields[9]{name,start,length}:
+      REC_TYPE,     0,  1
+      SEQ_NO,       1,  6
+      MSISDN,       7,  12
+      RECHARGE_TS,  19, 14
+      CHANNEL,      33, 6
+      AMOUNT_MINOR, 39, 9
+      CURRENCY,     48, 3
+      STATUS,       51, 2
+      REASON,       53, 4
+
+collector:
+  discovery: poll
+  connector: local

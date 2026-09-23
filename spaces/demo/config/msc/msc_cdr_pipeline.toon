@@ -1,0 +1,44 @@
+name: msc_cdr
+active: false
+description: "MSC switch CDRs as ASN.1 BER: one file mixes voice-originating, voice-terminating, SMS and supplementary-service records, told apart by the CHOICE alternative. Three alternatives land in a store each; supplementary-service records are not collected and count as junk. The domain-shaped counterpart to the synthetic asn1_example. Sample bytes and the readable grammar: data/samples/gen-msc-cdr.py."
+
+dirs:
+  poll:       spaces/demo/data/inbox/msc_cdr
+  database:   spaces/demo/data/msc_cdr/database
+  backup:     spaces/demo/data/msc_cdr/backup
+  temp:       spaces/demo/data/msc_cdr/temp
+  errors:     spaces/demo/data/msc_cdr/errors
+  quarantine: spaces/demo/data/msc_cdr/quarantine
+  markers:    spaces/demo/data/msc_cdr/markers
+  status_dir: spaces/demo/data/msc_cdr/status
+  log_dir:    spaces/demo/data/msc_cdr/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.ber"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  csv_settings:
+    date_formats[1]: "%Y%m%d%H%M%S"
+    timestamp_formats[1]: "%Y%m%d%H%M%S"
+
+parsing:
+  frontend: asn1
+  asn1:
+    grammar: "MSC-CDR DEFINITIONS IMPLICIT TAGS ::= BEGIN CallEventRecord ::= CHOICE { moCallRecord [0] MOCallRecord, mtCallRecord [1] MTCallRecord, moSMSRecord [6] MOSMSRecord, ssActionRecord [10] SSActionRecord } MOCallRecord ::= SEQUENCE { servedIMSI [0] IA5String, servedMSISDN [1] IA5String, calledNumber [2] IA5String, mscIdentity [3] IA5String, location [4] LocationInfo OPTIONAL, answerTime [5] IA5String, callDuration [6] INTEGER, causeForTerm [7] INTEGER } MTCallRecord ::= SEQUENCE { servedIMSI [0] IA5String, servedMSISDN [1] IA5String, callingNumber [2] IA5String, mscIdentity [3] IA5String, location [4] LocationInfo OPTIONAL, answerTime [5] IA5String, callDuration [6] INTEGER, causeForTerm [7] INTEGER } MOSMSRecord ::= SEQUENCE { servedIMSI [0] IA5String, servedMSISDN [1] IA5String, destinationNumber [2] IA5String, mscIdentity [3] IA5String, location [4] LocationInfo OPTIONAL, originationTime [5] IA5String, smsResult [6] INTEGER } SSActionRecord ::= SEQUENCE { servedIMSI [0] IA5String, ssCode [1] INTEGER, actionTime [2] IA5String } LocationInfo ::= SEQUENCE { lac [0] INTEGER, cellId [1] INTEGER } END"
+    root_type: CallEventRecord
+    strictness: BER
+    segments:
+      moCallRecord: spaces/demo/config/msc/msc_cdr_mo_call_schema.toon
+      mtCallRecord: spaces/demo/config/msc/msc_cdr_mt_call_schema.toon
+      moSMSRecord: spaces/demo/config/msc/msc_cdr_mo_sms_schema.toon
+
+collector:
+  discovery: poll
+  connector: local
