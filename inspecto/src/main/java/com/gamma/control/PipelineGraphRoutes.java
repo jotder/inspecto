@@ -558,7 +558,9 @@ final class PipelineGraphRoutes implements RouteModule {
         PipelineGraph g = graphFor(api, id);
         Path scratch;
         try {
-            scratch = Files.createTempDirectory("inspecto_testrun_");
+            // Short prefix: every partition path is written under this root, and Windows refuses a path
+            // past ~260 chars (WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1).
+            scratch = Files.createTempDirectory("itr_");
         } catch (IOException e) {
             throw new ApiException(500, "could not create a scratch root: " + e.getMessage());
         }

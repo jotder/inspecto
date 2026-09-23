@@ -188,9 +188,21 @@ found independently by both lanes). `PipelineTestRun.sampleRowsBySegment` reads 
 parsed but the batch failed, the route answers 200 *“no rows were parsed”*; `PipelineTestRun.Result.status()`
 and `error()` never reach the response. Seen with a binder error after 11 rows had parsed.
 
-⚠ **A long scratch path on Windows quarantines a readable file**
-(`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, P3). A scratch path near 250 characters failed the partition
-write, and the member was marked `QUARANTINED_UNREADABLE` although it read fine.
+✅ **A failed partition write fails the batch; it never quarantines the input**
+(`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, fixed 2026-09-23). A scratch path near 250 characters failed the
+partition write on Windows, and the member was marked `QUARANTINED_UNREADABLE` although it read fine. The
+cause was not Windows-specific: `NativeCsvStreamingEngine.streamingIngest` (the single-member native
+`read_csv` lane) held the `read_csv`, the transform **and** the `writeAndTrace` in one `catch`, so any sink
+failure became an unreadable-input verdict — and in a production run that verdict **moves a good file out
+of the inbox**. `streamUnit` now wraps the write in `SinkFlushException` (the type the generation and union
+lanes already use for the same distinction) and `streamingIngest` rethrows it, so the batch is `FAILED`
+with *“partition write failed for …”* and nothing is quarantined. A genuine `read_csv` failure surfaces
+before the write and is still `QUARANTINED_UNREADABLE`. Pinned by
+`PipelineTestRunTest.aFailedPartitionWriteFailsTheBatchAndNeverBlamesTheInput`, which blocks the partition
+directory with a regular file, so it runs on every platform. The route's scratch prefix is also shorter
+(`itr_`, was `inspecto_testrun_`); the rest of a written path — the temp dir, the partition layout, the
+file stem — is data and still counts toward the Windows limit. ⚠ A `FAILED` test run still answers
+*“no rows were parsed”* until `TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1` (above) is fixed.
 
 ## A `route:<segment>` edge out of a parser IS walked (D5, signed 2026-09-22)
 

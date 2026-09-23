@@ -199,4 +199,37 @@ class PipelineTestRunTest {
         assertEquals(3, r.totalInputRows(), "2 rows from the inbox a.csv + 1 from the other a.csv");
         assertEquals(2, r.files().size(), "both picked files should appear in the audit");
     }
+
+    /**
+     * {@code WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1}: a file that READ fine but whose partition WRITE
+     * failed (seen as a ~250-char scratch path on Windows) was reported {@code QUARANTINED_UNREADABLE} —
+     * the single-member native streaming path caught the sink write in the same {@code catch} as the
+     * {@code read_csv}. The write is forced to fail here, on any platform, by occupying the partition
+     * directory's name with a regular FILE — the name is taken from a first, clean run.
+     */
+    @Test
+    void aFailedPartitionWriteFailsTheBatchAndNeverBlamesTheInput(@TempDir Path dir) throws Exception {
+        Fixture f = fixture(dir);
+        PipelineTestRun.Result clean = PipelineTestRun.run(f.cfg(), List.of(f.good1()), dir.resolve("clean"));
+        assertEquals("SUCCESS", clean.status(), "the probe run must write, or there is no path to block");
+        Path cleanDb = dir.resolve("clean").resolve("database").toAbsolutePath();
+        Path firstPart = cleanDb.relativize(Path.of(clean.outputs().get(0).outputFile()).toAbsolutePath())
+                .getName(0);
+        assertTrue(firstPart.toString().contains("="), "expected a partition dir, got " + firstPart);
+
+        Path scratch = dir.resolve("blocked");
+        Files.createDirectories(scratch.resolve("database"));
+        Files.writeString(scratch.resolve("database").resolve(firstPart.toString()), "not a directory");
+
+        PipelineTestRun.Result r = PipelineTestRun.run(f.cfg(), List.of(f.good1()), scratch);
+
+        assertEquals("FAILED", r.status(), "a sink write failure fails the batch: " + r);
+        assertTrue(r.error().contains("partition write failed"), "the error must name the write: " + r.error());
+        assertTrue(r.files().stream().noneMatch(x -> x.status().startsWith("QUARANTINED")),
+                "a readable file must never be quarantined for a WRITE failure: " + r.files());
+        try (Stream<Path> q = Files.walk(scratch)) {
+            assertTrue(q.noneMatch(p -> p.toString().contains("quarantine") && Files.isRegularFile(p)),
+                    "nothing may have been moved into quarantine");
+        }
+    }
 }

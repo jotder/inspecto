@@ -181,6 +181,8 @@ final class NativeCsvStreamingEngine {
         try {
             s = streamUnit(conn, m.file(), m.file().getName(), schema, cfg,
                     dbDir, baseName, partCols, m.srcId(), batch.batchId());
+        } catch (SinkFlushException e) {
+            throw e;   // the write failed, not the read → fail the batch (don't quarantine)
         } catch (Exception e) {
             // read_csv failure (unreadable/undecodable) surfaces when the CTAS drives it.
             QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
@@ -275,8 +277,16 @@ final class NativeCsvStreamingEngine {
         }
         // One write per CHUNK, so each carries its own scope — the base name is unique per chunk and
         // is what keeps the batch's branch ledger from reading the second chunk as already committed.
-        var written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
-                batchId, Map.of(srcId, lineageName), baseName);
+        // 🔴 The input has been READ by now, so a failure below is the sink's, never the file's: it is
+        // wrapped so streamingIngest fails the batch instead of quarantining a readable file as
+        // UNREADABLE (WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1 — a too-long partition path did exactly that).
+        ConsignmentIngestStrategy.Written written;
+        try {
+            written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
+                    batchId, Map.of(srcId, lineageName), baseName);
+        } catch (Exception e) {
+            throw new SinkFlushException("partition write failed for " + baseName + ": " + msg(e), e);
+        }
         dropTable(conn, "transformed");
         return new Streamed(parsed, rejects, written.outputs(), written.lineage(), written.bounds(),
                 castFailures);
