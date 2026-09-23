@@ -179,15 +179,11 @@ class CollectorProcessorRemoteCycleTest {
     }
 
     /**
-     * 🔴 {@code RATE-LIMIT-OVERSIZE-HANGS-1}: a remote file LARGER than {@code rate_limit} bytes (one second's
-     * worth) hangs the acquisition forever. {@code RateLimiter.acquire} waits until the bucket holds
-     * {@code bytes} tokens, but {@code refill} caps the bucket at one second of rate, so a request above that
-     * cap can never be satisfied — contradicting its own javadoc ("never deadlocks on an over-large request").
-     * Found by the first draft of the test above, which hung the surefire fork for ten minutes. Enable this
-     * once the limiter is fixed.
+     * {@code RATE-LIMIT-OVERSIZE-HANGS-1} (fixed 2026-09-24): a remote file LARGER than {@code rate_limit} bytes
+     * (one second's worth) used to hang the acquisition forever, because the bucket is capped at one second of
+     * rate. The limiter now drains the bucket and waits {@code (bytes - available) / rate}, so it is throttled.
      */
     @Test
-    @org.junit.jupiter.api.Disabled("RATE-LIMIT-OVERSIZE-HANGS-1 — a file above one second of rate_limit never fetches")
     void aFileLargerThanOneSecondOfRateIsThrottledNotHung(@TempDir Path dir) throws Exception {
         Files.writeString(serverRoot.resolve("20200403_big.csv"), csvOfAtLeast("big", 6 * 1024));
         registerSftp("pw");

@@ -649,9 +649,17 @@ circuit breaker (trips at the threshold, skips without dialling while OPEN, half
 `fetch.rate_limit` (measurably throttles), `post_action: MOVE` (moves a fetched file, leaves a failed fetch in
 place and retries it next cycle) and SFTP/JDBC runs asserting the exact sink rows; `CollectorProcessorDatasetFeedTest`
 (inspecto-engine) does the same for a `connector: dataset` feed, including refresh and producer-file safety.
-⚠ `post_action` fires on **fetch** success (land-then-ack), before ingest — not on ingest success. One defect
-found and pinned as a disabled test: `RATE-LIMIT-OVERSIZE-HANGS-1` (a file above one second of `rate_limit`
-hangs acquisition forever).
+⚠ `post_action` fires on **fetch** success (land-then-ack), before ingest — not on ingest success.
+✅ **A file above one second of `rate_limit` is throttled, not hung (2026-09-24, `RATE-LIMIT-OVERSIZE-HANGS-1`).**
+`RateLimiter.acquire` (inspecto-acquire; its only caller is `RemoteAcquisitionHandler`, once per whole file with
+`rf.size()` before the fetch — there is no per-chunk acquire) used to loop until the bucket held `bytes` tokens,
+but the bucket is capped at one second of rate (the burst), so an oversized request never completed. Operator
+decision — **proportional wait**: a request the bucket cannot cover drains it and sleeps once for
+`(bytes − available) / rate`; the refill accrued during that sleep pays the deficit and is discarded, so the
+bucket never goes negative (no debt borrowed from later requests) and the long-run rate is honoured. Requests
+within the bucket behave as before. Pinned by `RateLimiterTest` (proportional wait, throughput over five
+oversize requests = rate, a following small request pays only normal refill; the old loop times out three of
+them) and the re-enabled `CollectorProcessorRemoteCycleTest#aFileLargerThanOneSecondOfRateIsThrottledNotHung`.
 ✅ **A MOVE's archive tree is excluded from discovery (2026-09-23, `POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1`).**
 Every connector resolves `archive_path` under the Collector's own root, so a recursive listing used to return the
 archived files under `archive/…` and MOVE them again to `archive/archive/…` every cycle.
