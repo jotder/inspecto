@@ -659,7 +659,12 @@ archived files under `archive/…` and MOVE them again to `archive/archive/…` 
 fetch; date tokens in the template match any digits, so every past day's `archive/yyyy/MM/dd` tree is excluded,
 not just today's. ⚠ The row's "duplicate rows" half was not reproduced: content dedup already refused the
 re-ingest — the observable defect was the repeated re-MOVE (and a re-fetch per cycle). Pinned by
-`CollectorProcessorRemoteCycleTest#anArchivedFileIsNotCollectedAgain`.
+`CollectorProcessorRemoteCycleTest#anArchivedFileIsNotCollectedAgain`, plus `#aFileArchivedOnAnEarlierDayIsNotCollectedAgain`
+(`archive_path: archive/yyyy/MM/dd` with a file already under `archive/2026/09/01/`; turning off the date-token
+matching makes it red, with the old file ingested and today's file collected again) and
+`#ftpAnArchivedFileIsNotCollectedAgain` (FTP's MOVE target is `basePath/archive_path/<relativePath>`, the same
+under-the-root shape as SFTP, driven against an in-process Apache FtpServer; dropping the exclusion re-MOVEs the
+file to `archive/archive/…`).
 
 ⚠ **Also open (filed 2026-09-23):** `COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1` — the acquisition form offers `duplicate__on_change: skip`, which `DuplicatePolicy.OnChange.from` does not recognise, so it silently means REPROCESS (the valid values are `ignore` / `alert` / `archive_old_version`).
 

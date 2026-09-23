@@ -265,6 +265,86 @@ class CollectorProcessorRemoteCycleTest {
         assertFalse(Files.exists(serverRoot.resolve("archive/archive/20200403_once.csv")), "not re-archived");
     }
 
+    /**
+     * The same guard with a DATED {@code archive_path}: a file MOVEd on an EARLIER day sits under
+     * {@code archive/2026/09/01/}, not today's rendered folder, so excluding only today's archive would re-collect
+     * it. The date tokens match any digits, so every past day's archive tree is dropped from discovery.
+     */
+    @Test
+    void aFileArchivedOnAnEarlierDayIsNotCollectedAgain(@TempDir Path dir) throws Exception {
+        Files.createDirectories(serverRoot.resolve("archive/2026/09/01"));
+        Files.writeString(serverRoot.resolve("archive/2026/09/01/20200401_old.csv"), csv("old", 3));
+        Files.writeString(serverRoot.resolve("20200403_new.csv"), csv("new", 2));
+        registerSftp("pw");
+        PipelineConfig cfg = load(dir, "G6_MOVE_DATED", sftpCollector("""
+                  post_action:
+                    on_success: MOVE
+                    archive_path: archive/yyyy/MM/dd
+                """));
+
+        CollectorProcessor.run(cfg);
+        CollectorProcessor.run(cfg);
+
+        assertEquals(List.of("new_1", "new_2"), ids(cfg), "only the root file is ingested, never a past archive");
+        assertTrue(Files.exists(serverRoot.resolve("archive/2026/09/01/20200401_old.csv")),
+                "the earlier day's archived file is left untouched");
+        String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        assertTrue(Files.exists(serverRoot.resolve("archive/" + today + "/20200403_new.csv")),
+                "the new file is MOVEd into today's folder and stays there");
+    }
+
+    /**
+     * FTP's MOVE resolves {@code archive_path} under the connection's base path (the Collector root) exactly like
+     * SFTP, so the archive tree is in discovery's reach and must be excluded. Driven against an in-process Apache
+     * FtpServer, as {@code FtpConnectorTest} does.
+     */
+    @Test
+    void ftpAnArchivedFileIsNotCollectedAgain(@TempDir Path dir) throws Exception {
+        Path ftpRoot = Files.createDirectories(dir.resolve("ftproot"));
+        Files.writeString(ftpRoot.resolve("20200403_ftp.csv"), csv("ftp", 2));
+        int ftpPort;
+        try (java.net.ServerSocket s = new java.net.ServerSocket(0)) { ftpPort = s.getLocalPort(); }
+        org.apache.ftpserver.FtpServerFactory factory = new org.apache.ftpserver.FtpServerFactory();
+        org.apache.ftpserver.listener.ListenerFactory lf = new org.apache.ftpserver.listener.ListenerFactory();
+        lf.setServerAddress("127.0.0.1");
+        lf.setPort(ftpPort);
+        factory.addListener("default", lf.createListener());
+        org.apache.ftpserver.usermanager.PropertiesUserManagerFactory umf =
+                new org.apache.ftpserver.usermanager.PropertiesUserManagerFactory();
+        umf.setPasswordEncryptor(new org.apache.ftpserver.usermanager.ClearTextPasswordEncryptor());
+        org.apache.ftpserver.ftplet.UserManager um = umf.createUserManager();
+        org.apache.ftpserver.usermanager.impl.BaseUser user = new org.apache.ftpserver.usermanager.impl.BaseUser();
+        user.setName("user");
+        user.setPassword("pw");
+        user.setHomeDirectory(ftpRoot.toString());
+        user.setAuthorities(List.of(new org.apache.ftpserver.usermanager.impl.WritePermission()));
+        um.save(user);
+        factory.setUserManager(um);
+        org.apache.ftpserver.FtpServer ftp = factory.createServer();
+        ftp.start();
+        String id = "g6-ftp";
+        ConnectionRegistry.register(new ConnectionProfile(id, "ftp", "127.0.0.1", ftpPort, null, "",
+                "user", "pw", Map.of(), null));
+        try {
+            PipelineConfig cfg = load(dir, "G6_FTP_MOVE_LOOP", "collector:\n  connector: ftp\n  connection: " + id
+                    + "\n" + """
+                  post_action:
+                    on_success: MOVE
+                    archive_path: archive
+                """);
+
+            CollectorProcessor.run(cfg);
+            CollectorProcessor.run(cfg);
+
+            assertEquals(List.of("ftp_1", "ftp_2"), ids(cfg), "the archived file must not be ingested again");
+            assertTrue(Files.exists(ftpRoot.resolve("archive/20200403_ftp.csv")), "MOVE put it under the root");
+            assertFalse(Files.exists(ftpRoot.resolve("archive/archive/20200403_ftp.csv")), "not re-archived");
+        } finally {
+            ConnectionRegistry.remove(id);
+            ftp.stop();
+        }
+    }
+
     // ── (4) full Pipeline runs: acquire → parse → sink ───────────────────────────────────────
 
     /** SFTP collector → CSV parse → Parquet sink: the exact source rows arrive, typed, and a re-run adds none. */
