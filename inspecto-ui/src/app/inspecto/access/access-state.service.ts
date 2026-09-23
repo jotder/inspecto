@@ -5,6 +5,7 @@ import { Lens, LensService } from '../api/lens.service';
 import {
     CatalogIndex,
     deriveDefaultAccessCatalog,
+    deriveSpaceAccessCatalog,
     filterNavByAccess,
     filterNavByLens,
     indexCatalog,
@@ -23,6 +24,12 @@ export class AccessStateService {
     private readonly api = inject(AccessService);
     private readonly lens = inject(LensService);
     private readonly idx: CatalogIndex = indexCatalog(deriveDefaultAccessCatalog());
+
+    /** The Space catalog incl. custom menus — re-derived per call because the Menu tree can change
+     *  after start-up (hydration, a Menu Builder edit) while this root service lives on. */
+    private spaceIdx(): CatalogIndex {
+        return indexCatalog(deriveSpaceAccessCatalog());
+    }
 
     /** lens id → its saved grants; empty until profiles load (= nothing denied). */
     private readonly grantsByLens = signal<Partial<Record<Lens, Record<string, AccessGrant>>>>({});
@@ -47,7 +54,7 @@ export class AccessStateService {
         const lens = this.lens.currentLens();
         const scoped = filterNavByLens(items, lens);
         const grants = this.grantsByLens()[lens];
-        return grants ? filterNavByAccess(scoped, grants, this.idx) : scoped;
+        return grants ? filterNavByAccess(scoped, grants, this.spaceIdx()) : scoped;
     }
 
     private apply(profiles: AccessProfile[]): void {

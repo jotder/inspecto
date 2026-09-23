@@ -10,12 +10,7 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, Observable } from 'rxjs';
 
 import { AccessStateService } from 'app/inspecto/access/access-state.service';
-import {
-    CatalogIndex,
-    deriveDefaultAccessCatalog,
-    indexCatalog,
-    resolveGrant,
-} from 'app/inspecto/access/access-catalog';
+import { CatalogIndex, deriveSpaceAccessCatalog, indexCatalog, resolveGrant } from 'app/inspecto/access/access-catalog';
 import { AccessCatalog, AccessGrant, AccessNode, AccessService, apiErrorMessage, LensService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { TreeTableComponent } from 'app/inspecto/tree-table/tree-table.component';
@@ -64,7 +59,7 @@ export class AccessComponent {
     readonly subjects = LensService.LENSES;
 
     /** The catalog is derived fresh from the live navigation — the UI is its source of truth (§4). */
-    private readonly catalogNodes: AccessNode[] = deriveDefaultAccessCatalog();
+    private readonly catalogNodes: AccessNode[] = deriveSpaceAccessCatalog();
     private readonly idx: CatalogIndex = indexCatalog(this.catalogNodes);
 
     readonly loading = signal(true);

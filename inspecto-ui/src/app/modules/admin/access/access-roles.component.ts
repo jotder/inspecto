@@ -7,12 +7,7 @@ import { ToastrService } from 'ngx-toastr';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import {
-    CatalogIndex,
-    deriveDefaultAccessCatalog,
-    indexCatalog,
-    resolveGrant,
-} from 'app/inspecto/access/access-catalog';
+import { CatalogIndex, deriveSpaceAccessCatalog, indexCatalog, resolveGrant } from 'app/inspecto/access/access-catalog';
 import { AccessNode, AccessProfile, AccessService, apiErrorMessage, LensService, RoleDef } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -57,8 +52,8 @@ export class AccessRolesComponent {
     private readonly toastr = inject(ToastrService);
 
     /** Capability → the catalog action nodes bound to it (the profile-deny projection). */
-    private readonly actionNodes: AccessNode[] = actionsOf(deriveDefaultAccessCatalog());
-    private readonly idx: CatalogIndex = indexCatalog(deriveDefaultAccessCatalog());
+    private readonly actionNodes: AccessNode[] = actionsOf(deriveSpaceAccessCatalog());
+    private readonly idx: CatalogIndex = indexCatalog(deriveSpaceAccessCatalog());
 
     readonly loading = signal(true);
     readonly saving = signal(false);

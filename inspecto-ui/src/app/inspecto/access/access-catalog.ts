@@ -2,6 +2,9 @@ import { GammaNavigationItem } from '@gamma/components/navigation';
 import { defaultNavigation } from 'app/core/navigation/navigation-data';
 import { AccessGrant, AccessNode } from '../api/access.service';
 import type { Lens } from '../api/lens.service';
+import { menuTreeToNav } from '../menu/menu-nav';
+import { loadMenuTrees } from '../menu/menu-persist';
+import type { MenuNode } from '../menu/menu-types';
 
 /**
  * Access Catalog derivation + grant resolution (framework-free — design
@@ -135,6 +138,39 @@ export function deriveDefaultAccessCatalog(): AccessNode[] {
     return deriveAccessCatalog(defaultNavigation);
 }
 
+/** Catalog id of the synthetic parent every Menu-Builder custom menu hangs under — deny it and the whole
+ *  per-Space custom navigation is hidden for that lens; deny a group or an entry below it for less. */
+export const CUSTOM_MENUS_NODE_ID = 'custom-menus';
+
+/** The active Space's Menu-Builder nodes, from the mirror NavigationService hydrates at start-up. */
+export function activeSpaceMenuNodes(): MenuNode[] {
+    const space = (typeof localStorage !== 'undefined' && localStorage.getItem('inspecto.currentSpace')) || 'default';
+    return loadMenuTrees()[space]?.nodes ?? [];
+}
+
+/**
+ * The Space's full catalog: the platform navigation plus, when the Space has a custom Menu tree, a
+ * **Custom menus** node carrying it. The custom nodes keep the sidebar's own `menu-<id>` ids (via
+ * {@link menuTreeToNav}), so {@link filterNavByAccess} matches them with no translation. Grants on a
+ * custom node live in the same per-lens profile as every other node; the backend only enforces action
+ * nodes, so these are UI-side visibility, exactly like platform menus/panes.
+ */
+export function deriveSpaceAccessCatalog(customMenus: MenuNode[] = activeSpaceMenuNodes()): AccessNode[] {
+    const platform = deriveDefaultAccessCatalog();
+    const custom = deriveAccessCatalog(menuTreeToNav(customMenus));
+    if (!custom.length) return platform;
+    return [
+        ...platform,
+        {
+            id: CUSTOM_MENUS_NODE_ID,
+            label: 'Custom menus',
+            kind: 'menu',
+            icon: 'heroicons_outline:bars-3',
+            children: custom,
+        },
+    ];
+}
+
 export interface CatalogIndex {
     byId: Map<string, AccessNode>;
     parentOf: Map<string, string | null>;
@@ -179,7 +215,7 @@ export function resolveGrant(nodeId: string, grants: Record<string, AccessGrant>
 
 /**
  * Drop navigation items (with their subtree) whose effective grant is deny. Items unknown to the
- * catalog — dividers, Menu-Builder custom menus — always stay: unknown = allow, so an empty or
+ * catalog — dividers, custom menus absent from the catalog passed in — always stay: unknown = allow, so an empty or
  * missing profile leaves the sidebar byte-identical.
  */
 export function filterNavByAccess(
@@ -189,7 +225,10 @@ export function filterNavByAccess(
 ): GammaNavigationItem[] {
     if (!Object.keys(grants).length) return items;
     const keep = (item: GammaNavigationItem): GammaNavigationItem | null => {
-        if (item.id && idx.byId.has(item.id) && resolveGrant(item.id, grants, idx).effective === 'deny') {
+        // A Favorites shortcut (`fav-<id>`) follows the grant of the custom entry it points at
+        // (`menu-<id>`) — otherwise a denied entry would stay reachable through its shortcut.
+        const id = item.id?.startsWith('fav-') ? `menu-${item.id.slice(4)}` : item.id;
+        if (id && idx.byId.has(id) && resolveGrant(id, grants, idx).effective === 'deny') {
             return null;
         }
         if (!item.children?.length) return item;
