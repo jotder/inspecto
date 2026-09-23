@@ -324,6 +324,31 @@ public class CollectorProcessor {
      * <p>{@link #run} calls this inline before {@link #collect} today; a later step gives it its own driver,
      * timer and budget. The unit boundary is drawn here (plan §5) so that move is a re-parenting, not a rewrite.
      */
+    /**
+     * POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1: every connector resolves a MOVE's {@code archive_path} under the
+     * Collector's own root, so a recursive discovery lists the archived files again under {@code archive/…} and
+     * they would be MOVEd again every cycle. Drop anything under the archive tree; date tokens in the template
+     * match any digits, so every past day's archive is excluded, not just today's.
+     */
+    static List<RemoteFile> excludeArchiveTree(PipelineConfig.PostActionConfig pac, List<RemoteFile> discovered) {
+        if (!pac.active() || !"MOVE".equals(pac.onSuccess()) || pac.archivePath() == null
+                || pac.archivePath().isBlank()) return discovered;
+        String t = pac.archivePath().replace('\\', '/').replaceAll("^/+|/+$", "");
+        StringBuilder rx = new StringBuilder();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("yyyy|yy|MM|dd|HH|mm|ss").matcher(t);
+        int last = 0;
+        while (m.find()) {
+            rx.append(java.util.regex.Pattern.quote(t.substring(last, m.start())))
+              .append(m.group().equals("yyyy") ? "\\d{4}" : "\\d{2}");
+            last = m.end();
+        }
+        rx.append(java.util.regex.Pattern.quote(t.substring(last))).append("/.*");
+        java.util.regex.Pattern archive = java.util.regex.Pattern.compile(rx.toString());
+        return discovered.stream()
+                .filter(rf -> !archive.matcher(rf.relativePath().replace('\\', '/').replaceAll("^/+", "")).matches())
+                .toList();
+    }
+
     @PublicApi(since = "1.0.0")
     public static int acquire(PipelineConfig cfg) throws java.io.IOException {
         return acquire(cfg, false);
@@ -373,6 +398,7 @@ public class CollectorProcessor {
                 if (e instanceof RuntimeException re) throw re;
                 throw new java.io.IOException("Discovery failed for " + cfg.identity().pipelineName(), e);
             }
+            discovered = excludeArchiveTree(src.postAction(), discovered);
 
             List<RemoteFile> ready = gateStability(cfg, src, st, connector, discovered, true);
 

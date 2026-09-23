@@ -242,14 +242,12 @@ class CollectorProcessorRemoteCycleTest {
     }
 
     /**
-     * 🔴 {@code POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1}: with the default unbounded {@code recursive_depth}, an
-     * {@code archive_path} under the collector's own root is DISCOVERED on the next cycle — the archived file has
-     * a new relative path ({@code archive/…}), so no marker matches it: it is fetched, ingested a SECOND time and
-     * MOVEd again to {@code archive/archive/…}, once per cycle, forever. Neither the parser nor the engine
-     * excludes {@code archive_path} from discovery. Enable once it does (or once the config is refused at save).
+     * {@code POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1}: with the default unbounded {@code recursive_depth}, an
+     * {@code archive_path} under the collector's own root used to be DISCOVERED on the next cycle — the archived
+     * file has a new relative path ({@code archive/…}), so no marker matched it: it was ingested a SECOND time and
+     * MOVEd again to {@code archive/archive/…}. Discovery now drops everything under a MOVE's archive tree.
      */
     @Test
-    @org.junit.jupiter.api.Disabled("POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1 — archive_path under the root is re-collected")
     void anArchivedFileIsNotCollectedAgain(@TempDir Path dir) throws Exception {
         Files.writeString(serverRoot.resolve("20200403_once.csv"), csv("once", 2));
         registerSftp("pw");

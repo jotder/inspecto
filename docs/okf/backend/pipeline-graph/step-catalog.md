@@ -648,10 +648,17 @@ circuit breaker (trips at the threshold, skips without dialling while OPEN, half
 `fetch.rate_limit` (measurably throttles), `post_action: MOVE` (moves a fetched file, leaves a failed fetch in
 place and retries it next cycle) and SFTP/JDBC runs asserting the exact sink rows; `CollectorProcessorDatasetFeedTest`
 (inspecto-engine) does the same for a `connector: dataset` feed, including refresh and producer-file safety.
-⚠ `post_action` fires on **fetch** success (land-then-ack), before ingest — not on ingest success. Two defects
-found and pinned as disabled tests: `RATE-LIMIT-OVERSIZE-HANGS-1` (a file above one second of `rate_limit`
-hangs acquisition forever) and `POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1` (an `archive_path` inside the scanned
-root is re-collected every cycle unless `recursive_depth` excludes it).
+⚠ `post_action` fires on **fetch** success (land-then-ack), before ingest — not on ingest success. One defect
+found and pinned as a disabled test: `RATE-LIMIT-OVERSIZE-HANGS-1` (a file above one second of `rate_limit`
+hangs acquisition forever).
+✅ **A MOVE's archive tree is excluded from discovery (2026-09-23, `POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1`).**
+Every connector resolves `archive_path` under the Collector's own root, so a recursive listing used to return the
+archived files under `archive/…` and MOVE them again to `archive/archive/…` every cycle.
+`CollectorProcessor.excludeArchiveTree` drops them right after `discover`, before stability, gap detection and
+fetch; date tokens in the template match any digits, so every past day's `archive/yyyy/MM/dd` tree is excluded,
+not just today's. ⚠ The row's "duplicate rows" half was not reproduced: content dedup already refused the
+re-ingest — the observable defect was the repeated re-MOVE (and a re-fetch per cycle). Pinned by
+`CollectorProcessorRemoteCycleTest#anArchivedFileIsNotCollectedAgain`.
 
 ⚠ **Also open (filed 2026-09-23):** `COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1` — the acquisition form offers `duplicate__on_change: skip`, which `DuplicatePolicy.OnChange.from` does not recognise, so it silently means REPROCESS (the valid values are `ignore` / `alert` / `archive_old_version`). `CONNECTOR-TESTS-HIDE-DROPPED-ROWS-1` — `DbExportConnectorTest#endToEndDbExportIsIngested` sets `skip_header_lines: 1` on top of the default header skip and so drops the first data row unnoticed; `SftpConnectorTest#endToEndParallelFetchWithMovePostAction`'s comment says files move after ingest (they move after fetch).
 
