@@ -69,7 +69,7 @@ export function resetProjectionLimits(): void {
  * "Bob" (Phase C). Unscoped `entity:<key>` otherwise. The key is {@link normalizeEntityKey} of the raw
  * value (D-S4, 2026-09-23), so `ACME Ltd` and ` acme  ltd.` are ONE node; the raw spelling stays the label.
  */
-function entityId(entityType: string | undefined, value: string): string {
+export function entityId(entityType: string | undefined, value: string): string {
     const key = normalizeEntityKey(value);
     return entityType ? `entity:${entityType}:${key}` : `entity:${key}`;
 }

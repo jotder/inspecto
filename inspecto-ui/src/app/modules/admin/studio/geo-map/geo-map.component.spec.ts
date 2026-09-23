@@ -16,6 +16,7 @@ import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 import { GeoMapService, GeoMapView } from './geo-map.service';
+import { GeoLinkBrushService } from '../link-analysis/geo-link-brush';
 
 const DS: Dataset = {
     id: 'towers-ds',
@@ -324,6 +325,36 @@ describe('GeoMapComponent', () => {
         expect(c.polygonFilter()).toBeNull();
         expect(c.displayed()?.points).toHaveLength(3);
         expect(c.notes()).toHaveLength(1);
+    });
+
+    it('LA-22: a polygon brushes Link Analysis by KEY, and a Link brush highlights the keyed points', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const brush = TestBed.inject(GeoLinkBrushService);
+        c.geo.set({
+            points: [
+                { id: 'pt:0', lat: 23.5, lon: 90.5, kind: 'x', label: 'Shown', key: 'K1' },
+                { id: 'pt:1', lat: 23.6, lon: 90.6, kind: 'x', label: 'K9' }, // unkeyed: its label must not brush
+                { id: 'pt:2', lat: 51.5, lon: -0.1, kind: 'x', label: 'Far', key: 'K2' },
+            ],
+            routes: [],
+            truncated: false,
+            skipped: 0,
+        });
+        c.setTool('polygon');
+        c.onMapClick({ lat: 23, lon: 90 });
+        c.onMapClick({ lat: 23, lon: 91 });
+        c.onMapClick({ lat: 24.5, lon: 91 });
+        c.closePolygon();
+        expect(brush.brush()).toEqual({ origin: 'geo', keys: ['K1'] });
+
+        brush.fromLink(['entity:K2'], [undefined]);
+        c.clearTools();
+        expect(brush.brush()).toBeNull(); // clearing the area clears the brush it published
+        brush.fromLink(['entity:K2'], [undefined]);
+        expect(c.emphasis()).toEqual({ pointIds: ['pt:2'] });
     });
 
     it('persists notes with a saved view and blocks point details while a tool is active', async () => {

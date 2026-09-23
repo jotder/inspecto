@@ -14,6 +14,7 @@ import { G6GraphData, GraphSource } from 'app/inspecto/graph';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { GraphSourcesService } from './graph-sources';
+import { GeoLinkBrushService } from './geo-link-brush';
 import { LinkAnalysisComponent } from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
@@ -206,6 +207,29 @@ describe('LinkAnalysisComponent', () => {
         c.onNodeClick('f');
         expect(dataOf(1).objectRef).toEqual({ id: 'case-1', type: 'CASE' });
         expect(dataOf(1).pivotViews).toEqual(['map']);
+    });
+
+    it('LA-22: a Geo brush highlights the nodes its keys project to, and a node click brushes the map', async () => {
+        const keyed: G6GraphData = {
+            nodes: [
+                { id: 'entity:K1', data: { label: 'Alias', kind: 'entity' } },
+                { id: 'entity:K2', data: { label: 'K1', kind: 'entity' } }, // label equal to the key: must NOT match
+            ],
+            edges: [{ id: 'e', source: 'entity:K1', target: 'entity:K2', data: { kind: 'link' } }],
+        };
+        const { fixture } = create({ graph: keyed });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const brush = TestBed.inject(GeoLinkBrushService);
+        brush.fromGeo(['K1']);
+        expect(c.geoBrushEmphasis()).toEqual({ nodeIds: ['entity:K1'], edgeIds: [] });
+
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(undefined) } as never);
+        c.onNodeClick('entity:K2');
+        expect(brush.brush()).toMatchObject({ origin: 'link', nodeIds: ['entity:K2'] });
+        expect(c.geoBrushEmphasis()).toBeNull();
     });
 
     it('resolves an incoming investigation pivot against the loaded graph, or toasts if absent', async () => {

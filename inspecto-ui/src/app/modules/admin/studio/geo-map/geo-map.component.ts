@@ -54,6 +54,7 @@ import {
     withinBBox,
 } from 'app/inspecto/geo';
 import type { Feature, FeatureCollection } from 'geojson';
+import { GeoLinkBrushService, pointIdsForNodes } from '../link-analysis/geo-link-brush';
 import {
     ElementDetailDialog,
     ElementDetailResult,
@@ -160,6 +161,8 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     private geoSources = inject(GeoSourcesService);
     private datasetsService = inject(DatasetsService);
     private viewsService = inject(GeoMapService);
+    /** LA-22: the shared Geo ↔ Link brush (keyed by `GeoPoint.key`, D-U3). */
+    private brush = inject(GeoLinkBrushService);
     private geoSettings = inject(GeoSettingsService);
     private geocoder = inject(GeocoderService);
     private datasetRowsSvc = inject(DatasetRowsService);
@@ -361,6 +364,8 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         if (q) return { pointIds: searchPoints(d, q) };
         const result = this.resultEmphasis();
         if (result) return { pointIds: result };
+        const b = this.brush.brush();
+        if (b?.origin === 'link') return { pointIds: pointIdsForNodes(d.points, new Set(b.nodeIds), b.entityTypes) };
         const sel = this.selectedId();
         return sel ? { pointIds: [sel] } : null;
     });
@@ -687,6 +692,8 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         this.polygonFilter.set([...v, v[0]].map((p) => [p.lon, p.lat]));
         this.polygonVertices.set([]);
         this.activeTool.set(null);
+        // LA-22: the area selection brushes Link Analysis — by the key column only; unkeyed points never brush.
+        this.brush.fromGeo((this.displayed()?.points ?? []).map((p) => p.key ?? ''));
     }
 
     clearTools(): void {
@@ -695,6 +702,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         this.radiusCenter.set(null);
         this.polygonVertices.set([]);
         this.polygonFilter.set(null);
+        this.brush.clear();
     }
 
     /** Any tool artifact on the canvas (drives the clear-tools affordance). */
@@ -741,6 +749,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         const p = d?.points.find((x) => x.id === id);
         if (!d || !p) return;
         this.selectedId.set(id);
+        if (p.key) this.brush.fromGeo([p.key]);
         const rows: ElementDetailRow[] = [{ label: 'Coordinates', value: `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}` }];
         if (p.time !== undefined) rows.push({ label: 'Time', value: new Date(p.time).toISOString() });
         for (const [k, v] of Object.entries(p.attrs ?? {})) {

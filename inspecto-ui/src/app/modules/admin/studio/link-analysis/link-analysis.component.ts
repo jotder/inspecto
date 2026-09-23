@@ -126,6 +126,7 @@ import { ElementDetailDialog, ElementDetailResult, ElementObjectRef, PivotServic
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { ProjectedGraph, projectionNodeCapValue, splitIdentityGroups } from './entity-projection';
+import { GeoLinkBrushService, nodeIdsForKeys } from './geo-link-brush';
 import { GraphSourcesService } from './graph-sources';
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
@@ -240,6 +241,8 @@ export class LinkAnalysisComponent implements OnInit {
     });
     private pivotService = inject(PivotService);
     private graphSources = inject(GraphSourcesService);
+    /** LA-22: the shared Geo ↔ Link brush. */
+    private brush = inject(GeoLinkBrushService);
     private spaces = inject(SpacesService);
     private lens = inject(LensService);
     private exchange = inject(ExchangeService);
@@ -701,6 +704,21 @@ export class LinkAnalysisComponent implements OnInit {
     // ── canvas emphasis (shared: written by search / canvas clicks / the analysis toolbox child) ──
     readonly emphasis = signal<GraphEmphasis | null>(null);
 
+    /** The last run's mapping entity types — what `entityId` scoped the node ids with (`undefined` = unscoped). */
+    private readonly brushEntityTypes = computed<(string | undefined)[]>(() => {
+        const q = this.lastRun()?.query;
+        return q?.projections?.length ? q.projections.map((p) => p.entityType) : [q?.projection?.entityType];
+    });
+
+    /** LA-22: a Geo Map selection highlights the nodes its KEYS project to; an explicit emphasis wins. */
+    readonly geoBrushEmphasis = computed<GraphEmphasis | null>(() => {
+        const b = this.brush.brush();
+        const g = this.displayed();
+        if (b?.origin !== 'geo' || !g) return null;
+        const ids = new Set(g.nodes.map((n) => n.id));
+        return { nodeIds: nodeIdsForKeys(b.keys, ids, this.brushEntityTypes()), edgeIds: [] };
+    });
+
     // ── saved views ──
     readonly views = signal<LinkAnalysisView[]>([]);
     /** Stated in the saved-views menu, so the analyst reads it before choosing one (D-S1). */
@@ -1137,6 +1155,7 @@ export class LinkAnalysisComponent implements OnInit {
         const g = this.baseGraph();
         const node = g?.nodes.find((n) => n.id === id);
         if (!g || !node) return;
+        this.brush.fromLink([id], this.brushEntityTypes());
         const outgoing = g.edges.filter((e) => e.source === id);
         const incoming = g.edges.filter((e) => e.target === id);
         const neighbors = [...new Set([...outgoing.map((e) => e.target), ...incoming.map((e) => e.source)])].map((n) =>

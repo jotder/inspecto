@@ -87,6 +87,15 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
   "View on map" (pivots to Geo Map Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.
+* **Geo ↔ Link brushing** (LA-22, shipped 2026-09-23) — `link-analysis/geo-link-brush.ts`'s root
+  `GeoLinkBrushService` holds the last selection. On the Geo Map, closing a polygon (or clicking a point)
+  publishes the displayed points' `GeoPoint.key`s; Link Analysis highlights the nodes those keys project to
+  (`[emphasis]="emphasis() ?? geoBrushEmphasis()"` — an explicit emphasis wins). A node click publishes back
+  and the map emphasises the points whose key projects to it. The join goes **only** through `entityId()`
+  with the last run's mapping `entityType`s, so id-minting normalisation (D-S4) reaches the brush for free.
+  ⛔ Never label, never `pt:<i>`: a point with no mapped `entityIdCol` never brushes. ⚠ It is a brush
+  across **routes** (the service is root-scoped, so it survives navigation) — the split-pane mode and
+  graph-path → map-route tracing in the original row are deferred.
 * **V2 decisions of record — 2026-07-25 product session (BACKLOG D9 / D10 / D16).** All three remaining V2
   blockers were product calls, and all three were answered in favour of generalizing an existing seam rather
   than adding a link-analysis-specific one:
