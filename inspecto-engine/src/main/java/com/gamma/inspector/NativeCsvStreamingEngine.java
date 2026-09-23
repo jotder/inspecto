@@ -200,6 +200,10 @@ final class NativeCsvStreamingEngine {
      * file size. Each chunk writes its own per-partition output file ({@code <base>_cNNNN_out.*}),
      * which coexist in the partition dirs (valid Hive layout). Counts/outputs/lineage aggregate; the
      * <em>original</em> file remains the member for audit/markers/backup, so commit is unchanged.
+     *
+     * <p>An unreadable chunk makes the whole FILE unreadable: the chunks already written are rolled back
+     * ({@link #rollBackChunks}) and the file is quarantined {@code QUARANTINED_UNREADABLE}. A readable
+     * chunk whose transform or write fails still fails the batch, and the file stays in the inbox.
      */
     static IngestOutcome chunkedIngest(Consignment batch, Consignment.Member m, PipelineConfig cfg,
                                        Connection conn, LocalDateTime batchStart) throws Exception {
@@ -220,11 +224,23 @@ final class NativeCsvStreamingEngine {
         Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
         long castTotal = -1;   // stays "not measured" unless at least one chunk measured
         int chunkCount = 0;
+        String unreadable = null;   // set when a chunk proves the FILE unreadable (CHUNKED-UNREADABLE-FAILS-BATCH-1)
 
+        // Each chunk's failure is classified exactly as the single-member lane classifies its one unit:
+        // streamUnit's read probe splits a failed materialize into TransformFailedException (readable → fail
+        // the batch) or the raw read error (unreadable); a sink write is a SinkFlushException (fail the batch).
+        // The chunker's own read of the source (a corrupt or truncated .gz) is UnreadableSourceException;
+        // its scratch writes stay plain IOExceptions and fail the batch — the host's fault, not the file's.
         try (FileChunker chunker = new FileChunker(m.file(), cfg, chunkDir)) {
             int seq = 0;
-            while (chunker.hasNext()) {
-                File chunk = chunker.next();
+            while (unreadable == null && chunker.hasNext()) {
+                File chunk;
+                try {
+                    chunk = chunker.next();
+                } catch (FileChunker.UnreadableSourceException e) {
+                    unreadable = "chunk " + seq + " unreadable: " + msg(e);
+                    break;
+                }
                 chunkCount++;
                 try {
                     // Lineage is attributed to the ORIGINAL file name, not the transient chunk.
@@ -238,17 +254,53 @@ final class NativeCsvStreamingEngine {
                     bounds.putAll(s.bounds());
                     // Sum across chunks; one unmeasurable chunk must not erase the others' counts.
                     if (s.castFailures() >= 0) castTotal = Math.max(castTotal, 0) + s.castFailures();
+                } catch (SinkFlushException | TransformFailedException e) {
+                    throw e;   // the write or the transform failed, not the read → fail the batch
+                } catch (Exception e) {
+                    unreadable = "chunk " + seq + " unreadable: " + msg(e);
                 } finally {
                     Files.deleteIfExists(chunk.toPath());
                 }
                 seq++;
             }
+        } catch (FileChunker.UnreadableSourceException e) {
+            unreadable = "unreadable: " + msg(e);   // the constructor's first read of the source failed
+        }
+        if (unreadable != null) {
+            // Quarantine only AFTER the chunker is closed: an open handle refuses the move on Windows.
+            int removed = rollBackChunks(outputs, cfg, batch.batchId());
+            QuarantineManager.quarantine(m.file(), "unreadable", false, cfg);
+            String reason = removed > 0
+                    ? unreadable + " (" + removed + " output file(s) written by earlier chunks rolled back)"
+                    : unreadable;
+            return empty(batch, batchStart, MemberAudit.rejected(m, MemberStatus.QUARANTINED_UNREADABLE, reason, mStart));
         }
         log.info("[INGEST] [{}] streamed {} chunk(s): {} rows{}", m.file().getName(), chunkCount,
                 String.format("%,d", parsedTotal), rejectTotal > 0 ? "  rejected=" + rejectTotal : "");
 
         return finishSingle(batch, m, cfg, batchStart, mStart, parsedTotal, rejectTotal, outputs, lineage,
                 bounds, castTotal);
+    }
+
+    /**
+     * Undo what the chunks before an unreadable one wrote, so a quarantined file leaves NO rows in the
+     * Dataset — the same all-or-nothing a single-member file has. Each chunk's write was revealed into the
+     * partition dirs on its own, and a quarantine never commits (no manifest, no registration, no lineage),
+     * so without this the earlier chunks would sit there as unregistered orphans that a glob still reads.
+     * The batch's branch-commit log goes too: it would otherwise claim those chunk scopes as committed.
+     * ⚠ Not undone: Decision Rule record-quarantine copies ({@code quarantine/records/…}) — they are
+     * quarantine evidence, beside the file that now joins them. Returns the number of files removed.
+     */
+    private static int rollBackChunks(List<PartitionOutput> outputs, PipelineConfig cfg, String batchId)
+            throws java.io.IOException {
+        int removed = 0;
+        for (PartitionOutput o : outputs)
+            if (Files.deleteIfExists(Paths.get(o.outputFile()))) removed++;
+        Files.deleteIfExists(ConsignmentIngestStrategy.branchCommitLogPath(cfg, batchId));
+        if (removed > 0)
+            log.warn("[INGEST] rolled back {} chunk output file(s) of batch {} before quarantining it UNREADABLE",
+                    removed, batchId);
+        return removed;
     }
 
     /**

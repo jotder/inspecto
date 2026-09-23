@@ -64,19 +64,53 @@ final class FileChunker implements Closeable {
         this.targetBytes = target > 0 ? target : Long.MAX_VALUE;
         Files.createDirectories(outDir);
 
-        InputStream in = com.gamma.etl.Compression.decompress(
-                source, Files.newInputStream(source.toPath()), 1 << 16);
-        this.reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8), 1 << 20);
-
-        // Capture the leading context reproduced on every chunk: skip_header_lines preamble
-        // plus the header row (when has_header). Mirrors read_csv's skip = skipHeaderLines + header.
-        int prefixCount = cfg.csv().skipHeaderLines() + (cfg.csv().hasHeader() ? 1 : 0);
-        for (int i = 0; i < prefixCount; i++) {
-            String line = reader.readLine();
-            if (line == null) break;
-            prefixLines.add(line);
+        // ⚠ A constructor that throws is never closed by the caller's try-with-resources, and the caller
+        // then MOVES the file into quarantine — which an open handle refuses on Windows. So close on failure.
+        InputStream raw;
+        try {
+            raw = Files.newInputStream(source.toPath());
+        } catch (IOException e) {
+            throw new UnreadableSourceException(e);
         }
-        pendingDataLine = reader.readLine();   // first data line (null ⇒ no data)
+        try {
+            InputStream in = com.gamma.etl.Compression.decompress(source, raw, 1 << 16);
+            this.reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8), 1 << 20);
+        } catch (IOException e) {
+            raw.close();
+            throw new UnreadableSourceException(e);
+        }
+        try {
+            // Capture the leading context reproduced on every chunk: skip_header_lines preamble
+            // plus the header row (when has_header). Mirrors read_csv's skip = skipHeaderLines + header.
+            int prefixCount = cfg.csv().skipHeaderLines() + (cfg.csv().hasHeader() ? 1 : 0);
+            for (int i = 0; i < prefixCount; i++) {
+                String line = readSourceLine();
+                if (line == null) break;
+                prefixLines.add(line);
+            }
+            pendingDataLine = readSourceLine();   // first data line (null ⇒ no data)
+        } catch (UnreadableSourceException e) {
+            reader.close();
+            throw e;
+        }
+    }
+
+    /**
+     * A failure READING the source (a corrupt or truncated {@code .gz}, an I/O error on the input) —
+     * the file's fault, so the caller quarantines it {@code UNREADABLE}. Kept apart from a plain
+     * {@link IOException} writing the chunk to scratch (disk full, a too-long path), which is the
+     * host's fault and must fail the batch instead (CHUNKED-UNREADABLE-FAILS-BATCH-1).
+     */
+    static final class UnreadableSourceException extends IOException {
+        UnreadableSourceException(IOException cause) { super(cause.getMessage(), cause); }
+    }
+
+    private String readSourceLine() throws UnreadableSourceException {
+        try {
+            return reader.readLine();
+        } catch (IOException e) {
+            throw new UnreadableSourceException(e);
+        }
     }
 
     /** True if at least one more data line remains, i.e. another chunk can be produced. */
@@ -102,7 +136,7 @@ final class FileChunker implements Closeable {
                 w.write(pendingDataLine);
                 w.write('\n');
                 dataBytes += (long) pendingDataLine.length() + 1;
-                pendingDataLine = reader.readLine();
+                pendingDataLine = readSourceLine();
             } while (pendingDataLine != null && dataBytes < targetBytes);
         }
         return chunk.toFile();

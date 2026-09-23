@@ -111,6 +111,106 @@ class ChunkedStreamingTest {
         }
     }
 
+    // ── CHUNKED-UNREADABLE-FAILS-BATCH-1: classify a failure per chunk ─────────────────────────────
+
+    private PipelineConfig chunkedPipeline(Path dir, String chunkBytes) throws Exception {
+        String chunking = "  chunking:\n    max_file_bytes: 30\n    target_chunk_bytes: " + chunkBytes + "\n";
+        Path toon = com.gamma.etl.PipelineConfigBatchTest.writePipeline(dir, chunking);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Files.createDirectories(Path.of(cfg.dirs().poll()));
+        return cfg;
+    }
+
+    private static boolean quarantined(PipelineConfig cfg, String name) throws Exception {
+        Path q = Path.of(cfg.dirs().quarantine());
+        if (!Files.exists(q)) return false;
+        try (Stream<Path> w = Files.walk(q)) {
+            return w.anyMatch(p -> p.getFileName().toString().equals(name));
+        }
+    }
+
+    /**
+     * A {@code .gz} that is TRUNCATED mid-stream: the first chunks decompress and are WRITTEN, then a
+     * later chunk's read hits the torn end. The file is unreadable, so it must be quarantined
+     * {@code QUARANTINED_UNREADABLE} — not FAILED and retried every cycle — and the Consignment must
+     * not stay half-written: the chunks written before the torn one are rolled back.
+     */
+    @Test
+    void truncatedGzipLaterChunkIsQuarantinedUnreadableAndEarlierChunksAreRolledBack(@TempDir Path dir)
+            throws Exception {
+        PipelineConfig cfg = chunkedPipeline(dir, "200000");
+        Path gz = Path.of(cfg.dirs().poll()).resolve("big.csv.gz");
+        // > the chunker's 1 MiB read buffer decompressed, so chunk 0 is written before the torn tail is read.
+        StringBuilder csv = new StringBuilder("ID,AMT,EVENT_DATE\n");
+        for (int i = 0; i < 120_000; i++)
+            csv.append("r").append(i).append(',').append(i % 97).append(".0,2020-0").append(1 + i % 4).append("-03\n");
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.GZIPOutputStream z = new java.util.zip.GZIPOutputStream(bytes)) {
+            z.write(csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        byte[] whole = bytes.toByteArray();
+        Files.write(gz, java.util.Arrays.copyOf(whole, whole.length * 3 / 4));   // tear off the last quarter
+
+        process(cfg, new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+                List.of(member(cfg, gz.toFile(), 0))));
+
+        assertFalse(Files.exists(gz), "an unreadable file must leave the inbox");
+        assertTrue(quarantined(cfg, "big.csv.gz"), "and land in quarantine");
+        String status = Files.readString(Path.of(cfg.dirs().statusFilePath()));
+        assertTrue(status.contains("QUARANTINED_UNREADABLE"), status);
+        assertTrue(status.contains("chunk"), "the reason names the torn chunk: " + status);
+        String batches = Files.readString(Path.of(cfg.dirs().batchesFilePath()));
+        assertFalse(batches.contains(",FAILED,"), "an unreadable file is a quarantine, not a FAILED batch: " + batches);
+        // Atomicity: nothing the earlier chunks wrote survives — no half-written Consignment in the Dataset.
+        Path db = Path.of(cfg.dirs().database());
+        if (Files.exists(db))
+            try (Stream<Path> w = Files.walk(db)) {
+                List<Path> left = w.filter(Files::isRegularFile)
+                        .filter(p -> p.getFileName().toString().startsWith("big_c")).toList();
+                assertTrue(left.isEmpty(), "earlier chunks' outputs must be rolled back: " + left);
+            }
+        assertFalse(Files.exists(ConsignmentIngestStrategy.branchCommitLogPath(cfg,
+                        cfg.identity().runTimestamp() + "_mini_0001")),
+                "no branch-commit log may claim the rolled-back chunks as committed");
+    }
+
+    /** Unreadable from the first byte (not gzip at all): quarantined the same way, nothing written. */
+    @Test
+    void corruptGzipChunkedFileIsQuarantinedUnreadable(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = chunkedPipeline(dir, "30");
+        Path gz = Path.of(cfg.dirs().poll()).resolve("corrupt.csv.gz");
+        Files.write(gz, "this is not gzip-compressed data, but long enough to be chunked".getBytes());
+
+        process(cfg, new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+                List.of(member(cfg, gz.toFile(), 0))));
+
+        assertTrue(quarantined(cfg, "corrupt.csv.gz"), "an unreadable chunked file must be quarantined");
+        assertTrue(Files.readString(Path.of(cfg.dirs().statusFilePath())).contains("QUARANTINED_UNREADABLE"));
+    }
+
+    /**
+     * The other half of the split: a READABLE chunked file whose TRANSFORM fails (a {@code partitionKey}
+     * naming an absent column) fails the BATCH, named, and stays in the inbox — never quarantined.
+     */
+    @Test
+    void chunkedTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox(@TempDir Path dir) throws Exception {
+        chunkedPipeline(dir, "30");   // writes the pipeline + schema; the schema is then broken and reloaded
+        Files.writeString(dir.resolve("mini_schema.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema()
+                .replace("partitionKey: EVENT_DATE", "partitionKey: NO_SUCH_COLUMN"));
+        PipelineConfig cfg = PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        Path solo = Path.of(cfg.dirs().poll()).resolve("solo.csv");
+        Files.writeString(solo, DATA);
+
+        process(cfg, new Consignment(cfg.identity().runTimestamp() + "_mini_0001", "mini", null,
+                List.of(member(cfg, solo.toFile(), 0))));
+
+        assertTrue(Files.exists(solo), "a readable file must stay in the inbox when its TRANSFORM fails");
+        assertFalse(quarantined(cfg, "solo.csv"), "nothing may be quarantined");
+        String batches = Files.readString(Path.of(cfg.dirs().batchesFilePath()));
+        assertTrue(batches.contains(",FAILED,"), "the batch must be FAILED: " + batches);
+        assertTrue(batches.contains("transform failed for solo.csv"), "named: " + batches);
+    }
+
     @Test
     void chunkedAndUnchunkedProduceSameRowTotal(@TempDir Path dir) throws Exception {
         // Un-chunked baseline (chunking disabled).

@@ -237,13 +237,40 @@ rethrows beside `SinkFlushException`, so the batch is `FAILED` and the file stay
 **Cost: zero on a successful batch** — the probe runs only on the failure path (one extra read of a file that
 already failed). A cheaper pre-read or a `DESCRIBE` bind-check was not needed and would have taxed every batch.
 ⚠ A runtime transform error (e.g. author SQL in an `EXPR` rule that throws) is classified correctly too — the
-probe does not care WHY the transform failed. ⚠ The chunked lane (`chunkedIngest`) has no quarantine catch at
-all: any failure, including an unreadable chunk, fails the batch — the opposite, file-preserving direction
-(`CHUNKED-UNREADABLE-FAILS-BATCH-1`). The Java parse lane (`IOException` only) and both plugin lanes (transform
+probe does not care WHY the transform failed. The chunked lane now classifies per chunk too — see the next
+paragraph (`CHUNKED-UNREADABLE-FAILS-BATCH-1`). The Java parse lane (`IOException` only) and both plugin lanes (transform
 wrapped in `SinkFlushException`) already classified correctly. Pinned by
 `ConsignmentIngestorTest.singleMemberTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox` and
 `…singleMemberUnreadableInputIsStillQuarantinedUnreadable` (a non-gzip `.csv.gz`, which fails INSIDE
 `materialize`, so it exercises the probe's unreadable branch — a probe forced to succeed turns it red).
+
+✅ **The chunked lane quarantines an unreadable file, and rolls back the chunks it already wrote**
+(`CHUNKED-UNREADABLE-FAILS-BATCH-1`, fixed 2026-09-23). `chunkedIngest` had no quarantine catch, so an
+unreadable file over `processing.chunking.max_file_bytes` FAILED the batch and stayed in the inbox until
+`CommitRetry` exhausted it (`retry_exhausted`, not `unreadable`), each attempt re-writing the readable chunks.
+**Classification, per chunk, with no second helper:** each chunk goes through the same `streamUnit`, so the
+`COUNT(*)` probe above already splits a failed `materialize` into `TransformFailedException` (batch `FAILED`,
+file stays) or the raw read error (unreadable); `SinkFlushException` still fails the batch. 🔴 **The realistic
+unreadable chunk is not a `read_csv` error at all** — chunks are re-written as clean UTF-8 and read with
+`ignore_errors=true` — it is `FileChunker`'s own read of the source: a corrupt `.gz` fails in its constructor, a
+TRUNCATED `.gz` fails in `next()` after earlier chunks were written. `FileChunker` now raises those as
+`UnreadableSourceException`, kept apart from a plain `IOException` writing the chunk to scratch (disk full, a
+too-long path — the host's fault, which still fails the batch, the `WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`
+lesson). The constructor closes its stream when it throws: the caller then MOVES the file, which an open handle
+refuses on Windows. **Atomicity (decided 2026-09-23):** each chunk's write is revealed into the partition dirs
+on its own, and a quarantine never commits (no manifest, registration or lineage), so the earlier chunks would
+sit in the Dataset as unregistered orphans that a glob still reads — a half-written Consignment, silently. So
+an unreadable chunk makes the whole FILE unreadable: `rollBackChunks` deletes every output file the earlier
+chunks wrote and the batch's branch-commit log (which would otherwise claim those chunk scopes committed), then
+the file is quarantined `QUARANTINED_UNREADABLE` with *“chunk N unreadable: … (K output file(s) written by
+earlier chunks rolled back)”* — the same all-or-nothing a single-member file has. ⚠ Not undone: Decision Rule
+record-quarantine copies (`quarantine/records/…`) from earlier chunks — quarantine evidence, beside the file.
+⚠ A chunk output that OVERWROTE a same-named file from an earlier committed batch (same file stem re-ingested)
+is deleted too; that earlier content was already gone at the overwrite. Pinned by `ChunkedStreamingTest`
+(+3): `truncatedGzipLaterChunkIsQuarantinedUnreadableAndEarlierChunksAreRolledBack` (20 chunk outputs written
+then removed; red with the rollback disabled, and separately with only the branch-log delete disabled),
+`corruptGzipChunkedFileIsQuarantinedUnreadable`, and `chunkedTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox`
+(red when the per-chunk catch swallows `TransformFailedException`).
 
 ✅ **A failed partition write fails the batch; it never quarantines the input**
 (`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, fixed 2026-09-23). A scratch path near 250 characters failed the
