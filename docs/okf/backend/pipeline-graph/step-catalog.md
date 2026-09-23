@@ -94,7 +94,7 @@ warns when one is set on a local inbox (`WARN_COLLECTOR_KEY_INERT`, [config safe
 |---|---|---|---|
 | `connector` | string · `local` | — (derived) | `local`, `dataset`, or the named Connection's connector. The form derives it at save and never asks. |
 | `connection` | string | `connection` (writes `use: connection/<name>`) | The saved Connection profile — host, credentials and the connector's own options (below). |
-| `dataset` | string | `dataset` | Dataset entry: the Dataset whose snapshots each cycle copies in. Only with `connector: dataset`. ⚠ A plain component id (`orders_by_region`), never a path: `ComponentStore.get` refuses a `/` as an unsafe id — the shipped `orders_by_region_feed` still says `datasets/orders_by_region` (`DEMO-DATASET-FEED-UNSAFE-ID-1`). |
+| `dataset` | string | `dataset` | Dataset entry: the Dataset whose snapshots each cycle copies in. Only with `connector: dataset`. Spell it bare (`orders_by_region`) or as the trigger's `datasets/<id>` ref: `PipelineConfigParser` strips a leading `datasets/` at load, so the connector always receives the bare id. ⚠ Any other `/` reaches `ComponentStore.get`, which refuses it as an unsafe id. The shipped `orders_by_region_feed` uses the prefixed form and resolves (`DEMO-DATASET-FEED-UNSAFE-ID-1` refuted, pinned by `DatasetCollectorConnectorFactoryTest`). |
 | `id` | string · the pipeline name | — | The Collector's id. Circuit-breaker state is keyed by it. |
 | `include` | list · `processing.file_pattern` | `include` | Discovery patterns (`glob:` or `regex:` over the relative path). |
 | `exclude` | list | `exclude` | Patterns removed from discovery. |

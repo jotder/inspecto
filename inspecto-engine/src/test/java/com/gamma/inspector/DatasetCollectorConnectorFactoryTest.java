@@ -94,6 +94,36 @@ class DatasetCollectorConnectorFactoryTest {
         assertTrue(view.getMessage().contains("physicalRef"), view.getMessage());
     }
 
+    /**
+     * DEMO-DATASET-FEED-UNSAFE-ID-1 (refuted 2026-09-24): the SHIPPED demo Pipeline spells
+     * {@code collector.dataset: datasets/orders_by_region}. The row claimed that reaches
+     * {@code ComponentStore.get} with the slash and is refused as an unsafe id — but
+     * {@code PipelineConfigParser} strips the {@code datasets/} prefix at load, so the factory sees the
+     * bare id. Pinned against the real file + the real demo registry so a parser change that drops the
+     * normalisation goes red here, on the shipped value, rather than at a demo poll.
+     */
+    @Test
+    void theShippedDemoFeedResolvesItsDatasetDespiteTheDatasetsPrefix(@TempDir Path dir) throws Exception {
+        Path demo = Path.of("..", "spaces", "demo", "config").toAbsolutePath().normalize();
+        Path shipped = demo.resolve("orders/orders_by_region_feed_pipeline.toon");
+        assertTrue(Files.readString(shipped).contains("dataset: datasets/orders_by_region"),
+                "precondition: the shipped file still uses the prefixed spelling");
+        Path dataRoot = Files.createDirectories(dir.resolve("data"));
+        ambient(demo, dataRoot);
+
+        PipelineConfig cfg = PipelineConfig.load(shipped.toString());
+        assertEquals("orders_by_region", cfg.collector().dataset(), "the parser stores the bare id");
+
+        Path resolved = DatasetCollectorConnectorFactory.resolveDatasetDir(cfg.collector().dataset());
+        assertTrue(resolved.normalize().startsWith(dataRoot.resolve("orders_by_region").normalize()),
+                "resolved through the demo registry's physicalRef: " + resolved);
+        IllegalArgumentException raw = assertThrows(IllegalArgumentException.class,
+                () -> DatasetCollectorConnectorFactory.resolveDatasetDir("datasets/orders_by_region"));
+        assertTrue(raw.getMessage().contains("unsafe component id"),
+                "the factory itself does refuse the prefixed spelling — only the parser saves it: "
+                        + raw.getMessage());
+    }
+
     @Test
     void theFactoryIsServiceLoaderDiscoverable() {
         boolean found = false;

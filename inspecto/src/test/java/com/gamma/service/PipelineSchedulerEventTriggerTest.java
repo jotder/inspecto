@@ -292,4 +292,20 @@ class PipelineSchedulerEventTriggerTest {
             assertEquals(List.of("orders_proc"), h.ran, "a job no pipeline owns must still trigger subscribers");
         }
     }
+
+    /**
+     * DEMO-DATASET-FEED-UNSAFE-ID-1: the shipped demo feed declares
+     * {@code {on: dataset, from: datasets/orders_by_region}}; the Signal carries the bare id.
+     */
+    @Test
+    void theDemoFeedsPrefixedFromFiresOnABareDatasetWrite(@TempDir Path dir) throws Exception {
+        Path feed = pipeline(dir.resolve("feed"), "ORDERS_BY_REGION_FEED",
+                "trigger:\n  type: event\n  on: dataset\n  from: datasets/orders_by_region\n");
+
+        try (Harness h = harness(List.of(feed))) {
+            h.scheduler.onDatasetWrite("orders_by_region", null);
+            h.settle();
+            assertEquals(List.of("orders_by_region_feed"), h.ran);
+        }
+    }
 }
