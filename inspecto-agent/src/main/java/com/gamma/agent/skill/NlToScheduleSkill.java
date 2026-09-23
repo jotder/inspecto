@@ -185,7 +185,7 @@ public final class NlToScheduleSkill implements Capability {
 
         String answer = humanReadable
                 + (d.onPipeline != null ? " (also after the '" + d.onPipeline + "' pipeline commits)" : "")
-                + ". Review the draft below and save it as a *_job.toon to schedule it.";
+                + ". Review the draft below and save it through POST /jobs (persisted as jobs/<name>_job.toon under the write root) to schedule it.";
 
         return AgentResult.draft(ID, SPEC.version(), answer, evidence, links, null, 1.0, chosen, data);
     }
