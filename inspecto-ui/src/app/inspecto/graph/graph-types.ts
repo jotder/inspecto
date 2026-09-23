@@ -52,6 +52,8 @@ export interface G6Edge {
         attrs?: Record<string, string | null>;
         /** LA-08: the Datasets this link was projected from (`__provenance_dataset`). */
         provenance?: string[];
+        /** A derived display-only Pipeline edge (the companion-enrichment line): styled apart, not selectable. */
+        derived?: true;
     };
 }
 

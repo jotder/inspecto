@@ -32,9 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       same way, through {@code WebhookSink.plan}.</li>
  * </ol>
  *
- * <p>⚠ The companion shape {@code GET /graph/raw} synthesizes for a {@code *_enrich.toon} (a
- * {@code sink --data--> enrichment} edge) never reaches the walk: it fails {@code PipelineValidator}'s
- * {@code ILLEGAL_EMIT} first — a separate defect, filed rather than pinned here.
+ * <p>The companion shape {@code GET /graph/raw} synthesizes for a {@code *_enrich.toon} is joined to the
+ * sink by a derived display-only edge the save path drops — see {@code ControlApiPipelineGraphCompanionTest}.
  */
 class ControlApiDryRunBlindSpotsTest {
 

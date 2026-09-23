@@ -38,6 +38,7 @@ import {
     nodeConfigEntries,
     nodeDisplayLabel,
     nodeLastRunTotal,
+    isDerivedEdge,
     provenanceCounts,
     removeStepFromChain,
     removeEdgeFromModel,
@@ -160,6 +161,27 @@ describe('authoredToG6 last-run overlay (T17)', () => {
         const { edges } = authoredToG6(pipeline, typeCat);
         expect(edges.map((e) => e.data.kind)).toEqual(['data', 'dropped']);
         expect(edges.every((e) => !('weight' in e.data))).toBe(true);
+    });
+});
+
+describe('authoredToG6 derived companion edge (GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1)', () => {
+    const pipeline: AuthoredPipeline = {
+        name: 'F',
+        active: true,
+        nodes: [
+            { id: 'sink', type: 'sink.persistent' },
+            { id: 'daily', type: 'enrichment', use: 'enrichment/daily' },
+        ],
+        edges: [{ from: 'sink', rel: 'companion', to: 'daily', derived: true }],
+    };
+
+    it('renders the derived edge marked derived, with no run overlay, and not selectable', () => {
+        const counts = provenanceCounts([{ nodeId: 'sink', rel: 'companion', rowCount: 9, simulated: false }]);
+        const g = authoredToG6(pipeline, new Map([['sink.persistent', 'SINK']]), undefined, undefined, counts);
+        expect(g.edges[0].data).toEqual({ kind: 'companion', derived: true });
+        expect(isDerivedEdge(g, g.edges[0].id)).toBe(true);
+        expect(isDerivedEdge(g, 'sink->daily:data:0')).toBe(false);
+        expect(isDerivedEdge(null, g.edges[0].id)).toBe(false);
     });
 });
 

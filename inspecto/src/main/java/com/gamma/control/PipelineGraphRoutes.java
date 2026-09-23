@@ -345,6 +345,16 @@ final class PipelineGraphRoutes implements RouteModule {
         return r;
     }
 
+    /**
+     * The rel of the <b>derived, display-only</b> edge {@link #attachCompanionEnrichments} draws from the
+     * pipeline's persistent sink to each companion enrichment node ({@code {from, rel: "companion", to,
+     * derived: true}}). It is not a data-flow relationship: the companion runs AFTER the pipeline's commit,
+     * off its own {@code *_enrich.toon} ({@code triggers.on_pipeline}), so no rel the validator knows fits it
+     * — a {@code data} edge out of a sink is {@code ILLEGAL_EMIT} (GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1).
+     * {@link #withoutDerivedEdges} drops it again before any save or candidate dry run parses the graph.
+     */
+    static final String COMPANION_REL = "companion";
+
     /** Synthesize the companion-enrichment nodes for {@code editableGraph} (read-only projection). */
     @SuppressWarnings("unchecked")
     private void attachCompanionEnrichments(ApiContext api, String pipeline, Map<String, Object> editable) {
@@ -377,8 +387,9 @@ final class PipelineGraphRoutes implements RouteModule {
                 if (sinkId != null) {
                     Map<String, Object> em = new LinkedHashMap<>();
                     em.put("from", sinkId);
-                    em.put("rel", "data");
+                    em.put("rel", COMPANION_REL);
                     em.put("to", ename);
+                    em.put("derived", true);
                     edges.add(em);
                 }
             }
@@ -387,11 +398,29 @@ final class PipelineGraphRoutes implements RouteModule {
         }
     }
 
+    /**
+     * {@code body} minus every derived display-only edge ({@code rel: companion, derived: true}) that
+     * {@code GET .../graph/raw} synthesizes — so an untouched open → save or candidate dry run never
+     * persists or validates it as data flow. Only that exact kind is dropped: a hand-authored {@code data}
+     * edge out of a sink still reaches the validator and is still refused {@code ILLEGAL_EMIT}.
+     */
+    static Map<String, Object> withoutDerivedEdges(Map<String, Object> body) {
+        if (!(body.get("edges") instanceof List<?> edges)) return body;
+        List<Object> kept = new ArrayList<>();
+        for (Object o : edges)
+            if (!(o instanceof Map<?, ?> em && Boolean.TRUE.equals(em.get("derived"))
+                    && COMPANION_REL.equals(em.get("rel")))) kept.add(o);
+        if (kept.size() == edges.size()) return body;
+        Map<String, Object> out = new LinkedHashMap<>(body);
+        out.put("edges", kept);
+        return out;
+    }
+
     /** Parse a pipeline definition (400 on a malformed shape) and validate it (422 on validation errors). */
     private PipelineGraph parseAndValidateFlow(ApiContext api, Map<String, Object> body) {
         PipelineGraph g;
         try {
-            g = PipelineCodec.fromMap(body);
+            g = PipelineCodec.fromMap(withoutDerivedEdges(body));
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         }

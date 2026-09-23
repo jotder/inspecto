@@ -3,6 +3,8 @@ import { HttpHeaders, HttpResponse, provideHttpClient, withXhr } from '@angular/
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import {
+    AuthoredPipeline,
+    withoutDerivedEdges,
     PipelineBundleImportResult,
     PipelineListRow,
     PipelineSummary,
@@ -108,5 +110,62 @@ describe('PipelinesService (broken rows)', () => {
         const { pipelines, broken } = splitPipelineRows(got!);
         expect(pipelines.map((p) => p.name)).toEqual(['good']);
         expect(broken.map((b) => [b.name, b.loadError.line])).toEqual([['orders', 7]]);
+    });
+});
+
+/**
+ * GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1: `GET …/graph/raw` draws a companion enrichment with a
+ * DERIVED display-only edge (`rel: companion, derived: true`). It must never travel back as a real edge —
+ * neither in a save nor in a candidate dry run.
+ */
+describe('PipelinesService (derived companion edge)', () => {
+    let svc: PipelinesService;
+    let httpMock: HttpTestingController;
+    const graph: AuthoredPipeline = {
+        name: 'orders',
+        active: true,
+        nodes: [
+            { id: 'acq', type: 'acquisition' },
+            { id: 'sink', type: 'sink.persistent' },
+            { id: 'daily', type: 'enrichment', use: 'enrichment/daily' },
+        ],
+        edges: [
+            { from: 'acq', rel: 'data', to: 'sink' },
+            { from: 'sink', rel: 'companion', to: 'daily', derived: true },
+        ],
+    };
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            providers: [PipelinesService, provideHttpClient(withXhr()), provideHttpClientTesting()],
+        });
+        svc = TestBed.inject(PipelinesService);
+        httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => httpMock.verify());
+
+    it('withoutDerivedEdges drops only the derived edge and keeps the companion node', () => {
+        const out = withoutDerivedEdges(graph);
+        expect(out.edges).toEqual([{ from: 'acq', rel: 'data', to: 'sink' }]);
+        expect(out.nodes.map((n) => n.id)).toEqual(['acq', 'sink', 'daily']);
+        expect(graph.edges.length).toBe(2); // the canvas model is not mutated
+    });
+
+    it('savePipelineGraph never sends the derived edge back', () => {
+        svc.savePipelineGraph('orders', graph).subscribe();
+        const req = httpMock.expectOne((r) => r.method === 'PUT' && r.url === `${base}/pipelines/orders/graph`);
+        expect((req.request.body as AuthoredPipeline).edges.some((e) => e.derived)).toBe(false);
+        req.flush({ written: true });
+    });
+
+    it('a candidate dry run never sends the derived edge back', () => {
+        svc.dryRunAuthored('orders', [{ ID: '1' }], graph).subscribe();
+        const req = httpMock.expectOne(
+            (r) => r.method === 'POST' && r.url === `${base}/pipelines/authored/orders/dry-run`,
+        );
+        const body = req.request.body as { pipeline: AuthoredPipeline };
+        expect(body.pipeline.edges.some((e) => e.derived)).toBe(false);
+        req.flush({});
     });
 });

@@ -161,12 +161,13 @@ it over the sample would preview something no real run does. **Why not a refusal
 preview of every graph with an enrichment in it, because of one node the rest of the walk doesn't need.
 Any future node type the walk has no executor for gets the same named warning.
 
-⚠ **The companion shape never gets as far as the walk.** `GET /pipelines/{name}/graph/raw` adds a
-`*_enrich.toon` companion to the graph as a `sink.persistent --data--> enrichment` edge
-(`attachCompanionEnrichments`). `PipelineValidator` refuses that edge with `ILLEGAL_EMIT`: a sink emits
-only `on_commit / success / failure`. So posting that graph back as a dry-run candidate returns 422 before
-anything runs, and so does `PUT …/graph`, because both use `parseAndValidateFlow`. This is filed as its own
-row and not fixed here.
+✅ **The companion shape now reaches the walk (2026-09-24, `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1`).**
+`GET /pipelines/{name}/graph/raw` joins a `*_enrich.toon` companion to the sink with a **derived display-only**
+edge `{rel: "companion", derived: true}` instead of a `data` edge (which `PipelineValidator` refuses
+`ILLEGAL_EMIT` — a sink emits only `on_commit / success / failure`). `parseAndValidateFlow`, shared by the
+candidate dry run and `PUT …/graph`, drops that edge before parsing, so both answer 200; a hand-authored
+sink `data` edge is still refused. As-built in
+[editable-round-trip](../pipeline-graph/editable-round-trip.md) (*Derived companion edge*).
 
 **A `sink.webhook` branch now refuses the way the job dry run does.** For every webhook sink the walk reaches,
 `PipelineDryRun` calls `WebhookSink.plan`. That is the same resolution `DryRunSinkWriter` uses: config, edition
@@ -311,7 +312,7 @@ then removed; red with the rollback disabled, and separately with only the branc
 `corruptGzipChunkedFileIsQuarantinedUnreadable`, and `chunkedTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox`
 (red when the per-chunk catch swallows `TransformFailedException`).
 
-✅ **`PARKED-BRANCH-LEAK-ON-FAILED-BATCH-1` FIXED 2026-09-23:** `ConsignmentIngestor.process` now drains the batch's `ParkedBranches` entry on EVERY non-dry-run outcome — a non-SUCCESS batch (FAILED, `QUARANTINED_UNREADABLE`, …) drains and discards it, so the static registry never outlives its batch; a re-run re-parks to the same `<backup>/parked/<batchId>__<node>.parquet`. Pinned by `ChunkedStreamingTest#parkedBranchEntryIsDrainedWhenTheBatchDoesNotSucceed`. ⚠ **Open (filed 2026-09-23):** `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1` — `GET /pipelines/{name}/graph/raw` synthesizes `sink.persistent --data--> enrichment` for each `*_enrich.toon` companion, which `PipelineValidator` refuses `ILLEGAL_EMIT`, so an untouched open → save and the candidate dry run of such a Pipeline answer 422 (operator decision). `ENRICHMENT-MIDWALK-LANES-DISAGREE-1` — a mid-walk enrichment is skipped by `PipelineExecutor.execute` (downstream sinks starve) but dropped by `PipelineEditable.lower` (the flat lane feeds them).
+✅ **`PARKED-BRANCH-LEAK-ON-FAILED-BATCH-1` FIXED 2026-09-23:** `ConsignmentIngestor.process` now drains the batch's `ParkedBranches` entry on EVERY non-dry-run outcome — a non-SUCCESS batch (FAILED, `QUARANTINED_UNREADABLE`, …) drains and discards it, so the static registry never outlives its batch; a re-run re-parks to the same `<backup>/parked/<batchId>__<node>.parquet`. Pinned by `ChunkedStreamingTest#parkedBranchEntryIsDrainedWhenTheBatchDoesNotSucceed`. ✅ `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1` FIXED 2026-09-24 — the companion edge is a derived display-only `rel: companion` edge the save path drops (see above). ⚠ **Open (filed 2026-09-23):** `ENRICHMENT-MIDWALK-LANES-DISAGREE-1` — a mid-walk enrichment is skipped by `PipelineExecutor.execute` (downstream sinks starve) but dropped by `PipelineEditable.lower` (the flat lane feeds them).
 
 ✅ **A failed partition write fails the batch; it never quarantines the input**
 (`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, fixed 2026-09-23). A scratch path near 250 characters failed the

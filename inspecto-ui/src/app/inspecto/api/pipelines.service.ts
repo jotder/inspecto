@@ -238,6 +238,19 @@ export interface AuthoredEdge {
     from: string;
     rel: string;
     to: string;
+    /**
+     * `true` on a DISPLAY-ONLY edge the server synthesized — today only `rel: 'companion'`, the sink →
+     * `*_enrich.toon` companion line `GET …/graph/raw` draws. Not data flow: never saved, never dry-run
+     * ({@link withoutDerivedEdges}), and not editable on the canvas.
+     */
+    derived?: boolean;
+}
+
+/** `pipeline` minus its derived display-only edges — what a save or a candidate dry run may send back. */
+export function withoutDerivedEdges(pipeline: AuthoredPipeline): AuthoredPipeline {
+    return pipeline.edges.some((e) => e.derived)
+        ? { ...pipeline, edges: pipeline.edges.filter((e) => !e.derived) }
+        : pipeline;
 }
 
 /** A full authored pipeline definition (GET …/raw, POST/PUT body) — lossless, unlike the read-only projection. */
@@ -524,7 +537,7 @@ export class PipelinesService {
     savePipelineGraph(name: string, pipeline: AuthoredPipeline): Observable<PipelineGraphWriteResult> {
         return this.http.put<PipelineGraphWriteResult>(
             apiUrl(`/pipelines/${encodeURIComponent(name)}/graph`),
-            pipeline,
+            withoutDerivedEdges(pipeline),
         );
     }
 
@@ -652,7 +665,7 @@ export class PipelinesService {
     ): Observable<PipelineDryRunResult> {
         return this.http.post<PipelineDryRunResult>(
             apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/dry-run`),
-            candidate ? { sampleRows, pipeline: candidate } : { sampleRows },
+            candidate ? { sampleRows, pipeline: withoutDerivedEdges(candidate) } : { sampleRows },
         );
     }
 

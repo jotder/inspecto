@@ -392,15 +392,24 @@ export function authoredToG6(
             };
         }),
         edges: pipeline.edges.map((e, i) => {
+            const id = `${e.from}->${e.to}:${e.rel}:${i}`;
+            // A derived display-only edge (the companion-enrichment line) carries no data, so no overlay;
+            // `derived` styles it apart and keeps it out of edge selection (it is not editable).
+            if (e.derived) return { id, source: e.from, target: e.to, data: { kind: e.rel, derived: true } };
             const count = lastRunCounts?.get(`${e.from}|${e.rel}`);
             return {
-                id: `${e.from}->${e.to}:${e.rel}:${i}`,
+                id,
                 source: e.from,
                 target: e.to,
                 data: count == null ? { kind: e.rel } : edgeOverlayData(e.rel, count),
             };
         }),
     };
+}
+
+/** `true` when canvas edge `id` is a derived display-only edge ({@link authoredToG6}) — never selectable. */
+export function isDerivedEdge(data: G6GraphData | null, id: string): boolean {
+    return !!data?.edges.some((e) => e.id === id && e.data.derived);
 }
 
 /**

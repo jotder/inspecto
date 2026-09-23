@@ -121,7 +121,9 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   Grammar editor), which is why every ref it could write was refusable by construction.
 - **Routes** ([`PipelineGraphRoutes`](../../../../inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java)):
   `GET /pipelines/{name}/graph/raw` (lift + a synthesized node per registered enrichment companion whose
-  `triggers.on_pipeline` names this pipeline) and `PUT /pipelines/{name}/graph` (lower over the existing
+  `triggers.on_pipeline` names this pipeline, joined to the persistent sink by a **derived display-only
+  edge** `{from: <sink>, rel: "companion", to: <enrichment>, derived: true}` — see *Derived companion
+  edge* below) and `PUT /pipelines/{name}/graph` (lower over the existing
   file, then the **same** `ConfigSpecs.pipeline()` + `ConfigSafetyValidator` gate + atomic write that
   `POST /config/write` runs — the editor is a *caller*, not a second write pipe). **Since 2026-09-01 the
   graph route also runs the three arming pre-checks** (`armedWithoutSchemaFindings` ·
@@ -230,6 +232,31 @@ were violated by shipped code until 2026-08-18:
 shift authored the repo's first `steps:` fixture in `ae2c0909`) plus 3 explicit guards: authored order
 preserved, round trip in the authored spelling, and an unmodelled kind refusing rather than vanishing.
 Full `-Pedition-enterprise -fae` reactor 3458/0/0/5 at `f72f7fc8`.*
+
+### Derived companion edge — display-only, never saved (2026-09-24)
+
+`GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1` (operator decision: a derived display-only edge kind).
+`attachCompanionEnrichments` used to join each companion to the sink with a real `data` edge, and
+`PipelineValidator` refuses that `ILLEGAL_EMIT` (a sink emits only `on_commit / success / failure`), so an
+untouched open → save and the candidate dry run of any Pipeline with a companion answered 422. The edge is
+now `{from, rel: "companion", to, derived: true}` (`PipelineGraphRoutes.COMPANION_REL`):
+
+- **Server:** `parseAndValidateFlow` — the one parse behind `PUT …/graph` and the candidate dry run — first
+  drops every edge that is BOTH `derived: true` AND `rel: companion` (`withoutDerivedEdges`). Only that exact
+  kind: a `data` edge out of a sink, with or without `derived`, still reaches the validator and is still
+  `ILLEGAL_EMIT`. The companion node itself stays (the lower already ignores `enrichment` nodes), so a graph
+  save never touches the `*_enrich.toon`.
+- **SPA:** `AuthoredEdge.derived`; `withoutDerivedEdges` in `pipelines.service.ts` strips it from
+  `savePipelineGraph` and the `dryRunAuthored` candidate; `authoredToG6` renders it with no run overlay,
+  dotted and faded, and `isDerivedEdge` keeps `edge:click` from selecting it (not editable).
+- ⚠ Not covered: the authored-pipeline store (`BundleRoutes` `authored-pipeline` kind) and the catalog
+  export carry a `graph/raw` body opaquely; they do not validate data flow, so the edge rides along there.
+
+*Verified: `ControlApiPipelineGraphCompanionTest` (real HTTP: raw shape, untouched PUT → 200 with the
+companion byte-unchanged, candidate dry run → 200, a hand-authored sink `data` edge still `ILLEGAL_EMIT`);
+mutation — parsing `body` instead of `withoutDerivedEdges(body)` turns the save and dry-run tests red with
+`ILLEGAL_EMIT … does not emit relationship 'companion'`. UI: `pipelines.service.spec.ts`,
+`pipeline-graph.spec.ts`.*
 
 ---
 

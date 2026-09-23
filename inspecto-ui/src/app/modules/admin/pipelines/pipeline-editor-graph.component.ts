@@ -19,7 +19,7 @@ import { CanvasEvent, Graph, GraphData, NodeData, NodeEvent } from '@antv/g6';
 import { G6GraphData, nodeColor, nodeIcon } from 'app/modules/admin/catalog/catalog-graph';
 import { NodeKind } from 'app/inspecto/api';
 import { canvasTheme, nodeStatusStroke } from 'app/inspecto/theme/chart-tokens';
-import { NodeStatus, statusGlyph } from './pipeline-graph';
+import { isDerivedEdge, NodeStatus, statusGlyph } from './pipeline-graph';
 import {
     PipelinePositions,
     applyPipelineLayout,
@@ -308,7 +308,15 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
                     endArrow: true,
                     // An overlaid dry run's edges are dashed, as in the Sankey view — its counts landed
                     // nothing (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b); the label also says "(simulated)".
-                    lineDash: (d) => ((d.data as { simulated?: boolean }).simulated ? [4, 3] : []),
+                    // A derived display-only edge (sink → companion enrichment) is dotted and faded — it is
+                    // not data flow and cannot be selected or edited (edge:click below ignores it).
+                    lineDash: (d) =>
+                        (d.data as { derived?: boolean }).derived
+                            ? [1, 4]
+                            : (d.data as { simulated?: boolean }).simulated
+                              ? [4, 3]
+                              : [],
+                    strokeOpacity: (d) => ((d.data as { derived?: boolean }).derived ? 0.55 : 1),
                     labelText: (d) => (d.data as { kind: string }).kind,
                     labelFill: fg,
                     labelFontSize: 9,
@@ -373,7 +381,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
         });
         graph.on('edge:click', (e) => {
             const id = (e as unknown as { target?: { id?: string } }).target?.id;
-            if (id) this.edgeSelected.emit(id);
+            if (id && !isDerivedEdge(this.data, id)) this.edgeSelected.emit(id);
         });
         graph.on(CanvasEvent.CLICK, () => this.backgroundClick.emit());
         graph.on('node:pointerenter', (e) => {
