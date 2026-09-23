@@ -867,8 +867,10 @@
                             ></inspecto-link-analysis-investigation>
                         }
 
-                        <!-- View — layouts and canvas overlays -->
-                        <div [hidden]="toolboxTab() !== 'view'" class="flex flex-col gap-3">
+                        <!-- View — layouts and canvas overlays. `[class.hidden]`, never `[hidden]`: Tailwind's `.flex`
+                             sets display:flex, which beats the [hidden] attribute, so the View tools rendered under
+                             every tab. Still mounted, like the Analysis toolbox above. -->
+                        <div [class.hidden]="toolboxTab() !== 'view'" class="flex flex-col gap-3" data-toolbox-view>
                             <section aria-label="Layout">
                                 <h3 class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wide">
                                     Layout

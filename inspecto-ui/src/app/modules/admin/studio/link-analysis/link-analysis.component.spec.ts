@@ -400,6 +400,28 @@ describe('LinkAnalysisComponent', () => {
         expect(c.queryOpen()).toBe(true);
     });
 
+    it('the View tools are hidden (not merely [hidden]) under the other toolbox tabs, and stay mounted', () => {
+        // jsdom does not compute Tailwind, so pin the class contract: `.flex` beat the [hidden] attribute in the
+        // browser (computed display: flex), which put Layout / Overlays / Lenses under Analysis and Investigation.
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.toolboxDockOpen.set(true);
+        c.toolboxTab.set('analysis');
+        fixture.detectChanges();
+        const view = (): HTMLElement | null => fixture.nativeElement.querySelector('[data-toolbox-view]');
+        expect(view()).not.toBeNull(); // still mounted
+        expect(view()!.classList.contains('hidden')).toBe(true);
+        expect(view()!.hasAttribute('hidden')).toBe(false); // the attribute Tailwind overrides is not relied on
+
+        c.toolboxTab.set('investigation');
+        fixture.detectChanges();
+        expect(view()!.classList.contains('hidden')).toBe(true);
+
+        c.toolboxTab.set('view');
+        fixture.detectChanges();
+        expect(view()!.classList.contains('hidden')).toBe(false);
+    });
+
     it('workspace: a failed query keeps the form open; the docks open, collapse to rails and maximize', async () => {
         const { fixture } = create({ fail: true });
         fixture.detectChanges();
