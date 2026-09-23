@@ -138,12 +138,32 @@ into the output lake (measured live: `lake_out` held `A=3 B=5`, `lake_a` had no 
   with no attribution — byte-for-byte the old behaviour.
 * **Partitioned** — the "registration is mandatory" check runs for every sink that wrote, **before any
   ATTACH**, and names the offending `sinks[]` database; a sink that wrote nothing is skipped.
-* ⚠ **Two sinks inheriting the SAME lake both register** into its one table, so a replicate fan-out puts
-  each row there once per destination — exactly what the old pooled call did; the decision is per sink.
-  Keep or dedupe is an open operator question (BACKLOG `SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1`).
-  The caller's table name (`batch.table()`) still overrides a block's `table` key, per sink.
+* ⛔ **Two sinks registering into ONE lake table are REFUSED** (operator decision 2026-09-23,
+  `SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1`). Before it, two sinks inheriting the same lake both inserted
+  into its one table, so a replicate fan-out held each row once per destination — silently. The rule is
+  `com.gamma.etl.SinkLakeCollisions` (one copy, plain data in, the `RouteArming` pattern):
+  * **Identity** = `catalog_url` (trimmed, verbatim — `./lake.ducklake` and `lake.ducklake` are NOT
+    unified) + `schema` (default `main`) + the table **that would actually be registered**. Only
+    `enabled: true` lakes register, so only they collide. The effective lake is entry → `output.ducklake`.
+  * **The registered table is not always the block's `table` key.** `register` is handed `batch.table()`,
+    which overrides it; that is non-null exactly on a multi-schema pipeline (`processing.schemas[].table`;
+    `ConsignmentPlanner` maps blank / `default` to `null`). So there a per-sink `table` does **not**
+    separate two sinks sharing a catalog, and the refusal says to give one its own `schema` or
+    `catalog_url` instead. On a single-schema pipeline it suggests a per-sink `table`.
+  * **Where it bites** — `PipelineConfig.prepare()` throws the first collision, **unconditionally** (a
+    shape rule like the versioned-reference-with-many-sinks rule above it, not an `active`-gated arming
+    rule). The save path — `/config/write`, `/config/patch`, `PUT /pipelines/{name}/graph`, bundle import
+    and the draft branch of `POST /validate` — reports every collision as
+    `ERR_SINK_DUCKLAKE_SHARED_TABLE` at **ERROR even on an inactive draft**, because a WARNING would write
+    a file that then fails at registration. `POST /validate {configPath}` now answers **422** (not 500) for
+    any `prepare()` refusal. `fromMap` (editor / lift) does not refuse, so such a file still opens.
+  * ⚠ It lives in `ConfigRoutes`, **not** `ConfigSafetyValidator`: `inspecto-config` is below
+    `inspecto-etl`, so the validator cannot call the rule without a second copy of it. The draft side
+    approximates the parser's plugin-ingester test (`processing.ingester` / `parsing.plugin.ingester`);
+    a grammar-component or `frontend: asn1` ingester beside a `schemas[]` list is not modelled there.
 
-Tests: `DuckLakeRegistrarPerSinkTest` (7). A live two-catalog DuckLake run (ducklake extension cached)
+Tests: `DuckLakeRegistrarPerSinkTest` (7), `SinkDuckLakeSharedTableTest` (8, `prepare()`),
+`ControlApiSinkDuckLakeSharedTableTest` (4, real HTTP). A live two-catalog DuckLake run (ducklake extension cached)
 read `lake_a → A=3`, `lake_out → B=5` after the fix; it is not in the reactor, for the network-INSTALL
 reason `DuckLakeRegistrarTest` records.
 

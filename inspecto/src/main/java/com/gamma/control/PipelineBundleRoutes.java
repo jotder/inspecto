@@ -317,6 +317,7 @@ final class PipelineBundleRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", retargeted));
         findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", retargeted));
         findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", retargeted));
+        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings("pipeline", retargeted));
         // Import-time referential integrity (W5): resolve the bundle's declared dependencies against
         // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
         List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);

@@ -82,6 +82,7 @@ final class ConfigWriteRoutes implements RouteModule {
         // ERROR (when active): disabled_steps cannot arm until park/drain ships (S4a gate).
         findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         findings.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
+        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
         // ERROR: a collector bound to a connection this space does not have cannot acquire anything —
         // it throws once per poll cycle instead. Bundle import already refuses it; a save now agrees.
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
@@ -438,6 +439,7 @@ final class ConfigWriteRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.routeArmingFindings(type, merged));              // a patch can break arming too
         findings.addAll(ConfigRoutes.stepDisableFindings(type, merged));                // and can add disabled_steps too
         findings.addAll(ConfigRoutes.dedupWindowFindings(type, merged));               // and a windowed dedup (D-9)
+        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, merged));         // and two sinks sharing one lake table
         findings.addAll(ConfigRoutes.unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
         // A patch can ADD a dead block as easily as a write can, and over the merged draft so a block
         // the patch did not touch is judged too (`DUCKLE-C3-DEAD-PROPERTY-1`).

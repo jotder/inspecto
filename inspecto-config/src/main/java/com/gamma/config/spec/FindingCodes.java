@@ -49,6 +49,11 @@ public final class FindingCodes {
     /** The same windowed-dedup refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_DEDUP_WINDOW_UNARMABLE = "WARN_DEDUP_WINDOW_UNARMABLE";
 
+    /** Two {@code sinks[]} destinations whose effective ducklake is one catalog + one registered table —
+     *  every batch would insert both destinations' files into it ({@code SinkLakeCollisions}). A shape
+     *  rule, not an arming one: refused regardless of {@code active}, so it has no {@code WARN_} twin. */
+    public static final String ERR_SINK_DUCKLAKE_SHARED_TABLE = "ERR_SINK_DUCKLAKE_SHARED_TABLE";
+
     /** An ACTIVE {@code route:} branch whose {@code where:} predicate reads a column the pipeline's
      *  declared schema does not carry — the branch binds nowhere and throws on the first row
      *  (`TYPEFLOW-CONSUMERS-1` (a)). */

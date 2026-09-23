@@ -133,9 +133,11 @@ final class ConfigPreviewRoutes implements RouteModule {
             PipelineConfig cfg;
             try {
                 cfg = PipelineConfig.load(configPath);
-            } catch (IllegalArgumentException refused) {
+            } catch (IllegalArgumentException | IllegalStateException refused) {
                 // A config that does not load is the author's to fix, not a server fault: 422 with the
                 // loader's own message (file + line for a TOON decode refusal), never a bare 500.
+                // IllegalStateException is prepare()'s shape refusal (e.g. two sinks sharing one
+                // DuckLake table, SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1) — the author's to fix too.
                 throw new ApiException(422, refused.getMessage());
             }
             List<String> warnings = ConfigValidator.validate(cfg);
@@ -180,6 +182,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
         findings.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         findings.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
+        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
         // Opt-in hard-fail safety gate (R6): merged in only when the caller asks, so the default
         // /validate response is byte-for-byte unchanged for existing callers.
         boolean safety = "true".equalsIgnoreCase(String.valueOf(body.get("safety")));

@@ -344,6 +344,7 @@ final class PipelineGraphRoutes implements RouteModule {
         findings.addAll(ConfigRoutes.routeArmingFindings("pipeline", lowered));
         findings.addAll(ConfigRoutes.stepDisableFindings("pipeline", lowered));
         findings.addAll(ConfigRoutes.dedupWindowFindings("pipeline", lowered));
+        findings.addAll(ConfigRoutes.sinkLakeCollisionFindings("pipeline", lowered));
         // TYPEFLOW-CONSUMERS-1 (a): the graph editor is where a route branch and a summarize node are
         // actually authored, so this is the save path that sees them first — and the one the deferring
         // plan meant by "needs the recipe/pipeline context". Inside the existing ERROR gate below.

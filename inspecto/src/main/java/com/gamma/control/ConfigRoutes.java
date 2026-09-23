@@ -211,6 +211,27 @@ final class ConfigRoutes {
     }
 
     /**
+     * Two {@code sinks[]} destinations that would register into ONE DuckLake table — the save-time half
+     * of {@link com.gamma.etl.SinkLakeCollisions} ({@code SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1}).
+     * <b>ERROR regardless of {@code active}</b>, unlike the arming findings above: {@code prepare()}
+     * refuses the shape unconditionally, so a WARNING on an inactive draft would write a file that then
+     * fails at registration — the save-gate-vs-registration disagreement those findings exist to end.
+     */
+    static List<Finding> sinkLakeCollisionFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type)) return List.of();
+        Map<?, ?> proc    = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        Map<?, ?> parsing = draft.get("parsing")    instanceof Map<?, ?> m ? m : Map.of();
+        List<Finding> out = new ArrayList<>();
+        for (String refusal : com.gamma.etl.SinkLakeCollisions.refusals(
+                com.gamma.etl.SinkLakeCollisions.draftDestinations(draft.get("sinks"), draft.get("output")),
+                com.gamma.etl.SinkLakeCollisions.draftSchemaTables(proc, parsing))) {
+            out.add(new Finding(Severity.ERROR, "sinks", refusal, FindingCodes.ERR_SINK_DUCKLAKE_SHARED_TABLE,
+                    "apply the fix the message names — this shape is refused whether or not the pipeline is active"));
+        }
+        return out;
+    }
+
+    /**
      * A windowed {@code dedup} ({@code scope: window(...)}) that would refuse to run (D-9) — either the
      * {@code scope:} spelling is malformed, or the window lacks its REQUIRED {@code order_by} tie-break
      * ({@link com.gamma.consignment.DedupScope#refusal}: against a <b>durable</b> ledger a

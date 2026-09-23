@@ -1802,6 +1802,19 @@ public final class PipelineConfig {
                             + "combining it with multiple sinks: destinations is not supported "
                             + "(see docs/superpower/sinks-config-format-plan.md)");
         }
+        // Two sinks[] destinations registering into ONE DuckLake table duplicate its rows silently
+        // (SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1, operator decision 2026-09-23: refuse the shape).
+        // Unconditional, like the rule above: it is a shape rule, not an arming rule, and the save path
+        // refuses it at ERROR regardless of active: so a saved file never fails only at registration.
+        if (sinks.size() > 1) {
+            List<SinkLakeCollisions.Destination> dests = new ArrayList<>();
+            for (Sink d : sinks) dests.add(new SinkLakeCollisions.Destination(d.database(), d.duckLake()));
+            List<String> tables = new ArrayList<>();
+            if (schemas.selector() != null)
+                for (SchemaSelector.Selection s : schemas.selector().entries()) tables.add(s.table());
+            List<String> collisions = SinkLakeCollisions.refusals(dests, tables);
+            if (!collisions.isEmpty()) throw new IllegalStateException(collisions.get(0));
+        }
         // webhook: executes on the AT-REST lane only (operator decision 2026-09-23): PipelineLift.stageTwo
         // hangs the sink.webhook branch beside the output_store: sink, and the ingest lane has no executor
         // for it. So an active pipeline without output_store: would arm, ingest — and never send a row,
