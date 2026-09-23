@@ -646,18 +646,18 @@ export class LinkAnalysisComponent implements OnInit {
         return workingSetStats(this.collapsedGraph(), g, g ? workingSetOptionsFor(this.profile(), attrColumns(g)) : {});
     });
     /**
-     * Identities the value-projected id scheme appears to have SPLIT (D-S4). Measured on the same
-     * pre-aggregation graph as the tiles, and REPORTED only — merging spellings is the decision itself.
+     * Identities whose raw spellings the normalised entity id folded together (D-S4). Measured on the same
+     * pre-aggregation graph as the tiles, and REPORTED so the analyst can see a fold happened.
      */
     readonly splitIdentities = computed(() => splitIdentityGroups(this.graph()));
     readonly splitIdentityHint = computed(() => {
         const groups = this.splitIdentities();
         if (!groups.length) return '';
-        const shown = groups.slice(0, 3).map((g) => g.ids.join(' / '));
+        const shown = groups.slice(0, 3).map((g) => g.spellings.join(' / '));
         const rest = groups.length - shown.length;
         return (
-            'These ids differ only by case, spacing or trailing punctuation, so each counts as a separate ' +
-            'entity in degree, communities and every ranking: ' +
+            'These spellings differ only by case, spacing or trailing punctuation, so they are counted as ONE ' +
+            'entity in degree, communities and every ranking — check they really are the same: ' +
             shown.join('; ') +
             (rest > 0 ? `; and ${rest} more` : '')
         );

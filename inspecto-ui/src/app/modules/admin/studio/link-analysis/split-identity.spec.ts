@@ -3,12 +3,9 @@ import { G6GraphData } from 'app/inspecto/graph';
 import { splitIdentityGroups } from './entity-projection';
 
 /**
- * Decision D-S4: Link Analysis node ids are value-projected — `entityId` mints them from the trimmed raw
- * column value with no case fold and no alias resolution. `splitIdentityGroups` REPORTS the identities
- * that scheme has divided, so a degree count or a centrality ranking computed over a split identity space
- * is visible rather than silently wrong.
- *
- * ⛔ These specs pin that it reports and never merges. Merging would answer D-S4 in passing.
+ * Decision D-S4: since 2026-09-23 projected ids are normalised (`entity-normalisation.spec.ts`), but a graph
+ * can still carry raw ids (a pre-D-S4 saved view, another GraphSource). These specs pin that
+ * `splitIdentityGroups` reports such raw-id splits too, and never mutates the graph it reports on.
  */
 function node(id: string, label = id, extra: Record<string, unknown> = {}) {
     return { id, data: { label, kind: 'entity', ...extra } } as G6GraphData['nodes'][number];

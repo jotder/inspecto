@@ -27,6 +27,12 @@ export interface G6Node {
          * account while believing it represented all of them.
          */
         superMembers?: string[];
+        /**
+         * D-S4: the distinct RAW spellings folded into this entity by `normalizeEntityKey`, in first-seen
+         * order. Present only on projected entity nodes; `label` is the first of them. Two or more is what
+         * the split-identity notice reports.
+         */
+        spellings?: string[];
     };
 }
 

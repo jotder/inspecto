@@ -231,7 +231,7 @@ describe('geo-analysis', () => {
         expect(pairs[0].firstAt).toBe(1 * HOUR);
 
         const g = coLocationGraph(pairs);
-        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:A', 'entity:B']);
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:a', 'entity:b']);
         expect(g.edges).toHaveLength(1);
         expect(g.edges[0].data.kind).toBe('co-located · 2');
     });
@@ -254,13 +254,13 @@ describe('geo-analysis', () => {
         const pairs = coLocations(pts, 300, HOUR);
 
         expect(pairs).toHaveLength(1);
-        expect([pairs[0].aId, pairs[0].bId]).toEqual(['ACC-1', 'ACC-2']);
+        expect([pairs[0].aId, pairs[0].bId]).toEqual(['acc-1', 'acc-2']);
         expect(pairs[0].count).toBe(2);
 
         const g = coLocationGraph(pairs);
-        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:ACC-1', 'entity:ACC-2']);
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:acc-1', 'entity:acc-2']);
         // the display name survives on the node, it just is not the identity
-        expect(g.nodes.find((n) => n.id === 'entity:ACC-1')?.data.label).toBeTruthy();
+        expect(g.nodes.find((n) => n.id === 'entity:acc-1')?.data.label).toBeTruthy();
     });
 
     // And the fallback: a projection that maps no key behaves exactly as before.
@@ -273,6 +273,6 @@ describe('geo-analysis', () => {
 
         const g = coLocationGraph(coLocations(pts, 300, HOUR));
 
-        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:A', 'entity:B']);
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:a', 'entity:b']);
     });
 });

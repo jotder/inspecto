@@ -69,7 +69,7 @@ describe('LinkAnalysisAdvancedSearchDialog', () => {
         c.project(); // folds the RESULT relation with the mapping — SQL text never leaves this dialog
         expect(close).toHaveBeenCalledTimes(1);
         const g = close.mock.calls[0][0] as { nodes: { id: string }[]; edges: { data: { count?: number } }[] };
-        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:B', 'entity:C']);
+        expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:b', 'entity:c']);
         expect(g.edges).toHaveLength(1);
         expect(g.edges[0].data.count).toBe(1);
         await expectNoA11yViolations(fixture.nativeElement);

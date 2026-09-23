@@ -1,4 +1,4 @@
-import type { G6GraphData } from 'app/inspecto/graph';
+import { normalizeEntityKey, type G6GraphData } from 'app/inspecto/graph';
 import { GeoData, GeoPoint } from './geo-types';
 
 /**
@@ -337,8 +337,9 @@ export function coLocations(points: readonly GeoPoint[], radiusM: number, window
     const pts = points.slice(0, ANALYSIS_POINT_CAP).filter((p) => p.label && p.time !== undefined);
     const byPair = new Map<string, CoLocation>();
     // A point's identity is its mapped key, falling back to the display label when none is mapped — which
-    // keeps the pre-D-U3 behaviour exactly for every projection that maps no key column.
-    const idOf = (pt: GeoPoint) => pt.key ?? pt.label!;
+    // keeps the pre-D-U3 behaviour for every projection that maps no key column. Either way it is the shared
+    // D-S4 key, so two spellings of one entity never co-locate with themselves and the ids match the projection's.
+    const idOf = (pt: GeoPoint) => normalizeEntityKey(pt.key ?? pt.label!);
     for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
             const p = pts[i],
@@ -392,7 +393,7 @@ export function coLocationGraph(pairs: readonly CoLocation[]): G6GraphData {
             [p.aId, p.a],
             [p.bId, p.b],
         ] as const) {
-            const nodeId = `entity:${id}`;
+            const nodeId = `entity:${normalizeEntityKey(id)}`;
             if (!nodes.has(nodeId)) nodes.set(nodeId, { id: nodeId, data: { label: name, kind: 'entity' } });
         }
     }
@@ -400,8 +401,8 @@ export function coLocationGraph(pairs: readonly CoLocation[]): G6GraphData {
         nodes: [...nodes.values()],
         edges: pairs.map((p) => ({
             id: `co:${p.a}->${p.b}`,
-            source: `entity:${p.a}`,
-            target: `entity:${p.b}`,
+            source: `entity:${normalizeEntityKey(p.aId)}`,
+            target: `entity:${normalizeEntityKey(p.bId)}`,
             data: { kind: p.count > 1 ? `co-located · ${p.count}` : 'co-located', weight: p.count },
         })),
     } as G6GraphData;

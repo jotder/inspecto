@@ -6,6 +6,7 @@ import {
     GraphSource,
     GraphSourceQuery,
     mergeGraphs,
+    normalizeEntityKey,
 } from 'app/inspecto/graph';
 import { InvService, ProjectionTriple } from 'app/inspecto/api';
 import { firstValueFrom } from 'rxjs';
@@ -63,13 +64,20 @@ export function resetProjectionLimits(): void {
 }
 
 /**
- * The Entity node id for a projected value. Type-scoped (`entity:<entityType>:<value>`) when a
+ * The Entity node id for a projected value. Type-scoped (`entity:<entityType>:<key>`) when a
  * multi-mapping merge supplies an `entityType`, so a `person` "Bob" stays distinct from an `account`
- * "Bob" (Phase C). Unscoped `entity:<value>` (unchanged since 2026-07-08) otherwise — the single-mapping
- * path never sets `entityType`, so its ids and every existing saved view/export stay byte-identical.
+ * "Bob" (Phase C). Unscoped `entity:<key>` otherwise. The key is {@link normalizeEntityKey} of the raw
+ * value (D-S4, 2026-09-23), so `ACME Ltd` and ` acme  ltd.` are ONE node; the raw spelling stays the label.
  */
 function entityId(entityType: string | undefined, value: string): string {
-    return entityType ? `entity:${entityType}:${value}` : `entity:${value}`;
+    const key = normalizeEntityKey(value);
+    return entityType ? `entity:${entityType}:${key}` : `entity:${key}`;
+}
+
+/** Record a raw spelling on a node that already exists (D-S4) — the split-identity notice reads these. */
+function addSpelling(node: G6Node, value: string): void {
+    const s = node.data.spellings;
+    if (s && !s.includes(value)) s.push(value);
 }
 
 /**
@@ -131,8 +139,16 @@ export function projectEntities(
                 truncated = true;
                 return null;
             }
-            nodes.set(id, { id, data: { label: value, kind: 'entity', objectRef: objectRefForColumn(column, value) } });
-        }
+            nodes.set(id, {
+                id,
+                data: {
+                    label: value,
+                    kind: 'entity',
+                    objectRef: objectRefForColumn(column, value),
+                    spellings: [value],
+                },
+            });
+        } else addSpelling(nodes.get(id)!, value);
         return id;
     };
 
@@ -172,7 +188,8 @@ export function projectTriples(
     p?: EntityProjection,
 ): ProjectedGraph {
     const nodes = new Map<string, G6Node>();
-    const edges: G6Edge[] = [];
+    // Keyed by edge id: two server triples whose spellings normalise to one pair fold into one edge (D-S4).
+    const edges = new Map<string, G6Edge & { data: { kind: string; count: number } }>();
     let truncated = serverTruncated;
 
     const ensure = (value: string, column?: string): string | null => {
@@ -182,8 +199,16 @@ export function projectTriples(
                 truncated = true;
                 return null;
             }
-            nodes.set(id, { id, data: { label: value, kind: 'entity', objectRef: objectRefForColumn(column, value) } });
-        }
+            nodes.set(id, {
+                id,
+                data: {
+                    label: value,
+                    kind: 'entity',
+                    objectRef: objectRefForColumn(column, value),
+                    spellings: [value],
+                },
+            });
+        } else addSpelling(nodes.get(id)!, value);
         return id;
     };
 
@@ -195,14 +220,18 @@ export function projectTriples(
         const tid = ensure(tv, p?.targetCol);
         if (!sid || !tid) continue;
         const kind = t.kind ?? 'link';
-        edges.push({
-            id: `${sid}->${tid}:${kind}${t.attrs ? ':' + JSON.stringify(t.attrs) : ''}`,
-            source: sid,
-            target: tid,
-            data: { kind: t.count > 1 ? `${kind} · ${t.count}` : kind, attrs: t.attrs },
-        });
+        const id = `${sid}->${tid}:${kind}${t.attrs ? ':' + JSON.stringify(t.attrs) : ''}`;
+        const existing = edges.get(id);
+        const count = (existing?.data.count ?? 0) + t.count;
+        const label = count > 1 ? `${kind} · ${count}` : kind;
+        if (existing) {
+            existing.data.count = count;
+            existing.data.kind = label;
+        } else {
+            edges.set(id, { id, source: sid, target: tid, data: { kind: label, count, attrs: t.attrs } });
+        }
     }
-    return { nodes: [...nodes.values()], edges, truncated };
+    return { nodes: [...nodes.values()], edges: [...edges.values()], truncated };
 }
 
 /**
@@ -268,41 +297,32 @@ export class EntityProjectionGraphSource implements GraphSource {
 }
 
 /**
- * A group of node ids that are almost certainly the SAME real-world entity, split apart by the
- * value-projected id scheme (decision D-S4). {@link entityId} mints an id from the trimmed raw column
- * value with no case fold and no alias resolution, so `ACME Ltd` and `acme ltd.` are two nodes -- with
- * two degree counts, two community memberships and two rows in every centrality ranking.
+ * An identity whose raw spellings differ only by case, spacing or trailing punctuation (decision D-S4).
+ * Since 2026-09-23 {@link entityId} NORMALISES ids, so a projection folds those spellings into ONE node
+ * (`data.spellings`); this group still names them, because two spellings genuinely CAN be two entities
+ * and the analyst must be told a fold happened. A graph whose nodes carry raw ids (a saved view from
+ * before D-S4, or another GraphSource) is reported the same way, as two or more `ids` sharing a key.
  */
 export interface SplitIdentityGroup {
     /** The entity-type scope these ids share; empty for the unscoped single-mapping path. */
     scope: string;
     /** The shared normalised value, for a stable `track` and for tests. */
     key: string;
-    /** The node ids that collapsed onto `key` -- always 2 or more. */
+    /** The node ids on `key` -- just one when the projection already folded the spellings. */
     ids: string[];
+    /** The distinct raw spellings on `key`, first-seen order -- always 2 or more. */
+    spellings: string[];
     /** One member's label, to name the group without implying which spelling is canonical. */
     sample: string;
 }
 
 /**
- * The comparison key: case-folded, whitespace-collapsed and stripped of trailing punctuation
- * (`ACME Ltd.` -> `acme ltd`). Deliberately conservative -- it RAISES A QUESTION, it never merges.
- */
-function identityKey(value: string): string {
-    return value
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .replace(/[.,;:]+$/, '')
-        .trim();
-}
-
-/**
- * Detect identities the projection has split, so the analyst is told rather than left to trust a
- * ranking computed over a divided identity space.
+ * Detect identities whose raw spellings the normalised id folded together (or, on a raw-id graph, left
+ * split), so the analyst knows degree, communities and rankings count them as one.
  *
- * (!) **This reports; it never merges.** Whether entity ids should be normalised at all is decision
- * D-S4, and merging here would answer it in passing -- and silently, which is worse, because two
- * spellings genuinely CAN be two entities (`J Smith` the person vs `J Smith` the account).
+ * The comparison key is the SAME {@link normalizeEntityKey} the ids are minted with -- a private copy
+ * would let the notice and the ids disagree. The count is distinct raw spellings vs distinct keys.
+ * This function itself never mutates the graph.
  *
  * Type-scoped ids are compared only within their own scope, so `entity:person:bob` and
  * `entity:account:bob` are two entities by construction, not a split identity. Super-node stand-ins
@@ -310,24 +330,26 @@ function identityKey(value: string): string {
  */
 export function splitIdentityGroups(graph: G6GraphData | null | undefined): SplitIdentityGroup[] {
     if (!graph) return [];
-    const byScope = new Map<string, Map<string, { ids: string[]; sample: string }>>();
+    const byScope = new Map<string, Map<string, { ids: string[]; spellings: string[]; sample: string }>>();
     for (const n of graph.nodes) {
         if (n.data.superMembers) continue;
         const raw = n.id.startsWith('entity:') ? n.id.slice('entity:'.length) : n.id;
         // A type-scoped id is `<entityType>:<value>`; keep the scope apart so types never merge.
         const cut = raw.indexOf(':');
         const scope = cut >= 0 ? raw.slice(0, cut) : '';
-        const key = identityKey(cut >= 0 ? raw.slice(cut + 1) : raw);
+        const value = cut >= 0 ? raw.slice(cut + 1) : raw;
+        const key = normalizeEntityKey(value);
         let bucket = byScope.get(scope);
         if (!bucket) byScope.set(scope, (bucket = new Map()));
-        const hit = bucket.get(key);
-        if (hit) hit.ids.push(n.id);
-        else bucket.set(key, { ids: [n.id], sample: n.data.label });
+        let hit = bucket.get(key);
+        if (!hit) bucket.set(key, (hit = { ids: [], spellings: [], sample: n.data.label }));
+        hit.ids.push(n.id);
+        for (const s of n.data.spellings ?? [value]) if (!hit.spellings.includes(s)) hit.spellings.push(s);
     }
     const groups: SplitIdentityGroup[] = [];
     for (const [scope, bucket] of byScope) {
         for (const [key, v] of bucket) {
-            if (v.ids.length > 1) groups.push({ scope, key, ids: v.ids, sample: v.sample });
+            if (v.spellings.length > 1) groups.push({ scope, key, ...v });
         }
     }
     return groups;

@@ -35,8 +35,8 @@ import { globSync } from 'node:fs';
 const GLOB = 'spaces/demo/data/samples/roaming_tap/TAP_*.csv';
 const COLUMNS = ['SENDER_NAME', 'RECIPIENT_NAME'];
 
-/** The same comparison key the SPA's `identityKey` uses: case-folded, whitespace-collapsed, de-punctuated. */
-const key = (v) => v.toLowerCase().replace(/\s+/g, ' ').replace(/[.,;:]+$/, '').trim();
+/** MIRRORS the SPA's `normalizeEntityKey` (inspecto-ui/src/app/inspecto/graph/entity-key.ts) -- change both together. */
+const key = (v) => v.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.,;:]+$/, '').trim();
 
 const files = globSync(GLOB);
 if (files.length === 0) {

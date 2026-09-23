@@ -397,19 +397,27 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   this screen. Creating one anyway would also mean a durable Case with a session-only attachment — an
   empty Case that looks like it holds evidence. Tracked as `LA-CASE-CREATE-IN-PLACE-1`; revisit once the
   SPA is wired to the sealed snapshot store.
-* **The projection reports the identities it has SPLIT** (`splitIdentityGroups`, decision D-S4). Entity ids
-  are value-projected — `entityId` mints them from the trimmed raw value with no case fold and no alias
-  resolution — so `ACME Ltd` and `acme ltd.` are two nodes carrying two degree counts, two community
-  memberships and two rows in every ranking. The working set now counts the collisions and names them, in
-  both the expanded panel and the minimized pill, so the signal is not lost by minimizing.
-  ⛔ **It reports and never merges.** Whether ids should be normalised at all is D-S4 itself, and merging
-  here would answer it silently — the worst way, because two spellings genuinely can be two entities.
+* **Entity ids are NORMALISED, and the projection still reports the spellings it folded** (decision D-S4,
+  as built 2026-09-23). Link Analysis stays value-projected (no alias resolution, no entity model), but every
+  id goes through ONE key, `normalizeEntityKey` (`inspecto/graph/entity-key.ts`: case-fold, collapse internal
+  whitespace, strip trailing punctuation, trim), so `ACME Ltd`, `acme ltd` and ` Acme  Ltd.` are one node
+  (`entity:acme ltd`) with summed edge counts. The label stays the first raw spelling — never the lowercase
+  key — and each node carries its distinct raw `spellings`. `projectTriples` now folds server triples that
+  normalise to the same edge id (summing `count`). ⚠ Ids changed case: a saved view or export holding
+  pre-D-S4 raw ids no longer matches freshly projected ids.
+  `splitIdentityGroups` uses the SAME `normalizeEntityKey` (its private `identityKey` copy is gone) and
+  reports a group when distinct raw spellings exceed distinct keys — from a node's `spellings`, or from
+  raw ids on a pre-D-S4 graph. The working set counts and names them in both the expanded panel and the
+  minimized pill; the hint now says they are counted as ONE entity, because two spellings genuinely can
+  be two entities and the analyst must see the fold. `tools/check-split-identity-fixture.mjs` mirrors the
+  key in plain Node (it cannot import TS) — change both together.
   ⚠ Comparison is scoped: `entity:person:bob` and `entity:account:bob` are two entities by construction,
   and super-node stand-ins are skipped because their label is a count, not a name.
   🔴 **It reads ZERO on every dataset this repo ships, and that is CORRECT** — measured 2026-09-22 across 24 candidate entity columns in 4 spaces, including all five configured projection columns: distinct-raw equals distinct-normalised exactly, with zero untrimmed values, zero double-spaces and zero trailing punctuation. `gen-link-analysis-demos.py` emits every entity from a canonical literal list, so a variant spelling is impossible by construction. ⛔ **Do not read a zero as a broken detector** — a positive control collapses 6 spellings of `ACME Ltd` to 2. It is a guard against dirty data the demo corpus does not contain.
-  🔴 **There are THREE id mint sites, not the two D-S4 named** — `geo-analysis.ts`'s `coLocationGraph`
-  is a third and does not even `trim()`, so any normalisation answer touching only the named pair stays
-  half-fixed.
+  🔴 **There are THREE id mint sites, not the two D-S4 named** — `geo-analysis.ts`'s `coLocations` /
+  `coLocationGraph` is the third; it now normalises too (the fold identity, node ids AND edge endpoints —
+  edges previously pointed at `entity:<label>` while nodes used the key, so a keyed projection produced
+  dangling edges).
 * ⛔ **The analysis cap's refusal was already graceful, and its NUMBER is now answered** (D-S3: keep 500 / 2 000, and give suspicion score its own 750 — see below). `requireUnderCap`
   throws, but all ten sites catch it, clear the stale result, and render the message in a warning alert
   naming the algorithm, the cap and the actual size. Converting the ten to an outcome value was **refused
