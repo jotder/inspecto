@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Shared pre-flight findings helpers for declarative-config drafts. The HTTP routes that used to
@@ -342,6 +343,28 @@ final class ConfigRoutes {
         }
     }
 
+    /** Upper-cased names of mapping fields NOT produced by a plain {@code keep} — their output type is unknown here. */
+    private static Set<String> derivedMappedNames(Map<String, Object> draft, Path configDir) {
+        Set<String> out = new java.util.HashSet<>();
+        if (!(draft.get("processing") instanceof Map<?, ?> proc)
+                || !(proc.get("schema_file") instanceof String ref)) return out;
+        Path file = resolvedPath(ref, configDir);
+        if (file == null) return out;
+        Map<String, Object> schema;
+        try {
+            schema = ConfigLoader.filesystem().decode(file.toString());
+        } catch (Exception unreadable) {
+            return out;
+        }
+        if (!(schema.get("mapping") instanceof Map<?, ?> mapping)
+                || !(mapping.get("fields") instanceof List<?> fields)) return out;
+        for (Object f : fields)
+            if (f instanceof Map<?, ?> m && m.get("name") != null
+                    && !"keep".equalsIgnoreCase(String.valueOf(m.get("fn") == null ? "keep" : m.get("fn"))))
+                out.add(String.valueOf(m.get("name")).toUpperCase(java.util.Locale.ROOT));
+        return out;
+    }
+
     /**
      * Is this DuckDB bind failure a genuine unknown-column error? Only that is refused; any other failure
      * (an unknown function, a type mismatch, the check's own mechanics) FAILS OPEN - a save-time check
@@ -567,8 +590,9 @@ final class ConfigRoutes {
         if (!"pipeline".equals(type)) return List.of();
         if (!(draft.get("route") instanceof Map<?, ?> route)) return List.of();
         if (!(route.get("branches") instanceof List<?> branches) || branches.isEmpty()) return List.of();
-        List<TypeFlow.Column> columns = declaredColumns(draft, configDir);
+        List<TypeFlow.Column> columns = new ArrayList<>(declaredColumns(draft, configDir));
         if (columns.isEmpty()) return List.of();   // unknown ≠ empty — see declaredColumns
+        addMappedColumns(draft, configDir, columns);   // a branch predicate sees the MAPPED row
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
         Severity severity = active ? Severity.ERROR : Severity.WARNING;
         List<Finding> out = new ArrayList<>();
@@ -599,6 +623,7 @@ final class ConfigRoutes {
             try {
                 TypeFlow.describe(columns, probe);
             } catch (IllegalArgumentException doesNotBind) {
+                if (!isUnknownColumn(doesNotBind.getMessage())) continue;   // fail open, see isUnknownColumn
                 out.add(new Finding(severity, fieldPath,
                         "route: branch '" + m.get("key") + "' has a where: predicate that does not bind "
                                 + "against the declared schema — " + doesNotBind.getMessage(),
@@ -625,8 +650,10 @@ final class ConfigRoutes {
         if (!(draft.get("processing") instanceof Map<?, ?> proc)) return List.of();
         if (!(proc.get("summarize") instanceof Map<?, ?> summarize)) return List.of();
         if (!(summarize.get("measures") instanceof List<?> measures) || measures.isEmpty()) return List.of();
-        List<TypeFlow.Column> columns = declaredColumns(draft, configDir);
+        List<TypeFlow.Column> columns = new ArrayList<>(declaredColumns(draft, configDir));
         if (columns.isEmpty()) return List.of();   // unknown ≠ empty — see declaredColumns
+        addMappedColumns(draft, configDir, columns);   // summarize aggregates the MAPPED row
+        Set<String> derived = derivedMappedNames(draft, configDir);
         List<Map<String, Object>> split;
         try {
             split = MeasureCompiler.splitShorthand(measures, "processing.summarize");
@@ -641,6 +668,9 @@ final class ConfigRoutes {
             Object fieldObj = m.get("field");
             if (!MeasureCompiler.NUMERIC_AGGS.contains(agg) || fieldObj == null) continue;
             String field = String.valueOf(fieldObj);
+            // A mapped field built by anything but a plain `keep` (custom expression, cast, …) has a type
+            // this check cannot know — its raw source's type would be a guess, so say nothing.
+            if (derived.contains(field.toUpperCase(java.util.Locale.ROOT))) continue;
             String declared = columns.stream()
                     .filter(c -> c.name().equalsIgnoreCase(field)).map(TypeFlow.Column::type)
                     .findFirst().orElse(null);

@@ -138,6 +138,14 @@ As built:
   "needs the recipe/pipeline context" the amendment's P2 S2 deferral meant. Its sibling
   `summarizeMeasureFindings` is a plain type comparison (no DuckDB): `sum`/`avg` over a non-numeric
   declared field.
+  🔴 **Both judge the MAPPED row, not the raw fields** (2026-09-24). Branch predicates and summarize
+  measures run after the mapping, so the known columns are the raw fields plus `mapping.fields[]`
+  (`ConfigRoutes.addMappedColumns`). A predicate is refused only on a genuine `Referenced column … not
+  found` binder error — any other bind failure (unknown function, type mismatch) fails open, as the filter
+  `where` check does. A summarize field whose mapping is anything but a plain `keep` (a `custom`
+  expression or cast) has no type the check can know, so it is not judged; a plain `keep` of a text field
+  is still refused. Until then both read the raw fields only, so a mapped column was a false refusal
+  (route) or was judged by its raw source's type (summarize). Pinned by `TypeFlowSaveTimeFindingsTest`.
   🔴 **`SqlGuard.check` runs on the ASSEMBLED statement, never the bare predicate.** `SqlGuard` requires
   SQL to begin with SELECT/WITH, so guarding the fragment rejects **every** predicate and silently skips
   the bind for all of them — the check then passes everything while appearing to work (found by test, not

@@ -46,6 +46,37 @@ class TypeFlowSaveTimeFindingsTest {
         return file;
     }
 
+    /**
+     * A schema whose MAPPED row differs from its raw fields: GROSS is derived (custom), AMT is raw
+     * VARCHAR re-typed by a custom CAST under the same name, and ID_COPY is a plain keep of ID.
+     */
+    private static Path mappedSchemaFile(Path dir, String name) throws Exception {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", name);
+        raw.put("format", "CSV");
+        raw.put("fields", List.of(
+                Map.of("name", "ID", "selector", "0", "type", "VARCHAR"),
+                Map.of("name", "QTY", "selector", "1", "type", "INTEGER"),
+                Map.of("name", "AMT", "selector", "2", "type", "VARCHAR")));
+        Map<String, Object> mapping = new LinkedHashMap<>();
+        mapping.put("canonicalName", name);
+        mapping.put("rawName", name);
+        mapping.put("fields", List.of(
+                Map.of("name", "ID", "from", "ID", "fn", "keep"),
+                Map.of("name", "QTY", "from", "QTY", "fn", "keep"),
+                Map.of("name", "ID_COPY", "from", "ID", "fn", "keep"),
+                Map.of("name", "AMT", "from", "", "fn", "custom",
+                        "args", Map.of("expression", "CAST(AMT AS DOUBLE)")),
+                Map.of("name", "GROSS", "from", "", "fn", "custom",
+                        "args", Map.of("expression", "QTY * 2"))));
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("raw", raw);
+        schema.put("mapping", mapping);
+        Path file = dir.resolve(name + ".toon");
+        Files.writeString(file, ConfigCodec.toToon(schema), StandardCharsets.UTF_8);
+        return file;
+    }
+
     private static Map<String, Object> pipelineWithRoute(Path schema, boolean active, String where) {
         Map<String, Object> draft = new LinkedHashMap<>();
         draft.put("name", "P");
@@ -80,6 +111,31 @@ class TypeFlowSaveTimeFindingsTest {
         // DuckDB's binder names the column; that is the whole reason this binds instead of regexing.
         assertTrue(out.get(0).message().contains("AMOUNT"),
                 "the binder's own message must name the offending column: " + out.get(0).message());
+    }
+
+    @Test
+    void aPredicateOverAMAPPEDColumnIsClean(@TempDir Path dir) throws Exception {
+        // Branch predicates run on the mapped row, so a derived column is a real column there.
+        Path schema = mappedSchemaFile(dir, "mp");
+        assertTrue(ConfigRoutes.routeColumnFindings(
+                "pipeline", pipelineWithRoute(schema, true, "GROSS > 10"), dir).isEmpty());
+    }
+
+    @Test
+    void aPredicateOverAColumnNeitherRawNorMappedIsStillRefused(@TempDir Path dir) throws Exception {
+        Path schema = mappedSchemaFile(dir, "mp");
+        List<Finding> out = ConfigRoutes.routeColumnFindings(
+                "pipeline", pipelineWithRoute(schema, true, "NETT > 10"), dir);
+        assertEquals(1, out.size(), out.toString());
+        assertTrue(out.get(0).message().contains("NETT"), out.get(0).message());
+    }
+
+    @Test
+    void aPredicateThatFailsToBindForANonColumnReasonFailsOpen(@TempDir Path dir) throws Exception {
+        // An unknown function is not this check's to judge — it must never refuse on what it cannot model.
+        Path schema = schemaFile(dir, "ev");
+        assertTrue(ConfigRoutes.routeColumnFindings(
+                "pipeline", pipelineWithRoute(schema, true, "no_such_function(QTY) > 1"), dir).isEmpty());
     }
 
     @Test
@@ -139,6 +195,23 @@ class TypeFlowSaveTimeFindingsTest {
         assertEquals(Severity.ERROR, out.get(0).severity());
         assertEquals(FindingCodes.ERR_SUMMARIZE_MEASURE_TYPE, out.get(0).code());
         assertTrue(out.get(0).message().contains("VARCHAR"), out.get(0).message());
+    }
+
+    @Test
+    void summingAFieldTheMappingRETYPESIsNotJudgedByItsRawType(@TempDir Path dir) throws Exception {
+        // AMT is raw VARCHAR but the mapping CASTs it to DOUBLE — summarize sees the mapped AMT.
+        Path schema = mappedSchemaFile(dir, "mp");
+        assertTrue(ConfigRoutes.summarizeMeasureFindings(
+                "pipeline", pipelineWithSummarize(schema, true, List.of("sum(AMT)")), dir).isEmpty());
+    }
+
+    @Test
+    void summingAPlainKeepOfATextFieldIsStillRefused(@TempDir Path dir) throws Exception {
+        Path schema = mappedSchemaFile(dir, "mp");
+        List<Finding> out = ConfigRoutes.summarizeMeasureFindings(
+                "pipeline", pipelineWithSummarize(schema, true, List.of("sum(ID_COPY)")), dir);
+        assertEquals(1, out.size(), out.toString());
+        assertTrue(out.get(0).message().contains("ID_COPY"), out.get(0).message());
     }
 
     @Test
