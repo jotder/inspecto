@@ -1,6 +1,7 @@
 # Inspecto — Competitive Landscape
 
-> Audience: product owner **and** the market/sales side, together · Status date: **2026-09-10** ·
+> Audience: product owner **and** the market/sales side, together · Status date: **2026-09-10** (product-side
+> corrections 2026-09-23, logged in §2.4) ·
 > **A living alignment document.** It has two sides that must agree before a claim leaves the building:
 > the **product side** (what ships, in which edition, with what evidence — every statement here traces to
 > the repository) and the **market side** (who we meet, what they have, what buyers believe — every
@@ -40,7 +41,7 @@ The staging table of record is `tools/bundle-modules.mjs`; the per-capability ma
 |---|---|---|---|
 | **Buyer situation** | one engineer, one ugly feed, no budget | a regulated team putting it in front of other people | multi-tenant, or one node is not enough |
 | **The sentence** | *the whole data plane, free, on your laptop* | *operate it, prove it, survive a node* | *outgrow a node: same artifact, N pods* |
-| **What is in it** | core: acquisition (SFTP/FTP/FTPS/DB/S3/GCS), every parser lane, Pipelines, the Parquet lakehouse, Query Library, Studio dashboards, **Reconciliation → Breaks**, Spaces, `/api/v1` | + `inspecto-security` (OIDC, HTTPS, RBAC, attributed audit) · `inspecto-ops` (Alerts → Incidents → Cases → RCA) · `inspecto-metrics` + `inspecto-events` (`/metrics`, event feed, audit CSV) · `inspecto-backup` · `inspecto-notify-channels` · `inspecto-geo-link` (Geo Map + Link Analysis) · `inspecto-exchange` (cross-Space sharing) · **fault-tolerant DR (T4)** | + `inspecto-policy` (ABAC tenant isolation) · **partitioned scale-out on Kubernetes (T5)** · gateway assertion trust |
+| **What is in it** | core: acquisition (SFTP/FTP/FTPS/DB/S3/GCS), every parser lane, Pipelines, the Parquet lakehouse, Query Library, Studio dashboards, **Reconciliation → Breaks**, Spaces, `/api/v1` | + `inspecto-security` (OIDC, HTTPS, RBAC, attributed audit) · `inspecto-ops` (Alerts → Incidents → Cases → RCA) · `inspecto-metrics` + `inspecto-events` (`/metrics`, event feed, audit CSV) · `inspecto-backup` · `inspecto-notify-channels` · `inspecto-geo-link` (Geo Map + Link Analysis) · `inspecto-exchange` (cross-Space sharing) · `inspecto-agent` (the assistant, optional) · **fault-tolerant DR (T4)** | + `inspecto-policy` (ABAC tenant isolation) · **partitioned scale-out on Kubernetes (T5)** · gateway assertion trust |
 | **External dependencies** (signed D9, 2026-09-10) | none | none — unless DR is enabled, then Postgres | Postgres + S3-compatible object store |
 | **Conversion trigger** | the laptop becomes a shared server; or a Break needs an owner | a second tenant that must not see the first; or one node cannot keep up | — |
 
@@ -49,9 +50,13 @@ problem; Professional owns it; Enterprise scales it.* Reconciliation and quality
 Break needs an Incident, an audit export or a second team, the buyer is in Professional — because that is
 where the modules live.
 
-⛔ **The assistant and the autonomy ladder ship in NO edition.** `CP-14` on the board reads *"never bundled by
-design; routes answer 503 in every bundle."* Built and tested; blocked on the Java-floor question
-(`PKG-5`), which has no owner. It appears in no column above on purpose.
+⛔ **The assistant ships from Professional; the autonomy ladder ships in NO edition.** *(Corrected 2026-09-23 — this
+paragraph said neither ships, citing `CP-14` as "never bundled by design" and the Java-floor question `PKG-5` as the
+blocker. Both closed 2026-09-12.)* The **assist agent** (`inspecto-agent`, `/assist/*`) is staged into every
+Professional and Enterprise bundle — `tools/bundle-modules.mjs` `from: 'professional'`,
+[`../EDITIONS.md`](../EDITIONS.md) `CP-14` — and answers 503 only on Personal. The **intelligence agent**
+(`inspecto-intelligence`: `/agent/*`, the autonomy ladder, the approvals inbox) and `inspecto-agent-hosted` are
+still staged by no edition, which is why neither appears in a column above.
 
 ### 1.3 Measured capacity — the only numbers we may quote
 
@@ -154,7 +159,7 @@ Two lanes, and we should say so rather than apologise for the rest:
 | **Telecom RA / fraud** | **Mobileum RAID** (absorbed WeDo, 2019, $70M; RAID 9 current) · **Subex HyperSense** (GenAI-embedded RA/FM, winning 2026 carrier deals incl. a USD 1.93M five-year North-African modernisation) · Amdocs (absorbed cVidya) · Neural Technologies · Araxxe | Carrier procurement already solved; built for billions of CDRs/day on distributed engines. We compete *below their floor* on footprint and price |
 | **Investigation (fraud, public sector)** | **i2 Group** — *not IBM*: divested to N. Harris Computer Corp (Constellation Software) effective Jan 2022 · Siren · Linkurious · SAS Visual Investigator · Nuix | i2 is the product our Link Analysis + Geo Map most resembles; the incumbent in telecom, law enforcement, intelligence |
 | **Reconciliation as a product** | Duco (SaaS) · SmartStream TLM · Gresham Clareti · Broadridge | Our Reconciliation → Breaks lifecycle *is* their entire business |
-| **Data quality platforms** | **Collibra Data Quality** (built on OwlDQ, acquired Feb 2021) · Ataccama ONE · Great Expectations / Soda (OSS) | DQ buyers compare our Expectation engine to GX/Soda on day one — and it has routes but **no UI** (`ING-6`) |
+| **Data quality platforms** | **Collibra Data Quality** (built on OwlDQ, acquired Feb 2021) · Ataccama ONE · Great Expectations / Soda (OSS) | DQ buyers compare our Expectation engine to GX/Soda on day one — it has a builder UI but **five check kinds** against GX's 300+ *(corrected 2026-09-23: this said "routes but no UI"; `ING-6` closed 2026-07-07)* |
 
 ### 2.3 Lane incumbents
 
@@ -176,6 +181,10 @@ Two lanes, and we should say so rather than apologise for the rest:
 | "Pentaho (Hitachi Vantara)" | LEO Software, June 2026 | — |
 | "cloud object storage is a release-gating gap" (the exec brief) | S3/GCS connectors shipped in **every** edition 2026-09-07 (`CONNECTORS-BUNDLE-1`) | the brief dated 2026-07-07 undersells the product |
 | "nothing occupies the same square" | Definite occupies the neighbouring square with the same stack | "no direct competitor" is a risk, not a moat |
+| "the Expectation engine has routes but no UI (`ING-6`)" — §2.2, §3, §4.2, §6 A6 | the builder UI landed 2026-07-04 (`73831fa6`) and `ING-6` closed 2026-07-07, two months **before** this document's status date (corrected 2026-09-23) | a board ID quoted as a gap needs its close date checked first |
+| "the assistant and the autonomy ladder ship in NO edition" — §1.2, §4.2 | `PKG-5` staged the assist agent into Professional and Enterprise on 2026-09-12; only `inspecto-intelligence` and `inspecto-agent-hosted` still ship in none (corrected 2026-09-23) | re-read `tools/bundle-modules.mjs` after any packaging change |
+| "Link Analysis backend projection pending" — §3, §6 A8 | `/inv/projection*` routes ship in `inspecto-geo-link`; only the evidential controls (`LA-19`) are unstarted (corrected 2026-09-23) | — |
+| "the audit trail is in memory on every stock bundle" — §4.1 | `EVENTS-DURABLE-1` closed 2026-09-11: the Professional/Enterprise launchers set `-Devents.backend=parquet`; only Personal stays in memory (corrected 2026-09-23) | a P1 cited by ID goes stale the day it closes |
 
 ---
 
@@ -188,8 +197,8 @@ at once. This is structural, not a failing — Palantir loses it too.
 |---|---|---|
 | Ingestion | 300–500 connectors; NiFi's processor library | SFTP/FTP/DB/S3/GCS; the hard-format parsers |
 | BI | 40+ chart types, plugin ecosystems, communities | Datasets → Widgets → Dashboards |
-| Data quality | GX's 300+ expectations, profiling, docs generation | an Expectation engine with routes and no UI |
-| Investigation | i2's decades of analyst workflows, case management, court-ready export | Link Analysis (backend projection pending) + Geo Map |
+| Data quality | GX's 300+ expectations, profiling, docs generation | an Expectation engine with a builder UI and five check kinds (`non_null`, `range`, `regex`, `referential`, `condition`) |
+| Investigation | i2's decades of analyst workflows, case management, court-ready export | Link Analysis (server projection `POST /inv/projection*` shipped; evidential controls `LA-19` not started) + Geo Map |
 | Ops workflow | ServiceNow's CMDB, SLAs, approvals, integrations | Alerts → Incidents → Cases |
 
 **How the bundle wins anyway — five levers, all grounded:**
@@ -220,19 +229,20 @@ at once. This is structural, not a failing — Palantir loses it too.
 | "~1.35M cells/s per physical core end to end, measured; ~1.8–2.8M on a current Linux server core" | §1.3 — say "measured" only of the first half |
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
-| Fault-tolerant DR at Professional; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ And the audit trail DR would protect is **in memory** on every stock bundle today: `EVENTS-DURABLE-1` (P1, 2026-09-11) |
+| Fault-tolerant DR at Professional; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ The audit trail DR would protect is durable (Parquet) on Professional and Enterprise bundles since `EVENTS-DURABLE-1` closed 2026-09-11, and in memory on Personal *(corrected 2026-09-23 — this said "in memory on every stock bundle")* |
 | **20**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
 | A distinct Professional bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
+| An Expectation (data-quality) engine with a builder UI — five check kinds, not a GX-sized library | `ING-6` closed 2026-07-07 (`REQUIREMENTS.md` §5); `ExpectationEvaluator`; `inspecto-ui/src/app/modules/admin/expectations/`. A breach raises a deduplicated Incident only where `inspecto-ops` ships (Professional+). *Moved here from §4.2 on 2026-09-23 — its unlock condition, "the UI ships", was met on 2026-07-04* |
 
 ### 4.2 We MUST NOT claim yet — and what unlocks each
 
 | Claim | Why not | Unlocks when |
 |---|---|---|
-| Anything about the AI assistant or autonomy | ships in **no** bundle (`CP-14`, `PKG-5`) | `PKG-5` resolves and the assistant is in a downloadable artifact — **filed as a §1 decision needing an owner, 2026-09-11** |
+| Anything about the AI assistant | *(corrected 2026-09-23 — this row said "ships in no bundle")* staged in every Professional and Enterprise bundle since 2026-09-12 (`CP-14`, `PKG-5`, both closed), but **no release has been tagged since `v3.12.0` (2026-06-05)** and only a `v*` tag publishes (`.github/workflows/release.yml`), so no downloadable artifact carries it | a tagged release publishes a Professional bundle |
+| Anything about the autonomy ladder or the intelligence agent (approvals inbox, `SHADOW`/`AUTO`) | `inspecto-intelligence` and `inspecto-agent-hosted` ship in **no** bundle ([`../EDITIONS.md`](../EDITIONS.md) `CP-14`) | a bundling decision places `inspecto-intelligence` in an edition |
 | "1 trillion rows/day" for Professional | off by 10–250× on one node (§1.3) | never for Professional; an Enterprise cluster-design conversation |
 | "119 processors" | 67 are planned, inactive tiles | say **37**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above; one dead SPI | phrase as categories covered + named seams (§1.4) |
-| A production-grade Expectation engine | routes, no UI (`ING-6`) | the UI ships, or GX suites import |
 | "Low maintenance" | the install kit (preflight, service wrappers, upgrade/rollback) is unbuilt | deployment Phases 0–1 ship — `DEPLOY-SERVICE-WRAPPER-1` (P1) is the first piece |
 | Air-gap parity claims about Definite | their blog says it; their product page does not | a vendor conversation |
 
@@ -267,9 +277,9 @@ counts; SSO as a feature (table stakes).
 | **A3** | Sustained benchmark + CI floor | ~a day's work; `PipelineBenchmark -Dbench.cols=100` replaces the extrapolation | this is the evidence behind every capacity claim | **Open — highest-value unbuilt evidence** |
 | **A4** | Publish pricing? | editions exist; Professional bundle exists | Definite shows $250/mo; a buyer who cannot self-serve a price assumes enterprise sales | Open |
 | **A5** | The plugin/services line | 19 SPIs; one dead seam to fix or remove | "we build the rest for you" is a revenue line — price it | Open |
-| **A6** | The Expectation engine | routes exist, no UI; absorb GX suites rather than rival them | DQ buyers test this first | Open — product decision |
+| **A6** | The Expectation engine | engine + builder UI shipped (`ING-6`, closed 2026-07-07), five check kinds; absorb GX suites rather than rival them | DQ buyers test this first | Open — product decision |
 | **A7** | Retire the stale stakeholder docs | brief + capabilities dated 2026-07-07 under- and over-sell | a sponsor reading them today gets the wrong product | Open — refresh from `EDITIONS.md` |
-| **A8** | Link Analysis backend | UI complete, projection pending; serves two verticals | the i2-shaped differentiator is worth zero half-built | Open |
+| **A8** | Link Analysis backend | projection shipped; the Investigation layer (op log, multi-hop traversal, dossier) landed 2026-09-23; evidential controls (`LA-19`) not started; serves two verticals | the i2-shaped differentiator is worth zero half-built | Open |
 
 ---
 
