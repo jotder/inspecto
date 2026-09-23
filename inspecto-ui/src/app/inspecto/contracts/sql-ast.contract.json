@@ -1,0 +1,29 @@
+{
+  "description": "The ONLY parts of DuckDB's json_serialize_sql tree the SPA reads (inspecto/query/sql-ast.ts). Pinned against the real engine by SqlAstContractTest (inspecto-processor); the reader's own type sets are pinned to this file by sql-ast.spec.ts. Every other key is DuckDB's and deliberately unpinned: we do not own this shape.",
+  "nodes": [
+    { "type": "CONJUNCTION_AND", "class": "CONJUNCTION", "reads": ["children"], "example": "a = 1 AND b = 2" },
+    { "type": "CONJUNCTION_OR", "class": "CONJUNCTION", "reads": ["children"], "example": "a = 1 OR b = 2" },
+    { "type": "COMPARE_EQUAL", "class": "COMPARISON", "reads": ["left", "right"], "example": "a = 1" },
+    { "type": "COMPARE_NOTEQUAL", "class": "COMPARISON", "reads": ["left", "right"], "example": "a <> 1" },
+    { "type": "COMPARE_LESSTHAN", "class": "COMPARISON", "reads": ["left", "right"], "example": "a < 1" },
+    { "type": "COMPARE_GREATERTHAN", "class": "COMPARISON", "reads": ["left", "right"], "example": "a > 1" },
+    { "type": "COMPARE_LESSTHANOREQUALTO", "class": "COMPARISON", "reads": ["left", "right"], "example": "a <= 1" },
+    { "type": "COMPARE_GREATERTHANOREQUALTO", "class": "COMPARISON", "reads": ["left", "right"], "example": "a >= 1" },
+    { "type": "OPERATOR_IS_NULL", "class": "OPERATOR", "reads": ["children"], "example": "a IS NULL" },
+    { "type": "OPERATOR_IS_NOT_NULL", "class": "OPERATOR", "reads": ["children"], "example": "a IS NOT NULL" },
+    { "type": "COMPARE_IN", "class": "OPERATOR", "reads": ["children"], "example": "a IN (1, 2)" },
+    { "type": "COMPARE_NOT_IN", "class": "OPERATOR", "reads": ["children"], "example": "a NOT IN (1, 2)" },
+    { "type": "COMPARE_BETWEEN", "class": "BETWEEN", "reads": ["input", "lower", "upper"], "example": "a BETWEEN 1 AND 5" },
+    { "type": "FUNCTION", "class": "FUNCTION", "reads": ["function_name", "children"], "example": "a LIKE 'x%'" },
+    { "type": "COLUMN_REF", "class": "COLUMN_REF", "reads": ["column_names"], "example": "a = 1" },
+    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["value.type.id", "value.is_null", "value.value"], "example": "a = 'x'" },
+    { "type": "VALUE_CONSTANT", "class": "CONSTANT", "reads": ["value.type.id", "value.type.type_info.scale", "value.value"], "example": "a = 1.5" },
+    { "type": "OPERATOR_CAST", "class": "CAST", "reads": ["child", "cast_type.id"], "example": "a = TRUE" }
+  ],
+  "likeFunctions": [
+    { "name": "~~", "example": "a LIKE 'x%'" },
+    { "name": "!~~", "example": "a NOT LIKE 'x%'" },
+    { "name": "~~*", "example": "a ILIKE 'x%'" },
+    { "name": "!~~*", "example": "a NOT ILIKE 'x%'" }
+  ]
+}

@@ -69,6 +69,54 @@ final class ComponentRoutes implements RouteModule {
         api.post("/components/mapping/validate", (e, m) -> validateMapping(api.body(e)));
         // Live zero-row output column derivation via DuckDB DESCRIBE query over scratch input table.
         api.post("/components/transform/describe", (e, m) -> describeTransform(api.body(e)));
+        // AUTHORING-REDESIGN-1 (c): the READ-ONLY parse tree of author SQL. `sql/`, not `transform/` —
+        // its first consumer is the Filter Step's predicate, and a predicate is not transform-specific.
+        api.post("/components/sql/ast", (e, m) -> sqlAst(api.body(e)));
+    }
+
+    /**
+     * {@code POST /components/sql/ast} — DuckDB's own parse tree for author SQL, passed through verbatim
+     * ({@link SqlAst}). Body {@code {sql, fragment?: "statement" | "predicate"}}; a {@code predicate} is a
+     * bare row condition (a Filter Step's {@code where}) and the answer is its {@code where_clause} node.
+     *
+     * <p>Answers {@code {ok: true, ast}} or {@code {ok: false, error: {message, position, subtype}}} —
+     * <b>200 either way</b>: a parse failure is the answer, not a server error. 400 only on a missing or
+     * blank {@code sql} or an unknown {@code fragment}.
+     *
+     * <p>⚠ Deliberately NO {@link SqlGuard} (operator Q3, 2026-09-23): nothing binds or executes, and
+     * {@code json_serialize_sql} refuses every non-SELECT itself. ⛔ Not a precedent for
+     * {@link #describeTransform}, which binds and must keep its guard — do not "make the two consistent".
+     * And no AST→SQL sibling exists or may be added (Q2): the tree is read-only, for good.
+     */
+    private Object sqlAst(Map<String, Object> body) {
+        if (body == null) throw new ApiException(400, "body must not be empty");
+        Object rawSql = body.get("sql");
+        if (!(rawSql instanceof String sql) || sql.isBlank()) {
+            throw new ApiException(400, "body must include non-blank 'sql'");
+        }
+        Object rawFragment = body.get("fragment");
+        SqlAst.Fragment fragment;
+        if (rawFragment == null || "statement".equals(rawFragment)) fragment = SqlAst.Fragment.STATEMENT;
+        else if ("predicate".equals(rawFragment)) fragment = SqlAst.Fragment.PREDICATE;
+        else throw new ApiException(400, "'fragment' must be 'statement' or 'predicate'");
+        SqlAst.Result r;
+        try {
+            r = SqlAst.parse(sql, fragment);
+        } catch (java.sql.SQLException | IOException e) {
+            throw new ApiException(500, "the SQL structure could not be read: " + duckDbMessage(e.getMessage()));
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", r.ok());
+        if (r.ok()) {
+            out.put("ast", r.ast());
+        } else {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("message", r.message());
+            error.put("position", r.position());
+            error.put("subtype", r.subtype());
+            out.put("error", error);
+        }
+        return out;
     }
 
     /**

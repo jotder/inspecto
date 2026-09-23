@@ -118,6 +118,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/components/mapping/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:69` |
 | POST | `/components/sink/([^/]+)/test` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:59` |
 | POST | `/components/sink/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:66` |
+| POST | `/components/sql/ast` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:74` |
 | POST | `/components/transform/([^/]+)/test` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:57` |
 | POST | `/components/transform/describe` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:71` |
 | POST | `/components/transform/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:64` |
