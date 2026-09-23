@@ -642,6 +642,18 @@ test resources, because `WebhookSinkTest.theEngineBundlesNoTransport` pins that 
 Profile `min_value`/`max_value` are aggregated in the column's own type and only then cast to VARCHAR,
 so a numeric column reports a numeric min/max (20 before 150), not a text one.
 
+**G6 (Collector features at poll-cycle level) — tests shipped 2026-09-23.** `CollectorProcessorRemoteCycleTest`
+(inspecto-connectors; real MINA SFTP server + DuckDB JDBC) drives `CollectorProcessor.run`/`acquire` for the
+circuit breaker (trips at the threshold, skips without dialling while OPEN, half-open trial closes it),
+`fetch.rate_limit` (measurably throttles), `post_action: MOVE` (moves a fetched file, leaves a failed fetch in
+place and retries it next cycle) and SFTP/JDBC runs asserting the exact sink rows; `CollectorProcessorDatasetFeedTest`
+(inspecto-engine) does the same for a `connector: dataset` feed, including refresh and producer-file safety.
+⚠ `post_action` fires on **fetch** success (land-then-ack), before ingest — not on ingest success. Two defects
+found and pinned as disabled tests: `RATE-LIMIT-OVERSIZE-HANGS-1` (a file above one second of `rate_limit`
+hangs acquisition forever) and `POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1` (an `archive_path` inside the scanned
+root is re-collected every cycle unless `recursive_depth` excludes it).
+
+
 
 ## Collectors & Ingestion (`ACQ`) — 4<!--count:processors-acq-delivered--> delivered · 5<!--count:processors-acq-partial--> partial · 11<!--count:processors-acq-planned--> planned
 
