@@ -8,7 +8,10 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.nio.file.Path;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,7 +26,8 @@ import java.util.stream.Collectors;
  * cannot reach the shared catalog would write Parquet files no other pod can see, so the batch must fail
  * rather than succeed invisibly. See {@link #onRegistrationFailure}.
  *
- * <p>Activation requires {@code output.ducklake.enabled: true} in the pipeline config. On a {@code single}
+ * <p>Activation requires {@code ducklake.enabled: true} on the destination — a {@code sinks[]} entry's own
+ * block, else {@code output.ducklake} (see {@link #register}). On a {@code single}
  * topology the method is a no-op otherwise — the lakehouse is an optional sidecar there.
  *
  * <p>⛔ <b>In a {@code partitioned} topology it is MANDATORY, not optional</b> (operator 2026-09-14,
@@ -41,21 +45,74 @@ public final class DuckLakeRegistrar {
     private DuckLakeRegistrar() {}
 
     /**
-     * Register {@code outputPaths} in the DuckLake catalog referenced by the
-     * pipeline config's {@code output.ducklake} section.
+     * Register {@code outputPaths} in the DuckLake catalog of the destination that wrote each one — every
+     * {@code cfg.sinks()} entry's <b>effective</b> {@code ducklake} block (the entry's own, else
+     * {@code output.ducklake}, else none; resolved by {@code PipelineConfig.resolveSinks}).
+     *
+     * <p>🔴 <b>Per sink since 2026-09-23</b> ({@code SINK-DUCKLAKE-IGNORED-1}, operator decision). This read
+     * only {@code cfg.output().duckLake()} and pooled every file into it, so a sink's own lake was silently
+     * dropped and a two-sink pipeline registered both sinks' files into one lake. The single-destination
+     * shorthand is unchanged: its one sink IS {@code output.ducklake}, and it receives every file.
+     *
+     * <p>⛔ The partitioned "registration is mandatory" check runs for EVERY sink that wrote, before ANY
+     * attach, so one sink is never registered while another's Parquet stays invisible.
      *
      * @param outputPaths absolute paths of Parquet files to register
-     * @param tableName   target DuckLake table (overrides the toon's {@code table} key)
+     * @param tableName   target DuckLake table (overrides each lake block's {@code table} key)
      * @param cfg         pipeline configuration
      */
-    @SuppressWarnings("unchecked")
     public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg) {
         if (outputPaths.isEmpty()) return;
-        Map<String, Object> dl = cfg.output().duckLake();
-        // ⛔ Checked BEFORE the two early returns below, not after: those returns ARE the hole. On one node
-        // they are the optional-sidecar contract; when partitioned they are how a pipeline writes Parquet
-        // that is registered nowhere and no other node can see.
-        requireRegistrationConfigured(dl);
+        List<Registration> plan = plan(outputPaths, cfg);
+        // ⛔ Checked BEFORE the early returns in registerOne, not after: those returns ARE the hole. On one
+        // node they are the optional-sidecar contract; when partitioned they are how a pipeline writes
+        // Parquet that is registered nowhere and no other node can see.
+        boolean multi = cfg.sinks().size() > 1;
+        for (Registration r : plan)
+            requireRegistrationConfigured(r.duckLake(), multi ? r.sink().database() : null);
+        for (Registration r : plan) registerOne(r.files(), tableName, r.duckLake());
+    }
+
+    /** One destination's share of a batch: the sink, its effective lake ({@code null} if none), its files. */
+    record Registration(PipelineConfig.Sink sink, Map<String, Object> duckLake, List<String> files) {}
+
+    /**
+     * Which files each destination's lake receives. One sink (the shorthand, or a one-entry
+     * {@code sinks:}) takes every file, exactly as before. Several sinks are told apart by their
+     * {@code database} root — the directory every write site re-roots that sink's output under
+     * ({@code IngestSinkWriter.write}, {@code ConsignmentIngestStrategy.flatWriteAndTrace}); the DEEPEST
+     * matching root wins, so nested databases do not claim each other's files. Sinks that wrote nothing
+     * are omitted. ⛔ A file under no sink's root is refused: registering it into an arbitrary lake is the
+     * silent mis-registration this exists to end.
+     */
+    static List<Registration> plan(List<String> outputPaths, PipelineConfig cfg) {
+        List<PipelineConfig.Sink> sinks = cfg.sinks();
+        if (sinks.size() == 1)
+            return List.of(new Registration(sinks.get(0), sinks.get(0).duckLake(), List.copyOf(outputPaths)));
+
+        List<Path> roots = sinks.stream().map(s -> Path.of(s.database()).toAbsolutePath().normalize()).toList();
+        Map<Integer, List<String>> byIndex = new LinkedHashMap<>();
+        for (String p : outputPaths) {
+            Path f = Path.of(p).toAbsolutePath().normalize();
+            int best = -1;
+            for (int i = 0; i < roots.size(); i++)
+                if (f.startsWith(roots.get(i))
+                        && (best < 0 || roots.get(i).getNameCount() > roots.get(best).getNameCount())) best = i;
+            if (best < 0)
+                throw new IllegalStateException("DuckLake: written file '" + p + "' lies under none of this"
+                        + " pipeline's sinks[] databases " + sinks.stream().map(PipelineConfig.Sink::database)
+                        .toList() + ", so which destination's ducklake it belongs to is unknown");
+            byIndex.computeIfAbsent(best, k -> new ArrayList<>()).add(p);
+        }
+        List<Registration> plan = new ArrayList<>();
+        for (int i = 0; i < sinks.size(); i++) {
+            List<String> files = byIndex.get(i);
+            if (files != null) plan.add(new Registration(sinks.get(i), sinks.get(i).duckLake(), List.copyOf(files)));
+        }
+        return plan;
+    }
+
+    private static void registerOne(List<String> outputPaths, String tableName, Map<String, Object> dl) {
         if (dl == null) return;
         if (!Boolean.parseBoolean(String.valueOf(dl.getOrDefault("enabled", false)))) return;
 
@@ -192,6 +249,11 @@ public final class DuckLakeRegistrar {
      * shipped commit already cites it.
      */
     static void requireRegistrationConfigured(Map<String, Object> duckLakeCfg) {
+        requireRegistrationConfigured(duckLakeCfg, null);
+    }
+
+    /** As above, naming the {@code sinks[]} destination ({@code sinkDatabase}) on a multi-sink pipeline. */
+    static void requireRegistrationConfigured(Map<String, Object> duckLakeCfg, String sinkDatabase) {
         if (!Topology.partitioned()) return;
         boolean enabled = duckLakeCfg != null
                 && Boolean.parseBoolean(String.valueOf(duckLakeCfg.getOrDefault("enabled", false)));
@@ -200,6 +262,7 @@ public final class DuckLakeRegistrar {
         throw new IllegalStateException("-D" + Topology.PROPERTY + "=partitioned requires"
                 + " output.ducklake.enabled: true, and this pipeline has "
                 + (duckLakeCfg == null ? "no output.ducklake block" : "it disabled or unset")
+                + (sinkDatabase == null ? "" : " for the sinks[] destination '" + sinkDatabase + "'")
                 + ". Several processes share this state, so Parquet that is registered in no catalog is"
                 + " Parquet no other node can see — the same invisible output D10 already refuses when"
                 + " registration FAILS, reached by never attempting it. Configure the shared catalog, or"

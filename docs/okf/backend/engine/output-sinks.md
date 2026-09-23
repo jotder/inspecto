@@ -124,6 +124,28 @@ codec off disk), `…anEntrysOwnCompressionOverridesTheOutputBlock`,
 `LiftLowerFixtureSweepTest` + `RecipeConverterTest` over the real `premed_events`,
 `ControlApiPipelineCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline`.
 
+**Each sink registers into ITS OWN effective `ducklake`** (operator decision 2026-09-23,
+`SINK-DUCKLAKE-IGNORED-1`). The parser, `resolveSinks` and `PipelineLift` always carried a per-sink
+lake, but `DuckLakeRegistrar.register` read only `cfg.output().duckLake()` and pooled every written file
+into it — a sink's own lake was silently dropped, and a two-sink pipeline registered **both** sinks' files
+into the output lake (measured live: `lake_out` held `A=3 B=5`, `lake_a` had no table).
+
+* **Attribution** — `DuckLakeRegistrar.plan` assigns each written file to the sink whose `database` root
+  contains it (the root every write site re-roots under: `IngestSinkWriter.write`,
+  `ConsignmentIngestStrategy.flatWriteAndTrace`); the **deepest** root wins, so nested databases do not
+  claim each other's files. A multi-sink file under **no** root is refused (`IllegalStateException`), not
+  registered somewhere arbitrary. **One sink** (the shorthand, or a one-entry `sinks:`) takes every file
+  with no attribution — byte-for-byte the old behaviour.
+* **Partitioned** — the "registration is mandatory" check runs for every sink that wrote, **before any
+  ATTACH**, and names the offending `sinks[]` database; a sink that wrote nothing is skipped.
+* ⚠ **Two sinks inheriting the SAME lake both register** into its one table, so a replicate fan-out puts
+  each row there once per destination — exactly what the old pooled call did; the decision is per sink.
+  The caller's table name (`batch.table()`) still overrides a block's `table` key, per sink.
+
+Tests: `DuckLakeRegistrarPerSinkTest` (7). A live two-catalog DuckLake run (ducklake extension cached)
+read `lake_a → A=3`, `lake_out → B=5` after the fix; it is not in the reactor, for the network-INSTALL
+reason `DuckLakeRegistrarTest` records.
+
 ## Quarantine outcomes
 
 * `QUARANTINED_UNREADABLE` — the ingester threw (file unreadable/undecodable).
