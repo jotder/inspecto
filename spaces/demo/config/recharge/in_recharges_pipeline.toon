@@ -15,6 +15,7 @@ dirs:
 
 output:
   format: PARQUET
+  compression: snappy
 
 sinks[2]{database,format}:
   spaces/demo/data/in_recharges/accepted,PARQUET
