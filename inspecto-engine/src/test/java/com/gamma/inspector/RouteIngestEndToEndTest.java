@@ -382,6 +382,88 @@ class RouteIngestEndToEndTest {
                 "no re-ingest after the drain");
     }
 
+    /**
+     * ROUTED-WRITE-COUNTS-PER-BRANCH-1: the workbench TEST RUN of a routed pipeline routes, exactly as
+     * the production lane above does — the same rows to the same branches, and one reported row per
+     * input row.
+     *
+     * <p>🔴 What this pins is a silent DEGRADATION, not a miscount. Branch↔sink pairing is by the
+     * branch's declared {@code database}; {@code forScratchRun} re-rooted the sinks under the scratch
+     * root and left the branches naming production directories, so {@code PipelineLift} paired nothing,
+     * wired a plain data edge per destination, and the run fanned every row out to every sink. The
+     * reported {@code rowsWritten} was then rows × branches (3 × 2 = 6 here; 9 → 18 on the shipped
+     * {@code route_step}, 12 → 36 on {@code premed_events}) — the branch-count factor that named the
+     * defect. ⚠ The counts were the symptom; the real damage was the CONTENT, because a builder testing
+     * a route saw the whole feed under every branch and had no way to tell the routing had not run.
+     *
+     * <p>Assert the per-sink CONTENT, never just the total: a fan-out and a correct route agree on
+     * {@code outputs().size()}, and would agree on the total too for any predicate that matched
+     * everything.
+     */
+    @Test
+    void aTestRunOfARoutedPipelineRoutesRatherThanFanningOut(@TempDir Path dir) throws Exception {
+        Path toon = dir.resolve("route_pipeline.toon");
+        Files.writeString(toon, routeFixture(dir));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path feed = Files.createDirectories(Path.of(cfg.dirs().poll())).resolve("feed.csv");
+        Files.writeString(feed,
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-03\n");
+
+        Path scratch = dir.resolve("scratch");
+        PipelineTestRun.Result r = PipelineTestRun.run(cfg, List.of(feed), scratch);
+
+        assertEquals("SUCCESS", r.status(), r.error());
+        assertEquals(3, r.totalInputRows());
+        assertEquals(3, r.rowsWritten(),
+                "one reported row per input row — not one per input row PER BRANCH");
+
+        // The content half: each scratch destination holds ITS branch's rows and no others.
+        List<String> emea = dataLines(scratch.resolve("database/sink0"));
+        List<String> apac = dataLines(scratch.resolve("database/sink1"));
+        assertEquals(List.of("E1,1.0,2020-04-03"), emea, "the emea branch got exactly the E row");
+        assertEquals(List.of("A2,2.0,2020-04-03", "X3,3.0,2020-04-03"), apac,
+                "apac got its own row AND the unmatched row via default:");
+    }
+
+    /** The routed fixture of {@link #aRoutePipelineWritesEachBranchToItsPairedDestination}, as a string. */
+    private static String routeFixture(Path dir) throws Exception {
+        String d = dir.toString().replace("\\", "/");
+        Path schema = dir.resolve("mini_schema.toon");
+        if (!Files.exists(schema))
+            Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        return """
+            name: ROUTE_TESTRUN
+            active: true
+            dirs:
+              poll: %1$s/inbox
+              database: %1$s/db
+              backup: %1$s/backup
+              temp: %1$s/temp
+              quarantine: %1$s/quarantine
+              markers: %1$s/markers
+              status_dir: %1$s/status
+            output:
+              format: CSV
+            sinks[2]{database,format}:
+              "%1$s/db_emea",CSV
+              "%1$s/db_apac",CSV
+            route:
+              mode: case
+              default: apac
+              branches[2]{key,where,database}:
+                emea,"ID LIKE 'E%%'","%1$s/db_emea"
+                apac,"ID LIKE 'A%%'","%1$s/db_apac"
+            processing:
+              threads: 1
+              schema_file: "%2$s"
+              csv_settings:
+                delimiter: ","
+                skip_header_lines: 0
+                date_formats[1]: "%%Y-%%m-%%d"
+                timestamp_formats[1]: "%%Y-%%m-%%d"
+            """.formatted(d, schema.toString().replace("\\", "/"));
+    }
+
     /** The park fixture of {@link #aDisabledBranchSinkParksTheConsignment}, with the disable toggleable. */
     private static String parkFixture(Path dir, boolean disabled) throws Exception {
         String d = dir.toString().replace("\\", "/");

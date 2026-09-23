@@ -53,6 +53,21 @@ the source is the problem: run against the real inbox and **testing a malformed 
 from the user's inbox**. (A hardlink would also work on a single filesystem but fails across volumes —
 a later optimisation behind a fallback, never the default.)
 
+🔴 **Re-rooting the sinks means re-rooting the `route:` branches with them** (`ROUTED-WRITE-COUNTS-PER-BRANCH-1`,
+fixed 2026-09-23). Branch↔sink pairing is **by the branch's declared `database`**
+(`PipelineLift.branchKeyForDatabase`). While `forScratchRun` moved the sinks under the scratch root and
+left the branches naming production directories, the lift paired **nothing**, fell through to a plain
+data edge per destination, and the test run silently **degraded to a fan-out: every sink received every
+row**. It reported `rowsWritten` = rows × branches — 9 → 18 on `route_step`, 12 → 36 on `premed_events`,
+the branch-count factor that named the defect — and showed a builder the whole feed under each branch.
+
+⚠ **The counts were the symptom; the content was the damage.** A fan-out and a correct route agree on
+`outputs().size()`, so any test that asserts only the shape of the result passes against both. Assert
+the per-destination **content** (`RouteIngestEndToEndTest.aTestRunOfARoutedPipelineRoutesRatherThanFanningOut`).
+The general rule this is an instance of: **anything `forScratchRun` re-roots, every config key that
+JOINS on that value must be re-rooted in the same step** — `route.branches[].database` is the only such
+join key today, and a second one would fail the same silent way.
+
 The ingest half touches exactly five dirs — `poll`, `database`, `errors`, `quarantine`, `temp` — plus
 each `sinks[].database` on fan-out. `forScratchRun` additionally **nulls the commit-half destinations**
 (`backup`, `markers`, the status/batches/lineage CSVs, manifests, commit log) even though the commit

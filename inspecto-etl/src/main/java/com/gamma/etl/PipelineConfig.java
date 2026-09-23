@@ -1417,7 +1417,8 @@ public final class PipelineConfig {
         this(src,
              new Identity(src.identity.name(), src.identity.pipelineName(), runTimestamp),
              runTimestampedDirs(src, runTimestamp),
-             src.sinks);
+             src.sinks,
+             src.route);
     }
 
     /**
@@ -1445,11 +1446,16 @@ public final class PipelineConfig {
     }
 
     /**
-     * Clone {@code src} verbatim except for its identity, dirs and sinks — the shared body behind
-     * {@link #forNewRun()} and {@link #forScratchRun(Path)}. Performs <b>no disk I/O</b>: schemas,
-     * grammar and every parsed group are reused by reference.
+     * Clone {@code src} verbatim except for its identity, dirs, sinks and {@code route:} block — the
+     * shared body behind {@link #forNewRun()} and {@link #forScratchRun(Path)}. Performs <b>no disk
+     * I/O</b>: schemas, grammar and every parsed group are reused by reference.
+     *
+     * <p>⚠ {@code route} travels WITH {@code sinks}, never independently: a branch names its
+     * destination by {@code database}, so re-rooting the sinks without re-rooting the branches breaks
+     * the pairing — see {@link #forScratchRun(Path)}.
      */
-    private PipelineConfig(PipelineConfig src, Identity identity, Dirs dirs, List<Sink> sinks) {
+    private PipelineConfig(PipelineConfig src, Identity identity, Dirs dirs, List<Sink> sinks,
+                           Map<String, Object> route) {
         this.identity = identity;
         this.dirs = dirs;
         this.sinks = sinks;
@@ -1479,7 +1485,7 @@ public final class PipelineConfig {
         this.outputStore = src.outputStore;
         this.trigger = src.trigger;
         this.dedup = src.dedup;
-        this.route = src.route;
+        this.route = route;
         this.summarize = src.summarize;
         this.profile = src.profile;
         this.join = src.join;
@@ -1539,15 +1545,53 @@ public final class PipelineConfig {
                 root.resolve("logs").toString(),
                 null, null, null, null, null, null);     // status/batches/lineage/manifests/commit-log/unpack
         List<Sink> scratchSinks = new ArrayList<>();
+        Map<String, String> rerooted = new LinkedHashMap<>();   // declared database → its scratch twin
         for (int i = 0; i < sinks.size(); i++) {
             Sink s = sinks.get(i);
             // Distinct subdir per destination so a fan-out's outputs stay distinguishable in the preview.
             String dbDir = (sinks.size() == 1)
                     ? d.database() : Paths.get(d.database(), "sink" + i).toString();
+            if (s.database() != null) rerooted.put(s.database(), dbDir);
             scratchSinks.add(new Sink(dbDir, s.format(), s.compression(), Map.of(),  // duckLake: never register
                     s.filenameColumn()));
         }
-        return new PipelineConfig(this, identity, d, List.copyOf(scratchSinks));
+        return new PipelineConfig(this, identity, d, List.copyOf(scratchSinks), scratchRoute(rerooted));
+    }
+
+    /**
+     * The {@code route:} block with every branch's {@code database} moved to that destination's scratch
+     * twin — the half of {@link #forScratchRun(Path)} that keeps a routed pipeline ROUTED.
+     *
+     * <p>🔴 Why this exists ({@code ROUTED-WRITE-COUNTS-PER-BRANCH-1}): branch↔sink pairing is by the
+     * branch's declared {@code database} ({@code PipelineLift.branchKeyForDatabase}). Re-rooting the sinks
+     * alone left every branch naming a production directory that matches no scratch sink, so the lift
+     * paired nothing, emitted a plain data edge per destination, and the test run silently degraded to a
+     * FAN-OUT: every sink received every row. It reported {@code rowCount} = rows × branches and showed a
+     * builder the whole feed under each branch — the routing predicate never ran.
+     *
+     * <p>Entries are rewritten in place ({@code database} substituted into a copy of the verbatim map), so
+     * unmodeled per-branch keys and their authored order survive — the same rule {@code RouteBranch} holds
+     * at the editor seam. A branch naming a database no sink declares is left verbatim: {@code prepare()}
+     * owns that refusal, and inventing a destination here would hide it.
+     */
+    private Map<String, Object> scratchRoute(Map<String, String> rerooted) {
+        if (route == null || !(route.get("branches") instanceof List<?> branches)) return route;
+        List<Object> out = new ArrayList<>();
+        for (Object b : branches) {
+            if (!(b instanceof Map<?, ?> m)) {       // malformed by hand — carried verbatim, never dropped
+                out.add(b);
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            m.forEach((k, v) -> entry.put(String.valueOf(k), v));
+            Object db = entry.get("database");
+            String scratch = db == null ? null : rerooted.get(String.valueOf(db));
+            if (scratch != null) entry.put("database", scratch);
+            out.add(entry);
+        }
+        Map<String, Object> scratchRoute = new LinkedHashMap<>(route);
+        scratchRoute.put("branches", List.copyOf(out));
+        return scratchRoute;
     }
 
     /**

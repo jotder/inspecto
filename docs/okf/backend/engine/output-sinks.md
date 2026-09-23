@@ -83,6 +83,17 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
 ⚠ **Toon authoring:** in the indexed-tuple form `sinks[N]{database,format}:`, a `database` path
 (contains `:` and `/`) **must be quoted** — `"/data/hot",PARQUET` — or the tabular decoder reads 0 rows.
 
+🔴 **A `sinks[]` entry inherits NOTHING from `output:` — OPEN, and master is red on it**
+(`SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1`, filed 2026-09-23). `PipelineConfigParser` reads each entry's
+`compression` from that entry alone (null when the tuple has no such column) and defaults `format` to the
+literal `"CSV"`, *not* to `output.format`; `resolveSinks` then takes the declared list verbatim, so only
+the no-`sinks[]` shorthand ever reads `output.*`. The shipped `premed_events` declares
+`output.compression: snappy` above three `{database,format}` destinations and writes all three
+**uncompressed**. Two fixture sweeps already fail on it. ⚠ **Do not "fix" the round-trip alone** — making
+the bytes survive a save would leave the write path still ignoring the authored value. The open question
+is whether `output:` is the default layer for `sinks[]` entries or is meaningless beside them (in which
+case the parser should refuse the combination rather than accept and ignore it).
+
 Tests: `PipelineConfigSinksTest`, `ConfigSafetyValidatorTest` (per-sink jail/allow-list),
 `PipelineLiftTest.liftsSinksListToADataFedFanOut`,
 `ConsignmentIngestorSinksTest.fanOutWritesEachDestinationAndFinalisesOnce`,
