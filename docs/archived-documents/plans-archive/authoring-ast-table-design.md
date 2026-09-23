@@ -344,7 +344,7 @@ the AST server-side (§4), or write a re-emitted statement without the author's 
 | Q4 | **Sealed `SqlSandbox`**: fidelity to the Step 0 pins over per-call cost | `SqlAst.parse` opens + seals per call |
 | Q5 | **A contract pinning ONLY the AST keys the SPA reads**, not the whole shape | `sql-ast.contract.json` + `SqlAstContractTest` (engine side) + `sql-ast.spec.ts` (reader side). `query_location` is deliberately NOT pinned: the SPA never reads it |
 
-Built: step 1 `8eca6d59` (route), steps 2–4 `30bd09e1` (SPA). Step 5 (`transform.join`) stays out of scope, as §6 said.
+Built: step 1 `b2abe387` (route), steps 2–4 `7328a251` (SPA). Step 5 (`transform.join`) stays out of scope, as §6 said.
 
 The questions as they were put:
 

@@ -489,6 +489,8 @@ best-effort + commit-log replay in that case.
 Java-date token) and emits a `SEQUENCE_GAP` event per missing key in the series; the service tier promotes that
 to a managed ALERT object (trackable in Cases/Issues) with no extra config.
 
+> ⚠ **Doc drift, open (`DOC-DRIFT-COLLECTOR-ALERT-1`, filed 2026-09-23):** nothing reads a `collector.integrity:` block as documented here; `output.ducklake.*` is undeclared in `ConfigSpecs`; and the retired edition name "Standard+" still appears in several OKF docs.
+
 **`integrity`** *(remote)* — every fetched file is checked (size vs. the listing, checksum vs. the server etag
 when present). A failure discards the bytes to quarantine (`corrupt_download`) and skips the file — never
 processed corrupt.

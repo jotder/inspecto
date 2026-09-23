@@ -132,6 +132,8 @@ already made), and the draft/preview paths use the pure `fromMap()`. Two non-rou
 `CollectorService.requireDistinctPipelineIds` (boot pre-check; the registry build right after runs `load()`
 on the same files) and `PipelineRenameRoutes` resume (a mutating route over an already-registered Pipeline).
 
+⚠ **Open (filed 2026-09-23):** `VALIDATE-CONFIGPATH-SKIPS-SAVEGATE-1` — `/validate {configPath}` still runs only spec validation + arming, not the shared `SaveGate`; G3 (`ccda98a8`) moved only the draft branch onto it.
+
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about
 whether a space boots. Verify with a real server boot from the repo root.

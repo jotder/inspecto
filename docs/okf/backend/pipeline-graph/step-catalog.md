@@ -653,6 +653,8 @@ found and pinned as disabled tests: `RATE-LIMIT-OVERSIZE-HANGS-1` (a file above 
 hangs acquisition forever) and `POST-ACTION-MOVE-RECOLLECTS-ARCHIVE-1` (an `archive_path` inside the scanned
 root is re-collected every cycle unless `recursive_depth` excludes it).
 
+⚠ **Also open (filed 2026-09-23):** `COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1` — the acquisition form offers `duplicate__on_change: skip`, which `DuplicatePolicy.OnChange.from` does not recognise, so it silently means REPROCESS (the valid values are `ignore` / `alert` / `archive_old_version`). `CONNECTOR-TESTS-HIDE-DROPPED-ROWS-1` — `DbExportConnectorTest#endToEndDbExportIsIngested` sets `skip_header_lines: 1` on top of the default header skip and so drops the first data row unnoticed; `SftpConnectorTest#endToEndParallelFetchWithMovePostAction`'s comment says files move after ingest (they move after fetch).
+
 
 
 ## Collectors & Ingestion (`ACQ`) — 4<!--count:processors-acq-delivered--> delivered · 5<!--count:processors-acq-partial--> partial · 11<!--count:processors-acq-planned--> planned
