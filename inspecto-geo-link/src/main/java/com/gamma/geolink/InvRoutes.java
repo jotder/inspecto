@@ -265,6 +265,7 @@ public final class InvRoutes implements RouteModule {
         Map<String, List<String>> columnsByDataset = new LinkedHashMap<>();
         int skipped = 0;
         for (ComponentRegistry.Component c : store.list("dataset")) {
+            if (!ComponentAccess.canView(ex, c.content())) continue;   // R3: not counted as skipped — that would leak it
             try {
                 String relationSql = DatasetRelation.relationSql(c.content(), api.dataRoot(), views);
                 QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
@@ -404,6 +405,7 @@ public final class InvRoutes implements RouteModule {
         int scanned = 0, skipped = 0;
         for (ComponentRegistry.Component c : store.list("dataset")) {
             if (!wantDatasets.isEmpty() && !containsIgnoreCase(wantDatasets, c.name())) continue;
+            if (!ComponentAccess.canView(ex, c.content())) continue;   // R3: shared-away reads as absent (404 below)
             seenDatasets.add(c.name());
             try {
                 String relationSql = DatasetRelation.relationSql(c.content(), api.dataRoot(), views);
@@ -875,17 +877,7 @@ public final class InvRoutes implements RouteModule {
         int maxEdges = clamp(body.get("maxEdgeYield"), DEFAULT_EDGE_YIELD, MAX_EDGE_YIELD);
         int limit = clamp(body.get("limit"), DEFAULT_PATHS, MAX_PATHS);
 
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        Map<String, Object> dataset = store.get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
-        String relationSql;
-        try {
-            relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),
-                    new ViewStore(writeRoot.resolve("views")));
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
-        }
+        String relationSql = relationFor(api, ex, writeRoot, datasetId);
 
         // Every identifier is checked against the REAL columns before any statement text is assembled.
         List<String> columns = relationColumns(datasetId, relationSql);

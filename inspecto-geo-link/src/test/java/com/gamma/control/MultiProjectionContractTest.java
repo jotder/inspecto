@@ -210,6 +210,52 @@ class MultiProjectionContractTest {
         }
     }
 
+    /**
+     * 🔴 The same R3 gate on every other route that reads a Dataset: traversal (LA-11) walks it, and the two
+     * schema-inference routes (LA-15, relationships) would otherwise leak a shared-away Dataset's column
+     * names and value statistics. Each negative has alice's positive twin, so a pass is not a broken route.
+     */
+    @Test
+    void everyDatasetReadingRouteHidesAnUnviewableDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, true)) {
+            seed(c);
+            String walk = "{\"dataset\":\"wires_ds\",\"sourceCol\":\"payer\",\"targetCol\":\"payee\",\"startNode\":\"3\"}";
+            assertEquals(404, post(c.port, "/inv/traversal/recursive-paths", walk, "bob").statusCode());
+            assertEquals(200, post(c.port, "/inv/traversal/recursive-paths", walk, "alice").statusCode());
+
+            String overlap = "{\"datasets\":[\"wires_ds\",\"calls_ds\"]}";
+            HttpResponse<String> bobOverlap = post(c.port, "/inv/schema/overlap-profile", overlap, "bob");
+            assertEquals(404, bobOverlap.statusCode(), bobOverlap.body());
+            assertFalse(bobOverlap.body().contains("payer"), bobOverlap.body());
+            HttpResponse<String> aliceOverlap = post(c.port, "/inv/schema/overlap-profile", overlap, "alice");
+            assertEquals(200, aliceOverlap.statusCode(), aliceOverlap.body());
+            assertTrue(aliceOverlap.body().contains("payer"), aliceOverlap.body());
+
+            // unnamed: bob's profile of everything simply never sees wires_ds
+            HttpResponse<String> bobAll = post(c.port, "/inv/schema/overlap-profile", "{}", "bob");
+            assertEquals(200, bobAll.statusCode(), bobAll.body());
+            assertFalse(bobAll.body().contains("wires_ds"), bobAll.body());
+
+            HttpResponse<String> bobRel = get(c.port, "/inv/schema/relationships", "bob");
+            HttpResponse<String> aliceRel = get(c.port, "/inv/schema/relationships", "alice");
+            assertEquals(200, bobRel.statusCode(), bobRel.body());
+            assertFalse(bobRel.body().contains("wires_ds"), bobRel.body());
+            assertEquals(json(aliceRel.body()).path("skipped").asInt(-1), json(bobRel.body()).path("skipped").asInt(-1),
+                    "a hidden Dataset is not counted as skipped either");
+        }
+    }
+
+    private HttpResponse<String> post(int port, String path, String body, String bearer) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", "Bearer " + bearer)
+                .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> get(int port, String path, String bearer) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", "Bearer " + bearer).GET().build(), BodyHandlers.ofString());
+    }
+
     private static JsonNode json(String raw) throws Exception {
         JsonNode n = JSON.readTree(raw);
         return n.has("data") ? n.get("data") : n;
