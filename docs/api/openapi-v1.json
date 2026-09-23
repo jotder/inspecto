@@ -7530,6 +7530,21 @@
         "x-generated" : true,
         "x-optional-module" : true
       }
+    },
+    "/inv/pattern/branching" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/pattern/branching (generated skeleton)",
+        "operationId" : "postInvPatternBranching",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
     }
   },
   "components" : {

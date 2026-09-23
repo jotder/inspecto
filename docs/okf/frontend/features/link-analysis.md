@@ -373,7 +373,25 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (`stages[n]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax}`);
   blank = wildcard / no bound, and ANY unusable row drops the whole pack. No TOON copy is seeded — the
   built-in reaches every Space through the PACK-1 merge — so that shape has not yet been through
-  `ConfigCodec`'s round-trip. ⚠ `PatternQueryCompiler.java` (the server half) is **deferred**; see the plan row.
+  `ConfigCodec`'s round-trip.
+* **The server half runs the SAME motif over the whole Dataset** (LA-14b, 2026-09-23):
+  `POST /inv/pattern/branching` (`inspecto-geo-link` `PatternRoutes` → `PatternQueryCompiler` →
+  `BranchingPatternEngine`). 🔴 **Why:** the projection is capped (2 000 links, `cnt DESC`; and 500 nodes in the
+  browser), and structuring legs are small one-offs — they sort LAST and are cut FIRST, so on a large feed the
+  browser matcher looks at a graph the ring was removed from. **Split of work:** SQL pushes each stage's kind,
+  threshold band and the query `filter` into the `WHERE` of the whole Dataset and prunes with NECESSARY
+  conditions only (stage-0 anchor breadth; a later leg must leave a node the previous stage reached, strictly
+  after the earliest leg that reached it); the windowed per-branch search then runs in Java over those few legs,
+  a line-for-line port of the TS matcher. Node keys are normalised IN SQL with `normalizeEntityKey`'s rule, so a
+  breadth count sees the nodes the browser draws. Fences: every value bound, every identifier checked against
+  the relation's real columns (threshold attrs too), R3 via `InvRoutes.relationFor`, ≤ 100 000 legs
+  (`legCapped` + `truncated`), a 5 s statement timeout, the work budget, a match limit (200, ≤ 1 000).
+  Refusals are a 200 with `refusal` in the browser's words. Audited `LINK_PATTERN_MATCHED`; read-shaped exemption.
+  ⛔ **Parity is the contract:** `link-analysis/branching-parity.fixture.json` is asserted by BOTH
+  `branching-parity.spec.ts` and `ControlApiInvPatternTest` against one `expected`. The toolbox offers
+  **Run on server** only when the graph is truncated and an edge mapping is loaded; the answer is merged onto
+  the working set (`branchingResultToGraph`) like LA-11's paths. ⚠ Differences, deliberate: no node cap
+  server-side, and a stage `nodeKind` other than `entity` matches nothing (every projected node is an entity).
 * 🔴 **`followsInTime` also closed an LA-14a hole**: an un-ordered hop with no time was recorded as `NaN`, and
   a later ordered hop compared against it with `t <= NaN` / `t - NaN > gap` — both false — so an unknown
   time silently counted as "in order". Pinned by a spec that goes red on the old comparison.

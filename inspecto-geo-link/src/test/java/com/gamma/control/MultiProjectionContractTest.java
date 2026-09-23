@@ -245,6 +245,16 @@ class MultiProjectionContractTest {
             assertEquals(404, post(c.port, "/inv/traversal/recursive-paths", walk, "bob").statusCode());
             assertEquals(200, post(c.port, "/inv/traversal/recursive-paths", walk, "alice").statusCode());
 
+            // LA-14b: the whole-Dataset pattern search reads the Dataset too — same gate, same 404.
+            String motif = "{\"dataset\":\"wires_ds\",\"sourceCol\":\"payer\",\"targetCol\":\"payee\","
+                    + "\"stages\":[{\"shape\":\"fan-in\",\"minBranches\":1,\"threshold\":{\"attr\":\"amount\",\"min\":1}}]}";
+            HttpResponse<String> bobMotif = post(c.port, "/inv/pattern/branching", motif, "bob");
+            assertEquals(404, bobMotif.statusCode(), bobMotif.body());
+            assertFalse(bobMotif.body().contains("payer"), bobMotif.body());
+            HttpResponse<String> aliceMotif = post(c.port, "/inv/pattern/branching", motif, "alice");
+            assertEquals(200, aliceMotif.statusCode(), aliceMotif.body());
+            assertEquals(2, json(aliceMotif.body()).get("matches").size(), aliceMotif.body());
+
             String overlap = "{\"datasets\":[\"wires_ds\",\"calls_ds\"]}";
             HttpResponse<String> bobOverlap = post(c.port, "/inv/schema/overlap-profile", overlap, "bob");
             assertEquals(404, bobOverlap.statusCode(), bobOverlap.body());

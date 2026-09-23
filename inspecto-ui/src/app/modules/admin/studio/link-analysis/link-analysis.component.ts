@@ -132,6 +132,8 @@ import {
     MultiProjectedGraph,
     ProjectedGraph,
     ServerPathsState,
+    ServerPatternState,
+    branchingResultToGraph,
     invErrorMessage,
     projectionNodeCapValue,
     recursivePathsToGraph,
@@ -147,7 +149,11 @@ import {
     LinkAnalysisViewOptions,
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
-import { FindPathsRequest, LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
+import {
+    FindPathsRequest,
+    LinkAnalysisToolboxComponent,
+    ServerPatternRequest,
+} from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
@@ -389,6 +395,9 @@ export class LinkAnalysisComponent implements OnInit {
     /** LA-11: the last server traversal, mapped onto the graph; reset with every fresh graph. */
     readonly serverPaths = signal<ServerPathsState | null>(null);
     readonly serverPathsBusy = signal(false);
+    /** LA-14b: the last whole-Dataset branching pattern search. */
+    readonly serverPattern = signal<ServerPatternState | null>(null);
+    readonly serverPatternBusy = signal(false);
 
     /**
      * LA-11: the edge mappings of the loaded query a server traversal can walk — one per single-Dataset mapping
@@ -407,6 +416,7 @@ export class LinkAnalysisComponent implements OnInit {
                 sourceCol: p.sourceCol,
                 targetCol: p.targetCol,
                 entityType: p.entityType,
+                linkKindCol: p.linkKindCol || undefined,
                 filter: q.filter,
                 label: `${dsName(p.datasetId)}: ${p.sourceCol} → ${p.targetCol}`,
             }));
@@ -417,6 +427,7 @@ export class LinkAnalysisComponent implements OnInit {
                 sourceCol: e.sourceColumn,
                 targetCol: e.targetColumn,
                 entityType: undefined,
+                linkKindCol: undefined,
                 filter:
                     q.filter && e.filter
                         ? { kind: 'group' as const, op: 'AND' as const, items: [q.filter, e.filter] }
@@ -892,6 +903,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         this.history.set(emptyHistory()); // a fresh graph invalidates prior undo/redo snapshots
         this.serverPaths.set(null);
+        this.serverPattern.set(null);
         this.mappingSummary.set([]);
         try {
             const g = await source.query(q);
@@ -1371,6 +1383,48 @@ export class LinkAnalysisComponent implements OnInit {
             this.toastr.error(invErrorMessage(err, 'The server path search failed.'));
         } finally {
             this.serverPathsBusy.set(false);
+        }
+    }
+
+    /**
+     * LA-14b: run the toolbox's branching motif server-side (`POST /inv/pattern/branching`) over the WHOLE Dataset of
+     * one edge mapping — offered when the projection was truncated, because a structuring motif's small legs are the
+     * first links the projection's cap cuts. The matches are merged into the working set (legs beyond it are added)
+     * and highlighted, exactly as LA-11's server paths are.
+     */
+    async runPatternOnServer(req: ServerPatternRequest): Promise<void> {
+        const target = this.traversalTargets()[req.mapping];
+        const g = this.graph();
+        if (!target || !g) return;
+        this.serverPatternBusy.set(true);
+        try {
+            const res = await firstValueFrom(
+                this.inv.branchingPattern({
+                    dataset: target.dataset,
+                    sourceCol: target.sourceCol,
+                    targetCol: target.targetCol,
+                    linkKindCol: target.linkKindCol,
+                    timeCol: this.timeColumn() || undefined,
+                    stages: req.stages,
+                    filter: target.filter,
+                }),
+            );
+            const { graph, state } = branchingResultToGraph(res, g, target.entityType);
+            this.graph.set(graph);
+            this.serverPattern.set(state);
+            this.emphasis.set(
+                state.matches.length
+                    ? {
+                          nodeIds: [...new Set(state.matches.flatMap((m) => m.nodeIds))],
+                          edgeIds: [...new Set(state.matches.flatMap((m) => m.edgeIds))],
+                      }
+                    : null,
+            );
+        } catch (err) {
+            this.serverPattern.set(null);
+            this.toastr.error(invErrorMessage(err, 'The server pattern search failed.'));
+        } finally {
+            this.serverPatternBusy.set(false);
         }
     }
 

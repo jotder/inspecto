@@ -383,6 +383,66 @@ describe('LinkAnalysisToolboxComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('structuring pack: offers "Run on server" ONLY on a truncated graph with an edge mapping, and emits the motif', () => {
+        const { fixture, c } = make(structuringGraph());
+        c.tab.set('pattern');
+        c.loadPatternPack('structuring');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const serverButton = () =>
+            [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Run on server'));
+        expect(serverButton()).toBeUndefined(); // complete graph: the browser answer is honest
+
+        fixture.componentRef.setInput('graphTruncated', true);
+        fixture.detectChanges();
+        expect(serverButton()).toBeUndefined(); // truncated, but nothing to run it against
+
+        fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'tx: PAYER → PAYEE' }]);
+        fixture.detectChanges();
+        expect(el.textContent).toContain('first links a truncation cuts');
+        const asked: unknown[] = [];
+        c.runPatternOnServer.subscribe((r) => asked.push(r));
+        serverButton()!.click();
+        expect(asked).toEqual([{ mapping: 0, stages: c.branchStages() }]);
+    });
+
+    it('structuring pack: renders the server answer — matches by layer, the fence stated, a11y clean', async () => {
+        const { fixture, c, last } = make(structuringGraph());
+        fixture.componentRef.setInput('graphTruncated', true);
+        fixture.componentRef.setInput('traversalMappings', [{ value: '0', label: 'tx: PAYER → PAYEE' }]);
+        const match = {
+            nodeIds: ['s1', 's2', 's3', 'hub', 'r1', 'r2', 'off'],
+            edgeIds: ['tx0'],
+            layers: [['s1', 's2', 's3'], ['hub'], ['r1', 'r2'], ['off']],
+        };
+        fixture.componentRef.setInput('serverPattern', { matches: [match], truncated: true, legCapped: false });
+        c.tab.set('pattern');
+        c.loadPatternPack('structuring');
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[aria-label="Server pattern search"]')?.textContent?.replace(/\s+/g, ' ')).toContain(
+            'Server: 1 match over the whole Dataset',
+        );
+        expect(el.textContent).toContain('The match limit cut the answer short');
+        const item = el.querySelector<HTMLButtonElement>('[aria-label="Server pattern matches"] button')!;
+        expect(item.textContent).toContain('S1, S2 +1 ⇒ HUB ⇒ R1, R2 ⇒ OFF');
+        item.click();
+        expect(last()).toEqual({ nodeIds: match.nodeIds, edgeIds: match.edgeIds });
+        await fixture.whenStable();
+        await expectNoA11yViolations(el);
+
+        fixture.componentRef.setInput('serverPattern', {
+            matches: [],
+            truncated: false,
+            legCapped: false,
+            refusal: 'No link carries a numeric AMOUNT.',
+        });
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Server pattern search"]')?.textContent).toContain(
+            'No link carries a numeric AMOUNT.',
+        );
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = make();
         fixture.detectChanges();

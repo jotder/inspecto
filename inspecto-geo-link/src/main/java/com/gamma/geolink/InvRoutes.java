@@ -342,7 +342,7 @@ public final class InvRoutes implements RouteModule {
         return d.endsWith("s") && b.equals(d.substring(0, d.length() - 1));
     }
 
-    private static boolean containsIgnoreCase(List<String> cols, String target) {
+    static boolean containsIgnoreCase(List<String> cols, String target) {
         for (String c : cols) if (c.equalsIgnoreCase(target)) return true;
         return false;
     }
@@ -1031,7 +1031,7 @@ public final class InvRoutes implements RouteModule {
     }
 
     /** Field-check then render; {@link ConditionSql}'s refusal of a non-group root becomes a 422. */
-    private static String checkedFilterSql(Object filter, List<String> columns, String datasetId) {
+    static String checkedFilterSql(Object filter, List<String> columns, String datasetId) {
         checkFilterFields(filter, columns, datasetId);
         try {
             return ConditionSql.predicate(filter);
@@ -1041,7 +1041,7 @@ public final class InvRoutes implements RouteModule {
     }
 
     /** The relation's column names, probed with a zero-row SELECT — the same technique {@link #schemaRelationships} uses. */
-    private static List<String> relationColumns(String datasetId, String relationSql) {
+    static List<String> relationColumns(String datasetId, String relationSql) {
         try {
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
                     datasetId, relationSql, "SELECT * FROM " + q(datasetId), 0, 0, List.of(), List.of()));

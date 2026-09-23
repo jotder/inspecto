@@ -855,8 +855,12 @@
                             [traversalMappings]="traversalMappingOptions()"
                             [serverPaths]="serverPaths()"
                             [serverPathsBusy]="serverPathsBusy()"
+                            [graphTruncated]="truncated()"
+                            [serverPattern]="serverPattern()"
+                            [serverPatternBusy]="serverPatternBusy()"
                             (emphasisChange)="emphasis.set($event)"
                             (findPaths)="findPaths($event)"
+                            (runPatternOnServer)="runPatternOnServer($event)"
                         ></inspecto-link-analysis-toolbox>
 
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse -->

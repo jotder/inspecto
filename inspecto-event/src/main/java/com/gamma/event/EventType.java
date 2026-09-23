@@ -147,6 +147,10 @@ public final class EventType {
      *  LA-11). {@code startNode}, optional {@code targetNode}, {@code maxDepth}, {@code paths} and
      *  {@code truncated} carry what was walked and whether a fence cut it short. */
     public static final String LINK_TRAVERSED = "LINK_TRAVERSED";
+    /** A branching motif (structuring &amp; co.) was run over a whole Dataset ({@code POST /inv/pattern/branching},
+     *  LA-14b). {@code matches}, {@code truncated} and — when the pattern could not be evaluated —
+     *  {@code refusal} carry what the analyst was told. */
+    public static final String LINK_PATTERN_MATCHED = "LINK_PATTERN_MATCHED";
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */

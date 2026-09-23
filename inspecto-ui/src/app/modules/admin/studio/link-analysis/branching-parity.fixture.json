@@ -1,0 +1,308 @@
+{
+  "_comment": "LA-14b parity golden, asserted by BOTH engines: branching-parity.spec.ts (browser matcher) and BranchingPatternParityTest (server compiler). Rows are [source, target, TS, AMOUNT]. Expected keys are normalizeEntityKey values, layers sorted, edges 'source>target@TS' sorted. Ring A matches (smurf-06 is spelled two ways and counts once); decoys B (window), C (ordering) and D (band) must not.",
+  "timeAttr": "TS",
+  "amountAttr": "AMOUNT",
+  "stages": [
+    {
+      "shape": "fan-in",
+      "minBranches": 5,
+      "threshold": {
+        "attr": "AMOUNT",
+        "min": 900,
+        "max": 1000
+      },
+      "windowHours": 24
+    },
+    {
+      "shape": "fan-out",
+      "minBranches": 2,
+      "afterPrevious": true,
+      "maxGapHours": 48
+    },
+    {
+      "shape": "fan-in",
+      "minBranches": 2,
+      "afterPrevious": true,
+      "maxGapHours": 48
+    }
+  ],
+  "rows": [
+    [
+      "SMURF-01",
+      "MULE-HUB-01",
+      "2026-03-01 08:00:00",
+      951
+    ],
+    [
+      "SMURF-02",
+      "MULE-HUB-01",
+      "2026-03-01 09:00:00",
+      952
+    ],
+    [
+      "SMURF-03",
+      "MULE-HUB-01",
+      "2026-03-01 10:00:00",
+      953
+    ],
+    [
+      "SMURF-04",
+      "MULE-HUB-01",
+      "2026-03-01 11:00:00",
+      954
+    ],
+    [
+      "SMURF-05",
+      "MULE-HUB-01",
+      "2026-03-01 12:00:00",
+      955
+    ],
+    [
+      "SMURF-06",
+      "MULE-HUB-01",
+      "2026-03-01 12:30:00",
+      990
+    ],
+    [
+      "smurf-06.",
+      "MULE-HUB-01",
+      "2026-03-01 13:00:00",
+      985
+    ],
+    [
+      "MULE-HUB-01",
+      "EARLY-01",
+      "2026-02-28 09:00:00",
+      400
+    ],
+    [
+      "MULE-HUB-01",
+      "RELAY-01",
+      "2026-03-02 09:00:00",
+      2800
+    ],
+    [
+      "MULE-HUB-01",
+      "RELAY-02",
+      "2026-03-02 10:00:00",
+      2900
+    ],
+    [
+      "RELAY-01",
+      "OFFSHORE-77",
+      "2026-03-03 08:00:00",
+      2750
+    ],
+    [
+      "RELAY-02",
+      "OFFSHORE-77",
+      "2026-03-03 09:00:00",
+      2850
+    ],
+    [
+      "B-SMURF-01",
+      "HUB-B",
+      "2026-03-01 10:00:00",
+      960
+    ],
+    [
+      "B-SMURF-02",
+      "HUB-B",
+      "2026-03-02 10:00:00",
+      960
+    ],
+    [
+      "B-SMURF-03",
+      "HUB-B",
+      "2026-03-03 10:00:00",
+      960
+    ],
+    [
+      "B-SMURF-04",
+      "HUB-B",
+      "2026-03-04 10:00:00",
+      960
+    ],
+    [
+      "B-SMURF-05",
+      "HUB-B",
+      "2026-03-05 10:00:00",
+      960
+    ],
+    [
+      "HUB-B",
+      "B-RELAY-1",
+      "2026-03-06 10:00:00",
+      2000
+    ],
+    [
+      "HUB-B",
+      "B-RELAY-2",
+      "2026-03-06 11:00:00",
+      2000
+    ],
+    [
+      "B-RELAY-1",
+      "B-EXIT",
+      "2026-03-07 10:00:00",
+      2000
+    ],
+    [
+      "B-RELAY-2",
+      "B-EXIT",
+      "2026-03-07 11:00:00",
+      2000
+    ],
+    [
+      "C-SMURF-01",
+      "HUB-C",
+      "2026-03-10 01:00:00",
+      970
+    ],
+    [
+      "C-SMURF-02",
+      "HUB-C",
+      "2026-03-10 02:00:00",
+      970
+    ],
+    [
+      "C-SMURF-03",
+      "HUB-C",
+      "2026-03-10 03:00:00",
+      970
+    ],
+    [
+      "C-SMURF-04",
+      "HUB-C",
+      "2026-03-10 04:00:00",
+      970
+    ],
+    [
+      "C-SMURF-05",
+      "HUB-C",
+      "2026-03-10 05:00:00",
+      970
+    ],
+    [
+      "HUB-C",
+      "C-RELAY-1",
+      "2026-03-11 10:00:00",
+      2000
+    ],
+    [
+      "HUB-C",
+      "C-RELAY-2",
+      "2026-03-11 11:00:00",
+      2000
+    ],
+    [
+      "C-RELAY-1",
+      "C-EXIT",
+      "2026-03-11 09:00:00",
+      2000
+    ],
+    [
+      "C-RELAY-2",
+      "C-EXIT",
+      "2026-03-12 10:00:00",
+      2000
+    ],
+    [
+      "D-SENDER-01",
+      "HUB-D",
+      "2026-03-15 01:00:00",
+      5000
+    ],
+    [
+      "D-SENDER-02",
+      "HUB-D",
+      "2026-03-15 02:00:00",
+      5000
+    ],
+    [
+      "D-SENDER-03",
+      "HUB-D",
+      "2026-03-15 03:00:00",
+      5000
+    ],
+    [
+      "D-SENDER-04",
+      "HUB-D",
+      "2026-03-15 04:00:00",
+      5000
+    ],
+    [
+      "D-SENDER-05",
+      "HUB-D",
+      "2026-03-15 05:00:00",
+      5000
+    ],
+    [
+      "D-SENDER-06",
+      "HUB-D",
+      "2026-03-15 06:00:00",
+      5000
+    ],
+    [
+      "HUB-D",
+      "D-RELAY-1",
+      "2026-03-16 10:00:00",
+      9000
+    ],
+    [
+      "HUB-D",
+      "D-RELAY-2",
+      "2026-03-16 11:00:00",
+      9000
+    ],
+    [
+      "D-RELAY-1",
+      "D-EXIT",
+      "2026-03-17 10:00:00",
+      9000
+    ],
+    [
+      "D-RELAY-2",
+      "D-EXIT",
+      "2026-03-17 11:00:00",
+      9000
+    ]
+  ],
+  "expected": [
+    {
+      "layers": [
+        [
+          "smurf-01",
+          "smurf-02",
+          "smurf-03",
+          "smurf-04",
+          "smurf-05",
+          "smurf-06"
+        ],
+        [
+          "mule-hub-01"
+        ],
+        [
+          "relay-01",
+          "relay-02"
+        ],
+        [
+          "offshore-77"
+        ]
+      ],
+      "edges": [
+        "mule-hub-01>relay-01@2026-03-02 09:00:00",
+        "mule-hub-01>relay-02@2026-03-02 10:00:00",
+        "relay-01>offshore-77@2026-03-03 08:00:00",
+        "relay-02>offshore-77@2026-03-03 09:00:00",
+        "smurf-01>mule-hub-01@2026-03-01 08:00:00",
+        "smurf-02>mule-hub-01@2026-03-01 09:00:00",
+        "smurf-03>mule-hub-01@2026-03-01 10:00:00",
+        "smurf-04>mule-hub-01@2026-03-01 11:00:00",
+        "smurf-05>mule-hub-01@2026-03-01 12:00:00",
+        "smurf-06>mule-hub-01@2026-03-01 12:30:00",
+        "smurf-06>mule-hub-01@2026-03-01 13:00:00"
+      ]
+    }
+  ]
+}

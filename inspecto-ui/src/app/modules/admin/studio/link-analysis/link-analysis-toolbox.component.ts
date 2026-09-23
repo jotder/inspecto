@@ -55,7 +55,7 @@ import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-pa
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { FormsModule } from '@angular/forms';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
-import { ServerPathsState } from './entity-projection';
+import { ServerPathsState, ServerPatternState } from './entity-projection';
 
 /**
  * LA-11: what the analyst asked the server to walk. `mapping` is the index into the host's
@@ -67,6 +67,12 @@ export interface FindPathsRequest {
     mapping: number;
     maxDepth: number;
     direction: 'DIRECTED' | 'UNDIRECTED';
+}
+
+/** LA-14b: run the loaded branching motif over the whole Dataset of one edge mapping (the host owns the call). */
+export interface ServerPatternRequest {
+    mapping: number;
+    stages: BranchStage[];
 }
 
 type AnalysisTab =
@@ -202,11 +208,22 @@ export class LinkAnalysisToolboxComponent {
     /** LA-11: the last server traversal's answer, mapped onto the graph by the host (null = none yet). */
     readonly serverPaths = input<ServerPathsState | null>(null);
     readonly serverPathsBusy = input(false);
+    /**
+     * LA-14b: the projection behind the graph was cut by the server's link cap. A branching motif's legs are small
+     * one-off amounts that sort LAST and are cut FIRST, so on a truncated graph the browser matcher may be looking
+     * at a graph the ring was removed from — the toolbox offers the server search instead.
+     */
+    readonly graphTruncated = input(false);
+    /** LA-14b: the last server pattern search, mapped onto the graph by the host (null = none yet). */
+    readonly serverPattern = input<ServerPatternState | null>(null);
+    readonly serverPatternBusy = input(false);
 
     /** A selection to emphasize on the canvas (`null` clears). */
     readonly emphasisChange = output<GraphEmphasis | null>();
     /** LA-11: run a server-side multi-hop traversal — the host owns the call (this panel has no HTTP). */
     readonly findPaths = output<FindPathsRequest>();
+    /** LA-14b: run the branching motif server-side over the whole Dataset. */
+    readonly runPatternOnServer = output<ServerPatternRequest>();
 
     /** The analysis tool groups (the accordion = the graph-algorithms toolbox). */
     readonly tools: { id: AnalysisTab; label: string; icon: string }[] = [
@@ -503,6 +520,14 @@ export class LinkAnalysisToolboxComponent {
             maxDepth: Math.max(1, Math.min(10, Math.floor(this.serverDepth() || 6))),
             direction: this.serverDirection(),
         });
+    }
+
+    /** LA-14b — the loaded branching motif, over the whole Dataset of the picked edge mapping. */
+    runBranchingOnServer(): void {
+        const stages = this.branchStages();
+        if (!stages || !this.traversalMappings().length) return;
+        const idx = Number(this.serverMapping());
+        this.runPatternOnServer.emit({ mapping: idx >= 0 && idx < this.traversalMappings().length ? idx : 0, stages });
     }
 
     focusAllPath(p: GraphSelection): void {

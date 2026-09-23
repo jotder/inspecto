@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import {
+    BranchingMatch,
     G6Edge,
     G6GraphData,
     G6Node,
@@ -14,6 +15,7 @@ import {
     InvService,
     MultiProjectionMappingSummary,
     MultiProjectionResult,
+    BranchingPatternResult,
     ProjectionTriple,
     RecursivePathsResult,
     apiErrorMessage,
@@ -475,6 +477,62 @@ export function recursivePathsToGraph(
             depthLimit: res.fences.maxDepth,
             deepest: res.paths.reduce((m, p) => Math.max(m, p.hops), 0),
         },
+    };
+}
+
+/** What an LA-14b server pattern search found, in graph ids — the browser matcher's result shape. */
+export interface ServerPatternState {
+    matches: BranchingMatch[];
+    /** The match limit, the work budget or the leg fence cut the answer short. */
+    truncated: boolean;
+    /** The leg fence was hit: part of the Dataset was not searched. */
+    legCapped: boolean;
+    refusal?: string;
+}
+
+/**
+ * Map a `POST /inv/pattern/branching` answer (LA-14b) onto the working set, as {@link recursivePathsToGraph} does
+ * for LA-11: node values are raw and minted by {@link entityId}; a leg the working set already draws is reused
+ * (the same edge id {@link projectTriples} mints — when the projection's `attrCols` are the time column then the
+ * threshold columns, the order the server spells `attrs` in), and one it lacks —
+ * the search ran over the whole Dataset, typically because the projection cut exactly these legs — is added.
+ */
+export function branchingResultToGraph(
+    res: BranchingPatternResult,
+    base: G6GraphData,
+    entityType?: string,
+): { graph: G6GraphData; state: ServerPatternState } {
+    const nodes = new Map(base.nodes.map((n) => [n.id, n]));
+    const edges = new Map(base.edges.map((e) => [e.id, e]));
+    const node = (raw: string): string => {
+        const value = String(raw ?? '').trim();
+        const id = entityId(entityType, value);
+        if (!nodes.has(id)) nodes.set(id, { id, data: { label: value, kind: 'entity', spellings: [value] } });
+        else addSpelling(nodes.get(id)!, value);
+        return id;
+    };
+    const legId = new Map<string, string>();
+    for (const leg of res.edges) {
+        const sid = node(leg.source);
+        const tid = node(leg.target);
+        const id = `${sid}->${tid}:${leg.kind}:${JSON.stringify(leg.attrs)}`;
+        if (!edges.has(id))
+            edges.set(id, {
+                id,
+                source: sid,
+                target: tid,
+                data: { kind: leg.kind, attrs: leg.attrs as Record<string, string> },
+            });
+        legId.set(leg.id, id);
+    }
+    const matches: BranchingMatch[] = res.matches.map((m) => ({
+        nodeIds: m.nodeIds.map(node),
+        edgeIds: m.edgeIds.map((id) => legId.get(id) ?? id),
+        layers: m.layers.map((layer) => layer.map(node)),
+    }));
+    return {
+        graph: { nodes: [...nodes.values()], edges: [...edges.values()] },
+        state: { matches, truncated: res.truncated, legCapped: res.legCapped, refusal: res.refusal },
     };
 }
 

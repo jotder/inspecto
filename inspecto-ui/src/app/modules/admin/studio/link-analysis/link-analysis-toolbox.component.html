@@ -705,7 +705,70 @@
                                         <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                                         Find matches
                                     </button>
+                                    @if (graphTruncated() && traversalMappings().length) {
+                                        <button
+                                            mat-stroked-button
+                                            (click)="runBranchingOnServer()"
+                                            [disabled]="serverPatternBusy()"
+                                        >
+                                            <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                                            Run on server
+                                        </button>
+                                    }
                                 </div>
+                                @if (graphTruncated() && traversalMappings().length) {
+                                    <p class="text-secondary m-0 text-sm">
+                                        This graph is truncated, and the small legs this pattern looks for are the first
+                                        links a truncation cuts. Run on server searches the whole Dataset of
+                                        {{
+                                            traversalMappings()[+serverMapping()]?.label ??
+                                                traversalMappings()[0].label
+                                        }}.
+                                    </p>
+                                }
+                                @if (serverPattern(); as sp) {
+                                    <p
+                                        class="m-0 text-sm tabular-nums"
+                                        role="status"
+                                        aria-label="Server pattern search"
+                                    >
+                                        @if (sp.refusal) {
+                                            {{ sp.refusal }}
+                                        } @else if (sp.matches.length) {
+                                            Server: {{ sp.matches.length }}
+                                            {{ sp.matches.length === 1 ? 'match' : 'matches' }} over the whole Dataset
+                                        } @else {
+                                            Server: no matches over the whole Dataset
+                                        }
+                                    </p>
+                                    @if (sp.legCapped) {
+                                        <inspecto-alert variant="warning" title="Leg cap reached">
+                                            More links qualified than the server searches at once, so part of the
+                                            Dataset was not searched — filter the query to narrow it.
+                                        </inspecto-alert>
+                                    } @else if (sp.truncated) {
+                                        <inspecto-alert variant="warning" title="Truncated">
+                                            The match limit cut the answer short — more matches exist than are shown.
+                                        </inspecto-alert>
+                                    }
+                                    @if (sp.matches.length) {
+                                        <ul
+                                            class="mt-1 flex flex-col gap-1 text-sm"
+                                            aria-label="Server pattern matches"
+                                        >
+                                            @for (m of sp.matches; track $index) {
+                                                <li>
+                                                    <button
+                                                        class="underline-offset-2 hover:underline"
+                                                        (click)="focusMatch(m)"
+                                                    >
+                                                        {{ patternMatchLabel(m) }}
+                                                    </button>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                }
                             } @else {
                                 <div class="flex flex-col gap-2">
                                     @for (step of patternSteps(); track $index; let i = $index) {

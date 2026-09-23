@@ -172,6 +172,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/replay` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:117` |
 | POST | `/inv/investigations/([^/]+)/template` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:82` |
 | POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:113` |
+| POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/PatternRoutes.java:59` |
 | POST | `/inv/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:97` |
 | POST | `/inv/projection/multi` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:99` |
 | POST | `/inv/projection/neighbors` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:98` |

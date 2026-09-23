@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import type { ConditionGroup } from '../query/query-types';
+import type { BranchStage } from '../graph/branching-pattern-engine';
 
 /** One aggregated projection triple: a distinct (source, target[, kind]) pair with its folded row count. */
 export interface ProjectionTriple {
@@ -135,6 +136,34 @@ export interface RecursivePathsResult {
     edgeYieldCapped: boolean;
     /** The fences actually applied, after server-side clamping. */
     fences: { maxDepth: number; maxEdgeYield: number; timeoutMs: number };
+}
+
+/**
+ * LA-14b: {@code POST /inv/pattern/branching} — a branching motif run over the WHOLE Dataset, for when the projected
+ * graph is truncated and the browser matcher could only see part of it. `stages` is the browser's `BranchStage[]`.
+ */
+export interface BranchingPatternRequest {
+    dataset: string;
+    sourceCol: string;
+    targetCol: string;
+    linkKindCol?: string;
+    /** The time column — required by a motif with a window or ordering, exactly as in the browser. */
+    timeCol?: string;
+    stages: BranchStage[];
+    filter?: ConditionGroup;
+    limit?: number;
+}
+
+/** The browser matcher's `BranchingResult` shape, with RAW node values and the matched legs spelled out. */
+export interface BranchingPatternResult {
+    matches: { nodeIds: string[]; edgeIds: string[]; layers: string[][] }[];
+    edges: { id: string; source: string; target: string; kind: string; attrs: Record<string, string | null> }[];
+    truncated: boolean;
+    /** More than the server's leg fence were eligible — part of the Dataset was not searched. */
+    legCapped: boolean;
+    /** Why the motif could not be evaluated — the browser matcher's wording. */
+    refusal?: string;
+    fences: { maxLegs: number; workBudget: number; timeoutMs: number };
 }
 
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
@@ -516,6 +545,11 @@ export class InvService {
     /** LA-11: multi-hop paths from a start value, fenced server-side (depth, edge yield, timeout). */
     recursivePaths(req: RecursivePathsRequest): Observable<RecursivePathsResult> {
         return this.http.post<RecursivePathsResult>(apiUrl('/inv/traversal/recursive-paths'), req);
+    }
+
+    /** LA-14b: a branching motif over the whole Dataset — bounded server-side (legs, work, timeout, match limit). */
+    branchingPattern(req: BranchingPatternRequest): Observable<BranchingPatternResult> {
+        return this.http.post<BranchingPatternResult>(apiUrl('/inv/pattern/branching'), req);
     }
 
     // ── LA-10 Investigation. There is NO list or get-one route: the caller remembers the ids it created. ──
