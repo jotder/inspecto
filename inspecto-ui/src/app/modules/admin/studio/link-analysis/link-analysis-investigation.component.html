@@ -326,6 +326,51 @@
             }
         </section>
 
+        <!-- ── pin to a Widget (LA-21) ── -->
+        <section
+            class="flex flex-col gap-2 rounded-md border p-2"
+            style="border-color: var(--gamma-border)"
+            aria-label="Pin to a Widget"
+        >
+            <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Pin to a Widget</h3>
+            <p class="text-secondary m-0 text-xs">
+                Save this Working Set as a dashboard Widget. <strong>Frozen</strong> shows it as it is now and never
+                moves. <strong>Live</strong> follows this Investigation and shows what changed since now — a Live Widget
+                cannot leave this Space. Either way only the Investigation's owner sees its rows; anyone else is told it
+                is not available to them.
+            </p>
+            <form class="flex flex-col gap-2" [formGroup]="pinForm" (ngSubmit)="pinToWidget()">
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Widget name</mat-label>
+                    <input matInput formControlName="name" />
+                    @if (pinForm.controls.name.hasError('required')) {
+                        <mat-error>A name is required.</mat-error>
+                    }
+                    @if (pinForm.controls.name.hasError('pattern')) {
+                        <mat-error>Letters, digits, '.', '_' or '-', starting with a letter or digit.</mat-error>
+                    }
+                </mat-form-field>
+                <inspecto-option-picker
+                    label="Relation"
+                    formControlName="relation"
+                    [options]="relationOptions"
+                ></inspecto-option-picker>
+                <mat-radio-group formControlName="mode" aria-label="Widget kind" class="flex gap-4">
+                    <mat-radio-button value="frozen">Frozen</mat-radio-button>
+                    <mat-radio-button value="live">Live</mat-radio-button>
+                </mat-radio-group>
+                <button mat-stroked-button type="submit" [disabled]="pinBusy()">Save Widget</button>
+            </form>
+            @if (pinnedWidget()) {
+                <inspecto-alert variant="success" title="Widget saved">
+                    “{{ pinnedWidget() }}” is in the Widget library — add it to a dashboard from there.
+                </inspecto-alert>
+            }
+            @if (pinError()) {
+                <inspecto-alert variant="error" title="Widget not saved">{{ pinError() }}</inspecto-alert>
+            }
+        </section>
+
         @if (store.workingSet()?.excluded?.length) {
             <section aria-label="Excluded entities">
                 <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Excluded</h3>

@@ -8,6 +8,8 @@ import { EntityProjection } from 'app/inspecto/graph';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
+import { WidgetsService } from '../widgets/widgets.service';
+import { Widget } from '../widgets/widget-types';
 
 @Component({
     standalone: true,
@@ -80,10 +82,17 @@ function create() {
         reorderInvestigation: vi.fn(() =>
             of({ id: 'inv-fork', parent: { id: 'inv-1', order: [2, 1], parentSteps: 2 } }),
         ),
+        workingSetRelation: vi.fn(() => of({ head: { step: 2, workingSetHash: 'sha256:h2' } })),
     };
+    const widgets = { save: vi.fn((w: Widget) => of(w)) };
     TestBed.configureTestingModule({
         imports: [Host],
-        providers: [provideNoopAnimations(), InvestigationSessionStore, { provide: InvService, useValue: inv }],
+        providers: [
+            provideNoopAnimations(),
+            InvestigationSessionStore,
+            { provide: InvService, useValue: inv },
+            { provide: WidgetsService, useValue: widgets },
+        ],
     });
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
@@ -93,7 +102,7 @@ function create() {
         Array.from(el.querySelectorAll('button')).find((b) =>
             b.textContent?.trim().startsWith(text),
         ) as HTMLButtonElement;
-    return { fixture, store, inv, el, button };
+    return { fixture, store, inv, widgets, el, button };
 }
 
 /** Open inv-1 as if it had been started here, and let the async refresh land. */
@@ -151,5 +160,43 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         button('Create fork').click();
         await fixture.whenStable();
         expect(inv.reorderInvestigation).toHaveBeenCalledWith('inv-1', { order: [2, 1] });
+    });
+
+    it('LA-21: pins the Working Set to a Widget at the current head — Frozen by default, Live on request', async () => {
+        const { fixture, store, inv, widgets, el, button } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const section = el.querySelector('[aria-label="Pin to a Widget"]') as HTMLElement;
+        expect(section.textContent).toContain('a Live Widget cannot leave this Space');
+        await expectNoA11yViolations(el);
+
+        button('Save Widget').click(); // no name yet
+        fixture.detectChanges();
+        expect(widgets.save).not.toHaveBeenCalled();
+        expect(section.querySelector('mat-error')?.textContent).toContain('A name is required');
+
+        const input = section.querySelector('input[formcontrolname="name"]') as HTMLInputElement;
+        input.value = 'burners_frozen';
+        input.dispatchEvent(new Event('input'));
+        button('Save Widget').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.workingSetRelation).toHaveBeenCalledWith('inv-1', { of: 'entities', limit: 1 });
+        const frozen = widgets.save.mock.calls[0][0];
+        expect(frozen).toMatchObject({
+            id: 'burners_frozen',
+            datasetId: '',
+            vizType: 'working-set',
+            viewId: 'inv-1',
+            workingSet: { relation: 'entities', mode: 'frozen', pin: { step: 2, workingSetHash: 'sha256:h2' } },
+        });
+        expect(el.textContent).toContain('“burners_frozen” is in the Widget library');
+        expect(section.querySelector('mat-error')).toBeNull(); // the cleared name is not left in error (found in preview)
+
+        const comp = fixture.debugElement.children[0].componentInstance;
+        comp.pinForm.setValue({ name: 'burners_live', relation: 'links', mode: 'live' });
+        button('Save Widget').click();
+        await fixture.whenStable();
+        expect(widgets.save.mock.calls[1][0].workingSet).toMatchObject({ relation: 'links', mode: 'live' });
     });
 });

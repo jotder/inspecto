@@ -91,6 +91,47 @@ class ControlApiBundleTest {
         }
     }
 
+    /**
+     * LA-21 / D-E6: a Live Working Set Widget cannot leave its Space. A bundle is how a Widget leaves one, so export
+     * CONVERTS it — the copy is Frozen at the Live Widget's own pin — and says so under {@code converted}. A Frozen one
+     * travels verbatim, and the source Widget is not touched.
+     */
+    @Test
+    void aLiveWorkingSetWidgetLeavesTheSpaceFrozenAtItsPin(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String binding = "\"vizType\":\"working-set\",\"viewId\":\"case-a\",\"workingSet\":{\"relation\":\"links\","
+                    + "\"pin\":{\"step\":4,\"workingSetHash\":\"sha256:ab\",\"pinnedAt\":\"2026-09-23T10:00:00Z\"},\"mode\":";
+            assertEquals(200, send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"ws_live\"," + binding + "\"live\"}}").statusCode());
+            assertEquals(200, send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"ws_frozen\"," + binding + "\"frozen\"}}").statusCode());
+            assertEquals(422, send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"ws_bad\"," + binding + "\"sometimes\"}}").statusCode(),
+                    "a mode the tile cannot state is refused at save");
+
+            JsonNode out = json(send(c.port, "POST", "/bundle/export",
+                    "{\"items\":[{\"kind\":\"widget\",\"id\":\"ws_live\"},{\"kind\":\"widget\",\"id\":\"ws_frozen\"}]}"));
+            JsonNode items = out.at("/bundle/items");
+            assertEquals(2, items.size());
+            JsonNode live = items.get(0).get("content").get("workingSet");
+            assertEquals("frozen", live.get("mode").asText(), "the Live Widget left as a Frozen one");
+            assertEquals(4, live.at("/pin/step").asInt(), "at its own pin");
+            assertEquals("sha256:ab", live.at("/pin/workingSetHash").asText());
+            assertEquals("links", live.get("relation").asText());
+            assertEquals("case-a", items.get(0).at("/content/viewId").asText());
+            assertEquals("frozen", items.get(1).at("/content/workingSet/mode").asText());
+
+            JsonNode converted = out.get("converted");
+            assertEquals(1, converted.size(), "only the Live one is converted, and the response says which: " + out);
+            assertEquals("ws_live", converted.get(0).get("id").asText());
+            assertEquals("live", converted.get(0).get("from").asText());
+            assertEquals("frozen", converted.get(0).get("to").asText());
+
+            assertTrue(send(c.port, "GET", "/components/widget/ws_live", null).body().contains("\"live\""),
+                    "export converts the copy, never the source Widget");
+        }
+    }
+
     // ── referential-integrity import gate (System Maintenance MNT-16) ───────────────
 
     @Test

@@ -1,17 +1,30 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { FormControl, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import {
+    FormControl,
+    FormGroup,
+    FormGroupDirective,
+    FormsModule,
+    ReactiveFormsModule,
+    Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EntityProjection } from 'app/inspecto/graph';
-import { InvestigationLogEntry } from 'app/inspecto/api';
+import { firstValueFrom } from 'rxjs';
+import { InvService, InvestigationLogEntry, WorkingSetRelationName, apiErrorMessage } from 'app/inspecto/api';
+import { WORKING_SET_PLUGIN } from 'app/inspecto/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
+import { RELATION_NOUN, pinBinding } from './working-set-widget';
+import { buildWidget } from '../widgets/widget-types';
+import { WidgetsService } from '../widgets/widgets.service';
 
 /**
  * **Link Analysis — Investigation panel** (LA-10, SPA half). The right dock's Investigation tab: start an
@@ -31,6 +44,7 @@ import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
+        MatRadioModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
@@ -40,6 +54,8 @@ import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 })
 export class LinkAnalysisInvestigationComponent {
     readonly store = inject(InvestigationSessionStore);
+    private inv = inject(InvService);
+    private widgets = inject(WidgetsService);
 
     /** The last run's single Entity/Link mapping, or null when the query cannot bind an Investigation. */
     readonly projection = input<EntityProjection | null>(null);
@@ -52,6 +68,25 @@ export class LinkAnalysisInvestigationComponent {
         validators: [Validators.required, Validators.maxLength(200)],
     });
     readonly reread = signal(false);
+    /** LA-21: pin the Working Set to a dashboard Widget — FROZEN by default (D-E6); Live is opt-in. */
+    readonly pinForm = new FormGroup({
+        name: new FormControl('', {
+            nonNullable: true,
+            validators: [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)],
+        }),
+        relation: new FormControl<WorkingSetRelationName>('entities', { nonNullable: true }),
+        mode: new FormControl<'frozen' | 'live'>('frozen', { nonNullable: true }),
+    });
+    readonly relationOptions: PickerOption[] = (['entities', 'links', 'excluded'] as const).map((r) => ({
+        value: r,
+        label: RELATION_NOUN[r].title,
+    }));
+    /** The pin form's directive — reset through it, or its `submitted` flag keeps the cleared name in error. */
+    private readonly pinFormDirective = viewChild(FormGroupDirective);
+    readonly pinBusy = signal(false);
+    /** The name of the Widget just saved, for the confirmation line. */
+    readonly pinnedWidget = signal('');
+    readonly pinError = signal('');
     /** Non-null while the analyst is re-ordering: the proposed order of effective step numbers. */
     readonly order = signal<number[] | null>(null);
 
@@ -155,6 +190,46 @@ export class LinkAnalysisInvestigationComponent {
     openParent(): void {
         const p = this.store.header()?.parent;
         if (p) this.switchTo(p.id);
+    }
+
+    /**
+     * Save a Working Set Widget pinned at the relation's CURRENT head — the head read through the same owner-only route
+     * the tile will read, so the pin is exactly what a Frozen tile re-reads (`?at=step`) and checks (`workingSetHash`).
+     */
+    async pinToWidget(): Promise<void> {
+        const id = this.store.activeId();
+        if (!id || this.pinBusy()) return;
+        if (this.pinForm.invalid) {
+            this.pinForm.markAllAsTouched();
+            return;
+        }
+        const { name, relation, mode } = this.pinForm.getRawValue();
+        this.pinBusy.set(true);
+        this.pinError.set('');
+        this.pinnedWidget.set('');
+        try {
+            const { head } = await firstValueFrom(this.inv.workingSetRelation(id, { of: relation, limit: 1 }));
+            const widget = buildWidget(
+                name,
+                '',
+                WORKING_SET_PLUGIN.meta.type,
+                {},
+                {
+                    viewId: id,
+                    workingSet: pinBinding(relation, mode, head),
+                    description: `${RELATION_NOUN[relation].title} of Investigation ${id} — ${
+                        mode === 'live' ? 'Live' : `Frozen at step ${head.step}`
+                    }`,
+                },
+            );
+            await firstValueFrom(this.widgets.save(widget));
+            this.pinnedWidget.set(name);
+            this.pinFormDirective()?.resetForm({ name: '', relation, mode });
+        } catch (err) {
+            this.pinError.set(apiErrorMessage(err, 'Could not save the Widget.'));
+        } finally {
+            this.pinBusy.set(false);
+        }
     }
 
     opLabel(e: InvestigationLogEntry): string {

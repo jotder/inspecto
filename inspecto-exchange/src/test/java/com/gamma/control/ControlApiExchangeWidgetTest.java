@@ -95,6 +95,39 @@ class ControlApiExchangeWidgetTest {
         }
     }
 
+    /**
+     * LA-21 / D-E6: a Live Working Set Widget cannot leave its Space. The Exchange refuses it — and a Frozen one too,
+     * because what it reads is an Investigation, which only its owner may evaluate (D-E7), not a Dataset a grant covers.
+     */
+    @Test
+    void aWorkingSetWidgetCannotLeaveItsSpaceThroughTheExchange(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"finance\"}").statusCode());
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"audit\"}").statusCode());
+            String binding = "\"vizType\":\"working-set\",\"viewId\":\"case-a\",\"workingSet\":{\"relation\":\"entities\","
+                    + "\"pin\":{\"step\":4,\"workingSetHash\":\"sha256:ab\",\"pinnedAt\":\"2026-09-23T10:00:00Z\"},\"mode\":";
+            HttpResponse<String> live = send(c.port, "POST", "/spaces/finance/components/widget",
+                    "{\"id\":\"ws_live\"," + binding + "\"live\"}}");
+            assertEquals(200, live.statusCode(), "the binding is a declared widget key: " + live.body());
+            assertEquals(200, send(c.port, "POST", "/spaces/finance/components/widget",
+                    "{\"id\":\"ws_frozen\"," + binding + "\"frozen\"}}").statusCode());
+
+            HttpResponse<String> liveOffer = send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"widget\",\"item\":\"ws_live\",\"owner\":\"finance\"}");
+            assertEquals(422, liveOffer.statusCode(), liveOffer.body());
+            assertTrue(liveOffer.body().contains("cannot leave its Space (D-E6)"), liveOffer.body());
+
+            HttpResponse<String> frozenOffer = send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"widget\",\"item\":\"ws_frozen\",\"owner\":\"finance\"}");
+            assertEquals(422, frozenOffer.statusCode(), frozenOffer.body());
+            assertTrue(frozenOffer.body().contains("only the Investigation's owner may evaluate it (D-E7)"),
+                    frozenOffer.body());
+
+            assertEquals(0, json(send(c.port, "GET", "/exchange/offers?owner=finance", null)).size(),
+                    "nothing reached the shareable catalog");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

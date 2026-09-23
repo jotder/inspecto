@@ -313,6 +313,34 @@ export interface InvestigationLog {
     truncated: boolean;
 }
 
+/** LA-20's three relations of a Working Set. */
+export type WorkingSetRelationName = 'entities' | 'links' | 'excluded';
+
+/** `GET /inv/investigations/{id}/working-set` — one relation page, with the head it is the relation OF. */
+export interface WorkingSetRelation {
+    id: string;
+    relation: WorkingSetRelationName;
+    columns: string[];
+    rows: Record<string, unknown>[];
+    /** The TRUE row count; `rows` is a bounded page (`truncated`). */
+    total: number;
+    offset: number;
+    limit: number;
+    truncated: boolean;
+    /** With `?at`, the pinned step's head — its hash is what a Frozen Widget checks its pin against. */
+    head: { step: number; workingSetHash: string };
+    key: string;
+    cached: boolean;
+}
+
+export interface WorkingSetRelationQuery {
+    of?: WorkingSetRelationName;
+    /** LA-21: the relation at a past step (a Frozen Widget's pin); omitted = the current head. */
+    at?: number;
+    limit?: number;
+    offset?: number;
+}
+
 /**
  * Investigation-studio backend (INV-1): the real DuckDB-side Entity Projection over a Dataset —
  * the server half of the Link Analysis studio's `entity-projection` GraphSource. Offline/mock mode
@@ -369,6 +397,13 @@ export class InvService {
 
     investigationLog(id: string, limit?: number): Observable<InvestigationLog> {
         return this.http.get<InvestigationLog>(invPath(id, 'log'), { params: toParams({ limit }) });
+    }
+
+    /** LA-20/21: the Working Set as a relation. Owner-only (a 404 for anyone else — indistinguishable from absence). */
+    workingSetRelation(id: string, q: WorkingSetRelationQuery = {}): Observable<WorkingSetRelation> {
+        return this.http.get<WorkingSetRelation>(invPath(id, 'working-set'), {
+            params: toParams({ of: q.of, at: q.at, limit: q.limit, offset: q.offset }),
+        });
     }
 }
 

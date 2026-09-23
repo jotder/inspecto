@@ -4,6 +4,7 @@ import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
+import com.gamma.control.WorkingSetWidgets;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
@@ -157,6 +158,11 @@ public final class ExchangeRoutes implements RouteModule {
         // A derived item (a Widget, a saved View) shares render-only, and the grants of every Dataset it
         // reads travel with it (§3.5, generalized by D9): each must already be offered by the same owner.
         java.util.List<String> datasets = java.util.List.of();
+        // LA-21 / D-E6: a Working Set Widget never leaves its Space through the Exchange (the reason differs by mode).
+        if ("widget".equals(kind)) {
+            java.util.Optional<String> refusal = WorkingSetWidgets.exchangeRefusal(item, component.content());
+            if (refusal.isPresent()) throw new ApiException(422, refusal.get());
+        }
         if (Exchange.isDerived(kind)) {
             datasets = boundDatasetsOf(kind, component.content());
             if (datasets.isEmpty())

@@ -224,6 +224,85 @@ class ControlApiInvestigationWorkingSetTest {
         }
     }
 
+    // ── ?at= — the pinned step a Frozen Working Set Widget reads (LA-21) ─────────────────────────────────
+
+    @Test
+    void aPinnedStepReadsTheSameRelationForeverWhileTheHeadMovesOn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            post(c, "/inv/investigations", CREATE);
+            for (String s : List.of("{\"op\":\"seed\",\"ids\":[\"alice\"]}", "{\"op\":\"expand\"}", EXCLUDE_BOB,
+                    "{\"op\":\"expand\"}"))
+                post(c, "/inv/investigations/case-a/ops", s);
+            JsonNode pinned = ws(c, "case-a", "");      // what a Widget saved now pins: head{step 4, hash}
+            assertEquals(4, pinned.at("/head/step").asInt());
+            assertEquals(Set.of("alice", "carol", "frank"), ids(pinned));
+
+            // the head moves on — and the pinned step is the one an undo reverts, the hardest case for a pin
+            post(c, "/inv/investigations/case-a/undo", "");
+            post(c, "/inv/investigations/case-a/ops", "{\"op\":\"hide\",\"ids\":[\"carol\"]}");
+            JsonNode head = ws(c, "case-a", "");
+            assertEquals(6, head.at("/head/step").asInt());
+            assertEquals(Set.of("alice", "carol"), ids(head), "the undo removed frank from the head");
+            assertNotEquals(pinned.at("/head/workingSetHash").asText(), head.at("/head/workingSetHash").asText());
+
+            JsonNode frozen = ws(c, "case-a", "?at=4");
+            assertEquals(4, frozen.at("/head/step").asInt(), "the answer is the relation OF the pinned step");
+            assertEquals(pinned.at("/head/workingSetHash").asText(), frozen.at("/head/workingSetHash").asText(),
+                    "the pin's hash still matches — the tile can prove it renders what was saved");
+            assertEquals(pinned.get("rows"), frozen.get("rows"), "the pinned relation never moves");
+            assertEquals(1, ws(c, "case-a", "?at=4&of=excluded").get("total").asInt(), "bob, excluded at step 3");
+            assertEquals(0, ws(c, "case-a", "?at=2&of=excluded").get("total").asInt(), "not yet excluded at step 2");
+            assertEquals(Set.of("alice", "bob", "carol"), ids(ws(c, "case-a", "?at=2")));
+            JsonNode empty = ws(c, "case-a", "?at=0");
+            assertEquals(0, empty.get("total").asInt(), "step 0 is the empty Investigation");
+            assertEquals(0, empty.at("/head/step").asInt());
+
+            assertTrue(ws(c, "case-a", "?at=4").get("cached").asBoolean(), "a pinned step is cached too");
+            assertNotEquals(ws(c, "case-a", "").get("key").asText(), frozen.get("key").asText(),
+                    "a pinned step never answers for the head, nor the head for it");
+            assertEquals(Set.of("alice", "carol"), ids(ws(c, "case-a", "")));
+
+            for (String bad : List.of("?at=7", "?at=-1", "?at=four"))
+                assertEquals(422, send(c.port, "GET", "/inv/investigations/case-a/working-set" + bad, null, null)
+                        .statusCode(), bad);
+        }
+    }
+
+    /** The pinned read is the same gate, run first: a non-owner cannot read a pinned step, nor probe the head with 422s. */
+    @Test
+    void onlyTheOwnerReadsAPinnedStepAndAPolicyDenyHidesItToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        AtomicReference<AccessDecider.Decision> verdict = new AtomicReference<>(AccessDecider.Decision.ABSTAIN);
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case "Bearer owner" -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents")));
+            case "Bearer other" -> Optional.of(new Subject("analyst-2", Set.of("canManageIncidents", "canConfigureAccess")));
+            default -> Optional.empty();
+        });
+        AccessDeciders.forTest((ex, subject, action, route, kind, resource) ->
+                "investigation".equals(kind) ? verdict.get() : AccessDecider.Decision.ABSTAIN);
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, send(c.port, "POST", "/inv/investigations", CREATE, "Bearer owner").statusCode());
+            assertEquals(200, send(c.port, "POST", "/inv/investigations/case-a/ops",
+                    "{\"op\":\"seed\",\"ids\":[\"alice\"]}", "Bearer owner").statusCode());
+            String pinned = "/inv/investigations/case-a/working-set?at=1";
+            assertEquals(200, send(c.port, "GET", pinned, null, "Bearer owner").statusCode());
+            assertTrue(data(send(c.port, "GET", pinned, null, "Bearer owner")).get("cached").asBoolean(), "warm");
+
+            HttpResponse<String> other = send(c.port, "GET", pinned, null, "Bearer other");
+            assertEquals(404, other.statusCode(), "a shared dashboard's viewer who is not the owner reads absence: "
+                    + other.body());
+            assertFalse(other.body().contains("alice"), "the cached pinned rows did not leak");
+            assertEquals(404, send(c.port, "GET", "/inv/investigations/case-a/working-set?at=99", null, "Bearer other")
+                    .statusCode(), "the gate runs before validation — a non-owner cannot learn the head from a 422");
+
+            verdict.set(AccessDecider.Decision.DENY);
+            assertEquals(404, send(c.port, "GET", pinned, null, "Bearer owner").statusCode(),
+                    "a policy DENY hides the pinned step from its owner as well");
+        } finally {
+            AccessDeciders.forTest(null);
+            Authenticators.forTest(null);
+        }
+    }
+
     // ── D-E7 ───────────────────────────────────────────────────────────────────────────────────────────
 
     /**

@@ -337,6 +337,30 @@ class ConfigSpecsTest {
                 "neither dataset nor view → ERROR");
     }
 
+    /** LA-21: a working-set binding must carry what the tile renders (the pin) and a mode it can state. */
+    @Test
+    void aWorkingSetBindingNeedsItsInvestigationRelationModeAndPin() {
+        ConfigSpec w = ConfigSpecs.widget();
+        Map<String, Object> pin = Map.of("step", 4, "workingSetHash", "sha256:ab");
+        Map<String, Object> ok = Map.of("vizType", "working-set", "viewId", "case-a",
+                "workingSet", Map.of("relation", "entities", "mode", "frozen", "pin", pin));
+        assertTrue(fire(w, "working-set-binding", ok).isEmpty(), "a complete Frozen binding");
+        assertTrue(fire(w, "working-set-binding", Map.of("vizType", "kpi", "datasetId", "orders")).isEmpty(),
+                "no binding → the rule does not apply");
+        assertTrue(fire(w, "working-set-binding", Map.of("vizType", "working-set", "viewId", "case-a",
+                "workingSet", Map.of("relation", "entities", "mode", "sometimes", "pin", pin))).isPresent(),
+                "a mode the tile cannot state → ERROR");
+        assertTrue(fire(w, "working-set-binding", Map.of("vizType", "working-set", "viewId", "case-a",
+                "workingSet", Map.of("relation", "nodes", "mode", "live", "pin", pin))).isPresent(),
+                "an unknown relation → ERROR");
+        assertTrue(fire(w, "working-set-binding", Map.of("vizType", "working-set", "viewId", "case-a",
+                "workingSet", Map.of("relation", "entities", "mode", "live"))).isPresent(),
+                "no pin — a Live tile has nothing to measure drift from → ERROR");
+        assertTrue(fire(w, "working-set-binding", Map.of("vizType", "working-set",
+                "workingSet", Map.of("relation", "entities", "mode", "frozen", "pin", pin))).isPresent(),
+                "no Investigation (viewId) → ERROR");
+    }
+
     @Test
     void dashboardNeedsAtLeastOneTile() {
         ConfigSpec d = ConfigSpecs.dashboard();

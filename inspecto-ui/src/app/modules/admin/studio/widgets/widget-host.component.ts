@@ -96,6 +96,7 @@ export interface DrillEvent {
                             [props]="props()"
                             [title]="widget.name"
                             [viewId]="widget.viewId"
+                            [viewBinding]="widget.workingSet"
                         />
                     } @else if (resolvedDataset(); as dataset) {
                         @if (showRevoked()) {

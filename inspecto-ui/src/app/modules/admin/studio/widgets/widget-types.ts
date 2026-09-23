@@ -1,4 +1,18 @@
 import { ControlValues, VizRenderOptions } from 'app/inspecto/viz';
+import type { WorkingSetRelationName } from 'app/inspecto/api';
+
+/**
+ * LA-21 — a **Working Set Widget**'s binding (decision D-E6). The Widget's `viewId` names the Investigation; this says
+ * which relation it shows, how, and from where. It holds NO rows: every render reads through the Investigation-scoped
+ * route, so the owner-only / PDP gate (D-E7) applies to every viewer of every dashboard it sits on.
+ * - `frozen` (the default) re-reads the relation AT `pin.step` and checks the answer's hash against `pin.workingSetHash`;
+ * - `live` re-reads the head and shows what changed since the pin. A Live Widget cannot leave its Space.
+ */
+export interface WorkingSetBinding {
+    relation: WorkingSetRelationName;
+    mode: 'frozen' | 'live';
+    pin: { step: number; workingSetHash: string; pinnedAt: string };
+}
 
 /**
  * Studio **Widget** model — a saved visualization = a dataset reference + a viz plugin type + the field→channel
@@ -15,8 +29,11 @@ export interface WidgetConfig {
     vizType: string;
     /** The field→channel mapping the plugin compiles to a QuerySpec (empty for view-bound widgets). */
     controls: ControlValues;
-    /** View-bound widgets only: the saved investigation view (`geo-map-view`/`link-analysis-view`) to render. */
+    /** View-bound widgets only: the saved investigation view (`geo-map-view`/`link-analysis-view`) to render —
+     *  or, for a Working Set Widget, the Investigation it reads. */
     viewId?: string;
+    /** Working Set Widgets only (LA-21): the relation, the Frozen/Live mode and the pin. */
+    workingSet?: WorkingSetBinding;
     /** Free-text tags for the library gallery's search/filter (e.g. `ops`, `billing`). */
     tags?: string[];
     /** Shown as the library card's subtitle. */
@@ -47,7 +64,7 @@ export function buildWidget(
     datasetId: string,
     vizType: string,
     controls: ControlValues,
-    extra?: Pick<WidgetConfig, 'tags' | 'description' | 'options' | 'viewId' | 'queryId'>,
+    extra?: Pick<WidgetConfig, 'tags' | 'description' | 'options' | 'viewId' | 'queryId' | 'workingSet'>,
 ): Widget {
     return {
         id: name,
@@ -57,6 +74,7 @@ export function buildWidget(
         vizType,
         controls,
         viewId: extra?.viewId,
+        workingSet: extra?.workingSet,
         tags: extra?.tags,
         description: extra?.description,
         options: extra?.options,

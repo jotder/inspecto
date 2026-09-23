@@ -79,7 +79,13 @@
                 </div>
             </div>
 
-            @if (viewBound()) {
+            @if (workingSet()) {
+                <div class="text-secondary text-sm">
+                    This Widget reads Investigation <strong>{{ viewId() }}</strong
+                    >'s Working Set. Its pin and its Frozen/Live kind are set when it is saved from the Link Analysis
+                    Investigation panel.
+                </div>
+            } @else if (viewBound()) {
                 <mat-form-field subscriptSizing="dynamic">
                     <mat-label>Saved view</mat-label>
                     <mat-select [ngModel]="viewId()" (ngModelChange)="viewId.set($event)" aria-label="Saved view">
@@ -138,6 +144,7 @@
                         [props]="props()"
                         [title]="p.meta.label"
                         [viewId]="viewId() || undefined"
+                        [viewBinding]="workingSet()"
                     />
                 }
             } @else if (!dataset()) {

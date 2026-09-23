@@ -67,6 +67,9 @@ export class VizRenderComponent {
     readonly renderOptions = input<VizRenderOptions | undefined>(undefined);
     /** For view-bound plugins (`meta.viewKind`): the saved view id the outlet component renders. */
     readonly viewId = input<string | undefined>(undefined);
+    /** For a view-bound plugin whose binding is more than an id (LA-21's Working Set Widget): handed to the outlet
+     *  component as its `binding` input. Pass a STABLE reference — a new object per change detection re-runs its reads. */
+    readonly viewBinding = input<unknown>(undefined);
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no
      *  filterable categories, so it never emits. */
     readonly categoryClick = output<string>();
@@ -228,7 +231,9 @@ export class VizRenderComponent {
         const r = this.plugin().render;
         return r.kind === 'component' && r.componentKey === 'kpi'
             ? { value: this.props().value ?? 0, label: this.title() }
-            : { viewId: this.viewId() };
+            : this.viewBinding() === undefined
+              ? { viewId: this.viewId() }
+              : { viewId: this.viewId(), binding: this.viewBinding() };
     });
 
     /** Resolve the clicked point's index to its category label (from the same, possibly sorted/limited,

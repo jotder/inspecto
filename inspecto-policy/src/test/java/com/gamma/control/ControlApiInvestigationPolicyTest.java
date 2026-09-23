@@ -89,6 +89,7 @@ class ControlApiInvestigationPolicyTest {
             // used to assert /log stayed 200 — the policy hid one view of data every other route still served.
             for (String[] r : new String[][]{
                     {"GET", "/inv/investigations/case-a/log", null},
+                    {"GET", "/inv/investigations/case-a/working-set?at=1", null},   // LA-21: a Frozen Widget's pinned read
                     {"GET", "/inv/investigations/case-a/dossier", null},
                     {"POST", "/inv/investigations/case-a/replay", "{}"},
                     {"POST", "/inv/investigations/case-a/ops", "{\"op\":\"seed\",\"ids\":[\"bob\"]}"}}) {

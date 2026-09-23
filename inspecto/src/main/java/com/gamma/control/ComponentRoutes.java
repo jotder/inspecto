@@ -691,6 +691,18 @@ final class ComponentRoutes implements RouteModule {
                         .collect(java.util.stream.Collectors.joining("; ")));
         }
 
+        // LA-21: a Working Set Widget is validated against the WHOLE widget spec — its pin is what a Frozen tile
+        // renders and what a Live tile measures drift from, so a binding without one is refused at authoring time.
+        // Only this kind of widget, because older widgets predate the spec's rules (a bare `vizType` still saves).
+        if ("widget".equals(type) && WorkingSetWidgets.binding(content).isPresent()) {
+            List<Finding> errors = ConfigLoader.filesystem().validate(ConfigSpecs.widget(), content).stream()
+                    .filter(f -> f.severity() == Severity.ERROR).toList();
+            if (!errors.isEmpty())
+                throw new IllegalArgumentException("working-set widget is invalid: " + errors.stream()
+                        .map(f -> (f.fieldPath().isEmpty() ? "" : f.fieldPath() + ": ") + f.message())
+                        .collect(java.util.stream.Collectors.joining("; ")));
+        }
+
         if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
     }
 

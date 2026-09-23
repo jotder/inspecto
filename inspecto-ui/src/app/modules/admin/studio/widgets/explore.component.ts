@@ -22,12 +22,13 @@ import {
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
+import { WORKING_SET_VIEW_KIND } from 'app/inspecto/viz/plugins';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { Widget, WidgetOptions, buildWidget } from './widget-types';
+import { Widget, WidgetOptions, WorkingSetBinding, buildWidget } from './widget-types';
 import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
 import { WidgetOptionsDialog } from './widget-options.dialog';
 import { WidgetsService } from './widgets.service';
@@ -121,12 +122,17 @@ export class ExploreComponent implements OnInit {
     readonly plugin = computed<VizPlugin | null>(() => getViz(this.vizType()) ?? null);
     readonly sourceName = computed(() => this.dataset()?.sourceName ?? 'data');
 
-    /** The view-bound plugins (geo-map / link-analysis) — offered without a dataset; excluded from Show-Me. */
-    readonly viewPlugins: VizPlugin[] = allViz().filter((p) => !!p.meta.viewKind);
+    /** The view-bound plugins (geo-map / link-analysis) — offered without a dataset; excluded from Show-Me. The
+     *  Working Set Widget is not offered: it is pinned and saved from the Link Analysis Investigation panel (LA-21). */
+    readonly viewPlugins: VizPlugin[] = allViz().filter(
+        (p) => !!p.meta.viewKind && p.meta.viewKind !== WORKING_SET_VIEW_KIND,
+    );
     readonly viewBound = computed(() => !!this.plugin()?.meta.viewKind);
     /** The selected saved view (a view-bound widget's binding) + the picker's choices. */
     readonly viewId = signal<string>('');
     readonly savedViews = signal<{ id: string; name: string }[]>([]);
+    /** A loaded Working Set Widget's binding, carried verbatim through a re-save (never authored here). */
+    readonly workingSet = signal<WorkingSetBinding | undefined>(undefined);
 
     /** The picked Dataset's rows — one page from the rows seam (the real store live, samples offline). */
     private readonly page = signal<DatasetRows | null>(null);
@@ -171,6 +177,7 @@ export class ExploreComponent implements OnInit {
      *  A view-bound plugin instead clears the mapping and loads its saved-view picker choices. */
     setVizType(type: string): void {
         this.vizType.set(type);
+        this.workingSet.set(undefined); // a Working Set binding belongs to the working-set type alone
         const p = this.plugin();
         if (p?.meta.viewKind) {
             this.controls.set({});
@@ -223,12 +230,14 @@ export class ExploreComponent implements OnInit {
         this.vizType.set(w.vizType);
         this.controls.set(w.controls);
         this.viewId.set(w.viewId ?? '');
+        this.workingSet.set(w.workingSet);
         this.options.set(w.options ?? {});
         this.tags.set(w.tags);
         this.description.set(w.description);
         const viewKind = getViz(w.vizType)?.meta.viewKind;
         if (viewKind) {
-            this.loadSavedViews(viewKind);
+            // An Investigation is not a registry component — there is no list to pick from (LA-21).
+            if (viewKind !== WORKING_SET_VIEW_KIND) this.loadSavedViews(viewKind);
             return; // view-bound: no dataset to fetch, no query to run
         }
         this.datasetsApi.get(w.datasetId).subscribe({
@@ -300,6 +309,7 @@ export class ExploreComponent implements OnInit {
                         tags: this.tags(),
                         description,
                         viewId: viewBound ? this.viewId() : undefined,
+                        workingSet: viewBound ? this.workingSet() : undefined,
                         queryId: viewBound ? undefined : this.boundQueryId(),
                     },
                 );

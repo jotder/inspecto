@@ -60,6 +60,13 @@ import java.util.Map;
  *
  * <p>A {@code GET}: reads are open by policy (no capability — {@code route-gating.md}), so the gate is the row
  * rule above, not a capability. Audited per the LA-04 query pattern.
+ *
+ * <p><b>{@code ?at=<step>} — the relation at a past head (LA-21).</b> A Frozen Working Set Widget pins
+ * {@code head{step, workingSetHash}} and re-reads the relation at that step: the log is append-only and an undo is a
+ * LATER entry, so the prefix up to a step evaluates to the same Working Set forever (the evaluator's prefix semantics).
+ * The tile compares the answered {@code head.workingSetHash} with its pin, so a log rewritten on disk shows as a broken
+ * pin, never as quietly different evidence. It goes through the same gate as every other read — nothing is stored in
+ * the Widget, so a Widget can never carry rows past the owner-only / PDP rule. A step past the head is a 422.
  */
 public final class WorkingSetRoutes implements RouteModule {
 
@@ -98,9 +105,11 @@ public final class WorkingSetRoutes implements RouteModule {
         int limit = Math.min(Math.max(intParam(ex, "limit", DEFAULT_LIMIT), 1), MAX_LIMIT);
         int offset = intParam(ex, "offset", 0);
         if (offset < 0) throw new ApiException(422, "offset must be >= 0");
+        int at = intParam(ex, "at", -1);
+        if (ApiContext.query(ex, "at") != null && at < 0) throw new ApiException(422, "at must be >= 0");
 
         boolean[] cached = {false};
-        Relation rel = relation(inv, cached);
+        Relation rel = relation(inv, at, cached);
         List<Map<String, Object>> all = rel.tables().get(of);
         List<Map<String, Object>> rows = all.subList(Math.min(offset, all.size()), (int) Math.min((long) offset + limit, all.size()));
         boolean truncated = (long) offset + rows.size() < all.size();
@@ -108,7 +117,7 @@ public final class WorkingSetRoutes implements RouteModule {
         String relation = of;
         emit(ex, id, b -> b.attr("investigationId", id).attr("relation", relation).attr("rows", rows.size())
                 .attr("total", all.size()).attr("truncated", truncated).attr("cached", cached[0])
-                .attr("key", rel.key()));
+                .attr("key", rel.key()).attr("at", at < 0 ? null : at));
 
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("step", rel.headStep());
@@ -131,11 +140,19 @@ public final class WorkingSetRoutes implements RouteModule {
     /** The resolved Investigation as the PDP sees it — {@code resource.*} in an Access Policy's {@code when}. */
     /** The relation at the log's current committed head — from the cache when the head has not moved. */
     static Relation relation(InvestigationRoutes.Inv inv, boolean[] cachedOut) throws IOException {
+        return relation(inv, -1, cachedOut);
+    }
+
+    /**
+     * The relation at step {@code at} ({@code < 0} = the current committed head). A past step is keyed by the log AND
+     * the step, so it shares the cache without ever answering for the head, and vice versa.
+     */
+    static Relation relation(InvestigationRoutes.Inv inv, int at, boolean[] cachedOut) throws IOException {
         Path logFile = inv.dir().resolve("log.jsonl");
         byte[] bytes = Files.isRegularFile(logFile) ? Files.readAllBytes(logFile) : new byte[0];
         int end = bytes.length;
         while (end > 0 && bytes[end - 1] != '\n') end--;   // a line being appended right now is not committed yet
-        String key = inv.dir().toAbsolutePath().normalize() + "\u0000" + sha256(bytes, end);
+        String key = inv.dir().toAbsolutePath().normalize() + "\u0000" + sha256(bytes, end) + (at < 0 ? "" : "@" + at);
         synchronized (CACHE) {
             Relation hit = CACHE.get(key);
             if (hit != null) {
@@ -149,8 +166,16 @@ public final class WorkingSetRoutes implements RouteModule {
             @SuppressWarnings("unchecked") Map<String, Object> m = ApiContext.JSON.readValue(line, Map.class);
             log.add(m);
         }
-        InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(log, -1, null);
-        int headStep = log.isEmpty() ? 0 : ((Number) log.get(log.size() - 1).get("step")).intValue();
+        int lastStep = log.isEmpty() ? 0 : ((Number) log.get(log.size() - 1).get("step")).intValue();
+        if (at > lastStep)
+            throw new ApiException(422, "at " + at + " is past the Investigation's head (step " + lastStep + ")");
+        InvestigationEvaluator.State s = InvestigationEvaluator.evaluate(log, at, null);
+        int headStep = 0;   // the last log entry at or before `at` — the head the answer is the relation OF
+        for (Map<String, Object> e : log) {
+            int step = ((Number) e.get("step")).intValue();
+            if (at >= 0 && step > at) break;
+            headStep = step;
+        }
         Relation rel = new Relation(key.substring(key.indexOf('\u0000') + 1), headStep, s.hash(), tables(s));
         synchronized (CACHE) {
             CACHE.put(key, rel);

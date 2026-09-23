@@ -715,7 +715,12 @@ public final class ConfigSpecs {
                 FieldSpec.of("datasetId", "Dataset", FieldType.STRING,
                         "The dataset the widget queries (empty for a view-bound widget, which uses viewId)."),
                 FieldSpec.of("viewId", "View", FieldType.STRING,
-                        "A saved investigation view (geo-map/link-analysis) rendered instead of a dataset query."),
+                        "A saved investigation view (geo-map/link-analysis) rendered instead of a dataset query — "
+                                + "or, for a working-set widget, the Investigation whose Working Set it reads."),
+                FieldSpec.of("workingSet", "Working Set binding", FieldType.MAP,
+                        "A working-set widget's binding (LA-21): {relation: entities|links|excluded, mode: "
+                                + "frozen|live, pin: {step, workingSetHash, pinnedAt}}. Frozen (the default) re-reads "
+                                + "the relation at the pinned step; live re-reads the head and shows drift since the pin."),
                 FieldSpec.of("queryId", "Query", FieldType.STRING,
                         "A saved query component that supplies the rows instead of the dataset's own columns."),
                 FieldSpec.of("controls", "Field mapping", FieldType.MAP,
@@ -730,7 +735,20 @@ public final class ConfigSpecs {
                         "A widget must bind a dataset (datasetId) or a saved view (viewId).",
                         Severity.ERROR,
                         List.of("datasetId", "viewId"),
-                        raw -> present(raw, "datasetId") || present(raw, "viewId"))
+                        raw -> present(raw, "datasetId") || present(raw, "viewId")),
+                // LA-21 / D-E6: the pin is what a Frozen tile renders and what a Live tile measures drift from, so a
+                // binding without one — or in a mode the tile cannot state — is refused rather than drawn wrong.
+                new CrossFieldRule(
+                        "working-set-binding",
+                        "A working-set binding names its Investigation (viewId), a relation (entities, links or "
+                                + "excluded), a mode (frozen or live) and a pin {step, workingSetHash}.",
+                        Severity.ERROR,
+                        List.of("workingSet", "viewId"),
+                        raw -> !present(raw, "workingSet") || (present(raw, "viewId")
+                                && java.util.Set.of("entities", "links", "excluded").contains(str(raw, "workingSet.relation"))
+                                && java.util.Set.of("frozen", "live").contains(str(raw, "workingSet.mode"))
+                                && str(raw, "workingSet.pin.step") != null && str(raw, "workingSet.pin.step").matches("\\d+")
+                                && present(raw, "workingSet.pin.workingSetHash")))
         );
         return new ConfigSpec("widget", fields, rules);
     }

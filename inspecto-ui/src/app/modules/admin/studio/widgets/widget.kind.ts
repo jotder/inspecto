@@ -29,6 +29,11 @@ if (!getVizComponentLoader('link-analysis-view')) {
         import('../link-analysis/link-view-widget.component').then((m) => m.LinkViewWidgetComponent),
     );
 }
+if (!getVizComponentLoader('working-set')) {
+    registerVizComponent('working-set', () =>
+        import('../link-analysis/working-set-widget.component').then((m) => m.WorkingSetWidgetComponent),
+    );
+}
 if (!getVizComponentLoader('reconciliation')) {
     registerVizComponent('reconciliation', () =>
         import('../../reconciliation/recon-view-widget.component').then((m) => m.ReconViewWidgetComponent),

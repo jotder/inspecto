@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
 import { ControlValues } from 'app/inspecto/viz';
-import { Widget, WidgetOptions } from './widget-types';
+import { Widget, WidgetOptions, WorkingSetBinding } from './widget-types';
 
 /**
  * Widget store — persists {@link Widget}s as the `widget` component type (mock-served by the unified mock store). Mirrors
@@ -43,6 +43,7 @@ function toContent(w: Widget): Record<string, unknown> {
         vizType: w.vizType,
         controls: w.controls,
         viewId: w.viewId,
+        workingSet: w.workingSet,
         tags: w.tags,
         description: w.description,
         options: w.options,
@@ -58,6 +59,7 @@ function fromContent(name: string, content: Record<string, unknown>): Widget {
         vizType: (content['vizType'] as string) ?? 'bar',
         controls: (content['controls'] as ControlValues) ?? {},
         viewId: (content['viewId'] as string) ?? undefined,
+        workingSet: (content['workingSet'] as WorkingSetBinding) ?? undefined,
         tags: (content['tags'] as string[]) ?? undefined,
         description: (content['description'] as string) ?? undefined,
         options: (content['options'] as WidgetOptions) ?? undefined,

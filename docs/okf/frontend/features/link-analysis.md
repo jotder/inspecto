@@ -615,6 +615,14 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   non-owner reads 404; no fallback to Dataset sharing); on Enterprise additionally the `PolicyEngine`'s row
   verdict for `resourceKind: investigation`, which can hide it even from its owner but never widens it. ⛔ It is
   **not** a Dataset or DuckDB view — `/bi` and `/db` cannot reach it; binding it to a Widget is LA-21.
+* **Working Set Widgets** (LA-21, 2026-09-23; D-E6). The Investigation panel's *Pin to a Widget* saves a
+  `working-set` Widget (`viewId` = the Investigation, `workingSet{relation, mode, pin{step, workingSetHash}}`).
+  **Frozen** (default) re-reads `?at=<pin.step>` and refuses to show rows if the answered hash differs from the pin;
+  **Live** reads the head and states the drift since the pin; the tile always shows *Frozen*/*Live*. It stores no
+  rows and reads only the Investigation-scoped route, so a dashboard viewer who is not the owner sees *Not
+  available to you*. ⛔ A Live Widget cannot leave the Space: the Exchange refuses Working Set Widgets (Frozen too,
+  per D-E7), a bundle export converts Live → Frozen at its pin (`converted`). As-built:
+  `docs/superpower/link-analysis-backlog-plan.md` §5.8.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as

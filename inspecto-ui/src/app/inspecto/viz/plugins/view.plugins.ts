@@ -48,3 +48,24 @@ export const RECONCILIATION_PLUGIN: VizPlugin = {
     transformProps: NO_PROPS,
     render: { kind: 'component', componentKey: 'reconciliation' },
 };
+
+/**
+ * LA-21: a dashboard tile over an **Investigation's Working Set** (decision D-E6). `viewKind` is `investigation`: the
+ * binding is the Investigation id (`viewId`) plus the widget's `workingSet` {relation, mode, pin}. It is saved from the
+ * Link Analysis Investigation panel — the one place that knows the head to pin — so Explore does not offer it.
+ */
+export const WORKING_SET_VIEW_KIND = 'investigation';
+
+export const WORKING_SET_PLUGIN: VizPlugin = {
+    meta: {
+        type: 'working-set',
+        label: 'Working Set',
+        icon: 'heroicons_outline:finger-print',
+        fit: {},
+        viewKind: WORKING_SET_VIEW_KIND,
+    },
+    controls: [],
+    buildQuery: NO_QUERY,
+    transformProps: NO_PROPS,
+    render: { kind: 'component', componentKey: 'working-set' },
+};

@@ -69,6 +69,9 @@ import java.util.Set;
  * no writes), {@code POST /bundle/import} (write; sequential upsert in dependency order, reporting
  * per-item without aborting the rest). Import is gated on {@code canAuthorWorkbench} (a no-op on
  * Personal) then the write-root 503 gate — matching {@link ComponentRoutes}.
+ *
+ * <p><b>A Live Working Set Widget leaves Frozen</b> (LA-21, D-E6): export rewrites its {@code workingSet.mode} to
+ * {@code frozen} at its own pin and lists it under {@code converted} — see {@link WorkingSetWidgets}.
  */
 final class BundleRoutes implements RouteModule {
 
@@ -143,6 +146,7 @@ final class BundleRoutes implements RouteModule {
 
         List<Map<String, Object>> items = new ArrayList<>();
         List<Map<String, Object>> missing = new ArrayList<>();
+        List<Map<String, Object>> converted = new ArrayList<>();
         for (Map<String, Object> req : requested) {
             String kind = ApiContext.str(req, "kind"), id = ApiContext.str(req, "id");
             BundleSource src = sourceFor(api, kind);
@@ -152,6 +156,15 @@ final class BundleRoutes implements RouteModule {
                 continue;
             }
             Map<String, Object> content = exportContent(kind, raw);
+            // LA-21 / D-E6: a Live Working Set Widget cannot leave its Space — the copy that leaves is Frozen at its pin.
+            if ("widget".equals(kind) && WorkingSetWidgets.isLive(content)) {
+                content = WorkingSetWidgets.frozenCopy(content);
+                Map<String, Object> c = refMap(kind, id);
+                c.put("from", WorkingSetWidgets.LIVE);
+                c.put("to", WorkingSetWidgets.FROZEN);
+                c.put("reason", "a Live Working Set Widget cannot leave its Space (D-E6); it is exported Frozen at its pin");
+                converted.add(c);
+            }
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("kind", kind);
             item.put("id", id);
@@ -177,6 +190,7 @@ final class BundleRoutes implements RouteModule {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("bundle", bundle);
         out.put("missing", missing);
+        out.put("converted", converted);
         return out;
     }
 
