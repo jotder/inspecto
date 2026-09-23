@@ -60,6 +60,8 @@ class DiagnoseAndAlertSkillTest {
             assertEquals("CRITICAL", data.get("severity"));
             assertFalse(data.containsKey("onPipeline"), "no pipeline named -> rule spans all");
             assertTrue(String.valueOf(data.get("humanReadable")).contains("error_rate"));
+            assertTrue(res.answer().contains("save it as an Alert Rule"), res.answer());
+            assertFalse(res.answer().contains("_alert.toon"), "a *_alert.toon file is never loaded: " + res.answer());
 
             // The draft .toon the user saves carries the rule under an 'alert' section.
             String draftToon = (String) data.get("draftToon");

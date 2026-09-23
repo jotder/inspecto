@@ -22,7 +22,7 @@ import java.util.Map;
  *
  * <h3>Why a bridge and not {@code AlertService}</h3>
  * {@code AlertService} evaluates operator rules over the <em>batches ledger</em> (a fired rule → ALERT object).
- * A sequence gap is not a batch metric and is independent of whether any {@code *_alert.toon} rule is loaded, so
+ * A sequence gap is not a batch metric and is independent of whether any Alert Rule is loaded, so
  * it gets its own promotion path here, gated only on the object store being present.
  *
  * <h3>De-duplication</h3>

@@ -338,7 +338,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /**
-     * Full constructor (v4.1, B5). Adds operator-saved {@code *_alert.toon} rules, executed by a
+     * Full constructor (v4.1, B5). Adds operator-saved Alert Rules ({@code alert-rule} components), executed by a
      * deterministic {@link com.gamma.alert.AlertService} on this service's bus (the runtime half of
      * the agent's draft-only {@code diagnose-and-alert}); empty disables the alert layer.
      *
@@ -500,7 +500,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (this.eventObjectBridge != null) this.eventLog.addSubscriber(this.eventObjectBridge);
         // Alert engine (v4.1, B5): deterministic, lean-core, event-driven. Always present (like the
         // object store above) so the authoring routes (POST/PUT/DELETE /alerts/rules) can arm rules at
-        // runtime even when no *_alert.toon was loaded at boot — empty until a rule is added. Subscribed
+        // runtime even when no Alert Rule was loaded at boot — empty until a rule is added. Subscribed
         // here (before start()) so it sees the first terminal batch. Phase 2: also persists each fired
         // alert as a managed ALERT object via the Object Engine above.
         this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status,

@@ -30,7 +30,7 @@ import java.util.Set;
 /**
  * The fifth and final MVP assist slice (v3.7.0, M7, C1): {@code diagnose-and-alert}. This class
  * serves the request/response half — <b>NL → alert rule</b> ("warn when error rate exceeds 5% on
- * EVENTS") → a validated alert-rule draft the operator saves as a {@code *_alert.toon}. The
+ * EVENTS") → a validated alert-rule draft the operator saves as an Alert Rule ({@code POST /alerts/rules}). The
  * event-driven half (auto-diagnosing FAILED batches) is the {@link com.gamma.agent.diagnose.FailureReactor},
  * wired separately in {@code UccAssistAgent}; both share the M7 design.
  *
@@ -139,7 +139,7 @@ public final class DiagnoseAndAlertSkill implements Capability {
         data.put("findings", List.of());                        // clean by construction (oracle passed)
 
         String answer = humanReadable
-                + ". Review the draft below and save it as a *_alert.toon to enable it.";
+                + ". Review the draft below and save it as an Alert Rule to enable it.";
         return AgentResult.draft(ID, SPEC.version(), answer, evidence, links, null, 1.0, tier, data);
     }
 

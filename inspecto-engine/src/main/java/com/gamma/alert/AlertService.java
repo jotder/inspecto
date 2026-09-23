@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The alert execution engine (v4.1, B5) — evaluates operator-saved {@code *_alert.toon} rules
+ * The alert execution engine (v4.1, B5) — evaluates operator-saved Alert Rules ({@code alert-rule} components)
  * against the batches ledger and records breaches. This is the runtime half of the agent's
  * draft-only {@code diagnose-and-alert} skill: the agent proposes, a human saves the reviewed
  * {@code .toon}, and THIS deterministic service (no model, lean core) executes it.

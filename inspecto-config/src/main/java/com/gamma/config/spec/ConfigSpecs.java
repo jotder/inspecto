@@ -583,7 +583,7 @@ public final class ConfigSpecs {
 
     // ── alert (v4.1, B5) ─────────────────────────────────────────────────────────
 
-    /** The {@code *_alert.toon} rule executed by the core alert engine (drafted by diagnose-and-alert). */
+    /** The Alert Rule (an {@code alert-rule} component under {@code <write-root>/registry}) executed by the core alert engine (drafted by diagnose-and-alert). */
     public static ConfigSpec alert() {
         List<FieldSpec> fields = List.of(
                 FieldSpec.required("alert.name", "Rule name", FieldType.STRING,
