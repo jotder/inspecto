@@ -241,6 +241,70 @@ class ConfigValidatorTest {
                         + "positive for a false negative. Got: " + warnings);
     }
 
+    /**
+     * {@code PARTITION-KEY-VALIDATION-GAPS-1} (a) — a partition is cut from the RAW relation, before mapping,
+     * so a {@code partitionKey} naming a column only the mapping produces cannot bind. It used to validate
+     * clean and then fail at run time with a DuckDB binder error.
+     */
+    @Test
+    void aPartitionKeyNamingAMappedOnlyColumnIsReported(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema.toon");
+        Files.writeString(schema, """
+                partitionKey: POSTING_DATE
+                raw:
+                  name: x
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    ID,"0",VARCHAR
+                    POSTING_SERIAL,"1",INTEGER
+                mapping:
+                  canonicalName: x
+                  rawName: x
+                  fields[2]:
+                    - name: ID
+                      from: ID
+                      fn: keep
+                    - name: POSTING_DATE
+                      from: ""
+                      fn: custom
+                      args:
+                        expression: "CAST(DATE '1899-12-30' + POSTING_SERIAL AS DATE)"
+                """);
+        List<String> warnings = ConfigValidator.validate(loadPipeline(dir, schema));
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("'POSTING_DATE'") && w.contains("not a raw field")
+                        && w.contains("mapped column")),
+                "a partition source that only the mapping produces must be reported. Got: " + warnings);
+    }
+
+    /**
+     * {@code PARTITION-KEY-VALIDATION-GAPS-1} (b) — DuckDB column names are case-insensitive, so a partition
+     * column {@code account_class} next to a mapped {@code ACCOUNT_CLASS} is a DUPLICATE: DuckDB silently
+     * renames the partition column {@code account_class_1}, and the folders are cut from the mapped column.
+     */
+    @Test
+    void aPartitionColumnCollidingByCaseWithAMappedColumnIsReported(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema.toon");
+        Files.writeString(schema, """
+                partitions[1]{column,source,type}:
+                  account_class,ACCOUNT_CLASS,VARCHAR
+                raw:
+                  name: x
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    ID,"0",VARCHAR
+                    ACCOUNT_CLASS,"1",VARCHAR
+                mapping:
+                  canonicalName: x
+                  rawName: x
+                  fields[2]{name,from,fn}:
+                    ID,ID,keep
+                    ACCOUNT_CLASS,ACCOUNT_CLASS,keep
+                """);
+        List<String> warnings = ConfigValidator.validate(loadPipeline(dir, schema));
+        assertTrue(warnings.stream().anyMatch(w -> w.contains("'account_class'") && w.contains("'ACCOUNT_CLASS'")),
+                "a partition column that collides by case with a mapped column must be reported. Got: " + warnings);
+    }
+
     private static String basePipeline(Path dir, String schemaPath) {
         return """
                 name: VALIDATOR_ETL

@@ -113,6 +113,12 @@ public final class DataTransformer {
 
         // ── partition columns ─────────────────────────────────────────────────
         List<PartitionDef> partDefs = PartitionDef.fromSchema(schemaConfig);
+        // Refused here, not left to DuckDB: a case-colliding pair does not fail, it is silently renamed
+        // `<name>_1` and the folders are cut from the mapped column (PARTITION-KEY-VALIDATION-GAPS-1 (b)).
+        List<String> collisions = PartitionDef.columnCollisions(partDefs,
+                cols.stream().map(c -> (String) c.get("name")).toList());
+        if (!collisions.isEmpty())
+            throw new IllegalArgumentException(String.join("; ", collisions));
         if (partDefs.isEmpty()) {
             // E1: no partition key ⇒ no partition columns — the write lands as a flat file
             // (the year=1900/month=01/day=01 sentinel is retired for new writes).

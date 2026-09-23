@@ -277,6 +277,25 @@ class ControlApiTest {
         }
     }
 
+    /**
+     * {@code PARTITION-KEY-VALIDATION-GAPS-1} (a) over real HTTP — a {@code partitionKey} naming a column only
+     * the mapping produces used to validate {@code clean:true} and then fail the run with a binder error.
+     */
+    @Test
+    void validateReportsAPartitionKeyNamingAMappedOnlyColumn(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Path toon = TestConfigs.csv(Files.createDirectories(dir.resolve("mapped_only")),
+                    PipelineConfigBatchTest.miniSchema().replace("partitionKey: EVENT_DATE", "partitionKey: AMT_X2")
+                            .replace("rules[3]{targetColumn,sourceExpression,transformType}:",
+                                    "rules[4]{targetColumn,sourceExpression,transformType}:\n    AMT_X2,\"AMT * 2\",EXPR")
+                    ).write();
+            String body = "{\"configPath\":\"" + toon.toString().replace("\\", "/") + "\"}";
+            JsonNode r = json(send(c.port, "POST", "/validate", body));
+            assertFalse(r.get("clean").asBoolean(), "must not validate clean: " + r);
+            assertTrue(r.get("warnings").toString().contains("'AMT_X2' is not a raw field"), "Got: " + r);
+        }
+    }
+
     @Test
     void unknownPipelineAndPathYield404(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

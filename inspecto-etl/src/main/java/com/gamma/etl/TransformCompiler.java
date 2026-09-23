@@ -47,7 +47,7 @@ public final class TransformCompiler {
      * uses {@code timestamp_formats}, everything else ({@code VARCHAR}/{@code DATE}) uses
      * {@code date_formats}. This matters because a {@code TIMESTAMP} value rendered to text carries a
      * time component that a date-only format cannot match — so a date-only parse would yield {@code NULL}
-     * and send every row to the {@code 1900/01/01} sentinel partition. {@code YEAR}/{@code MONTH}/
+     * and send every row to the {@code __HIVE_DEFAULT_PARTITION__} (NULL) partition. {@code YEAR}/{@code MONTH}/
      * {@code DAY} accept both {@code DATE} and {@code TIMESTAMP}, so the extracted component is correct
      * either way.
      */
@@ -92,7 +92,7 @@ public final class TransformCompiler {
      * {@code TIMESTAMP} source (its text has a time component), {@code date_formats} otherwise. This matters
      * because a {@code TIMESTAMP} value rendered to text carries a time component that a date-only format
      * cannot match — so a date-only parse would yield {@code NULL} and send every row to the
-     * {@code 1900/01/01} sentinel partition.
+     * {@code __HIVE_DEFAULT_PARTITION__} (NULL) partition.
      */
     private static String dateExpr(PartitionDef pd, String sourceTable,
                                    Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,

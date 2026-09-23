@@ -173,7 +173,7 @@ partitionKey: REVERSAL_DATE          # column used to derive year/month/day part
 
 # Option B — explicit partitions[] list (plugin ingester / multi-type events)
 # partitions:
-#   - column: event_type             # output partition column name
+#   - column: record_type            # output partition column name — must not equal a mapped column, ignoring case
 #     source: EVENT_TYPE             # column in the raw DuckDB table (set by ingester)
 #     type: VARCHAR
 #   - column: year
@@ -218,15 +218,36 @@ one column) or an explicit `partitions[]` list. The `DATE_YEAR`/`DATE_MONTH`/`DA
 the component from the `source` column, parsing its value with **`timestamp_formats` when the source
 field is declared `TIMESTAMP`**, otherwise with **`date_formats`** (`VARCHAR`/`DATE` sources). Put the
 matching pattern in the right list: a `TIMESTAMP` value like `2018-04-09-00.00.00.000000` will **not**
-match a date-only pattern, and any unparsed value falls into the `1900/01/01` sentinel partition.
-(`VARCHAR` partition columns pass through as-is; `DOUBLE`/`INTEGER` use `TRY_CAST`.)
+match a date-only pattern. **An unparsed value yields NULL, and every such row lands under
+`year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/day=__HIVE_DEFAULT_PARTITION__`** — DuckDB's
+name for a NULL partition value. There is no `1900/01/01` sentinel for unparsed values (that was the
+pre-E1 no-partition fallback, and a schema with no partition now writes flat files). So `partitionKey:` on a
+text column that is not a date sends every row to that one folder; partition a text column with an
+explicit `partitions[]` entry of type `VARCHAR` instead. (`VARCHAR` partition columns pass through as-is;
+`DOUBLE`/`INTEGER` use `TRY_CAST`.) Pinned by
+`DataTransformerCustomPartitionTest.anUnparsableDatePartitionSourceLandsUnderTheHiveDefaultPartition`.
 
-⚠ **Open, reported 2026-09-23 by the demo lanes and not yet re-grounded** (`PARTITION-KEY-VALIDATION-GAPS-1`):
-a `partitionKey` naming a **mapped-only** column validates clean and fails at run time with a binder
-error; a partition column colliding **by case** with a mapped column (`account_class` vs
-`ACCOUNT_CLASS`) is silently renamed `account_class_1` and the folders split on the other column; and
-the shipped `excel_example`, partitioned on the text column `CATEGORY`, puts every row under
-`__HIVE_DEFAULT_PARTITION__` — not the `1900/01/01` sentinel described above.
+Two more rules, both `PARTITION-KEY-VALIDATION-GAPS-1` (fixed 2026-09-23):
+
+- **A partition `source` must be a `raw.fields[]` name.** A partition is cut from the **raw** relation,
+  before mapping, so a `partitionKey` naming a column only the mapping produces (e.g. a `custom`
+  `POSTING_DATE`) cannot bind. It used to validate clean and fail the run with a DuckDB binder error;
+  `ConfigValidator` now reports it (startup `WARN`, and `POST /validate` with `configPath` answers
+  `clean:false` with the warning). It is a report, not a refusal, because a plugin ingester may `define`
+  raw columns beyond `raw.fields[]` — for any other source the binder still fails the run closed.
+- **A partition `column` must not equal a mapped column, ignoring case.** DuckDB column names are
+  case-insensitive, so `account_class` beside a mapped `ACCOUNT_CLASS` is a duplicate: DuckDB silently
+  renamed the partition column `account_class_1`, `PARTITION_BY` bound to the mapped column, and the folders
+  came out `ACCOUNT_CLASS=<mapped value>` with `account_class_1` left in the data files (measured). There is
+  no way to write both, so `DataTransformer.selectFor` — the one seam the run, the test run and the derived
+  schema share — **refuses** it naming both columns, and `ConfigValidator` reports it. Rename the partition
+  column (the `gl_journal` demo uses `acct_class`).
+
+The shipped `excel_example` used `partitionKey: CATEGORY` (every row under the Hive default); it now
+declares `partitions[1]{column,source,type}: item_category,CATEGORY,VARCHAR`, pinned end to end by
+`DemoCorpusIngestTest.excelExamplePartitionsByCategoryNotUnderTheHiveDefault`. ⚠ Two more shipped
+schemas carry the same shape and still land under the Hive default: `asn1_example` (`partitionKey: IMSI`)
+and `orders_by_region_feed` (`partitionKey: REGION`).
 
 `create-schema` generates one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; it wrote the
 legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that

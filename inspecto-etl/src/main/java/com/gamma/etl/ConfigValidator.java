@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Post-load sanity checks for {@link PipelineConfig}.
@@ -71,6 +73,18 @@ public final class ConfigValidator {
                             "its output will be written as unpartitioned flat files.");
             }
         }
+
+        // Partition defs that load fine but cannot be written as declared (PARTITION-KEY-VALIDATION-GAPS-1):
+        // a source that is not a raw field (a run-time binder error), and a column colliding by case with a
+        // mapped column (refused by DataTransformer.selectFor). Reported here so POST /validate says so.
+        Map<String, Map<String, Object>> schemas = new LinkedHashMap<>();
+        if (cfg.schemas().single() != null) schemas.put("single schema", cfg.schemas().single());
+        if (cfg.schemas().segments() != null)
+            cfg.schemas().segments().forEach((k, v) -> schemas.put("segment '" + k + "'", v));
+        if (cfg.schemas().selector() != null)
+            for (var sel : cfg.schemas().selector().entries()) schemas.put("table '" + sel.table() + "'", sel.schema());
+        schemas.forEach((label, schema) -> partitionProblems(schema, cfg)
+                .forEach(p -> warn(warnings, "Partition on the " + label + ": " + p + ".")));
 
         // 🔴 The three csv_settings rules apply ONLY to a delimited Pipeline (WB-04, 2026-09-22).
         //
@@ -186,6 +200,30 @@ public final class ConfigValidator {
         }
 
         return warnings;
+    }
+
+    /**
+     * The partition problems of one schema. A schema whose mapping does not compile yields none here — that
+     * failure is reported by the transform itself, and guessing its columns would report the wrong thing.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<String> partitionProblems(Map<String, Object> schema, PipelineConfig cfg) {
+        List<PartitionDef> defs = PartitionDef.fromSchema(schema);
+        if (defs.isEmpty() || !(schema.get("raw") instanceof Map<?, ?> raw)
+                || !(raw.get("fields") instanceof List<?> fields)) return List.of();
+        List<String> rawNames = new ArrayList<>();
+        for (Object f : fields)
+            if (f instanceof Map<?, ?> m && m.get("name") instanceof String n) rawNames.add(n);
+        List<String> mapped = new ArrayList<>();
+        try {
+            for (Map<String, Object> c : DataTransformer.dataColumns(schema, cfg.csv(), "raw_input"))
+                mapped.add((String) c.get("name"));
+        } catch (RuntimeException notCompilable) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>(PartitionDef.sourcesNotRaw(defs, rawNames, mapped));
+        out.addAll(PartitionDef.columnCollisions(defs, mapped));
+        return out;
     }
 
     private static void warn(List<String> sink, String msg) {

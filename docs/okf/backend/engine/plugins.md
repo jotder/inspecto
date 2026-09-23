@@ -95,7 +95,7 @@ Each segment key has its own schema toon. Use the `partitions[N]{...}` tabular l
 # file: spaces/default/config/events/call_schema.toon
 
 partitions[4]{column,source,type}:
-  event_type,EVENT_TYPE,VARCHAR    # column emitted by the ingester (define it on the sink)
+  record_type,EVENT_TYPE,VARCHAR   # from the column the ingester emits; NOT named event_type — see below
   year,EVENT_DATE,DATE_YEAR
   month,EVENT_DATE,DATE_MONTH
   day,EVENT_DATE,DATE_DAY
@@ -116,6 +116,13 @@ mapping:
     EVENT_TYPE,EVENT_TYPE,DIRECT
     EVENT_DATE,EVENT_DATE,DIRECT
 ```
+
+⛔ **A partition `column` must not equal a mapped column, ignoring case** (`PARTITION-KEY-VALIDATION-GAPS-1`,
+2026-09-23). DuckDB column names are case-insensitive, so `event_type` next to the mapped `EVENT_TYPE` is a
+duplicate: DuckDB silently renamed the partition column `event_type_1`, `PARTITION_BY` bound to the mapped
+column, and the folders came out `EVENT_TYPE=…` with `event_type_1` left in the data files. The transform now
+refuses the pair (`DataTransformer.selectFor`) and `POST /validate` reports it; this example used to be
+exactly that shape. The partition `source` must be a `raw.fields[]` name — a partition is cut before mapping.
 
 **`PartitionDef.type` values:**
 
@@ -195,13 +202,13 @@ Output files are written under `database/<source>/<SEGMENT_KEY>/` and partitione
 ```
 database/events/
   CALL/
-    event_type=CALL/
+    record_type=CALL/
       year=2020/
         month=04/
           day=03/
             events_20200403_out.csv       # union mode: one consolidated file per partition
   SMS/
-    event_type=SMS/
+    record_type=SMS/
       year=2020/
         month=04/
           day=03/

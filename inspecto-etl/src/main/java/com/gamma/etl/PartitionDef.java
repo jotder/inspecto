@@ -1,8 +1,13 @@
 package com.gamma.etl;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * One declared partition column: the output Hive-directory segment name, the raw-table
@@ -105,6 +110,51 @@ public record PartitionDef(String column, String source, Type type) {
     /** Extract just the column names in declaration order. */
     public static List<String> columnNames(List<PartitionDef> defs) {
         return defs.stream().map(PartitionDef::column).toList();
+    }
+
+    /**
+     * Defs whose {@link #source} is not a declared raw field, as author-facing messages
+     * ({@code PARTITION-KEY-VALIDATION-GAPS-1} (a)). A partition is cut from the RAW relation, before
+     * mapping, so a source only the mapping produces cannot bind — it validated clean and then failed at run
+     * time with a DuckDB binder error. Compared ignoring case, as DuckDB binds identifiers.
+     *
+     * <p>A report, not a run-time refusal: a plugin ingester may {@code define} raw columns beyond
+     * {@code raw.fields[]}, and for any other source DuckDB's binder already fails closed.
+     */
+    public static List<String> sourcesNotRaw(List<PartitionDef> defs, Collection<String> rawFields,
+                                             Collection<String> dataColumns) {
+        Set<String> raw = caseInsensitive(rawFields);
+        Set<String> mapped = caseInsensitive(dataColumns);
+        return defs.stream().filter(d -> d.source() != null && !raw.contains(d.source()))
+                .map(PartitionDef::source).distinct()
+                .map(s -> "partition source '" + s + "' is not a raw field"
+                        + (mapped.contains(s) ? " (it is a mapped column, and a partition is cut from the raw"
+                                + " relation BEFORE mapping)" : "")
+                        + " — name one of raw.fields[] " + rawFields)
+                .toList();
+    }
+
+    /**
+     * Defs whose output {@link #column} collides, ignoring case, with a mapped data column, as author-facing
+     * messages ({@code PARTITION-KEY-VALIDATION-GAPS-1} (b)). DuckDB column names are case-insensitive, so
+     * the pair is a DUPLICATE: DuckDB silently renames the partition column {@code <name>_1}, and
+     * {@code PARTITION_BY} then binds to the mapped column — the folders are cut from the wrong values under
+     * the wrong name. There is no correct way to write both, so the transform refuses it.
+     */
+    public static List<String> columnCollisions(List<PartitionDef> defs, Collection<String> dataColumns) {
+        Map<String, String> mapped = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (String c : dataColumns) mapped.putIfAbsent(c, c);
+        return defs.stream().filter(d -> d.column() != null && mapped.containsKey(d.column()))
+                .map(d -> "partition column '" + d.column() + "' collides with mapped column '"
+                        + mapped.get(d.column()) + "' (column names are case-insensitive) — rename the"
+                        + " partition column, e.g. 'part_" + d.column().toLowerCase(Locale.ROOT) + "'")
+                .toList();
+    }
+
+    private static Set<String> caseInsensitive(Collection<String> names) {
+        Set<String> s = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        s.addAll(names);
+        return s;
     }
 
     /** The date-typed defs — the ones {@code year}/{@code month}/{@code day} are cut from. */

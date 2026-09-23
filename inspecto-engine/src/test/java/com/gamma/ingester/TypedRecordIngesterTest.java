@@ -166,7 +166,7 @@ class TypedRecordIngesterTest {
     private static String callSchemaToon() {
         return """
                 partitions[4]{column,source,type}:
-                  event_type,EVENT_TYPE,VARCHAR
+                  record_type,EVENT_TYPE,VARCHAR
                   year,EVENT_DATE,DATE_YEAR
                   month,EVENT_DATE,DATE_MONTH
                   day,EVENT_DATE,DATE_DAY
@@ -190,7 +190,7 @@ class TypedRecordIngesterTest {
     private static String smsSchemaToon() {
         return """
                 partitions[4]{column,source,type}:
-                  event_type,EVENT_TYPE,VARCHAR
+                  record_type,EVENT_TYPE,VARCHAR
                   year,EVENT_DATE,DATE_YEAR
                   month,EVENT_DATE,DATE_MONTH
                   day,EVENT_DATE,DATE_DAY

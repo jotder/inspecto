@@ -82,7 +82,7 @@
 |---|---|---|
 | Stage-1 per-record scalar transform | see `EXPR` above | `configuration.md` |
 | `partitionKey` shorthand (→ year/month/day) | `partitionKey: EVENT_DATE` | `configuration.md` |
-| Explicit `partitions[]` (multi-column) | `partitions:` / `  - { column: event_type, source: EVENT_TYPE, type: VARCHAR }` | `configuration.md` |
+| Explicit `partitions[]` (multi-column) | `partitions:` / `  - { column: record_type, source: EVENT_TYPE, type: VARCHAR }` | `configuration.md` |
 | Stage-2 enrichment (`*_enrich.toon`) | `name: KPI` / `input: {database: …}` / `references: {…}` / `output: {…}` / `transform: "SELECT … GROUP BY …"` | `configuration.md` · events_daily_kpi |
 | Enrichment reference join | `references:` / `  region_dim: { path: ref/region_dim.parquet, format: PARQUET }` | events_daily_kpi |
 

@@ -111,15 +111,39 @@ class DemoCorpusIngestTest {
         assertEquals("0.00", scalar(db, "CAST(SUM(AMOUNT) AS DECIMAL(18,2))::VARCHAR"), "the journal balances");
     }
 
+    /**
+     * {@code PARTITION-KEY-VALIDATION-GAPS-1} (c) — the shipped {@code excel_example} (in {@code spaces/default})
+     * used {@code partitionKey: CATEGORY}, a DATE partition over a text column: no value parses, so every row
+     * landed under {@code __HIVE_DEFAULT_PARTITION__}. It now partitions on the category as text.
+     */
+    @Test
+    void excelExamplePartitionsByCategoryNotUnderTheHiveDefault(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = stage(dir, "default", "config/excel_example/excel_example_pipeline.toon");
+        seed(cfg, "default", "excel_example/INVENTORY_20260820.xlsx");
+
+        CollectorProcessor.run(cfg);
+
+        Path db = Path.of(cfg.dirs().database());
+        List<String> parts = subdirs(db).stream().filter(p -> !p.startsWith(".")).toList();   // not .staging
+        assertEquals(List.of("item_category=Electronics", "item_category=Hardware", "item_category=Misc"), parts,
+                "one folder per category, none the Hive default");
+        assertEquals(5, count(db, "true"), "the five inventory rows of A1:D6");
+        assertEquals(0, count(db, "CATEGORY IS NULL"), "the mapped CATEGORY column is written, not renamed");
+    }
+
     // ── harness ─────────────────────────────────────────────────────────────────────────────────
 
     private static PipelineConfig stage(Path dir, String pipeline) throws Exception {
+        return stage(dir, "demo", pipeline);
+    }
+
+    private static PipelineConfig stage(Path dir, String space, String pipeline) throws Exception {
         String data = dir.resolve("data").toString().replace('\\', '/') + "/";
-        String config = REPO.resolve("spaces/demo/config").toString().replace('\\', '/') + "/";
+        String config = REPO.resolve("spaces/" + space + "/config").toString().replace('\\', '/') + "/";
         List<String> out = new ArrayList<>();
-        for (String line : Files.readAllLines(REPO.resolve("spaces/demo").resolve(pipeline))) {
-            String l = rewrite(line, "spaces/demo/data/", data);
-            out.add(rewrite(l, "spaces/demo/config/", config));
+        for (String line : Files.readAllLines(REPO.resolve("spaces/" + space).resolve(pipeline))) {
+            String l = rewrite(line, "spaces/" + space + "/data/", data);
+            out.add(rewrite(l, "spaces/" + space + "/config/", config));
         }
         Path toon = dir.resolve(Path.of(pipeline).getFileName());
         Files.write(toon, out);
@@ -138,8 +162,12 @@ class DemoCorpusIngestTest {
     }
 
     private static void seed(PipelineConfig cfg, String sample) throws Exception {
+        seed(cfg, "demo", sample);
+    }
+
+    private static void seed(PipelineConfig cfg, String space, String sample) throws Exception {
         Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
-        Path src = REPO.resolve("spaces/demo/data/samples").resolve(sample);
+        Path src = REPO.resolve("spaces/" + space + "/data/samples").resolve(sample);
         Files.copy(src, inbox.resolve(src.getFileName()));
     }
 

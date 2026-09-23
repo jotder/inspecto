@@ -17,8 +17,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class DataTransformerCustomPartitionTest {
 
     /**
-     * Schema with explicit partitions[]: event_type (VARCHAR) + date components.
-     * Simulates the custom ingester path where event_type is a pre-computed column
+     * Schema with explicit partitions[]: record_type (VARCHAR, from EVENT_TYPE) + date components.
+     * Simulates the custom ingester path where EVENT_TYPE is a pre-computed column
      * the ingester added to the raw table.
      */
     @Test
@@ -28,7 +28,7 @@ class DataTransformerCustomPartitionTest {
 
         Map<String, Object> schema = Map.of(
                 "partitions", List.of(
-                        Map.of("column", "event_type", "source", "EVENT_TYPE", "type", "VARCHAR"),
+                        Map.of("column", "record_type", "source", "EVENT_TYPE", "type", "VARCHAR"),
                         Map.of("column", "year",  "source", "EVENT_DATE", "type", "DATE_YEAR"),
                         Map.of("column", "month", "source", "EVENT_DATE", "type", "DATE_MONTH"),
                         Map.of("column", "day",   "source", "EVENT_DATE", "type", "DATE_DAY")),
@@ -54,11 +54,11 @@ class DataTransformerCustomPartitionTest {
             DataTransformer.materialize(conn, schema, cfg, "raw_CALL", "transformed_CALL");
 
             try (ResultSet rs = st.executeQuery(
-                    "SELECT ID, EVENT_TYPE, event_type, year, month, day FROM transformed_CALL ORDER BY ID")) {
+                    "SELECT ID, EVENT_TYPE, record_type, year, month, day FROM transformed_CALL ORDER BY ID")) {
                 assertTrue(rs.next());
                 assertEquals("r1",   rs.getString("ID"));
                 assertEquals("CALL", rs.getString("EVENT_TYPE"));
-                assertEquals("CALL", rs.getString("event_type"));   // partition col
+                assertEquals("CALL", rs.getString("record_type"));  // partition col
                 assertEquals("2020", rs.getString("year"));
                 assertEquals("04",   rs.getString("month"));
                 assertEquals("03",   rs.getString("day"));
@@ -89,7 +89,7 @@ class DataTransformerCustomPartitionTest {
         // EVENT_DATE declared as DATE, but the ingester inserts it as VARCHAR.
         Map<String, Object> schema = Map.of(
                 "partitions", List.of(
-                        Map.of("column", "event_type", "source", "EVENT_TYPE", "type", "VARCHAR"),
+                        Map.of("column", "record_type", "source", "EVENT_TYPE", "type", "VARCHAR"),
                         Map.of("column", "year",  "source", "EVENT_DATE", "type", "DATE_YEAR"),
                         Map.of("column", "month", "source", "EVENT_DATE", "type", "DATE_MONTH"),
                         Map.of("column", "day",   "source", "EVENT_DATE", "type", "DATE_DAY")),
@@ -137,7 +137,7 @@ class DataTransformerCustomPartitionTest {
             // ── verify PartitionWriter creates 2 separate output files ────────
             List<PartitionOutput> outputs = PartitionWriter.write(
                     conn, "transformed_CALL", dbDir, "CSV", null, "test",
-                    List.of("event_type", "year", "month", "day"));
+                    List.of("record_type", "year", "month", "day"));
 
             assertEquals(2, outputs.size(),
                     "Expected 2 partition outputs (one per distinct day). Got: " + outputs);
@@ -151,6 +151,73 @@ class DataTransformerCustomPartitionTest {
                         "day=03 directory not found. Found: " + dirs);
                 assertTrue(dirs.stream().anyMatch(p -> p.contains("day=04")),
                         "day=04 directory not found. Found: " + dirs);
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /**
+     * {@code PARTITION-KEY-VALIDATION-GAPS-1} (b) — a partition column that collides, ignoring case, with a
+     * mapped data column is REFUSED before DuckDB sees it. Measured before the fix: DuckDB renamed the
+     * partition column {@code account_class_1}, {@code PARTITION_BY (account_class)} bound to the MAPPED
+     * column, and the folders came out {@code ACCOUNT_CLASS=asset} — the mapped value under the mapped name —
+     * with {@code account_class_1} left behind as a data column.
+     */
+    @Test
+    void aPartitionColumnCollidingByCaseWithAMappedColumnIsRefused(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTest.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Map<String, Object> schema = Map.of(
+                "partitions", List.of(Map.of("column", "account_class", "source", "ACCOUNT_CLASS", "type", "VARCHAR")),
+                "raw", Map.of("fields", List.of(
+                        Map.of("name", "ID",            "selector", "0", "type", "VARCHAR"),
+                        Map.of("name", "ACCOUNT_CLASS", "selector", "1", "type", "VARCHAR"))),
+                "mapping", Map.of("fields", List.of(
+                        Map.of("name", "ID",            "from", "ID",            "fn", "keep"),
+                        Map.of("name", "ACCOUNT_CLASS", "from", "ACCOUNT_CLASS", "fn", "keep"))));
+
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                () -> DataTransformer.selectFor(schema, cfg, "raw_input"));
+        assertTrue(refused.getMessage().contains("'account_class'")
+                        && refused.getMessage().contains("'ACCOUNT_CLASS'"),
+                "the refusal must name both columns. Got: " + refused.getMessage());
+    }
+
+    /**
+     * {@code PARTITION-KEY-VALIDATION-GAPS-1} (c) — a {@code DATE_*} partition over a value that does not
+     * parse as a date yields NULL, and DuckDB writes a NULL partition value as
+     * {@code __HIVE_DEFAULT_PARTITION__}. There is no {@code 1900/01/01} sentinel for unparsed values; this
+     * pins what actually happens so the owning doc cannot drift from it again.
+     */
+    @Test
+    void anUnparsableDatePartitionSourceLandsUnderTheHiveDefaultPartition(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTest.writePipeline(dir, "");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Map<String, Object> schema = Map.of(
+                "partitionKey", "CATEGORY",
+                "raw", Map.of("fields", List.of(
+                        Map.of("name", "ID",       "selector", "0", "type", "VARCHAR"),
+                        Map.of("name", "CATEGORY", "selector", "1", "type", "VARCHAR"))),
+                "mapping", Map.of("fields", List.of(
+                        Map.of("name", "ID",       "from", "ID",       "fn", "keep"),
+                        Map.of("name", "CATEGORY", "from", "CATEGORY", "fn", "keep"))));
+        Path outDir = Files.createDirectories(dir.resolve("output"));
+        File db = DuckDbUtil.tempDbFile("test_default_part_");
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE raw_input (ID VARCHAR, CATEGORY VARCHAR, __src_id INTEGER)");
+            st.execute("INSERT INTO raw_input VALUES ('a', 'Hardware', 0), ('b', 'Tools', 0)");
+            DataTransformer.materialize(conn, schema, cfg);
+            List<PartitionOutput> outputs = PartitionWriter.write(conn, "transformed",
+                    outDir.toString().replace("\\", "/"), "CSV", null, "t", List.of("year", "month", "day"));
+            assertEquals(1, outputs.size(), "every row lands in ONE partition. Got: " + outputs);
+            try (Stream<Path> s = Files.walk(outDir)) {
+                List<String> files = s.filter(Files::isRegularFile)
+                        .map(p -> outDir.relativize(p).toString().replace("\\", "/")).toList();
+                assertEquals(1, files.size(), "Got: " + files);
+                assertTrue(files.get(0).startsWith("year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/"
+                        + "day=__HIVE_DEFAULT_PARTITION__/"), "Got: " + files);
             }
         } finally {
             DuckDbUtil.deleteTempDb(db);
