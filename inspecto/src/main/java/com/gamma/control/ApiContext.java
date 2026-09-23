@@ -418,6 +418,10 @@ public interface ApiContext {
         ex.getResponseHeaders().set("Content-Type", "application/json");
         Idempotency.capture(ex, status, bytes);   // cache the pre-compression body for a keyed-write replay (W5)
         bytes = maybeGzip(ex, bytes);
+        if ("HEAD".equals(ex.getRequestMethod())) {   // headers only: a body on HEAD makes the JDK warn, then the write throws
+            ex.sendResponseHeaders(status, -1);
+            return HANDLED;
+        }
         ex.sendResponseHeaders(status, bytes.length);
         ex.getResponseBody().write(bytes);
         return HANDLED;

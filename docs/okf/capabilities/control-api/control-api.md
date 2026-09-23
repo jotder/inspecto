@@ -173,6 +173,13 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`, `:370-393`).
 `permissions[]` on an authenticated envelope is `subject.capabilities() ∩ applicable` when a route declares
 `resourcePermissions` — an affordance signal, never the security boundary (`SEC` §3.14).
+**`HEAD` is answered with headers only** (`HEAD-RESPONSE-STREAM-CLOSED-1`, 2026-09-24): `respondJson` sends
+`-1` (no body) for a `HEAD` request. Before, it sent the body's length — the JDK server then logged
+*"being invoked with a content length for a HEAD request"* and the body write threw, once per preview or
+uptime probe. Routes match on their declared method, so a `HEAD` still answers `405`/`404` — only the
+framing changed. Pinned by `ControlApiHeadRequestTest`, which captures the JDK's `com.sun.net.httpserver`
+warnings through JUL. ⚠ Only `respondJson` is guarded; the text/binary/static helpers are reached only by
+`GET` routes today.
 
 ⛔ **SPA adoption is RESERVED, not scheduled** (decided 2026-09-10 as `CLIENT-HALVES-1` (b); the row was
 deleted 2026-09-14 once its other halves shipped, so this is the record). The field stays **emitted and
