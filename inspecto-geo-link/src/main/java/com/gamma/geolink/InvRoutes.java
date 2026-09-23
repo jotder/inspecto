@@ -771,7 +771,7 @@ public final class InvRoutes implements RouteModule {
      * 404; not viewable by this request's subject → the SAME 404 (R3: shared-away is indistinguishable from
      * absence, exactly as {@code BiRoutes} answers); an unusable Dataset → 422.
      */
-    private static String relationFor(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
+    static String relationFor(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
         Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));

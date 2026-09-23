@@ -137,7 +137,7 @@ public final class InvestigationRoutes implements RouteModule {
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
 
-        String relationSql = relationFor(api, ex, writeRoot, dataset);
+        String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);
         List<String> columns = relationColumns(dataset, relationSql);
         for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol))
             if (col != null && columns.stream().noneMatch(col::equalsIgnoreCase))
@@ -461,7 +461,7 @@ public final class InvestigationRoutes implements RouteModule {
     private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, List<String> frontier,
                                      List<String> excluded, int limit) {
         String dataset = inv.dataset();
-        String relationSql = relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
+        String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
         List<Map<String, Object>> rows = new ArrayList<>();
         boolean truncated = false;
         if (!frontier.isEmpty()) {
@@ -608,25 +608,6 @@ public final class InvestigationRoutes implements RouteModule {
         if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
             throw new ApiException(404, "no dataset '" + dataset + "'");
         return new Inv(store, writeRoot, id, header);
-    }
-
-    /**
-     * A Dataset id → its trusted relation SQL, through the R3 view gate: unknown → 404; not viewable → the SAME
-     * 404; unusable → 422. ⚠ Deliberately the same body as {@code InvRoutes.relationFor}, kept here rather than
-     * moved into a shared helper so this change does not edit {@code InvRoutes} under a parallel lane; fold the
-     * two together once that lane lands.
-     */
-    private static String relationFor(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
-        Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
-        if (!ComponentAccess.canView(ex, dataset))
-            throw new ApiException(404, "no dataset '" + datasetId + "'");
-        try {
-            return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
-        }
     }
 
     private static List<String> relationColumns(String datasetId, String relationSql) {
