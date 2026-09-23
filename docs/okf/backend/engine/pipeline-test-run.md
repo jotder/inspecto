@@ -102,7 +102,7 @@ The body is caller-supplied, so without containment this route is an arbitrary-f
 `PipelineRunResult` = `{seedNode, toNode, files[], relations[], output|null, warnings[]}`.
 
 ⚠ **`relations[]` counts the seeded sample; `output.rowCount` is the full parse.** The seed is bounded
-(`TEST_RUN_SEED_ROWS` = 1000) because `PipelineDryRun` is in-memory and a picked file is unbounded. A
+(`PipelineTestRun.SEED_ROWS` = 1000 raw rows per segment) because `PipelineDryRun` is in-memory and a picked file is unbounded. A
 warning names the difference whenever the two can disagree, so neither number is quietly mistaken for
 the other. Per-file quarantine outcomes also surface as warnings — the operator is told a file *would*
 be quarantined even though nothing moved.
@@ -179,29 +179,54 @@ message **starts with** the real error; each went red against the unstripped mes
 `ExpectationRoutes`) build a 422 from a raw DuckDB message and probably carry the same preamble —
 unverified, reproduce per route before adopting the seam. Row `DUCKDB-PREAMBLE-OTHER-422S-1`.
 
-## Known open defects (reported 2026-09-23, not yet re-grounded)
+## Defects found by the demo lanes (reported 2026-09-23)
 
 Found by the lanes that built the domain demos (`gl_journal`, `stock_movements`, `msc_cdr`,
 `in_recharges`). Each cause is the lane's hypothesis until someone reproduces it.
 
-🔴 **The seed is the MAPPED output, so the mappers run twice** (`TESTRUN-SEED-IS-MAPPED-OUTPUT-1`, P2,
-found independently by both lanes). `PipelineTestRun.sampleRowsBySegment` reads back the rows the ingest
-**wrote** — already mapped to canonical columns — and `PipelineGraphRoutes.testRun` passes them to
-`PipelineDryRun.runSeeded` **as the parse node's output**. The walk then re-applies `map` /
-`map_<segment>` to columns that are already canonical:
-- **Loud:** `in_recharges` (`AMOUNT_MINOR`), `msc_cdr` (`EVENT_TIME`) and `gl_journal` (`POSTING_SERIAL`, as filed —
-  that column is gone since `EXCEL-DATES-ARRIVE-AS-SERIALS-1` made its date a plain `keep`) refuse 422 with a binder error. `?to=parse` succeeds, so on those Pipelines the test run **cannot reach
-  route or sinks**.
-- **Silent, and worse:** `premed_events` answers 200 with **every `EVENT_TS` NULL** in the preview, while
-  a real ingest of the same file writes all 12 values. A builder is shown a broken mapping that is not
-  broken.
-- ⚠ **Fix direction undecided:** seed from the raw parsed relation, or seed downstream of `map` and skip
-  it. Either way the seed must match the relation the edge it enters actually carries — the same rule the
-  `D5` segment seeds follow (next section).
+✅ **The seed is the PARSER's raw rows, captured before mapping** (`TESTRUN-SEED-IS-MAPPED-OUTPUT-1`, fixed
+2026-09-23). **Decision (operator, 2026-09-23): seed the preview with the RAW parsed rows, so it runs the same
+mapping a real ingest does.** The alternative — seed downstream of `map` and skip it — was declined: it would
+leave the mapping, the step most likely to be wrong, as the one step a test run never exercises.
+- 🔴 **What it was:** `PipelineTestRun.sampleRowsBySegment` read back the rows the ingest **wrote** — already
+  mapped — and `testRun` passed them to `PipelineDryRun.runSeeded` as the parse node's output, so the walk
+  re-applied `map` / `map_<segment>` to canonical columns. **Loud:** `in_recharges` (`AMOUNT_MINOR`) and
+  `msc_cdr` (`EVENT_TIME`) refused 422 with a binder error, so the test run could not reach route or sinks.
+  **Silent, and worse:** `premed_events` answered 200 with every `EVENT_TS` NULL — the written TIMESTAMP,
+  stringified by JDBC and re-parsed by the `keep`'s format list, failed the format and became NULL.
+- **The seam:** `DataTransformer.RAW_INPUT`, a `ScopedValue<RawInputObserver>` checked at the top of
+  `DataTransformer.materialize` — the ONE point all six ingest lanes (native single / chunked / union, the
+  Java parse lane, both plugin modes) funnel through. `PipelineTestRun.run` binds it around
+  `strategy.ingest(...)` and samples `SELECT * FROM <raw source> LIMIT n` (up to `SEED_ROWS` = 1000 per
+  segment, `__src_id` dropped) into `Result.rawRows()`. The segment is found from the schema map the
+  union-mode ingester passes (identity, then value) — never from table names. Unbound, i.e. every production
+  run, it is one `isBound()` check. ⚠ A scoped value, not a parameter, because a parameter would have to be
+  threaded through all six lanes; ⚠ it does not cross threads, which is fine only because every lane calls
+  `materialize` on the ingest thread.
+- ⚠ **The sample re-scans the raw relation** (a lazy `read_csv` view on the native lanes). Production already
+  scans it twice (`materialize` + `countCastFailures`), so this adds a third bounded scan in a test run only.
+- ⚠ **An exception thrown by the observer is the ingest's exception** — on the single-member native lane that
+  reads as the member being unreadable. The sampler is a plain `SELECT … LIMIT`, so this is theoretical today.
+- Pinned by `ControlApiPipelineTestRunDemoTest` (3, real HTTP over the shipped demos, each compared against a
+  REAL ingest of the same committed sample): `premed_events` — all 12 `EVENT_TS` equal to the written values,
+  route voice·sms·other `5·3·4` as written; `in_recharges` — 14 `AMOUNT`s equal to the written ones, route `10·4`; `msc_cdr` —
+  each `map_<segment>` row count and `EVENT_TS` equal to the written segment. ⚠ A previewed TIMESTAMP comes back
+  as epoch millis of a HOST-zone `java.sql.Timestamp`; reading it as UTC is off by the host offset.
 
-⚠ **A failed batch reads as an empty one** (`TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1`, P2). When the file
-parsed but the batch failed, the route answers 200 *“no rows were parsed”*; `PipelineTestRun.Result.status()`
-and `error()` never reach the response. Seen with a binder error after 11 rows had parsed.
+✅ **A failed batch is reported as the failure** (`TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1`, fixed 2026-09-23). A
+`FAILED` `PipelineTestRun.Result` now answers **422** *“test run failed: the batch FAILED after N row(s) parsed:
+&lt;the batch's error&gt;”* before any preview runs, and `RunToHereDialog` renders it in its error alert (it already
+surfaced any error body through `apiErrorMessage`; `run-to-here.dialog.spec.ts` pins the rendered alert). 🔴 With
+the raw seed alone the hole got WORSE, not better: a failure outside the mapping — a `partitionKey` naming an
+absent column fails the real transform, while the preview's map projects mapped columns only — answered 200
+with a clean preview and no warning. Pinned by
+`ControlApiPipelineTestRunTest.aBatchThatFailsAfterParsingIsReportedAsTheFailureNotAsEmpty`, which uses TWO files
+because only the multi-member lane fails the BATCH on a transform error.
+⚠ **The single-member native lane files a TRANSFORM failure as the input being unreadable**: `streamingIngest`
+holds `streamUnit`'s `materialize` inside the catch that quarantines `QUARANTINED_UNREADABLE`, so the same bad
+`partitionKey` over one file quarantines a readable file — in production that moves it out of the inbox.
+Reported as its own row; the write half was split out by `WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, the
+transform half was not.
 
 ✅ **A failed partition write fails the batch; it never quarantines the input**
 (`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, fixed 2026-09-23). A scratch path near 250 characters failed the
@@ -217,7 +242,7 @@ before the write and is still `QUARANTINED_UNREADABLE`. Pinned by
 directory with a regular file, so it runs on every platform. The route's scratch prefix is also shorter
 (`itr_`, was `inspecto_testrun_`); the rest of a written path — the temp dir, the partition layout, the
 file stem — is data and still counts toward the Windows limit. ⚠ A `FAILED` test run still answers
-*“no rows were parsed”* until `TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1` (above) is fixed.
+*“no rows were parsed”* — no longer: it answers 422 with the batch's error (above).
 
 ## A `route:<segment>` edge out of a parser IS walked (D5, signed 2026-09-22)
 
@@ -273,7 +298,8 @@ and when a probe leaves a test green, suspect the test, not the probe.
 
 ## Code
 
-- `inspecto-engine/…/inspector/PipelineTestRun.java` — `run`, `sampleRows`, `deleteScratch`
+- `inspecto-engine/…/inspector/PipelineTestRun.java` — `run` (binds `RAW_INPUT`), `Result.rawRows`, `sampleRows`, `deleteScratch`
+- `inspecto-etl/…/etl/DataTransformer.java` — `RAW_INPUT` / `RawInputObserver`, checked in `materialize`
 - `inspecto-etl/…/etl/PipelineConfig.java` — `forScratchRun(Path)`
 - `inspecto/…/control/PipelineGraphRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
 - `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
@@ -281,5 +307,6 @@ and when a probe leaves a test green, suspect the test, not the probe.
 - `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`
 - `inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`
 - `inspecto-engine/…/query/QueryExecutor.java` — `run` (the plain-`Statement` view registration and no-bind query)
-- Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (7, real HTTP),
+- Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (8, real HTTP),
+  `ControlApiPipelineTestRunDemoTest` (3, real HTTP over the shipped demos vs a real ingest),
   `PipelineDryRunTest` (15, of which 5 pin the cutoff)

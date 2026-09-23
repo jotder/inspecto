@@ -216,6 +216,39 @@ class ControlApiPipelineTestRunTest {
         }
     }
 
+    /**
+     * {@code TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1} — the file parses, then the BATCH fails. The route used to
+     * answer 200 with the false <i>"no rows were parsed"</i> (or, once the seed became the raw rows, a clean
+     * preview of a mapping that on its own is fine) and drop {@code Result.status()/error()} on the floor.
+     *
+     * <p>⚠ The failure is chosen to live OUTSIDE the mapping: a {@code partitionKey} naming a column the
+     * schema does not have fails the real transform (it builds the partition column), while the preview's map
+     * node — which projects the mapped columns only — succeeds. So only the batch's own status can tell the
+     * author, and the answer must be an error that carries the batch's error.
+     */
+    @Test
+    void aBatchThatFailsAfterParsingIsReportedAsTheFailureNotAsEmpty(@TempDir Path dir) throws Exception {
+        // TWO files: the multi-member lane fails the BATCH on a transform error. (The single-member native
+        // lane still files the same error as the member being unreadable — a separate defect, reported.)
+        Files.copy(seedInbox(dir).resolve("a.csv"), dir.resolve("inbox/b.csv"));
+        String schema = PipelineConfigBatchTest.miniSchema()
+                .replace("partitionKey: EVENT_DATE", "partitionKey: NO_SUCH_COLUMN");
+        Path toon = TestConfigs.csv(dir, schema).write();
+        Files.writeString(toon, Files.readString(toon) + "collector:\n  consignment:\n    max_files: 10\n");
+        CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
+        ControlApi api = new ControlApi(svc, 0);
+        api.start();
+        try (Ctx c = new Ctx(svc, api, api.port())) {
+            HttpResponse<String> r = send(c.port, "POST",
+                    "/pipelines/authored/test_etl/run", "{\"files\":[\"a.csv\",\"b.csv\"]}");
+            assertEquals(422, r.statusCode(), "a FAILED batch is not a success: " + r.body());
+            String message = JSON.readTree(r.body()).get("error").get("message").asText();
+            assertFalse(message.contains("no rows were parsed"), "the false 'empty' reading is gone: " + message);
+            assertTrue(message.startsWith("test run failed: the batch FAILED"), "the batch's status is named: " + message);
+            assertTrue(message.contains("NO_SUCH_COLUMN"), "the batch's own error is carried: " + message);
+        }
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     private static List<String> warnings(JsonNode b) {

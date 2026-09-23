@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 import { ConnectionProbeService, PipelineRunResult, PipelinesService, ResourceNode } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -24,7 +25,7 @@ const RUN_RESULT: PipelineRunResult = {
     warnings: [],
 };
 
-function create(data: Partial<RunToHereData> = {}) {
+function create(data: Partial<RunToHereData> = {}, runToNode: () => Observable<PipelineRunResult> = () => of(RUN_RESULT)) {
     TestBed.configureTestingModule({
         imports: [RunToHereDialog],
         providers: [
@@ -39,7 +40,7 @@ function create(data: Partial<RunToHereData> = {}) {
                     ...data,
                 },
             },
-            { provide: PipelinesService, useValue: { runToNode: () => of(RUN_RESULT) } },
+            { provide: PipelinesService, useValue: { runToNode } },
             { provide: ConnectionProbeService, useValue: { explore: () => of([]) } },
         ],
     });
@@ -54,6 +55,20 @@ describe('RunToHereDialog', () => {
         c.run();
         expect(c.result()?.output?.rowCount).toBe(3);
         expect(c.result()?.relations.map((r) => `${r.node}/${r.rel}`)).toEqual(['parse/success', 'parse/unmatched']);
+    });
+
+    // TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1: a FAILED batch answers 422 carrying the batch's own error; the
+    // dialog must SHOW it (rendered alert, not just a signal) and show no result that could read as success.
+    it('renders a failed batch as the error the server gave, with no result', () => {
+        const message = 'test run failed: the batch FAILED after 2 row(s) parsed: Binder Error: NO_SUCH_COLUMN';
+        const fixture = create({}, () =>
+            throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } })),
+        );
+        fixture.componentInstance.run();
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('inspecto-alert[variant="error"]');
+        expect(alert?.textContent).toContain(message);
+        expect(fixture.componentInstance.result()).toBeNull();
     });
 
     it('toggles a file into and out of the selection', () => {

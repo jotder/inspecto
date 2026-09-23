@@ -31,11 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p><b>Why the real ingest and not the workbench test run.</b> A hand-authored demo exists so that a
  * wrong count is visible; the fixture sweeps read row counts with nothing to compare them against. The
  * expectation has to be asserted somewhere that runs every build, or it is only a comment in a
- * generator. 🔴 And today the test run cannot reach either demo's sinks at all: it seeds the graph walk
- * with the ingest's WRITTEN (already-mapped) rows, so the map node re-applies the mapping to canonical
- * columns and refuses 422 on any expression over a raw column the mapping does not keep
- * ({@code AMOUNT_MINOR}, {@code EVENT_TIME}) — found building these demos, filed as
- * {@code TESTRUN-SEED-IS-MAPPED-OUTPUT-1}.
+ * generator. (Building these demos found {@code TESTRUN-SEED-IS-MAPPED-OUTPUT-1}: the test run seeded its
+ * walk with the WRITTEN, already-mapped rows. Fixed 2026-09-23 — it seeds with the raw parsed rows, and
+ * {@code ControlApiPipelineTestRunDemoTest} pins the test run against this real ingest.)
  *
  * <p>The committed config is staged into a temp root: every {@code spaces/demo/data/…} path is
  * re-pointed at the temp copy (the demo's own data dirs are never touched), and the pipeline's directory —

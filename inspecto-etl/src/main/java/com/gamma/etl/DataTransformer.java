@@ -41,6 +41,29 @@ public final class DataTransformer {
 
     private DataTransformer() {}
 
+    /**
+     * Sees a transform's RAW input just before the mapping runs — {@code TESTRUN-SEED-IS-MAPPED-OUTPUT-1}.
+     *
+     * @param schemaConfig the schema being applied (a segment's own schema for a segment-routed frontend)
+     * @param sourceTable  the raw relation {@link #materialize} is about to read
+     */
+    @FunctionalInterface
+    public interface RawInputObserver {
+        void observe(Connection conn, Map<String, Object> schemaConfig, String sourceTable) throws Exception;
+    }
+
+    /**
+     * Bound only by the workbench test run ({@code PipelineTestRun}), which must seed its preview with the
+     * rows the parser produced, BEFORE mapping — so the preview runs the same mapping a real ingest does
+     * instead of re-applying it to already-canonical columns (operator decision 2026-09-23).
+     *
+     * <p>⚠ A scoped value rather than a parameter because {@link #materialize} is the ONE point every ingest
+     * lane (native single / chunked / union, the Java parse lane, both plugin modes) funnels through; a
+     * parameter would have to be threaded through all six. Unbound — every production run — it costs one
+     * {@code isBound()} check and changes nothing.
+     */
+    public static final ScopedValue<RawInputObserver> RAW_INPUT = ScopedValue.newInstance();
+
     // ── public API ────────────────────────────────────────────────────────────
 
     /**
@@ -66,6 +89,7 @@ public final class DataTransformer {
                                    PipelineConfig cfg,
                                    String sourceTable, String destTable) throws Exception {
 
+        if (RAW_INPUT.isBound()) RAW_INPUT.get().observe(conn, schemaConfig, sourceTable);
         String select = selectFor(schemaConfig, cfg, sourceTable);
 
         // ── post-parse row predicate (csv_settings.where) ─────────────────────

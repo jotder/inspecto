@@ -2,6 +2,7 @@ package com.gamma.inspector;
 
 import com.gamma.etl.Consignment;
 import com.gamma.etl.ConsignmentPlanner;
+import com.gamma.etl.DataTransformer;
 import com.gamma.etl.IngestProgress;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.PartitionOutput;
@@ -25,6 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -90,17 +92,35 @@ public final class PipelineTestRun {
      *        segment). Empty for a single-schema Pipeline — "all one schema", never "unknown".
      *        ⚠ This is what makes {@code WB-08} a seed change rather than a plumbing exercise: the
      *        attribution already existed at write time; nothing was carrying it out.
+     * @param rawRows the PARSER's rows, captured just before the mapping ran, grouped by segment — up to
+     *        {@link #SEED_ROWS} per segment; key {@code null} for a single-schema Pipeline. This is what the
+     *        graph preview seeds its parse node with (operator decision 2026-09-23,
+     *        {@code TESTRUN-SEED-IS-MAPPED-OUTPUT-1}). 🔴 It used to seed with the rows the ingest WROTE,
+     *        which are already mapped, so the walk re-applied every mapping to canonical columns: a mapping
+     *        over a raw column the mapping does not keep refused 422 ({@code AMOUNT_MINOR},
+     *        {@code EVENT_TIME}), and a {@code keep} of a TIMESTAMP silently re-parsed its written value
+     *        into NULL. A segment that routed nothing is ABSENT, never present-and-empty.
      */
     public record Result(String status, int batches, List<FileResult> files, long totalInputRows,
                          long rowsWritten, long castFailures, List<PartitionOutput> outputs, String error,
-                         Map<String, String> schemaByOutput) {
+                         Map<String, String> schemaByOutput, Map<String, List<Map<String, Object>>> rawRows) {
 
-        /** Single-schema form — no per-segment attribution to carry. */
+        /** Single-schema form — no per-segment attribution and no raw sample to carry. */
         public Result(String status, int batches, List<FileResult> files, long totalInputRows,
                       long rowsWritten, long castFailures, List<PartitionOutput> outputs, String error) {
-            this(status, batches, files, totalInputRows, rowsWritten, castFailures, outputs, error, Map.of());
+            this(status, batches, files, totalInputRows, rowsWritten, castFailures, outputs, error,
+                    Map.of(), Map.of());
         }
     }
+
+    /**
+     * How many raw rows per segment are captured for the graph preview. Bounded because
+     * {@link com.gamma.pipeline.exec.PipelineDryRun} works in memory — a picked file can be arbitrarily large.
+     */
+    public static final int SEED_ROWS = 1000;
+
+    /** The ingest lane's internal lineage tag — bookkeeping on the raw relation, never a parsed column. */
+    private static final String SRC_ID = "__src_id";
 
     /**
      * Parse {@code pickedFiles} through the real ingest path into {@code scratchRoot}.
@@ -136,6 +156,21 @@ public final class PipelineTestRun {
         long inputRows = 0, written = 0, casts = -1;
         boolean anyFailed = false, anyRows = false;
         String error = "";
+        Map<String, List<Map<String, Object>>> rawRows = new LinkedHashMap<>();
+        DataTransformer.RawInputObserver capture = (conn, schema, source) -> {
+            String segment = segmentOf(scratch, schema);
+            List<Map<String, Object>> rows = rawRows.computeIfAbsent(segment, k -> new ArrayList<>());
+            int room = SEED_ROWS - rows.size();
+            if (room <= 0) return;
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT * FROM \"" + source + "\" LIMIT " + room)) {
+                for (Map<String, Object> row : JdbcRows.toMaps(rs)) {
+                    row.remove(SRC_ID);
+                    rows.add(row);
+                }
+            }
+            if (rows.isEmpty()) rawRows.remove(segment);
+        };
 
         for (Consignment batch : batches) {
             ConsignmentIngestStrategy strategy = (scratch.schemas().ingesterClass() == null)
@@ -144,7 +179,8 @@ public final class PipelineTestRun {
 
             IngestOutcome outcome;
             try {
-                outcome = strategy.ingest(batch, scratch);
+                outcome = ScopedValue.where(DataTransformer.RAW_INPUT, capture)
+                        .call(() -> strategy.ingest(batch, scratch));
             } finally {
                 // Mirrors ConsignmentIngestor.process — a progress snapshot must never outlive the batch.
                 IngestProgress.clear(scratch.identity().pipelineName());
@@ -174,7 +210,22 @@ public final class PipelineTestRun {
         log.info("Test run of pipeline {} over {} file(s): {} — {} row(s) in, {} written",
                 cfg.identity().pipelineName(), pickedFiles.size(), status, inputRows, written);
         return new Result(status, batches.size(), List.copyOf(files), inputRows, written, casts,
-                List.copyOf(outputs), error, Map.copyOf(schemaByOutput));
+                List.copyOf(outputs), error, Map.copyOf(schemaByOutput), Collections.unmodifiableMap(rawRows));
+    }
+
+    /**
+     * The segment whose schema a transform is applying, or {@code null} for a single-schema Pipeline. The
+     * union-mode ingester passes the segment's own schema map from the config, so it is found by identity
+     * first and by value as a fallback. ⛔ Never guessed from table names.
+     */
+    private static String segmentOf(PipelineConfig cfg, Map<String, Object> schema) {
+        Map<String, Map<String, Object>> segments = cfg.schemas().segments();
+        if (segments == null) return null;
+        for (Map.Entry<String, Map<String, Object>> e : segments.entrySet())
+            if (e.getValue() == schema) return e.getKey();
+        for (Map.Entry<String, Map<String, Object>> e : segments.entrySet())
+            if (e.getValue().equals(schema)) return e.getKey();
+        return null;
     }
 
     /**
@@ -208,48 +259,6 @@ public final class PipelineTestRun {
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
-    }
-
-    /**
-     * The run's parsed rows grouped by the SEGMENT that produced them — {@code WB-08}.
-     *
-     * <p>🔴 {@link #sampleRows} reads every output into ONE flat list, which is correct for a
-     * single-schema Pipeline and lossy for a segment-routed one: the graph preview then seeds a single
-     * {@code data} relation, the walk cannot leave a {@code parse →(route:<segment>)→ …} parser, and the
-     * run reports {@code relations: []} ({@code TESTRUN-SEGMENT-ROUTE-NO-FLOW-1}).
-     *
-     * <p>⚠ The grouping is not inferred from paths or names: it reads {@link Result#schemaByOutput},
-     * which the union-mode ingester fills as it writes each segment. ⛔ An output with no attribution is
-     * NOT guessed at — it lands under {@code null}, and the caller seeds it as plain {@code data}, which
-     * is exactly what a single-schema Pipeline is.
-     *
-     * @return segment key → rows, in the order the segments were written; empty when the run wrote
-     *         nothing. A segment that wrote no rows is absent rather than present-and-empty.
-     */
-    public static Map<String, List<Map<String, Object>>> sampleRowsBySegment(
-            Result result, String outputFormat, int limit) throws SQLException, IOException {
-        if (result.outputs().isEmpty() || limit <= 0) return Map.of();
-
-        Map<String, List<String>> pathsBySegment = new LinkedHashMap<>();
-        for (PartitionOutput o : result.outputs())
-            pathsBySegment.computeIfAbsent(result.schemaByOutput().get(o.outputFile()), k -> new ArrayList<>())
-                    .add(o.outputFile());
-
-        Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
-        File db = DuckDbUtil.tempDbFile("testrun_sample_");
-        try (Connection conn = DuckDbUtil.openConnection(db)) {
-            for (Map.Entry<String, List<String>> e : pathsBySegment.entrySet()) {
-                try (Statement st = conn.createStatement();
-                     ResultSet rs = st.executeQuery("SELECT * FROM "
-                             + SqlViews.reader(outputFormat, e.getValue(), false) + " LIMIT " + limit)) {
-                    List<Map<String, Object>> rows = JdbcRows.toMaps(rs);
-                    if (!rows.isEmpty()) out.put(e.getKey(), rows);
-                }
-            }
-        } finally {
-            DuckDbUtil.deleteTempDb(db);
-        }
-        return out;
     }
 
     /**

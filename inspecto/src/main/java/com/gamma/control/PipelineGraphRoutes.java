@@ -514,13 +514,6 @@ final class PipelineGraphRoutes implements RouteModule {
     }
 
     /**
-     * How many parsed rows are fed to the graph preview. Bounded because {@link PipelineDryRun} works
-     * in memory — a picked file can be arbitrarily large. When the parse produced more than this, the
-     * response says so in {@code warnings} rather than quietly reporting sample counts as totals.
-     */
-    private static final int TEST_RUN_SEED_ROWS = 1000;
-
-    /**
      * {@code POST /pipelines/authored/{id}/run?to={nodeId}} — <b>run-to-here</b>: parse the caller's
      * <em>real</em> inbox files through the real ingest path into a scratch root, then preview the graph
      * over the parsed rows. Build→Test→Run Step 5c. Never writes outside the scratch root and never fires
@@ -535,7 +528,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * same primitive the picker uses, so the two cannot disagree about what is reachable. An escape is
      * {@code PathEscape} → <b>403</b>.
      *
-     * <p>404 unknown pipeline · 400 empty/absent {@code files} · 403 path escape · 422 parse or preview
+     * <p>404 unknown pipeline · 400 empty/absent {@code files} · 403 path escape · 422 a FAILED batch, parse or preview
      * failure · 501 a non-local connection (nothing local to stage from; those files reach the inbox via
      * acquisition first).
      */
@@ -567,14 +560,21 @@ final class PipelineGraphRoutes implements RouteModule {
         }
         try {
             PipelineTestRun.Result parsed = PipelineTestRun.run(cfg, picked, scratch);
-            // \U0001f534 Grouped by SEGMENT (WB-08). A segment-routed frontend lifts as
-            // `parse →(route:<segment>)→ map_<segment> → sink_<segment>`, and the preview's walk follows an
-            // edge only when the parse node produced that edge's relation — so a single flat `data` seed
-            // could never leave the decoder, and the run reported `relations: []` with an honest
-            // "nothing downstream consumed it" (TESTRUN-SEGMENT-ROUTE-NO-FLOW-1).
-            Map<String, List<Map<String, Object>>> bySegment =
-                    PipelineTestRun.sampleRowsBySegment(parsed, cfg.output().format(), TEST_RUN_SEED_ROWS);
-            Map<String, List<Map<String, Object>>> seedRelations = seedRelations(bySegment);
+            // 🔴 A FAILED batch is the answer, not an empty one (TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1). It
+            // used to fall through to "no rows were parsed" — false, the file had parsed — or, where a raw
+            // sample existed, to a clean preview of a failure the preview's steps do not reproduce. Either
+            // way the batch's own error, the one message that explains it, never reached the author.
+            if ("FAILED".equals(parsed.status()))
+                throw new ApiException(422, "test run failed: the batch FAILED after "
+                        + parsed.totalInputRows() + " row(s) parsed: "
+                        + DuckDbUtil.withoutPendingQueryPreamble(parsed.error()));
+            // 🔴 Seeded with the PARSER's rows, captured before mapping (TESTRUN-SEED-IS-MAPPED-OUTPUT-1,
+            // operator decision 2026-09-23) — never the rows the ingest wrote, which are already mapped and
+            // made the preview's map re-apply itself to canonical columns. Grouped by SEGMENT (WB-08): a
+            // segment-routed frontend lifts as `parse →(route:<segment>)→ map_<segment> → sink_<segment>`,
+            // and the walk follows an edge only when the parse node produced that edge's relation
+            // (TESTRUN-SEGMENT-ROUTE-NO-FLOW-1).
+            Map<String, List<Map<String, Object>>> seedRelations = seedRelations(parsed.rawRows());
             List<Map<String, Object>> seed =
                     seedRelations.values().stream().flatMap(List::stream).toList();
 
