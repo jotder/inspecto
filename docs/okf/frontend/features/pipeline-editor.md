@@ -588,7 +588,7 @@ database; the lift rebuilds pairing from the stamp.
   all and looks identical to any unconfigured Step.
 - 🔴 **A round-trip test that configures the artifact under test tests nothing** — the original spec
   set `database` by hand and passed the whole time.
-- 🔴 **Single-slot kinds** — *corrected 2026-09-09: `MULTI_JOIN` DOES NOT EXIST.* Only **two** “too many of a kind” constants are live, `MULTI_PARSER` and `MULTI_MAP_CONFIG` (`PipelineEditable.java:58,65`); the join/dedup/route/summarize codes were deleted with the ordered `steps:` chain and survive only inside a `PipelineCompileException` Javadoc paragraph explaining their own removal. §Multiplicity below already says this — this bullet contradicted it. (`processing.join` is last-one-wins; `recordDedup`,
+- 🔴 **Single-slot kinds** — *corrected 2026-09-09: `MULTI_JOIN` DOES NOT EXIST.* Only **two** “too many of a kind” constants are live, `MULTI_PARSER` and `MULTI_MAP_CONFIG` (`PipelineEditable.java:58,65`) — *five since 2026-09-23, with `MULTI_ACQUISITION` / `MULTI_GAP` / `MULTI_MARKER`*; the join/dedup/route/summarize codes were deleted with the ordered `steps:` chain and survive only inside a `PipelineCompileException` Javadoc paragraph explaining their own removal. §Multiplicity below already says this — this bullet contradicted it. (`processing.join` is last-one-wins; `recordDedup`,
   `routeNode`, `summarizeNode` are last-one-wins, silently): the discard behavior is PINNED per
   slot in `PipelineEditableTest`; inverting it is an operator call (BACKLOG §4). Mid-branch
   `steps:` sub-chains are refused by both authoring surfaces — design:
@@ -791,8 +791,10 @@ were verified FIXED in code (the BACKLOG rows are struck through; the grounding 
 each fix live). Genuinely open:
 
 - ~~Single-slot inversion question~~ **STALE (corrected 2026-09-01)**: multiplicity was resolved
-  2026-08-11 (ordered `steps:`; `MULTI_*` refusals deleted). Still deliberately last-one-wins:
-  `acquisition`, `gap`, `dedup.marker` (`parser` refuses via `MULTI_PARSER`).
+  2026-08-11 (ordered `steps:`; `MULTI_*` refusals deleted). ~~Still deliberately last-one-wins:
+  `acquisition`, `gap`, `dedup.marker`~~ — *closed 2026-09-23*: a second one of each now refuses by
+  name (`MULTI_ACQUISITION` / `MULTI_GAP` / `MULTI_MARKER`), exactly like `parser`'s `MULTI_PARSER`,
+  on both the engine and the SPA lowering (`backend/pipeline-graph/editable-round-trip.md`).
 - ~~Mid-branch `steps:` sub-chains refused~~ **SHIPPED 2026-09-02 (R3)**: a route branch carries
   `steps[]` in the shared step grammar — authorable on the canvas (wire `route:<key>` → step →
   sink; the lift presents branch chains as ordinary flattened nodes, lower writes them back to the

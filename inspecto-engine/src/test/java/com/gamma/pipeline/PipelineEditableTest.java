@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -841,6 +842,34 @@ class PipelineEditableTest {
                 () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
         assertEquals(PipelineEditable.MULTI_PARSER, ex.refusals().get(0).code());
         assertEquals("p2", ex.refusals().get(0).nodeId());
+    }
+
+    /**
+     * acquisition, gap and dedup.marker each own ONE slot in the flat file. A second node of any of them
+     * was last-one-wins — the first node's config silently vanished on save — so each refuses by name,
+     * exactly as a second parser does. Lenient (inactive draft) too: the discard does not depend on strict.
+     */
+    @Test
+    void aSecondNodeOfASingleSlotKindRefusesByName() {
+        record Case(String type, Map<String, Object> cfg, String code) {}
+        for (Case c : List.of(
+                new Case("acquisition", Map.of("poll", "in2"), PipelineEditable.MULTI_ACQUISITION),
+                new Case("gap", Map.of("enabled", true), PipelineEditable.MULTI_GAP),
+                new Case("transform.dedup.marker", Map.of("enabled", true), PipelineEditable.MULTI_MARKER))) {
+            List<PipelineNode> nodes = new ArrayList<>(List.of(
+                    node("acq", "acquisition", Map.of("poll", "in")),
+                    node("p1", "parser", Map.of("schema_file", "s.toon")),
+                    node("sink", "sink.persistent", Map.of("database", "db"))));
+            if (!c.type().equals("acquisition")) nodes.add(node("first", c.type(), c.cfg()));
+            nodes.add(node("second", c.type(), c.cfg()));
+            for (boolean strict : new boolean[] {true, false}) {
+                PipelineGraph g = new PipelineGraph("x", true, nodes, List.of());
+                PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                        () -> PipelineEditable.lower(g, new LinkedHashMap<>(), strict), c.type());
+                assertEquals(c.code(), ex.refusals().get(0).code(), c.type());
+                assertEquals("second", ex.refusals().get(0).nodeId(), c.type());
+            }
+        }
     }
 
     /** A Grammar binds to the subtype like the plain parser; a plugin ingester/ ref contradicts it. */

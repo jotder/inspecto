@@ -205,6 +205,30 @@ describe('mock pipeline-editable — the delimited parser subtype (parser.delimi
         expect(refusals[0].nodeId).toBe('parse2');
     });
 
+    // acquisition / gap / dedup.marker each own ONE flat-file slot; a second node was last-one-wins
+    // (the first node's config silently vanished). Mirrors the engine's MULTI_ACQUISITION/_GAP/_MARKER.
+    for (const [type, code] of [
+        ['acquisition', 'MULTI_ACQUISITION'],
+        ['gap', 'MULTI_GAP'],
+        ['transform.dedup.marker', 'MULTI_MARKER'],
+    ] as const) {
+        it(`refuses a second ${type} node instead of last-one-wins`, () => {
+            const existing = delimitedConfig();
+            const g = liftConfig(existing);
+            if (!g.nodes.some((n) => n.type === type))
+                g.nodes.push({ id: 'first', type, name: type, config: { enabled: true } });
+            g.nodes.push({ id: 'second', type, name: type, config: { enabled: true } });
+
+            for (const strict of [true, false]) {
+                const res = lowerGraph(g, existing, strict);
+                expect('refusals' in res).toBe(true);
+                const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+                expect(refusals[0].code).toBe(code);
+                expect(refusals[0].nodeId).toBe('second');
+            }
+        });
+    }
+
     it('takes a grammar/ binding but refuses ingester/ on the subtype', () => {
         const existing = delimitedConfig();
         const bound = liftConfig(existing);

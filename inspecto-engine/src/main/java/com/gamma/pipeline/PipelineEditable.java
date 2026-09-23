@@ -63,6 +63,15 @@ public final class PipelineEditable {
      * an authorable state, so it refuses by name.
      */
     public static final String MULTI_PARSER = "MULTI_PARSER";
+    /**
+     * A second {@code acquisition} / {@code gap} / {@code transform.dedup.marker} node. Each owns ONE slot
+     * in the flat file (the collector block, {@code gap_detection}, the marker-dedup keys); a second node
+     * was last-one-wins — the first node's config silently vanished on save — so each refuses by name,
+     * exactly like {@link #MULTI_PARSER}.
+     */
+    public static final String MULTI_ACQUISITION = "MULTI_ACQUISITION";
+    public static final String MULTI_GAP = "MULTI_GAP";
+    public static final String MULTI_MARKER = "MULTI_MARKER";
     /** A {@code parser.delimited} node whose {@code parsing.frontend} names a DIFFERENT frontend. */
     public static final String PARSER_FRONTEND_MISMATCH = "PARSER_FRONTEND_MISMATCH";
     /**
@@ -718,7 +727,12 @@ public final class PipelineEditable {
             // 2026-09-05 may also be a transform.sql). See refuseUnsafeSql for why this belongs on the
             // save path at all.
             if (BuiltinNodeType.TRANSFORM_SQL.type().equals(t)) refuseUnsafeSql(n.cfg("sql"), n.id(), refusals);
-            if (BuiltinNodeType.ACQUISITION.type().equals(t)) acq = n;
+            if (BuiltinNodeType.ACQUISITION.type().equals(t)) {
+                if (acq != null) refusals.add(new PipelineCompileException.Refusal(MULTI_ACQUISITION, n.id(),
+                        "the flat pipeline config has one acquisition slot and '" + acq.id()
+                                + "' already holds it"));
+                else acq = n;
+            }
             else if (isParserType(t)) {
                 // One parse slot in the flat file. Last-one-wins predates the family, but with two
                 // palette icons a second parser is now an authorable state — refuse, don't discard.
@@ -737,8 +751,18 @@ public final class PipelineEditable {
                             "parsing.frontend '" + pb.get("frontend")
                                     + "' contradicts the node's own type '" + t + "'"));
             }
-            else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
-            else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
+            else if (BuiltinNodeType.GAP.type().equals(t)) {
+                if (gap != null) refusals.add(new PipelineCompileException.Refusal(MULTI_GAP, n.id(),
+                        "the flat pipeline config has one gap-detection slot and '" + gap.id()
+                                + "' already holds it"));
+                else gap = n;
+            }
+            else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) {
+                if (marker != null) refusals.add(new PipelineCompileException.Refusal(MULTI_MARKER, n.id(),
+                        "the flat pipeline config has one dedup-marker slot and '" + marker.id()
+                                + "' already holds it"));
+                else marker = n;
+            }
             // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
             // now join an ordered chain, and how many there are stops being the question — see stepsOf.
             // ⚠ The projection SLOT is checked BEFORE the chain kinds, because since 2026-09-05 the slot

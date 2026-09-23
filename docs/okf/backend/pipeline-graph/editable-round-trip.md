@@ -436,6 +436,18 @@ declaring its spellings and nothing else.
 * Two refusals, both named: `PARSER_FRONTEND_MISMATCH` (a `parsing.frontend` contradicting the node's own
   type) and `MULTI_PARSER` (a second parser-family node — the flat file has one parse slot, and what used
   to be a silent last-one-wins became authorable once the palette offered two icons).
+* **Every single-slot kind refuses a second node by name (2026-09-23).** `acquisition`, `gap` and
+  `transform.dedup.marker` each own ONE slot in the flat file (the collector block, `gap_detection`, the
+  marker-dedup keys) and were the last three still last-one-wins — a second node silently discarded the
+  first one's config on save. They now refuse exactly like `MULTI_PARSER`: `MULTI_ACQUISITION`,
+  `MULTI_GAP`, `MULTI_MARKER`, naming the SECOND node, the message naming the node that holds the slot,
+  strict and lenient alike (the discard never depended on `strict`). Same 422 `refusals[]` shape through
+  `PUT /pipelines/{name}/graph`, mirrored in the SPA's `lowerGraph` so the editor flags it before Save.
+  The lift emits at most one of each, so no shipped config can trip them (`LiftLowerFixtureSweepTest`
+  green); the rule only closes the hand-built / canvas-authored case. Pinned by
+  `PipelineEditableTest.aSecondNodeOfASingleSlotKindRefusesByName`,
+  `ControlApiPipelineCrudTest.aSecondAcquisitionNodeRefusesWithANamedCode` and the three
+  `pipeline-editable.spec.ts` cases.
 * Every subtype's `use:` home is `grammar/` **only**, not `ingester/`: a plugin-ingester binding on a node
   whose type already names its format is a contradiction, refused rather than half-honoured.
 * ⚠ **`use: grammar/<id>` is read-supported but NEVER authored** (operator decision 2026-08-15). Every

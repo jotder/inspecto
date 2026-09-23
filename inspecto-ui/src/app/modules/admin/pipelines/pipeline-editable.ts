@@ -539,8 +539,17 @@ export function lowerGraph(
         }
         const unhomed = unhomedBinding(n);
         if (unhomed) refusals.push({ code: 'UNSUPPORTED_BINDING', nodeId: n.id, message: unhomed });
-        if (n.type === 'acquisition') acq = n;
-        else if (isParserType(n.type)) {
+        // acquisition / gap / dedup.marker each own ONE flat-file slot: a second node refuses by name
+        // instead of last-one-wins (mirrors the engine's MULTI_ACQUISITION / MULTI_GAP / MULTI_MARKER).
+        if (n.type === 'acquisition') {
+            if (acq)
+                refusals.push({
+                    code: 'MULTI_ACQUISITION',
+                    nodeId: n.id,
+                    message: `the flat pipeline config has one acquisition slot and '${acq.id}' already holds it`,
+                });
+            else acq = n;
+        } else if (isParserType(n.type)) {
             // One parse slot in the flat file. With two palette icons a second parser is an authorable
             // state — refuse, don't last-one-wins (mirrors the engine's MULTI_PARSER).
             if (parser)
@@ -560,8 +569,23 @@ export function lowerGraph(
                     nodeId: n.id,
                     message: `parsing.frontend '${String(fe)}' contradicts the node's own type '${n.type}'`,
                 });
-        } else if (n.type === 'gap') gap = n;
-        else if (n.type === 'transform.dedup.marker') marker = n;
+        } else if (n.type === 'gap') {
+            if (gap)
+                refusals.push({
+                    code: 'MULTI_GAP',
+                    nodeId: n.id,
+                    message: `the flat pipeline config has one gap-detection slot and '${gap.id}' already holds it`,
+                });
+            else gap = n;
+        } else if (n.type === 'transform.dedup.marker') {
+            if (marker)
+                refusals.push({
+                    code: 'MULTI_MARKER',
+                    nodeId: n.id,
+                    message: `the flat pipeline config has one dedup-marker slot and '${marker.id}' already holds it`,
+                });
+            else marker = n;
+        }
         // The five chain kinds. They briefly refused a second node (MULTI_DEDUP / MULTI_ROUTE /
         // MULTI_SUMMARIZE / MULTI_JOIN, 2026-08-11) while the flat file still had one slot per kind;
         // the file now holds an ordered steps: chain, so the refusals are gone on both sides. They had

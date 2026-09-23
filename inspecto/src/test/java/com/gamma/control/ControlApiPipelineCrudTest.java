@@ -284,6 +284,26 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /** A second single-slot node (here acquisition) is a named 422 at save, not a silent last-one-wins. */
+    @Test
+    void aSecondAcquisitionNodeRefusesWithANamedCode(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String twoAcq = """
+                {"active":true,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"in"}},
+                          {"id":"acq2","type":"acquisition","config":{"poll":"in2"}},
+                          {"id":"p","type":"parser","config":{"schema_file":"s.toon"}},
+                          {"id":"out","type":"sink.persistent","config":{"database":"db"}}],
+                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"acq2","rel":"data","to":"p"},
+                          {"from":"p","rel":"data","to":"out"}]}""";
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/refuse_acq/graph", twoAcq);
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode refusal = V1Body.envelope(r.body()).get("error").get("details").get("refusals").get(0);
+            assertEquals("MULTI_ACQUISITION", refusal.get("code").asText());
+            assertEquals("acq2", refusal.get("nodeId").asText());
+        }
+    }
+
     /**
      * A {@code use:} binding naming a component that does not exist is refused AT SAVE (422) instead of
      * degrading to the node's local config and failing later, deep in whatever reads the missing key.
