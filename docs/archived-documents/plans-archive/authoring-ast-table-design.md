@@ -1,6 +1,6 @@
 # Structured AST table over SQL — design (`AUTHORING-REDESIGN-1` clause (c))
 
-> **Status (2026-09-16): DESIGN ONLY. No code written, no source file touched.** This is the decision
+> **Status (2026-09-23): COMPLETE + ARCHIVED. Steps 0–4 shipped under the operator's §7 answers; the plan stops at step 4 for good (Q2).** Originally (2026-09-16) DESIGN ONLY. This is the decision
 > pass the board asked for on clause (c) — *"v2 structured AST table over the SQL, for WHERE/JOIN
 > editing"*.
 >
@@ -332,10 +332,21 @@ the AST server-side (§4), or write a re-emitted statement without the author's 
 
 ---
 
-## 7. Open questions — operator calls
+## 7. Operator calls — ANSWERED 2026-09-23
 
-⛔ **Not answered here.** Each is a genuine call where the evidence points more than one way. To be filed
-into `BACKLOG.md` §1 by the main thread.
+✅ **The operator answered all five on 2026-09-23. The plan is COMPLETE and stops at step 4 for good.**
+
+| Q | Decision | As built |
+|---|---|---|
+| Q1 | **(a) RE-HOME** (c) to `transform.filter`, the Filter Step's predicate. D3 stands; nothing lands on the `transform.sql` pane | `app-pipeline-filter-predicate` inside the generic config pane, only for `transform.filter` |
+| Q2 | **Author formatting and comments MUST survive.** The AST is READ-ONLY; nothing ever writes authored SQL back through it. The plan **stops at step 4 permanently**; the `json_deserialize_sql` reserve path is closed | No AST→SQL route or function exists. Step 4 writes via `compileWhere` only on an explicit accept of the exact before/after; a predicate carrying a comment is never offered for structured editing |
+| Q3 | **(a) no extra guard** on `POST /components/sql/ast`: serialize-only, non-SELECT refused by T5. `describe` keeps `SqlGuard` | `ControlApiSqlAstTest.thereIsNoLexicalGuardBecauseNothingBinds` |
+| Q4 | **Sealed `SqlSandbox`**: fidelity to the Step 0 pins over per-call cost | `SqlAst.parse` opens + seals per call |
+| Q5 | **A contract pinning ONLY the AST keys the SPA reads**, not the whole shape | `sql-ast.contract.json` + `SqlAstContractTest` (engine side) + `sql-ast.spec.ts` (reader side). `query_location` is deliberately NOT pinned: the SPA never reads it |
+
+Built: step 1 `8eca6d59` (route), steps 2–4 `30bd09e1` (SPA). Step 5 (`transform.join`) stays out of scope, as §6 said.
+
+The questions as they were put:
 
 - **Q1 — Does clause (c) move off the Transform pane?** §2.1 says the clause names a pane whose shipped,
   twice-affirmed design excludes both `WHERE` and `JOIN`, and that the real home is `transform.filter`.

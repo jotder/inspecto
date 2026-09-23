@@ -797,6 +797,34 @@ Enrich → Publish — each with a status word and finding count, each click ope
 - `rejects` never promotes a stage to ✓; the Schema stage tops out at `configured` (the editor
   claims no validation it never ran).
 
+## Filter: the row predicate's structure (SHIPPED 2026-09-23, `AUTHORING-REDESIGN-1` (c))
+
+A `transform.filter` Step's drawer shows **What gets kept** beneath its `where` field: DuckDB's own parse
+tree of the predicate, rendered as a read-only table. Plan of record (archived):
+[`authoring-ast-table-design.md`](../../../archived-documents/plans-archive/authoring-ast-table-design.md) §7.
+
+- **Home (Q1).** On the Filter Step, not the `transform.sql` pane, whose D3 ("filtering belongs to its own
+  Step") stands. `transform.join` has no SQL to parse and is out of scope.
+- **Seam.** `POST /components/sql/ast` `{sql, fragment: 'predicate'}` (`ComponentRoutes` → `SqlAst`) wraps
+  the text as `SELECT 1 FROM input WHERE <pred>`, runs `json_serialize_sql(?::VARCHAR)` on a **sealed
+  `SqlSandbox`** (Q4) and returns the `where_clause` node verbatim. A parse error is a **200 `{ok:false}`**
+  with the position rebased onto the author's text; a "predicate" carrying its own ORDER BY / GROUP BY /
+  LIMIT / UNION is refused `NOT_A_PREDICATE` by comparing the tree to a fixed skeleton. **No `SqlGuard`**
+  (Q3): nothing binds; ⛔ not a precedent for `/components/transform/describe`, which binds.
+- **Read-only, for good (Q2).** No AST→SQL path exists and none may be added: the round trip drops
+  comments and re-spells everything. Editing goes through the shipped Query Core instead, and only when
+  (1) `astToConditionGroup` recognises the tree, (2) the text carries no comment, and (3) `compileWhere`'s
+  spelling re-parses to the **same** tree (`sameSqlStructure`, offsets ignored). The result is written into
+  the `where` field only on an explicit accept of the exact before/after; untouched text stays byte for byte.
+- **Contract (Q5).** `contracts/sql-ast.contract.json` pins ONLY the node types and keys the SPA reads;
+  `SqlAstContractTest` proves the engine emits them, `sql-ast.spec.ts` proves the reader handles exactly
+  them. ⛔ Never read `query_location`: start-only, and a CAST carries 2^64-1, which a JS number cannot hold.
+- **Degrade.** Parse error → `<inspecto-alert>` warning, saving never blocked; route unreachable → a quiet
+  status line; an unrepresentable part stays in the table as an explained row, never dropped.
+- ⚠ Traps: `NOT a = 1` parses as `a != 1`; `(a AND b) AND c` flattens to one conjunction; `TRUE` is a CAST
+  of `'t'`; a DECIMAL arrives as an unscaled integer + `scale`. Nesting in the table is carried by
+  visually-hidden "Level N" text, not `aria-level` (valid only inside a `treegrid`).
+
 ## Known gaps (owners: [BACKLOG](../../../BACKLOG.md))
 
 The behavior described above is the intended-and-actual state. ⚠ **Corrected 2026-09-01**: this

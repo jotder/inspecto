@@ -82,7 +82,8 @@ catalog and by persisting `fields[]`.
   grid asks for one. Anything beyond a projection — `WHERE`, `JOIN`, `GROUP BY`, CTE, `DISTINCT`, `*` mixed
   with items — leaves the **Fields tab disabled with the reason** as its tooltip and a line under the editor
   (D3 unchanged: filtering belongs to a Filter Step). It is NOT a SQL parser and needs no DuckDB extension;
-  the AST table of BACKLOG AUTHORING-REDESIGN-1 (c) remains the way to make a `WHERE` structurally editable.
+  a `WHERE` is made structurally visible on the Filter Step instead (AUTHORING-REDESIGN-1 (c), shipped 2026-09-23 —
+  [`pipeline-editor.md`](pipeline-editor.md) § *Filter: the row predicate's structure*).
   ⚠ **Switching views never changes the SQL; only an edit does.** Dirty is the generated SQL compared to what
   was loaded (not the rows), so Fields → SQL → Fields arms nothing — except that a hand-written SQL shown as
   fields regenerates in canonical spelling, which honestly arms Apply. A node carrying `sql` with no `fields`
