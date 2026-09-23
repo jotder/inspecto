@@ -6,6 +6,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -82,6 +84,41 @@ class DbObjectStoreTest {
         assertTrue(store.get(o.id()).isEmpty());
         assertThrows(NoSuchElementException.class, () -> store.delete(o.id()));
         assertThrows(NoSuchElementException.class, () -> store.delete("missing"));
+    }
+
+    /**
+     * LA-CASE-CREATE-IN-PLACE-1: the Entity identity lookup. Exact on every wanted attribute, oldest first, and
+     * the LIKE prefilter must neither match a near-miss (a key that merely CONTAINS the wanted one, a LIKE
+     * wildcard in the value) nor miss a value carrying characters JSON escapes.
+     */
+    @Test
+    void findByAttributesMatchesExactlyAndOldestFirst() {
+        OperationalObject older = incident("entity:a_b", "orders", 1000);
+        OperationalObject newer = incident("entity:a_b", "orders", 2000);
+        store.create(newer);
+        store.create(older);
+        store.create(incident("entity:a_b", "orders2", 3000));   // the wanted Dataset is a prefix of this one
+        store.create(incident("entity:aXb", "orders", 4000));    // `_` must not act as a LIKE wildcard
+        store.create(incident("entity:a_b-longer", "orders", 5000));
+        OperationalObject quoted = incident("entity:\"acme\" 50% \\ ltd", "or\"ders", 6000);
+        store.create(quoted);
+
+        List<OperationalObject> hits = store.findByAttributes(ObjectType.INCIDENT,
+                Map.of("entityKey", "entity:a_b", "entityDataset", "orders"), 10);
+        assertEquals(List.of(older.id(), newer.id()), hits.stream().map(OperationalObject::id).toList());
+        assertEquals(1, store.findByAttributes(ObjectType.INCIDENT,
+                Map.of("entityKey", "entity:a_b", "entityDataset", "orders"), 1).size(), "limit honoured");
+        assertEquals(List.of(quoted.id()), store.findByAttributes(ObjectType.INCIDENT,
+                Map.of("entityKey", "entity:\"acme\" 50% \\ ltd", "entityDataset", "or\"ders"), 10)
+                .stream().map(OperationalObject::id).toList(), "JSON-escaped characters still match");
+        assertTrue(store.findByAttributes(ObjectType.CASE,
+                Map.of("entityKey", "entity:a_b", "entityDataset", "orders"), 10).isEmpty(), "type is part of it");
+    }
+
+    private static OperationalObject incident(String key, String dataset, long created) {
+        return OperationalObject.builder(ObjectType.INCIDENT).title("t").status("IDENTIFIED")
+                .attr("entityKey", key).attr("entityDataset", dataset)
+                .createdAt(created).updatedAt(created).build();
     }
 
     @Test

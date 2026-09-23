@@ -99,6 +99,13 @@ public final class ObjectService {
     public static final String ATTR_RAISED_BY_RULE = "raisedByRule";
     /** Attribute key placing an object under legal hold — see {@link #hasLegalHold} (MNT-14). */
     public static final String ATTR_LEGAL_HOLD = "legalHold";
+    /**
+     * Attribute keys stamped on an Incident minted from a Link Analysis Entity (LA-CASE-CREATE-IN-PLACE-1):
+     * the Entity's node id ({@code entity:[<entityType>:]<normalised key>}, D-S4) and the Dataset it was
+     * projected from. Together they are the Entity's IDENTITY — minting the same pair again reuses the object.
+     */
+    public static final String ATTR_ENTITY_KEY = "entityKey";
+    public static final String ATTR_ENTITY_DATASET = "entityDataset";
 
     /**
      * {@code true} when {@code o} is under legal hold ({@link #ATTR_LEGAL_HOLD}) and must therefore
@@ -1094,6 +1101,113 @@ public final class ObjectService {
             moved++;
         }
         return moved;
+    }
+
+    /** One Link Analysis Entity to become a member of a new Case: its node id, source Dataset and label. */
+    public record EntityMember(String entityKey, String dataset, String label) {
+        public EntityMember {
+            if (entityKey == null || !entityKey.startsWith("entity:") || entityKey.length() <= "entity:".length())
+                throw new IllegalArgumentException("an entity needs its node id ('entity:…'), got '" + entityKey + "'");
+            if (dataset == null || dataset.isBlank())
+                throw new IllegalArgumentException("entity '" + entityKey + "' needs the Dataset it was projected from");
+            label = label == null || label.isBlank() ? entityKey : label.trim();
+        }
+    }
+
+    /** What {@link #openCaseFromEntities} did: the Case, every member it now CONTAINS, and which were new. */
+    public record EntityCase(OperationalObject caseObject, List<OperationalObject> members, Set<String> minted) {}
+
+    /**
+     * Open a Case whose first members are minted from Link Analysis Entities (LA-CASE-CREATE-IN-PLACE-1,
+     * operator decision 2026-09-23: <i>mint from the node</i>). Each Entity becomes an INCIDENT keyed by
+     * {@link #ATTR_ENTITY_KEY} + {@link #ATTR_ENTITY_DATASET}; one that already exists — and that the caller
+     * can see — is REUSED, never duplicated. {@code existingMembers} are Incidents the graph already named
+     * (a node projected from an {@code incidentId} column). The 2026-07-22 rule stands: a Case is never born
+     * empty, so at least one member is required.
+     *
+     * <p><b>Fails closed, in two layers.</b> Everything that can be refused is checked BEFORE the first write
+     * (members exist, are visible, are Incidents). The writes then run under compensation: if any of them
+     * throws, every object this call created — the Case and each minted Incident — is removed with its
+     * links, notes and tag edges, and the error propagates. Reused objects are never touched. So a failure
+     * leaves no orphan Case and no half-minted members; the OBJECT_OPENED events already emitted stay in the
+     * append-only log, followed by a {@code rollback} activity naming each discarded id.
+     *
+     * <p>{@code synchronized} so two concurrent mints of one Entity cannot both miss the lookup and open two.
+     *
+     * @param visible the caller's data-scope predicate — an object it cannot see is neither reused nor linked
+     * @throws IllegalArgumentException blank title, no members, an existing member that is not an INCIDENT
+     * @throws NoSuchElementException   an existing member that is absent or not visible (existence-hiding)
+     */
+    public synchronized EntityCase openCaseFromEntities(String title, String description, List<EntityMember> entities,
+                                                        List<String> existingMembers,
+                                                        java.util.function.Predicate<OperationalObject> visible,
+                                                        String actor) {
+        if (title == null || title.isBlank()) throw new IllegalArgumentException("a Case needs a 'title'");
+        if (entities.isEmpty() && existingMembers.isEmpty())
+            throw new IllegalArgumentException("a Case CONTAINS its members — name at least one entity");
+        // ── resolve (no writes) ──
+        Map<String, OperationalObject> members = new LinkedHashMap<>();
+        for (String id : existingMembers) {
+            OperationalObject o = store.get(id).filter(visible).orElseThrow(
+                    () -> new NoSuchElementException("no object with id '" + id + "'"));
+            if (o.objectType() != ObjectType.INCIDENT)
+                throw new IllegalArgumentException("a Case member must be an INCIDENT, but " + id + " is a " + o.objectType());
+            members.put(o.id(), o);
+        }
+        Map<List<String>, EntityMember> toMint = new LinkedHashMap<>();
+        Map<List<String>, OperationalObject> reused = new LinkedHashMap<>();
+        for (EntityMember e : entities) {
+            List<String> identity = List.of(e.entityKey(), e.dataset());
+            if (toMint.containsKey(identity) || reused.containsKey(identity)) continue;
+            Optional<OperationalObject> existing = store.findByAttributes(ObjectType.INCIDENT,
+                    Map.of(ATTR_ENTITY_KEY, e.entityKey(), ATTR_ENTITY_DATASET, e.dataset()), ObjectQuery.MAX_LIMIT)
+                    .stream().filter(visible).findFirst();
+            if (existing.isPresent()) reused.put(identity, existing.get());
+            else toMint.put(identity, e);
+        }
+        // ── write, under compensation ──
+        List<String> created = new ArrayList<>();
+        try {
+            for (OperationalObject o : reused.values()) members.putIfAbsent(o.id(), o);
+            for (EntityMember e : toMint.values()) {
+                Map<String, String> attrs = new LinkedHashMap<>();
+                attrs.put(ATTR_ENTITY_KEY, e.entityKey());
+                attrs.put(ATTR_ENTITY_DATASET, e.dataset());
+                OperationalObject minted = open(ObjectType.INCIDENT, e.label(),
+                        "Raised from Link Analysis: Entity " + e.entityKey() + " in Dataset " + e.dataset() + ".",
+                        null, null, null, null, null, attrs);
+                created.add(minted.id());
+                members.put(minted.id(), minted);
+            }
+            OperationalObject kase = open(ObjectType.CASE, title.trim(), description, null, null, null, null, null, Map.of());
+            created.add(kase.id());
+            for (String member : members.keySet()) link(kase.id(), member, LinkRelationship.CONTAINS, actor);
+            return new EntityCase(require(kase.id()), List.copyOf(members.values()),
+                    Set.copyOf(created.subList(0, created.size() - 1)));
+        } catch (RuntimeException failure) {
+            for (String id : created.reversed()) discard(id, actor, failure);
+            throw failure;
+        }
+    }
+
+    /** Compensation for {@link #openCaseFromEntities}: remove one object it created, cascade first (see {@link #purge}). */
+    private void discard(String objectId, String actor, RuntimeException cause) {
+        try {
+            notes.deleteForTarget(AnnotationKinds.OBJECT, objectId);
+            links.removeAllIncident(objectId);
+            tagAssignments.removeAllForTarget(AnnotationKinds.OBJECT, objectId);
+            if (store.get(objectId).isPresent()) store.delete(objectId);
+            EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+                    .level(EventLevel.WARN)
+                    .source(SOURCE)
+                    .message("object " + objectId + " discarded: opening a Case from entities failed ("
+                            + cause.getMessage() + ")")
+                    .attr("objectId", objectId)
+                    .attr("action", "rollback")
+                    .attr("actor", actor));
+        } catch (RuntimeException secondary) {
+            cause.addSuppressed(secondary);
+        }
     }
 
     /** The object must exist, be a CASE, and not be closed/merged — the precondition for group operations. */

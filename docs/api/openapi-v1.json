@@ -6483,6 +6483,50 @@
         "x-optional-module" : true
       }
     },
+    "/cases/from-entities" : {
+      "post" : {
+        "tags" : [ "cases" ],
+        "summary" : "Open a Case whose first members are minted from Link Analysis Entities",
+        "operationId" : "postCasesFromEntities",
+        "description" : "LA-CASE-CREATE-IN-PLACE-1. Each {id, dataset} entry is a Link Analysis Entity (node id entity:[<type>:]<normalised key>, D-S4) and is minted as an INCIDENT keyed by entityKey + entityDataset, or REUSED when that identity already exists and is visible to the caller; an {objectId} entry names an existing Incident. The Case CONTAINS every member. Gated on canManageIncidents (403). Missing title or no entities 400; a malformed entity, a non-INCIDENT objectId or more than 100 entities 422; an absent or out-of-scope objectId 404. Everything is checked before the first write, and a failed write rolls back every object the call created.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "title", "entities" ],
+                "properties" : {
+                  "title" : { "type" : "string" },
+                  "description" : { "type" : "string" },
+                  "actor" : { "type" : "string" },
+                  "entities" : {
+                    "type" : "array",
+                    "minItems" : 1,
+                    "maxItems" : 100,
+                    "items" : {
+                      "type" : "object",
+                      "properties" : {
+                        "id" : { "type" : "string", "description" : "Entity node id, entity:[<type>:]<key>" },
+                        "dataset" : { "type" : "string", "description" : "The Dataset the Entity was projected from" },
+                        "label" : { "type" : "string", "description" : "Title of a minted Incident (the raw spelling)" },
+                        "objectId" : { "type" : "string", "description" : "An existing Incident instead of an Entity" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {case, members:[object + minted:boolean]} (see #/components/schemas/Envelope)."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/cases/rules" : {
       "get" : {
         "tags" : [ "cases" ],

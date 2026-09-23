@@ -195,6 +195,48 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         return out;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Portable across DuckDB and PostgreSQL, so no JSON operator: the attribute column is the compact
+     * JSON {@link JsonAttributes} writes, and each wanted entry is prefiltered by {@code LIKE} on the exact
+     * fragment that same encoder produces for it ({@code "key":"value"}), then re-checked exactly on the
+     * decoded map — the {@code LIKE} only narrows, it never decides.
+     */
+    @Override
+    public List<OperationalObject> findByAttributes(ObjectType type, Map<String, String> attributes, int limit) {
+        List<String> where = new ArrayList<>(List.of("object_type = ?"));
+        List<Object> params = new ArrayList<>(List.of(type.name()));
+        for (Map.Entry<String, String> e : attributes.entrySet()) {
+            String pair = JsonAttributes.toJson(Map.of(e.getKey(), e.getValue()));
+            String fragment = pair.substring(1, pair.length() - 1);
+            where.add("attributes LIKE ? ESCAPE '\\'");
+            params.add("%" + fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%");
+        }
+        String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE " + String.join(" AND ", where)
+                + " ORDER BY created_at ASC";
+        List<OperationalObject> out = new ArrayList<>();
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    int i = 1;
+                    for (Object p : params) ps.setObject(i++, p);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next() && out.size() < limit) {
+                            OperationalObject o = mapRow(rs);
+                            if (attributes.entrySet().stream()
+                                    .allMatch(w -> w.getValue().equals(o.attributes().get(w.getKey()))))
+                                out.add(o);
+                        }
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("object attribute lookup failed: " + e.getMessage(), e);
+        }
+        return out;
+    }
+
     // ── schema + helpers ─────────────────────────────────────────────────────────
 
     private void initSchema() {

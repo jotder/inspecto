@@ -21,9 +21,11 @@ final class CapabilityManifest {
     record Entry(String method, String pattern, String capability) {}
 
     static final List<Entry> ENTRIES = List.of(
-            // Incident creation (operator, 2026-09-16) — one act, one capability, two routes
+            // Incident creation (operator, 2026-09-16) — one act, one capability, three routes
             new Entry("POST", "/recon/promote", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/objects", Roles.CAN_MANAGE_INCIDENTS),
+            // ObjectRoutes (LA-CASE-CREATE-IN-PLACE-1) — opens Incidents minted from Entities and a Case
+            new Entry("POST", "/cases/from-entities", Roles.CAN_MANAGE_INCIDENTS),
             // InvRoutes (LA-03) — sealing evidence and attaching it to a Case is Case work. The other
             // /inv/* POSTs are exempted as read-shaped; these two persist, so they are gated instead.
             new Entry("POST", "/inv/snapshots", Roles.CAN_MANAGE_INCIDENTS),

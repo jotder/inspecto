@@ -258,6 +258,19 @@ export interface UpdateObject {
 }
 
 /**
+ * One member of a Case opened from Link Analysis (`POST /cases/from-entities`, LA-CASE-CREATE-IN-PLACE-1):
+ * an Entity to mint — its node id plus the Dataset it was projected from, which together are its identity —
+ * or an Incident the graph already references.
+ */
+export type CaseEntityMember = { id: string; dataset: string; label?: string } | { objectId: string };
+
+/** What `POST /cases/from-entities` opened: the Case, and each member with whether it was minted just now. */
+export interface CaseFromEntities {
+    case: OperationalObject;
+    members: (OperationalObject & { minted: boolean })[];
+}
+
+/**
  * The Operational Intelligence object engine (Phases 2–4; CONTROL scope). One table backs ALERTs
  * (auto-promoted), INCIDENTs and CASEs (operator-created), each walking a config-driven workflow; objects
  * carry correlation links (an OBJECT_LINK graph) and an append-only note thread (comments / attachment
@@ -279,6 +292,18 @@ export class ObjectsService {
 
     create(body: CreateObject): Observable<OperationalObject> {
         return this.http.post<OperationalObject>(apiUrl('/objects'), body);
+    }
+
+    /**
+     * Open a Case whose first members are minted from Link Analysis Entities — or REUSED, when the same
+     * Entity (node id + Dataset) was minted before. One server call, so a refused member leaves no Case behind.
+     */
+    openCaseFromEntities(
+        title: string,
+        description: string | undefined,
+        entities: CaseEntityMember[],
+    ): Observable<CaseFromEntities> {
+        return this.http.post<CaseFromEntities>(apiUrl('/cases/from-entities'), { title, description, entities });
     }
 
     /** Patch mutable fields (priority / severity / assignee / attributes merge) — PATCH /objects/{id}. */

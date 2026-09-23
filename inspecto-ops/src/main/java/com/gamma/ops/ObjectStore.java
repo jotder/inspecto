@@ -39,6 +39,19 @@ public interface ObjectStore extends AutoCloseable {
     List<OperationalObject> query(ObjectQuery query);
 
     /**
+     * Objects of {@code type} whose attribute bag holds EVERY entry of {@code attributes} exactly, oldest
+     * first, at most {@code limit}. The identity lookup behind minting a Case member from a Link Analysis
+     * Entity (LA-CASE-CREATE-IN-PLACE-1): the same Entity minted twice must find the first object rather
+     * than open a second.
+     *
+     * <p>⛔ <b>Fails closed</b>: a store that cannot answer throws, rather than returning an empty list the way
+     * {@link #query} does. An empty answer here means "mint a new one", so a swallowed error would silently
+     * duplicate the object it exists to find.
+     */
+    List<OperationalObject> findByAttributes(com.gamma.objects.ObjectType type, java.util.Map<String, String> attributes,
+                                             int limit);
+
+    /**
      * Persist a mutated object (status/assignee/timestamps). Returns the stored object. Throws
      * {@link java.util.NoSuchElementException} if no object with {@code obj.id()} exists.
      */

@@ -1,4 +1,5 @@
 import { signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -201,6 +202,163 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
     it('pre-selects the Case it was opened from (the ?case= deep link)', () => {
         const { fixture } = create(() => of([{ id: 'CASE-9', title: 'Real case' }]), 'CASE-9');
         expect(fixture.componentInstance.form.getRawValue().caseId).toBe('CASE-9');
+    });
+});
+
+describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-IN-PLACE-1)', () => {
+    const EG: G6GraphData = {
+        nodes: [
+            { id: 'entity:acme ltd', data: { label: 'ACME Ltd', kind: 'entity' } },
+            { id: 'entity:bob', data: { label: 'Bob', kind: 'entity' } },
+            { id: 'entity:gone', data: { label: 'Gone', kind: 'entity', missing: true } },
+        ],
+        edges: [{ id: 'e', source: 'entity:acme ltd', target: 'entity:bob', data: { kind: 'paid' } }],
+    };
+    const MADE = {
+        case: { id: 'CASE-NEW', title: 'Ring', objectType: 'CASE' },
+        members: [{ id: 'INC-1', minted: true }],
+    };
+
+    interface Opts {
+        opsEnabled?: boolean;
+        selected?: string[];
+        openCase?: () => unknown;
+        attachTo?: () => unknown;
+    }
+
+    function create(o: Opts = {}) {
+        const close = vi.fn();
+        const calls: string[] = [];
+        const base = fakeSnapshots();
+        const store = fakeSnapshots({
+            save: (s: GraphSnapshot) => {
+                calls.push('seal');
+                return base.save(s);
+            },
+            attachTo: (id: string, caseId: string) => {
+                calls.push('attach:' + caseId);
+                return o.attachTo ? o.attachTo() : base.attachTo(id, caseId);
+            },
+        });
+        const openCaseFromEntities = vi.fn((title: string, _d: unknown, members: unknown[]) => {
+            calls.push(`case:${title}:${members.length}`);
+            return o.openCase ? o.openCase() : of(MADE);
+        });
+        TestBed.configureTestingModule({
+            imports: [LinkAnalysisSnapshotDialog],
+            providers: [
+                provideNoopAnimations(),
+                { provide: LinkAnalysisSnapshotsService, useValue: store },
+                { provide: SessionService, useValue: { opsEnabled: () => o.opsEnabled ?? true } },
+                {
+                    provide: ObjectsService,
+                    useValue: { list: () => of([{ id: 'CASE-9', title: 'Real case' }]), openCaseFromEntities },
+                },
+                { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
+                {
+                    provide: MAT_DIALOG_DATA,
+                    useValue: {
+                        graph: EG,
+                        predicate: null,
+                        origin: { sourceId: 'entity-projection', dataset: 'tx', query: {} },
+                        layout: 'dagre',
+                        suggestedTitle: 'Ring',
+                        selectedNodeIds: o.selected ?? ['entity:bob'],
+                    },
+                },
+            ],
+        });
+        const fixture = TestBed.createComponent(LinkAnalysisSnapshotDialog);
+        fixture.detectChanges();
+        return { fixture, close, calls, openCaseFromEntities, el: fixture.nativeElement as HTMLElement };
+    }
+
+    function chooseNewCase(fixture: ReturnType<typeof create>['fixture']) {
+        fixture.componentInstance.caseForm.controls.mode.setValue('new');
+        fixture.detectChanges();
+    }
+
+    it('mints the canvas selection into a new Case, then attaches the sealed analysis to it — in that order', async () => {
+        const { fixture, close, calls, openCaseFromEntities, el } = create();
+        chooseNewCase(fixture);
+        // The picker offers the two live Entities (never the stranded one), pre-ticked from the canvas emphasis.
+        const boxes = Array.from(el.querySelectorAll<HTMLInputElement>('mat-checkbox input[type="checkbox"]'));
+        expect(boxes).toHaveLength(2);
+        expect(boxes.map((b) => b.checked)).toEqual([false, true]);
+        expect(el.textContent).toContain('1 of 2 picked');
+        await expectNoA11yViolations(el);
+
+        fixture.componentInstance.save();
+        expect(calls).toEqual(['seal', 'case:Ring:1', 'attach:CASE-NEW']);
+        expect(openCaseFromEntities.mock.calls[0][2]).toEqual([{ id: 'entity:bob', dataset: 'tx', label: 'Bob' }]);
+        const snap = close.mock.calls[0][0] as GraphSnapshot;
+        expect(snap.attachedTo).toEqual(['CASE-NEW']);
+        expect(verifySnapshot(snap)).toBe(true);
+    });
+
+    it('refuses to create an empty Case — nothing is sealed or created without a picked node', () => {
+        const { fixture, close, calls, el } = create({ selected: [] });
+        chooseNewCase(fixture);
+        fixture.componentInstance.save();
+        fixture.detectChanges();
+        expect(el.querySelector('p[role="alert"]')?.textContent).toContain('Pick at least one node');
+        expect(calls).toEqual([]);
+        expect(close).not.toHaveBeenCalled();
+    });
+
+    it('a refused Case keeps the dialog open with the seal remembered — a retry never seals twice', () => {
+        let fail = true;
+        const { fixture, close, calls, el } = create({
+            openCase: () =>
+                fail
+                    ? throwError(
+                          () =>
+                              new HttpErrorResponse({
+                                  status: 403,
+                                  error: { error: { message: 'missing capability canManageIncidents' } },
+                              }),
+                      )
+                    : of(MADE),
+        });
+        chooseNewCase(fixture);
+        fixture.componentInstance.save();
+        fixture.detectChanges();
+        expect(close).not.toHaveBeenCalled();
+        expect(el.textContent).toContain('The Case was not created');
+        expect(el.textContent).toContain('missing capability canManageIncidents'); // the server's 403, verbatim
+        expect(el.querySelector<HTMLInputElement>('input[formcontrolname="title"]')?.disabled).toBe(true);
+
+        fail = false;
+        fixture.componentInstance.save();
+        expect(calls).toEqual(['seal', 'case:Ring:1', 'case:Ring:1', 'attach:CASE-NEW']);
+        expect((close.mock.calls[0][0] as GraphSnapshot).attachedTo).toEqual(['CASE-NEW']);
+    });
+
+    it('a failed attach after the Case exists retries ONLY the attach — the Case is never opened twice', () => {
+        let fail = true;
+        const { fixture, close, calls, el } = create({
+            attachTo: () => (fail ? throwError(() => new Error('down')) : of(['CASE-NEW'])),
+        });
+        chooseNewCase(fixture);
+        fixture.componentInstance.save();
+        fixture.detectChanges();
+        expect(close).not.toHaveBeenCalled();
+        expect(el.textContent).toContain('Case CASE-NEW was created');
+        expect(fixture.componentInstance.creatingCase()).toBe(false);
+        expect(fixture.componentInstance.form.getRawValue().caseId).toBe('CASE-NEW');
+
+        fail = false;
+        fixture.componentInstance.save();
+        expect(calls).toEqual(['seal', 'case:Ring:1', 'attach:CASE-NEW', 'attach:CASE-NEW']);
+        expect((close.mock.calls[0][0] as GraphSnapshot).attachedTo).toEqual(['CASE-NEW']);
+    });
+
+    it('says why a new Case cannot be offered when operational objects are not installed', () => {
+        const { fixture, el } = create({ opsEnabled: false });
+        expect(fixture.componentInstance.createUnavailable()).toContain('Professional edition');
+        expect(el.textContent).toContain('does not include');
+        const radios = Array.from(el.querySelectorAll<HTMLInputElement>('mat-radio-button input[type="radio"]'));
+        expect(radios.map((r) => r.disabled)).toEqual([false, true]);
     });
 });
 

@@ -64,6 +64,19 @@ public final class InMemoryObjectStore implements ObjectStore {
         return new ArrayList<>(matched.subList(from, to));
     }
 
+    @Override
+    public synchronized List<OperationalObject> findByAttributes(com.gamma.objects.ObjectType type,
+                                                                 Map<String, String> attributes, int limit) {
+        List<OperationalObject> matched = new ArrayList<>();
+        for (OperationalObject o : byId.values()) {
+            if (o.objectType() != type) continue;
+            if (attributes.entrySet().stream().allMatch(e -> e.getValue().equals(o.attributes().get(e.getKey()))))
+                matched.add(o);
+        }
+        matched.sort(Comparator.comparingLong(OperationalObject::createdAt));
+        return new ArrayList<>(matched.subList(0, Math.min(limit, matched.size())));
+    }
+
     /** Current object count (diagnostics/tests). */
     public synchronized int size() {
         return byId.size();

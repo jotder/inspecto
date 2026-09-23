@@ -982,6 +982,7 @@ export class LinkAnalysisComponent implements OnInit {
             layout: this.layoutId(),
             suggestedTitle: `${this.sourceLabel()} — ${g.nodes.filter((n) => !n.data.missing).length} nodes`,
             caseId: this.deepLinkedCaseId(),
+            selectedNodeIds: this.emphasis()?.nodeIds ?? [],
         };
     }
 
@@ -999,7 +1000,10 @@ export class LinkAnalysisComponent implements OnInit {
                 .subscribe((snap) => {
                     if (snap) {
                         this.latestSnapshot.set(snap);
-                        this.toastr.success(`Snapshot “${snap.title}” saved (${snap.manifestHash.slice(0, 12)}…).`);
+                        const attached = snap.attachedTo?.length ? ` Attached to ${snap.attachedTo.join(', ')}.` : '';
+                        this.toastr.success(
+                            `Snapshot “${snap.title}” saved (${snap.manifestHash.slice(0, 12)}…).${attached}`,
+                        );
                     }
                     resolve(snap ?? undefined);
                 }),

@@ -113,6 +113,7 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
             {"POST", "/cases/rules"},
             {"DELETE", "/cases/rules/id22"},
             {"POST", "/cases/rules/id23/evaluate"},
+            {"POST", "/cases/from-entities"},
             {"GET", "/notes/id24/id25"},
             {"GET", "/notes/id26/id27/comments"},
             {"GET", "/notes/id28/id29/attachments"},

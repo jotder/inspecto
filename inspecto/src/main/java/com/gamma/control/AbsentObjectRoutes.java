@@ -56,6 +56,7 @@ final class AbsentObjectRoutes implements RouteModule {
             {"POST",   "/cases/rules"},
             {"DELETE", "/cases/rules/([^/]+)"},
             {"POST",   "/cases/rules/([^/]+)/evaluate"},
+            {"POST",   "/cases/from-entities"},
             // ── NoteRoutes ──────────────────────────────────────────────────────────────────────
             {"GET",    "/notes/([^/]+)/([^/]+)"},
             {"GET",    "/notes/([^/]+)/([^/]+)/comments"},

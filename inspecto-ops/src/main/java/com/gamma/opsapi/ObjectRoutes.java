@@ -101,6 +101,65 @@ public final class ObjectRoutes implements RouteModule {
         api.post("/cases/rules", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> saveCaseRule(api, api.body(e))));
         api.delete("/cases/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteCaseRule(api, ApiContext.name(m))));
         api.post("/cases/rules/([^/]+)/evaluate", ApiContext.withCapability("canAdminister", (e, m) -> evaluateCaseRule(api, ApiContext.name(m))));
+        // LA-CASE-CREATE-IN-PLACE-1 (operator, 2026-09-23 — "mint from the node"): open a Case whose first
+        // members are minted from Link Analysis Entities. Its own route because POST /objects cannot compose
+        // it: that refuses a body with no existing link target, and in a fresh space there is none to name.
+        // Gated like POST /objects — it OPENS Incidents and a Case, the same act, the same capability.
+        api.post("/cases/from-entities", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> openCaseFromEntities(api, e, api.body(e))));
+    }
+
+    /** At most this many Entities per Case opened from Link Analysis — a Case, not a bulk import. */
+    static final int MAX_CASE_ENTITIES = 100;
+
+    /**
+     * {@code POST /cases/from-entities} — body {@code {title, description?, actor?, entities:[{id, dataset,
+     * label?} | {objectId}]}}. An {@code {id, dataset}} entry is a Link Analysis Entity (node id
+     * {@code entity:[<type>:]<key>} plus the Dataset it was projected from) and is minted as an INCIDENT, or
+     * REUSED when that identity already exists and is visible to the caller; an {@code {objectId}} entry names
+     * an Incident the graph already references. Answers {@code {case, members:[{…object, minted}]}}.
+     * Missing title / no entities → 400; a malformed entity or more than {@link #MAX_CASE_ENTITIES} → 422; an
+     * {@code objectId} absent or out of scope → 404; one that is not an INCIDENT → 422. All of it is checked
+     * before the first write, and a failed write rolls back every object this call created
+     * ({@link ObjectService#openCaseFromEntities}).
+     */
+    private Object openCaseFromEntities(ApiContext api, HttpExchange ex, Map<String, Object> body) {
+        String title = ApiContext.str(body, "title");
+        if (title == null) throw new ApiException(400, "body must include 'title'");
+        if (!(body.get("entities") instanceof List<?> raw) || raw.isEmpty())
+            throw new ApiException(400, "body must include at least one entry in 'entities'");
+        if (raw.size() > MAX_CASE_ENTITIES)
+            throw new ApiException(422, "at most " + MAX_CASE_ENTITIES + " entities per Case, got " + raw.size());
+        List<ObjectService.EntityMember> entities = new java.util.ArrayList<>();
+        List<String> existing = new java.util.ArrayList<>();
+        try {
+            for (Object o : raw) {
+                if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each entity must be an object");
+                Object objectId = m.get("objectId");
+                if (objectId != null && !objectId.toString().isBlank()) existing.add(objectId.toString().trim());
+                else entities.add(new ObjectService.EntityMember(text(m.get("id")), text(m.get("dataset")),
+                        text(m.get("label"))));
+            }
+            ObjectService.EntityCase made = OpsEngine.of(api).openCaseFromEntities(title,
+                    ApiContext.str(body, "description"), entities, existing, o -> visibleTo(ex, o),
+                    ApiContext.str(body, "actor"));
+            List<Map<String, Object>> members = made.members().stream().map(o -> {
+                Map<String, Object> row = new LinkedHashMap<>(o.toMap());
+                row.put("minted", made.minted().contains(o.id()));
+                return row;
+            }).toList();
+            return Map.of("case", made.caseObject().toMap(), "members", members);
+        } catch (IllegalArgumentException refused) {
+            // Only the refusals. A store that FAILS (IllegalStateException) stays a 500 — reporting it as a
+            // bad body would send the analyst to fix input that was never wrong.
+            throw new ApiException(422, refused.getMessage());
+        } catch (java.util.NoSuchElementException notFound) {
+            throw new ApiException(404, notFound.getMessage());
+        }
+    }
+
+    private static String text(Object v) {
+        return v == null ? null : v.toString().trim();
     }
 
     // ── rule-raised cases (C5) ────────────────────────────────────────────────────────

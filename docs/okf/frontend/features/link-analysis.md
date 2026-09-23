@@ -430,14 +430,40 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   dialog, so an analysis started from a Case is saved straight back onto it. ⚠ The param is **deliberately
   not stripped** (the `?open=` rule, not the `?create=1` one): it is the address of a Case-scoped
   investigation and has to survive a reload and a bookmark.
-  ⛔ **"Create a new Case" was deliberately NOT built here.** `POST /objects` refuses a body without at
-  least one entry in `links` — for EVERY object type, measured 2026-09-22, so in a space with no objects
-  none can be created through the API at all — and the UI states it as a product decision (2026-07-22,
-  `object-create.dialog.ts:224`): *a case CONTAINS its members*. Link Analysis holds graph **nodes**,
-  which are value-projected entity ids and not operational objects, so there is no legal link target on
-  this screen. Creating one anyway would also mean a durable Case with a session-only attachment — an
-  empty Case that looks like it holds evidence. Tracked as `LA-CASE-CREATE-IN-PLACE-1`; revisit once the
-  SPA is wired to the sealed snapshot store.
+* **A new Case can be created in place, MINTED from graph nodes** (`LA-CASE-CREATE-IN-PLACE-1`, operator
+  decision 2026-09-23; built the same day). The Save dialog's Case box offers *An existing Case, or none* /
+  *A new Case, from graph nodes*; the second asks a Case title and shows a checkbox list of the nodes that
+  can become members, pre-ticked from the canvas emphasis (`selectedNodeIds`, passed by the host from
+  `emphasis()`), with a filter once there are ≥ 8. ⛔ **The 2026-07-22 rule stands** (`object-create.dialog.ts`:
+  *a case CONTAINS its members*): an empty Case was offered to the operator and NOT chosen, so zero picked
+  nodes is refused on screen and by the server alike.
+  - **Object type: INCIDENT.** A Case's Contents are Incidents (GLOSSARY §9), and every Case surface — merge,
+    split, Case Rules, the Contents list — speaks Incidents; a new `ENTITY` object type would have had to
+    teach all of them, plus workflow, FindingsSpec and the SPA's type lists. A minted Incident is titled with
+    the node's raw spelling and described *Raised from Link Analysis: Entity … in Dataset …*. ⚠ The cost is
+    real: these land in the Incidents inbox like any manually raised Incident.
+  - **Identity = `entityKey` + `entityDataset`** (attributes on the Incident): the node id
+    (`entity:[<type>:]<D-S4 key>`, so the Entity type and the normalised key are both in it) plus the source
+    Dataset — the node's own `provenance` when recorded (several merged Datasets joined, sorted), else the
+    Dataset the pane projected. Minting the same pair again REUSES the object; a match the caller cannot see
+    (data scope) is not reused, so existence-hiding holds. The lookup is `ObjectStore.findByAttributes` —
+    portable SQL (`LIKE` on the exact JSON fragment, re-checked exactly), and it THROWS on a store error,
+    because an empty answer there means "mint", i.e. a silent duplicate. Which nodes qualify:
+    `case-members.ts` `caseMemberCandidates` — a node with an `objectRef` to an Incident joins as that
+    Incident; stranded nodes, super-nodes, Case refs, non-Entities and Entities with no knowable Dataset are
+    excluded.
+  - **One route, because composition could not work:** `POST /cases/from-entities` (`ObjectRoutes`, gated
+    `canManageIncidents` like `POST /objects`) mints/reuses and opens the Case with its `CONTAINS` links.
+    `POST /objects` cannot build this — it needs an existing link target, which a fresh space lacks.
+    Everything refusable is checked before the first write; the writes run under compensation
+    (`ObjectService.openCaseFromEntities` removes every object it created, with links/notes/tag edges, if
+    any write throws; reused objects are never touched). Personal: 503 via `AbsentObjectRoutes`, and the
+    dialog disables the option with the reason (`SessionService.opsEnabled()`); a 403 surfaces as the
+    server's message.
+  - **Order: seal → create the Case → attach.** A refused Case leaves the snapshot sealed and unattached and
+    the dialog OPEN, with the seal remembered (title/description lock), so *Save* retries only the Case step;
+    a failed attach after the Case exists flips the form to the existing-Case path with the new Case picked,
+    so a retry attaches and never opens a second Case. The host's toast names the Case it attached to.
 * **Entity ids are NORMALISED, and the projection still reports the spellings it folded** (decision D-S4,
   as built 2026-09-23). Link Analysis stays value-projected (no alias resolution, no entity model), but every
   id goes through ONE key, `normalizeEntityKey` (`inspecto/graph/entity-key.ts`: case-fold, collapse internal
