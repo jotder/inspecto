@@ -2708,21 +2708,71 @@ describe('PipelineEditorComponent', () => {
     });
 
     it('selecting a pipeline loads its last-run overlay and paints edge counts (T17)', () => {
-        api.provenanceBatches.mockReturnValue(of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50 }]));
+        api.provenanceBatches.mockReturnValue(
+            of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false }]),
+        );
         api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50, simulated: false }]));
         const c = make();
         c.select('demo');
         expect(api.provenanceBatches).toHaveBeenCalledWith('demo');
         expect(api.provenance).toHaveBeenCalledWith('demo', 'b2');
-        expect(c.lastRunBatch()).toEqual({ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50 });
+        expect(c.overlayRun()).toEqual({
+            batchId: 'b2',
+            runTs: '2026-07-18T10:00:00Z',
+            totalRows: 50,
+            simulated: false,
+        });
         const edge = c.g6Data()!.edges.find((e) => e.source === 'src' && e.target === 'flt');
         expect(edge!.data).toEqual({ kind: 'data · 50', weight: 50 });
         c.selectedNode.set(c.model()!.nodes[0]); // src
-        expect(c.selectedNodeLastRun()).toEqual({ rowCount: 50, runTs: '2026-07-18T10:00:00Z' });
+        expect(c.selectedNodeLastRun()).toEqual({
+            rowCount: 50,
+            runTs: '2026-07-18T10:00:00Z',
+            simulated: false,
+            latest: true,
+        });
+    });
+
+    /** PIPELINE-RUN-HISTORY-OVERLAY-1: the overlay is no longer pinned to the latest run. */
+    it('picking an earlier run re-paints the overlay from THAT run, and marks it as not the latest', () => {
+        const latest = { batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false };
+        const older = { batchId: 'b1', runTs: '2026-07-17T10:00:00Z', totalRows: 7, simulated: false };
+        api.provenanceBatches.mockReturnValue(of([latest, older]));
+        api.provenance.mockImplementation((_p: string, batch: string) =>
+            of([{ nodeId: 'src', rel: 'data', rowCount: batch === 'b1' ? 7 : 50, simulated: false }]),
+        );
+        const c = make();
+        c.select('demo');
+        expect(c.runBatches()).toEqual([latest, older]);
+
+        c.pickRun(older);
+
+        expect(api.provenance).toHaveBeenLastCalledWith('demo', 'b1');
+        expect(c.overlayRun()).toEqual(older);
+        const edge = c.g6Data()!.edges.find((e) => e.source === 'src' && e.target === 'flt');
+        expect(edge!.data).toEqual({ kind: 'data · 7', weight: 7 });
+        c.selectedNode.set(c.model()!.nodes[0]); // src
+        expect(c.selectedNodeLastRun()).toEqual({ rowCount: 7, runTs: older.runTs, simulated: false, latest: false });
+    });
+
+    /** DRYRUN-INVISIBLE-ON-FLAT-LANE-1 (b): a dry run's batch must not be drawn as if it were real. */
+    it('a dry-run batch is marked in the run picker label, the node summary and the edge data', () => {
+        const dry = { batchId: 'd1', runTs: '2026-07-19T10:00:00Z', totalRows: 4, simulated: true };
+        api.provenanceBatches.mockReturnValue(of([dry]));
+        api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 4, simulated: true }]));
+        const c = make();
+        c.select('demo');
+        expect(c.runLabel(dry)).toBe('2026-07-19T10:00:00Z · 4 row(s) · dry run');
+        const edge = c.g6Data()!.edges.find((e) => e.source === 'src' && e.target === 'flt');
+        expect(edge!.data).toEqual({ kind: 'data · 4 (simulated)', weight: 4, simulated: true });
+        c.selectedNode.set(c.model()!.nodes[0]);
+        expect(c.selectedNodeLastRun()?.simulated).toBe(true);
     });
 
     it('a node absent from the last run has no overlay (null, not zero)', () => {
-        api.provenanceBatches.mockReturnValue(of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50 }]));
+        api.provenanceBatches.mockReturnValue(
+            of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false }]),
+        );
         api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50, simulated: false }]));
         const c = make();
         c.select('demo');
@@ -2733,7 +2783,7 @@ describe('PipelineEditorComponent', () => {
     it('no recorded run (empty batch list) leaves the overlay off, no error', () => {
         const c = make();
         c.select('demo');
-        expect(c.lastRunBatch()).toBeNull();
+        expect(c.overlayRun()).toBeNull();
         c.selectedNode.set(c.model()!.nodes[0]);
         expect(c.selectedNodeLastRun()).toBeNull();
     });
@@ -2742,7 +2792,7 @@ describe('PipelineEditorComponent', () => {
         api.provenanceBatches.mockReturnValue(throwError(() => ({ status: 404 })));
         const c = make();
         c.select('demo');
-        expect(c.lastRunBatch()).toBeNull();
+        expect(c.overlayRun()).toBeNull();
         expect(toast.error).not.toHaveBeenCalled();
     });
 

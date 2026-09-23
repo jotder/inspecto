@@ -57,6 +57,18 @@ describe('PipelineInspectorComponent', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain(
             'Last run: 1,234 row(s) · 2026-07-18T10:00:00Z',
         );
+
+        // an earlier run the author picked, and a dry run (PIPELINE-RUN-HISTORY-OVERLAY-1 / DRYRUN-INVISIBLE-…-1 b)
+        fixture.componentRef.setInput('lastRun', {
+            rowCount: 4,
+            runTs: '2026-07-17T10:00:00Z',
+            simulated: true,
+            latest: false,
+        });
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+            'Selected run: 4 row(s) · 2026-07-17T10:00:00Z · dry run — nothing landed',
+        );
     });
 
     it('emits configure from the node actions', () => {

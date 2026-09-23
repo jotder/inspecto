@@ -131,7 +131,9 @@ describe('PipelineGraphSource', () => {
     });
 
     it('with counts weights edges from the latest batch, identical to the mapper', async () => {
-        const batches: ProvenanceBatch[] = [{ batchId: 'b2', runTs: '2026-07-04T00:00:00Z', totalRows: 10 }];
+        const batches: ProvenanceBatch[] = [
+            { batchId: 'b2', runTs: '2026-07-04T00:00:00Z', totalRows: 10, simulated: false },
+        ];
         const rows: ProvenanceCount[] = [{ nodeId: 'in', rel: 'data', rowCount: 10, simulated: false }];
         const pipelines = {
             graph: () => of(graph),

@@ -297,10 +297,38 @@
                 @if (dirty()) {
                     <span class="text-xs" style="color: var(--gamma-warn)">unsaved changes</span>
                 }
-                @if (lastRunBatch(); as b) {
-                    <span class="text-xs opacity-70" matTooltip="Last recorded run of this pipeline">
-                        last run: {{ b.totalRows.toLocaleString() }} row(s) · {{ b.runTs }}
-                    </span>
+                <!-- The run overlay's picker (PIPELINE-RUN-HISTORY-OVERLAY-1): the canvas paints ONE
+                     recorded run — the latest unless the author picks an earlier one here. A dry run is
+                     marked (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b): its counts landed nothing. -->
+                @if (overlayRun(); as b) {
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded px-1 text-xs opacity-70"
+                        [matMenuTriggerFor]="runMenu"
+                        matTooltip="The run painted on the canvas — pick another recorded run"
+                        [attr.aria-label]="'Run overlay: ' + runLabel(b) + '. Pick another run'"
+                    >
+                        {{ b.batchId === runBatches()[0]?.batchId ? 'last run' : 'run' }}: {{ runLabel(b) }}
+                        <mat-icon class="icon-size-3" svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                    </button>
+                    <mat-menu #runMenu="matMenu">
+                        @for (r of runBatches(); track r.batchId) {
+                            <button
+                                mat-menu-item
+                                role="menuitemradio"
+                                [attr.aria-checked]="r.batchId === b.batchId"
+                                (click)="pickRun(r)"
+                            >
+                                <mat-icon
+                                    [svgIcon]="
+                                        r.batchId === b.batchId ? 'heroicons_outline:check' : 'heroicons_outline:minus'
+                                    "
+                                    [style.visibility]="r.batchId === b.batchId ? 'visible' : 'hidden'"
+                                ></mat-icon>
+                                <span>{{ runLabel(r) }}</span>
+                            </button>
+                        }
+                    </mat-menu>
                 }
                 @if (isTemplate()) {
                     <span

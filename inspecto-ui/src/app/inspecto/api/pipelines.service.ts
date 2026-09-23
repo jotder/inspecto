@@ -301,6 +301,8 @@ export interface ProvenanceBatch {
     batchId: string;
     runTs: string;
     totalRows: number;
+    /** `true` when the batch came from a dry run (`?dryRun=true`) — its counts landed nothing. */
+    simulated: boolean;
 }
 
 /** The records a node emitted on one relationship during a run (GET /provenance) — a Sankey edge weight. */

@@ -518,8 +518,12 @@ for `DatasetWriteSignal.emit`, new `CollectorConnector.post` implementors, and n
 skips `recordProvenance`, so a flat-lane dry run writes **no provenance row at all**, while the
 job/graph lane still records one marked `simulated`. Gate 4’s `simulated BOOLEAN` column and the
 Lineage/Sankey visibility it was built for are therefore reachable on one lane only — and not the one
-this feature shipped for. The UI badge that would render the flag was never added either. ⛔ Do not
-read “a dry run is visible in the overlay” as true on the flat lane today.
+this feature shipped for. ✅ Half (b), the UI marking, **shipped 2026-09-23**: `GET /provenance/batches`
+carries a per-batch `simulated`, and the Pipeline editor's run overlay labels, dashes and annotates a
+dry-run batch ([pipeline editor](../../frontend/features/pipeline-editor.md)) — so a graph-lane dry run
+is no longer drawn as if real. ⛔ Do not read “a dry run is visible in the overlay” as true on the flat
+lane today: half (a) is still a decision (write one marked provenance row from the no-op, or retract
+the overlay promise for that lane).
 
 **References.** Provenance: the archived plan
 [`archived-documents/plans-archive/pipeline-dryrun-design.md`](../../../archived-documents/plans-archive/pipeline-dryrun-design.md).

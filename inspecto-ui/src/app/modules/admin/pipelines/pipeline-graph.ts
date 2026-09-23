@@ -404,6 +404,25 @@ export function authoredToG6(
 }
 
 /**
+ * One node's output in the run the canvas overlays (T17): the total, that run's timestamp, whether it was a
+ * dry run (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b), and whether it is the latest recorded run or one the author
+ * picked from the run history (PIPELINE-RUN-HISTORY-OVERLAY-1). `latest` absent reads as the latest.
+ */
+export interface NodeRunSummary {
+    rowCount: number;
+    runTs: string;
+    simulated?: boolean;
+    latest?: boolean;
+}
+
+/** The inspector's one-line run fact, e.g. `Last run: 1,234 row(s) · <ts>` (+ ` · dry run — nothing landed`). */
+export function nodeRunLine(run: NodeRunSummary): string {
+    const which = run.latest === false ? 'Selected run' : 'Last run';
+    const dry = run.simulated ? ' · dry run — nothing landed' : '';
+    return `${which}: ${run.rowCount.toLocaleString()} row(s) · ${run.runTs}${dry}`;
+}
+
+/**
  * A node's total last-run output (the sum of every relationship it emitted, e.g. {@code data}+{@code dropped})
  * from the {@code nodeId|rel} → rowCount lookup built by {@link provenanceCounts}. {@code null} when the node
  * recorded nothing in that run (not the same as a real {@code 0} — the inspector should read that as "no data").

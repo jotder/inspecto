@@ -108,6 +108,7 @@ import {
     findingTint,
     groupByCategory,
     nodeConfigEntries,
+    NodeRunSummary,
     nodeLastRunTotal,
     provenanceCounts,
     ProvenanceOverlay,
@@ -458,11 +459,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private readonly refsLoaded = signal(false);
     /** Per-node test outcome from the last run-to-here (`tested` / `rejects`). */
     private readonly testedStatus = signal<Map<string, TestOutcome>>(new Map());
-    // ── T17 live last-run overlay: the pipeline's most recent real run, from the durable provenance store ──
-    /** The most recent recorded run of the selected pipeline (`null` = none yet, or provenance backend unset). */
-    readonly lastRunBatch = signal<ProvenanceBatch | null>(null);
-    /** `nodeId|rel` → row count for {@link lastRunBatch} — paints edge weights and the inspector's node total. */
-    private readonly lastRunCounts = signal<Map<string, ProvenanceOverlay>>(new Map());
+    // ── T17 run overlay: one recorded run of the pipeline, from the durable provenance store ──
+    /**
+     * The pipeline's recent recorded runs, newest first (`GET /provenance/batches`) — the run picker's choices
+     * (PIPELINE-RUN-HISTORY-OVERLAY-1). Empty = none yet, or no provenance backend.
+     */
+    readonly runBatches = signal<ProvenanceBatch[]>([]);
+    /** The run the canvas overlay paints — the latest by default, or the one the author picked. */
+    readonly overlayRun = signal<ProvenanceBatch | null>(null);
+    /** `nodeId|rel` → row count for {@link overlayRun} — paints edge weights and the inspector's node total. */
+    private readonly overlayCounts = signal<Map<string, ProvenanceOverlay>>(new Map());
+    /** Bumped per run pick, so a slow `/provenance` reply for an earlier pick never paints over a later one. */
+    private overlayEpoch = 0;
     /** node-type → emitted relationships, for the edge relationship picker. */
     private readonly typeEmits = signal<Map<string, string[]>>(new Map());
     /**
@@ -590,21 +598,28 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     readonly g6Data = computed<G6GraphData | null>(() => {
         const m = this.model();
         return m
-            ? authoredToG6(m, this.typeCat(), (n) => this.statusOf(n), this.iconMap(), this.lastRunCounts())
+            ? authoredToG6(m, this.typeCat(), (n) => this.statusOf(n), this.iconMap(), this.overlayCounts())
             : null;
     });
 
-    /** The selected node's last-run output (T17), or `null` when that run recorded nothing for it. */
-    selectedNodeLastRun(): { rowCount: number; runTs: string } | null {
+    /** The selected node's output in the overlaid run (T17), or `null` when that run recorded nothing for it. */
+    selectedNodeLastRun(): NodeRunSummary | null {
         return this.nodeLastRun(this.selectedNode());
     }
 
-    /** A given node's last-run output — the drawer strip asks for ITS node, which can outlive the selection. */
-    nodeLastRun(node: AuthoredNode | null): { rowCount: number; runTs: string } | null {
-        const batch = this.lastRunBatch();
+    /** A given node's output in the overlaid run — the drawer strip asks for ITS node, which can outlive the selection. */
+    nodeLastRun(node: AuthoredNode | null): NodeRunSummary | null {
+        const batch = this.overlayRun();
         if (!node || !batch) return null;
-        const rowCount = nodeLastRunTotal(node.id, this.lastRunCounts());
-        return rowCount == null ? null : { rowCount, runTs: batch.runTs };
+        const rowCount = nodeLastRunTotal(node.id, this.overlayCounts());
+        return rowCount == null
+            ? null
+            : {
+                  rowCount,
+                  runTs: batch.runTs,
+                  simulated: batch.simulated === true,
+                  latest: batch.batchId === this.runBatches()[0]?.batchId,
+              };
     }
 
     /** A node's authoring status — the canvas outline cue and the inspector chip. */
@@ -1032,7 +1047,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.selectedId.set(null);
         this.model.set(null);
         this.dirty.set(false);
-        this.lastRunBatch.set(null);
+        this.runBatches.set([]);
+        this.overlayRun.set(null);
+        this.overlayCounts.set(new Map());
     }
 
     /**
@@ -1203,26 +1220,45 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * T17 live last-run overlay: fetch the pipeline's most recent real run from the durable provenance store
-     * (`/provenance/batches` + `/provenance`) and paint it onto the canvas edges + inspector. Degrades
-     * silently to "no overlay" both when the pipeline has no recorded run yet (empty batch list) and when no
-     * provenance backend is configured (404, `-Dprovenance.backend` unset) — this is a read-only enhancement,
-     * never worth blocking or erroring the editor over.
+     * T17 run overlay: fetch the pipeline's recent runs from the durable provenance store
+     * (`/provenance/batches`) and paint the latest onto the canvas edges + inspector; the author can then pick
+     * an earlier one ({@link pickRun}). Degrades silently to "no overlay" both when the pipeline has no
+     * recorded run yet (empty batch list) and when no provenance backend is configured (404,
+     * `-Dprovenance.backend` unset) — this is a read-only enhancement, never worth blocking or erroring the
+     * editor over. A dry run's batch is shown too, marked (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b).
      */
     private loadLastRun(id: string): void {
-        this.lastRunBatch.set(null);
-        this.lastRunCounts.set(new Map());
+        this.runBatches.set([]);
+        this.overlayRun.set(null);
+        this.overlayCounts.set(new Map());
+        this.overlayEpoch++;
         this.api.provenanceBatches(id).subscribe({
             next: (batches) => {
-                const latest = batches[0] ?? null;
-                this.lastRunBatch.set(latest);
-                if (!latest) return;
-                this.api.provenance(id, latest.batchId).subscribe({
-                    next: (rows) => this.lastRunCounts.set(provenanceCounts(rows)),
-                    error: () => this.lastRunCounts.set(new Map()),
-                });
+                this.runBatches.set(batches);
+                if (batches[0]) this.pickRun(batches[0], id);
             },
-            error: () => this.lastRunBatch.set(null),
+            error: () => this.runBatches.set([]),
+        });
+    }
+
+    /** A run picker entry: `<ts> · N row(s)`, plus ` · dry run` for a simulated batch. */
+    runLabel(b: ProvenanceBatch): string {
+        return `${b.runTs} · ${b.totalRows.toLocaleString()} row(s)${b.simulated ? ' · dry run' : ''}`;
+    }
+
+    /** Overlay one recorded run (PIPELINE-RUN-HISTORY-OVERLAY-1) — the run picker's action. */
+    pickRun(batch: ProvenanceBatch, id = this.selectedId()): void {
+        if (!id) return;
+        const epoch = ++this.overlayEpoch;
+        this.overlayRun.set(batch);
+        this.overlayCounts.set(new Map());
+        this.api.provenance(id, batch.batchId).subscribe({
+            next: (rows) => {
+                if (epoch === this.overlayEpoch) this.overlayCounts.set(provenanceCounts(rows));
+            },
+            error: () => {
+                if (epoch === this.overlayEpoch) this.overlayCounts.set(new Map());
+            },
         });
     }
 

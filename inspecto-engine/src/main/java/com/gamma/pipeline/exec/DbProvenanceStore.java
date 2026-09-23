@@ -143,9 +143,14 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         }
     }
 
-    /** The most recent runs of a pipeline (distinct {@code batchId}, newest first) — for picking a run to inspect. */
+    /**
+     * The most recent runs of a pipeline (distinct {@code batchId}, newest first) — for picking a run to inspect.
+     * {@code simulated} is {@code true} when any row of the batch came from a dry run
+     * (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b), so a run picker can mark it before its counts are fetched.
+     */
     public List<Map<String, Object>> batches(String pipelineId, int limit) {
-        String sql = "SELECT batch_id AS \"batchId\", max(run_ts) AS \"runTs\", sum(row_count) AS \"totalRows\""
+        String sql = "SELECT batch_id AS \"batchId\", max(run_ts) AS \"runTs\", sum(row_count) AS \"totalRows\", "
+                + "bool_or(coalesce(simulated, FALSE)) AS \"simulated\""
                 + " FROM " + T + " WHERE pipeline_id = ? GROUP BY batch_id ORDER BY \"runTs\" DESC LIMIT ?";
         try {
             return src.with(conn -> {

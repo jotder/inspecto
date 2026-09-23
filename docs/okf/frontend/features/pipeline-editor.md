@@ -756,9 +756,25 @@ Enrich → Publish — each with a status word and finding count, each click ope
   provenance into `tested`. The complaint was real — four nodes read *not yet tested* over three
   completed runs and 1219 rows, and a signal that is wrong for every Pipeline in production is one
   readers learn to ignore — but the remedy is a **third source, not a second opinion**: a distinct
-  *ran* badge fed by `lastRunCounts` (*“last run: 400 rows · <date>”*), with the finding reworded to
+  *ran* badge fed by `overlayCounts` (*“last run: 400 rows · <date>”*), with the finding reworded to
   *“not yet tested in this session”*. `tested` keeps meaning *the editor ran this test*. Tracked as
   `WB-11`; row `PIPELINE-NODE-TEST-STATE-STALE-1`.
+- **The run overlay is a PICKED run, not only the last one** (`PIPELINE-RUN-HISTORY-OVERLAY-1`,
+  2026-09-23). The toolbar's *last run* fact is a `mat-menu` trigger over `GET /provenance/batches`
+  (the server's default 20, newest first — no new storage): picking an entry re-reads `GET /provenance`
+  for that batch and re-paints the edge counts, the inspector strip and the drawer's identity strip
+  (`pickRun`, epoch-guarded so a slow reply for an earlier pick never paints over a later one). The
+  strip then reads *“Selected run: …”* instead of *“Last run: …”*, and the trigger drops *last*, so
+  an older overlay is never read as current. Selecting another Pipeline resets to its latest run.
+  ⚠ It is **pick, not side-by-side**: comparing two runs is switching between them; a per-edge delta
+  view is not built.
+- **A dry run is marked wherever the overlay shows it** (`DRYRUN-INVISIBLE-ON-FLAT-LANE-1` half b).
+  `GET /provenance/batches` carries a per-batch `simulated` (`bool_or` over the batch's rows), so the
+  picker labels a dry-run entry *“· dry run”* before its counts are fetched; the inspector strip adds
+  *“dry run — nothing landed”*; the canvas edge keeps its *“(simulated)”* label and is now **dashed**,
+  as in the Catalog Sankey. ⚠ Only the job/graph lane records a dry run's provenance — a flat-lane
+  `?dryRun=true` run still writes no row, so there is nothing to mark (half a, an open decision in
+  [pipeline execution](../../capabilities/pipeline-execution/pipeline-execution.md)).
 - ⛔ **The go-live readiness gate is guided-only**: `validatePipeline` does not require a parse
   Step; a hand-built collect→sink graph is legitimate. ⚠ Every stage resolves through the served
   catalog — unresolved catalog reads as five empty stages.
@@ -797,10 +813,11 @@ each fix live). Genuinely open:
   ([editable-round-trip §21](../../backend/pipeline-graph/editable-round-trip.md)); the residuals
   R1/R4/R5/R6 shipped the same shift. Small follow-up in BACKLOG: migrate Duplicate + the
   row export onto the bundle routes (both still ride the client stream-bundle).
-- **Carried from the archived workbench MoSCoW (2026-09-23), demand-gated P3s:** the canvas overlays
-  the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`); and a Pipeline has no persisted config
-  history (undo/redo above is 50 per tab, lost on reload — the open half of `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`). The
-  responsive floor and remembered Step positions shipped 2026-09-23 (see *Shell* above).
+- **Carried from the archived workbench MoSCoW (2026-09-23), demand-gated P3s:** ~~the canvas overlays
+  the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`)~~ **SHIPPED 2026-09-23** as the run picker
+  above; and a Pipeline has no persisted config history (undo/redo above is 50 per tab, lost on reload —
+  the open half of `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`). The responsive floor and remembered Step
+  positions shipped 2026-09-23 (see *Shell* above).
 
 ## Verification culture (why this file reads the way it does)
 

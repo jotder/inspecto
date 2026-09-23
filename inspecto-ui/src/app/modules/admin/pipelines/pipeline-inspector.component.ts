@@ -22,6 +22,8 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
 import {
     categoryColor,
     categoryLabel,
+    NodeRunSummary,
+    nodeRunLine,
     NodeStatus,
     nodeConfigEntries,
     statusIcon,
@@ -74,7 +76,7 @@ import {
             }
             @if (lastRun) {
                 <p class="mb-2 text-xs opacity-70">
-                    Last run: {{ lastRun.rowCount.toLocaleString() }} row(s) · {{ lastRun.runTs }}
+                    {{ runLine(lastRun) }}
                 </p>
             }
 
@@ -265,8 +267,9 @@ export class PipelineInspectorComponent implements OnChanges {
     @Input() status: NodeStatus | null = null;
     /** The node's palette category — drives the label chip's text + colour. */
     @Input() category = '';
-    /** The node's real most-recent run (T17 live overlay), or `null` when that run recorded nothing for it. */
-    @Input() lastRun: { rowCount: number; runTs: string } | null = null;
+    /** The node's output in the overlaid run (T17) — the latest unless the author picked another — or `null`. */
+    @Input() lastRun: NodeRunSummary | null = null;
+    readonly runLine = nodeRunLine;
     @Input() selectedEdgeId: string | null = null;
     @Input() selectedEdgeRel: string | null = null;
     @Input() candidateRels: string[] = [];

@@ -306,6 +306,9 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
                 style: {
                     stroke: edge,
                     endArrow: true,
+                    // An overlaid dry run's edges are dashed, as in the Sankey view — its counts landed
+                    // nothing (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b); the label also says "(simulated)".
+                    lineDash: (d) => ((d.data as { simulated?: boolean }).simulated ? [4, 3] : []),
                     labelText: (d) => (d.data as { kind: string }).kind,
                     labelFill: fg,
                     labelFontSize: 9,
