@@ -58,4 +58,33 @@ class SchemaExtractorFieldListTest {
         List<Map<String, Object>> raw = (List<Map<String, Object>>) ((Map<String, Object>) cfg.get("raw")).get("fields");
         assertEquals(3, raw.size());
     }
+
+    /**
+     * {@code DATA-PATH-RESIDUALS-1} (e): the generated pipeline's {@code dirs.*} are Space-relative DATA paths
+     * ({@code data/inbox/<x>}, {@code data/<x>/<kind>}) — the spelling every shipped config uses since
+     * {@code DATA-DIRS-RESOLVE-AGAINST-CWD-1} — never the old CWD-rooted {@code inbox/<x>}.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void createSchemaWritesSpaceRelativeDataDirs(@TempDir Path dir) throws Exception {
+        Path sample = dir.resolve("acct.csv");
+        Files.writeString(sample, "A,B\n1,2\n", StandardCharsets.UTF_8);
+        Path gen = dir.resolve("gen_config.toon");
+        Files.writeString(gen, "csv_settings:\n  delimiter: \",\"\n", StandardCharsets.UTF_8);
+
+        SchemaExtractor.run("acct", sample.toString(), gen.toString());
+
+        Map<String, Object> cfg = (Map<String, Object>) JToon.decode(
+                Files.readString(dir.resolve("acct_pipeline.toon"), StandardCharsets.UTF_8));
+        assertEquals(Map.of(
+                "poll", "data/inbox/acct",
+                "database", "data/acct/database",
+                "backup", "data/acct/backup",
+                "temp", "data/acct/temp",
+                "errors", "data/acct/errors",
+                "quarantine", "data/acct/quarantine",
+                "markers", "data/acct/markers",
+                "status_dir", "data/acct/status",
+                "log_dir", "data/acct/logs"), cfg.get("dirs"));
+    }
 }

@@ -71,6 +71,40 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * {@code DATA-PATH-RESIDUALS-1} (d): a Space job's relative {@code data_dir} is a DATA path, so it resolves
+     * under the Space DIRECTORY ({@code spaces/<id>/}) — the base the jail judges it from AND the directory the
+     * run reads and writes. It used to be judged from the Space config root while DuckDB read it from the CWD.
+     */
+    @Test
+    void aSpaceJobsRelativeDataDirResolvesUnderTheSpaceDirectory() throws Exception {
+        Path space = tmp.resolve("spaces/ucc").toAbsolutePath().normalize();
+        String spaceData = space.resolve("data").toString();
+        seedParquet(space.resolve("warehouse").toString(), "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("wh_rollup", new PipelineGraph("wh_rollup", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
+        com.gamma.pipeline.SpaceConfigRoot.register("ucc", space.resolve("config"));
+        org.slf4j.MDC.put(EventLog.SPACE_MDC_KEY, "ucc");
+        try {
+            JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "wh_rollup", "data_dir", "warehouse"));
+            JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, spaceData,
+                    tmp.resolve("audit").toString()).run();
+
+            assertTrue(res.success(), res.message());
+            assertEquals(List.of(1, 3), readIds(space.resolve("warehouse").toString(), "rollup"),
+                    "read from and written under the Space dir");
+            assertFalse(Files.exists(Path.of("warehouse")), "nothing lands under the working directory");
+        } finally {
+            org.slf4j.MDC.remove(EventLog.SPACE_MDC_KEY);
+            com.gamma.pipeline.SpaceConfigRoot.clear();
+        }
+    }
+
+    /**
      * PIPELINE-DRYRUN-1 — a manual-trigger dry run ({@code ctx.dryRun() == true}) runs the real
      * {@code transform → sink} walk (so a broken graph still fails loudly) but writes NO bytes to the
      * sink store, publishes no {@link com.gamma.etl.ConsignmentEvent} (so no downstream {@code on_pipeline}

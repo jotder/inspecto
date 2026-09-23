@@ -81,6 +81,34 @@ class DataPathResolutionTest {
         }
     }
 
+    /**
+     * {@code DATA-PATH-RESIDUALS-1} (a): the pre-2026-09-23 server-root spelling, loaded where that CWD path does
+     * NOT exist (so the ambiguity refusal cannot fire), used to resolve silently to a doubled
+     * {@code spaces/demo/spaces/demo/data/…}. It is refused by name instead — by the loader's resolver and the gate.
+     */
+    @Test
+    void aValueThatRepeatsTheSpacesOwnPathIsRefusedNotDoubled(@TempDir Path tmp) {
+        Path space = tmp.resolve("spaces/demo").toAbsolutePath().normalize();
+        Path configDir = space.resolve("config/orders");
+        String old = "spaces/demo/data/orders/database";
+        assertFalse(Files.exists(Path.of(old).toAbsolutePath()), "probe precondition: the old CWD path is absent");
+
+        PathJail.Escape e = assertThrows(PathJail.Escape.class,
+                () -> PathJail.resolveDataPath(configDir, old, "dirs.database"));
+        assertTrue(e.getMessage().contains("repeats its own Space's path ('spaces/demo')"), e.getMessage());
+        assertThrows(PathJail.Escape.class, () -> PathJail.dataPath(configDir, old, "dirs.database"),
+                "the reader form refuses too");
+
+        List<com.gamma.config.spec.Finding> findings = ConfigSafetyValidator.check("pipeline",
+                Map.of("dirs", Map.of("database", old)), SafetyPolicy.withRoots(space), configDir);
+        assertFalse(findings.isEmpty(), "the 422 gate refuses what the loader refuses");
+
+        // ONE repeated segment is not the old spelling — a Space named `data` keeps its `data/…` paths.
+        Path dataSpace = tmp.resolve("spaces/data").toAbsolutePath().normalize();
+        assertEquals(dataSpace.resolve("data/orders"),
+                PathJail.resolveDataPath(dataSpace.resolve("config"), "data/orders", "dirs.poll"));
+    }
+
     /** The 422 gate resolves a data path exactly as the loader does — under the Space dir, then jails it. */
     @Test
     void theWriteGateJudgesADataPathFromTheSpaceDir(@TempDir Path tmp) {

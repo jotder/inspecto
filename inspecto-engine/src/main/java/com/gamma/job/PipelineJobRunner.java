@@ -282,12 +282,18 @@ public final class PipelineJobRunner implements Job {
         // route already refuses one with UNKNOWN_USE_REF).
         if (registry != null) g = registry.get().effectiveGraph(g);
         String dir = cfg.opt("data_dir", dataDir);
-        // Containment CHECK only: the authored string itself travels on unchanged, because it is baked into the
-        // durable view definitions (`registerViews` → `SqlViews.storeReadRoot`) and swapping in the absolute form
-        // would rewrite persisted SQL for every existing relative `data_dir`. The constructor default is the
-        // Space's own data root (JobService), not an authored path, and is not jailed.
-        if (cfg.opt("data_dir", null) != null)
-            PathJail.requireJobPathUnderAny(jailRoots, SpaceConfigRoot.jobPathBase("data_dir"), dir, "job.data_dir");
+        // The authored string travels on unchanged WHERE IT ALREADY MEANS the resolved path (the single-tenant
+        // launch dir = the CWD), because it is baked into the durable view definitions (`registerViews` →
+        // `SqlViews.storeReadRoot`) and swapping in the absolute form would rewrite persisted SQL for every
+        // existing relative `data_dir`. In a Space the base is the Space dir (`DATA-PATH-RESIDUALS-1` (d)), so a
+        // relative value does NOT mean its CWD reading — the run then uses the resolved path, or it would read
+        // and write under the working directory while the jail judged the Space dir. The constructor default is
+        // the Space's own data root (JobService), not an authored path, and is not jailed.
+        if (cfg.opt("data_dir", null) != null) {
+            Path resolved = PathJail.requireJobPathUnderAny(jailRoots, SpaceConfigRoot.jobPathBase("data_dir"), dir,
+                    "job.data_dir");
+            if (!resolved.equals(Path.of(dir.trim()).toAbsolutePath().normalize())) dir = resolved.toString();
+        }
         requireTopLevelSinks(g, dir);
         String batchId = cfg.opt("batch_id", cfg.name().toLowerCase().replace(' ', '_')
                 + "-" + System.currentTimeMillis());

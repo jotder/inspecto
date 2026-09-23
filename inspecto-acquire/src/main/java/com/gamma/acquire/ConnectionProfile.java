@@ -38,7 +38,8 @@ import static com.gamma.util.Values.trimToNull;
 @com.gamma.api.PublicApi(since = "4.0.0")
 public record ConnectionProfile(String id, String connector, String host, int port, String database,
                                 String basePath, String username, String password,
-                                Map<String, String> options, Tunnel tunnel, Proxy proxy) {
+                                Map<String, String> options, Tunnel tunnel, Proxy proxy,
+                                String authoredBasePath) {
 
     /** "Unset" port sentinel. */
     public static final int NO_PORT = 0;
@@ -64,6 +65,13 @@ public record ConnectionProfile(String id, String connector, String host, int po
         public String endpoint() { return host + ":" + port; }
     }
 
+    /** A profile whose {@link #basePath} is exactly as authored — every constructor caller but {@link #resolvedBeside}. */
+    public ConnectionProfile(String id, String connector, String host, int port, String database,
+                             String basePath, String username, String password,
+                             Map<String, String> options, Tunnel tunnel, Proxy proxy) {
+        this(id, connector, host, port, database, basePath, username, password, options, tunnel, proxy, null);
+    }
+
     /** Pre-proxy shape, kept for {@code @PublicApi} source/binary compatibility; proxy = none. */
     public ConnectionProfile(String id, String connector, String host, int port, String database,
                              String basePath, String username, String password,
@@ -78,6 +86,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         id = id.trim();
         connector = connector.trim().toLowerCase();
         options = options == null ? Map.of() : Map.copyOf(options);
+        if (authoredBasePath == null) authoredBasePath = basePath;
     }
 
     /** Whether this profile reaches a remote system over the network (vs. the in-process {@code local} source). */
@@ -108,6 +117,11 @@ public record ConnectionProfile(String id, String connector, String host, int po
      * own {@code data/samples/orders} wherever the server was launched. A remote connector's
      * {@code base_path} is a path on the REMOTE system and is returned untouched.
      *
+     * <p>⚠ The resolution is INTERNAL: {@link #basePath} (what a connector reads) is the resolved path, while
+     * {@link #authoredBasePath} keeps the value as written, and that is what every view shows ({@link #toMap()},
+     * {@link #toBundleMap()}) and what a re-save persists — so the SPA's GET → edit → PUT round trip stores
+     * {@code data/…} again, not this host's absolute path ({@code DATA-PATH-RESIDUALS-1} (c)).
+     *
      * @param configDir the directory of the {@code *_connection.toon} that authored this profile
      */
     public ConnectionProfile resolvedBeside(Path configDir) {
@@ -115,7 +129,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         String resolved = PathJail.dataPath(configDir, basePath, "connection.base_path");
         if (resolved.equals(basePath)) return this;
         return new ConnectionProfile(id, connector, host, port, database, resolved, username, password,
-                options, tunnel, proxy);
+                options, tunnel, proxy, authoredBasePath);
     }
 
     /** Parse + validate from a decoded {@code connection { … }} map. */
@@ -162,7 +176,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         if (host != null) m.put("host", host);
         if (port > 0) m.put("port", port);
         if (database != null) m.put("database", database);
-        if (basePath != null) m.put("basePath", basePath);     // camelCase — the SPA's contract, see class javadoc
+        if (authoredBasePath != null) m.put("basePath", authoredBasePath);     // camelCase — the SPA's contract, see class javadoc
         if (username != null) m.put("username", username);
         if (password != null) m.put("password", mask(password));
         if (!options.isEmpty()) {
@@ -209,7 +223,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         if (host != null) m.put("host", host);
         if (port > 0) m.put("port", port);
         if (database != null) m.put("database", database);
-        if (basePath != null) m.put("base_path", basePath);   // on-disk spelling — a bundle is a file, not the API
+        if (authoredBasePath != null) m.put("base_path", authoredBasePath);   // on-disk spelling — a bundle is a file, not the API
         if (username != null) m.put("username", username);
         if (refOnly(password) != null) m.put("password", password);
         if (!options.isEmpty()) {

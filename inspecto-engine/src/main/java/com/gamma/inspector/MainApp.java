@@ -242,7 +242,7 @@ public class MainApp {
      * same directories the engine writes.
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> loadToon(String[] subArgs, String command)
+    static Map<String, Object> loadToon(String[] subArgs, String command)
             throws IOException {
         if (subArgs.length < 1) {
             System.err.println("Usage: " + command + " <pipeline.toon>");

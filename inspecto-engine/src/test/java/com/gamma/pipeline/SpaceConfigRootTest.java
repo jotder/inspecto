@@ -194,6 +194,24 @@ class SpaceConfigRootTest {
         assertEquals(ucc, SpaceConfigRoot.jobPathBase("dir"));
     }
 
+    /**
+     * {@code DATA-PATH-RESIDUALS-1} (d): {@code data_dir} is a DATA path, so in a Space laid out as
+     * {@code spaces/<id>/config} it resolves under the Space DIRECTORY — the base {@code PathJail.resolveDataPath}
+     * gives every other data path — while {@code pipeline_config} (a config ref) stays on the config root. The
+     * single-tenant read root (no {@code config/} ancestor) is unchanged.
+     */
+    @Test
+    void aSpacesDataDirBaseIsTheSpaceDirectoryAndSingleTenantIsUnchanged(@TempDir Path tmp, @TempDir Path launch) {
+        SpaceConfigRoot.registerConfigReadRoot(EventLog.DEFAULT_SPACE_ID, launch);
+        assertEquals(launch, SpaceConfigRoot.jobPathBase("data_dir"), "single-tenant: the launch dir, as before");
+
+        Path space = tmp.resolve("spaces/ucc");
+        SpaceConfigRoot.register("ucc", space.resolve("config"));
+        MDC.put(EventLog.SPACE_MDC_KEY, "ucc");
+        assertEquals(space.toAbsolutePath().normalize(), SpaceConfigRoot.jobPathBase("data_dir"));
+        assertEquals(space.resolve("config"), SpaceConfigRoot.jobPathBase("pipeline_config"));
+    }
+
     @Test
     void aSelfContainedSpacesReadRootIsItsConfigRoot(@TempDir Path ucc, @TempDir Path launch) {
         SpaceConfigRoot.register("ucc", ucc);

@@ -206,17 +206,19 @@ public class SchemaExtractor {
             pipelineConfig.put("version", 1);
 
             // Full dirs block — all managed directories included so the pipeline
-            // is ready to use with CollectorProcessor without manual editing.
+            // is ready to use with CollectorProcessor without manual editing. Space-relative DATA paths
+            // (`data/inbox/<x>`, `data/<x>/<kind>`), the shipped configs' spelling: they resolve under the
+            // Space directory, never the working directory (DATA-DIRS-RESOLVE-AGAINST-CWD-1).
             Map<String, String> dirs = new LinkedHashMap<>();
-            dirs.put("poll",       "inbox/"      + sourceName);
-            dirs.put("database",   "database/"   + sourceName);
-            dirs.put("backup",     "backup/"     + sourceName);
-            dirs.put("temp",       "temp/"       + sourceName);
-            dirs.put("errors",     "errors/"     + sourceName);
-            dirs.put("quarantine", "quarantine/" + sourceName);
-            dirs.put("markers",    "markers/"    + sourceName);
-            dirs.put("status_dir", "status/"     + sourceName);
-            dirs.put("log_dir",    "logs/"       + sourceName);
+            dirs.put("poll",       "data/inbox/" + sourceName);
+            dirs.put("database",   "data/" + sourceName + "/database");
+            dirs.put("backup",     "data/" + sourceName + "/backup");
+            dirs.put("temp",       "data/" + sourceName + "/temp");
+            dirs.put("errors",     "data/" + sourceName + "/errors");
+            dirs.put("quarantine", "data/" + sourceName + "/quarantine");
+            dirs.put("markers",    "data/" + sourceName + "/markers");
+            dirs.put("status_dir", "data/" + sourceName + "/status");
+            dirs.put("log_dir",    "data/" + sourceName + "/logs");
             pipelineConfig.put("dirs", dirs);
 
             Map<String, String> output = new LinkedHashMap<>();

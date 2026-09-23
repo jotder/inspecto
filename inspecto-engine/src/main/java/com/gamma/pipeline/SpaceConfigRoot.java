@@ -176,11 +176,20 @@ public final class SpaceConfigRoot {
      * layout those differ, and a job that RUNS ({@code pipeline_config: orders_pipeline.toon}) was refused at
      * save. In a self-contained Space the two roots are the same directory, so nothing changes there.
      *
+     * <p>{@code data_dir} is a DATA path, so where the read root sits in a Space ({@code spaces/<id>/config}) its
+     * base is the Space DIRECTORY — {@code PathJail.spaceDirOf}, the base {@code PathJail.resolveDataPath} gives
+     * every other data path ({@code DATA-PATH-RESIDUALS-1} (d), 2026-09-23). A read root with no {@code config/}
+     * ancestor (the single-tenant launch dir) stays the base, unchanged.
+     *
      * @param key       the bare job key, e.g. {@code pipeline_config}
      * @param spaceRoot the caller's Space config root, used for every key the pipeline runner does not read
      */
     public static Path jobPathBase(String key, Path spaceRoot) {
-        return CONFIG_READ_ROOT_JOB_KEYS.contains(key) ? currentConfigReadRoot() : spaceRoot;
+        if (!CONFIG_READ_ROOT_JOB_KEYS.contains(key)) return spaceRoot;
+        Path read = currentConfigReadRoot();
+        if (!"data_dir".equals(key)) return read;
+        Path spaceDir = com.gamma.config.safety.PathJail.spaceDirOf(read);
+        return spaceDir != null ? spaceDir : read;
     }
 
     /** {@link #jobPathBase(String, Path)} with {@link #current()} as the Space config root. */

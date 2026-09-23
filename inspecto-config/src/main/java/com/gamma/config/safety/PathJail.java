@@ -213,12 +213,42 @@ public final class PathJail {
      * deployment, by the same rule {@code SpaceConfigRoot.jobPathBase} gives a job's {@code data_dir} there:
      * the launch directory ({@code serve-example.sh} / {@code run-example.sh} {@code cd} into the example).
      *
+     * <p>⛔ <b>A value that still spells the Space's own path is REFUSED</b> ({@code DATA-PATH-RESIDUALS-1} (a)):
+     * {@code spaces/demo/data/orders} in a config under {@code spaces/demo/} — the pre-2026-09-23 server-root
+     * spelling — would otherwise resolve to {@code spaces/demo/spaces/demo/data/orders} wherever that old CWD
+     * path does not exist (the ambiguity refusal above only fires where it does). The test is that the value's
+     * leading segments repeat the Space dir's trailing ones, <b>two or more</b> of them (the spaces root and the
+     * Space id): one segment alone would refuse {@code data/…} in a Space that happens to be named {@code data}.
+     *
      * @param configDir the directory of the config file that authored {@code value}; the Space dir is derived
      *                  from it by {@link #spaceDirOf}
      */
     public static Path resolveDataPath(Path configDir, String value, String field) {
-        return resolveAgainst(spaceDirOf(configDir), value, field,
-                "a relative data path resolves under its Space directory");
+        Path spaceDir = spaceDirOf(configDir);
+        refuseRepeatedSpacePath(spaceDir, value, field);
+        return resolveAgainst(spaceDir, value, field, "a relative data path resolves under its Space directory");
+    }
+
+    /** See {@link #resolveDataPath}: refuse a relative value whose leading 2+ segments are the Space dir's last ones. */
+    private static void refuseRepeatedSpacePath(Path spaceDir, String value, String field) {
+        if (spaceDir == null || value == null || value.isBlank()) return;
+        Path authored;
+        try {
+            authored = Paths.get(value.trim()).normalize();
+        } catch (RuntimeException ex) {
+            return;   // resolveAgainst reports an unparseable value
+        }
+        if (authored.isAbsolute()) return;
+        Path space = spaceDir.toAbsolutePath().normalize();
+        int n = space.getNameCount();
+        for (int k = Math.min(n, authored.getNameCount()); k >= 2; k--) {
+            if (space.subpath(n - k, n).equals(authored.subpath(0, k)))
+                throw new Escape(field, value.trim(), "repeats its own Space's path ('"
+                        + authored.subpath(0, k).toString().replace('\\', '/')
+                        + "') — a relative data path resolves under the Space directory " + space
+                        + ", so this would mean " + space.resolve(authored).normalize()
+                        + ". Drop that leading part, or make it absolute");
+        }
     }
 
     /**

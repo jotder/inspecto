@@ -160,10 +160,11 @@ carried as an absolute string, so the ~100 typed readers of `dirs()` / `sinks()`
 |---|---|
 | `dirs.*` (all of them, `status_file` included), `processing.duckdb.temp_directory`, `output.ducklake.data_path`, `sinks[].database`, `sinks[].ducklake.data_path`, `route.branches[].database` (it pairs with a sink BY VALUE, so it must resolve identically), a join's path `reference` (`processing.join`, a `steps[]` / branch `join` step; a by-name `reference/<id>` is an id and untouched) | `PipelineConfigParser` (load) |
 | enrichment `input.database`, `output.database`, `references.<n>.path` | `EnrichmentConfig.load` (`fromMap(raw, sql, configDir)`) |
-| a **`local`** connection's `base_path` (a remote connector's is a path on the remote system — untouched) | `ConnectionProfile.load` / `resolvedBeside` (and `ConnectionRoutes.persistConnection` registers it resolved) |
+| a **`local`** connection's `base_path` (a remote connector's is a path on the remote system — untouched) | `ConnectionProfile.load` / `resolvedBeside` (and `ConnectionRoutes.persistConnection` registers it resolved). ⚠ Resolution is INTERNAL: `basePath()` (what a connector reads) is resolved, `authoredBasePath()` keeps the value as written, and `toMap()` (`GET /connections`), `toBundleMap()` and the persisted `*_connection.toon` all carry the AUTHORED value — so a UI GET → PUT round trip stores `data/…` again (`DATA-PATH-RESIDUALS-1` (c), 2026-09-23) |
 | the same keys at the 422 gate | `ConfigSafetyValidator.check(…, configDir)` — every caller that knows the config's location passes it |
 | a pipeline's owned dirs at deletion | `PipelineDataDirs` (conflicts, removal, the sharing scan) |
-| the `ura` CLI's `dirs.*` (`search` / `copy` / `copy-tars` / `extract` / `backup` / `prepare-inbox`) | `MainApp.loadToon` |
+| the `ura` CLI's `dirs.*` (`search` / `copy` / `copy-tars` / `extract` / `backup` / `prepare-inbox`) | `MainApp.loadToon`. `TarInboxPreparer` has no `main` and no path-taking constructor any more (both read `dirs.*` from the CWD) — `ura prepare-inbox` is its only entry (`DATA-PATH-RESIDUALS-1` (b)) |
+| a job's `data_dir` | `SpaceConfigRoot.jobPathBase("data_dir")` — the Space DIR (`PathJail.spaceDirOf` of the config read root) in a Space, the read root unchanged when it has no `config/` ancestor (single-tenant); `PipelineJobRunner` then RUNS on the resolved path whenever it differs from the value's CWD reading (`DATA-PATH-RESIDUALS-1` (d)) |
 | a store-authored graph's join path `reference` | `PipelineJobRunner.references()`, against `SpaceConfigRoot.current()` |
 
 **No Space → the working-directory reading, by design.** `spaceDirOf` is `null` for a single-tenant example
@@ -171,14 +172,20 @@ carried as an absolute string, so the ~100 typed readers of `dirs()` / `sinks()`
 (`PipelineConfig.fromMap`). The value is then left as authored — relative, i.e. the launch directory. That
 IS the single-tenant Space-dir equivalent, and the same answer `SpaceConfigRoot.jobPathBase` gives a job's
 `data_dir` there (the config READ root = `LegacySpaceRoot.base()` = the launch dir; `serve-example.sh` /
-`run-example.sh` `cd` into the example, so `out/inbox` is the example's own). ⚠ In a multi-Space server a
-job's `data_dir` still resolves against the Space **config** root (`jobPathBase`), not the Space dir — a
-different base for a different key family; no shipped Space job sets it.
+`run-example.sh` `cd` into the example, so `out/inbox` is the example's own). In a multi-Space server a
+job's `data_dir` resolves under the Space dir too (since 2026-09-23, `DATA-PATH-RESIDUALS-1` (d)); until then
+it was JAILED against the Space config root while the run read it against the CWD — three meanings for one
+value. The single-tenant string still travels unchanged (it is baked into view SQL), because there its CWD
+reading IS the resolved path.
 
 ⛔ **The ambiguous value is REFUSED, not relocated** — the shared rule: nothing under the Space dir while the
-old working-directory spelling exists throws naming both paths. ⚠ And, as for config refs, **only then**: a
-config still spelled `spaces/demo/data/…` loaded where that CWD path does not exist silently resolves to
-`spaces/demo/spaces/demo/data/…`. Every shipped config was respelled (302 values in 34 files, the
+old working-directory spelling exists throws naming both paths. ⛔ **And a value that repeats its own Space's
+path is refused too** (`DATA-PATH-RESIDUALS-1` (a), 2026-09-23): `spaces/demo/data/…` in a config under
+`spaces/demo/`, loaded where that CWD path does NOT exist, used to resolve silently to
+`spaces/demo/spaces/demo/data/…`. `resolveDataPath` now throws `repeats its own Space's path ('spaces/demo')`
+(a 422 finding at the gate) when the value's leading segments equal the Space dir's trailing ones — **two or
+more** of them, so a Space named `data` keeps its `data/…` paths. Data paths only; config refs and job paths
+keep the old limit. Every shipped config was respelled (302 values in 34 files, the
 `_templates` `spaces/${SPACE}/data/…` ones included); the SPA's scaffolds (`pipeline-scaffold.ts`, the
 stream import) write `data/…` too.
 
@@ -197,10 +204,11 @@ reads against the process CWD; an enrichment's `transform_file` is a config ref 
 Pinned by `ShippedPipelinesWriteUnderTheirSpaceDirectoryTest` (inspecto-engine: a relocated verbatim copy of
 `spaces/demo` RUNS the orders Pipeline and its output + status land under the copy; every shipped
 Pipeline / Enrichment / local Connection's data paths resolve under their Space; nothing appears under the
-CWD) and `DataPathResolutionTest` (inspecto-config: the resolver, `spaceDirOf`, the refusal, the gate).
-The open residuals (the silent doubled path, `TarInboxPreparer.main`, the absolute `base_path` a UI re-save
-stores, the multi-Space job `data_dir`, `SchemaExtractor`'s `inbox/<x>`) are `DATA-PATH-RESIDUALS-1` in
-`docs/BACKLOG.md`.
+CWD) and `DataPathResolutionTest` (inspecto-config: the resolver, `spaceDirOf`, the refusal, the gate, the
+repeated-Space-path refusal). The five residuals shipped 2026-09-23 (`DATA-PATH-RESIDUALS-1`), each pinned:
+(a) `DataPathResolutionTest`, (b) `MainAppPrepareInboxDirsTest`, (c) `ControlApiConnectionsTest` (the GET →
+PUT round trip), (d) `SpaceConfigRootTest` + `PipelineJobRunnerTest` (a Space job's `data_dir` runs under the
+Space dir), (e) `SchemaExtractorFieldListTest` — `create-schema` emits `data/inbox/<x>` and `data/<x>/<kind>`.
 
 ## The allowed roots are a union: declared ∪ discovered (tier 3, shipped 2026-08-14)
 

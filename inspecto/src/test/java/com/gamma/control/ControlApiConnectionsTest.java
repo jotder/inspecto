@@ -126,6 +126,41 @@ class ControlApiConnectionsTest {
         }
     }
 
+    /**
+     * {@code DATA-PATH-RESIDUALS-1} (c): a local connection's {@code base_path} is resolved under the Space dir
+     * INTERNALLY (the registered profile the connector reads), but the API shows the AUTHORED value — so the
+     * SPA's GET → edit → PUT round trip stores {@code data/…} again, not the absolute path of this host.
+     */
+    @Test
+    void aLocalBasePathRoundTripsAsAuthoredWhileTheRegisteredProfileIsResolved(@TempDir Path dir, @TempDir Path tmp)
+            throws Exception {
+        Path space = tmp.resolve("spaces/demo").toAbsolutePath().normalize();
+        Path root = space.resolve("config");
+        java.nio.file.Files.createDirectories(root);
+        System.setProperty("assist.write.root", root.toString());
+        try (Ctx c = open(dir)) {
+            assertEquals(200, send(c.port, "POST", "/connections",
+                    "{\"id\":\"orders_drop\",\"connector\":\"local\",\"basePath\":\"data/samples/orders\"}")
+                    .statusCode());
+
+            JsonNode got = json(send(c.port, "GET", "/connections/orders_drop", null));
+            assertEquals("data/samples/orders", got.get("basePath").asText(), "GET shows the authored value");
+            assertEquals("data/samples/orders",
+                    json(send(c.port, "GET", "/connections", null)).get(0).get("basePath").asText());
+            assertEquals(space.resolve("data/samples/orders").toString(),
+                    c.svc.connection("orders_drop").orElseThrow().basePath(),
+                    "the connector reads the path resolved under the Space dir");
+
+            assertEquals(200, send(c.port, "PUT", "/connections/orders_drop", got.toString()).statusCode());
+            String onDisk = java.nio.file.Files.readString(root.resolve("orders_drop_connection.toon"));
+            assertTrue(onDisk.contains("base_path: data/samples/orders"), "a UI re-save keeps it relative:\n" + onDisk);
+            assertEquals(space.resolve("data/samples/orders").toString(),
+                    c.svc.connection("orders_drop").orElseThrow().basePath());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

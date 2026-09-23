@@ -302,7 +302,7 @@ final class ConnectionRoutes implements RouteModule {
         if (p.host() != null) m.put("host", p.host());
         if (p.port() > 0) m.put("port", p.port());
         if (p.database() != null) m.put("database", p.database());
-        if (p.basePath() != null) m.put("base_path", p.basePath());
+        if (p.authoredBasePath() != null) m.put("base_path", p.authoredBasePath());
         if (p.username() != null) m.put("username", p.username());
         if (p.password() != null) m.put("password", p.password());
         if (!p.options().isEmpty()) m.put("options", new LinkedHashMap<>(p.options()));

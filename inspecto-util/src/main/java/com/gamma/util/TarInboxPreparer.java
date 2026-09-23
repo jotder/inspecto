@@ -26,13 +26,13 @@ import org.slf4j.LoggerFactory;
  * <p>After running, the source directory contains the usual date-partitioned layout
  * that the ETL pipeline's {@code pollInbox()} expects.
  *
- * <p>Configuration is read from a pipeline {@code .toon} file.  The following
- * {@code dirs} keys are used:
+ * <p>Configuration is a pipeline {@code .toon} file, loaded by {@code ura prepare-inbox <pipeline.toon>}
+ * (which resolves {@code dirs.*} under the config's Space directory). The following {@code dirs} keys are used:
  * <pre>
  *   dirs:
- *     poll:   inbox/adjustment   # scanned for .tar.gz and target for arranged CSVs
- *     temp:   temp/adjustment    # scratch space; cleaned up after each archive
- *     backup: backup/adjustment  # original .tar.gz files are moved here
+ *     poll:   data/inbox/adjustment    # scanned for .tar.gz and target for arranged CSVs
+ *     temp:   data/adjustment/temp     # scratch space; cleaned up after each archive
+ *     backup: data/adjustment/backup   # original .tar.gz files are moved here
  * </pre>
  *
  * <p>Supports {@code --dry-run} mode: all actions are logged but no files are moved.
@@ -63,27 +63,21 @@ public class TarInboxPreparer {
     // ── construction ──────────────────────────────────────────────────────────
 
     /**
-     * Loads configuration from {@code toonConfigPath} and resolves all directories.
+     * From an already-loaded config whose {@code dirs.*} the caller has resolved — the engine CLI
+     * ({@code ura prepare-inbox}, {@code MainApp.loadToon}) resolves them under the Space directory, which this
+     * module cannot do itself (it sits below {@code PathJail}). ⛔ There is deliberately no path-taking
+     * constructor and no {@code main} here any more ({@code DATA-PATH-RESIDUALS-1} (b), 2026-09-23): both read
+     * a relative {@code dirs.*} against the process working directory, the reading every other data path lost.
      *
-     * <p>Required {@code dirs} keys in the toon file:
+     * <p>Required {@code dirs} keys:
      * <ul>
      *   <li>{@code poll}   — scanned for {@code .tar.gz} files; CSVs are arranged here</li>
      *   <li>{@code temp}   — scratch space for extraction (created if absent)</li>
      *   <li>{@code backup} — destination for processed archives (created if absent)</li>
      * </ul>
      *
-     * @param toonConfigPath path to the pipeline {@code .toon} file
-     * @param dryRun         when {@code true}, log intended actions without modifying files
-     */
-    public TarInboxPreparer(String toonConfigPath, boolean dryRun) throws IOException {
-        this(ToonHelper.load(toonConfigPath), toonConfigPath, dryRun);
-    }
-
-    /**
-     * From an already-loaded config — the engine CLI ({@code MainApp prepare-inbox}) passes one whose
-     * {@code dirs.*} it has resolved under the Space directory, which this module cannot do itself.
-     *
      * @param toonConfigPath the config's path, for error messages only
+     * @param dryRun         when {@code true}, log intended actions without modifying files
      */
     public TarInboxPreparer(Map<String, Object> config, String toonConfigPath, boolean dryRun) throws IOException {
         Map<String, Object> dirs   = ToonHelper.requireSection(config, "dirs");
@@ -268,25 +262,5 @@ public class TarInboxPreparer {
         System.out.println("CSV files moved    : " + csvsMoved.get());
         System.out.println("CSV files skipped  : " + csvsSkipped.get());
         System.out.println("Archives backed up : " + archivesBacked.get());
-    }
-
-    // ── main ──────────────────────────────────────────────────────────────────
-
-    public static void main(String[] args) {
-        boolean dry = false;
-        List<String> rem = new ArrayList<>();
-        for (String a : args)
-            if (a.equalsIgnoreCase("--dry-run")) dry = true;
-            else rem.add(a);
-
-        if (rem.isEmpty()) {
-            System.err.println("Usage: TarInboxPreparer [--dry-run] <pipeline.toon>");
-            System.exit(1);
-        }
-        try {
-            new TarInboxPreparer(rem.get(0), dry).run();
-        } catch (Exception e) {
-            log.error("unhandled exception", e);
-        }
     }
 }
