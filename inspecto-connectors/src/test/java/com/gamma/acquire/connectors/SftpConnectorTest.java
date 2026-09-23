@@ -290,8 +290,9 @@ class SftpConnectorTest {
 
     @Test
     void endToEndParallelFetchWithMovePostAction(@TempDir Path dir) throws Exception {
-        // Three CSVs, fetched 2-at-a-time (pool of 2 sessions), then MOVEd into archive/ on the server after each
-        // is ingested. Proves parallel fetch + post-action wiring through CollectorProcessor.run.
+        // Three CSVs, fetched 2-at-a-time (pool of 2 sessions); each is MOVEd into archive/ on the server once it is
+        // fetched and landed locally (RemoteAcquisitionHandler.fetchOne applies the post-action BEFORE ingest runs).
+        // Proves parallel fetch + post-action wiring through CollectorProcessor.run, and that no row is dropped.
         for (int i = 1; i <= 3; i++)
             Files.writeString(serverRoot.resolve("2020040" + i + "_feed.csv"),
                     "ID,AMT,EVENT_DATE\nr" + i + "," + i + ".0,2020-04-0" + i + "\n");
@@ -303,10 +304,8 @@ class SftpConnectorTest {
 
             com.gamma.inspector.CollectorProcessor.run(cfg);
 
-            try (var w = Files.walk(Path.of(cfg.dirs().database()))) {
-                long outs = w.filter(p -> p.getFileName().toString().endsWith("_out.csv")).count();
-                assertTrue(outs >= 1, "the fetched SFTP files were ingested to output(s)");
-            }
+            assertEquals(List.of("r1", "r2", "r3"), OutputRows.ids(Path.of(cfg.dirs().database())),
+                    "every fetched row was ingested, none dropped");
             // Every source file was MOVEd out of the root into the dated archive after processing.
             for (int i = 1; i <= 3; i++) {
                 assertFalse(Files.exists(serverRoot.resolve("2020040" + i + "_feed.csv")),

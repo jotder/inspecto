@@ -660,7 +660,9 @@ not just today's. ⚠ The row's "duplicate rows" half was not reproduced: conten
 re-ingest — the observable defect was the repeated re-MOVE (and a re-fetch per cycle). Pinned by
 `CollectorProcessorRemoteCycleTest#anArchivedFileIsNotCollectedAgain`.
 
-⚠ **Also open (filed 2026-09-23):** `COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1` — the acquisition form offers `duplicate__on_change: skip`, which `DuplicatePolicy.OnChange.from` does not recognise, so it silently means REPROCESS (the valid values are `ignore` / `alert` / `archive_old_version`). `CONNECTOR-TESTS-HIDE-DROPPED-ROWS-1` — `DbExportConnectorTest#endToEndDbExportIsIngested` sets `skip_header_lines: 1` on top of the default header skip and so drops the first data row unnoticed; `SftpConnectorTest#endToEndParallelFetchWithMovePostAction`'s comment says files move after ingest (they move after fetch).
+⚠ **Also open (filed 2026-09-23):** `COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1` — the acquisition form offers `duplicate__on_change: skip`, which `DuplicatePolicy.OnChange.from` does not recognise, so it silently means REPROCESS (the valid values are `ignore` / `alert` / `archive_old_version`).
+
+✅ **Connector end-to-end tests assert ROW IDS, not just an output file (2026-09-23, was `CONNECTOR-TESTS-HIDE-DROPPED-ROWS-1`).** `DbExportConnectorTest#endToEndDbExportIsIngested` and `SftpConnectorTest#endToEndParallelFetchWithMovePostAction` read every `*_out.csv` (test helper `OutputRows`) and compare the sorted first column to the rows the Collector was fed. The DB-export test really was dropping `r1`: its Pipeline set `skip_header_lines: 1` on top of the default header skip — a test-config defect, not a product one; the key is gone. Mutation-proved: re-planting a header skip turns each test red with the missing IDs named.
 
 
 

@@ -197,10 +197,9 @@ class DbExportConnectorTest {
         try {
             com.gamma.etl.PipelineConfig cfg = com.gamma.etl.PipelineConfig.load(writeDbPipeline(dir).toString());
             com.gamma.inspector.CollectorProcessor.run(cfg);
-            try (var w = Files.walk(Path.of(cfg.dirs().database()))) {
-                assertTrue(w.anyMatch(f -> f.getFileName().toString().endsWith("_out.csv")),
-                        "the DB export was ingested to an output file");
-            }
+            // Every exported row must reach the output — an "output file exists" check alone hid a dropped row.
+            assertEquals(List.of("r1", "r2"), OutputRows.ids(Path.of(cfg.dirs().database())),
+                    "both exported rows were ingested, none dropped");
         } finally {
             ConnectionRegistry.remove("test-db");
         }
@@ -255,7 +254,6 @@ class DbExportConnectorTest {
                 max_bytes: 268435456
               csv_settings:
                 delimiter: ","
-                skip_header_lines: 1
                 skip_junk_lines: 0
                 skip_tail_lines: 0
                 date_formats[1]: "%%Y-%%m-%%d"
