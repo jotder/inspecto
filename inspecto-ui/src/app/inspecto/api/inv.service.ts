@@ -341,6 +341,154 @@ export interface WorkingSetRelationQuery {
     offset?: number;
 }
 
+// ── LA-12: the Dossier (`DossierRoutes`) ──────────────────────────────────────────────────────────────
+
+export interface DossierQuery {
+    /** The step the dossier covers up to; omitted = the head. */
+    at?: number;
+    /** Sealed snapshot ids anchored to this Investigation, to include their score vectors. */
+    snapshots?: string[];
+}
+
+/** The dossier manifest — what a reader keeps, and what `…/dossier/verify` checks against the store. */
+export interface DossierManifest {
+    algorithm: string;
+    investigation: string;
+    at: number;
+    snapshots: string[];
+    artefacts: { path: string; bytes: number; sha256: string }[];
+    content: Record<string, string>;
+    root: string;
+}
+
+export interface DossierLedgerRow {
+    step: number;
+    at: string;
+    author: string | null;
+    kind: 'op' | 'undo';
+    op: string;
+    text: string;
+    undoneBy: number | null;
+    entitiesAfter: number;
+    workingSetHash: string;
+    truncated?: boolean;
+    readFingerprint?: string;
+}
+
+/** `GET …/dossier` (format json) — the whole dossier, built from the sealed log only (`GraphDossierBuilder`). */
+export interface Dossier {
+    id: string;
+    generatedAt: string;
+    summary: {
+        investigation: string;
+        title: string | null;
+        owner: string | null;
+        dataset: string;
+        at: number;
+        steps: number;
+        entities: number;
+        links: number;
+        excluded: number;
+        hidden: number;
+        kept: number;
+        snapshots: string[];
+    };
+    topology: { entities: number; links: number; degreeTotal: number } & Record<string, unknown>;
+    scores: { computedBy: string; tables: { metric: string; snapshot: string; total: number }[]; note?: string };
+    ledger: DossierLedgerRow[];
+    negativeSpace: unknown;
+    integrity: { intact: boolean; stepsChecked: number; failures: unknown[] };
+    manifest: DossierManifest;
+    renderings: { json: unknown; steps: string[]; method: string };
+}
+
+/** `POST …/dossier/verify` — the manifest rebuilt from the store NOW, compared with the one submitted. */
+export interface DossierVerifyResult {
+    id: string;
+    verified: boolean;
+    /** The submitted manifest's root matches its own body — false means the manifest itself was edited. */
+    selfConsistent: boolean;
+    /** The store's own recorded hashes still agree. */
+    intact: boolean;
+    submittedRoot: string;
+    currentRoot: string;
+    changed: string[];
+    missing: string[];
+    added: string[];
+    contentChanged: string[];
+}
+
+// ── LA-23: Investigation Template, Measures, Alert Rules ──────────────────────────────────────────────
+
+export interface InvestigationTemplate {
+    id: string;
+    title: string | null;
+    owner: string | null;
+    createdAt: string;
+    derivedFrom: { investigation: string; steps: number; workingSetHash: string };
+    roles: { dataset: string; sourceCol: string; targetCol: string; linkKindCol: string | null };
+    /** Each seed step became a parameter (`seed1`, `seed2`, …) — its ids are NOT stored. */
+    parameters: { name: string; entityType: string | null; step: number }[];
+    ops: Record<string, unknown>[];
+    /** Exclude/hide/keep steps left out (D-E8) — counts only, never ids or reasons. */
+    dropped: { step: number; op: string; count: number }[];
+    /** Expands that named a frontier and became an expand of the whole Working Set. */
+    generalised: { step: number; namedFrontier: number; exact: boolean }[];
+}
+
+export interface InstantiateTemplateRequest {
+    id?: string;
+    title?: string;
+    params: Record<string, string[]>;
+    dataset?: string;
+    sourceCol?: string;
+    targetCol?: string;
+    linkKindCol?: string;
+}
+
+export interface InstantiateTemplateResult {
+    id: string;
+    header: InvestigationHeader;
+    steps: number;
+    workingSet: WorkingSetSummary;
+}
+
+export interface InvestigationMeasure {
+    name: string;
+    relation: WorkingSetRelationName;
+    measure: string;
+    value: number | null;
+}
+
+export interface InvestigationMeasures {
+    id: string;
+    head: { step: number; workingSetHash: string };
+    measures: InvestigationMeasure[];
+    byKind: { kind: string | null; links: number; events: number }[];
+    key: string;
+    cached: boolean;
+}
+
+export type AlertComparator = 'gt' | 'gte' | 'lt' | 'lte';
+export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+
+export interface InvestigationAlertRuleRequest {
+    name: string;
+    relation: WorkingSetRelationName;
+    measure: string;
+    comparator: AlertComparator;
+    threshold: number;
+    severity: AlertSeverity;
+}
+
+export interface InvestigationAlertRuleResult {
+    rule: Record<string, unknown>;
+    current: number | null;
+    wouldFire: boolean;
+    /** What a fired Alert discloses, and to whom — the backend's words, shown verbatim. */
+    disclosure: string;
+}
+
 /**
  * Investigation-studio backend (INV-1): the real DuckDB-side Entity Projection over a Dataset —
  * the server half of the Link Analysis studio's `entity-projection` GraphSource. Offline/mock mode
@@ -405,6 +553,59 @@ export class InvService {
             params: toParams({ of: q.of, at: q.at, limit: q.limit, offset: q.offset }),
         });
     }
+
+    /** LA-12: the dossier as JSON (all three renderings included). Owner-only; audited server-side. */
+    dossier(id: string, q: DossierQuery = {}): Observable<Dossier> {
+        return this.http.get<Dossier>(invPath(id, 'dossier'), { params: dossierParams(q, 'json') });
+    }
+
+    /** LA-12: one rendering as a file — a Blob through HttpClient, so the bearer travels (never a bare href). */
+    dossierRendering(id: string, format: 'steps' | 'method', q: DossierQuery = {}): Observable<Blob> {
+        return this.http.get(invPath(id, 'dossier'), { params: dossierParams(q, format), responseType: 'blob' });
+    }
+
+    /** LA-12: check a held manifest against the store as it is NOW. Persists nothing. */
+    verifyDossier(id: string, manifest: unknown): Observable<DossierVerifyResult> {
+        return this.http.post<DossierVerifyResult>(invPath(id, 'dossier/verify'), { manifest });
+    }
+
+    /** LA-23: save the effective log as a write-once template. The answer lists what was dropped/generalised. */
+    saveInvestigationTemplate(
+        id: string,
+        body: { id?: string; title?: string } = {},
+    ): Observable<InvestigationTemplate> {
+        return this.http.post<InvestigationTemplate>(invPath(id, 'template'), body);
+    }
+
+    investigationTemplate(templateId: string): Observable<InvestigationTemplate> {
+        return this.http.get<InvestigationTemplate>(templatePath(templateId, ''));
+    }
+
+    /** LA-23: a NEW Investigation from a template; every expand reads (and seals) the Dataset now. */
+    instantiateTemplate(templateId: string, req: InstantiateTemplateRequest): Observable<InstantiateTemplateResult> {
+        return this.http.post<InstantiateTemplateResult>(templatePath(templateId, '/instantiate'), req);
+    }
+
+    /** LA-23: the declared Measures over the Working Set — what an Alert Rule bound to one would compute. */
+    investigationMeasures(id: string): Observable<InvestigationMeasures> {
+        return this.http.get<InvestigationMeasures>(invPath(id, 'measures'));
+    }
+
+    /** LA-23: bind an Alert Rule to a Measure. 503 when the alert engine is absent. */
+    bindInvestigationAlertRule(
+        id: string,
+        req: InvestigationAlertRuleRequest,
+    ): Observable<InvestigationAlertRuleResult> {
+        return this.http.post<InvestigationAlertRuleResult>(invPath(id, 'alert-rules'), req);
+    }
+}
+
+function dossierParams(q: DossierQuery, format: string) {
+    return toParams({ at: q.at, snapshots: q.snapshots?.length ? q.snapshots.join(',') : undefined, format });
+}
+
+function templatePath(id: string, suffix: string): string {
+    return apiUrl(`/inv/investigation-templates/${encodeURIComponent(id)}${suffix}`);
 }
 
 function invPath(id: string, action: string): string {

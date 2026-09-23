@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationLog, WorkingSet } from 'app/inspecto/api';
 import { EntityProjection } from 'app/inspecto/graph';
+import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
@@ -82,7 +83,10 @@ function create() {
         reorderInvestigation: vi.fn(() =>
             of({ id: 'inv-fork', parent: { id: 'inv-1', order: [2, 1], parentSteps: 2 } }),
         ),
-        workingSetRelation: vi.fn(() => of({ head: { step: 2, workingSetHash: 'sha256:h2' } })),
+        workingSetRelation: vi.fn(() =>
+            of({ head: { step: 2, workingSetHash: 'sha256:h2' }, rows: [], total: 0, truncated: false, cached: false }),
+        ),
+        investigationMeasures: vi.fn(() => of({ head: { step: 2, workingSetHash: 'sha256:h2' }, measures: [] })),
     };
     const widgets = { save: vi.fn((w: Widget) => of(w)) };
     TestBed.configureTestingModule({
@@ -92,6 +96,8 @@ function create() {
             InvestigationSessionStore,
             { provide: InvService, useValue: inv },
             { provide: WidgetsService, useValue: widgets },
+            // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
         ],
     });
     const fixture = TestBed.createComponent(Host);

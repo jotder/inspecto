@@ -16,7 +16,13 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { EntityProjection } from 'app/inspecto/graph';
 import { firstValueFrom } from 'rxjs';
-import { InvService, InvestigationLogEntry, WorkingSetRelationName, apiErrorMessage } from 'app/inspecto/api';
+import {
+    InstantiateTemplateResult,
+    InvService,
+    InvestigationLogEntry,
+    WorkingSetRelationName,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import { WORKING_SET_PLUGIN } from 'app/inspecto/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
@@ -25,6 +31,9 @@ import { idsInWorkingSet, moveStep, rawIdsOf } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { buildWidget } from '../widgets/widget-types';
 import { WidgetsService } from '../widgets/widgets.service';
+import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
+import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
+import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set-rows.component';
 
 /**
  * **Link Analysis — Investigation panel** (LA-10, SPA half). The right dock's Investigation tab: start an
@@ -48,6 +57,9 @@ import { WidgetsService } from '../widgets/widgets.service';
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        LinkAnalysisDossierComponent,
+        LinkAnalysisTemplateMeasuresComponent,
+        LinkAnalysisWorkingSetRowsComponent,
     ],
     host: { class: 'block' },
     templateUrl: './link-analysis-investigation.component.html',
@@ -230,6 +242,12 @@ export class LinkAnalysisInvestigationComponent {
         } finally {
             this.pinBusy.set(false);
         }
+    }
+
+    /** LA-23: open the Investigation a template just created, keeping the open one's entity type for drawing. */
+    adoptInstantiated(res: InstantiateTemplateResult): void {
+        this.order.set(null);
+        this.store.adopt(res.id, res.header?.title ?? undefined, this.store.activeRef()?.entityType);
     }
 
     opLabel(e: InvestigationLogEntry): string {

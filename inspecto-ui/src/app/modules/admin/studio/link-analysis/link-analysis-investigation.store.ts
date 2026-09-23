@@ -161,6 +161,12 @@ export class InvestigationSessionStore {
         });
     }
 
+    /** LA-23: a template was instantiated into a NEW Investigation — remember it and open it. */
+    async adopt(id: string, title?: string, entityType?: string): Promise<boolean> {
+        if (!this.refs().some((r) => r.id === id)) this.refs.update((all) => [...all, { id, title, entityType }]);
+        return this.open(id);
+    }
+
     /** Full evaluation from the sealed log; with `reread`, per-expand drift against current data. */
     async replay(reread: boolean): Promise<boolean> {
         const id = this.activeId();

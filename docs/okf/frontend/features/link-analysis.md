@@ -606,6 +606,13 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). ⚠ The SPA still fingerprints snapshots with FNV-1a:
   swapping it to Web Crypto SHA-256 makes `snapshotGraph`/`verifySnapshot` async, which reaches the evidence
   dialog and its spec, so it was deferred.
+  **SPA half (2026-09-23):** the Investigation panel's *Dossier* section (`link-analysis-dossier.component`)
+  renders the json dossier, downloads `steps`/`method` as Blobs through HttpClient at the dossier's own `at`
+  (never a bare href — it would skip the bearer), and verifies either the manifest just issued or an uploaded
+  file holding a manifest or a whole dossier. A failed verify names *why*: an edited manifest
+  (`selfConsistent:false`), a store whose own hashes disagree (`intact:false`), a moved root, and every changed,
+  missing, added and content-changed artefact. ⚠ It always covers the head with no exhibits — the `at` and
+  `snapshots` pickers are deferred.
 * **The Working Set is addressable as rows** (LA-20, backend shipped 2026-09-23; `WorkingSetRoutes`).
   `GET /inv/investigations/{id}/working-set?of=entities|links|excluded&limit&offset` answers a relation with
   fixed columns carrying provenance (`opSeq`, `seedId`, `hop`, and `reason` for exclusions), bounded with the
@@ -615,6 +622,22 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   non-owner reads 404; no fallback to Dataset sharing); on Enterprise additionally the `PolicyEngine`'s row
   verdict for `resourceKind: investigation`, which can hide it even from its owner but never widens it. ⛔ It is
   **not** a Dataset or DuckDB view — `/bi` and `/db` cannot reach it; binding it to a Widget is LA-21.
+  **SPA half (2026-09-23):** *Working Set rows* in the Investigation panel pages it with true offsets (200 a page,
+  *Load more* appends) in a `<inspecto-data-table>` keyed `la-working-set-<relation>`, and states `truncated`,
+  the head step and whether the answer was `cached`. An empty relation renders an empty state, not an empty grid
+  (an empty ag-grid fails axe `aria-required-children`).
+* **Investigation Templates and Measures** (LA-23, SPA half 2026-09-23;
+  `link-analysis-template-measures.component` + `link-analysis-template.dialogs`). A Measures strip reads
+  `GET …/measures`; *Watch* binds an Alert Rule to one Measure and shows the answered current value,
+  `wouldFire`, and the backend's disclosure text verbatim. A 503 (no alert engine) is an explained notice, and a
+  403 names the Alert-Rule authoring capability, not Incident management. *Save as template* shows what the D-E8
+  extraction will do **before** the save: seeds become parameters, exclude/hide/keep are dropped, named expands
+  are generalised. ⚠ The route has no dry run and templates are write-once, so that preview is a client-side
+  mirror of `InvestigationTemplateRoutes.save` over the loaded log (`investigation-template.ts`). The server's
+  answer, with `exact`, is shown after the save and is the authority. *Instantiate* has no template list to pick
+  from (there is no list route), so it reads a template by id. It then asks one seed list per parameter, plus the
+  Dataset and column roles through autocomplete loaders (the template's roles are the defaults), and opens the
+  new Investigation.
 * **Working Set Widgets** (LA-21, 2026-09-23; D-E6). The Investigation panel's *Pin to a Widget* saves a
   `working-set` Widget (`viewId` = the Investigation, `workingSet{relation, mode, pin{step, workingSetHash}}`).
   **Frozen** (default) re-reads `?at=<pin.step>` and refuses to show rows if the answered hash differs from the pin;

@@ -371,6 +371,20 @@
             }
         </section>
 
+        @if (store.activeId(); as activeId) {
+            <!-- ── LA-20 rows · LA-23 measures + templates · LA-12 dossier ── -->
+            <inspecto-link-analysis-working-set-rows
+                [investigationId]="activeId"
+                [version]="store.log()"
+            ></inspecto-link-analysis-working-set-rows>
+            <inspecto-link-analysis-template-measures
+                [investigationId]="activeId"
+                [log]="store.log()"
+                (instantiated)="adoptInstantiated($event)"
+            ></inspecto-link-analysis-template-measures>
+            <inspecto-link-analysis-dossier [investigationId]="activeId"></inspecto-link-analysis-dossier>
+        }
+
         @if (store.workingSet()?.excluded?.length) {
             <section aria-label="Excluded entities">
                 <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Excluded</h3>
